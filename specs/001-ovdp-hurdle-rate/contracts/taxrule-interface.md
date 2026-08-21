@@ -24,10 +24,28 @@ class TaxRuleOps:
     charge: ChargeFn
 
 
+# ⚙ Revised after implementation: REGISTRY lives in tax/registry.py, not here,
+#   for the same circular-import reason as the instrument registry.
+
 REGISTRY: Final[Mapping[str, TaxRuleOps]] = {
     "flat_rate": flat_rate.OPS,  # covers the exempt case: a flat rate of zero
 }
+
+
+# ⚙ TaxContext was referenced throughout but never defined. It is:
+@dataclass(frozen=True)
+class TaxContext:
+    instrument_id: str
+    taxable_event: TaxableEventKind
+    taxable_base: Money  # an argument, because a disposal's base is a ledger
+    # fact rather than a field on the event
+    charged_for_year: int
 ```
+
+**Which rule applies** is currently the constant `registry.FLAT_RATE`, because `TaxClass`
+carries no `rule` field. ⚙ When a second rule kind arrives, that field must be added to
+`TaxClass` *and* to the declaration schema — recorded here so it is a deliberate change
+rather than a surprise.
 
 Note what the signature does **not** do: it takes the `TaxClass` as an argument rather
 than closing over it. A rule is a stateless function; the rates live in the declared
@@ -77,6 +95,7 @@ could not be applied".
 | `tax_class_id` | Which declared class produced this. |
 | `provenance` | Union of the event's and the class's. |
 | `charged_for_year` | Tax year the liability accrues to. Recorded now; payment timing arrives with a later feature. |
+| `event_sequence` | ⚙ **Added during implementation.** The sequence number of the event taxed. C6 requires a figure to resolve to its event **and** its rule; without this the pairing would be inferred from date adjacency, which is a guess. |
 
 ## Tax currency is not display currency
 

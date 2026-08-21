@@ -133,14 +133,18 @@ src/terezy/core/                        pure, deterministic
 │   ├── engine.py                       fold events -> state
 │   └── canonical.py                    of_event / of_result — structural, no serialisation
 ├── instruments/
-│   ├── interface.py                    EventsFn signatures, InstrumentOps record, REGISTRY
+│   ├── interface.py                    EventsFn signatures + InstrumentOps record
+│   ├── registry.py                     the closed mapping — separate, or it imports circularly
 │   └── fixed_income.py                 free functions + OPS: closed-form bond schedule
 ├── tax/
-│   ├── interface.py                    ChargeFn signature, TaxRuleOps record, REGISTRY
+│   ├── interface.py                    ChargeFn signature + TaxRuleOps record
+│   ├── registry.py                     ditto
 │   └── flat_rate.py                    free functions + OPS: apply declared rates
 └── results/
     ├── schedule.py                     CashFlowSchedule
-    └── hurdle.py                       HurdleRate — nominal + typed-empty real slot
+    ├── hurdle.py                       HurdleRate + the bisection yield solver
+    ├── canonical.py                    of_projection — composes ledger.canonical.of_result
+    └── project.py                      the two-pass fold: gross -> charge -> interleave -> fold
 
 src/terezy/data/
 ├── declarations/

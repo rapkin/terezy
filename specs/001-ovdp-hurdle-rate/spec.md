@@ -259,10 +259,21 @@ projection on it without editing any source file.
   typed result carrying the reason, and that reason MUST appear in the output. The
   system MUST NOT clamp a value to zero, substitute a default, or return an empty
   result to represent a failure.
-- **FR-018**: A purchase that violates the instrument's declared constraints — below
-  minimum ticket, non-positive quantity, inconsistent dates — MUST be reported as
-  infeasible, naming the constraint and the shortfall, and MUST NOT be silently adjusted
-  to fit.
+- **FR-018**: A purchase that violates the instrument's declared constraints MUST be
+  reported and MUST NOT be silently adjusted to fit. Two cases, kept distinct — the
+  first draft of this requirement collapsed them, and implementation showed the
+  collapse does not hold:
+  - **Below the minimum ticket** — a *shortfall*: the purchase is well-formed and simply
+    too small. Reported as infeasible, naming the constraint, the required amount, the
+    actual amount and the difference. A larger purchase would succeed.
+  - **Non-positive quantity, or dates that contradict each other** — not a shortfall but
+    *invalid input*. There is no amount that "would have been enough", and inventing one
+    to fill a shortfall field would mean fabricating a price. Reported as inconsistent
+    terms, naming what contradicts what. This matches the spec's own Edge Cases, which
+    already call these "invalid input" rather than infeasible.
+
+  Both are typed results carrying their reason, so nothing is lost by the distinction —
+  what is gained is that neither has to pretend to be the other.
 
 **Reinvestment**
 

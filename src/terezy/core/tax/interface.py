@@ -1,0 +1,189 @@
+"""The ``TaxRule`` plugin interface: one function signature, and the records it moves.
+
+The second of the four plugin interfaces permitted by Principle II, and the one whose
+governing constraint is the strictest in the project: **no tax value may originate from
+an implementer's or an agent's memory.** Every rate arrives in a ``TaxClass`` loaded from
+``data/tax/``, carrying a citation, a retrieval date and a verification date. A rate
+literal in a Python file is a defect regardless of whether it happens to be correct --
+including ``0.0``.
+
+Per owner decision D-E the interface is a function signature plus records of data. Note
+what the signature does *not* do: it takes the ``TaxClass`` as an **argument** rather than
+closing over it. A rule is a stateless function; there is nothing to construct and nothing
+to configure.
+
+**Three obligations that shape the records below.**
+
+*Zero is a charge, not an absence.* For an exempt class the rule returns a ``TaxCharge``
+of zero **carrying the class's provenance** -- not ``None``, not a skipped event. A zero
+charge that cites its exemption is the evidence the exemption was applied; a missing
+charge is indistinguishable from a rule that never ran, and SC-002's "exactly zero" is
+only checkable if the zeroes are recorded.
+
+*PIT and levy are separate lines on separate bases.* The military levy is not a surcharge
+folded into a rate. Nothing in feature 001 exercises the difference -- both rates are zero
+-- but the cases that matter later are unrepresentable once the two are added together at
+source: foreign withholding creditable against PIT but **not** against the levy cannot be
+expressed against a blended figure at all.
+
+*Tax currency is not display currency.* All three currency roles are UAH here, so the
+obligation is negative: do not collapse them. ``TaxCharge`` amounts are in the tax
+currency by definition, and no code in this feature may assume that equals the currency
+anything is displayed in, because for a foreign security it will not.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+from dataclasses import dataclass
+from enum import Enum
+
+from terezy.core.errors import TaxFailure
+from terezy.core.ledger.events import Event
+from terezy.core.primitives.money import Money
+from terezy.core.primitives.provenance import Provenance
+
+
+class TaxableEventKind(Enum):
+    """The kinds of income a tax class can speak about. A closed set.
+
+    Distinct from ``ledger.events.EventKind``, which says what *moved*. Several ledger
+    events map to one taxable kind and several ledger kinds are not taxable at all, so
+    collapsing the two enums would put tax policy inside the ledger's vocabulary.
+
+    The ``value`` strings are the data contract used in declaration files.
+    """
+
+    COUPON = "coupon"
+    """Contractual interest on a debt instrument."""
+
+    DISPOSAL_GAIN = "disposal_gain"
+    """Realised gain on disposing of a holding, redemption at maturity included."""
+
+    DISTRIBUTION = "distribution"
+    """A distribution from a fund or trust. Declared here because the same instrument is
+    taxed differently on distribution and on disposal, which is the reason
+    ``tax_classes`` is a mapping; no instrument in feature 001 produces one."""
+
+    INTEREST = "interest"
+    """Interest that is not a contractual bond coupon -- a deposit, a cash balance."""
+
+
+@dataclass(frozen=True, slots=True)
+class TaxClass:
+    """A declared tax treatment: what is charged on which kinds of income, and by whom.
+
+    Every field except ``id`` and ``applies_to`` is an observed value with a citation.
+    The exempt class is not a special type and has no special branch anywhere: it is this
+    record with both rates declared zero and a source that says why.
+    """
+
+    id: str
+    """Unique across every tax file. A duplicate is a load-time failure."""
+
+    applies_to: frozenset[TaxableEventKind]
+    """The income kinds this class governs. Non-empty.
+
+    A rule asked to charge a kind outside this set **refuses** rather than charging zero:
+    "the rule does not cover this" and "the rule applied and the result was zero" are
+    opposite claims, and only one of them is cited.
+    """
+
+    pit_rate: float
+    """Personal income tax as a fraction of the taxable base. ``0.0`` for an exemption."""
+
+    levy_rate: float
+    """Military levy as a fraction of **its own** base. ``0.0`` for an exemption."""
+
+    provenance: Provenance
+    """Where these rates came from. Required, and required for a zero as much as for a
+    non-zero: the exemption is the single most decision-relevant number in the model, and
+    an uncited zero is exactly the figure that gets believed without checking."""
+
+
+@dataclass(frozen=True, slots=True)
+class TaxContext:
+    """What a charge is being computed *for*: the base, the kind, and whose income it is.
+
+    The base arrives as an argument rather than being derived from the event, because for
+    a disposal it cannot be: the taxable amount is the realised gain, which is a property
+    of the ledger's disposal record and not of any single event. Making the caller state
+    the base keeps the rule a pure application of declared rates, and keeps the question
+    of *what is taxable* where it belongs -- with the code that knows the whole ledger.
+    """
+
+    instrument_id: str
+    """Whose income this is. Carried so a refusal can name the instrument that asked."""
+
+    taxable_event: TaxableEventKind
+    """Which kind of income, so the rule can check the class actually covers it."""
+
+    taxable_base: Money
+    """The amount the rates are applied to, in the tax currency.
+
+    A negative base is possible -- a realised loss -- and is passed through rather than
+    clamped. See :mod:`terezy.core.tax.flat_rate` for what that means and does not mean.
+    """
+
+    charged_for_year: int
+    """The tax year the liability accrues to. Payment timing is a later feature."""
+
+
+@dataclass(frozen=True, slots=True)
+class TaxCharge:
+    """What one rule charged on one event: both lines, their base, and their sources."""
+
+    event_sequence: int
+    """The sequence number of the ledger event this charge was computed for.
+
+    Stored rather than inferred, for the same reason a fee's allocation is stored: C6
+    requires every tax figure to resolve to its event *and* its rule, and matching a
+    charge to an event by date adjacency would be a guess dressed as an audit trail.
+    """
+
+    pit: Money
+    """The personal income tax line. Zero for an exempt class, and recorded as zero."""
+
+    levy: Money
+    """The military levy line, computed on its own base and reported separately."""
+
+    total: Money
+    """``money.add(pit, levy)``, same currency enforced by the addition itself."""
+
+    taxable_base: Money
+    """What the rates were applied to, recorded so a figure can be checked without
+    re-deriving it from the ledger."""
+
+    tax_class_id: str
+    """Which declared class produced this charge. The audit trail's "which rule"."""
+
+    charged_for_year: int
+    """The tax year this liability accrues to."""
+
+    provenance: Provenance
+    """Union of the base's sources and the class's. This is how an exemption's citation
+    reaches the total tax figure, and how an unverified rate marks it (FR-015)."""
+
+
+ChargeFn = Callable[[Event, TaxClass, TaxContext], TaxCharge | TaxFailure]
+"""Charge the declared rates of one class against one event, or say why not.
+
+Obligations: no rate literals in code; provenance unions the base's and the class's; a
+zero is returned as a charge rather than skipped; an unresolvable situation returns a
+typed ``TaxFailure`` rather than raising or silently charging zero; and no timing logic,
+because payment date and cash sourcing are later features.
+"""
+
+
+@dataclass(frozen=True, slots=True)
+class TaxRuleOps:
+    """How one kind of tax rule behaves. Data, not an object.
+
+    One field today. It is a record rather than a bare function so that the second
+    obligation a rule acquires -- a payment schedule, a withholding credit -- is a field
+    here instead of a second registry that could disagree with this one about which
+    rules exist.
+    """
+
+    charge: ChargeFn
+    """The rule itself."""

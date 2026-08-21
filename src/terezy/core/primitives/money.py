@@ -134,12 +134,40 @@ def scale(amount: Money, factor: float) -> Money:
 
     There is deliberately no money-times-money function: that product is not money. A
     plain ``float`` factor carries no provenance of its own, so there is nothing to
-    merge -- which is also a warning. A factor that *did* come from a source (a rate, a
-    fraction read from a file) must reach this function as ``Money`` in some other
-    operation, or its own provenance will be lost here. That case does not arise in
-    feature 001, where factors are lot fractions and signs.
+    merge -- which is also a warning. A factor that *did* come from a source (a declared
+    rate, a fraction read from a file) must not come through here, because its own
+    provenance would be lost silently: use :func:`scale_sourced` instead, which demands
+    the factor's sources in its signature. This function is for factors that are
+    arithmetic rather than observation -- lot fractions, signs, unit counts.
     """
     return Money(amount.amount * factor, amount.currency, amount.provenance)
+
+
+def scale_sourced(amount: Money, factor: float, sources: Provenance) -> Money:
+    """Multiply by a factor that itself rests on sources, unioning them into the result.
+
+    The companion to :func:`scale`, and the function to reach for whenever the factor
+    came from *data*: a declared tax rate, a declared coupon rate, any number a
+    declaration file supplied. ``scale`` would carry only the amount's own provenance,
+    so applying a declared rate through it would produce a figure that does not admit
+    where its rate came from -- and a zero tax charge that cannot cite its exemption is
+    indistinguishable from a rule that never ran.
+
+    The sources are a required positional argument rather than an optional one, so the
+    caller cannot reach this function and forget them. Passing ``provenance.EMPTY``
+    here is legitimate only for a factor that genuinely came from nowhere, in which case
+    :func:`scale` says the same thing more plainly.
+
+    Note that this can only ever *add* sources. There is no function anywhere that
+    removes one, which is what makes the mark monotone: a figure's provenance grows as
+    it is derived and never shrinks, so a mark cannot be laundered out of a chain of
+    arithmetic (FR-015).
+    """
+    return Money(
+        amount.amount * factor,
+        amount.currency,
+        prov.merge(amount.provenance, sources),
+    )
 
 
 def total(items: Iterable[Money], currency: Currency) -> Money:

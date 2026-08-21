@@ -62,7 +62,16 @@ count).
 | `provenance` | `Provenance` | Excluded from equality — `field(compare=False)`. |
 
 Operations are free functions in `core/primitives/money.py` — `add`, `sub`, `scale`,
-`total`, `compare` — with **no operator dunders** (D-E). The union site is therefore
+`scale_sourced`, `total`, `zero`, `compare` — with **no operator dunders** (D-E).
+
+⚙ `scale_sourced(amount, factor, sources)` was added during Phase 3. There was no way to
+apply a **declared** rate and keep the rate's own provenance: `scale` carries only the
+amount's, and `Money(` may not be constructed outside this module — so a zero tax charge
+could not have cited its exemption, which is precisely the evidence that the exemption was
+applied. Its `sources` argument is required and positional, so it cannot be reached and
+forgotten, and it only ever *adds* sources. Nothing anywhere removes one, which is what
+makes the mark **monotone**: provenance grows as a figure is derived and never shrinks, so
+it cannot be laundered out of a chain of arithmetic (FR-015). The union site is therefore
 singular and greppable.
 
 - **Currency safety (FR-007, C5).** `add`, `sub` and `compare` raise
@@ -285,6 +294,18 @@ signature without a union.
 `verified_on` later would change the digest even though no computed amount moved, and C4
 would fail on a documentation update. The unverified mark is asserted separately by E5.
 
+## Per-run inputs
+
+⚙ **All three were referenced in the interface contract and defined nowhere.** Kept
+minimal on purpose: this feature needs a purchase and a horizon, and a field accepted but
+ignored is worse than a field that is missing.
+
+| Record | Fields | Rule |
+|---|---|---|
+| `Holding` | `owner_id`, `instrument_id`, `quantity`, `purchased_on`, `cost` | It **names** the instrument rather than embedding the declaration. Principle VII separates per-owner from curated data, and a holding carrying its own declaration would put curated data inside per-user data. |
+| `DateRange` | `start`, `end`, inclusive | Must reach the **adjusted** final payment. A horizon too short returns `InconsistentTerms` rather than a truncated schedule — a truncated schedule's yield is *wrong*, not partial — and never an implicit liquidation. |
+| `Assumptions` | `consumption_method` | One field. FR-019's coupon policy is deliberately absent until Phase 5; `fixed_income.events` takes the argument as `_assumptions` and says why. |
+
 ## Results
 
 ### `CashFlowSchedule`
@@ -300,7 +321,8 @@ ledger events, never computed alongside them.
 | `nominal_ytm` | `NominalRate` | Contractual yield to maturity. |
 | `nominal_cash_flow_return` | `NominalRate` | Cash-flow-weighted. Kept separate from the yield and separately labelled; neither substitutes for the other (FR-005). |
 | `real` | `RealRate \| RealTermsUnavailable` | Always `RealTermsUnavailable` in this feature, carrying its reason. Present and explicitly empty — never absent (SC-011). |
-| `total_tax` | `Money` | Exactly zero for the exempt class (SC-002). |
+| `total_tax` | `Money` | Exactly zero for the exempt class (SC-002) — and zero because zeroes were recorded and summed, not because nothing was. |
+| `accounts_for` | `frozenset[str]` | ⚙ **Added after implementation.** What the figure *is* net of, in particular that it is after tax. US1's second acceptance scenario requires the figure to state this and none of the six prescribed fields did. Named beside `excludes` so a later feature cannot quietly move a term from one set to the other. |
 | `excludes` | `frozenset[str]` | What this figure does **not** account for: route costs, exit costs, inflation. Principle VI forbids presenting a per-instrument access cost, so the figure states its own boundaries rather than leaving a later reader to assume it is comparison-ready. |
 | `provenance` | `Provenance` | Unioned from everything upstream. `is_unverified` is `True` while the yield is unverified. |
 

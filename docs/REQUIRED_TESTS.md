@@ -85,7 +85,7 @@ xfailed, or deleted without an amendment.
 
 | # | Example | Test |
 |---|---|---|
-| D1 | OVDP bought at a stated price and held to maturity reproduces a hand-computed coupon and principal schedule, and pays **zero** tax under the exempt class. | `[ ]` |
+| D1 | OVDP bought at a stated price and held to maturity reproduces a hand-computed coupon and principal schedule, and pays **zero** tax under the exempt class. | `[x]` `tests/worked_examples/test_ovdp_schedule.py` |
 | D2 | Coupon reinvestment into the then-current yield curve matches a hand-computed two-period example. | `[ ]` |
 | D3 | A restructuring scenario with a 40% haircut and two-year delay produces the hand-computed shortfall. | `[ ]` |
 

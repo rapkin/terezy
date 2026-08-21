@@ -13,12 +13,23 @@ of functions, and the registry is a mapping.
 
 ## The signatures
 
+> **Revised 2026-08-21 after implementation.** Two things in the first draft did not
+> typecheck. Both are marked ⚙ below.
+
 ```python
 # --- the functions an instrument must supply ---
+# ⚙ All three take the declaration first. The draft's
+#   EventsFn(Holding, DateRange, Assumptions) cannot work: a schedule is not
+#   computable from a holding that knows only an instrument id. And the draft wrote
+#   tax_classes/constraints as zero-argument, which a module of free functions has
+#   nothing to close over -- that shape only makes sense for a bound method.
 
-EventsFn = Callable[[Holding, DateRange, Assumptions], Sequence[Event] | InstrumentFailure]
-TaxClassesFn = Callable[[], Mapping[TaxableEventKind, str]]
-ConstraintsFn = Callable[[], InstrumentConstraints]
+EventsFn = Callable[
+    [InstrumentDeclaration, Holding, DateRange, Assumptions],
+    Sequence[Event] | InstrumentFailure,
+]
+TaxClassesFn = Callable[[InstrumentDeclaration], Mapping[TaxableEventKind, str]]
+ConstraintsFn = Callable[[InstrumentDeclaration], InstrumentConstraints]
 
 
 @dataclass(frozen=True)
@@ -31,6 +42,11 @@ class InstrumentOps:
 
 
 # --- dispatch is a mapping, not subclass resolution ---
+# ⚙ This lives in a THIRD module, instruments/registry.py, not in interface.py.
+#   interface.py importing fixed_income to build the mapping, while fixed_income
+#   imports interface.py for the types, is a circular import. Splitting it keeps
+#   OPS beside its implementation. Semantics unchanged: closed mapping, no subclass
+#   dispatch, an unknown name raises and names the known ones.
 
 REGISTRY: Final[Mapping[str, InstrumentOps]] = {
     "fixed_income": fixed_income.OPS,
