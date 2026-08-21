@@ -50,10 +50,10 @@ make the import succeed.
 **Purpose**: package skeletons. The layered tree already exists from the foundation
 commit; this adds the new leaves.
 
-- [ ] T001 [P] Create `src/terezy/core/primitives/__init__.py` with a charter docstring stating it imports nothing but the standard library
-- [ ] T002 [P] Create `src/terezy/core/results/__init__.py` with a charter docstring
-- [ ] T003 [P] Create `src/terezy/data/declarations/__init__.py` with a charter docstring stating validation lives here, never in core
-- [ ] T004 Verify `uv run lint-imports` still passes with the new packages, and add the new modules to `tests/unit/test_package_layout.py`
+- [x] T001 [P] Create `src/terezy/core/primitives/__init__.py` with a charter docstring stating it imports nothing but the standard library
+- [x] T002 [P] Create `src/terezy/core/results/__init__.py` with a charter docstring
+- [x] T003 [P] Create `src/terezy/data/declarations/__init__.py` with a charter docstring stating validation lives here, never in core
+- [x] T004 Verify `uv run lint-imports` still passes with the new packages, and add the new modules to `tests/unit/test_package_layout.py`
 
 **Checkpoint**: packages importable, boundaries intact.
 
@@ -70,31 +70,31 @@ No task within this phase is marked `[P]`.
 
 ### Primitives (plan step 1)
 
-- [ ] T005 Write `tests/invariants/test_currency_safety.py` — property test that combining UAH and USD always raises `CurrencyMismatchError`; no implicit conversion exists. Closes **C5**, FR-007. Must fail first.
-- [ ] T006 Implement `src/terezy/core/primitives/currency.py` — closed `Currency` enum, `UAH` and `USD`
-- [ ] T007 Implement `src/terezy/core/primitives/provenance.py` — frozen `SourceRef` and `Provenance` records plus free functions `merge`, `merge_all`, `is_unverified`, `unverified_sources`, `EMPTY`. Closes part of FR-014
-- [ ] T008 Write `tests/unit/test_provenance_monoid.py` — property tests that `merge` is associative and commutative and that `EMPTY` is its identity, so evaluation order can never change a mark. Closes part of **E5**
-- [ ] T009 Implement `src/terezy/core/primitives/money.py` — frozen `Money(amount: float, currency: Currency, provenance: Provenance)` with `provenance` excluded from equality (`field(compare=False)`), plus free functions `add`, `sub`, `scale`, `total`, `compare`. Every combining function merges provenance; cross-currency raises. **No dunders.** Closes FR-006, FR-007, part of FR-015
-- [ ] T010 Implement `src/terezy/core/primitives/tolerance.py` — the single `TOLERANCE` constant plus `is_close` and `assert_money_close`, the latter also asserting currency equality. Closes FR-002
-- [ ] T011 Implement `src/terezy/core/primitives/rates.py` — three unrelated frozen records `NominalRate`, `RealRate`, `RealTermsUnavailable(reason: str)`. Not a hierarchy: assigning nominal into a real slot must be a mypy error. Closes part of FR-022
-- [ ] T012 Implement `src/terezy/core/errors.py` — the tagged union of domain failures (`InfeasiblePurchase`, `InconsistentTerms`, `UnresolvedTaxClass`, `InstrumentFailure`, `TaxFailure`), each a frozen record carrying its reason, plus `CurrencyMismatchError` as the one exception. Closes FR-017
-- [ ] T013 Write `tests/contract/test_money_construction_guard.py` — scan the source tree for direct `Money(` construction outside `core/primitives/money.py` and `data/declarations/`, and fail on any other site. This closes the one hole the functional style leaves open (research.md D2)
+- [x] T005 Write `tests/invariants/test_currency_safety.py` — property test that combining UAH and USD always raises `CurrencyMismatchError`; no implicit conversion exists. Closes **C5**, FR-007. Must fail first.
+- [x] T006 Implement `src/terezy/core/primitives/currency.py` — closed `Currency` enum, `UAH` and `USD`
+- [x] T007 Implement `src/terezy/core/primitives/provenance.py` — frozen `SourceRef` and `Provenance` records plus free functions `merge`, `merge_all`, `is_unverified`, `unverified_sources`, `EMPTY`. Closes part of FR-014
+- [x] T008 Write `tests/unit/test_provenance_monoid.py` — property tests that `merge` is associative and commutative and that `EMPTY` is its identity, so evaluation order can never change a mark. Closes part of **E5**
+- [x] T009 Implement `src/terezy/core/primitives/money.py` — frozen `Money(amount: float, currency: Currency, provenance: Provenance)` with `provenance` excluded from equality (`field(compare=False)`), plus free functions `add`, `sub`, `scale`, `total`, `compare`. Every combining function merges provenance; cross-currency raises. **No dunders.** Closes FR-006, FR-007, part of FR-015
+- [x] T010 Implement `src/terezy/core/primitives/tolerance.py` — the single `TOLERANCE` constant plus `is_close` and `assert_money_close`, the latter also asserting currency equality. Closes FR-002
+- [x] T011 Implement `src/terezy/core/primitives/rates.py` — three unrelated frozen records `NominalRate`, `RealRate`, `RealTermsUnavailable(reason: str)`. Not a hierarchy: assigning nominal into a real slot must be a mypy error. Closes part of FR-022
+- [x] T012 Implement `src/terezy/core/errors.py` — the tagged union of domain failures (`InfeasiblePurchase`, `InconsistentTerms`, `UnresolvedTaxClass`, `InstrumentFailure`, `TaxFailure`), each a frozen record carrying its reason, plus `CurrencyMismatchError` as the one exception. Closes FR-017
+- [x] T013 Write `tests/contract/test_money_construction_guard.py` — scan the source tree for direct `Money(` construction outside `core/primitives/money.py` and `data/declarations/`, and fail on any other site. This closes the one hole the functional style leaves open (research.md D2)
 
 ### Conventions (plan step 2)
 
-- [ ] T014 Write `tests/worked_examples/test_day_count.py` — hand-computed day-count fractions for `act/365`, `act/act` and `30/360` over stated date pairs, arithmetic checked in beside each assertion
-- [ ] T015 Implement `src/terezy/core/primitives/conventions.py` — `DAY_COUNT_FNS`, `PERIODICITY_FNS`, `BUSINESS_DAY_FNS` as `Mapping[str, Callable]`. Closes part of FR-021
-- [ ] T016 Write `tests/contract/test_unknown_convention.py` — an unrecognised convention name fails loudly naming the value; there is no fallback convention. Closes part of **FR-021**
+- [x] T014 Write `tests/worked_examples/test_day_count.py` — hand-computed day-count fractions for `act/365`, `act/act` and `30/360` over stated date pairs, arithmetic checked in beside each assertion
+- [x] T015 Implement `src/terezy/core/primitives/conventions.py` — `DAY_COUNT_FNS`, `PERIODICITY_FNS`, `BUSINESS_DAY_FNS` as `Mapping[str, Callable]`. Closes part of FR-021
+- [x] T016 Write `tests/contract/test_unknown_convention.py` — an unrecognised convention name fails loudly naming the value; there is no fallback convention. Closes part of **FR-021**
 
 ### Ledger (plan step 3)
 
-- [ ] T017 Write `tests/invariants/test_ledger_conservation.py` with three property suites: cash conservation per currency **on every date** (**C1**), lot conservation with no negative quantity (**C2**), and basis conservation with realised gain equal to proceeds minus consumed basis minus allocated fees in **both** currencies (**C3**). Must fail first. Closes FR-009, FR-010, FR-011
-- [ ] T018 Implement `src/terezy/core/ledger/events.py` — frozen `Event` record with `sequence`, `occurred_on`, `kind`, `amount`, `owner_id`, `caused_by: CausationRef`, `lot_ref`. `owner_id` is present from day one per Principle VII
-- [ ] T019 Implement `src/terezy/core/ledger/lots.py` — frozen `Lot` and `Position` records, plus free functions `rebuild(events)` and `consume(position, qty, method)`. Lots carry cost in trade **and** base currency plus the FX rate used
-- [ ] T020 Implement `src/terezy/core/ledger/accounts.py` — frozen per-currency balance record plus `apply(account, event)`
-- [ ] T021 Implement `src/terezy/core/ledger/engine.py` — pure fold of an event sequence into ledger state. Deterministic in `sequence` order, never dependent on sort stability
-- [ ] T022 Implement `src/terezy/core/ledger/canonical.py` — free functions `of_event`, `of_position`, `of_result` returning nested tuples of primitives with amounts as `float.hex()`. **Provenance is deliberately excluded** — see plan's post-Phase-1 note
-- [ ] T023 Write `tests/invariants/test_traceability.py` — every figure resolves to the events behind it, and every event names the term or rule that caused it. Closes **C6**, FR-008
+- [x] T017 Write `tests/invariants/test_ledger_conservation.py` with three property suites: cash conservation per currency **on every date** (**C1**), lot conservation with no negative quantity (**C2**), and basis conservation with realised gain equal to proceeds minus consumed basis minus allocated fees in **both** currencies (**C3**). Must fail first. Closes FR-009, FR-010, FR-011
+- [x] T018 Implement `src/terezy/core/ledger/events.py` — frozen `Event` record with `sequence`, `occurred_on`, `kind`, `amount`, `owner_id`, `caused_by: CausationRef`, `lot_ref`. `owner_id` is present from day one per Principle VII
+- [x] T019 Implement `src/terezy/core/ledger/lots.py` — frozen `Lot` and `Position` records, plus free functions `rebuild(events)` and `consume(position, qty, method)`. Lots carry cost in trade **and** base currency plus the FX rate used
+- [x] T020 Implement `src/terezy/core/ledger/accounts.py` — frozen per-currency balance record plus `apply(account, event)`
+- [x] T021 Implement `src/terezy/core/ledger/engine.py` — pure fold of an event sequence into ledger state. Deterministic in `sequence` order, never dependent on sort stability
+- [x] T022 Implement `src/terezy/core/ledger/canonical.py` — free functions `of_event`, `of_position`, `of_result` returning nested tuples of primitives with amounts as `float.hex()`. **Provenance is deliberately excluded** — see plan's post-Phase-1 note
+- [x] T023 Write `tests/invariants/test_traceability.py` — every figure resolves to the events behind it, and every event names the term or rule that caused it. Closes **C6**, FR-008
 
 **Checkpoint**: `uv run pytest -m invariant` green for C1, C2, C3, C5, C6. Parallel work
 may now begin. **Commit here** — this is the natural green checkpoint.

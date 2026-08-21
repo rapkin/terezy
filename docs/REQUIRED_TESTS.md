@@ -72,12 +72,12 @@ xfailed, or deleted without an amendment.
 
 | # | Invariant | Test |
 |---|---|---|
-| C1 | Cash conservation: `Σ inflows − Σ outflows = cash balance`, per currency, every day. | `[ ]` |
-| C2 | Lot conservation: `Σ lot.quantity = position.quantity`; a sale consumes lots by the configured method and never produces a negative quantity. | `[ ]` |
-| C3 | Basis conservation: `Σ lot.cost = position basis`; realised gain = proceeds − consumed basis − allocated fees, in **both** currencies. | `[ ]` |
+| C1 | Cash conservation: `Σ inflows − Σ outflows = cash balance`, per currency, every day. | `[x]` `tests/invariants/test_ledger_conservation.py` |
+| C2 | Lot conservation: `Σ lot.quantity = position.quantity`; a sale consumes lots by the configured method and never produces a negative quantity. | `[x]` `tests/invariants/test_ledger_conservation.py` |
+| C3 | Basis conservation: `Σ lot.cost = position basis`; realised gain = proceeds − consumed basis − allocated fees, in **both** currencies. | `[x]` `tests/invariants/test_ledger_conservation.py` |
 | C4 | Determinism: same scenario + same snapshot ⇒ identical output hash. | `[ ]` |
-| C5 | Currency safety: values in different currencies can never be combined. | `[ ]` |
-| C6 | Every displayed figure resolves to ledger events and to the rule that produced it. | `[ ]` |
+| C5 | Currency safety: values in different currencies can never be combined. | `[x]` `tests/invariants/test_currency_safety.py` |
+| C6 | Every displayed figure resolves to ledger events and to the rule that produced it. | `[x]` `tests/invariants/test_traceability.py` |
 
 ## D. Contractual instruments
 

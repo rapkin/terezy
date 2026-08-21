@@ -15,6 +15,7 @@ import terezy
 
 LAYER_MODULES = (
     "terezy.core",
+    "terezy.core.primitives",
     "terezy.core.instruments",
     "terezy.core.routes",
     "terezy.core.ledger",
@@ -22,7 +23,9 @@ LAYER_MODULES = (
     "terezy.core.metrics",
     "terezy.core.analysis",
     "terezy.core.decision",
+    "terezy.core.results",
     "terezy.data",
+    "terezy.data.declarations",
     "terezy.data.providers",
     "terezy.data.snapshot",
     "terezy.api",

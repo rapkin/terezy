@@ -175,6 +175,12 @@ The contractual terms from which the schedule is computed in closed form.
 
 ## Ledger
 
+> **Revised 2026-08-21 after implementation.** The first draft of this section was written
+> before any code existed and turned out to be *under-specified* in six places — nothing
+> in it was contradicted, but records lacked identities, two `Event` fields were missing,
+> and one function signature did not typecheck as written. The shapes below are the ones
+> that landed. Each correction is marked ⚙ with what was missing and why it mattered.
+
 ### `Event`
 
 One dated, typed thing that moved money or changed a holding. The audit trail behind
@@ -182,51 +188,102 @@ every figure (FR-008).
 
 | Field | Type | Rule |
 |---|---|---|
-| `sequence` | `int` | Monotonic, assigned on append. Makes the fold order explicit rather than dependent on sort stability. |
+| `sequence` | `int` | Monotonic. **Assigned by the producer, not the ledger** — only the schedule applier knows the intended order among same-dated events. The ledger treats it as the sole authority on fold order and *checks* it: `events.in_sequence` refuses a repeat (otherwise the tie is broken by sort stability, i.e. by plumbing) and refuses dates running backwards as the sequence advances. |
 | `occurred_on` | `date` | |
-| `kind` | `EventKind` | `purchase`, `coupon`, `principal_repayment`, `tax_charge`, `reinvestment`, `cash_deposit`. |
-| `amount` | `Money` | Carries its own provenance. |
+| `kind` | `EventKind` | `purchase`, `coupon`, `principal_repayment`, `tax_charge`, `reinvestment`, `cash_deposit`, `fee`, `disposal`. Partitioned by the `frozenset` constants `LOT_OPENING_KINDS`, `LOT_CLOSING_KINDS`, `CASH_ONLY_KINDS`, so the partition is inspectable. |
+| `amount` | `Money` | Carries its own provenance. Its **sign** decides cash direction, so a direction can never disagree with an amount. |
+| `quantity` | `float \| None` | ⚙ **Was missing.** A disposal must say how many units. `None` for cash-only kinds. |
+| `allocated_to` | `int \| None` | ⚙ **Was missing, and its absence would have hollowed out C3.** The sequence number of the event a fee is charged against. C3 asserts `gain = proceeds − consumed basis − allocated fees`, and nothing said how a fee reaches a disposal; inferring it from date adjacency would be a guess. `events.allocated_fees()` indexes fees by target in one pass *before* the fold, so a fee may sit anywhere in the stream. An unallocated fee, or one pointing outside the stream, raises. Without this the third term would have been a hardcoded zero and the invariant would have asserted two thirds of what it claims. |
 | `owner_id` | `str` | Present from day one per Principle VII, though there is one owner and no auth. |
-| `caused_by` | `CausationRef` | The instrument term or tax rule that produced this event. **This field is what makes C6 satisfiable** — traceability is a stored fact, not a reconstruction. |
+| `caused_by` | `CausationRef` | Required, never optional. `CausationKind` has **exactly two** members — `INSTRUMENT_TERM` and `TAX_RULE`. A third kind (`SYSTEM`, `OWNER_ACTION`) was deliberately *not* added: it becomes the bucket for every event whose cause nobody tracked down, and C6 would then pass while meaning nothing. |
 | `lot_ref` | `LotRef \| None` | Set where the event touches a specific lot. |
 
-### `Lot` / `Position`
+### `Lot` / `Position` / `Consumption` / `Disposal`
 
-| Field | Type | Rule |
-|---|---|---|
-| `Lot.quantity` | `float` | Strictly positive. A lot may not exist at zero. |
-| `Lot.acquired_on` | `date` | |
-| `Lot.cost_trade_ccy` | `Money` | Cost in the instrument's own currency. |
-| `Lot.cost_base_ccy` | `Money` | Cost in the base currency. Equal in this feature — both are UAH — but stored separately because the field's whole purpose is the case where they differ. |
-| `Lot.fx_rate_used` | `float \| None` | `None` when trade and base currency coincide. |
+⚙ **Identities were missing.** The first draft gave `Lot` only its quantity, dates and
+costs — with no `lot_id`, so no lot could be selected for consumption or traced to its
+acquisition, and no `instrument_id`. `Position` was described only as "a record".
 
-`Position` is a record; `positions.rebuild(events)` and `positions.consume(pos, qty, method)`
-are free functions. Invariants asserted as properties over generated event streams:
+| Record | Fields |
+|---|---|
+| `Lot` | `lot_id`, `instrument_id`, `quantity` (strictly positive — a lot may not exist at zero), `acquired_on`, `cost_trade_ccy`, `cost_base_ccy`, `fx_rate_used: float \| None` |
+| `Position` | `instrument_id`, `lots: tuple[Lot, ...]`, plus **separately accumulated** `quantity`, `basis_trade_ccy`, `basis_base_ccy` — accumulating them independently of the lot tuple is what makes C2 and C3 non-vacuous |
+| `Consumption` | ⚙ **Was missing.** What `consume` returns: the new position, the consumed basis in **both** currencies, and `consumed_from: tuple[tuple[str, float], ...]` naming the lots drawn on |
+| `Disposal` | ⚙ **Was missing entirely, and C3 is unassertable without it.** Stores every term of the identity: proceeds, consumed basis and allocated fees in both currencies, the realised gain in both, `consumed_from`, and `caused_by` copied off its event so a realised gain names its cause too |
 
-- **C2** — `sum(lot.quantity) == position.quantity`; no lot ever goes negative; a
-  disposal consumes lots by the configured method.
-- **C3** — `sum(lot.cost) == position.basis`; on disposal,
-  `realised_gain == proceeds − consumed_basis − allocated_fees`, computed in **both**
+Functions live in `lots.py` (⚙ the draft said `positions.*`, which contradicted the
+plan's own file tree):
+
+- `lots.opening(instrument_id, trade_currency, base_currency)` — an empty position still
+  knows what denomination its zero is in.
+- `lots.rebuild(events, base_currency, consumption_method)` — ⚙ the draft's
+  `rebuild(events)` does not typecheck: neither the base currency nor the consumption
+  method is derivable from the events.
+- `lots.add_lot(position, lot)`, `lots.consume(position, qty, order)` → `Consumption`,
+  `lots.realise(...)` → `Disposal`, `lots.advance(...)`.
+- `lots.base_amount_of(...)` — with no FX in this feature and no conversion function
+  permitted in `money.py`, this returns the amount unchanged when trade currency **is**
+  base currency (recording `fx_rate_used = None`) and raises `CurrencyMismatchError`
+  otherwise. Both currency slots are real fields and both C3 assertions are written out,
+  so the identity already exists for when dated FX arrives.
+
+**Lot consumption method.** `Mapping[str, ConsumptionOrderFn]` keyed by declared name —
+`fifo` and `lifo` — mirroring `primitives/conventions.py` (explicit membership test, no
+`dict.get` default, the raise lists the known names). A method is modelled as an
+*ordering over lots*, the smallest thing that makes FIFO and LIFO the same code. **There
+is no default**, and `engine.opening` validates the name before folding anything, so a
+misconfiguration fails at the start of a run rather than at the first disposal.
+Average-cost and specific-lot are **absent rather than approximated** — they are E6's
+job. A disposal naming a specific `lot_id` is refused loudly rather than having the
+naming silently ignored, because ignoring it would tax a different basis than the caller
+asked for.
+
+Invariants asserted as properties over generated streams:
+
+- **C2** — `sum(lot.quantity) == position.quantity`; no lot ever negative.
+- **C3** — `sum(lot.cost) == position.basis`; the realised-gain identity in **both**
   currencies.
 
-### `CashAccount`
+### `CashBalance`
 
-A record of per-currency balances, folded by `accounts.apply(acct, event)`. **C1**: for
-each currency, on every date,
-`Σ inflows − Σ outflows == balance`. Asserted daily across the whole projection, not only
-at the end — an error that cancels out by the final date is still an error.
+⚙ **Renamed and re-shaped.** The draft described a `CashAccount` as "a record of
+per-currency balances" — one record holding many currencies, which puts currency routing
+*inside* the account. Split instead: `CashBalance` is **one** currency, and the
+per-currency mapping lives on `LedgerState` where the engine does the routing. Renamed
+because it is no longer an account-of-accounts.
+
+It carries **three** figures — `inflows`, `outflows`, `balance` — accumulated separately
+from the same events, so **C1** compares three independently maintained numbers rather
+than a running sum against itself. It is also literally the shape FR-009 is written in.
+`accounts.net()` is the identity's left-hand side and deliberately does *not* return the
+stored balance.
+
+C1 is asserted **on every date**, not only at the end: an error that cancels out by
+maturity is still an error.
+
+**Negative balances are permitted.** An overdraft is a feasibility question about a plan
+(Principle VI), not a ledger invariant. Clamping it here would be the silent clamp the
+constitution puts in its top severity class.
+
+### `LedgerState`
+
+`engine.opening` / `apply` / `fold` / `history`. Holds the per-currency `Mapping` of
+balances, positions, disposals, and `applied` events. A value, rebuilt per event — never
+a mutable owner of dicts.
 
 ### Canonical form
 
-Free functions in `core/ledger/canonical.py` — `of_event(e)`, `of_position(p)`,
-`of_result(r)` — returning nested tuples of primitives, with amounts as `float.hex()`. No
-serialisation, no hashing; those live in `data`.
+Free functions in `canonical.py` — `of_event`, `of_lot`, `of_position`, `of_account`,
+`of_disposal`, `of_result` — returning nested tuples of primitives, amounts as
+`float.hex()`. No serialisation, no hashing; those live in `data`.
 
-**Provenance is deliberately excluded.** It identifies sources, so filling in a
+⚙ `of_result` is typed on `LedgerState`, because `HurdleRate` does not exist until T030.
+Phase 3 needs either a second function or to compose this one — it cannot widen this
+signature without a union.
+
+**Provenance is deliberately excluded.** It identifies *sources*, so filling in a
 `verified_on` later would change the digest even though no computed amount moved, and C4
 would fail on a documentation update. The unverified mark is asserted separately by E5.
-
----
 
 ## Results
 
@@ -261,3 +318,9 @@ site that must handle it, rather than silently inheriting a default:
 | `UnresolvedTaxClass` | The missing class id and the instrument that referenced it |
 | `RealTermsUnavailable` | Why the real figure is absent |
 | `DeclarationError` | File path, field path, and what was wrong (`data` layer) |
+
+**Two exceptions exist, not one.** `CurrencyMismatchError` and — added during
+implementation — `LedgerInvariantError`. Neither is a tagged-union member, because
+neither is an outcome the owner can act on: both are statements about the *code* being
+wrong, not about the money. Every ledger refusal raises the latter. A domain outcome the
+owner could respond to is always a union member instead.

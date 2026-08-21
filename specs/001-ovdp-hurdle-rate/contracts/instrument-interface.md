@@ -24,6 +24,7 @@ ConstraintsFn = Callable[[], InstrumentConstraints]
 @dataclass(frozen=True)
 class InstrumentOps:
     """The functions that define one instrument kind. Data, not an object."""
+
     events: EventsFn
     tax_classes: TaxClassesFn
     constraints: ConstraintsFn

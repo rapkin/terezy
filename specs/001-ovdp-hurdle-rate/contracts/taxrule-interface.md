@@ -20,11 +20,12 @@ ChargeFn = Callable[[Event, TaxClass, TaxContext], TaxCharge | TaxFailure]
 @dataclass(frozen=True)
 class TaxRuleOps:
     """How a kind of tax rule behaves. Data, not an object."""
+
     charge: ChargeFn
 
 
 REGISTRY: Final[Mapping[str, TaxRuleOps]] = {
-    "flat_rate": flat_rate.OPS,     # covers the exempt case: a flat rate of zero
+    "flat_rate": flat_rate.OPS,  # covers the exempt case: a flat rate of zero
 }
 ```
 
