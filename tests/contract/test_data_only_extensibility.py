@@ -146,7 +146,7 @@ def _projection(
             cost=Money(cost, Currency.UAH, prov.EMPTY),
         ),
         DateRange(start=purchased_on, end=horizon_end),
-        Assumptions(consumption_method="fifo"),
+        Assumptions(consumption_method="fifo", coupon_policy="hold_cash"),
         tax_classes=declarations.tax_classes,
     )
     assert isinstance(outcome, Projection), f"expected a projection, got {outcome!r}"

@@ -110,7 +110,7 @@ principal schedule in closed form from `BondTerms`, then returns it as events.
 | Coupon amount | `face_value × coupon_rate × period_fraction`, where the fraction comes from the declared `day_count` |
 | Coupon dates | Placed by declared `periodicity` from `issue_date`, then adjusted by the declared `business_day_rule` |
 | Principal | One `principal_repayment` event on the adjusted `maturity_date` |
-| Reinvestment | Per declared policy: `hold_cash` emits nothing further; `reinvest` emits a `reinvestment` event buying whole units at the yield available on the coupon date, and reports the unbought remainder as retained cash (FR-020) |
+| Reinvestment | Per declared policy: `hold_cash` emits nothing further; `reinvest` emits a `reinvestment` event buying whole units at the yield available on the coupon date, and reports the unbought remainder as retained cash (FR-020). ⚙ Three things this row left open, resolved during implementation — see below |
 | Zero-coupon | `coupon_rate == 0.0` is valid: principal only, no coupon events |
 | Maturity ≤ issue | Returns `InconsistentTerms` |
 | Purchase below `min_ticket` | Returns `InfeasiblePurchase` with the shortfall (FR-018) |
@@ -118,6 +118,24 @@ principal schedule in closed form from `BondTerms`, then returns it as events.
 Conventions are resolved through three mappings — `DAY_COUNT_FNS`, `PERIODICITY_FNS`,
 `BUSINESS_DAY_FNS` — each `str -> Callable`. Adding a convention adds an entry and a
 function; adding an *issue* that uses one adds only a data file (SC-012).
+
+### ⚙ Three things the reinvestment row did not settle
+
+- **At what price.** With no yield curve in this feature, "the yield available on the
+  coupon date" can only mean the issue's own declared coupon rate — so the price is
+  **par**, since a unit bought at face value is the only unit that earns exactly the
+  declared rate. Any other price would be a market quote and there is none to invent.
+- **Where the remainder is reported.** As retained cash on a record that is always
+  present, carrying a reason. "Considered and bought nothing" and "nothing was
+  considered" are different claims, and `Reinvestment | None` would collapse them.
+- **Whether `min_ticket` applies.** It does: a reinvestment is a purchase (FR-018). Not in
+  FR-020's letter, but the alternative is executing a ticket the venue would refuse.
+
+**The contractual yield is generated policy-free.** A reinvestment changes what the owner
+*holds*; it cannot change what the paper *promises*. So `nominal_ytm` comes from a second,
+policy-free event stream rather than from the stream the policy produced — a regression
+that was found and fixed, and is now guarded by
+`tests/unit/test_contractual_yield_is_policy_invariant.py`.
 
 **Not implemented here**, and deliberately absent rather than stubbed: secondary-market
 sale before maturity, a thin-market haircut, restructuring, and pricing future purchases

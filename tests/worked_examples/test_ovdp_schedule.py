@@ -193,7 +193,10 @@ HOLDING = Holding(
 )
 
 HORIZON = DateRange(start=ISSUE_DATE, end=date(2028, 1, 31))
-ASSUMPTIONS = Assumptions(consumption_method="fifo")
+# Coupons are held as cash, so this example is the contractual schedule and nothing
+# else: what the bond pays, not what a policy does with it afterwards. The reinvesting
+# policy is D2's subject (tests/worked_examples/test_coupon_reinvestment.py).
+ASSUMPTIONS = Assumptions(consumption_method="fifo", coupon_policy="hold_cash")
 TAX_CLASSES = {EXEMPT_CLASS.id: EXEMPT_CLASS}
 
 # --- the hand-computed schedule -------------------------------------------------------

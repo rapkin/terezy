@@ -207,11 +207,9 @@ class Assumptions:
 
     Kept minimal on purpose: a field here is a place where a result depends on something
     other than declared terms, so each one has to earn its place. Feature 001 has exactly
-    one such choice.
-
-    The coupon policy of FR-019 (``hold_cash`` versus ``reinvest``) belongs here and is
-    deliberately absent until the feature that implements it, rather than being declared
-    now and ignored -- an accepted-and-ignored field is worse than a missing one.
+    two such choices, and the second of them arrived with the feature that reads it --
+    ``coupon_policy`` was deliberately absent until then rather than declared and ignored,
+    because an accepted-and-ignored field is worse than a missing one.
     """
 
     consumption_method: str
@@ -220,6 +218,23 @@ class Assumptions:
     An assumption rather than a declared term, because it is the owner's choice and it
     changes the answer: FIFO and LIFO give different, both correct, taxes on the same
     trades. There is no default anywhere in the stack.
+    """
+
+    coupon_policy: str
+    """What happens to a coupon when it is paid: a key of
+    ``fixed_income.COUPON_POLICY_FNS`` -- ``"hold_cash"`` or ``"reinvest"`` (FR-019).
+
+    An assumption rather than a declared term for the same reason as
+    :attr:`consumption_method`: the instrument's terms say what it *pays*, and what the
+    owner does with the money afterwards is the owner's decision. Two different, both
+    correct, answers follow from the same purchase (SC-010), so there is no default here
+    either -- a defaulted policy would make one of the two answers the one you get by not
+    thinking about it.
+
+    The keys belong to the instrument class that implements the policies, because what
+    "reinvest" *means* depends on what the instrument is: buying more of a bond at par is
+    not the same operation as reinvesting a fund distribution. An unrecognised name fails
+    loudly naming the known ones, exactly as an unrecognised convention does.
     """
 
 

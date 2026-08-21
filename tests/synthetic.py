@@ -39,6 +39,7 @@ from dataclasses import replace
 from datetime import date
 from typing import Any
 
+from terezy.core.instruments import fixed_income
 from terezy.core.instruments.interface import (
     Assumptions,
     BondTerms,
@@ -184,6 +185,16 @@ def horizon(**overrides: Any) -> DateRange:
 
 
 def assumptions(**overrides: Any) -> Assumptions:
-    """FIFO lot consumption. Stated rather than defaulted, here as everywhere."""
-    base = Assumptions(consumption_method="fifo")
+    """FIFO lot consumption, coupons held as cash. Stated rather than defaulted.
+
+    ``hold_cash`` is the fixture's default because it is the *contractual* schedule -- the
+    holding pays what its terms say and nothing further happens -- so a test about anything
+    other than reinvestment is not silently a test about reinvestment too. A test that wants
+    the other policy asks for it by name, and the reinvestment arithmetic is checked by hand
+    in ``tests/worked_examples/test_coupon_reinvestment.py``.
+    """
+    base = Assumptions(
+        consumption_method="fifo",
+        coupon_policy=fixed_income.HOLD_CASH,
+    )
     return replace(base, **overrides)

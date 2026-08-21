@@ -304,7 +304,7 @@ ignored is worse than a field that is missing.
 |---|---|---|
 | `Holding` | `owner_id`, `instrument_id`, `quantity`, `purchased_on`, `cost` | It **names** the instrument rather than embedding the declaration. Principle VII separates per-owner from curated data, and a holding carrying its own declaration would put curated data inside per-user data. |
 | `DateRange` | `start`, `end`, inclusive | Must reach the **adjusted** final payment. A horizon too short returns `InconsistentTerms` rather than a truncated schedule — a truncated schedule's yield is *wrong*, not partial — and never an implicit liquidation. |
-| `Assumptions` | `consumption_method` | One field. FR-019's coupon policy is deliberately absent until Phase 5; `fixed_income.events` takes the argument as `_assumptions` and says why. |
+| `Assumptions` | `consumption_method`, `coupon_policy` | ⚙ Two fields as of Phase 5. `coupon_policy` was deliberately absent until reinvestment earned it — an accepted-and-ignored field is worse than a missing one — and `fixed_income.events` now reads it. |
 
 ## Results
 

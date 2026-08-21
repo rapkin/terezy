@@ -134,10 +134,10 @@ source and verification state; an unverified input marking everything downstream
 **Independent test**: leave the yield unverified and confirm no derived figure appears
 unmarked.
 
-- [ ] T034 [US2] Write `tests/contract/test_provenance_propagation.py` — with the yield's `verified_on` empty, the schedule, every tax figure, `total_tax` and both return figures all report unverified, and **no derived figure is unmarked**. Closes **E5**, FR-015. Must fail first
-- [ ] T035 [P] [US2] Write `tests/invariants/test_determinism.py` — two runs on identical inputs produce an identical digest; the digest is unaffected by filling in a `verified_on`. Closes **C4**, SC-006
-- [ ] T036 [US2] Implement `src/terezy/data/manifest.py` — run manifest recording inputs, their versions and the SHA-256 digest over the canonical form. `hashlib` lives here, not in core. Closes FR-012
-- [ ] T037 [P] [US2] Write `tests/unit/test_manifest_records_inputs.py` — a result without a manifest is not a result; the manifest names every declaration and version that fed the run
+- [x] T034 [US2] Write `tests/contract/test_provenance_propagation.py` — with the yield's `verified_on` empty, the schedule, every tax figure, `total_tax` and both return figures all report unverified, and **no derived figure is unmarked**. Closes **E5**, FR-015. Must fail first
+- [x] T035 [P] [US2] Write `tests/invariants/test_determinism.py` — two runs on identical inputs produce an identical digest; the digest is unaffected by filling in a `verified_on`. Closes **C4**, SC-006
+- [x] T036 [US2] Implement `src/terezy/data/manifest.py` — run manifest recording inputs, their versions and the SHA-256 digest over the canonical form. `hashlib` lives here, not in core. Closes FR-012
+- [x] T037 [P] [US2] Write `tests/unit/test_manifest_records_inputs.py` — a result without a manifest is not a result; the manifest names every declaration and version that fed the run
 
 **Checkpoint**: `pytest -m "contract or invariant"` green. Commit.
 
@@ -151,10 +151,10 @@ date, with the difference visible.
 **Independent test**: same purchase run under both policies, two-period arithmetic checked
 by hand.
 
-- [ ] T038 [US3] Write `tests/worked_examples/test_coupon_reinvestment.py` — the D2 example: two coupon periods reinvested, arithmetic checked in beside the assertion. Closes **D2**. Must fail first
-- [ ] T039 [US3] Extend `src/terezy/core/instruments/fixed_income.py` with the declared coupon policy — `hold_cash` and `reinvest` — emitting `reinvestment` events for whole units only. Closes FR-019
-- [ ] T040 [P] [US3] Write `tests/unit/test_reinvestment_remainder.py` — a coupon too small to buy a whole unit reports the remainder and retains it as cash, never discarding it and never buying a fraction. Closes **FR-020**
-- [ ] T041 [P] [US3] Write `tests/unit/test_policies_differ.py` — reinvesting and cash-holding produce different terminal amounts on the same purchase, and the cash sits in a UAH balance. Closes **SC-010**
+- [x] T038 [US3] Write `tests/worked_examples/test_coupon_reinvestment.py` — the D2 example: two coupon periods reinvested, arithmetic checked in beside the assertion. Closes **D2**. Must fail first
+- [x] T039 [US3] Extend `src/terezy/core/instruments/fixed_income.py` with the declared coupon policy — `hold_cash` and `reinvest` — emitting `reinvestment` events for whole units only. Closes FR-019
+- [x] T040 [P] [US3] Write `tests/unit/test_reinvestment_remainder.py` — a coupon too small to buy a whole unit reports the remainder and retains it as cash, never discarding it and never buying a fraction. Closes **FR-020**
+- [x] T041 [P] [US3] Write `tests/unit/test_policies_differ.py` — reinvesting and cash-holding produce different terminal amounts on the same purchase, and the cash sits in a UAH balance. Closes **SC-010**
 
 **Checkpoint**: commit.
 

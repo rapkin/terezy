@@ -75,7 +75,7 @@ xfailed, or deleted without an amendment.
 | C1 | Cash conservation: `Σ inflows − Σ outflows = cash balance`, per currency, every day. | `[x]` `tests/invariants/test_ledger_conservation.py` |
 | C2 | Lot conservation: `Σ lot.quantity = position.quantity`; a sale consumes lots by the configured method and never produces a negative quantity. | `[x]` `tests/invariants/test_ledger_conservation.py` |
 | C3 | Basis conservation: `Σ lot.cost = position basis`; realised gain = proceeds − consumed basis − allocated fees, in **both** currencies. | `[x]` `tests/invariants/test_ledger_conservation.py` |
-| C4 | Determinism: same scenario + same snapshot ⇒ identical output hash. | `[ ]` |
+| C4 | Determinism: same scenario + same snapshot ⇒ identical output hash. | `[x]` `tests/invariants/test_determinism.py` |
 | C5 | Currency safety: values in different currencies can never be combined. | `[x]` `tests/invariants/test_currency_safety.py` |
 | C6 | Every displayed figure resolves to ledger events and to the rule that produced it. | `[x]` `tests/invariants/test_traceability.py` |
 
@@ -86,7 +86,7 @@ xfailed, or deleted without an amendment.
 | # | Example | Test |
 |---|---|---|
 | D1 | OVDP bought at a stated price and held to maturity reproduces a hand-computed coupon and principal schedule, and pays **zero** tax under the exempt class. | `[x]` `tests/worked_examples/test_ovdp_schedule.py` |
-| D2 | Coupon reinvestment into the then-current yield curve matches a hand-computed two-period example. | `[ ]` |
+| D2 | Coupon reinvestment matches a hand-computed two-period example. (Original wording said "into the then-current yield **curve**"; there is no curve in feature 001, so reinvestment is at par — the only price that earns the declared rate. A curve remains a later feature.) | `[x]` `tests/worked_examples/test_coupon_reinvestment.py` |
 | D3 | A restructuring scenario with a 40% haircut and two-year delay produces the hand-computed shortfall. | `[ ]` |
 
 ## E. Tax
@@ -97,7 +97,7 @@ xfailed, or deleted without an amendment.
 | E2 | A loss year followed by a gain year nets correctly; a run that omits the loss-year declaration forfeits the carryforward. **Both branches tested.** | `[ ]` |
 | E3 | Foreign dividend with 15% withholding: PIT credit applied, military levy **not** credited. | `[ ]` |
 | E4 | Crypto scenarios `current_practice`, `draft_18_5`, `draft_transitional_5_5` produce three different hand-checkable results from identical market data. | `[ ]` |
-| E5 | Every tax figure renders with `source` and `verified_on`; an empty `verified_on` marks the figure **and everything derived from it**. | `[ ]` |
+| E5 | Every tax figure renders with `source` and `verified_on`; an empty `verified_on` marks the figure **and everything derived from it**. | `[x]` `tests/contract/test_provenance_propagation.py` |
 | E6 | Lot-selection methods (FIFO / LIFO / average / specific) on a three-lot position with a partial sale each produce their own hand-computed tax. | `[ ]` |
 | E7 | Tax paid from cash in the following tax year; insufficient cash forces a sale, which is itself taxed. | `[ ]` |
 | E8 | The same scenario under jurisdiction A vs B differs only in the tax terms; the gross market outcome is bit-identical. | `[ ]` |

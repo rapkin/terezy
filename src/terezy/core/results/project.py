@@ -54,6 +54,7 @@ from terezy.core.errors import (
     TaxFailure,
     UnresolvedTaxClass,
 )
+from terezy.core.instruments import fixed_income
 from terezy.core.instruments import registry as instrument_registry
 from terezy.core.instruments.interface import (
     Assumptions,
@@ -152,6 +153,18 @@ def project(
     )
 
     year_fraction = conventions.day_count(declaration.terms.day_count)
+
+    # The contractual series is generated WITHOUT the coupon policy, because a
+    # contractual yield to maturity is a property of the paper and reinvestment is a
+    # decision about the proceeds. Taking it from `state.applied` instead would fold the
+    # reinvestment purchases and the larger redemption into the figure, and `nominal_ytm`
+    # would then move when the owner changed their mind about coupons -- a figure
+    # labelled "contractual" that is not (FR-005). Policy-invariance is asserted by
+    # tests/unit/test_contractual_yield_is_policy_invariant.py.
+    contractual_events = _contractual_events(declaration, holding, horizon, assumptions)
+    if isinstance(contractual_events, InfeasiblePurchase | InconsistentTerms):
+        return contractual_events  # pragma: no cover -- the policy run already succeeded
+
     return Projection(
         ledger=state,
         schedule=schedule_rows.of_ledger(
@@ -165,11 +178,7 @@ def project(
         ),
         charges=charges,
         hurdle=hurdle_figures.of_flows(
-            contractual=_flows(
-                [e for e in state.applied if e.kind is not EventKind.TAX_CHARGE],
-                holding,
-                year_fraction,
-            ),
+            contractual=_flows(contractual_events, holding, year_fraction),
             received=_flows(state.applied, holding, year_fraction),
             total_tax=money.total([charge.total for charge in charges], base_currency),
             provenance=prov.merge(
@@ -178,6 +187,39 @@ def project(
             ),
         ),
     )
+
+
+def _contractual_events(
+    declaration: InstrumentDeclaration,
+    holding: Holding,
+    horizon: DateRange,
+    assumptions: Assumptions,
+) -> tuple[Event, ...] | InfeasiblePurchase | InconsistentTerms:
+    """The events the paper itself produces, with no coupon policy and no tax applied.
+
+    Regenerated rather than filtered out of the taxed stream. Filtering could remove the
+    tax charges but not the *consequences* of reinvestment -- the extra purchases and the
+    larger redemption are ordinary events indistinguishable from contractual ones once
+    they are in the ledger. Generating a second, policy-free stream is the only way to
+    get a series that answers "what does this bond promise", and it is cheap and pure.
+
+    ``hold_cash`` is the policy-free case by construction: it buys nothing, so the events
+    are exactly the declared coupons and the principal.
+    """
+    ops = instrument_registry.ops_for(declaration.instrument_class)
+    produced = ops.events(
+        declaration,
+        holding,
+        horizon,
+        replace(assumptions, coupon_policy=fixed_income.HOLD_CASH),
+    )
+    match produced:
+        case InfeasiblePurchase() | InconsistentTerms():
+            return produced
+        case tuple():
+            return produced
+        case _:  # pragma: no cover -- mypy proves this unreachable
+            assert_never(produced)
 
 
 def _flows(

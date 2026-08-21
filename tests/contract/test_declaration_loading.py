@@ -127,8 +127,13 @@ class TestTheShippedFilesLoad:
         assert declaration.instrument_class == "fixed_income"
         assert declaration.currency is Currency.UAH
         assert declaration.is_synthetic is True
-        # 15.5 in the file, 0.155 in the core -- divided by 100 exactly once, here.
-        assert declaration.terms.coupon_rate == pytest.approx(0.155)
+        # 15.5 in the file, 0.155 in the core -- divided by 100 exactly once, at the
+        # loader boundary. Asserted as **exact** equality, not approximately: 15.5 is
+        # exactly representable, so IEEE division returns the nearest double to 0.155,
+        # which is the literal `0.155` bit for bit. An approximate assertion here would
+        # pass just as happily on a rate that was off by a rounding step, and the whole
+        # point of this line is that the conversion happens once and lands exactly.
+        assert declaration.terms.coupon_rate == 0.155
         assert declaration.terms.issue_date == date(2026, 1, 15)
         assert declaration.terms.maturity_date == date(2028, 1, 15)
         assert declaration.terms.periodicity == "semiannual"
@@ -787,7 +792,7 @@ class TestAnImpossibleInstrumentIsNotALoadError:
                 cost=Money(10_000.0, Currency.UAH, prov.EMPTY),
             ),
             DateRange(start=date(2026, 1, 15), end=date(2028, 1, 31)),
-            Assumptions(consumption_method="fifo"),
+            Assumptions(consumption_method="fifo", coupon_policy="hold_cash"),
             tax_classes={cls.id: cls for cls in loader.tax_classes_from_file(TAX_UA)},
         )
         assert isinstance(outcome, InconsistentTerms)
