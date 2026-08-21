@@ -168,16 +168,16 @@ malformed declaration fails loudly naming file and field.
 **Independent test**: add a declaration file and run the full projection with no source
 edit.
 
-- [ ] T042 [P] [US4] Implement `src/terezy/data/declarations/errors.py` — `DeclarationError(file, field_path, problem, remedy)`. No `pydantic.ValidationError` may cross this boundary
-- [ ] T043 [US4] Implement `src/terezy/data/declarations/schema.py` — pydantic v2 models with `ConfigDict(extra="forbid", strict=True, frozen=True)` and **zero field defaults**, per `contracts/declaration-schema.md`. `is_synthetic` is required
-- [ ] T044 [US4] Implement `src/terezy/data/declarations/loader.py` — `tomllib` read → validate → construct core records, adapting `ValidationError` into `DeclarationError`. Divides `_pct` fields by 100 exactly once, at this boundary. Builds `SourceRef` ids from file and table so figures trace back
-- [ ] T045 [US4] Implement `src/terezy/data/declarations/resolver.py` — the cross-file pass pydantic cannot do: duplicate ids across files, and `tax_classes` referencing an undeclared class. Closes part of FR-016
-- [ ] T046 [P] [US4] Create `data/tax/ua.toml` — the `ua_government_bond` exempt class with its cited source per `contracts/declaration-schema.md`. **Zero rates carry a citation.** `verified_on` empty
-- [ ] T047 [P] [US4] Create `data/instruments/ovdp_synthetic_a.toml` — the D1/D2 fixture, `is_synthetic = true`, name stating plainly that terms are invented
-- [ ] T048 [P] [US4] Create `data/instruments/ovdp_synthetic_b.toml` — a second issue with **different** periodicity and day-count, to prove SC-012
-- [ ] T049 [US4] Write `tests/contract/test_declaration_loading.py` — a battery of deliberately broken files, one per row of the enforced-rules table in `contracts/declaration-schema.md`: unknown field, missing field, wrong type, absent `verified_on`, table with numerics but no source, duplicate id, undeclared tax class, unknown convention name, malformed TOML, non-positive face value. Every case names file and field; **no case substitutes a default**. Closes **H2**, FR-014, FR-016, SC-004
-- [ ] T050 [US4] Write `tests/contract/test_data_only_extensibility.py` — the second issue produces a complete result with zero source-code changes, and each schedule reports the convention it applied. Closes **SC-003**, **SC-012**
-- [ ] T051 [P] [US4] Confirm `uv run python scripts/check_provenance.py` passes on the three new data files, with empty-`verified_on` warnings expected and no errors
+- [x] T042 [P] [US4] Implement `src/terezy/data/declarations/errors.py` — `DeclarationError(file, field_path, problem, remedy)`. No `pydantic.ValidationError` may cross this boundary
+- [x] T043 [US4] Implement `src/terezy/data/declarations/schema.py` — pydantic v2 models with `ConfigDict(extra="forbid", strict=True, frozen=True)` and **zero field defaults**, per `contracts/declaration-schema.md`. `is_synthetic` is required
+- [x] T044 [US4] Implement `src/terezy/data/declarations/loader.py` — `tomllib` read → validate → construct core records, adapting `ValidationError` into `DeclarationError`. Divides `_pct` fields by 100 exactly once, at this boundary. Builds `SourceRef` ids from file and table so figures trace back
+- [x] T045 [US4] Implement `src/terezy/data/declarations/resolver.py` — the cross-file pass pydantic cannot do: duplicate ids across files, and `tax_classes` referencing an undeclared class. Closes part of FR-016
+- [x] T046 [P] [US4] Create `data/tax/ua.toml` — the `ua_government_bond` exempt class with its cited source per `contracts/declaration-schema.md`. **Zero rates carry a citation.** `verified_on` empty
+- [x] T047 [P] [US4] Create `data/instruments/ovdp_synthetic_a.toml` — the D1/D2 fixture, `is_synthetic = true`, name stating plainly that terms are invented
+- [x] T048 [P] [US4] Create `data/instruments/ovdp_synthetic_b.toml` — a second issue with **different** periodicity and day-count, to prove SC-012
+- [x] T049 [US4] Write `tests/contract/test_declaration_loading.py` — a battery of deliberately broken files, one per row of the enforced-rules table in `contracts/declaration-schema.md`: unknown field, missing field, wrong type, absent `verified_on`, table with numerics but no source, duplicate id, undeclared tax class, unknown convention name, malformed TOML, non-positive face value. Every case names file and field; **no case substitutes a default**. Closes **H2**, FR-014, FR-016, SC-004
+- [x] T050 [US4] Write `tests/contract/test_data_only_extensibility.py` — the second issue produces a complete result with zero source-code changes, and each schedule reports the convention it applied. Closes **SC-003**, **SC-012**
+- [x] T051 [P] [US4] Confirm `uv run python scripts/check_provenance.py` passes on the three new data files, with empty-`verified_on` warnings expected and no errors
 
 **Checkpoint**: `pytest -m contract` green. Commit.
 

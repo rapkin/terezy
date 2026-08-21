@@ -1,0 +1,27 @@
+# Ukraine, tax-resident individual: the rule pack feature 001 needs.
+#
+# One class, and it is the most decision-relevant number in the whole model: the
+# exemption that makes a 15.5% government bond beat a 15.5% deposit taxed at 23%.
+# Constitution Principle I -- no tax value comes from an implementer's or an agent's
+# memory. The rates below are read off the cited source, and the zeroes carry that
+# citation exactly as a non-zero rate would: an uncited zero is the figure that gets
+# believed without checking.
+#
+# `verified_on` is empty: this has not been checked against the Tax Code itself, only
+# against the secondary source named. Everything derived from it renders marked, which
+# is the honest state of affairs and not a defect to work around (FR-014, FR-015).
+
+[jurisdiction]
+id            = "ua"
+name          = "Ukraine (tax resident)"
+base_currency = "UAH"
+
+[[jurisdiction.tax_class]]
+id            = "ua_government_bond"
+applies_to    = ["coupon", "disposal_gain"]
+pit_rate_pct  = 0.0
+levy_rate_pct = 0.0
+note          = "Interest on certain Ukrainian state securities is PIT-exempt; the military levy is not charged on income not subject to PIT. Verify against the Tax Code of Ukraine before any figure derived from this leaves the tool."
+source        = "https://taxsummaries.pwc.com/ukraine/individual/income-determination"
+retrieved_on  = "2026-08-21"
+verified_on   = ""

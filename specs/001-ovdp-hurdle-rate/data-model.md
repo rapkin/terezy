@@ -339,7 +339,7 @@ site that must handle it, rather than silently inheriting a default:
 | `InconsistentTerms` | Which two terms conflict and how |
 | `UnresolvedTaxClass` | The missing class id and the instrument that referenced it |
 | `RealTermsUnavailable` | Why the real figure is absent |
-| `DeclarationError` | File path, field path, and what was wrong (`data` layer) |
+| `DeclarationError` | ⚙ **Not a union member — an exception.** File path, field path, problem and remedy, carried as attributes so the API layer can render them without parsing a string. A broken file is not an outcome about the money: there is no partial answer and every caller's only response is to stop. Principle II says data files fail loudly *at load time*. |
 
 **Two exceptions exist, not one.** `CurrencyMismatchError` and — added during
 implementation — `LedgerInvariantError`. Neither is a tagged-union member, because

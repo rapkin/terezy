@@ -1,0 +1,40 @@
+# SYNTHETIC FIXTURE. Every term in this file is invented.
+#
+# It exists so the D1/D2 worked examples have a declaration on disk with terms chosen
+# to be checkable on paper: two years, semiannual, act/365, bought at par. The real
+# OVDP issue's yield, maturity and coupon terms are not confirmed
+# (`SIMULATOR_SPEC.md` §11 item 2), so no figure computed from this file describes a
+# bond anyone can buy, and none of them may be quoted as if it did.
+#
+# `is_synthetic = true` is what a reader and the engine both go by, and every
+# `verified_on` is empty because there is nothing to verify invented terms against.
+
+[instrument]
+id           = "ovdp_synthetic_a"
+name         = "Synthetic OVDP issue A — TEST FIXTURE, terms invented"
+class        = "fixed_income"
+currency     = "UAH"
+is_synthetic = true
+
+[instrument.terms]
+face_value        = 1000.0
+coupon_rate_pct   = 15.5
+issue_date        = "2026-01-15"
+maturity_date     = "2028-01-15"
+periodicity       = "semiannual"
+day_count         = "act/365"
+business_day_rule = "following"
+source            = "SYNTHETIC FIXTURE — terms chosen for a hand-checkable example, not observed from any issue."
+retrieved_on      = "2026-08-21"
+verified_on       = ""
+
+[instrument.constraints]
+min_ticket   = 1000.0
+min_unit     = 1.0
+source       = "SYNTHETIC FIXTURE — invented minimum ticket of one bond. Not observed from any venue or prospectus."
+retrieved_on = "2026-08-21"
+verified_on  = ""
+
+[instrument.tax_classes]
+coupon        = "ua_government_bond"
+disposal_gain = "ua_government_bond"

@@ -25,8 +25,12 @@ Everything here is versioned, sourced, dated, and reviewed in git like code
    `verified_on`. An empty `verified_on` is permitted and expected — it must render
    visibly marked, and the mark propagates to everything derived from it. Omitting the
    key is *not* permitted. Enforced by `scripts/check_provenance.py` in CI.
-3. **Dated schedules, not constants.** Every rate accepts a dated schedule, so a
+3. **Dated schedules, not constants.** Every rate must accept a dated schedule, so a
    legislated change is modelled rather than requiring a rebuild (spec §4.5.1).
+   **Not yet true:** as of feature 001 a tax class carries a scalar rate, not a schedule.
+   Tracked as **E10** in `docs/REQUIRED_TESTS.md`. This rule states the requirement, and
+   the checklist states how far off we are — a rule that quietly contradicted the code
+   would be worse than either.
 4. **No legal value from memory.** Tax and legal values come from a cited public
    source, entered as data. Not from an implementer, and not from an agent.
 5. **Curated vs per-user.** Everything in this directory is curated and shared.

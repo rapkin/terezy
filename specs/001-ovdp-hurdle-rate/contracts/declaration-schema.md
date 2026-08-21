@@ -50,7 +50,7 @@ verified_on         = ""
 [instrument.constraints]
 min_ticket   = 1000.0
 min_unit     = 1.0
-source       = "https://www.inzhur.reit/ — minimum ticket approximately one bond"
+source       = "SYNTHETIC FIXTURE — invented minimum ticket. Not observed from any venue or prospectus."
 retrieved_on = "2026-08-21"
 verified_on  = ""
 
@@ -64,6 +64,12 @@ Notes:
 - `coupon_rate_pct` is **percent in the file, fraction in the core.** The suffix is part
   of the field name so the unit is unmissable at the point of editing; the loader divides
   by 100 exactly once, at the boundary. The same applies to every `_pct` field.
+- ⚙ **The constraints citation was wrong in the first draft of this contract**, and the
+  implementing agent was right to refuse it. It read
+  `source = "https://www.inzhur.reit/ — minimum ticket approximately one bond"` on a file
+  whose every other term is invented — and Inzhur is a REIT venue, not an OVDP one.
+  Attaching a real URL to a made-up number produces exactly the figure Principle I says
+  gets believed without checking. A synthetic value's `source` must say it is synthetic.
 - `is_synthetic` is required rather than defaulting to `false`, so a real issue cannot be
   mistaken for a fixture by omission. `true` also makes the fixture obvious in the
   hand-computed test, satisfying the spec's assumption that synthetic terms be marked
@@ -95,6 +101,25 @@ The **zero rates carry a citation like any other value.** This is not ceremony: 
 exemption is the single most decision-relevant number in the whole model, and an uncited
 zero is exactly the sort of figure that gets believed without checking.
 `scripts/check_provenance.py` enforces it — `0.0` is numeric, so the table needs a source.
+
+## ⚙ Dates are quoted strings, parsed at the loader
+
+The examples above quote their dates (`retrieved_on = "2026-08-21"`), so `tomllib` returns
+`str` — and `strict=True` correctly refuses `str → date`. Two ways out: change the file
+format to bare TOML dates, or parse in the loader. **The loader parses**, keeping the
+quoted format, because it also buys the better message: `instrument.terms.issue_date is
+not an ISO date: '2026-13-40'`, naming the file, where pydantic would only say the type
+was wrong.
+
+## ⚙ Two decisions the first draft left open
+
+- **`note` on a tax class is required**, not optional. The no-defaults rule forces the
+  choice, and required is right: every tax figure links to its rule in words a reader can
+  check the citation against.
+- **`maturity_date ≤ issue_date` is NOT a loader check.** It routes to a typed
+  `InconsistentTerms` from the instrument instead. This means a data file can be valid and
+  still describe an impossible instrument — deliberate, and it keeps instrument
+  mathematics out of the data layer.
 
 ## Enforced rules
 

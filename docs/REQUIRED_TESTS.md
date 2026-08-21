@@ -102,6 +102,7 @@ xfailed, or deleted without an amendment.
 | E7 | Tax paid from cash in the following tax year; insufficient cash forces a sale, which is itself taxed. | `[ ]` |
 | E8 | The same scenario under jurisdiction A vs B differs only in the tax terms; the gross market outcome is bit-identical. | `[ ]` |
 | E9 | A residency change mid-simulation is applied by date, including positions held across the change. | `[ ]` |
+| E10 | A rate declared as a **dated schedule** changes on its effective date, so a legislated change is modelled rather than requiring a rebuild. **Known gap:** as of feature 001 the tax schema carries a scalar rate per class, not a schedule, so `data/README.md` rule 3 and `SIMULATOR_SPEC.md` §4.5.1 are not yet satisfied. Closing it is a schema change plus a core change. | `[ ]` |
 
 ## F. FX, display currency, and asymmetry
 
@@ -131,7 +132,7 @@ Compliance tests for Principle II. May not be skipped without an amendment.
 | # | Example | Test |
 |---|---|---|
 | H1 | Adding a new instrument, route, tax class and jurisdiction **in data only** — no engine edit — runs the full pipeline and appears in the comparison. | `[ ]` |
-| H2 | A malformed or unknown field in any data file fails loudly at load time, naming file and field; it never silently defaults. | `[ ]` |
+| H2 | A malformed or unknown field in any data file fails loudly at load time, naming file and field; it never silently defaults. | `[x]` `tests/contract/test_declaration_loading.py` |
 | H3 | Every data file's values round-trip through the run manifest, so a result traces to the exact configuration that produced it. | `[ ]` |
 | H4 | Architecture boundaries hold: the core imports no I/O, no network, no framework, and nothing from a layer above it. | `[x]` `tests/contract/test_architecture_boundaries.py` |
 
