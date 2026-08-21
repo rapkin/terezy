@@ -50,6 +50,10 @@ forbidden_modules =
     random
     secrets
     uuid
+    ; --- hashing implies serialisation; the digest lives in terezy.data.manifest ---
+    hashlib
+    ; --- no class hierarchies: functional style, owner decision D-E ---
+    abc
 allow_indirect_imports = False
 
 [importlinter:contract:core-independent-of-frameworks]
@@ -64,6 +68,8 @@ forbidden_modules =
     typer
     click
     rich
+    ; validation belongs at the data boundary, not in the domain
+    pydantic
 allow_indirect_imports = False
 
 [importlinter:contract:data-below-api]

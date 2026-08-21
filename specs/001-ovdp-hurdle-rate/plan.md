@@ -16,10 +16,16 @@ classes loaded from data, and one project-wide tolerance.
 
 The technical shape, decided in [research.md](./research.md): the instrument computes its
 contractual schedule in closed form, the engine applies that schedule as ledger events,
-and every reported figure derives from the ledger. Provenance rides on `Money` and unions
-through arithmetic, so losing an unverified mark is structurally impossible rather than a
-discipline. Validation is pydantic in the `data` layer with coercion and defaults turned
-off; the core stays plain frozen dataclasses.
+and every reported figure derives from the ledger. Provenance rides inside `Money` and is
+unioned by the one `money.add`, so losing an unverified mark is structurally impossible
+rather than a discipline. Validation is pydantic in the `data` layer with coercion and
+defaults turned off; the core stays plain frozen records.
+
+Everything is written as **free functions over immutable records** — no classes with
+behaviour, no inheritance, no ABCs, no `Protocol` classes, no operator dunders (owner
+decision D-E, added to the constitution as v1.1.0 while this plan was being written).
+Plugin interfaces are function signatures gathered into frozen records; dispatch is a
+`dict`. See research.md D7 for what that changed and what it did not.
 
 ## Technical Context
 
@@ -60,10 +66,11 @@ plugin interfaces project-wide, of which this feature implements two.
 |---|---|---|
 | **I — Honesty over precision** | No point estimate more confident than inputs; unverified marks propagate; no statistical metric for assumption-driven instruments | **PASS.** The return figure is contractual, not estimated, so a point estimate is legitimate here. It is labelled nominal (FR-022) and carries the unverified mark from the yield. No volatility or Sharpe is emitted — none is computed. |
 | **II — Framework, not script** | New instrument / venue / tax regime / jurisdiction is data-only; exactly four plugin interfaces | **PASS.** Implements `Instrument` and `TaxRule`; no fifth interface. SC-003 and SC-012 are executable tests of data-only extensibility. Day-count *algorithms* are code — justified in research.md, since a convention is none of the four data categories. |
-| **III — Pure deterministic core** | No I/O in core; seeds recorded; every figure traceable; run manifest | **PASS.** Loader, pydantic and the digest all live in `data`. `canonical_tuple()` in core is structural only. No randomness exists in this feature, so there is no seed to record; the manifest records inputs and versions. **Proposed tightening:** add `hashlib` and `pydantic` to core's forbidden modules in `.importlinter`. |
-| **IV — Reliability through contracts** | Invariants are property-based; float64 money currency-tagged; one tolerance; explicit failure; no synthetic cache | **PASS.** C1–C6 are Hypothesis suites. One `TOLERANCE` in `core/primitives/tolerance.py`, imported everywhere. Every failure is a typed result or a typed error carrying a reason. No cache exists yet. |
+| **III — Pure deterministic core** | No I/O in core; seeds recorded; every figure traceable; run manifest | **PASS.** Loader, pydantic and the digest all live in `data`. The canonical functions in core are structural only. No randomness exists in this feature, so there is no seed to record; the manifest records inputs and versions. **Done:** `hashlib`, `pydantic` and `abc` were added to core's forbidden modules in `.importlinter`. |
+| **IV — Reliability through contracts** | Invariants are property-based; float64 money currency-tagged; one tolerance; explicit failure; no synthetic cache | **PASS.** C1–C6 are Hypothesis suites. One `TOLERANCE` in `core/primitives/tolerance.py`, imported everywhere. Domain failures are a tagged union; `raise` is reserved for programmer errors such as a currency mismatch. No cache exists yet. |
 | **V — Test-first for financial logic** | Every financial behaviour lands with a worked example, an invariant, or a golden file; tests never reach the network | **PASS.** D1 and D2 are hand-computed with arithmetic checked in; C1–C6 are property-based; the network guard is already in place and tested. Tests are written before the code they cover. |
 | **VI — Model the whole tuple** | Access cost never per-instrument; round-trip not one-way; three currency roles kept distinct | **PASS, with a boundary to hold.** This slice models `(instrument × tax)` only; routes, streams and exit are out of scope per the spec. The result type must therefore **not** be named or shaped as if it were route-adjusted — see the risk register below. Only one currency is in play, but currency tagging is built now. |
+| **Engineering Standards — functional style (D-E)** | Free functions over immutable records; no inheritance, ABCs or `Protocol` methods; tagged unions; function registries | **PASS.** Enforced mechanically by `abc` in the core's forbidden imports, and by review for the rest. |
 | **VII — Owner-scoped and private** | `owner_id` from day one; curated vs per-user data separated; no telemetry | **PASS.** The holding and run records carry `owner_id` even though there is one owner and no auth. Curated data is under `data/`; `data/user/` stays gitignored and unused. No new dependency phones home. |
 
 **No violations requiring justification.** One item of genuine added complexity is
@@ -74,14 +81,18 @@ recorded in Complexity Tracking below.
 Re-checked after the design artifacts were written. No verdict changed. Two things the
 design surfaced that the pre-check had not made explicit:
 
-- **`canonical_tuple()` must not include provenance.** Provenance identifies *sources*,
+- **The canonical form must not include provenance.** Provenance identifies *sources*,
   and if a source's `verified_on` is filled in later, the digest would change even though
   no computed amount did — making C4 fail on a documentation update. The digest covers
   amounts, currencies, dates, kinds and identifiers only; the unverified *mark* is
   asserted separately by E5.
-- **`Money.__eq__` excluding provenance is load-bearing**, not a convenience. Without it,
-  two amounts equal in value but reached by different paths would compare unequal, and
-  the invariant suites would fail for reasons unrelated to conservation.
+- **Excluding provenance from `Money` equality is load-bearing**, not a convenience.
+  Without it, two amounts equal in value but reached by different paths would compare
+  unequal, and the invariant suites would fail for reasons unrelated to conservation.
+- **The functional style removed a guard and added one.** Dropping operator dunders means
+  provenance union now lives in one named function instead of several — easier to review.
+  But `Money(...)` remains constructible anywhere, so a test scans for direct
+  construction outside `money.py` and the loader.
 
 ## Project Structure
 
@@ -91,7 +102,7 @@ design surfaced that the pre-check had not made explicit:
 specs/001-ovdp-hurdle-rate/
 ├── spec.md              # Feature specification (complete)
 ├── plan.md              # This file
-├── research.md          # Phase 0 — six decisions with rationale
+├── research.md          # Phase 0 — seven decisions with rationale
 ├── data-model.md        # Phase 1 — entities, fields, validation rules
 ├── quickstart.md        # Phase 1 — how to verify the feature works
 ├── contracts/
@@ -120,13 +131,13 @@ src/terezy/core/                        pure, deterministic
 │   ├── lots.py                         Lot, Position
 │   ├── accounts.py                     CashAccount, per-currency balances
 │   ├── engine.py                       fold events -> state
-│   └── canonical.py                    canonical_tuple() — structural, no serialisation
+│   └── canonical.py                    of_event / of_result — structural, no serialisation
 ├── instruments/
-│   ├── interface.py                    Instrument protocol
-│   └── fixed_income.py                 contractual bond: closed-form schedule
+│   ├── interface.py                    EventsFn signatures, InstrumentOps record, REGISTRY
+│   └── fixed_income.py                 free functions + OPS: closed-form bond schedule
 ├── tax/
-│   ├── interface.py                    TaxRule protocol
-│   └── engine.py                       apply declared tax classes to events
+│   ├── interface.py                    ChargeFn signature, TaxRuleOps record, REGISTRY
+│   └── flat_rate.py                    free functions + OPS: apply declared rates
 └── results/
     ├── schedule.py                     CashFlowSchedule
     └── hurdle.py                       HurdleRate — nominal + typed-empty real slot
@@ -180,15 +191,15 @@ test that would fail without it (Principle V).
 
 | # | Step | Closes | Depends on |
 |---|---|---|---|
-| 1 | `primitives`: currency, provenance, money, tolerance, rates | C5, part of E5 | — |
+| 1 | `primitives`: currency, provenance, money (free fns), tolerance, rates | C5, part of E5 | — |
 | 2 | `conventions`: day-count, periodicity, business-day registries, unknown-name failure | part of FR-021 | 1 |
-| 3 | `ledger`: events, lots, accounts, fold engine, `canonical_tuple()` | C1, C2, C3, C6 | 1 |
-| 4 | `instruments`: `Instrument` protocol + closed-form bond schedule | part of D1 | 1, 2 |
-| 5 | `tax`: `TaxRule` protocol + declared-class application | part of D1 | 1, 3 |
+| 3 | `ledger`: events, lots, accounts, fold engine, canonical fns | C1, C2, C3, C6 | 1 |
+| 4 | `instruments`: signatures, registry + closed-form bond schedule | part of D1 | 1, 2 |
+| 5 | `tax`: signature, registry + declared-rate application | part of D1 | 1, 3 |
 | 6 | `results`: schedule, `HurdleRate` with typed-empty real slot | SC-011 | 1, 4, 5 |
 | 7 | `data.declarations`: schema, loader, resolver, errors | H2 | 1–6 |
 | 8 | declaration files: two synthetic issues + the UA tax pack | SC-012 | 7 |
-| 9 | `data.manifest`: digest over `canonical_tuple()` | C4, SC-006 | 3, 7 |
+| 9 | `data.manifest`: digest over the canonical form | C4, SC-006 | 3, 7 |
 | 10 | end-to-end wiring + the D1 and D2 worked examples | D1, D2 | all |
 | 11 | flip the ten rows in `docs/REQUIRED_TESTS.md`, record test paths | — | all |
 
@@ -201,7 +212,7 @@ Things most likely to go wrong, and what catches them.
 
 | Risk | Why it matters here | Guard |
 |---|---|---|
-| A transform drops the unverified mark | FR-015 calls this top-severity; it makes an unverified figure look verified | Provenance unions inside `Money` arithmetic (D2), so it cannot be forgotten. `test_provenance_propagation.py` asserts it. **Plus manual review** — the gates cannot see this. |
+| A transform drops the unverified mark | FR-015 calls this top-severity; it makes an unverified figure look verified | Provenance unions inside the `money` module's combining functions (D2), so it cannot be forgotten. A test also scans for direct `Money(` construction outside `money.py` and the loader. **Plus manual review** — the gates cannot see this. |
 | A test invents its own tolerance | Defeats FR-002; each drift is invisible alone | One `TOLERANCE` export; review any `pytest.approx`/`abs(... ) <` in a diff |
 | The result gets read as route-adjusted | Principle VI forbids per-instrument access cost; a later reader could compare this figure against a route-adjusted one | Name the type `HurdleRate` and carry an explicit field stating route costs are excluded. Revisit when routes land. |
 | pydantic coerces or defaults something | Would violate FR-016 silently | `strict=True`, `extra="forbid"`, zero defaults, and `test_declaration_loading.py` feeds a battery of broken files |
@@ -212,14 +223,18 @@ Things most likely to go wrong, and what catches them.
 
 | Violation | Why needed | Simpler alternative rejected because |
 |---|---|---|
-| `Money` carries provenance, making the most-used type in the system heavier than a plain `(amount, currency)` pair | FR-015 names a dropped provenance mark as a defect of the highest severity, and this work is being delegated to subagents. Automatic union inside arithmetic is the only mechanism that does not depend on every future contributor remembering | Provenance on schedule rows, or a `Sourced[T]` wrapper, both leave aggregation as a manual step where the mark is silently lost — the exact defect. A run-scoped taint flag is unfalsifiable but useless, since it cannot say *which* figure is affected |
+| `Money` carries provenance, making the most-used record in the system heavier than a plain `(amount, currency)` pair | FR-015 names a dropped provenance mark as a defect of the highest severity, and this work is being delegated to subagents. Automatic union inside the one combining function is the only mechanism that does not depend on every future contributor remembering | Provenance on schedule rows, or a `Sourced[T]` wrapper, both leave aggregation as a manual step where the mark is silently lost — the exact defect. A run-scoped taint flag is unfalsifiable but useless, since it cannot say *which* figure is affected |
 | A `core/primitives/` package rather than flat modules | `Money`, `Provenance` and `TOLERANCE` are imported by every core package; they need a leaf with no sibling imports | Flat modules produce a circular import as soon as tax needs money and money needs a rate |
+| Exhaustive `match` with an unreachable `case _:` at every dispatch over a failure union | Adding a variant then produces a type error at every site that must handle it | A base class with a default would silently absorb the new variant — the exact silent-default failure mode FR-016 exists to prevent |
 
-## Proposed change outside this feature
+## Changes made outside this feature while planning
 
-`.importlinter` should gain `hashlib` and `pydantic` in the `core-is-pure` contract's
-forbidden list. Neither is currently barred, and both would be a mistake in `core`:
-hashing implies serialisation, and pydantic would make the domain layer answerable to a
-validation library. This is a one-line tightening of an existing contract, not a new
-one, so it does not need a constitution amendment — but it is called out here rather than
-slipped in.
+Two, both recorded rather than slipped in:
+
+1. **`.importlinter` tightened.** `hashlib` and `pydantic` added to the core's forbidden
+   imports (hashing implies serialisation; validation belongs at the boundary), and `abc`
+   added as the mechanical guard for D-E. All four contracts still pass.
+2. **Constitution 1.0.0 → 1.1.0.** A functional-style clause was added to Engineering
+   Standards as owner decision D-E, and Principle IV's "currency-tagged value object" was
+   reworded to "currency-tagged immutable record" so the document does not contradict
+   itself. MINOR: guidance added, no principle removed or redefined.

@@ -103,8 +103,8 @@ uv run lint-imports
 
 `mypy` is doing real work here beyond typos: **assigning a nominal rate into the real-terms
 slot is a type error** (decision D4), which is the mechanical guard behind SC-011.
-`lint-imports` confirms the core acquired no I/O, no `pydantic` and no `hashlib` — if the
-loader drifted into `core`, this is where it shows.
+`lint-imports` confirms the core acquired no I/O, no `pydantic`, no `hashlib` and no `abc`
+— if the loader drifted into `core`, or a class hierarchy appeared, this is where it shows.
 
 ## 5. Coverage
 
@@ -122,11 +122,13 @@ them being true.
 - [ ] `ruff`, `mypy`, `lint-imports`, `check_provenance.py` all clean
 - [ ] Ten rows flipped in `docs/REQUIRED_TESTS.md` with test paths recorded: C1–C6, D1,
       D2, E5, H2
-- [ ] `.importlinter` tightened with `hashlib` and `pydantic` in the core's forbidden list
+- [x] `.importlinter` tightened: `hashlib`, `pydantic` and `abc` in the core's forbidden list
 - [ ] `docs/METHODOLOGY.md` created, documenting the coupon-schedule and yield formulas —
       an undocumented formula is an incomplete feature
 - [ ] Manual review of provenance propagation and tolerance usage, since no gate sees
       either
+- [ ] No classes with behaviour, no inheritance, no operator dunders — `abc` is blocked in
+      core but the rest is review (constitution, Engineering Standards, D-E)
 
 ## What this feature does not tell you
 

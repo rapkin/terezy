@@ -3,7 +3,9 @@
 **Date**: 2026-08-21
 
 Entities, their fields, and the validation rules each one enforces. Core types are plain
-frozen dataclasses; nothing here imports a validation framework. Field types are given in
+frozen dataclasses carrying **only data** — every operation on them is a free function in
+the same module (owner decision D-E, functional style). Nothing here imports a validation
+framework, and nothing inherits from anything. Field types are given in
 Python notation for precision, but the *rules* are the point — they trace back to spec
 requirements, which are cited throughout.
 
@@ -29,7 +31,8 @@ One cited origin for one or more observed values.
 | `retrieved_on` | `date` | Required. |
 | `verified_on` | `date \| None` | `None` means not verified against a primary source. **Permitted and expected**; the key may not be absent from the declaration (FR-014). |
 
-`is_verified` is `verified_on is not None`.
+`sources.is_verified(ref)` — a free function, not a property — is
+`ref.verified_on is not None`.
 
 ### `Provenance`
 
@@ -37,12 +40,15 @@ A frozenset of `SourceRef`, with union as its combining operation — a commutat
 with the empty set as identity. This is the mechanism by which FR-015 becomes structural
 rather than remembered.
 
-| Member | Behaviour |
+The record holds one field, `sources: frozenset[SourceRef]`. Everything else is a free
+function in `core/primitives/provenance.py`:
+
+| Function | Behaviour |
 |---|---|
-| `sources` | `frozenset[SourceRef]` |
-| `\|` (union) | Combines two provenances. Associative and commutative, so evaluation order cannot change the mark. |
-| `is_unverified` | `True` if **any** source has `verified_on is None`. One unverified input taints the result — that is the intended asymmetry. |
-| `unverified_sources` | The specific sources responsible, so the mark can name *why*. |
+| `merge(a, b)` | Union. Associative and commutative, so evaluation order cannot change the mark. |
+| `merge_all(items)` | Fold of `merge` over many, with `EMPTY` as the identity. |
+| `is_unverified(p)` | `True` if **any** source has `verified_on is None`. One unverified input taints the result — that is the intended asymmetry. |
+| `unverified_sources(p)` | The specific sources responsible, so the mark can name *why*. |
 
 `Provenance.EMPTY` is the identity, used for literals that came from no source (a zero, a
 count).
@@ -55,20 +61,26 @@ count).
 | `currency` | `Currency` | Always present. |
 | `provenance` | `Provenance` | Excluded from equality — `field(compare=False)`. |
 
-Rules:
+Operations are free functions in `core/primitives/money.py` — `add`, `sub`, `scale`,
+`total`, `compare` — with **no operator dunders** (D-E). The union site is therefore
+singular and greppable.
 
-- **Currency safety (FR-007, C5).** `+`, `-` and ordering comparisons between different
-  currencies raise `CurrencyMismatchError`. There is no implicit conversion anywhere, and
-  no operator that performs one.
-- **Provenance union (FR-015, E5).** Every arithmetic operation returns money whose
-  provenance is the union of its operands'. Multiplication by a scalar preserves
-  provenance; multiplication by money is not defined (money × money is not money).
+- **Currency safety (FR-007, C5).** `add`, `sub` and `compare` raise
+  `CurrencyMismatchError` across currencies. This is one of the few places a `raise` is
+  correct rather than a tagged union: mixing currencies is a programmer error, not a
+  business outcome, so it must stop the run rather than flow into a result.
+- **Provenance union (FR-015, E5).** Every combining function returns money whose
+  provenance is `merge` of its operands'. `scale(m, k)` by a plain number preserves
+  provenance; there is no money × money function, because that product is not money.
 - **Equality ignores provenance.** Two amounts equal in value are equal regardless of the
   path that produced them. Without this, the conservation invariants would fail for
   reasons unrelated to conservation.
 - **Equality is exact, and is not the financial comparison.** Because money is float,
   tests compare through the tolerance helpers, never `==`.
-- Frozen and hashable.
+- Frozen and hashable. No methods.
+- **Direct construction is the one hole.** `Money(...)` is callable anywhere, so code could
+  build an amount with `Provenance.EMPTY` and launder an unverified input. Guarded by a
+  test scanning for `Money(` outside `money.py` and the loader, plus manual review.
 
 ### `TOLERANCE` — the single tolerance
 
@@ -82,8 +94,9 @@ defines its own constant is a defect.
 
 ### `NominalRate` / `RealRate` / `RealTermsUnavailable`
 
-Three distinct types, so that assigning a nominal figure into a real slot is a **mypy
-strict error** rather than a runtime mistake (FR-022, SC-011, decision D4).
+Three distinct frozen records, so that assigning a nominal figure into a real slot is a
+**mypy strict error** rather than a runtime mistake (FR-022, SC-011, decision D4). Not a
+hierarchy — three unrelated types, which is exactly why the assignment fails to check.
 
 `RealTermsUnavailable` carries `reason: str` — populated with the fact that inflation is
 not modelled in this feature — satisfying FR-017's requirement that a degraded outcome
@@ -91,13 +104,14 @@ carry its reason.
 
 ### Conventions
 
-Three named registries, mapping a declared name to an implemented algorithm.
+Three registries, each a `Mapping[str, Callable]` from a declared name to an implemented
+algorithm. No classes, no subclass dispatch.
 
 | Registry | Values this feature implements |
 |---|---|
-| `DayCount` | `act/365`, `act/act`, `30/360` |
-| `Periodicity` | `annual`, `semiannual`, `quarterly` |
-| `BusinessDayRule` | `following`, `modified_following`, `none` |
+| `DAY_COUNT_FNS` | `act/365`, `act/act`, `30/360` |
+| `PERIODICITY_FNS` | `annual`, `semiannual`, `quarterly` |
+| `BUSINESS_DAY_FNS` | `following`, `modified_following`, `none` |
 
 An unrecognised name is a load-time failure naming the file and the value (FR-021). The
 *choice* is data; the *algorithm* is code — see research.md for why that is not a
@@ -131,9 +145,9 @@ The contractual terms from which the schedule is computed in closed form.
 | `coupon_rate` | `float` | Fraction of face per annum. Non-negative; zero is a valid zero-coupon bond. |
 | `issue_date` | `date` | |
 | `maturity_date` | `date` | **Strictly after** `issue_date` and after any purchase date, else a typed failure (spec edge case). |
-| `periodicity` | `Periodicity` | |
-| `day_count` | `DayCount` | |
-| `business_day_rule` | `BusinessDayRule` | |
+| `periodicity` | `str` | Must be a key of `PERIODICITY_FNS`, else a load-time failure (FR-021). |
+| `day_count` | `str` | Must be a key of `DAY_COUNT_FNS`. |
+| `business_day_rule` | `str` | Must be a key of `BUSINESS_DAY_FNS`. |
 | `provenance` | `Provenance` | Required. |
 
 ### `InstrumentDeclaration`
@@ -186,7 +200,8 @@ every figure (FR-008).
 | `Lot.cost_base_ccy` | `Money` | Cost in the base currency. Equal in this feature — both are UAH — but stored separately because the field's whole purpose is the case where they differ. |
 | `Lot.fx_rate_used` | `float \| None` | `None` when trade and base currency coincide. |
 
-`Position` invariants, asserted as properties over generated event streams:
+`Position` is a record; `positions.rebuild(events)` and `positions.consume(pos, qty, method)`
+are free functions. Invariants asserted as properties over generated event streams:
 
 - **C2** — `sum(lot.quantity) == position.quantity`; no lot ever goes negative; a
   disposal consumes lots by the configured method.
@@ -196,14 +211,16 @@ every figure (FR-008).
 
 ### `CashAccount`
 
-Per-currency balances. **C1**: for each currency, on every date,
+A record of per-currency balances, folded by `accounts.apply(acct, event)`. **C1**: for
+each currency, on every date,
 `Σ inflows − Σ outflows == balance`. Asserted daily across the whole projection, not only
 at the end — an error that cancels out by the final date is still an error.
 
-### `canonical_tuple()`
+### Canonical form
 
-A structural representation for the determinism check: nested tuples of primitives, with
-amounts as `float.hex()`. No serialisation, no hashing — those live in `data`.
+Free functions in `core/ledger/canonical.py` — `of_event(e)`, `of_position(p)`,
+`of_result(r)` — returning nested tuples of primitives, with amounts as `float.hex()`. No
+serialisation, no hashing; those live in `data`.
 
 **Provenance is deliberately excluded.** It identifies sources, so filling in a
 `verified_on` later would change the digest even though no computed amount moved, and C4
@@ -230,9 +247,12 @@ ledger events, never computed alongside them.
 | `excludes` | `frozenset[str]` | What this figure does **not** account for: route costs, exit costs, inflation. Principle VI forbids presenting a per-instrument access cost, so the figure states its own boundaries rather than leaving a later reader to assume it is comparison-ready. |
 | `provenance` | `Provenance` | Unioned from everything upstream. `is_unverified` is `True` while the yield is unverified. |
 
-### Failure results
+### Failure results — a tagged union
 
-Every degraded outcome is one of these, never an exception swallowed or a zero (FR-017):
+Every degraded outcome is one of these, never an exception swallowed and never a zero
+(FR-017). They are unrelated frozen records combined with `|`, dispatched by `match` with a
+`case _:` arm mypy proves unreachable — so adding a variant produces a type error at every
+site that must handle it, rather than silently inheriting a default:
 
 | Type | Carries |
 |---|---|

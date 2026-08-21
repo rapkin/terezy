@@ -1,6 +1,13 @@
 <!--
 Sync Impact Report
 ==================
+Version change: 1.0.0 → 1.1.0 (2026-08-21)
+Rationale: MINOR — new guidance added. A functional-style clause was added to
+Engineering Standards (owner decision D-E). No principle was removed or
+redefined, so no MAJOR bump. Invalidates nothing already written except the
+Phase-1 design artifacts of feature 001, which were restated as functions over
+records in the same change.
+
 Version change: (none) → 1.0.0
 Rationale: initial ratification. No prior constitution existed; the template
 placeholders are replaced with project-specific governance derived from
@@ -24,6 +31,8 @@ Founding decisions recorded (owner-approved 2026-08-21):
        stock-bond-inv-simulation (Engineering Standards → Provenance of behaviour).
   D-D  CI gates: property-based invariant tests, golden result files, strict
        typing, and a coverage floor. Mutation testing is out of scope for now.
+  D-E  Functional style: free functions over immutable records; no inheritance,
+       no ABCs, no Protocol classes with methods (Engineering Standards).
 -->
 
 # terezy Constitution
@@ -109,9 +118,10 @@ Reliability comes from invariants that are asserted, not from care.
   currency per day; lot conservation; basis conservation; no negative quantities;
   realised gain = proceeds − consumed basis − allocated fees, in both currencies.
   These are property-based tests over generated event streams, not example tests.
-- **Money is float64** (owner decision D-A), wrapped in a currency-tagged value
-  object so values in different currencies can never be silently combined. The
-  wrapper constrains currency, not precision.
+- **Money is float64** (owner decision D-A), carried in a currency-tagged immutable
+  record so values in different currencies can never be silently combined. The record
+  constrains currency, not precision; the functions that combine money live beside it in
+  its module (owner decision D-E), and they are the only way to combine it.
 - **One tolerance policy, defined centrally.** Because money is float, the
   specification's "reproduces a hand-computed schedule exactly" is implemented as
   "within the project tolerance". That tolerance is defined in exactly one place and
@@ -233,6 +243,28 @@ a test in this repository is an open gap, and the checklist states which.
 Mutation testing is explicitly out of scope for now, and may be proposed later as a
 scheduled job rather than a per-change gate.
 
+**Functional style (owner decision D-E).** Code is written as free functions over
+immutable records. This is not a stylistic footnote — it is how Principle III's purity
+requirement is actually achieved, since a function over a frozen record is trivially pure
+while an object invites hidden state.
+
+- **Records, not objects.** `@dataclass(frozen=True)` carrying only data is the
+  encouraged shape. Behaviour attached to a record is not.
+- **Free functions in modules, not methods.** `money.add(a, b)`, never `a.add(b)`.
+  Modules provide the namespace that classes otherwise would.
+- **No inheritance, no abstract base classes, no `Protocol` classes carrying methods.**
+  A plugin interface is a *function signature*, or a frozen record of functions passed
+  explicitly. The four permitted interfaces of Principle II are contracts on functions,
+  not class hierarchies.
+- **Tagged unions over exception hierarchies** for domain outcomes, dispatched with
+  `match`. `raise` is for programmer errors — a currency mismatch, a violated invariant —
+  never for a business result, which is a typed value per Principle IV.
+- **Registries are mappings of functions**, not subclass dispatch.
+- Enums and `Literal` are welcome: they are closed sum types, not objects.
+
+`abc` sits in the core's forbidden imports in `.importlinter`, so the no-hierarchies rule
+is mechanically enforced rather than merely stated.
+
 **Documentation is part of the feature.** An undocumented formula is an incomplete
 feature. Every metric carries a plain-language definition; every tax figure links to
 its rule, its source and its verification date; `docs/METHODOLOGY.md` is updated in
@@ -286,4 +318,4 @@ skipped, marked expected-to-fail, or deleted without an amendment.
 **Runtime guidance.** Day-to-day development guidance for coding agents lives in
 `CLAUDE.md`, which is subordinate to this document and may not contradict it.
 
-**Version**: 1.0.0 | **Ratified**: 2026-08-21 | **Last Amended**: 2026-08-21
+**Version**: 1.1.0 | **Ratified**: 2026-08-21 | **Last Amended**: 2026-08-21

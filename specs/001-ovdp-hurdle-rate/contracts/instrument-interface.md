@@ -5,72 +5,88 @@
 One of the four plugin interfaces permitted by constitution Principle II. Adding a fifth
 requires a constitution amendment; this feature implements this one and `TaxRule`.
 
-The shape follows what the product spec already fixed in §4.1, so that market instruments
-can arrive later without the interface being redesigned.
+Per owner decision D-E the interface is a **set of function signatures**, not a class.
+There is no base class to inherit and no protocol to implement — an instrument is a record
+of functions, and the registry is a mapping.
 
 ---
 
-## The protocol
+## The signatures
 
 ```python
-class Instrument(Protocol):
-    id: str
-    name: str
-    instrument_class: str
-    currency: Currency
-    income_currency: Currency
+# --- the functions an instrument must supply ---
 
-    def events(
-        self,
-        holding: Holding,
-        horizon: DateRange,
-        assumptions: Assumptions,
-    ) -> Sequence[Event] | InstrumentFailure: ...
+EventsFn = Callable[[Holding, DateRange, Assumptions], Sequence[Event] | InstrumentFailure]
+TaxClassesFn = Callable[[], Mapping[TaxableEventKind, str]]
+ConstraintsFn = Callable[[], InstrumentConstraints]
 
-    def tax_classes(self) -> Mapping[TaxableEventKind, str]: ...
 
-    def constraints(self) -> InstrumentConstraints: ...
+@dataclass(frozen=True)
+class InstrumentOps:
+    """The functions that define one instrument kind. Data, not an object."""
+    events: EventsFn
+    tax_classes: TaxClassesFn
+    constraints: ConstraintsFn
+
+
+# --- dispatch is a mapping, not subclass resolution ---
+
+REGISTRY: Final[Mapping[str, InstrumentOps]] = {
+    "fixed_income": fixed_income.OPS,
+}
 ```
+
+An unknown `instrument_class` is a load-time failure naming the file and the value — the
+mapping is closed, and a missing key is never a silent fallback.
+
+`InstrumentOps` is a frozen record whose fields happen to be functions. It carries no
+behaviour of its own, and nothing inherits from it.
 
 ## Obligations on every implementation
 
-**Purity.** `events()` is a pure function of its arguments. No I/O, no clock, no
+**Purity.** `events` is a pure function of its arguments. No I/O, no clock, no
 randomness. Called twice with equal arguments it returns equal results — this is what
 makes C4 achievable at all.
 
 **Provenance.** Every `Money` in every returned event carries the provenance of the terms
-that produced it. An implementation that constructs money with `Provenance.EMPTY` from
-declared terms is defective: it launders an unverified input into an apparently verified
-figure, which FR-015 calls top-severity.
+that produced it, built through `money.*` functions rather than constructed fresh. An
+implementation that builds money with `Provenance.EMPTY` from declared terms is defective:
+it launders an unverified input into an apparently verified figure, which FR-015 calls
+top-severity.
 
 **Explicit failure.** An instrument that cannot produce events returns an
-`InstrumentFailure` carrying the reason. It does not raise, does not return an empty
-sequence, and does not clamp anything to zero (FR-017). An empty sequence means
-"legitimately no events in this horizon" and nothing else.
+`InstrumentFailure` — a tagged union member, not an exception (D-E). It does not raise,
+does not return an empty sequence, and does not clamp anything to zero (FR-017). An empty
+sequence means "legitimately no events in this horizon" and nothing else.
+
+**Instrument identity is data, not a dispatch key.** Behaviour comes from declared terms.
+A conditional on `id == "ovdp_synthetic_a"` is a Principle II violation. Dispatch on
+`instrument_class` through the registry is the only branching permitted, and it selects an
+algorithm, not an issue.
 
 **`income_currency` may differ from `currency`.** Not exercised in this feature — both are
 UAH — but the field exists because the Inzhur REIT case (a UAH-denominated unit paying
 USD-pegged rent) is the reason it must not be collapsed into one field.
 
-**`tax_classes()` is plural.** A mapping from event kind to tax-class id, because the same
+**`tax_classes` is plural.** A mapping from event kind to tax-class id, because the same
 instrument is taxed one way on distribution and another on disposal. Returning a single
 class for all kinds is the modelling error this signature exists to prevent.
 
 ## What implementations must NOT do
 
-- **Apply tax.** Instruments emit gross events. Tax is the `TaxRule`'s job, applied
-  downstream. An instrument that nets tax into its own amounts makes the waterfall in
+- **Apply tax.** Instruments emit gross events. Tax is applied downstream by a
+  `ChargeFn`. An instrument that nets tax into its own amounts makes the waterfall in
   spec §5.3 impossible to build.
 - **Apply route or access costs.** Out of scope here, and per Principle VI an access cost
   is never a property of the instrument alone — it belongs to
   `(instrument × income stream × route)`.
-- **Branch on instrument identity.** Behaviour comes from declared terms. A conditional on
-  `id == "ovdp_synthetic_a"` is a Principle II violation.
+- **Hold mutable state between calls.** There is no instance to hold it in, which is
+  rather the point.
 
-## `FixedIncomeInstrument` — this feature's implementation
+## `fixed_income` — this feature's implementation
 
-Computes the coupon and principal schedule in closed form from `BondTerms`, then returns
-it as events.
+A module of free functions exporting `OPS: InstrumentOps`. Computes the coupon and
+principal schedule in closed form from `BondTerms`, then returns it as events.
 
 | Aspect | Behaviour |
 |---|---|
@@ -79,8 +95,12 @@ it as events.
 | Principal | One `principal_repayment` event on the adjusted `maturity_date` |
 | Reinvestment | Per declared policy: `hold_cash` emits nothing further; `reinvest` emits a `reinvestment` event buying whole units at the yield available on the coupon date, and reports the unbought remainder as retained cash (FR-020) |
 | Zero-coupon | `coupon_rate == 0.0` is valid: principal only, no coupon events |
-| Maturity ≤ issue | Returns `InconsistentTerms`, not an empty schedule |
+| Maturity ≤ issue | Returns `InconsistentTerms` |
 | Purchase below `min_ticket` | Returns `InfeasiblePurchase` with the shortfall (FR-018) |
+
+Conventions are resolved through three mappings — `DAY_COUNT_FNS`, `PERIODICITY_FNS`,
+`BUSINESS_DAY_FNS` — each `str -> Callable`. Adding a convention adds an entry and a
+function; adding an *issue* that uses one adds only a data file (SC-012).
 
 **Not implemented here**, and deliberately absent rather than stubbed: secondary-market
 sale before maturity, a thin-market haircut, restructuring, and pricing future purchases
@@ -95,4 +115,4 @@ later feature. A stub would invite a caller to depend on it.
 | `tests/worked_examples/test_coupon_reinvestment.py` | D2 — two-period reinvestment matches by hand; remainder retained as cash |
 | `tests/contract/test_data_only_extensibility.py` | SC-003, SC-012 — a second issue with different conventions works with zero code changes |
 | `tests/contract/test_provenance_propagation.py` | Every emitted amount carries the terms' provenance |
-| `tests/invariants/test_determinism.py` | C4 — `events()` called twice yields an identical digest |
+| `tests/invariants/test_determinism.py` | C4 — `events` called twice yields an identical digest |

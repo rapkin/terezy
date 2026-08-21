@@ -9,34 +9,43 @@ cited source entered as data, or it does not exist.
 
 ---
 
-## The protocol
+## The signatures
+
+Per owner decision D-E this is a function signature plus a record of data, not a class.
 
 ```python
-class TaxRule(Protocol):
-    id: str
-    applies_to: frozenset[TaxableEventKind]
+ChargeFn = Callable[[Event, TaxClass, TaxContext], TaxCharge | TaxFailure]
 
-    def charge(
-        self,
-        event: Event,
-        context: TaxContext,
-    ) -> TaxCharge | TaxFailure: ...
 
-    def provenance(self) -> Provenance: ...
+@dataclass(frozen=True)
+class TaxRuleOps:
+    """How a kind of tax rule behaves. Data, not an object."""
+    charge: ChargeFn
+
+
+REGISTRY: Final[Mapping[str, TaxRuleOps]] = {
+    "flat_rate": flat_rate.OPS,     # covers the exempt case: a flat rate of zero
+}
 ```
+
+Note what the signature does **not** do: it takes the `TaxClass` as an argument rather
+than closing over it. A rule is a stateless function; the rates live in the declared
+class, which is data loaded from `data/tax/`. There is nothing to construct and nothing to
+configure.
 
 ## Obligations on every implementation
 
-**No rates in code.** The implementation reads its rates from the declared `TaxClass` it
-was constructed with. A literal rate in a Python file is a defect regardless of whether
-it happens to be correct — including `0.0`.
+**No rates in code.** The function reads its rates from the `TaxClass` passed in. A
+literal rate in a Python file is a defect regardless of whether it happens to be correct
+— including `0.0`.
 
-**Provenance is mandatory and propagates.** `charge()` returns amounts whose provenance
-unions the event's provenance with the tax class's own. E5 requires that a tax figure
+**Provenance is mandatory and propagates.** `charge` returns amounts whose provenance
+unions the event's provenance with the tax class's own, via the `money.*` combining
+functions. E5 requires that a tax figure
 render with its source and verification date, and that the mark reach everything
 downstream.
 
-**Zero is a charge, not an absence.** For the exempt class, `charge()` returns a
+**Zero is a charge, not an absence.** For the exempt class, `charge` returns a
 `TaxCharge` of zero **carrying the exempt class's provenance** — not `None`, and not a
 skipped event. This matters: a zero charge that cites the exemption is the evidence that
 the exemption was applied; a missing charge is indistinguishable from a rule that never
@@ -50,8 +59,9 @@ are unrepresentable if the two are added together at source. Not exercised in th
 feature, where both are zero, but the structure is built now for the same reason
 currency tagging is.
 
-**Explicit failure.** An unresolvable situation returns `TaxFailure` with its reason. It
-does not raise, and it does not silently charge zero — a zero charge means "the rule
+**Explicit failure.** An unresolvable situation returns `TaxFailure` — a tagged union
+member, not an exception (D-E) — carrying its reason. It does not raise, and it does not
+silently charge zero — a zero charge means "the rule
 applied and the result was zero", which is a completely different fact from "the rule
 could not be applied".
 
@@ -61,7 +71,7 @@ could not be applied".
 |---|---|
 | `pit` | `Money`. Zero for the exempt class. |
 | `levy` | `Money`. Computed on its own base, reported separately. |
-| `total` | `pit + levy`, in the same currency. |
+| `total` | `money.add(pit, levy)`, same currency enforced. |
 | `taxable_base` | `Money`. The amount the rates were applied to — recorded so a figure can be checked without re-deriving it. |
 | `tax_class_id` | Which declared class produced this. |
 | `provenance` | Union of the event's and the class's. |
@@ -82,15 +92,20 @@ display currency, because for foreign securities it will not.
 - **Assume a single class per instrument.** The instrument supplies a mapping from event
   kind to class id; a rule that ignores the event kind will apply the wrong treatment the
   moment an instrument has two.
+- **Hold state.** There is no instance. Rates arrive as an argument on every call.
 - **Carry timing logic.** Payment date, cash sourcing for the payment, and forced sales on
   insufficient cash are later features. This interface records what is owed and for which
   year.
 
-## `ExemptTaxRule` — this feature's implementation
+## `flat_rate` — this feature's implementation
 
-Applies a declared class whose `pit_rate` and `levy_rate` are both zero. It is not a
-special case in code: it is the general rate-applying rule, given a class that declares
-zeroes. If it needed its own branch, the abstraction would be wrong.
+A module of free functions exporting `OPS: TaxRuleOps`. Applies whatever `pit_rate` and
+`levy_rate` the declared class carries.
+
+**There is no exempt rule.** The exemption is `flat_rate` applied to a class declaring
+zeroes — data, not code. If the exempt case needed its own function or its own branch,
+the abstraction would be wrong, and Principle II would be violated the moment a second
+exempt instrument appeared.
 
 Applied to `coupon` and `disposal_gain` per `ua_government_bond` in `data/tax/ua.toml`.
 

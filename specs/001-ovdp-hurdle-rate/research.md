@@ -2,7 +2,7 @@
 
 **Date**: 2026-08-21
 
-Six decisions the plan rests on. Each records what was chosen, why, and what was
+Seven decisions the plan rests on. Each records what was chosen, why, and what was
 rejected. No `NEEDS CLARIFICATION` remains: the spec's two clarifications were resolved
 before planning, and the questions below are design questions, not owner questions.
 
@@ -37,20 +37,33 @@ is what makes the D1 worked example a check of the engine rather than of the loa
 
 ## D2 — How provenance propagates
 
-**Decision**: Provenance rides **on `Money` itself**, as a frozenset-backed
-`Provenance` value object, and every arithmetic operation unions the operands'
-provenance. `Provenance` is excluded from equality comparison
+**Decision**: Provenance rides **inside the `Money` record**, as a frozenset-backed
+`Provenance` record, and the combining functions in the `money` module union the
+operands' provenance. `Provenance` is excluded from equality comparison
 (`field(compare=False)`), so it never affects whether two amounts are equal.
 
+Combination goes through free functions — `money.add`, `money.sub`, `money.scale` — not
+methods and not operator dunders (owner decision D-E, functional style). That makes the
+union site singular and greppable: there is exactly one `add`, and a reviewer checking
+FR-015 reads one function rather than auditing every call site.
+
 ```
-Money(1000.0, UAH, prov={ovdp_terms})  +  Money(155.0, UAH, prov={ovdp_terms, curve})
-    -> Money(1155.0, UAH, prov={ovdp_terms, curve})
+money.add(
+    Money(1000.0, UAH, prov={ovdp_terms}),
+    Money( 155.0, UAH, prov={ovdp_terms, curve}),
+) -> Money(1155.0, UAH, prov={ovdp_terms, curve})
 ```
 
 A figure is marked unverified when any source in its provenance set has an empty
-`verified_on`. Because union happens inside the arithmetic operators, **there is no way
-to add two amounts and forget to carry the mark** — the failure mode FR-015 calls
-top-severity becomes structurally unreachable rather than a thing to remember.
+`verified_on`. Because union happens inside the module's combining functions — the only
+way to combine money — **there is no way to add two amounts and forget to carry the
+mark**. The failure mode FR-015 calls top-severity becomes structurally unreachable
+rather than a thing to remember.
+
+The one remaining hole is direct construction: `Money(...)` is callable anywhere, so code
+could build an amount with `Provenance.EMPTY` and launder an unverified input. That is
+guarded by a test which scans for `Money(` outside its own module and the loader, plus
+manual review — the gates cannot see it.
 
 **Rationale**: FR-015 is the requirement most likely to be violated silently, by any
 contributor including a subagent. Making it a property of the type rather than a
@@ -66,6 +79,9 @@ recorded in the plan's Complexity Tracking.
 - *A generic `Sourced[T]` wrapper.* Propagation stays manual: every operation has to
   unwrap and rewrap, and `.value` becomes an easy escape hatch. Would need a lint rule to
   police, which is weaker than making it impossible.
+- *Operator dunders (`__add__`) for ergonomics.* Rejected under D-E. They are marginally
+  nicer to read but they are methods on a record, and they scatter the union across
+  several dunders instead of concentrating it in one named function.
 - *Run-scoped taint only* ("if any input to this run is unverified, mark the whole
   result"). Unfalsifiable and cheap, but useless: it cannot tell the owner *which*
   figure rests on an unverified input, so every figure would be marked forever and the
@@ -130,9 +146,9 @@ defence.
 
 ## D5 — How determinism is verified, given float64 money
 
-**Decision**: `core` exposes a pure, structural `canonical_tuple()` on events and
-results, returning nested tuples of primitives with amounts rendered by
-**`float.hex()`**. The **digest** (SHA-256 over a canonical encoding of that tuple)
+**Decision**: `core.ledger.canonical` provides pure, structural free functions —
+`canonical.of_event(e)`, `canonical.of_result(r)` — returning nested tuples of primitives
+with amounts rendered by **`float.hex()`**. The **digest** (SHA-256 over a canonical encoding of that tuple)
 lives in `terezy.data.manifest`, not in `core`.
 
 **Rationale**, three parts:
@@ -148,9 +164,10 @@ lives in `terezy.data.manifest`, not in `core`.
    tens of values — no numpy reductions, no BLAS. When the vectorized fast path arrives
    the digest may need revisiting, and that is noted rather than pre-solved.
 3. **The digest lives outside `core`** because hashing requires serialisation, and
-   `core` is barred from serialisation modules. Keeping `canonical_tuple()` structural
-   (tuples of primitives, no bytes, no encoding) leaves the purity contract intact while
-   still making determinism a core-defined property.
+   `core` is barred from serialisation modules — `hashlib` is now explicitly on that list.
+   Keeping the canonical functions structural (tuples of primitives, no bytes, no
+   encoding) leaves the purity contract intact while still making determinism a
+   core-defined property.
 
 **Alternatives rejected**:
 
@@ -159,9 +176,9 @@ lives in `terezy.data.manifest`, not in `core`.
 - *Compare full result objects for equality instead of digesting.* Works for a single
   run pair but gives nothing to record in the manifest for later comparison, which
   FR-012 wants.
-- *`hashlib` inside `core`.* Not currently forbidden by `.importlinter`, but importing it
-  there would be arguing with the spirit of Principle III to save an indirection. The
-  plan proposes adding `hashlib` and `pydantic` to the core's forbidden list instead.
+- *`hashlib` inside `core`.* Importing it there would argue with the spirit of
+  Principle III to save an indirection. `hashlib` and `pydantic` were added to the core's
+  forbidden list in `.importlinter` instead, alongside `abc`.
 
 ## D6 — pydantic or hand-rolled validation
 
@@ -196,6 +213,47 @@ the boundary; the loader's contract is a project error naming file and field.
 - *pydantic types in `core`.* Purity-wise harmless, but it would put a validation
   framework in the domain layer and make the core's types answerable to a library's
   release cycle. Core uses plain frozen dataclasses.
+
+## D7 — Functional style, and what it changes
+
+**Decision** (owner decision D-E, added to the constitution as v1.1.0 mid-planning): free
+functions over immutable records. No inheritance, no ABCs, no `Protocol` classes carrying
+methods, no operator dunders. Tagged unions for domain outcomes, dispatched with `match`.
+Registries are mappings of functions.
+
+**What this changed in the design above, and what it did not.** All six decisions survive
+intact — none of them depended on objects. What changed is how each is *expressed*:
+
+| Was | Becomes |
+|---|---|
+| `Instrument` / `TaxRule` as `Protocol` classes with methods | Named function signatures (`EventsFn`, `ChargeFn`), grouped in a frozen record of functions where several travel together, dispatched from a `dict` registry keyed by instrument class |
+| `Money.__add__` unioning provenance | `money.add(a, b)` — one named function, the single union site |
+| `event.canonical_tuple()` | `canonical.of_event(event)` |
+| Exception hierarchy for failures | Tagged union of frozen records (`InfeasiblePurchase | InconsistentTerms | ...`), matched exhaustively |
+
+**Rationale**: the owner's stated preference, and it happens to reinforce Principle III
+rather than fight it. A free function over a frozen record is pure by construction and
+needs no reasoning about instance state; the purity contract in `.importlinter` and this
+style are pulling the same direction. It also improves the FR-015 guard specifically:
+concentrating provenance union in one named function is easier to review than auditing
+several dunders.
+
+**One place it costs something.** Exhaustive dispatch over a tagged union needs `match`
+plus a `case _:` arm that mypy proves unreachable, which is more ceremony than a virtual
+method call. That ceremony is the point: adding a variant then produces a type error at
+every site that must handle it, instead of silently inheriting a base-class default —
+which is exactly the silent-default failure mode Principle II and FR-016 exist to
+prevent.
+
+**Alternatives rejected**:
+
+- *`Protocol` without methods, holding only callables as attributes.* Nearly equivalent,
+  and a frozen dataclass of functions says the same thing with less indirection.
+- *`functools.singledispatch`.* Idiomatic and functional, but it dispatches on runtime
+  type and hides the set of handled cases, so a missing case is a runtime error rather
+  than a mypy error. Explicit `match` keeps exhaustiveness checkable.
+- *Keeping dunders as a "thin convenience" over the free functions.* Two ways to do the
+  same thing, and the convenient one bypasses the reviewable one.
 
 ---
 
