@@ -27,10 +27,14 @@ When a specification is ambiguous, clarify. Do not guess — and never guess a l
 or fee value. Those come from a cited public source entered as data, or they do not go
 in at all.
 
-**Never commit during implementation work.** Commits happen only when the user invokes
-`/commit`, which is why that skill is not model-invocable. Never `git push`, never open
-a PR, and never amend or rebase unless asked for exactly that. Every change lands
-green: `/commit` runs the gates and stops if any is red.
+**Commit at green checkpoints.** Committing is authorised without asking; follow
+`/commit`, which runs the gates and stops if any is red. A finished task or phase is a
+checkpoint — a half-finished edit is not, and broken work never gets committed to
+checkpoint it. Feature work lands on `main` by design; there are no feature branches.
+
+**Never `git push`**, never open a PR, and never amend, rebase or reset unless asked for
+exactly that. The commit grant is about not making the user click a button, not about
+rewriting history.
 
 ## Commands
 

@@ -1,12 +1,12 @@
 ---
 name: "commit"
-description: "Stage and commit changes to git. Running the command is the approval — it does not ask again."
+description: "Stage and commit changes to git at a green checkpoint. Runs the repo gates first and stops if any is red."
 argument-hint: "Optional commit message, and optional list of files to stage"
 metadata:
   author: "Mikola Parfenyuck"
   source: "adapted from lg-worktrees/self-review-2026/.claude/commands/commit.md"
 user-invocable: true
-disable-model-invocation: true
+disable-model-invocation: false
 ---
 
 ## User Input
@@ -19,8 +19,8 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Goal
 
-Stage and commit changes with a user-provided or generated message. Commits happen
-only when the user asks for one, and this skill is that ask.
+Stage and commit changes with a user-provided or generated message, at a point where the
+work is finished and the gates are green.
 
 ## Execution Steps
 
@@ -50,9 +50,8 @@ only when the user asks for one, and this skill is that ask.
    git add [files]
    git commit -m "[message]"
    ```
-   If the branch is `main` and the change is feature work rather than foundation or
-   docs, say so in the result — spec-kit puts feature work on its own branch — but
-   still commit what was asked.
+   This repo works on `main` by design; feature work landing there is normal and does
+   not need flagging.
 
 7. **Show the result** in the format below.
 
@@ -171,12 +170,14 @@ Nothing to commit — working tree is clean.
 
 ## Behavior Rules
 
-- **Never auto-commit** during implementation work. Commit only when the user invokes
-  this skill.
-- **Invoking this skill IS the approval** — never ask for yes/no confirmation of the
-  commit itself. The one exception is a red gate, per step 3.
-- **Never `git push`**, never open a PR, never amend or rebase an existing commit
-  unless the user asks for exactly that.
+- **Commit at green checkpoints, not mid-work.** A finished task or phase whose gates
+  pass is a checkpoint; a half-finished edit is not. Never commit to checkpoint broken
+  work.
+- **No yes/no confirmation needed** — commit authority is standing (granted 2026-08-21).
+  The one exception is a red gate, per step 3.
+- **Never `git push`**, never open a PR, never amend, rebase, reset --hard or force
+  anything unless the user asks for exactly that. The standing grant covers `commit`
+  only — it is about not making the user click a button, not about rewriting history.
 - **Never `git add -A` blindly past a guard** — if something looks like a secret or
   like per-user data, stop and say so.
 - **Keep messages concise** and use conventional commits consistently.
