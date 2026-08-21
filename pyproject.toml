@@ -1,0 +1,159 @@
+[project]
+name = "terezy"
+version = "0.1.0"
+description = "Decision-support framework for a UAH-income investor: instruments, routes, taxes, and honest strategy comparison."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Proprietary" }
+authors = [{ name = "Mikola Parfenyuck" }]
+
+dependencies = [
+    "numpy>=2.1",
+    "pandas>=2.2",
+    "scipy>=1.14",
+    "pydantic>=2.9",
+]
+
+[project.optional-dependencies]
+api = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+]
+cli = [
+    "typer>=0.15",
+    "rich>=13.9",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-cov>=6.0",
+    "hypothesis>=6.115",
+    "mypy>=1.13",
+    "ruff>=0.8",
+    "import-linter>=2.1",
+    "pandas-stubs>=2.2",
+    "syrupy>=4.8",
+    "httpx>=0.28",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/terezy"]
+
+# ---------------------------------------------------------------------------
+# Ruff — lint + format
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",      # pycodestyle
+    "F",           # pyflakes
+    "I",           # isort
+    "N",           # pep8-naming
+    "UP",          # pyupgrade
+    "B",           # flake8-bugbear
+    "A",           # flake8-builtins
+    "C4",          # comprehensions
+    "DTZ",         # flake8-datetimez — naive datetimes are a real bug class here
+    "T20",         # no print() in library code
+    "PT",          # pytest style
+    "RET",         # return simplification
+    "SIM",         # simplify
+    "ARG",         # unused arguments
+    "PTH",         # use pathlib
+    "ERA",         # commented-out code
+    "PL",          # pylint subset
+    "TRY",         # exception anti-patterns
+    "FLY",         # static join
+    "NPY",         # numpy legacy random etc.
+    "PD",          # pandas-vet
+    "RUF",
+]
+ignore = [
+    "TRY003",      # long messages in raise are wanted: errors must name file + field
+    "PLR0913",     # financial constructors legitimately take many parameters
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["PLR2004", "S101", "ARG001", "ARG002"]
+"src/terezy/cli/**" = ["T20"]      # the CLI is allowed to write to stdout
+
+[tool.ruff.lint.flake8-builtins]
+builtins-allowed-modules = ["types"]
+
+# ---------------------------------------------------------------------------
+# mypy — strict on the core, per constitution "Quality gates in CI"
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.12"
+files = ["src", "tests"]
+strict = true
+warn_unreachable = true
+warn_no_return = true
+enable_error_code = [
+    "redundant-expr",
+    "possibly-undefined",
+    "truthy-bool",
+    "ignore-without-code",
+    "unused-awaitable",
+]
+# A silent `Any` is how provenance and typing both get lost.
+disallow_any_explicit = false
+disallow_any_generics = true
+
+[[tool.mypy.overrides]]
+module = ["scipy.*"]
+ignore_missing_imports = true
+
+# ---------------------------------------------------------------------------
+# pytest
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--import-mode=importlib",
+]
+markers = [
+    "invariant: property-based invariant tests (Principle IV)",
+    "worked_example: hand-computed arithmetic checked into the repo (Principle V)",
+    "golden: end-to-end run compared against a checked-in golden result",
+    "contract: data-only extensibility and plugin-boundary tests (Principle II)",
+    "slow: excluded from the fast feedback loop",
+]
+filterwarnings = [
+    "error",
+    # Tests must never reach the network; if something tries, surface it loudly.
+]
+xfail_strict = true
+
+# ---------------------------------------------------------------------------
+# Coverage — the floor is a blocking gate
+# ---------------------------------------------------------------------------
+[tool.coverage.run]
+source = ["src/terezy"]
+branch = true
+
+[tool.coverage.report]
+# Raise this as the core fills in; it must never be lowered without a note in the PR.
+fail_under = 90
+show_missing = true
+skip_covered = true
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "@(abc\\.)?abstractmethod",
+    "class .*\\(Protocol\\):",
+    "\\.\\.\\.$",
+]

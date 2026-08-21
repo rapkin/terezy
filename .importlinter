@@ -1,0 +1,76 @@
+; Architecture boundaries from the constitution ("Architecture Constraints").
+; These are compliance tests for Principle III (Pure Deterministic Core) and
+; Principle II (Framework, Not Script). A violation fails the build.
+;
+; Run with:  uv run lint-imports
+
+[importlinter]
+root_package = terezy
+include_external_packages = True
+
+[importlinter:contract:layers]
+name = Layered architecture — dependencies point one way only
+type = layers
+layers =
+    terezy.cli
+    terezy.api
+    terezy.data
+    terezy.core
+
+[importlinter:contract:core-is-pure]
+name = The core performs no I/O, no network, no rendering, no formatting
+type = forbidden
+source_modules =
+    terezy.core
+forbidden_modules =
+    ; --- network ---
+    http
+    httpx
+    requests
+    socket
+    urllib
+    urllib3
+    ; --- filesystem / process ---
+    pathlib
+    shutil
+    subprocess
+    tempfile
+    os
+    io
+    ; --- serialisation & rendering are the API layer's job ---
+    csv
+    json
+    pickle
+    sqlite3
+    tomllib
+    logging
+    argparse
+    matplotlib
+    ; --- nondeterminism: seeds are explicit and recorded in the manifest ---
+    random
+    secrets
+    uuid
+allow_indirect_imports = False
+
+[importlinter:contract:core-independent-of-frameworks]
+name = The core knows nothing about its delivery surface
+type = forbidden
+source_modules =
+    terezy.core
+forbidden_modules =
+    fastapi
+    starlette
+    uvicorn
+    typer
+    click
+    rich
+allow_indirect_imports = False
+
+[importlinter:contract:data-below-api]
+name = The data layer never reaches up into orchestration
+type = forbidden
+source_modules =
+    terezy.data
+forbidden_modules =
+    terezy.api
+    terezy.cli

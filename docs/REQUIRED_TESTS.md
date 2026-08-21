@@ -1,0 +1,178 @@
+# Required tests
+
+This is the standing definition of done referenced by the constitution
+(Principle V, and "Provenance of behaviour" under Engineering Standards).
+
+Per owner decision **D-C**, terezy is a fresh implementation. No code was carried over
+from the predecessor project. The knowledge that lived in its test suite is carried
+over here as **requirements**: every item below must be independently re-derived and
+re-tested in this repository. A row without a test is an open gap, and this file is
+where that is visible.
+
+**Status legend** — `[ ]` not started · `[~]` partially covered · `[x]` covered, test
+path recorded in the Test column.
+
+Sources: `docs/reference/REWRITE_BRIEF.md` §4.1 (preserve), §4.2 (defects), §7
+(acceptance); `docs/reference/SIMULATOR_SPEC.md` §9 (acceptance).
+
+---
+
+## A. Preserved correctness behaviours
+
+From `REWRITE_BRIEF.md` §4.1. These were expensive to get right in the predecessor
+and must not be "simplified" here. Each is a behaviour, not a code port.
+
+| # | Behaviour | Test |
+|---|---|---|
+| A1 | Flow-adjusted (time-weighted) returns `r_t = (V_t − F_t)/V_{t−1} − 1` for every risk metric. A DCA value series is never `pct_change()`d. Canonical test: a flat-price asset with contributions yields exactly 0 return and 0 volatility. | `[ ]` |
+| A2 | XIRR reported separately as the money-weighted outcome. `(final/invested)^(1/y)` is not a DCA CAGR and must not reappear. | `[ ]` |
+| A3 | Sortino uses the 2nd lower partial moment over **all** observations, `√(mean(min(r−rf,0)²))` — never `std(r[r<0])`. | `[ ]` |
+| A4 | Optimizer input is asset price returns, never portfolio values. | `[ ]` |
+| A5 | No look-ahead: static weights come from the warm-up window only; walk-forward weights use data strictly before each rebalance date. Test corrupts future data and asserts weights unchanged. | `[ ]` |
+| A6 | Paydays map to the next trading day on/after; colliding paydays sum; every compared strategy uses the identical contribution schedule. | `[ ]` |
+| A7 | T-bills / deposits accrue ACT/365 over calendar-day gaps — weekends earn interest. | `[ ]` |
+| A8 | Periods-per-year measured from the data (~252 equities, ~365 crypto), never assumed. | `[ ]` |
+| A9 | Infeasible constraints raise instead of silently returning an invalid portfolio. | `[ ]` |
+| A10 | Walk-forward CV with an equal-weight baseline and an explicit train→test degradation number. The honest verdict ("tuning does not beat 1/N out of sample") is a feature. | `[ ]` |
+| A11 | Rolling-window robustness as the antidote to single-backtest storytelling. | `[ ]` |
+| A12 | Only completed calendar years are cached; the current year is always refetched. | `[ ]` |
+
+## B. Defect regressions
+
+From `REWRITE_BRIEF.md` §4.2 — one test per defect, so the class of mistake cannot
+recur. Severity is the predecessor's: **H** wrong numbers or crash, **M** misleading,
+**L** papercut.
+
+| # | Sev | Regression to assert | Test |
+|---|---|---|---|
+| B1 | H | Price index vs total-return series are never ranked in one table without labelling. Prices and distributions are separate series. | `[ ]` |
+| B2 | H | A provider outage never writes to cache and never silently reuses synthetic data. Cache entries carry provenance and a synthetic flag. | `[ ]` |
+| B3 | H | Non-integer year offsets either work or are rejected at parse time — never crash mid-run. | `[ ]` |
+| B4 | H | Exit/liquidation taxes only unrealised gains, never gains already taxed at a rebalance. | `[ ]` |
+| B5 | H | Tax is assessed to a tax year and paid from cash on the due date, not deducted from the position at trade time. Per-disposal basis, loss offset, and carryforward all modelled. | `[ ]` |
+| B6 | M | Benchmarks are compared after tax: deposit and T-bill interest is taxable income. | `[ ]` |
+| B7 | M | Per-leg minimum commission does not unrealistically penalise diversification; order batching, minimum order size and idle cash are modelled. | `[ ]` |
+| B8 | M | A young asset never silently truncates the study window; the effective window is reported. | `[ ]` |
+| B9 | M | Rolling metrics use measured periods-per-year, not a hardcoded 252. | `[ ]` |
+| B10 | M | Insufficient data returns a typed outcome carrying its reason, never an empty result that callers drop. | `[ ]` |
+| B11 | M | Report/API headline figures are selected explicitly, never by dict insertion order. | `[ ]` |
+| B12 | M | No non-standard composite score drives the primary user-visible ordering. | `[ ]` |
+| B13 | M | Costs are never silently clamped at zero; fees are explicit ledger lines and never blended into "market loss". | `[ ]` |
+| B14 | L | Date defaults are relative ("last full year"), never a hardcoded year. | `[ ]` |
+| B15 | L | Rolling robustness covers portfolios, and walk-forward CV accepts an arbitrary objective — including after-tax XIRR. | `[ ]` |
+| B16 | L | Per-asset provider failures degrade gracefully, are retried with backoff, and are reported. | `[ ]` |
+| B17 | L | API and CLI have smoke coverage, and a golden result file makes a refactor provably output-preserving. | `[ ]` |
+| B18 | L | Repo hygiene: no vendored virtualenv, caches, or stale result directories tracked. | `[x]` `.gitignore` |
+
+## C. Ledger invariants (property-based)
+
+Constitution Principle IV. These are generative tests over event streams, not example
+tests, and they are compliance tests for the constitution: they may not be skipped,
+xfailed, or deleted without an amendment.
+
+| # | Invariant | Test |
+|---|---|---|
+| C1 | Cash conservation: `Σ inflows − Σ outflows = cash balance`, per currency, every day. | `[ ]` |
+| C2 | Lot conservation: `Σ lot.quantity = position.quantity`; a sale consumes lots by the configured method and never produces a negative quantity. | `[ ]` |
+| C3 | Basis conservation: `Σ lot.cost = position basis`; realised gain = proceeds − consumed basis − allocated fees, in **both** currencies. | `[ ]` |
+| C4 | Determinism: same scenario + same snapshot ⇒ identical output hash. | `[ ]` |
+| C5 | Currency safety: values in different currencies can never be combined. | `[ ]` |
+| C6 | Every displayed figure resolves to ledger events and to the rule that produced it. | `[ ]` |
+
+## D. Contractual instruments
+
+`SIMULATOR_SPEC.md` §9. Hand-computed worked examples, arithmetic checked in.
+
+| # | Example | Test |
+|---|---|---|
+| D1 | OVDP bought at a stated price and held to maturity reproduces a hand-computed coupon and principal schedule, and pays **zero** tax under the exempt class. | `[ ]` |
+| D2 | Coupon reinvestment into the then-current yield curve matches a hand-computed two-period example. | `[ ]` |
+| D3 | A restructuring scenario with a 40% haircut and two-year delay produces the hand-computed shortfall. | `[ ]` |
+
+## E. Tax
+
+| # | Example | Test |
+|---|---|---|
+| E1 | An Inzhur distribution taxed at 9% + 5% and a redemption of the same units taxed at 18% + 5%, both in one run from one instrument — the two classes must not collide. | `[ ]` |
+| E2 | A loss year followed by a gain year nets correctly; a run that omits the loss-year declaration forfeits the carryforward. **Both branches tested.** | `[ ]` |
+| E3 | Foreign dividend with 15% withholding: PIT credit applied, military levy **not** credited. | `[ ]` |
+| E4 | Crypto scenarios `current_practice`, `draft_18_5`, `draft_transitional_5_5` produce three different hand-checkable results from identical market data. | `[ ]` |
+| E5 | Every tax figure renders with `source` and `verified_on`; an empty `verified_on` marks the figure **and everything derived from it**. | `[ ]` |
+| E6 | Lot-selection methods (FIFO / LIFO / average / specific) on a three-lot position with a partial sale each produce their own hand-computed tax. | `[ ]` |
+| E7 | Tax paid from cash in the following tax year; insufficient cash forces a sale, which is itself taxed. | `[ ]` |
+| E8 | The same scenario under jurisdiction A vs B differs only in the tax terms; the gross market outcome is bit-identical. | `[ ]` |
+| E9 | A residency change mid-simulation is applied by date, including positions held across the change. | `[ ]` |
+
+## F. FX, display currency, and asymmetry
+
+| # | Example | Test |
+|---|---|---|
+| F1 | **A position flat in USD across a devaluation produces a positive taxable gain in UAH.** This test is the reason the rewrite exists. | `[ ]` |
+| F2 | Switching display currency changes no realised amount, no tax figure, and no after-tax UAH ranking. | `[ ]` |
+| F3 | Historical series convert at per-date rates, never at today's rate. | `[ ]` |
+| F4 | The real-terms view uses UA CPI in the UAH display and US CPI in the USD display. | `[ ]` |
+| F5 | Cash-vs-non-cash channel selection changes the result and is visible in the attribution. A single mid-rate is never used for a transaction. | `[ ]` |
+
+## G. Streams and routes
+
+| # | Example | Test |
+|---|---|---|
+| G1 | The same crypto purchase funded from the UAH salary and from the USD income yields different net positions, differing by exactly the hand-computed ramp cost. | `[ ]` |
+| G2 | A P2P premium of +3 UAH at a stated reference rate reproduces the `SIMULATOR_SPEC.md` §4.3.1 percentage. | `[ ]` |
+| G3 | A plan exceeding a monthly cap queues the excess per the fallback policy and reports each occurrence; total deployed equals the cap, never the plan. | `[ ]` |
+| G4 | A regime transition on the war-end date switches the route set; round-trip cost drops by exactly the hand-computed difference. | `[ ]` |
+| G5 | Two variants of one route differing only in conversion count rank in the expected order. | `[ ]` |
+| G6 | No comparison reports a one-way cost as if it were round-trip. | `[ ]` |
+
+## H. The framework surface
+
+Compliance tests for Principle II. May not be skipped without an amendment.
+
+| # | Example | Test |
+|---|---|---|
+| H1 | Adding a new instrument, route, tax class and jurisdiction **in data only** — no engine edit — runs the full pipeline and appears in the comparison. | `[ ]` |
+| H2 | A malformed or unknown field in any data file fails loudly at load time, naming file and field; it never silently defaults. | `[ ]` |
+| H3 | Every data file's values round-trip through the run manifest, so a result traces to the exact configuration that produced it. | `[ ]` |
+| H4 | Architecture boundaries hold: the core imports no I/O, no network, no framework, and nothing from a layer above it. | `[x]` `tests/contract/test_architecture_boundaries.py` |
+
+## I. The decision layer
+
+| # | Example | Test |
+|---|---|---|
+| I1 | Feasibility pruning drops infeasible candidates with a recorded reason, and the count of dropped candidates is reported. | `[ ]` |
+| I2 | Two objectives over the same candidate set produce different rankings, and each run's manifest records which objective was used. | `[ ]` |
+| I3 | A binding constraint reports a non-zero shadow cost; a non-binding one reports zero. | `[ ]` |
+| I4 | The naive baseline (100% OVDP; 50/50 OVDP + VWCE) is always scored and always shown, and a synthetic case where nothing beats it produces the honest verdict. | `[ ]` |
+| I5 | Stability: perturbing one assumed input by 1% must not silently change the top recommendation; if the ranking flips, the run is labelled unstable. | `[ ]` |
+| I6 | Indifference band: a synthetic case where a range of allocations scores within noise reports the band, not a point. No allocation is ever reported to sub-percent precision. | `[ ]` |
+| I7 | "Sometimes best" and "never bad" are computed separately, and a synthetic case where they differ shows both. | `[ ]` |
+
+## J. Goals, seed, liquidity, honesty
+
+| # | Example | Test |
+|---|---|---|
+| J1 | The three goal modes are mutually consistent: solving for date from (contribution, sum) and then for sum from (contribution, that date) returns the original sum. | `[ ]` |
+| J2 | A seed lot with a known basis produces the hand-computed gain on disposal; a basis-estimated seed marks every downstream tax figure. | `[ ]` |
+| J3 | Redemption outside an Inzhur window is refused, or executed at the stated haircut when allowed — taxed correctly either way. | `[ ]` |
+| J4 | A lock-up longer than the horizon is a feasibility error, not a silent simulation. | `[ ]` |
+| J5 | Correlated stress hits OVDP, Inzhur and UAH simultaneously, never as independent draws. | `[ ]` |
+| J6 | No Sharpe ratio or volatility figure is emitted for an assumption-driven instrument. | `[ ]` |
+
+## K. Equivalence and golden results
+
+| # | Example | Test |
+|---|---|---|
+| K1 | With zero fees and zero taxes, the ledger engine matches the vectorized fast path within the project tolerance. | `[ ]` |
+| K2 | With zero taxes but nonzero fees, the ledger engine matches a closed-form fee-drag calculation. | `[ ]` |
+| K3 | A full end-to-end run on the offline snapshot completes and matches a checked-in golden result file. | `[ ]` |
+| K4 | Tests never reach the network; CI runs with networking unavailable. | `[x]` `tests/conftest.py`, `tests/contract/test_no_network.py` |
+
+---
+
+## On tolerance
+
+Owner decision **D-A**: money is `float64`. The specification's phrasing "reproduces a
+hand-computed schedule **exactly**" is therefore implemented as "within the project
+tolerance", which is defined in exactly one place and imported. A test that invents
+its own tolerance is a defect; a test that needs a looser one states why at the
+assertion site (constitution, Principle IV).

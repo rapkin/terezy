@@ -1,0 +1,110 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# The quality gates below are blocking, per the constitution's
+# "Quality gates in CI" clause (owner decision D-D). None is advisory.
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  UV_FROZEN: "1"
+
+jobs:
+  lint:
+    name: Lint and format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --all-extras --dev
+      - name: ruff check
+        run: uv run ruff check --output-format=github .
+      - name: ruff format
+        run: uv run ruff format --check --diff .
+
+  types:
+    name: Strict typing
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --all-extras --dev
+      - name: mypy (strict)
+        run: uv run mypy
+
+  architecture:
+    name: Architecture boundaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --all-extras --dev
+      - name: Import contracts
+        # Principle III: a layer violation or an I/O import in the core fails the build.
+        run: uv run lint-imports --verbose
+
+  test:
+    name: Tests (py${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv python install ${{ matrix.python }}
+      - run: uv sync --all-extras --dev --python ${{ matrix.python }}
+
+      - name: Tests, coverage gate enforced
+        # The suite must pass with no network reachable (Principle V). The conftest
+        # guard asserts this in-process; the runner has no fixtures that need egress.
+        run: >-
+          uv run pytest
+          --cov
+          --cov-report=term-missing
+          --cov-report=xml
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-py${{ matrix.python }}
+          path: coverage.xml
+          if-no-files-found: ignore
+
+  constitution:
+    name: Constitution compliance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --all-extras --dev
+
+      - name: Compliance tests may not be skipped
+        # The data-only extensibility test (Principle II) and the ledger invariant
+        # suite (Principle IV) are compliance tests for the constitution. Weakening
+        # them requires an amendment, so a skip or xfail here fails the build.
+        run: uv run pytest -m "contract or invariant" --no-header -q
+
+      - name: Legal and tax values carry a source
+        # Principle I: no tax or legal value may originate from an implementer's or
+        # an agent's memory. Every rate in data/tax/ needs source + retrieved_on.
+        run: uv run python scripts/check_provenance.py

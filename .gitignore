@@ -1,0 +1,39 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.eggs/
+
+# --- Environments (never vendored into the repo: REWRITE_BRIEF.md D18) ---
+.venv/
+venv/
+env/
+
+# --- Tool caches ---
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# --- Runtime data ---
+# Curated data under data/ IS version-controlled (constitution, Principle VII).
+# Per-user data, fetched caches and run outputs are not.
+cache/
+runs/
+out/
+data/user/
+
+# --- OS / editor ---
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# --- Agent folders may hold credentials (spec-kit init advisory) ---
+.claude/settings.local.json
