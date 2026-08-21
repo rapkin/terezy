@@ -117,14 +117,32 @@ def test_the_real_slot_is_tagged_so_absence_cannot_look_like_zero() -> None:
     )
 
 
-def test_the_exclusions_are_emitted_in_a_stable_order() -> None:
+def test_both_boundary_sets_are_emitted_in_a_stable_order() -> None:
     """A ``frozenset``'s iteration order is not a promise; the digest needs one."""
     hurdle = _projection(verified=False).hurdle
-    rendered = canonical.of_hurdle_rate(hurdle)[4]
-    assert rendered == tuple(sorted(hurdle.excludes))
+    rendered = canonical.of_hurdle_rate(hurdle)
+    assert rendered[4] == tuple(sorted(hurdle.accounts_for))
+    assert rendered[5] == tuple(sorted(hurdle.excludes))
     assert canonical.of_hurdle_rate(hurdle) == canonical.of_hurdle_rate(
-        replace(hurdle, excludes=frozenset(sorted(hurdle.excludes, reverse=True)))
+        replace(
+            hurdle,
+            accounts_for=frozenset(sorted(hurdle.accounts_for, reverse=True)),
+            excludes=frozenset(sorted(hurdle.excludes, reverse=True)),
+        )
     )
+
+
+def test_a_claim_added_to_accounts_for_alone_moves_the_digest() -> None:
+    """The mechanism ``ACCOUNTS_FOR`` claims, made real.
+
+    Naming what is included beside what is excluded is only a guard if *both* reach the
+    digest. It originally emitted ``excludes`` alone, so a term added to ``accounts_for``
+    -- a claim that the figure is now net of something it is not -- changed nothing a
+    reviewer or a golden file would notice.
+    """
+    hurdle = _projection(verified=False).hurdle
+    overclaimed = replace(hurdle, accounts_for=hurdle.accounts_for | {"funding route costs (in)"})
+    assert canonical.of_hurdle_rate(hurdle) != canonical.of_hurdle_rate(overclaimed)
 
 
 def test_the_schedule_records_the_conventions_that_placed_its_dates() -> None:

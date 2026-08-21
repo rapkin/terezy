@@ -61,7 +61,7 @@ recur. Severity is the predecessor's: **H** wrong numbers or crash, **M** mislea
 | B14 | L | Date defaults are relative ("last full year"), never a hardcoded year. | `[ ]` |
 | B15 | L | Rolling robustness covers portfolios, and walk-forward CV accepts an arbitrary objective — including after-tax XIRR. | `[ ]` |
 | B16 | L | Per-asset provider failures degrade gracefully, are retried with backoff, and are reported. | `[ ]` |
-| B17 | L | API and CLI have smoke coverage, and a golden result file makes a refactor provably output-preserving. | `[ ]` |
+| B17 | L | API and CLI have smoke coverage, and a golden result file makes a refactor provably output-preserving. | `[~]` `tests/golden/test_end_to_end_ovdp.py` — golden half done; API and CLI do not exist yet (owner decision D-B) |
 | B18 | L | Repo hygiene: no vendored virtualenv, caches, or stale result directories tracked. | `[x]` `.gitignore` |
 
 ## C. Ledger invariants (property-based)
@@ -102,6 +102,7 @@ xfailed, or deleted without an amendment.
 | E7 | Tax paid from cash in the following tax year; insufficient cash forces a sale, which is itself taxed. | `[ ]` |
 | E8 | The same scenario under jurisdiction A vs B differs only in the tax terms; the gross market outcome is bit-identical. | `[ ]` |
 | E9 | A residency change mid-simulation is applied by date, including positions held across the change. | `[ ]` |
+| E11 | A **zero** tax figure distinguishes *exempted* from *not applicable* when rendered. The engine already separates them — a taxable event's zero cites its tax class, a non-taxable row's zero cites nothing because there is nothing to cite — but a reader looking at a schedule table sees `0.00` on every row either way. A presentation requirement for the waterfall (spec §5.3), recorded here so the distinction the engine preserves is not thrown away at the last step. | `[ ]` |
 | E10 | A rate declared as a **dated schedule** changes on its effective date, so a legislated change is modelled rather than requiring a rebuild. **Known gap:** as of feature 001 the tax schema carries a scalar rate per class, not a schedule, so `data/README.md` rule 3 and `SIMULATOR_SPEC.md` §4.5.1 are not yet satisfied. Closing it is a schema change plus a core change. | `[ ]` |
 
 ## F. FX, display currency, and asymmetry
@@ -165,7 +166,7 @@ Compliance tests for Principle II. May not be skipped without an amendment.
 |---|---|---|
 | K1 | With zero fees and zero taxes, the ledger engine matches the vectorized fast path within the project tolerance. | `[ ]` |
 | K2 | With zero taxes but nonzero fees, the ledger engine matches a closed-form fee-drag calculation. | `[ ]` |
-| K3 | A full end-to-end run on the offline snapshot completes and matches a checked-in golden result file. | `[ ]` |
+| K3 | A full end-to-end run on the offline snapshot completes and matches a checked-in golden result file. | `[x]` `tests/golden/test_end_to_end_ovdp.py` |
 | K4 | Tests never reach the network; CI runs with networking unavailable. | `[x]` `tests/conftest.py`, `tests/contract/test_no_network.py` |
 
 ---

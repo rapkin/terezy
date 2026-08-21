@@ -69,6 +69,7 @@ EXCLUDES: Final[frozenset[str]] = frozenset(
         "funding route costs (in)",
         "exit route costs (out)",
         "inflation (the figure is nominal)",
+        "public holidays (weekends are observed; no holiday calendar is modelled)",
     }
 )
 """What a feature-001 hurdle rate does not account for, in the output's own words.
@@ -171,8 +172,10 @@ class HurdleRate:
 def net_present_value(flows: Sequence[CashFlow], rate: float) -> float:
     """Discount a series of dated amounts back to the purchase date at ``rate``.
 
-    Continuous annual compounding of a discrete rate -- ``(1 + r) ** years`` with
-    fractional years -- rather than per-period compounding on a period count. The year
+    **Annual compounding at a fractional exponent** -- ``(1 + r) ** years``, where
+    ``years`` is a real number -- rather than per-period compounding on a count of whole
+    periods. It is deliberately *not* continuous compounding: that would be
+    ``exp(-r * years)`` and would give a different rate for the same flows. The year
     fractions come from the issue's declared day-count convention, so the annualisation
     is measured the same way the coupons were accrued; a separate hard-coded 365 here
     would make the yield disagree with the schedule it was computed from.
@@ -222,6 +225,11 @@ def internal_rate_of_return(flows: Sequence[CashFlow]) -> float:
         if (value > 0.0) == (at_low > 0.0):
             low, at_low = middle, value
         else:
+            # `high` moves without an accompanying `at_high`, and that is deliberate
+            # rather than an oversight: the loop only ever compares a midpoint's sign
+            # against `at_low`, so the upper endpoint's value is never read again after
+            # the bracket check above. Tracking it would be a second variable that has to
+            # stay correct and is never consulted.
             high = middle
     return (low + high) / 2.0
 

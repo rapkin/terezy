@@ -1,0 +1,224 @@
+# terezy golden result -- one end-to-end projection, recorded.
+#
+# Produced by tests/golden/test_end_to_end_ovdp.py, which compares this whole file
+# against a fresh run. Read that module's docstring before changing anything here.
+#
+# To update deliberately:
+#     TEREZY_UPDATE_GOLDEN=1 uv run pytest tests/golden/test_end_to_end_ovdp.py
+#     git diff tests/golden/ovdp_synthetic_a.golden.txt
+# then read the diff and say in the commit message why each changed line is intended.
+#
+# Every amount is repr of a float64: exact and round-trippable, so this rendering is
+# as strict as the digest at the foot of the file. Provenance and the code version are
+# deliberately absent; the declaration files' digests are deliberately present.
+#
+# THE TERMS PROJECTED HERE ARE SYNTHETIC AND UNVERIFIED. No figure below describes a
+# bond anyone can buy, and none of them accounts for funding-route cost, exit cost or
+# inflation. See docs/METHODOLOGY.md.
+
+== run ==
+
+instrument         ovdp_synthetic_a
+owner_id           owner-1
+purchased_on       2026-01-15
+quantity           10.0
+cost               10000.0 UAH
+horizon            2026-01-15 .. 2028-01-31
+consumption_method fifo
+coupon_policy      hold_cash
+canonical_encoding terezy-canonical-v1
+
+== inputs ==
+
+instrument ovdp_synthetic_a     instruments/ovdp_synthetic_a.toml        sha256:5094da08cebef6078dad2fb4c60887a90bd050a7ad0dc3b4701c0c82ebe0cf6d
+instrument ovdp_synthetic_b     instruments/ovdp_synthetic_b.toml        sha256:678d18eb309ea2ea96e5124abc4acf2660184384d69fc1e1c8389c804aad154e
+tax_class  ua_government_bond   tax/ua.toml                              sha256:fde43d76b65bc0c8d1829af48742c23fd767806770a26a48ac3e6448661ebd28
+
+== figures ==
+
+nominal_ytm                  0.16058553778779106
+nominal_cash_flow_return     0.16058553778779106
+real                         unavailable
+real_unavailable_because     inflation is not modelled in this feature, so no real figure can be computed. None is assumed either: a real rate derived from a guessed inflation rate would be a fabricated number wearing the same label as a measured one.
+total_tax                    0.0 UAH
+accounts_for                 tax on every taxable event over the holding's life
+excludes                     exit route costs (out)
+excludes                     funding route costs (in)
+excludes                     inflation (the figure is nominal)
+excludes                     public holidays (weekends are observed; no holiday calendar is modelled)
+
+== schedule ==
+
+  1  2026-01-15  purchase              units=10.0
+       gross -10000.0 UAH
+       tax   0.0 UAH
+       net   -10000.0 UAH
+       conventions semiannual / act/365 / following
+       caused_by instrument_term ovdp_synthetic_a:purchase
+       because   purchase of 10.0 units of 'Synthetic OVDP issue A — TEST FIXTURE, terms invented' at the stated cost
+  2  2026-07-15  coupon                units=none
+       gross 768.6301369863013 UAH
+       tax   0.0 UAH
+       net   768.6301369863013 UAH
+       conventions semiannual / act/365 / following
+       caused_by instrument_term ovdp_synthetic_a:coupon_rate
+       because   coupon at 0.155 per annum on 10.0 unit(s) accrued 2026-01-15 to 2026-07-15 on 'act/365', paid 2026-07-15 under the 'following' rule
+  4  2027-01-15  coupon                units=none
+       gross 781.3698630136987 UAH
+       tax   0.0 UAH
+       net   781.3698630136987 UAH
+       conventions semiannual / act/365 / following
+       caused_by instrument_term ovdp_synthetic_a:coupon_rate
+       because   coupon at 0.155 per annum on 10.0 unit(s) accrued 2026-07-15 to 2027-01-15 on 'act/365', paid 2027-01-15 under the 'following' rule
+  6  2027-07-15  coupon                units=none
+       gross 768.6301369863013 UAH
+       tax   0.0 UAH
+       net   768.6301369863013 UAH
+       conventions semiannual / act/365 / following
+       caused_by instrument_term ovdp_synthetic_a:coupon_rate
+       because   coupon at 0.155 per annum on 10.0 unit(s) accrued 2027-01-15 to 2027-07-15 on 'act/365', paid 2027-07-15 under the 'following' rule
+  8  2028-01-17  coupon                units=none
+       gross 781.3698630136987 UAH
+       tax   0.0 UAH
+       net   781.3698630136987 UAH
+       conventions semiannual / act/365 / following
+       caused_by instrument_term ovdp_synthetic_a:coupon_rate
+       because   coupon at 0.155 per annum on 10.0 unit(s) accrued 2027-07-15 to 2028-01-15 on 'act/365', paid 2028-01-17 under the 'following' rule
+ 10  2028-01-17  principal_repayment   units=10.0
+       gross 10000.0 UAH
+       tax   0.0 UAH
+       net   10000.0 UAH
+       conventions semiannual / act/365 / following
+       caused_by instrument_term ovdp_synthetic_a:maturity_date
+       because   redemption of 10.0 units at face value on 2028-01-15, paid 2028-01-17 under the 'following' rule
+
+== tax charges ==
+
+event   2  class ua_government_bond  year 2026
+       base  768.6301369863013 UAH
+       pit   0.0 UAH
+       levy  0.0 UAH
+       total 0.0 UAH
+event   4  class ua_government_bond  year 2027
+       base  781.3698630136987 UAH
+       pit   0.0 UAH
+       levy  0.0 UAH
+       total 0.0 UAH
+event   6  class ua_government_bond  year 2027
+       base  768.6301369863013 UAH
+       pit   0.0 UAH
+       levy  0.0 UAH
+       total 0.0 UAH
+event   8  class ua_government_bond  year 2028
+       base  781.3698630136987 UAH
+       pit   0.0 UAH
+       levy  0.0 UAH
+       total 0.0 UAH
+event  10  class ua_government_bond  year 2028
+       base  0.0 UAH
+       pit   0.0 UAH
+       levy  0.0 UAH
+       total 0.0 UAH
+
+== ledger ==
+
+as_of              2028-01-17
+base_currency      UAH
+consumption_method fifo
+
+-- accounts --
+UAH  inflows  13100.0 UAH
+UAH  outflows 10000.0 UAH
+UAH  balance  3100.0 UAH
+
+-- positions --
+ovdp_synthetic_a  quantity 0.0
+  basis_trade_ccy 0.0 UAH
+  basis_base_ccy  0.0 UAH
+
+-- disposals --
+event  10  2028-01-17  ovdp_synthetic_a  quantity 10.0
+       proceeds_trade_ccy       10000.0 UAH
+       proceeds_base_ccy        10000.0 UAH
+       consumed_basis_trade_ccy 10000.0 UAH
+       consumed_basis_base_ccy  10000.0 UAH
+       allocated_fees_trade_ccy 0.0 UAH
+       allocated_fees_base_ccy  0.0 UAH
+       realised_gain_trade_ccy  0.0 UAH
+       realised_gain_base_ccy   0.0 UAH
+       consumed_from ovdp_synthetic_a@2026-01-15 10.0
+
+-- events --
+  1  2026-01-15  purchase
+       amount -10000.0 UAH  owner owner-1
+       units  10.0  allocated_to none
+       lot_ref ovdp_synthetic_a ovdp_synthetic_a@2026-01-15
+       caused_by instrument_term ovdp_synthetic_a:purchase
+       because   purchase of 10.0 units of 'Synthetic OVDP issue A — TEST FIXTURE, terms invented' at the stated cost
+  2  2026-07-15  coupon
+       amount 768.6301369863013 UAH  owner owner-1
+       units  none  allocated_to none
+       lot_ref none
+       caused_by instrument_term ovdp_synthetic_a:coupon_rate
+       because   coupon at 0.155 per annum on 10.0 unit(s) accrued 2026-01-15 to 2026-07-15 on 'act/365', paid 2026-07-15 under the 'following' rule
+  3  2026-07-15  tax_charge
+       amount -0.0 UAH  owner owner-1
+       units  none  allocated_to none
+       lot_ref none
+       caused_by tax_rule ua_government_bond
+       because   tax class 'ua_government_bond' charged on a taxable base of 768.6301369863013 UAH arising from event 2, accruing to the 2026 tax year
+  4  2027-01-15  coupon
+       amount 781.3698630136987 UAH  owner owner-1
+       units  none  allocated_to none
+       lot_ref none
+       caused_by instrument_term ovdp_synthetic_a:coupon_rate
+       because   coupon at 0.155 per annum on 10.0 unit(s) accrued 2026-07-15 to 2027-01-15 on 'act/365', paid 2027-01-15 under the 'following' rule
+  5  2027-01-15  tax_charge
+       amount -0.0 UAH  owner owner-1
+       units  none  allocated_to none
+       lot_ref none
+       caused_by tax_rule ua_government_bond
+       because   tax class 'ua_government_bond' charged on a taxable base of 781.3698630136987 UAH arising from event 4, accruing to the 2027 tax year
+  6  2027-07-15  coupon
+       amount 768.6301369863013 UAH  owner owner-1
+       units  none  allocated_to none
+       lot_ref none
+       caused_by instrument_term ovdp_synthetic_a:coupon_rate
+       because   coupon at 0.155 per annum on 10.0 unit(s) accrued 2027-01-15 to 2027-07-15 on 'act/365', paid 2027-07-15 under the 'following' rule
+  7  2027-07-15  tax_charge
+       amount -0.0 UAH  owner owner-1
+       units  none  allocated_to none
+       lot_ref none
+       caused_by tax_rule ua_government_bond
+       because   tax class 'ua_government_bond' charged on a taxable base of 768.6301369863013 UAH arising from event 6, accruing to the 2027 tax year
+  8  2028-01-17  coupon
+       amount 781.3698630136987 UAH  owner owner-1
+       units  none  allocated_to none
+       lot_ref none
+       caused_by instrument_term ovdp_synthetic_a:coupon_rate
+       because   coupon at 0.155 per annum on 10.0 unit(s) accrued 2027-07-15 to 2028-01-15 on 'act/365', paid 2028-01-17 under the 'following' rule
+  9  2028-01-17  tax_charge
+       amount -0.0 UAH  owner owner-1
+       units  none  allocated_to none
+       lot_ref none
+       caused_by tax_rule ua_government_bond
+       because   tax class 'ua_government_bond' charged on a taxable base of 781.3698630136987 UAH arising from event 8, accruing to the 2028 tax year
+ 10  2028-01-17  principal_repayment
+       amount 10000.0 UAH  owner owner-1
+       units  10.0  allocated_to none
+       lot_ref ovdp_synthetic_a none
+       caused_by instrument_term ovdp_synthetic_a:maturity_date
+       because   redemption of 10.0 units at face value on 2028-01-15, paid 2028-01-17 under the 'following' rule
+ 11  2028-01-17  tax_charge
+       amount -0.0 UAH  owner owner-1
+       units  none  allocated_to none
+       lot_ref none
+       caused_by tax_rule ua_government_bond
+       because   tax class 'ua_government_bond' charged on a taxable base of 0.0 UAH arising from event 10, accruing to the 2028 tax year
+
+== digest ==
+
+# sha256 over core.results.canonical.of_projection, taken by
+# data.manifest.digest_of_projection. Amounts reach it as float.hex(), so this
+# asserts bit-identity -- deliberately stricter than the project tolerance.
+sha256:43933823e5eb17e3c53d132898dc7ff0fbef41a434423906e258516ed4a11249

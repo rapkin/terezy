@@ -45,8 +45,9 @@ TOLERANCE: Final[float] = 1e-9
 Chosen as roughly four decimal orders above float64's ~1e-16 relative resolution, which
 leaves room for the accumulated rounding of a schedule of tens of cash flows while
 staying far tighter than any amount of money anyone would notice. On a balance of one
-million hryvnia that is a bound of one hundredth of a kopiyka -- indistinguishable from
-exact for a decision, and nowhere near loose enough to hide a modelling error.
+million hryvnia that is a bound of ``1e6 * 1e-9 = 0.001`` UAH -- a tenth of a kopiyka,
+indistinguishable from exact for a decision, and nowhere near loose enough to hide a
+modelling error.
 """
 
 

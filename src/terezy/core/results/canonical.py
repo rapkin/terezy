@@ -110,17 +110,25 @@ def of_real_terms(value: RealRate | RealTermsUnavailable) -> tuple[str, str]:
 
 
 def of_hurdle_rate(value: HurdleRate) -> tuple[Canonical, ...]:
-    """The figures: both nominal rates, the real slot, the tax total, and the exclusions.
+    """The figures: both nominal rates, the real slot, the tax total, and both boundary sets.
 
-    ``excludes`` is emitted sorted, so the digest depends on the content of the set and not
-    on the iteration order of a ``frozenset``, which is not guaranteed stable across
-    interpreter runs.
+    Both sets are emitted sorted, so the digest depends on their content and not on the
+    iteration order of a ``frozenset``, which is not guaranteed stable across interpreter
+    runs.
+
+    ``accounts_for`` was originally omitted, which quietly broke the mechanism its own
+    constant claims: naming what is included beside what is excluded is supposed to mean a
+    later feature cannot move a term from one set to the other without a reviewer seeing
+    both edits. With only ``excludes`` in the digest, a term added to ``accounts_for``
+    alone -- a *claim that the figure is now net of something* -- moved nothing. It does
+    now.
     """
     return (
         ledger_canonical.of_number(value.nominal_ytm.value),
         ledger_canonical.of_number(value.nominal_cash_flow_return.value),
         of_real_terms(value.real),
         ledger_canonical.of_money(value.total_tax),
+        tuple(sorted(value.accounts_for)),
         tuple(sorted(value.excludes)),
     )
 

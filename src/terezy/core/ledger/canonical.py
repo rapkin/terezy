@@ -54,8 +54,23 @@ two amounts with the wrong precision by accident.
 
 
 def of_number(value: float) -> str:
-    """One float, exactly and reversibly: ``float.hex()``."""
-    return value.hex()
+    """One float, exactly and reversibly: ``float.hex()``, with negative zero normalised.
+
+    ``-0.0`` is added to before hexing, which turns it into ``0.0`` and leaves every other
+    value untouched. Without that step ``(-0.0).hex()`` is ``-0x0.0p+0`` against
+    ``0x0.0p+0``: **different bytes for the same money.** Every zero tax charge currently
+    enters the ledger as a negative zero, because it is produced by scaling a zero by
+    ``-1.0``.
+
+    Normalising is the same judgement that keeps provenance out of this form. A digest
+    exists to answer "did the result change", and `-0.0 == 0.0` is true, the project
+    tolerance calls them identical, and no amount of money distinguishes them. A digest
+    that separated them would fire on a refactor that changed a sign convention while
+    moving no money at all -- and the only available response would be to overwrite every
+    recorded golden file unread, which is precisely the habit that makes golden files
+    worthless.
+    """
+    return (value + 0.0).hex()
 
 
 def of_optional_number(value: float | None) -> str | None:

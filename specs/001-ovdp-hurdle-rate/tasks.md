@@ -185,12 +185,12 @@ edit.
 
 ## Phase 7: Polish and cross-cutting
 
-- [ ] T052 Write `tests/golden/test_end_to_end_ovdp.py` — the full path from `data/instruments/ovdp_synthetic_a.toml` through the loader to `HurdleRate`, asserting it agrees with the directly-constructed path of T033 within the project tolerance
-- [ ] T053 [P] Create `docs/METHODOLOGY.md` documenting the coupon-schedule formula, each day-count fraction, the yield-to-maturity and cash-flow-weighted return definitions, and the tolerance policy. An undocumented formula is an incomplete feature
-- [ ] T054 [P] Flip the ten rows in `docs/REQUIRED_TESTS.md` and record each test path: **C1, C2, C3, C4, C5, C6, D1, D2, E5, H2**
-- [ ] T055 **REVIEW (manual, no gate can do this)**: read every site that produces a figure and confirm the provenance mark survives. The gates cannot see a dropped mark; FR-015 calls it top-severity. Check especially aggregations and any place a raw `float` is turned back into `Money`
-- [ ] T056 **REVIEW (manual, no gate can do this)**: grep the diff for `pytest.approx`, `abs(... ) <`, `math.isclose` and any numeric literal used as a bound. Every tolerance must be the imported one; FR-002 admits no local constant
-- [ ] T057 Run the full gate set: `ruff check`, `ruff format --check`, `mypy`, `lint-imports`, `check_provenance.py`, `pytest --cov` with the 90% floor. All blocking
+- [x] T052 Write `tests/golden/test_end_to_end_ovdp.py` — the full path from `data/instruments/ovdp_synthetic_a.toml` through the loader to `HurdleRate`, asserting it agrees with the directly-constructed path of T033 within the project tolerance
+- [x] T053 [P] Create `docs/METHODOLOGY.md` documenting the coupon-schedule formula, each day-count fraction, the yield-to-maturity and cash-flow-weighted return definitions, and the tolerance policy. An undocumented formula is an incomplete feature
+- [x] T054 [P] Flip the ten rows in `docs/REQUIRED_TESTS.md` and record each test path: **C1, C2, C3, C4, C5, C6, D1, D2, E5, H2**
+- [x] T055 **REVIEW (manual, no gate can do this)**: read every site that produces a figure and confirm the provenance mark survives. The gates cannot see a dropped mark; FR-015 calls it top-severity. Check especially aggregations and any place a raw `float` is turned back into `Money`
+- [x] T056 **REVIEW (manual, no gate can do this)**: grep the diff for `pytest.approx`, `abs(... ) <`, `math.isclose` and any numeric literal used as a bound. Every tolerance must be the imported one; FR-002 admits no local constant
+- [x] T057 Run the full gate set: `ruff check`, `ruff format --check`, `mypy`, `lint-imports`, `check_provenance.py`, `pytest --cov` with the 90% floor. All blocking
 
 ---
 
