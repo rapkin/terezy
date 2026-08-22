@@ -22,8 +22,10 @@ elsewhere.
 **Status:** two features in. **001 — the OVDP hurdle rate** is complete: an event-sourced
 ledger with tax lots, currency-tagged money whose provenance propagates through every
 derivation, declared instruments and tax classes, and a hand-verified after-tax return.
-**002 — the ramp** is in progress: income streams, routes as chains of legs, two-sided FX
-channels, and what it actually costs to move money to where an instrument lives.
+**002 — the ramp** is complete: income streams, routes as chains of legs, two-sided FX
+channels, monthly limits that belong to a shared rail, war-end regimes kept apart from
+observed facts, and the number the whole product turns on — **the same acquisition costs
+6.67% funded from the hryvnia salary and exactly 0% funded from the dollar contract.**
 
 The number the tool currently produces is marked **unverified**, and that is the honest
 state: the OVDP yield it rests on is an owner-reported observation nobody has checked

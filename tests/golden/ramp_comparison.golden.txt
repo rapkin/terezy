@@ -1,0 +1,86 @@
+# terezy ramp comparison -- a recorded result, not a source of truth.
+# Regenerate deliberately: TEREZY_UPDATE_GOLDEN=1 uv run pytest tests/golden/test_ramp_comparison.py
+# then read the diff. Every changed line needs a reason in the commit message.
+
+destination   binance
+stream        salary_uah
+amount        10000.0 UAH
+on_date       2026-08-21
+as_of         2026-08-21
+
+## inputs -- a change to any of these SHOULD fail this test, on its own line
+route      binance_p2p_to_monobank            sha256:69714d24adae946eab60b3a7c9a57690edc8ea15a01fddd801804678094e5c15
+route      coinbase_to_ibkr                   sha256:0a66044e87ea407cc7c8ebea7dc2a1bec35a2126c8d8ca2f8b136e529d14d5ef
+route      inzhur_direct                      sha256:22ca3b7b8e22cff58185cdff9117ee851b4b378f9efaf38675716419bdaf2026
+route      inzhur_to_monobank                 sha256:b50470924c2addd55fd19c7a654273fe8296a7604ee019a68f01d67838dcbdcd
+route      monobank_to_binance_card           sha256:4835af0b2feef59bd56cfda2e43b6ad69cc0662c37fd69c6b32eb6d9a95c4c36
+route      monobank_to_binance_p2p            sha256:bbc3d7bd9c338891f1f6bdba323cb21059230ae7e5aa2cc7538419759cd7ff51
+route      monobank_to_binance_p2p_double     sha256:e23f102032c347bbbd87a396d0bdcd1393c907ab90840779c33feb48dab8e693
+file       channels/uah_usd                   sha256:f8c7d96d5387a21efff9857b9326692a07049d9ed989a8ec107771b37dd7422e
+file       streams/owner-001                  sha256:6651ba42cf373ee55559b8975a623d01b50d565dc5e1a523d156dd42ad4cbe13
+file       observation_kinds                  sha256:5fce57016fecf3ceb49c7e2d9ad0d3da8e450d05c3404ac836dbc3ace04321c1
+file       venues                             sha256:b0417dd2c35ca6dcefd5fc122fce8598665d9881936f138dabaff7f82c2e7850
+
+## ranking -- lexicographic on (round trip, ceiling desc, latency)
+
+[0] monobank_to_binance_card
+      stream            salary_uah
+      destination       binance
+      status            open
+      latency_days      0
+      ceiling           100000.0 UAH
+      disruption        0.02
+      one_way  sent     10000.0 UAH
+      one_way  arrived  234.5765892563922 USD
+      one_way  fraction 0.014778325123152802
+      one_way  channels ('card',)
+      one_way  spread/r (0.01500000000000006,)
+      one_way  conversion_spread 147.78325123152803 UAH
+      one_way  fixed_fee        0.0 UAH
+      one_way  percentage_fee   0.0 UAH
+      round    fraction 0.07342247243725088
+      round    channels ('card', 'p2p')
+
+[1] monobank_to_binance_p2p
+      stream            salary_uah
+      destination       binance
+      status            open
+      latency_days      0
+      ceiling           100000.0 UAH
+      disruption        0.05
+      one_way  sent     10000.0 UAH
+      one_way  arrived  222.22222222222223 USD
+      one_way  fraction 0.06666666666666665
+      one_way  channels ('p2p',)
+      one_way  spread/r (0.07142857142857142,)
+      one_way  conversion_spread 666.6666666666665 UAH
+      one_way  fixed_fee        0.0 UAH
+      one_way  percentage_fee   0.0 UAH
+      round    fraction 0.12222222222222222
+      round    channels ('p2p', 'p2p')
+
+[2] monobank_to_binance_p2p_double
+      stream            salary_uah
+      destination       binance
+      status            open
+      latency_days      0
+      ceiling           100000.0 UAH
+      disruption        0.05
+      one_way  sent     10000.0 UAH
+      one_way  arrived  195.06172839506172 USD
+      one_way  fraction 0.18074074074074073
+      one_way  channels ('p2p', 'p2p', 'p2p')
+      one_way  spread/r (0.07142857142857142, 0.05952380952380952, 0.07142857142857142)
+      one_way  conversion_spread 1807.4074074074072 UAH
+      one_way  fixed_fee        0.0 UAH
+      one_way  percentage_fee   0.0 UAH
+      round    fraction 0.22950617283950614
+      round    channels ('p2p', 'p2p', 'p2p', 'p2p')
+
+recommended   0 (monobank_to_binance_card)
+ties          ()
+excluded      0
+not_comparable 0
+
+## digest over core.routes.ranking output
+sha256:ea6d06275e82918c132528634833e07588a713dd71171a590df8e50607f7229f

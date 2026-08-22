@@ -181,12 +181,12 @@ documents cited and nobody had written.
 
 ## Phase 8: Polish and cross-cutting
 
-- [ ] T049 Write `tests/golden/test_ramp_comparison.py` with a checked-in artefact — the full ramp comparison from declarations, digest plus readable rendering, same update procedure as feature 001's golden. Extends **K3**
-- [ ] T050 [P] Extend `docs/METHODOLOGY.md` — the premium-to-percentage formula, round-trip composition from a declared exit route, the two-sided channel convention and why no mid-rate is used, the staleness rule and its as-of date, and the capacity accumulator
-- [ ] T051 [P] Flip the eight rows in `docs/REQUIRED_TESTS.md` with test paths: **G1, G2, G3, G4, G5, G6, F5, B13**
-- [ ] T052 **REVIEW (manual, no gate can do this)**: walk every site producing a figure and confirm provenance **and** the staleness verdict survive. Every route number here is unverified at first run, so this feature leans on the marks harder than any so far. Check especially `money.scale_sourced` at each declared-rate application
-- [ ] T053 **REVIEW (manual, no gate can do this)**: grep the diff for `pytest.approx`, `math.isclose`, and numeric literals used as bounds. Every tolerance must be the imported one
-- [ ] T054 Run the full gate set: `ruff check`, `ruff format --check`, `mypy`, `lint-imports`, `check_provenance.py`, `pytest --cov` at the 90% floor. All blocking
+- [x] T049 Write `tests/golden/test_ramp_comparison.py` with a checked-in artefact — the full ramp comparison from declarations, digest plus readable rendering, same update procedure as feature 001's golden. Extends **K3**
+- [x] T050 [P] Extend `docs/METHODOLOGY.md` — the premium-to-percentage formula, round-trip composition from a declared exit route, the two-sided channel convention and why no mid-rate is used, the staleness rule and its as-of date, and the capacity accumulator
+- [x] T051 [P] Flip the eight rows in `docs/REQUIRED_TESTS.md` with test paths: **G1, G2, G3, G4, G5, G6, F5, B13**
+- [x] T052 **REVIEW (manual, no gate can do this)**: walk every site producing a figure and confirm provenance **and** the staleness verdict survive. Every route number here is unverified at first run, so this feature leans on the marks harder than any so far. Check especially `money.scale_sourced` at each declared-rate application
+- [x] T053 **REVIEW (manual, no gate can do this)**: grep the diff for `pytest.approx`, `math.isclose`, and numeric literals used as bounds. Every tolerance must be the imported one
+- [x] T054 Run the full gate set: `ruff check`, `ruff format --check`, `mypy`, `lint-imports`, `check_provenance.py`, `pytest --cov` at the 90% floor. All blocking
 
 ---
 

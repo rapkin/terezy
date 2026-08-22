@@ -18,7 +18,7 @@ needs  = []
 
 [[feature]]
 id     = "002-ramp-cost"
-status = "in-progress"
+status = "done"
 needs  = ["001-ovdp-hurdle-rate"]
 
 [[feature]]

@@ -1319,7 +1319,172 @@ separation itself in `tests/unit/test_transition_is_an_assumption.py`.
 
 ---
 
-## 16. Where to look next
+## 16. The ramp: what a declared premium actually costs
+
+This is feature 002's headline arithmetic, and it is written out at length because the first
+implementation of it was **wrong in a way that looked right**.
+
+### 16.1 The two-sided channel, and why no mid-rate is ever transacted at
+
+A channel is a named rate source with **two sides**, both declared, neither derived from the
+other. A P2P book quotes one price to buy dollars and a lower one to sell them; a bank
+publishes a markup each way. Computing the sell side from the buy side would be using a
+mid-rate with extra steps, which is exactly what FR-010 forbids.
+
+Two declaration forms, because the owner observes two different things:
+
+* `markup_bps` — a **cost magnitude** in basis points, the form a bank publishes. Added on
+  the buy side, subtracted on the sell side.
+* `premium_per_unit` — a **signed offset** in base currency per unit, the form a P2P screen
+  shows. Both sides are `reference + premium`, so a buy side paying 3 UAH over declares `+3`
+  and a sell side giving up 2.5 declares `-2.5`. A **negative** buy-side premium is a
+  discount and is legal; a **zero** one means the channel is at the reference; a **missing**
+  one is refused, because absence and zero are different claims.
+
+The rate actually transacted at:
+
+```
+effective_rate  =  reference + premium          (buy, premium form)
+                =  reference + premium          (sell, premium form — the sign does the work)
+                =  reference × (1 + bps/10000)  (buy, markup form)
+                =  reference × (1 − bps/10000)  (sell, markup form)
+```
+
+### 16.2 The cost is `p/(r+p)` buying, and `p/r` is a different figure
+
+Both are reported, and only one of them is the cost.
+
+```
+loss_fraction         =  1 − reference/effective   (buying)  =  p/(r+p)
+                      =  1 − effective/reference   (selling) =  p/r
+spread_over_reference =  |effective − reference| / reference  =  p/r
+```
+
+Worked, with a premium of +3 against a reference of 42, so the price is **45**:
+
+```
+send            10 000.00 UAH
+arrive          10 000 / 45          =   222.222222… USD    ← what the venue hands over
+worth at ref    222.2222 × 42        = 9 333.333333… UAH
+the spread      10 000 − 9 333.33    =   666.666666… UAH
+loss_fraction   666.667 / 10 000     = 0.066666…  = 3/45 = 6.67 %   ← the cost
+spread/ref                             0.071428…  = 3/42 = 7.14 %   ← §4.3.1's figure
+```
+
+**Why both.** `SIMULATOR_SPEC.md` §4.3.1 quotes `p/r` — its "4.8–9.5% one way for +2 to +4"
+is `2/42` to `4/42` and nothing else — so that figure has to stay reproducible or the output
+loses its link to the claim that motivated the whole feature. But `p/r` is a fraction of a
+**rate**, and a cost is a fraction of **money**. On the sell side the two coincide exactly
+(`1 − (r−p)/r` is `p/r`); on the buy side they do not.
+
+**The correction, recorded because the wrong version shipped.** FR-004 originally named `p/r`
+as *the* cost, on the reading that §4.3.1 defined it. The first implementation charged `p/r`
+of the amount and converted the remainder at the reference. That reproduced §4.3.1's
+percentage exactly — and reported **221.09 USD arriving where the venue pays 222.22**, an
+implied all-in price of `r/(1 − p/r) = 45.23` rather than 45. The arriving amount was wrong,
+not merely differently framed, and no amount of internal consistency rescues a figure that
+says the owner ends up with less money than he does. §4.3.1 labels its own arithmetic
+illustrative — *"substitute the live rate; this is illustrative"* — so reading it as a
+definition of cost was the error. The requirement was corrected rather than the arithmetic
+bent to it.
+
+### 16.3 Fees, and where the spread applies
+
+Fees come off the amount entering a leg, in the sending currency; the **spread applies to
+what is left**, because that is what was actually converted. Attributing it to the full
+amount would double-count the fee-bearing slice.
+
+```
+10 000.00 UAH, 1 % fee, 50.00 fixed, premium +3
+percentage fee  100.00        fixed fee  50.00
+after fees      9 850.00
+arrive          9 850 / 45   = 218.888889 USD
+spread          9 850 × 3/45 = 656.666667 UAH
+```
+
+Cost components are a **closed set** — `conversion_spread`, `percentage_fee`, `fixed_fee` — so
+a leg cannot hide a charge in an unnamed one, and their sum is checkable against the whole.
+Nothing is clamped: if fees exceed the amount, the arriving figure goes to or below zero and
+the fraction may exceed 1.0, which is reported rather than capped.
+
+## 17. Round trip, and why it needs a declared exit
+
+Round-trip cost comes from a **separately declared exit route**, never from reversing the way
+in. Getting money back has its own chain, its own spreads and its own limits, and the way out
+is not the way in run backwards.
+
+For a single conversion each way it reduces to a ratio of the two prices:
+
+```
+round trip  =  1 − sell_price / buy_price
+            =  1 − 39.0 / 45.0  =  6/45  =  13.33 %      (premia +3 / −3)
+```
+
+**It needs no reference rate as an input** — which is what makes it hand-checkable. It is
+**not**, however, independent of the reference: the prices are `r ± p`, so the same premia
+against a different reference give a different answer (10.98 % at 42, 14.90 % at 30, 8.54 %
+at 55 for the war-end example in §15). What a formula does not *take* is not what its answer
+does not *depend on*, and an earlier docstring here blurred exactly that.
+
+**Conversions compound, they do not add.** A route crossing three times
+(UAH→USD→UAH→USD at 45 / 39.5 / 45) costs 18.07 % one way, not three times 6.67 %.
+
+**A destination whose exit nobody declared has no round-trip figure at all** — it is reported
+as *exit cost unknown* and kept out of any ranking. That is the decision working, not a gap:
+an asset that cannot be liquidated into spendable base currency at a knowable cost is not
+comparison-ready, and promoting the one-way figure into its place would produce a confident
+number for a path nobody has ever looked at.
+
+## 18. Staleness: which date ages, and against what
+
+Every observed value declares an **observation kind**, and every kind declares a
+`staleness_days` threshold. A P2P premium ages in days; a published bank tariff in a year; a
+regulatory limit when the regulator says so. One project-wide threshold would either cry wolf
+on tariffs or stay silent on premia, and a staleness warning that is usually wrong is one that
+gets ignored — worse than none. A kind with no declared threshold **fails at load**.
+
+```
+age      =  as_of − max(verified_on, retrieved_on)
+is_stale =  age > kind.staleness_days
+```
+
+**The later of the two dates.** Verifying a value against a primary source is the strongest
+refresh of confidence there is — stronger than re-fetching — so a value retrieved two years
+ago and verified last week is not stale. The asymmetry is deliberate: an **unverified** value
+ages from retrieval, which is every value in this project today and the stricter reading.
+
+**`as_of` is an input, never a clock.** The core cannot read the time (`datetime.now` is
+blocked by `.importlinter`), so the same inputs produce the same staleness verdicts forever.
+It is a different date from `on_date`, which is when money moves and which selects the month
+for a capacity limit; conflating them would make a projection into the future report every one
+of its inputs as stale, by years.
+
+## 19. Ranking: three keys in order, never combined
+
+Routes are ranked **lexicographically** on `(round-trip cost, ceiling descending, latency)`.
+A `None` ceiling sorts **first** — no declared cap is the least constrained a route can be, and
+treating an absent cap as zero would rank the freest route last while looking like a sensible
+default for a missing value.
+
+**There is no composite score**, and that is a requirement rather than a preference: required
+test **B12** forbids a non-standard score from driving the primary ordering, and a weighted
+score would have to weight hryvnia against days — a *preference*, not a fact, and precisely the
+kind of invented number this project refuses.
+
+**A tie is decided on round-trip cost alone.** Two routes costing the same within the project
+tolerance (§11) are reported as tied even where their ceilings or latencies differ: the owner
+asked which is cheapest, and "these two cost the same, and here is how they differ" answers
+that, while silently preferring one on a tiebreak he did not ask for does not. Tie grouping is
+**anchored, not chained** — every member is within one tolerance of the group's first member —
+because tolerance equality is not transitive and chaining would let an arbitrarily wide band
+become one tie as candidates accumulate.
+
+**Every candidate is costed by the same function as the recommendation**, and the
+recommendation is an *index into the costed set* rather than a separate value. A comparison
+whose alternatives were priced by a cheaper path than its winner is not a comparison; it is a
+recommendation with decoration.
+
+## 20. Where to look next
 
 | question | file |
 | --- | --- |
