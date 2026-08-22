@@ -44,8 +44,10 @@ rewriting history.
 (parallel spec-writing, an isolated experiment) runs in a git worktree under
 `.claude/worktrees/` (gitignored). Name the directory and the branch for the work, never
 an agent id: `.claude/worktrees/spec-006-goals` on branch `spec/006-goals`. These are
-short-lived plumbing, not feature branches: the work lands on `main` promptly, and the
-worktree and its branch are removed right after.
+short-lived plumbing, not feature branches: the work lands on `main` **squashed to one
+commit per unit of work** (one spec, one feature) with a message written fresh to the
+`/commit` standards — the branch's intermediate commits never reach `main`'s history —
+and the worktree and its branch are removed right after.
 
 ## Commands
 
