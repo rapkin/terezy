@@ -29,6 +29,14 @@ reads five short functions rather than auditing every arithmetic expression in t
 codebase. Adding ``__add__`` as a "thin convenience" would give the codebase two ways to
 do the same thing, and the convenient one would bypass the reviewable one.
 
+**Conversion is here too, and only here.** :func:`convert` is the one function that returns
+an amount in a currency other than its input's, and it exists in this module for the same
+reason everything else does: it is the single place a currency can change, so it is the
+single place a rate's provenance can be forgotten -- and it demands the rate's sources in
+its signature so it cannot be. Every other function refuses a mismatch by raising; that
+prohibition only means something if the sanctioned exception is one named, reviewable
+function rather than a ``Money`` built by hand somewhere else.
+
 **The one hole.** This record is constructible anywhere, so code elsewhere could build
 an amount with ``provenance.EMPTY`` and launder an unverified input into an apparently
 unmarked figure. No gate can see that. It is guarded by
@@ -168,6 +176,48 @@ def scale_sourced(amount: Money, factor: float, sources: Provenance) -> Money:
         amount.currency,
         prov.merge(amount.provenance, sources),
     )
+
+
+def convert(amount: Money, *, to_currency: Currency, rate: float, sources: Provenance) -> Money:
+    """Restate an amount in another currency at a dated rate, unioning the rate's sources.
+
+    The only function in the project that produces an amount in a currency other than its
+    input's, and therefore the only place a currency conversion can happen at all. Every
+    other function here refuses a mismatch by raising; this one performs the conversion the
+    others exist to prevent happening implicitly, which is why it demands the rate's
+    provenance in its signature and states its direction in the parameter name.
+
+    ``rate`` is **units of ``to_currency`` per one unit of ``amount.currency``**. That is
+    stated here, once, because an inverted rate is the classic FX defect: every figure stays
+    plausible and every one is wrong by a factor of the rate squared. A caller converting
+    UAH to USD against a channel quoting 42 UAH per USD passes ``1 / 42``, and the inversion
+    happens in one reviewable place next to the channel that supplied the number.
+
+    ``sources`` is required and keyword-only, for the reason :func:`scale_sourced` exists: a
+    rate is *always* an observation -- a channel's declared reference, an official quote on a
+    date -- so a conversion that carried only the amount's own provenance would produce a
+    figure that cannot say which rate it rests on. There is no overload without it.
+
+    **A conversion to the same currency is refused**, rather than returned unchanged. It is
+    not a conversion, and accepting it would let a bug that lost track of a currency pass
+    through here silently while collecting a rate's provenance it never used.
+
+    **A rate of zero or less is refused.** Zero is not a rate and neither is a negative
+    number; either would produce a figure that looks like money. This is a declined
+    question, not a clamp -- nothing is quietly adjusted to make the arithmetic work.
+    """
+    if amount.currency is to_currency:
+        raise ValueError(
+            f"a conversion from {amount.currency.value} to {to_currency.value} is not a "
+            "conversion. Same-currency arithmetic goes through scale, add or sub; reaching "
+            "here means a currency was lost track of."
+        )
+    if rate <= 0.0:
+        raise ValueError(
+            f"a rate of {rate!r} is not a rate: a conversion needs a strictly positive "
+            f"number of {to_currency.value} per {amount.currency.value}"
+        )
+    return Money(amount.amount * rate, to_currency, prov.merge(amount.provenance, sources))
 
 
 def total(items: Iterable[Money], currency: Currency) -> Money:

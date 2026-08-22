@@ -45,9 +45,9 @@ Do not stub a module to make an import succeed.
 
 ## Phase 1: Setup
 
-- [ ] T001 [P] Create `src/terezy/core/streams/__init__.py` with a charter docstring noting streams are per-owner data while routes are curated (Principle VII)
-- [ ] T002 [P] Add a charter docstring to `src/terezy/core/routes/__init__.py` (the package exists but is empty)
-- [ ] T003 Add the new modules to `tests/unit/test_package_layout.py` and confirm `uv run lint-imports` still passes
+- [x] T001 [P] Create `src/terezy/core/streams/__init__.py` with a charter docstring noting streams are per-owner data while routes are curated (Principle VII)
+- [x] T002 [P] Add a charter docstring to `src/terezy/core/routes/__init__.py` (the package exists but is empty)
+- [x] T003 Add the new modules to `tests/unit/test_package_layout.py` and confirm `uv run lint-imports` still passes
 
 **Checkpoint**: packages importable, boundaries intact.
 
@@ -62,19 +62,19 @@ costing function. Everything else depends on these.
 FR-029 hangs on; two agents writing it concurrently would produce the second code path the
 requirement exists to forbid.
 
-- [ ] T004 Write `tests/contract/test_staleness.py` — two values with the same retrieval date and different kinds go stale at different ages; a kind with no `staleness_days` fails; staleness is evaluated against a passed-in `as_of` and never a clock. Closes **FR-025**, **FR-028**. Must fail first
-- [ ] T005 Implement `src/terezy/core/primitives/staleness.py` — `ObservationKind`, `StalenessVerdict`, free functions `is_stale(retrieved_on, kind, *, as_of)` and `staleness_of(provenance, kinds, *, as_of)`
-- [ ] T006 Write `tests/worked_examples/test_channel_rates.py` — hand-computed: a premium of +3 UAH against a reference of 42 gives `3/42`; a 150 bps markup gives 0.015; a **negative** premium is legal; a **zero** premium means at-reference. Closes part of **FR-004**, **FR-010**
-- [ ] T007 Implement `src/terezy/core/routes/venues.py` — `Venue` record with the currencies it can hold
-- [ ] T008 Implement `src/terezy/core/routes/channels.py` — `FxChannel`, `ChannelSide` (exactly one of `markup_bps` / `premium_per_unit`), and `effective_rate(side, reference)`. **Both sides required, neither derived from the other** — a system computing the sell side from the buy side is using a mid-rate with extra steps
-- [ ] T009 Write `tests/unit/test_leg_costs.py` — one hand-checked case per leg kind, plus an unknown kind failing loudly and naming the known ones
-- [ ] T010 Implement `src/terezy/core/routes/legs.py` — `Leg` record and `LEG_COST_FNS: Mapping[str, LegCostFn]` for `transfer`, `fx`, `trade`, `withdrawal`. An `fx` leg requires a channel; the others forbid one
-- [ ] T011 Write `tests/contract/test_per_destination_cost_unrepresentable.py` — scan `core.routes` public signatures and fail on any that accepts a destination without a stream and a route. Closes **FR-008**. **This is the most important test in the feature**: a per-destination cost hides the entire §4.3.1 finding and reads as perfectly reasonable code
-- [ ] T012 Implement `src/terezy/core/routes/path.py` — `FundingPath(destination_id, stream_id, route_id)`, all three required, no defaults, no optional variant, and **no amount** (research.md D2, and the post-Phase-1 note in plan.md)
-- [ ] T013 [P] Write `tests/unit/test_round_trip_types.py` — a `OneWayCost` cannot occupy the round-trip slot (a mypy error, asserted structurally); `ExitCostUnknown` names the route whose partner is missing. Closes **FR-030**, part of **G6**
-- [ ] T014 Implement `src/terezy/core/results/ramp.py` — `CostComponent` (a **closed** enumeration, not a free-form mapping), `OneWayCost`, `RoundTripCost` as unrelated records, `ExitCostUnknown`, `RampCost`, `RouteUnusable`
-- [ ] T015 Write `tests/invariants/test_cost_attribution.py` — over generated routes and amounts, the components sum to `sent − arrived`. Closes part of **FR-003**. Must fail first
-- [ ] T016 Implement `src/terezy/core/routes/cost.py` — `cost_one`, the **only** costing function. Attributed by component, `as_of` and `on_date` as separate parameters, provenance merged through `money.scale_sourced` wherever a declared rate is applied. Closes **FR-001**–**FR-005**, **FR-011**, **FR-026**
+- [x] T004 Write `tests/contract/test_staleness.py` — two values with the same retrieval date and different kinds go stale at different ages; a kind with no `staleness_days` fails; staleness is evaluated against a passed-in `as_of` and never a clock. Closes **FR-025**, **FR-028**. Must fail first
+- [x] T005 Implement `src/terezy/core/primitives/staleness.py` — `ObservationKind`, `StalenessVerdict`, free functions `is_stale(retrieved_on, kind, *, as_of)` and `staleness_of(provenance, kinds, *, as_of)`
+- [x] T006 Write `tests/worked_examples/test_channel_rates.py` — hand-computed: a premium of +3 UAH against a reference of 42 gives `3/42`; a 150 bps markup gives 0.015; a **negative** premium is legal; a **zero** premium means at-reference. Closes part of **FR-004**, **FR-010**
+- [x] T007 Implement `src/terezy/core/routes/venues.py` — `Venue` record with the currencies it can hold
+- [x] T008 Implement `src/terezy/core/routes/channels.py` — `FxChannel`, `ChannelSide` (exactly one of `markup_bps` / `premium_per_unit`), and `effective_rate(side, reference)`. **Both sides required, neither derived from the other** — a system computing the sell side from the buy side is using a mid-rate with extra steps
+- [x] T009 Write `tests/unit/test_leg_costs.py` — one hand-checked case per leg kind, plus an unknown kind failing loudly and naming the known ones
+- [x] T010 Implement `src/terezy/core/routes/legs.py` — `Leg` record and `LEG_COST_FNS: Mapping[str, LegCostFn]` for `transfer`, `fx`, `trade`, `withdrawal`. An `fx` leg requires a channel; the others forbid one
+- [x] T011 Write `tests/contract/test_per_destination_cost_unrepresentable.py` — scan `core.routes` public signatures and fail on any that accepts a destination without a stream and a route. Closes **FR-008**. **This is the most important test in the feature**: a per-destination cost hides the entire §4.3.1 finding and reads as perfectly reasonable code
+- [x] T012 Implement `src/terezy/core/routes/path.py` — `FundingPath(destination_id, stream_id, route_id)`, all three required, no defaults, no optional variant, and **no amount** (research.md D2, and the post-Phase-1 note in plan.md)
+- [x] T013 [P] Write `tests/unit/test_round_trip_types.py` — a `OneWayCost` cannot occupy the round-trip slot (a mypy error, asserted structurally); `ExitCostUnknown` names the route whose partner is missing. Closes **FR-030**, part of **G6**
+- [x] T014 Implement `src/terezy/core/results/ramp.py` — `CostComponent` (a **closed** enumeration, not a free-form mapping), `OneWayCost`, `RoundTripCost` as unrelated records, `ExitCostUnknown`, `RampCost`, `RouteUnusable`
+- [x] T015 Write `tests/invariants/test_cost_attribution.py` — over generated routes and amounts, the components sum to `sent − arrived`. Closes part of **FR-003**. Must fail first
+- [x] T016 Implement `src/terezy/core/routes/cost.py` — `cost_one`, the **only** costing function. Attributed by component, `as_of` and `on_date` as separate parameters, provenance merged through `money.scale_sourced` wherever a declared rate is applied. Closes **FR-001**–**FR-005**, **FR-011**, **FR-026**
 
 **Checkpoint**: `pytest -m "invariant or contract"` green. **Commit.** Parallel work may begin.
 

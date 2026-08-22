@@ -225,9 +225,25 @@ against the existing ones with no source edit.
 - **FR-003**: The system MUST attribute cost to its components — conversion spread,
   percentage fees, fixed fees — so a reader can see which term dominates. "Most of the gap
   is the ramp, not the asset" is the sentence this feature exists to let the tool write.
-- **FR-004**: A declared premium in base currency per unit of foreign currency MUST
-  produce a cost percentage equal to the premium divided by the stated reference rate,
-  reproducing `SIMULATOR_SPEC.md` §4.3.1 exactly.
+- **FR-004**: ⚙ **Corrected during implementation.** A declared premium `p` in base
+  currency per unit of foreign currency MUST produce **two** separately labelled figures,
+  and the difference between them is not a rounding detail:
+  - the **cost** — what fraction of the money was actually lost — is `p / (r + p)` when
+    buying the foreign currency and `p / r` when selling. The conversion happens at the
+    rate actually transacted at, so the arriving amount is the one the venue would really
+    hand over.
+  - the **spread over the reference rate** is `p / r`. This is the figure
+    `SIMULATOR_SPEC.md` §4.3.1 quotes, and it MUST remain reproducible so the output stays
+    traceable to the claim that motivated this feature.
+
+  The first draft of this requirement mandated `p / r` as *the* cost, on the reading that
+  §4.3.1 defined it. Implementation showed the consequence: a +3 premium on a reference of
+  42 means a P2P price of 45, so 10 000 UAH buys 222.22 USD — but charging `3/42` of the
+  amount and converting the remainder at 42 reports **221.09 USD, short by 1.13 USD**. The
+  arriving amount was wrong, not merely differently framed. §4.3.1 labels its own arithmetic
+  illustrative ("substitute the live rate; this is illustrative"), so reading it as a
+  definition of cost was the error. On the **sell** side the two coincide exactly, so the
+  correction moved the buy side only.
 - **FR-005**: Costs MUST NEVER be silently clamped. If fees exceed the amount, the system
   reports that; the money never vanishes without a diagnostic. Every fee is an explicit
   recorded line, never blended into the outcome.
@@ -344,8 +360,10 @@ against the existing ones with no source edit.
 - **SC-001**: For a stated amount, a declared P2P premium and a stated reference rate, the
   one-way and round-trip cost percentages match independently hand-computed figures to
   within the single project tolerance, with the arithmetic recorded beside the check.
-- **SC-002**: A declared premium of +3 UAH against a reference rate reproduces the
-  `SIMULATOR_SPEC.md` §4.3.1 percentage exactly.
+- **SC-002**: A declared premium of +3 UAH against a reference of 42 reproduces
+  `SIMULATOR_SPEC.md` §4.3.1's `3/42 = 7.14%` exactly **as the spread over the reference
+  rate**, and reports `3/45 = 6.67%` as the cost — with 222.22 USD arriving, which is what
+  a P2P screen showing 45 would actually pay. Both figures present, each labelled.
 - **SC-003**: The same acquisition funded from the UAH stream and from the USD stream
   differs by exactly the hand-computed ramp cost, and the USD-funded path reports a
   conversion cost of exactly zero.
@@ -416,6 +434,19 @@ All three answered by the owner on 2026-08-22.
 | 1 | Round trip by reversing the inbound route, or from a declared exit route? | **Declared exit route**, separate and equally modelled | FR-027, and its consequence FR-030 |
 | 2 | One staleness threshold, or per value kind? | **Per value kind**, declared with the kind; no permissive default | FR-028 |
 | 3 | Cost every route fully, or cost the recommendation and summarise the rest? | **Every route in full, through the same code path** | FR-029 |
+
+### Correction found during implementation
+
+**FR-004 was wrong and was corrected**, not worked around. It mandated `p / r` as the cost
+of a premium, which produced an arriving amount 1.13 USD short of reality on a 10 000 UAH
+purchase. The full reasoning is in FR-004 itself; the short version is that `p / r` is a
+spread over a *rate* and `p / (r + p)` is a fraction of *money*, and only the second is a
+cost. Both are now reported, separately labelled.
+
+This is the second time in this project a figure has been correctly computed under a wrong
+label — the first was `nominal_ytm` in feature 001 moving with the coupon policy. Both were
+found by implementation rather than by review, and both are recorded rather than quietly
+fixed.
 
 **The first decision has a consequence worth stating on its own.** Requiring a declared
 exit route means a destination nobody has costed the exit for has **no round-trip figure at
