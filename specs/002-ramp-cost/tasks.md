@@ -134,9 +134,9 @@ the other, and no cost is attributable to a destination alone.
 
 **Goal**: two regimes, a transition date stated as an assumption, and the cost difference.
 
-- [ ] T035 [US4] Write `tests/worked_examples/test_regime_transition.py` — the **G4** example: contributions before and after the date use different route sets, and round-trip cost drops by exactly the hand-computed difference. Closes **G4**, **SC-009**. Must fail first
-- [ ] T036 [US4] Implement regime selection — `Regime`, `RegimeTransition` with `is_assumption: Literal[True]` (a `bool` could be set false; the type admits one value), and the free function selecting a route set by date. Closes **FR-019**
-- [ ] T037 [P] [US4] Write `tests/unit/test_transition_is_an_assumption.py` — the transition date is reported as a stated assumption with its rationale, never as a known fact, and a regime cannot be expressed as a leg availability window (research.md D8 — a fact and an assumption must stay distinguishable). Closes **FR-020**
+- [x] T035 [US4] Write `tests/worked_examples/test_regime_transition.py` — the **G4** example: contributions before and after the date use different route sets, and round-trip cost drops by exactly the hand-computed difference. Closes **G4**, **SC-009**. Must fail first
+- [x] T036 [US4] Implement regime selection — `Regime`, `RegimeTransition` with `is_assumption: Literal[True]` (a `bool` could be set false; the type admits one value), and the free function selecting a route set by date. Closes **FR-019**
+- [x] T037 [P] [US4] Write `tests/unit/test_transition_is_an_assumption.py` — the transition date is reported as a stated assumption with its rationale, never as a known fact, and a regime cannot be expressed as a leg availability window (research.md D8 — a fact and an assumption must stay distinguishable). Closes **FR-020**
 
 **Checkpoint**: commit.
 
@@ -161,6 +161,23 @@ the other, and no cost is attributable to a destination alone.
 **Checkpoint**: commit.
 
 ---
+
+## Phase 7b: the regime declaration — added after a gap was found
+
+⚙ **Found during Phase 6 review, not planned.** `plan.md`'s data tree promises
+`data/scenarios/ — regimes: transition date as a stated assumption`, and step 11 of its
+implementation sequence is "Regimes in scenario data". But T038 enumerates only routes, legs,
+channels, streams and observation kinds, and T039–T048 never touch a scenario. So **FR-019
+had no data-layer task anywhere in this feature**: the engine can select a route set by regime,
+and a regime cannot be declared.
+
+That is Principle II failing for one entity — adding a regime should be a data-only change,
+and without these tasks it is a code change. Same class of gap as the research decision four
+documents cited and nobody had written.
+
+- [ ] T055 [US5] Extend `src/terezy/data/declarations/schema.py`, `loader.py` and `resolver.py` for scenarios — `Regime` and `RegimeTransition` models, and the cross-file pass pydantic cannot do: every `route_ids` member must resolve, a regime must be **partner-closed** (including an inbound route while excluding its declared `partner_route` is refused, because `cost._round_trip` raises on a dangling partner), transitions must be date-ascending, and the chain must be unbroken. Closes the data half of **FR-019**
+- [ ] T056 [P] [US5] Create `data/scenarios/war_end.toml` — a `wartime` and a `normalized` regime and one transition, `is_assumption = true` with a required `rationale` in the owner's own words. **Exempt from the citation requirement** like everything in `data/scenarios/`: a belief has nothing to cite, and `is_assumption` is what it carries where an observation carries a source. Closes **FR-020**'s data half
+- [ ] T057 [US5] Write `tests/contract/test_scenario_declaration_loading.py` — one case per rule above, each failing loudly and naming file and field; plus a data-only test that a **third** regime added as data alone narrows the route set with zero source changes
 
 ## Phase 8: Polish and cross-cutting
 
@@ -238,7 +255,8 @@ the blended figure FR-008 exists to forbid.
 | 6 — US4 | 3 | G4, SC-009, FR-019, FR-020 |
 | 7 — US5 | 11 | SC-010, SC-011, FR-021–024, FR-027 |
 | 8 — Polish | 6 | the eight rows, methodology, manual reviews |
-| **Total** | **54** | |
+| 7b — the regime declaration (added) | 3 | the data half of FR-019, FR-020 |
+| **Total** | **57** | |
 
 **G5** (two route variants differing only in conversion count) and **F5** (channel selection
 visible in attribution) are closed by fixtures in T043 exercised through T019 and T021 —

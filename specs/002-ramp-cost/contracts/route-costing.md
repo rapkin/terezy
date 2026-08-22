@@ -133,11 +133,18 @@ LEG_COST_FNS: Final[Mapping[str, LegCostFn]] = {
 ```
 
 `on_date` and `as_of` are separate arguments and mean different things: `on_date` is when
-the money moves (it selects the regime and the month for the cap), `as_of` is when the
+the money moves (it selects the month for the cap), `as_of` is when the
 question is being asked (it decides staleness). Conflating them would make a projection into
 the future report every input as stale.
 
 ## Guarantees
+
+⚙ **`cost_one` never sees a `Regime`.** An earlier wording said `on_date` "selects the
+regime"; it does not. The caller narrows the route mapping with `scenarios.routes_in_force`
+using the same date, and only surviving routes reach `cost_one` — so a route a *belief* ruled
+out never produces a `RouteUnusable`, whose `binding_constraint` names a **declared field**.
+An assumed exclusion arriving in that record would be indistinguishable from an observed one,
+which is exactly the distinction research.md D8 exists to keep.
 
 **One costing function.** `rank` is defined as costing each path with `cost_one` and sorting
 the results. There is no second implementation, no fast path, no summary mode. FR-029.

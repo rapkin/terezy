@@ -1228,7 +1228,98 @@ carried is the whole of `sent`.
 
 ---
 
-## 15. Where to look next
+## 15. Regimes: a belief about the future, kept apart from an observation
+
+### 15.1 The two kinds of statement, and why they may not share a field
+
+Two things can shut a corridor, and a report has to be able to say which:
+
+| statement | where it lives | what it carries |
+| --- | --- | --- |
+| "this corridor closed in March 2025" — a **fact** | `Leg.available_from` / `Leg.available_until` | a source, a retrieval date, a verification date |
+| "the war ends mid-2027" — an **assumption** | `RegimeTransition` in scenario data | `is_assumption`, a `rationale`, and no source at all |
+
+Either could produce the same route set on a given date, and the arithmetic would agree to the
+last float. What would be lost is the only thing that mattered: written into one field, a
+corridor ruled out by a guess and one that genuinely closed appear in the *same shape* — a
+`RouteUnusable` whose `binding_constraint` names a declared field — and no reader can tell them
+apart. That is `SIMULATOR_SPEC.md` §1.3's distinction, and Principle I is the rule behind it.
+
+So a regime carries **no `Provenance`**, and that is not an omission. Provenance marks an
+observation; a belief has nothing to cite, and a fabricated source on one is the top-severity
+defect. What a belief carries instead is a marker whose type admits one value —
+`is_assumption: Literal[True]` — and the owner's reasoning in words. `data/scenarios/` is
+exempt from the citation gate for exactly this reason.
+
+### 15.2 The selection, and the boundary that is decided once
+
+`routes_in_force(regimes, routes, *, transitions, on_date)` returns the routes the scenario
+says exist on a date, the regime, the transition that decided it, and the ids it left out.
+
+* **`on_date`, never `as_of`.** `on_date` is when the money moves; `as_of` decides staleness.
+  The function has no `as_of` parameter at all, and there is no clock.
+* **The transition date belongs to the regime *after* it.** "The war ends on the first of July"
+  means the first of July is a day of peace, so the comparison is `on_date >= transition.on_date`.
+  Decided in one place, because two comparisons written independently would eventually disagree
+  by a day and the disagreement would be invisible.
+* **A sequence, folded forward.** A chain of regimes is a sequence of transitions; the regime in
+  force is the `after` of the last transition already passed, or the first transition's `before`
+  if none has. This feature *declares* one transition, because a second needs a second
+  assumption the owner has not stated.
+
+### 15.3 How a regime and a leg window compose
+
+In one direction only, and the order is the guarantee:
+
+1. The regime decides which routes are **candidates**. `routes_in_force` narrows the route
+   mapping, `paths_in_force` narrows the funding paths to match, and a route the regime rules
+   out never reaches `cost_one` — so it never produces a `RouteUnusable`. What was left out is
+   named in `RoutesInForce.excluded`, beside the transition responsible.
+2. Each surviving candidate is then costed, and its legs' windows and limits decide whether it
+   carries the money on the date — reported as a `RouteUnusable` naming the declared field.
+
+An assumed exclusion therefore appears as a route the regime does not include; an observed one
+as a binding constraint on a field with a source. The engine never learns what a regime is: no
+module in `core/routes/` imports `core/scenarios/`, which is asserted rather than intended.
+
+A regime is refused outright when it includes a route while excluding the exit route that route
+declares as its partner. "There is a way in and none out" is a *fact* about a corridor — a route
+declaring `partner_route = null` — so a one-directional regime is expressed as a separately
+declared pair, not as half of an existing one (FR-027).
+
+### 15.4 Worked example
+
+Same origin venue, same destination venue, same hryvnia salary, same 10 000 UAH, same reference
+rate of 42 out of the same channels mapping. The **only** difference is which corridor the
+regime says exists:
+
+```
+wartime      P2P book, +3 / -3     price 45 in, 39 back
+             in   10 000 / 45          =   222.222222 USD
+             out    222.222222 x 39    = 8 666.666666 UAH
+             round trip = 1 - 39/45    = 2/15  = 13.3333%    cost 1 333.333333 UAH
+
+normalized   bank, +0.5 / -0.5     price 42.5 in, 41.5 back
+             in   10 000 / 42.5        =   235.294117 USD
+             out    235.294117 x 41.5  = 9 764.705882 UAH
+             round trip = 1 - 41.5/42.5 = 2/85  =  2.3529%    cost   235.294117 UAH
+
+the drop     2/15 - 2/85 = 34/255 - 6/255 = 28/255 = 10.9804%
+             1 333.333333 - 235.294117    = 1 098.039215 UAH on 10 000
+```
+
+A round trip is what comes back over what went in, so the reference rate cancels out of both
+fractions and `28/255` is exact rather than an artefact of the rate chosen. `on_date` moves
+fourteen months across the transition while `as_of` does not move at all, so none of the drop is
+a staleness artefact.
+
+**1 098 UAH on 10 000 is what the assumption is worth**, and it is worth nothing more than the
+assumption is. Checked in `tests/worked_examples/test_regime_transition.py`; the fact/assumption
+separation itself in `tests/unit/test_transition_is_an_assumption.py`.
+
+---
+
+## 16. Where to look next
 
 | question | file |
 | --- | --- |
@@ -1245,6 +1336,8 @@ carried is the whole of `sent`.
 | Does a monthly cap bind, and is the excess reported? | `tests/worked_examples/test_monthly_cap.py` |
 | Is anything silently clamped? | `tests/invariants/test_no_silent_clamping.py` |
 | Does the ledger agree with the comparison? | `tests/invariants/test_cost_execute_agreement.py` |
+| What does the war ending change? | `tests/worked_examples/test_regime_transition.py` |
+| Can an assumption be mistaken for an observation? | `tests/unit/test_transition_is_an_assumption.py` |
 | What is still uncovered? | `docs/REQUIRED_TESTS.md` |
 
 The product specification is `docs/reference/SIMULATOR_SPEC.md`; the engine charter and the

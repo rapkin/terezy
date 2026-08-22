@@ -159,9 +159,24 @@ class Graph:
     reference_rate: float
 
 
-def _channel(reference: float, buy_premium: float, sell_premium: float) -> FxChannel:
+def _channel(
+    reference: float,
+    buy_premium: float,
+    sell_premium: float,
+    *,
+    channel_id: str = CHANNEL_ID,
+    kind: str = P2P_PREMIUM.id,
+) -> FxChannel:
+    """One two-sided quote for :data:`PAIR`.
+
+    ``channel_id`` and ``kind`` are parameters so a fixture can declare a *second* channel
+    for the same pair -- a bank quote beside a peer-to-peer one. Two channels quoting one
+    pair against the same reference and different markups is the ordinary case and is what
+    the two-sided quote is for; two channels quoting different *references* is the
+    disagreement this module's docstring refuses, so the reference stays one argument.
+    """
     return FxChannel(
-        id=CHANNEL_ID,
+        id=channel_id,
         pair=PAIR,
         reference_rate=reference,
         buy_side=ChannelSide(
@@ -171,7 +186,7 @@ def _channel(reference: float, buy_premium: float, sell_premium: float) -> FxCha
             markup_bps=None, premium_per_unit=Money(sell_premium, PAIR[0], RATE_SOURCES)
         ),
         observed_on=RETRIEVED_ON,
-        kind=P2P_PREMIUM.id,
+        kind=kind,
         provenance=RATE_SOURCES,
     )
 
@@ -190,7 +205,17 @@ def _leg(
     window: tuple[date | None, date | None] = (None, None),
     disruption: float = 0.0,
     pool: str | None = None,
+    channel_id: str = CHANNEL_ID,
+    observation: str | None = None,
 ) -> Leg:
+    """One leg of a hand-built fixture route.
+
+    ``channel_id`` names which declared channel an ``fx`` leg crosses at, so a second
+    corridor can price its conversion against a different quote for the same pair.
+    ``observation`` overrides which staleness threshold the leg's numbers age under; left
+    ``None`` it follows the kind, which is the right default for every fixture whose only
+    conversion is a peer-to-peer one.
+    """
     return Leg(
         index=index,
         kind=kind,
@@ -198,7 +223,7 @@ def _leg(
         to_venue=f"venue_{index + 1}",
         from_ccy=from_ccy,
         to_ccy=to_ccy,
-        channel=CHANNEL_ID if kind == FX else None,
+        channel=channel_id if kind == FX else None,
         fee_pct=fee_pct,
         fee_fixed=Money(fee_fixed, from_ccy, FEE_SOURCES),
         minimum=None if minimum is None else Money(minimum, from_ccy, FEE_SOURCES),
@@ -209,7 +234,11 @@ def _leg(
         available_from=window[0],
         available_until=window[1],
         disruption_probability=disruption,
-        kind_of_observation=P2P_PREMIUM.id if kind == FX else BANK_FEE_SCHEDULE.id,
+        kind_of_observation=(
+            observation
+            if observation is not None
+            else (P2P_PREMIUM.id if kind == FX else BANK_FEE_SCHEDULE.id)
+        ),
         provenance=FEE_SOURCES,
     )
 
@@ -521,6 +550,104 @@ def p2p_graph(
         route=inbound,
         routes={inbound.id: inbound, exit_route.id: exit_route},
         channels={CHANNEL_ID: _channel(reference, buy_premium, sell_premium)},
+        reference_rate=reference,
+    )
+
+
+BANK_CHANNEL_ID = "bank"
+"""A second declared quote for the same pair: a bank's rate rather than a P2P book's.
+
+The same reference, a much narrower spread. Two channels quoting one pair against one
+reference and different markups is the ordinary case -- it is what a two-sided quote is
+*for* -- and it is what makes :func:`bank_corridor_graph` a controlled comparison against
+:func:`p2p_graph` rather than a second world with its own idea of what a dollar is worth.
+"""
+
+
+def bank_corridor_graph(
+    *, buy_premium: float = 0.5, sell_premium: float = -0.5, reference: float = 42.0
+) -> Graph:
+    """The narrow corridor: one conversion in and one declared conversion out, at a bank.
+
+    Same shape as :func:`p2p_graph`, same origin venue, same destination venue, same stream,
+    same reference rate, zero fees -- and a spread of 0.5 UAH per dollar instead of 3. So the
+    **only** thing that differs between the two graphs is which corridor carries the money,
+    which is what makes the regime example (``tests/worked_examples/test_regime_transition.py``)
+    a controlled experiment: the cost drop is attributable to the route set and to nothing else.
+
+    Its channel is declared under its own id, so a caller costing both corridors passes **one**
+    channels mapping holding both quotes. That matters: had each regime been costed against its
+    own mapping, the rate would have changed with the route set and the drop would have had two
+    causes.
+
+    The bank's numbers age as a ``bank_fee_schedule`` rather than a ``p2p_premium`` -- a
+    published bank rate does not move the way a P2P book does -- so the two corridors also
+    carry different staleness verdicts against the same ``as_of``. Nothing in the arithmetic
+    depends on that; it is stated because a fixture calling a bank quote a peer-to-peer premium
+    would be inventing a fact about how the number was observed.
+
+    Every figure here is **invented**, with an empty ``verified_on``, exactly like every other
+    route number in this project.
+    """
+    exit_route = Route(
+        id="broker_to_bank",
+        provider="Universal Bank",
+        origin="venue_1",
+        destination="venue_2",
+        direction="exit",
+        partner_route=None,
+        status="open",
+        legs=(
+            _leg(
+                index=1,
+                kind=FX,
+                from_ccy=Currency.USD,
+                to_ccy=Currency.UAH,
+                fee_pct=0.0,
+                fee_fixed=0.0,
+                minimum=None,
+                channel_id=BANK_CHANNEL_ID,
+                observation=BANK_FEE_SCHEDULE.id,
+            ),
+        ),
+    )
+    inbound = Route(
+        id="bank_uah_to_broker",
+        provider="Universal Bank",
+        origin=ORIGIN_VENUE,
+        destination="venue_1",
+        direction="inbound",
+        partner_route=exit_route.id,
+        status="open",
+        legs=(
+            _leg(
+                index=0,
+                kind=FX,
+                from_ccy=Currency.UAH,
+                to_ccy=Currency.USD,
+                fee_pct=0.0,
+                fee_fixed=0.0,
+                minimum=None,
+                channel_id=BANK_CHANNEL_ID,
+                observation=BANK_FEE_SCHEDULE.id,
+            ),
+        ),
+    )
+    return Graph(
+        path=FundingPath(
+            destination_id=inbound.destination, stream_id=SALARY_UAH.id, route_id=inbound.id
+        ),
+        route=inbound,
+        routes={inbound.id: inbound, exit_route.id: exit_route},
+        channels={
+            BANK_CHANNEL_ID: _channel(
+                reference,
+                buy_premium,
+                sell_premium,
+                channel_id=BANK_CHANNEL_ID,
+                kind=BANK_FEE_SCHEDULE.id,
+            )
+        },
         reference_rate=reference,
     )
 

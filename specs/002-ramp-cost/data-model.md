@@ -153,7 +153,9 @@ generally ("a scenario MAY declare a transition date and a route set per regime"
 record expresses exactly one. A chain of regimes is representable as a sequence of these, and
 the selection function takes the whole sequence — but this feature declares and tests one,
 because a second transition needs a second assumption the owner has not stated. The type does
-not forbid more; the fixtures do not exercise more.
+not forbid more, and ⚙ the **tests** now exercise a three-segment chain: a validation loop
+never run to completion on a valid chain is untested validation. What still declares one is
+`data/scenarios/` (T056).
 
 | Field | Type | Rule |
 |---|---|---|
@@ -161,6 +163,12 @@ not forbid more; the fixtures do not exercise more.
 | `before`, `after` | `str` | Regime ids |
 | `is_assumption` | `Literal[True]` | **Structurally always true.** FR-020 requires a transition date be presented as a stated assumption; a `bool` could be set to `False`, so the type admits only one value. It exists to make the claim unmissable in the output, not to be branched on. |
 | `rationale` | `str` | Required. The owner's stated belief in words. |
+
+⚙ **Neither `Regime` nor `RegimeTransition` carries provenance, and the absence is
+load-bearing rather than an omission.** A belief has nothing to cite: `is_assumption` is what
+it carries where an observation carries a `source` and a `verified_on`. Giving a regime a
+provenance field would invite a citation for a guess, which is the one thing Principle I
+forbids most firmly. Asserted in `tests/unit/test_transition_is_an_assumption.py`.
 
 ---
 

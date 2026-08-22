@@ -19,6 +19,7 @@ LAYER_MODULES = (
     "terezy.core.instruments",
     "terezy.core.routes",
     "terezy.core.streams",
+    "terezy.core.scenarios",
     "terezy.core.ledger",
     "terezy.core.tax",
     "terezy.core.metrics",

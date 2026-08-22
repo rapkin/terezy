@@ -212,6 +212,18 @@ parallelisable against 8–11.
 | `FundingPath` as a mandatory triple, threaded through every costing signature | FR-008 requires a per-destination cost to be *unrepresentable*. A convention cannot deliver that, and this project has already had a mislabelled figure pass review twice | A required keyword argument is still satisfiable with a constant; a naming convention is the mechanism that already failed on `nominal_ytm` |
 | Two functions over one arithmetic — `cost_one` pure, `execute` deriving events from it | A comparison costs many routes and executes one, but FR-005 needs every executed fee as a recorded line | Events for all candidates would put fees in the ledger for money that never moved; two independent implementations is the divergence D3 exists to forbid |
 
+## An obligation this feature passes to the API layer
+
+⚙ **`RampCost` carries no regime and no assumption.** A figure costed under a regime cannot,
+from the `RampCost` alone, name the belief it rests on — the caller must keep the
+`RoutesInForce` beside it. So FR-020's "presented as a stated assumption, never as a known
+fact" is true of the **core** and becomes true of the **output** only if the result schema
+carries `stated_assumption` beside the figures.
+
+Recorded here rather than fixed: putting the transition on every `RampCost` would repeat one
+belief across every candidate in a ranking, and duplicated facts disagree. The same asymmetry
+is already recorded for `spreads_over_reference`.
+
 ## Deferred, with the seam named
 
 **`Provider` stays unimplemented.** FX channels are declared data in this feature, and the
