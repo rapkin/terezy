@@ -171,6 +171,25 @@ Compliance tests for Principle II. May not be skipped without an amendment.
 
 ---
 
+## Rows a feature reinforced without closing
+
+A feature sometimes exercises a row without satisfying it. Recording that here keeps two
+things straight at once: the box stays honest about what is actually covered, and the next
+person does not re-derive work that already exists somewhere.
+
+**003-route-coverage** closes **no** row. No lettered behaviour above names a registry
+coverage audit, and the feature's spec says so plainly rather than stretching one. Four rows
+it reinforces:
+
+| Row | How, and why the box does not move |
+|---|---|
+| **B10** | Exercised anew: an empty registry dimension returns `RegistryDimensionEmpty` naming **every** empty dimension, and every not-ready verdict carries its deficit and the declaration that would fix it — never an empty result a caller could read as full coverage. `tests/unit/test_coverage_empty.py`, `tests/invariants/test_coverage_totality.py`. The row is about *insufficient data anywhere in the engine*, so one feature's typed outcome does not close it. |
+| **B12** | Honoured by construction: the to-do ordering is a plain blocked-pair count with ties reported as ties, and `TodoEntry.count == len(TodoEntry.blocked)` is asserted. `tests/unit/test_coverage_deficits.py`, `tests/invariants/test_coverage_totality.py`. Again a whole-engine row — this is one more ordering that does not use a composite score, not the last one. |
+| **H2** | Relied on and extended, not re-derived: the one new declaration (`data/spendable/`) fails at load naming file and field for every refusal in its contract, on the existing loader path. `tests/contract/test_spendable_declaration_loading.py`. The row's own test stays `tests/contract/test_declaration_loading.py`. |
+| **G6** | Extended in visibility: feature 002's per-route *exit cost unknown* refusal becomes an audit of the whole registry, and `tests/invariants/test_coverage_costing_agreement.py` pins the two views together — a pair the audit marks ready is one costing produces a round-trip figure for, within this feature's single-route scope. |
+
+---
+
 ## On tolerance
 
 Owner decision **D-A**: money is `float64`. The specification's phrasing "reproduces a

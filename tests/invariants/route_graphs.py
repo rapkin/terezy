@@ -39,9 +39,11 @@ from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance, SourceRef
 from terezy.core.primitives.staleness import ObservationKind
+from terezy.core.results.coverage import SpendableEndpoint
 from terezy.core.routes.channels import ChannelSide, FxChannel
 from terezy.core.routes.legs import FX, TRANSFER, Leg, Route, RouteStatus
 from terezy.core.routes.path import FundingPath
+from terezy.core.routes.venues import Venue
 from terezy.core.streams.streams import IncomeStream, Indexation
 
 ON_DATE = date(2026, 8, 21)
@@ -767,4 +769,246 @@ def capped_graph(
         routes={route.id: route},
         channels={CHANNEL_ID: _channel(42.0, 0.0, 0.0)},
         reference_rate=42.0,
+    )
+
+
+# ---------------------------------------------------------------------------
+# 003-route-coverage: registries the coverage audit and costing can both be run over
+# ---------------------------------------------------------------------------
+#
+# The strategies above generate one route at a time, because the properties they serve are
+# about *arithmetic*. The coverage properties are about a whole registry -- every venue, every
+# stream, every corridor -- so they need a generator that produces one, and
+# ``test_coverage_costing_agreement.py`` needs the registry to be one where the audit and
+# ``cost_one`` are answering the same question.
+#
+# ⚙ **Four scoping decisions, each of which keeps a refusal that is out of scope out of the
+# generated data** (003 research.md D11). FR-018's agreement is scoped to costing's
+# *route-existence* refusals -- no matching route, and ``ExitCostUnknown`` -- because those are
+# the same fact coverage reports. ``RouteUnusable`` is *feasibility today*, which FR-022
+# deliberately excludes from coverage, so a generator that produced it would fail the property
+# for a reason the property is not about. The fix would then look like weakening the coverage
+# rule, which is exactly the pressure D11 exists to remove. So:
+#
+# 1. **No minimum, no maximum, no monthly cap.** Every one of them binds on an amount and
+#    yields ``RouteUnusable``.
+# 2. **No availability window.** Same, on a date.
+# 3. **Every route ``open``.** A closed route is ``RouteUnusable`` at costing time and is
+#    *declared* for coverage (FR-022) -- a real disagreement between the two views, and a
+#    deliberate one, so it is asserted in ``test_coverage_data_only.py`` rather than generated
+#    into a property that would read it as a defect.
+# 4. **Partner-closed.** An inbound route declares its exit as ``partner_route`` if and only if
+#    that exit exists. Coverage finds an exit by its own direction and origin and never by
+#    following the partner link (D6), and costing finds it *only* by the partner link -- so a
+#    registry where the two can disagree is a registry where the property is not about what it
+#    claims to be. The disagreement itself is real and is feature 004's to reconcile.
+#
+# One more, which is not a scoping decision but a modelling one: **every venue here holds
+# exactly one currency**. Coverage's destination is a currency balance at a venue and costing's
+# ``FundingPath.destination_id`` is a venue, so with two currencies at one venue the two views
+# are keyed differently and the comparison would need a mapping that could itself be wrong.
+
+BASE_CURRENCY = Currency.UAH
+"""What the owner earns and spends, and what an exit has to deliver to count as a way out."""
+
+HOME_VENUE = "home_uah"
+"""Where the salary lands and the only place money counts as spent. Holds hryvnia only."""
+
+CONTRACT_VENUE = "coin_usd"
+"""Where the dollar contract income lands. Holds dollars only."""
+
+COVERAGE_SALARY = IncomeStream(
+    id="salary_uah",
+    owner_id=OWNER_ID,
+    amount=Money(0.0, Currency.UAH, prov.EMPTY),
+    cadence="monthly",
+    arrives_at=HOME_VENUE,
+    indexation=Indexation(policy="cpi", rate=None),
+    income_tax_rate=None,
+)
+COVERAGE_CONTRACT = IncomeStream(
+    id="contract_usd",
+    owner_id=OWNER_ID,
+    amount=Money(0.0, Currency.USD, prov.EMPTY),
+    cadence="monthly",
+    arrives_at=CONTRACT_VENUE,
+    indexation=Indexation(policy="none", rate=None),
+    income_tax_rate=None,
+)
+COVERAGE_STREAMS: Mapping[str, IncomeStream] = {
+    COVERAGE_SALARY.id: COVERAGE_SALARY,
+    COVERAGE_CONTRACT.id: COVERAGE_CONTRACT,
+}
+"""Two streams in two currencies arriving at two venues.
+
+Two currencies because the currency half of an inbound match is what a one-currency registry
+cannot exercise, and two *venues* because the venue half is what a one-venue registry cannot.
+"""
+
+COVERAGE_AMOUNTS: Mapping[str, Money] = {
+    COVERAGE_SALARY.id: Money(10_000.0, Currency.UAH, prov.EMPTY),
+    COVERAGE_CONTRACT.id: Money(1_000.0, Currency.USD, prov.EMPTY),
+}
+"""What to cost, per stream. Comfortably inside every declared limit -- because there are no
+declared limits, which is scoping decision 1 above."""
+
+
+@dataclass(frozen=True, slots=True)
+class CoverageRegistry:
+    """One generated registry, and everything both views of it need."""
+
+    venues: Mapping[str, Venue]
+    streams: Mapping[str, IncomeStream]
+    routes: Mapping[str, Route]
+    channels: Mapping[str, FxChannel]
+    spendable: frozenset[SpendableEndpoint]
+
+
+def _unlimited_leg(
+    index: int, *, from_venue: str, to_venue: str, from_ccy: Currency, to_ccy: Currency
+) -> Leg:
+    """One movement with no limit and no window, so nothing about it can bind on an amount."""
+    converts = from_ccy is not to_ccy
+    return Leg(
+        index=index,
+        kind=FX if converts else TRANSFER,
+        from_venue=from_venue,
+        to_venue=to_venue,
+        from_ccy=from_ccy,
+        to_ccy=to_ccy,
+        channel=CHANNEL_ID if converts else None,
+        fee_pct=0.0,
+        fee_fixed=Money(0.0, from_ccy, FEE_SOURCES),
+        minimum=None,
+        maximum=None,
+        monthly_cap=None,
+        capacity_pool=None,
+        latency_days=0,
+        available_from=None,
+        available_until=None,
+        disruption_probability=0.0,
+        kind_of_observation=P2P_PREMIUM.id if converts else BANK_FEE_SCHEDULE.id,
+        provenance=FEE_SOURCES,
+    )
+
+
+def _corridor(
+    route_id: str,
+    *,
+    origin: str,
+    destination: str,
+    direction: str,
+    from_ccy: Currency,
+    to_ccy: Currency,
+    partner_route: str | None = None,
+) -> Route:
+    """One open, unlimited, single-leg corridor."""
+    return Route(
+        id=route_id,
+        provider=f"Synthetic {route_id}",
+        origin=origin,
+        destination=destination,
+        direction="inbound" if direction == "inbound" else "exit",
+        partner_route=partner_route,
+        status="open",
+        legs=(
+            _unlimited_leg(
+                0,
+                from_venue=origin,
+                to_venue=destination,
+                from_ccy=from_ccy,
+                to_ccy=to_ccy,
+            ),
+        ),
+    )
+
+
+@st.composite
+def coverage_registries(draw: st.DrawFn) -> CoverageRegistry:
+    """A registry with a drawn set of holes in it, over which both views can be run.
+
+    One to three destination venues, each holding one drawn currency, and for each of them
+    three independent booleans: is there a way in from the salary, is there a way in from the
+    contract income, is there a way out. Every combination of the three is reachable, which is
+    what makes the property a property rather than an example -- including the two that matter
+    most, a destination reachable from both streams with no exit, and one reachable from
+    neither with an exit nobody can use.
+
+    The exit always ends in hryvnia at :data:`HOME_VENUE`, which is the single declared
+    spendable endpoint. So "an exit exists" and "an exit reaches somewhere spendable" coincide
+    here by construction; deficit 3, where they come apart, is exercised by the unit and
+    contract suites, which can declare a non-spendable landing place on purpose.
+    """
+    venues: dict[str, Venue] = {
+        HOME_VENUE: Venue(
+            id=HOME_VENUE,
+            name="Home rail (SYNTHETIC FIXTURE)",
+            currencies=frozenset({Currency.UAH}),
+        ),
+        CONTRACT_VENUE: Venue(
+            id=CONTRACT_VENUE,
+            name="Contract rail (SYNTHETIC FIXTURE)",
+            currencies=frozenset({Currency.USD}),
+        ),
+    }
+    routes: dict[str, Route] = {}
+    for index in range(draw(st.integers(min_value=1, max_value=3))):
+        venue_id = f"dest_{index}"
+        currency = draw(st.sampled_from(Currency))
+        venues[venue_id] = Venue(
+            id=venue_id,
+            name=f"{venue_id} (SYNTHETIC FIXTURE)",
+            currencies=frozenset({currency}),
+        )
+        exit_id = f"out_{index}" if draw(st.booleans()) else None
+        if exit_id is not None:
+            routes[exit_id] = _corridor(
+                exit_id,
+                origin=venue_id,
+                destination=HOME_VENUE,
+                direction="exit",
+                from_ccy=currency,
+                to_ccy=BASE_CURRENCY,
+            )
+        for stream, origin in (
+            (COVERAGE_SALARY, HOME_VENUE),
+            (COVERAGE_CONTRACT, CONTRACT_VENUE),
+        ):
+            if not draw(st.booleans()):
+                continue
+            inbound_id = f"in_{stream.id}_{index}"
+            routes[inbound_id] = _corridor(
+                inbound_id,
+                origin=origin,
+                destination=venue_id,
+                direction="inbound",
+                from_ccy=stream.amount.currency,
+                to_ccy=currency,
+                # Partner-closed: the exit is declared as the partner exactly when it exists,
+                # which is what keeps the two views answering one question (scoping note 4).
+                partner_route=exit_id,
+            )
+    if not routes:
+        # Every boolean came up false. A registry with **no declared route at all** is not a
+        # coverage report -- it is ``RegistryDimensionEmpty``, which is a different claim and
+        # is exercised by ``tests/unit/test_coverage_empty.py`` on purpose. Rather than
+        # discarding the example, the least distorting repair is one orphan exit: it declares
+        # a corridor without declaring any way in, so every pair stays not-ready and the
+        # "destination nothing reaches" shape is preserved rather than papered over.
+        first = venues["dest_0"]
+        (currency,) = first.currencies
+        routes["out_0"] = _corridor(
+            "out_0",
+            origin=first.id,
+            destination=HOME_VENUE,
+            direction="exit",
+            from_ccy=currency,
+            to_ccy=BASE_CURRENCY,
+        )
+    return CoverageRegistry(
+        venues=venues,
+        streams=COVERAGE_STREAMS,
+        routes=routes,
+        channels={CHANNEL_ID: _channel(42.0, 3.0, -3.0)},
+        spendable=frozenset({SpendableEndpoint(venue_id=HOME_VENUE, currency=BASE_CURRENCY)}),
     )

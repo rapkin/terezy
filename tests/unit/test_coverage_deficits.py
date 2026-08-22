@@ -561,3 +561,110 @@ def test_a_registry_with_no_holes_states_that_there_is_nothing_to_observe() -> N
     assert all(isinstance(verdict, Ready) for verdict in block.verdicts)
     assert block.todo == ()
     assert block.ties == ()
+
+
+# ---------------------------------------------------------------------------
+# The currency half of an inbound match, which no route-graph generator reaches
+# ---------------------------------------------------------------------------
+
+
+def test_a_route_from_the_right_venue_in_the_wrong_currency_is_not_a_way_in() -> None:
+    """Spec Assumptions: *an inbound route "from this stream" means from its arrival venue **in
+    its arrival currency***.
+
+    A multi-currency account is the ordinary case -- it is what Monobank is -- so the venues
+    matching proves nothing about the currencies. A route that leaves the salary's own bank in
+    **dollars** cannot carry a hryvnia salary: something would have to convert first, and that
+    conversion is a declared leg with a declared channel, not an assumption the audit is
+    entitled to make. Reporting the pair as reachable would credit the registry with a corridor
+    whose first and most expensive step nobody has declared.
+
+    This is the same chaining discipline the loader enforces on legs and ``cost_one`` enforces
+    when it refuses a funding mismatch, applied at the audit level -- and it is asserted here
+    because the shape it needs, two currencies at one arrival venue, is exactly what the
+    coverage property's generator cannot produce: there a venue holds one currency so that
+    costing's per-venue destination and coverage's per-balance destination stay one-to-one.
+    """
+    routes = keyed(
+        [
+            route(
+                "in_mono_usd_to_fund",
+                origin="mono",
+                destination="fund",
+                direction="inbound",
+                from_ccy=USD,
+                to_ccy=UAH,
+            ),
+            route(
+                "out_fund_mono", origin="fund", destination="mono", direction="exit", from_ccy=UAH
+            ),
+        ]
+    )
+    block = _block(
+        venues=keyed([venue("mono", UAH, USD), venue("fund", UAH)]),
+        streams=keyed([SALARY]),
+        routes=routes,
+        spendable_set=SPENDABLE_AT_MONO,
+    )
+    verdict = _verdicts(block)[("fund", "salary_uah")]
+    assert isinstance(verdict, NotReady)
+    assert NO_INBOUND in {deficit.kind for deficit in verdict.deficits}
+    assert verdict.inbound == ()
+
+
+def test_a_route_arriving_in_the_wrong_currency_reaches_a_different_destination() -> None:
+    """The mirror of the case above, on the destination side rather than the stream side.
+
+    ``broker`` holds both currencies, so it is **two** destinations. A route delivering dollars
+    there is a way in to the dollar balance and says nothing at all about the hryvnia one --
+    they are different places money can sit, and a report that conflated them would call a
+    hryvnia balance reachable on the strength of a corridor that delivers dollars.
+    """
+    routes = keyed(
+        [
+            route(
+                "in_mono_broker_usd",
+                origin="mono",
+                destination="broker",
+                direction="inbound",
+                from_ccy=UAH,
+                to_ccy=USD,
+            ),
+            route(
+                "out_broker_usd",
+                origin="broker",
+                destination="mono",
+                direction="exit",
+                from_ccy=USD,
+                to_ccy=UAH,
+            ),
+            route(
+                "out_broker_uah",
+                origin="broker",
+                destination="mono",
+                direction="exit",
+                from_ccy=UAH,
+            ),
+        ]
+    )
+    block = _block(
+        venues=keyed([MONO, venue("broker", UAH, USD)]),
+        streams=keyed([SALARY]),
+        routes=routes,
+        spendable_set=SPENDABLE_AT_MONO,
+    )
+    verdicts = _verdicts(block)
+    dollars = next(
+        v
+        for v in block.verdicts
+        if v.destination.venue_id == "broker" and v.destination.currency is USD
+    )
+    hryvnia = next(
+        v
+        for v in block.verdicts
+        if v.destination.venue_id == "broker" and v.destination.currency is UAH
+    )
+    assert isinstance(dollars, Ready)
+    assert isinstance(hryvnia, NotReady)
+    assert NO_INBOUND in {deficit.kind for deficit in hryvnia.deficits}
+    assert verdicts  # two balances at one venue are two verdicts, not one
