@@ -82,6 +82,7 @@ NORMALIZED = regimes.Regime(
 REGIMES = {WARTIME.id: WARTIME, NORMALIZED.id: NORMALIZED}
 
 ROUTES_ROOT = Path(inspect.getfile(cost)).parent
+"""``src/terezy/core/routes/`` -- the costing engine, scanned by the boundary test below."""
 
 REGIME_AWARE = frozenset({"coverage.py"})
 """The only module in ``core.routes`` allowed to import the scenarios package, and why.
@@ -94,7 +95,6 @@ above exists to close. The test immediately after the scan holds it to exactly t
 stricter bar than the import ban it is exempt from. **Nothing else goes in this set** without
 the same argument written out beside it.
 """
-"""``src/terezy/core/routes/`` -- the costing engine, scanned by the boundary test below."""
 
 
 def _world() -> dict[str, Route]:
