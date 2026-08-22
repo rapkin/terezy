@@ -406,3 +406,28 @@ class TestVerificationRefreshesTheAge:
         assert staleness.freshest_date(_unverified_source(verified_on=date(2026, 6, 1))) == date(
             2026, 6, 1
         )
+
+    def test_a_re_retrieval_after_an_old_verification_ages_from_the_retrieval(self) -> None:
+        """FR-025 promises the *later* of the two dates, in both orderings.
+
+        A value verified in 2024 and re-fetched on 2026-08-01 is 21 days old on
+        2026-08-22, not 964: the retrieval is the more recent look at the source, and
+        reporting it stale would tell the owner to re-fetch the value he just fetched.
+        """
+        re_retrieved = SourceRef(
+            id="fixture",
+            citation="SYNTHETIC FIXTURE",
+            retrieved_on=date(2026, 8, 1),
+            verified_on=date(2024, 1, 1),
+        )
+        assert staleness.freshest_date(re_retrieved) == date(2026, 8, 1)
+        assert not staleness.is_stale(re_retrieved, P2P_PREMIUM, as_of=date(2026, 8, 7))
+        # And the other ordering: a verification after retrieval wins, as before.
+        re_verified = SourceRef(
+            id="fixture",
+            citation="SYNTHETIC FIXTURE",
+            retrieved_on=date(2024, 1, 1),
+            verified_on=date(2026, 8, 1),
+        )
+        assert staleness.freshest_date(re_verified) == date(2026, 8, 1)
+        assert not staleness.is_stale(re_verified, P2P_PREMIUM, as_of=date(2026, 8, 7))
