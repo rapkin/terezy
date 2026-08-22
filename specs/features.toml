@@ -51,7 +51,7 @@ why    = "fill HurdleRate.real; 001 FR-022 reserved the slot"
 
 [[feature]]
 id     = "008-seed-and-goals"
-status = "queued"
+status = "spec"
 needs  = ["001-ovdp-hurdle-rate"]
 why    = "seed lots with known/estimated basis (J2) and target sum/date/contribution goals (J1)"
 
