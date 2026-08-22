@@ -277,13 +277,12 @@ def from_data_root(root: Path) -> Declarations:
 # 8. **A regime's ``route_ids``** resolve, and a regime is **partner-closed**.
 # 9. **A stream's ``arrives_at``** names a declared venue.
 #
-# ⚙ **One seam this pass cannot cover, stated rather than left to be discovered.** A
-# channel *side* declares its own ``kind``, and ``ChannelSide`` has no field to carry it --
-# the core's staleness verdict for a channel is taken from ``FxChannel.kind``. So a side
-# naming an undeclared kind is caught by ``scripts/check_provenance.py``, which reads the
-# files rather than the records and is a blocking gate, and not here. Adding a field to the
-# core record for the sake of this check would put a value in the engine that no figure
-# reads.
+# ⚙ **A channel side's ``kind`` is a record field and resolves here.** An earlier revision
+# validated a side's declared kind at load and then dropped it, so the core aged every side
+# under ``FxChannel.kind`` -- a 7-day premium under a 365-day schedule threshold, reported
+# fresh. ``ChannelSide.kind`` now carries it, the staleness verdict ages each side under it
+# (``cost._aged``), and this pass resolves it against the declared kinds exactly as it does
+# the channel's own.
 
 BASE_CURRENCY_ROLE = (
     "the base currency is the currency the owner earns and spends -- the ledger's home "
@@ -850,6 +849,16 @@ def _resolved_channels(
                     path,
                 )
             _check_kind(channel.kind, kinds, path=path, field_path=f"channel[{channel.id}].kind")
+            for side_name, side in (
+                ("buy_side", channel.buy_side),
+                ("sell_side", channel.sell_side),
+            ):
+                _check_kind(
+                    side.kind,
+                    kinds,
+                    path=path,
+                    field_path=f"channel[{channel.id}].{side_name}.kind",
+                )
             channels[channel.id] = channel
             files[channel.id] = path
     return channels, files

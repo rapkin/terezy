@@ -1050,12 +1050,22 @@ def _channel_side(
         source=table.source,
         retrieved_on=table.retrieved_on,
         verified_on=table.verified_on,
-        # A side is its own observation, read off its own line, and ``ChannelSide`` has no
-        # field to carry its kind -- so this is the only place the side's declared kind is
-        # checked present at all. See the resolver's note on the seam this leaves.
-        kind=table.kind,
+        # Checked below, at ``ChannelSide.kind``, where the message names the field the
+        # file actually uses. A side is its own observation, and its kind is carried into
+        # the record so the staleness verdict ages the side under it (FR-028) -- not
+        # validated here and dropped, which would leave the side ageing under the
+        # channel's kind.
+        kind=None,
     )
     sources = prov.of([ref])
+    kind = _require_text(
+        path,
+        f"{field_prefix}.kind",
+        table.kind,
+        "every table of observed values names the kind it ages under, and there is no "
+        "default staleness threshold (FR-028): a side aged under the channel's kind would "
+        "be reported fresh long after its own threshold had passed",
+    )
     if table.markup_bps is not None and table.premium_per_unit is not None:
         raise DeclarationError(
             path,
@@ -1079,6 +1089,8 @@ def _channel_side(
                     "meaning",
                 ),
                 premium_per_unit=None,
+                kind=kind,
+                provenance=sources,
             ),
             ref,
         )
@@ -1087,6 +1099,8 @@ def _channel_side(
             ChannelSide(
                 markup_bps=None,
                 premium_per_unit=Money(table.premium_per_unit, price_currency, sources),
+                kind=kind,
+                provenance=sources,
             ),
             ref,
         )

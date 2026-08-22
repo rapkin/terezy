@@ -398,6 +398,36 @@ def _factor_after(walk: _Walk, leg: Leg, channel: FxChannel) -> tuple[float, Pro
     return factor, prov.merge(walk.factor_sources, channel.provenance)
 
 
+def _channel_verdicts(
+    channel: FxChannel,
+    kinds: Mapping[str, ObservationKind],
+    as_of: date,
+) -> tuple[StalenessVerdict, ...]:
+    """One verdict per observation in a channel, each aged under its own declared kind.
+
+    A channel file declares a kind **three times** -- once for the reference rate and once
+    per side -- because they are three observations that go out of date at three speeds. A
+    single verdict over ``channel.provenance`` under ``channel.kind`` was the first
+    implementation, and it aged a 7-day P2P premium under the reference's 365-day schedule
+    threshold: reported fresh at 82 days, which is the silent permissive default FR-028
+    exists to close. The reference's own sources are what remain of the union once the
+    sides' are taken out, so no source is aged under a kind its table did not declare --
+    in either direction, since the opposite error (a slow side reported stale under a fast
+    reference kind) is the cry-wolf warning the per-kind design exists to avoid.
+    """
+    side_sources = channel.buy_side.provenance.sources | channel.sell_side.provenance.sources
+    reference = prov.of(ref for ref in channel.provenance.sources if ref not in side_sources)
+    return (
+        stale.staleness_of(reference, kinds, kind=channel.kind, as_of=as_of),
+        stale.staleness_of(
+            channel.buy_side.provenance, kinds, kind=channel.buy_side.kind, as_of=as_of
+        ),
+        stale.staleness_of(
+            channel.sell_side.provenance, kinds, kind=channel.sell_side.kind, as_of=as_of
+        ),
+    )
+
+
 def _aged(
     walk: _Walk,
     leg: Leg,
@@ -407,19 +437,18 @@ def _aged(
 ) -> StalenessVerdict:
     """The walk's verdict extended with this leg's -- and its channel's -- observations.
 
-    Two declarations, two kinds: a leg's fee schedule ages on the bank's timetable while the
-    premium on the channel it uses ages in days. Aging both under one threshold is what
-    FR-028 exists to prevent, so each is aged under the kind its own table declared and the
-    verdicts are merged.
+    Several declarations, several kinds: a leg's fee schedule ages on the bank's timetable
+    while the premium on the channel it uses ages in days. Aging both under one threshold is
+    what FR-028 exists to prevent, so each is aged under the kind its own table declared --
+    the channel's sides included, per :func:`_channel_verdicts` -- and the verdicts are
+    merged.
     """
     verdicts = [
         walk.staleness,
         stale.staleness_of(leg.provenance, kinds, kind=leg.kind_of_observation, as_of=as_of),
     ]
     if channel is not None:
-        verdicts.append(
-            stale.staleness_of(channel.provenance, kinds, kind=channel.kind, as_of=as_of)
-        )
+        verdicts.extend(_channel_verdicts(channel, kinds, as_of))
     return stale.merge_all(verdicts)
 
 
