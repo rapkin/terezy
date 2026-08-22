@@ -1,0 +1,70 @@
+# The war-end scenario: two regimes, one assumed transition, and a fallback policy.
+#
+# **Everything in this file is an assumption, and that is what it carries instead of a
+# citation.** `data/scenarios/` is exempt from the provenance requirement by design (see
+# `data/README.md`, research.md D8): a belief about when a war ends has nothing to cite, and
+# `is_assumption = true` is what it carries where an observation carries a `source` and a
+# `verified_on`. Never present anything here as though it were observed.
+#
+# **Why a regime is scenario data and not a leg window.** A leg's `available_from/until` is
+# a *fact* — "this corridor closed in March 2025" — observed, with a source. A regime
+# transition is a *guess*. Collapsing the second into the first would bury an assumption in
+# a field whose every other value is an observation, and then no output could honestly
+# distinguish "this route is closed because it closed" from "this route is closed because I
+# guessed a date" (research.md D8). That distinction is the entire content of
+# `SIMULATOR_SPEC.md` §1.3 and of User Story 4.
+#
+# **The route sets are the belief.** Declarations do not come and go with a belief: every
+# corridor is declared in `data/routes/`, and a regime states which of them it believes in.
+# What the wartime regime leaves out is reported as excluded, beside the transition that
+# excluded it, so the belief travels with the figures it changed.
+#
+# A regime must be **partner-closed**: including an inbound route while excluding the exit
+# route it names would make money one-way, and costing it would raise on a dangling partner
+# and blame the loader. That is refused at load, naming this file.
+
+[scenario]
+id       = "war_end"
+owner_id = "owner-001"
+
+  # What happens to a contribution the route will not carry (FR-013). §4.3.4 calls this
+  # the *scenario's* fallback policy, which is why it is declared here rather than on a
+  # route or a stream: it is a decision about the owner's own money, not a property of a
+  # corridor. Three of §4.3.4's four policies exist in this feature; `deposit` needs a
+  # deposit instrument and fails at load naming the feature that will bring it, because
+  # treating it as "hold as cash" would substitute a default for a policy the owner chose.
+  # `redirect_to` is required to be present and is empty for every policy but `redirect`,
+  # on the same reasoning as an empty `verified_on`: a forgotten line must not read as a
+  # deliberate blank.
+  [scenario.fallback]
+  policy      = "hold_as_cash"
+  redirect_to = ""
+
+  [[scenario.regime]]
+  id        = "wartime"
+  route_ids = [
+    "inzhur_direct",
+    "inzhur_to_monobank",
+    "monobank_to_binance_p2p",
+    "monobank_to_binance_p2p_double",
+    "binance_p2p_to_monobank",
+  ]
+
+  [[scenario.regime]]
+  id        = "normalized"
+  route_ids = [
+    "inzhur_direct",
+    "inzhur_to_monobank",
+    "monobank_to_binance_p2p",
+    "monobank_to_binance_p2p_double",
+    "monobank_to_binance_card",
+    "binance_p2p_to_monobank",
+    "coinbase_to_ibkr",
+  ]
+
+  [[scenario.transition]]
+  on_date       = "2027-06-30"
+  before        = "wartime"
+  after         = "normalized"
+  is_assumption = true
+  rationale     = "PLACEHOLDER BELIEF, taken from SIMULATOR_SPEC.md §4.3.4's own illustrative scenario ('war_ends_2027', transition_date 2027-06-30) and not from any forecast. Nobody knows this date. It is here so the break-even question §1.3 asks — pay the wartime route cost now, or hold hryvnia until the cheaper corridors open — can be modelled at all, and every figure that depends on it is conditional on it. The owner is expected to replace this sentence with his own belief; the engine will keep calling it an assumption either way."

@@ -1,0 +1,82 @@
+# The UAH/USD channels: two named, two-sided quotes for one ordered pair.
+#
+# SYNTHETIC FIXTURE. **Every number in this file is invented**, including the reference
+# rate. `SIMULATOR_SPEC.md` §11 item 1 records that the owner's actual P2P premium, card
+# markup and bank spread have never been observed, so no figure computed from this file
+# describes a price anyone can trade at, and every `verified_on` below is empty because
+# there is nothing to verify an invented quote against.
+#
+# **Why two channels and not one rate.** FR-010: a rate is declared per *channel* —
+# official, interbank, bank non-cash, cash desk, card, peer-to-peer — and a single
+# mid-rate is never used for a transaction. The two below quote the same pair at the same
+# reference and cost very different amounts, which is the whole point of required test
+# **F5**: the channel a leg names changes the result, and the channel actually applied
+# appears in the attribution (FR-011).
+#
+# **The two declaration forms, and why both exist.** `p2p` is declared as a *premium per
+# unit* because that is what the owner reads off a peer-to-peer screen: "+3 UAH per
+# dollar". `card` is declared in *basis points* because that is how a bank publishes a
+# tariff. Converting either into the other by hand before writing it here would put an
+# arithmetic step where no test can see it. Exactly one of the two forms per side; both
+# or neither is a load-time failure, because "the markup wins if both are set" would
+# silently ignore one of the two numbers written here.
+#
+# **Both sides are declared and neither is derived from the other.** A system computing
+# the sell side from the buy side would be using a mid-rate with extra steps, and it
+# would force a symmetric spread on a market that is routinely asymmetric. A premium of
+# **zero** is legal and means "at the reference"; a **negative** premium is legal and is
+# what a P2P book trading below the reference looks like; a *missing* premium is refused.
+#
+# **Three citations per channel, and that is not clerical duplication.** Provenance sits
+# per *table*: `[[channel]]` cites where the reference rate was read, and each side cites
+# where that side's own number was read. The loader unions all three into the channel's
+# provenance, so a figure this channel touches carries every mark — and a verified
+# reference cannot vouch for an unverified side.
+
+[[channel]]
+id             = "p2p"
+pair           = ["UAH", "USD"]
+reference_rate = 42.0
+observed_on    = "2026-08-22"
+kind           = "p2p_premium"
+source         = "SYNTHETIC FIXTURE — invented reference rate. Not an observed quote from any book."
+retrieved_on   = "2026-08-22"
+verified_on    = ""
+
+  [channel.buy_side]
+  premium_per_unit = 3.0
+  kind             = "p2p_premium"
+  source           = "SYNTHETIC FIXTURE — the +3 UAH per dollar of SIMULATOR_SPEC.md §4.3.1's illustrative arithmetic, not an observed offer."
+  retrieved_on     = "2026-08-22"
+  verified_on      = ""
+
+  [channel.sell_side]
+  premium_per_unit = -2.5
+  kind             = "p2p_premium"
+  source           = "SYNTHETIC FIXTURE — invented. Negative because a P2P book does trade below the reference on the way out; the asymmetry is deliberate so no test can pass by assuming a symmetric spread."
+  retrieved_on     = "2026-08-22"
+  verified_on      = ""
+
+[[channel]]
+id             = "card"
+pair           = ["UAH", "USD"]
+reference_rate = 42.0
+observed_on    = "2026-08-22"
+kind           = "bank_fee_schedule"
+source         = "SYNTHETIC FIXTURE — invented reference rate, the same one the p2p channel quotes against so the two are comparable."
+retrieved_on   = "2026-08-22"
+verified_on    = ""
+
+  [channel.buy_side]
+  markup_bps   = 150.0
+  kind         = "bank_fee_schedule"
+  source       = "SYNTHETIC FIXTURE — invented markup. Not read off any published tariff."
+  retrieved_on = "2026-08-22"
+  verified_on  = ""
+
+  [channel.sell_side]
+  markup_bps   = 150.0
+  kind         = "bank_fee_schedule"
+  source       = "SYNTHETIC FIXTURE — invented markup, stated for the sell side in its own right rather than copied from the buy side by the engine."
+  retrieved_on = "2026-08-22"
+  verified_on  = ""

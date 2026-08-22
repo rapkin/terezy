@@ -1,0 +1,48 @@
+# How fast each kind of observed value goes stale. One threshold per kind, declared once.
+#
+# FR-028: the staleness threshold is **per kind of value**, and there is **no permissive
+# default** — a kind without `staleness_days` fails at load, and so does a sourced table
+# naming a kind that is not declared here. research.md D9 is the argument: one
+# project-wide threshold would either warn constantly on published fee schedules or stay
+# silent on peer-to-peer premiums, and a staleness warning that is usually wrong is one
+# that gets ignored, which is worse than none.
+#
+# These thresholds are **policy, not observation**. They are the owner's statement about
+# how long he is willing to trust a number of each kind, so they carry no citation and no
+# `verified_on` — there is nothing to verify a review interval against. Everything that
+# does carry a citation names one of these kinds, and `scripts/check_provenance.py`
+# refuses a sourced table naming a kind this file does not declare.
+#
+# The engine never evaluates staleness from a clock: `core.primitives.staleness` measures
+# `as_of − the later of verified_on and retrieved_on` against the threshold below, with
+# `as_of` an input to the run (research.md D12).
+
+[[kind]]
+id             = "p2p_premium"
+staleness_days = 7
+note           = "A peer-to-peer premium moves with demand and can shift within a week."
+
+[[kind]]
+id             = "bank_fee_schedule"
+staleness_days = 365
+note           = "A published tariff changes on the bank's own schedule, rarely mid-year."
+
+[[kind]]
+id             = "regulatory_limit"
+staleness_days = 180
+note           = "NBU limits change by decision, not by drift; six months is a review prompt."
+
+[[kind]]
+id             = "bond_terms"
+staleness_days = 365
+note           = "A bond's contractual terms do not drift, but the reading of them can be wrong or superseded by a new issue; a yearly re-read is the review prompt. Feature 001's declarations name this kind."
+
+[[kind]]
+id             = "tax_rule"
+staleness_days = 180
+note           = "A tax rule changes by legislation, not by drift, and a change is retroactive to a date rather than gradual; six months matches the regulatory-limit prompt because both are read off a published text."
+
+[[kind]]
+id             = "venue_terms"
+staleness_days = 365
+note           = "A venue's published minimum ticket or lot size changes on the venue's own schedule, like a tariff. Declared separately from bank_fee_schedule because a minimum ticket is a condition of dealing rather than a price, and the two are read off different pages."

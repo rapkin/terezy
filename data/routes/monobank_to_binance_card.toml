@@ -1,0 +1,65 @@
+# The same corridor through the bank's card conversion instead of the P2P book. The **F5**
+# fixture.
+#
+# SYNTHETIC FIXTURE. Every number here and in the channel it names is invented; every
+# `verified_on` is empty.
+#
+# **What this route is for.** Required test **F5**: the channel a leg names changes the
+# result and is visible in the attribution, and a single mid-rate is never used for a
+# transaction. This file is `monobank_to_binance_p2p.toml` with one field different — the
+# `channel` on its `fx` leg — so the cost gap between the two is the gap between a 150 bps
+# card markup and a +3 UAH P2P premium, and `channels_applied` on each result says which
+# one was taken (FR-011).
+#
+# The provider differs because the conversion is the bank's, not the book's: identity in the
+# route registry is `(provider × currency path × venue)` (FR-023), and two ways of buying
+# dollars at one venue through two different providers are two entries rather than a
+# collision.
+#
+# The exit is the **same** declared exit route the P2P corridor uses, and that is
+# deliberate: the way in and the way out are independent declarations, and holding the exit
+# fixed is what isolates the channel choice in the round-trip figure.
+
+[route]
+id            = "monobank_to_binance_card"
+provider      = "Monobank"
+origin        = "monobank_uah"
+destination   = "binance"
+direction     = "inbound"
+partner_route = "binance_p2p_to_monobank"
+status        = "open"
+
+  [[route.leg]]
+  index                  = 0
+  kind                   = "fx"
+  capacity_pool          = "monobank_card_uah_usd"
+  monthly_cap            = 100000.0
+  from_venue             = "monobank_uah"
+  to_venue               = "monobank_uah"
+  from_ccy               = "UAH"
+  to_ccy                 = "USD"
+  channel                = "card"
+  fee_pct                = 0.0
+  fee_fixed              = 0.0
+  latency_days           = 0
+  disruption_probability = 0.02
+  kind_of_observation    = "regulatory_limit"
+  source                 = "SYNTHETIC FIXTURE — invented. The same 100 000 UAH card ceiling as the P2P variants, declared identically because it is the same card and the same limit (research.md D10). The markup itself is declared in data/channels/uah_usd.toml under 'bank_fee_schedule'."
+  retrieved_on           = "2026-08-22"
+  verified_on            = ""
+
+  [[route.leg]]
+  index                  = 1
+  kind                   = "transfer"
+  from_venue             = "monobank_uah"
+  to_venue               = "binance"
+  from_ccy               = "USD"
+  to_ccy                 = "USD"
+  fee_pct                = 0.0
+  fee_fixed              = 0.0
+  latency_days           = 0
+  disruption_probability = 0.02
+  kind_of_observation    = "bank_fee_schedule"
+  source                 = "SYNTHETIC FIXTURE — invented, and identical to the P2P variant's transfer leg so that the channel on leg 0 is the only difference between the two routes."
+  retrieved_on           = "2026-08-22"
+  verified_on            = ""

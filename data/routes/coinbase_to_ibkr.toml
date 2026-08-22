@@ -1,0 +1,45 @@
+# Dollars from the contract income to the broker — and **nobody has costed the way back**.
+#
+# SYNTHETIC FIXTURE. Every number is invented and every `verified_on` is empty.
+#
+# **This file is the `ExitCostUnknown` fixture, and its missing `partner_route` is a
+# declaration rather than an omission.** FR-030: a destination with no declared exit route
+# has **no round-trip figure**, and the one-way figure is *not* promoted into the gap. So
+# this route is costed, reported, and kept out of every ranking — because round-trip cost
+# is what belongs in a comparison, and "most of the cost" is not the cost. §4.3.3's rule
+# again: an asset that cannot be liquidated into spendable hryvnia at a known cost is not
+# worth its stated value, and "we never checked" is that case.
+#
+# It is also the only route in this directory whose fees are **not** zero, which is
+# deliberate: `fee_pct = 0.5` is a percentage in the file and must reach the engine as the
+# fraction 0.005, divided by 100 exactly once at the loader boundary. A route where every
+# fee is zero could not tell a conversion done twice from one done not at all.
+#
+# The USD contract income arrives at Coinbase already in dollars, so this route converts
+# nothing — which is the other half of §4.2's finding and why FR-009 insists the conversion
+# component here be **exactly** zero rather than a small residual.
+
+[route]
+id          = "coinbase_to_ibkr"
+provider    = "Interactive Brokers"
+origin      = "coinbase"
+destination = "ibkr_usd"
+direction   = "inbound"
+status      = "constrained"
+
+  [[route.leg]]
+  index                  = 0
+  kind                   = "withdrawal"
+  from_venue             = "coinbase"
+  to_venue               = "ibkr_usd"
+  from_ccy               = "USD"
+  to_ccy                 = "USD"
+  fee_pct                = 0.5
+  fee_fixed              = 25.0
+  minimum                = 100.0
+  latency_days           = 2
+  disruption_probability = 0.03
+  kind_of_observation    = "bank_fee_schedule"
+  source                 = "SYNTHETIC FIXTURE — invented. A half-percent plus a flat 25 USD wire fee and a 100 USD minimum are placeholders for the unobserved figures of §11 item 1, not a published tariff. 'constrained' is the route's declared status: reachable, but not freely (§4.3), so it is ranked and flagged rather than excluded."
+  retrieved_on           = "2026-08-22"
+  verified_on            = ""

@@ -1,0 +1,47 @@
+# Where money can sit, and which currencies each place can hold.
+#
+# ⚙ **This file is not named by `contracts/declaration-schema.md`, and it has to exist.**
+# `core.routes.venues.Venue` declares the currencies a venue can hold precisely so that a
+# leg moving dollars into a hryvnia-only account is a load-time failure naming the file
+# and the leg index (FR-024) — and the resolver cannot make that check against a venue
+# nobody declared. Principle II also requires that *adding a venue* be a data-only change
+# (FR-021, SC-010), which is unreachable if the venue set lives in code. The contract
+# enumerates routes, channels, streams and observation kinds and simply does not mention
+# venues; this file is the missing half, declared in the shape of
+# `observation_kinds.toml` — one flat list at the data root, because a venue is a
+# structural identifier rather than a directory of sourced observations.
+#
+# **No citation keys, and that is deliberate.** A venue table carries no observed numeric
+# value — an id, a name, and a set of currency codes — so there is nothing here for a
+# source to vouch for, and `core.routes.venues.Venue` has no provenance field to carry
+# one. The same reading as feature 001's `[instrument.tax_classes]`, which holds
+# references rather than observations and cites nothing. Every *number* attached to a
+# venue lives on a leg, in `data/routes/`, with its own citation.
+#
+# SYNTHETIC FIXTURE. The venues are the ones `SIMULATOR_SPEC.md` §4.2 and §4.3 name, but
+# which currencies each account actually holds has not been confirmed with the providers.
+
+[[venue]]
+id         = "monobank_uah"
+name       = "Monobank multi-currency card — the UAH salary rail (SYNTHETIC FIXTURE)"
+currencies = ["UAH", "USD"]
+
+[[venue]]
+id         = "binance"
+name       = "Binance account, including its UAH peer-to-peer book (SYNTHETIC FIXTURE)"
+currencies = ["UAH", "USD"]
+
+[[venue]]
+id         = "coinbase"
+name       = "Coinbase account — where the USD contract income arrives (SYNTHETIC FIXTURE)"
+currencies = ["USD"]
+
+[[venue]]
+id         = "ibkr_usd"
+name       = "Interactive Brokers, USD cash account (SYNTHETIC FIXTURE)"
+currencies = ["USD"]
+
+[[venue]]
+id         = "inzhur"
+name       = "Inzhur fund platform, hryvnia only (SYNTHETIC FIXTURE)"
+currencies = ["UAH"]

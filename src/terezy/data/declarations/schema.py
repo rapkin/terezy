@@ -106,6 +106,23 @@ class BondTermsTable(BaseModel):
     business_day_rule: str
     """A declared key of ``core.primitives.conventions.BUSINESS_DAY_FNS``."""
 
+    kind: str
+    """An ``ObservationKind`` id -- which staleness threshold these values age under.
+
+    ⚙ **Added by feature 002 as a migration**, and required rather than optional: FR-028
+    says the threshold is per kind of value with no permissive default, so a sourced table
+    that names no kind is a table whose values could never be reported stale. Every
+    declaration in the project gained the field in one change, because a half-applied
+    requirement makes ``scripts/check_provenance.py`` red for every file that has not caught
+    up yet.
+
+    Resolved against ``data/observation_kinds.toml`` by ``check_provenance.py`` rather than
+    by the loader: the feature-001 core records this table becomes -- ``BondTerms``,
+    ``InstrumentConstraints``, ``TaxClass`` -- have no field to carry a kind, because their
+    staleness verdict is a later feature's, so a kind resolved here would be a value the
+    engine reads nowhere. The gate is blocking, so the check is enforced either way.
+    """
+
     source: str
     """A URL or document reference. These three keys are the terms' own citation.
 
@@ -132,6 +149,23 @@ class ConstraintsTable(BaseModel):
 
     min_unit: float
     """Smallest buyable increment, in units. Positive."""
+
+    kind: str
+    """An ``ObservationKind`` id -- which staleness threshold these values age under.
+
+    ⚙ **Added by feature 002 as a migration**, and required rather than optional: FR-028
+    says the threshold is per kind of value with no permissive default, so a sourced table
+    that names no kind is a table whose values could never be reported stale. Every
+    declaration in the project gained the field in one change, because a half-applied
+    requirement makes ``scripts/check_provenance.py`` red for every file that has not caught
+    up yet.
+
+    Resolved against ``data/observation_kinds.toml`` by ``check_provenance.py`` rather than
+    by the loader: the feature-001 core records this table becomes -- ``BondTerms``,
+    ``InstrumentConstraints``, ``TaxClass`` -- have no field to carry a kind, because their
+    staleness verdict is a later feature's, so a kind resolved here would be a value the
+    engine reads nowhere. The gate is blocking, so the check is enforced either way.
+    """
 
     source: str
     """Separate from the terms' citation, because a minimum ticket is a venue's fact and
@@ -233,6 +267,23 @@ class TaxClassTable(BaseModel):
     note is where the rule is stated in words a reader can check the citation against.
     """
 
+    kind: str
+    """An ``ObservationKind`` id -- which staleness threshold these values age under.
+
+    ⚙ **Added by feature 002 as a migration**, and required rather than optional: FR-028
+    says the threshold is per kind of value with no permissive default, so a sourced table
+    that names no kind is a table whose values could never be reported stale. Every
+    declaration in the project gained the field in one change, because a half-applied
+    requirement makes ``scripts/check_provenance.py`` red for every file that has not caught
+    up yet.
+
+    Resolved against ``data/observation_kinds.toml`` by ``check_provenance.py`` rather than
+    by the loader: the feature-001 core records this table becomes -- ``BondTerms``,
+    ``InstrumentConstraints``, ``TaxClass`` -- have no field to carry a kind, because their
+    staleness verdict is a later feature's, so a kind resolved here would be a value the
+    engine reads nowhere. The gate is blocking, so the check is enforced either way.
+    """
+
     source: str
 
     retrieved_on: str
@@ -271,3 +322,513 @@ class TaxFile(BaseModel):
     model_config = STRICT
 
     jurisdiction: JurisdictionTable
+
+
+# ---------------------------------------------------------------------------
+# 002-ramp-cost: observation kinds, venues, channels, routes, streams, scenarios
+# ---------------------------------------------------------------------------
+#
+# ⚙ **One qualification to "zero field defaults", and it is the only one.** Several fields
+# below are declared ``X | None = None``. That is *not* a substituted value: **TOML has no
+# null**, so an omitted key is the only way a file can say "nothing is declared here", and
+# a pydantic field with no default cannot be omitted at all. The rule is therefore stated
+# rather than bent -- a ``= None`` default is permitted **only** where the core field it
+# feeds is itself ``X | None`` and ``None`` means *the owner declared nothing*, never
+# where it would stand in for a number, a date or a policy. So ``minimum``,
+# ``monthly_cap``, ``income_tax_rate_pct`` and ``partner_route`` may be omitted, because
+# ``Leg.minimum``, ``Leg.monthly_cap``, ``IncomeStream.income_tax_rate`` and
+# ``Route.partner_route`` are all "``None`` means none was declared" in the core; while
+# ``fee_pct``, ``verified_on``, ``staleness_days`` and ``policy`` have no default and a
+# file that omits one fails.
+#
+# ``contracts/declaration-schema.md`` writes ``partner_route = null`` and
+# ``capacity_pool = null`` in its examples, which no TOML parser accepts. Omission is the
+# expressible form of the same declaration, and ``verified_on = ""`` stays the exception it
+# already was: present-and-empty, because for a citation a forgotten key and a deliberate
+# "not yet" must not look alike.
+
+
+class ObservationKindTable(BaseModel):
+    """One ``[[kind]]`` entry of ``data/observation_kinds.toml``: how fast a value ages."""
+
+    model_config = STRICT
+
+    id: str
+    """``p2p_premium``, ``bank_fee_schedule``, ``regulatory_limit``, ``bond_terms``,
+    ``tax_rule``, ``venue_terms``. Every sourced table in the project names one of these."""
+
+    staleness_days: int
+    """Days after which a value of this kind is reported stale. **No default** (FR-028): a
+    kind without one fails at load, because a permissive default is exactly the silently
+    stale value the requirement exists to forbid."""
+
+    note: str
+    """Why this kind ages at this rate. Required -- a threshold nobody explained is a
+    number nobody can argue with."""
+
+
+class ObservationKindsFile(BaseModel):
+    """The whole of ``data/observation_kinds.toml``.
+
+    No provenance keys anywhere in it, deliberately: a staleness threshold is the owner's
+    *policy* about how long he will trust a number, not an observation of the world, so
+    there is nothing for a citation to vouch for.
+    """
+
+    model_config = STRICT
+
+    kind: list[ObservationKindTable]
+
+
+class VenueTable(BaseModel):
+    """One ``[[venue]]`` entry: a place money can sit, and what it can hold."""
+
+    model_config = STRICT
+
+    id: str
+    """``monobank_uah``, ``binance``, ``coinbase``, ``ibkr_usd``, ``inzhur``."""
+
+    name: str
+    """Human-readable and non-empty. For a fixture it says so in words."""
+
+    currencies: list[str]
+    """The currency codes this venue can hold. Non-empty, resolved against the core's
+    closed ``Currency`` enum by the loader.
+
+    Declared rather than inferred from the legs that touch the venue: inference would make
+    a leg moving dollars into a hryvnia-only account *self-justifying*, since the leg
+    declaring the impossible movement would be the evidence that it was possible.
+    """
+
+
+class VenuesFile(BaseModel):
+    """The whole of ``data/venues.toml``.
+
+    No citation keys: a venue table carries no observed numeric value, and
+    ``core.routes.venues.Venue`` has no provenance field to carry one. Every number
+    attached to a venue lives on a leg, in ``data/routes/``, with its own source.
+    """
+
+    model_config = STRICT
+
+    venue: list[VenueTable]
+
+
+class ChannelSideTable(BaseModel):
+    """``[channel.buy_side]`` / ``[channel.sell_side]`` -- one side of a two-sided quote.
+
+    **Exactly one of the two numeric forms.** Both set, or neither, is a load-time failure
+    (FR-010). There is deliberately no precedence rule: "the markup wins if both are set"
+    would silently ignore one of the two numbers the owner wrote, and an empty side is not
+    a zero -- zero is declarable, so an absence can only mean an unfinished declaration.
+
+    The side carries its **own** citation because it is its own observation: a P2P screen's
+    buy price and its sell price are two numbers, and the loader unions both sides' sources
+    with the reference rate's into the channel's provenance so no mark is lost.
+    """
+
+    model_config = STRICT
+
+    markup_bps: float | None = None
+    """A cost in basis points -- ``150.0`` is 1.5% -- always positive as a cost. Omitted
+    when the premium form is used.
+
+    Basis points reach the core **as basis points**: ``ChannelSide.markup_bps`` divides by
+    10 000 itself, in one place, beside the channel that uses it. This is not a ``_pct``
+    field and must not pass through the loader's percent conversion.
+    """
+
+    premium_per_unit: float | None = None
+    """A signed offset from the reference, in price currency per unit of foreign currency.
+
+    ``+3.0`` UAH per USD is what the owner reads off a P2P screen. **Zero is legal** (the
+    channel is at the reference) and **negative is legal** (it trades below the reference).
+    A *missing* premium is refused.
+    """
+
+    kind: str
+    """An ``ObservationKind`` id: how fast this side's number ages."""
+
+    source: str
+
+    retrieved_on: str
+
+    verified_on: str
+
+
+class ChannelTable(BaseModel):
+    """One ``[[channel]]`` entry: a named, dated, two-sided rate source for one pair."""
+
+    model_config = STRICT
+
+    id: str
+    """``nbu_official``, ``interbank``, ``bank_non_cash``, ``cash_desk``, ``card``,
+    ``p2p``. Reaches the result's ``channels_applied``, because the choice changes the
+    number (FR-011)."""
+
+    pair: list[str]
+    """Exactly two currency codes, ordered ``[price currency, unit currency]``.
+
+    ``["UAH", "USD"]`` with a reference of 42 means *42 UAH per USD*. The order is
+    load-bearing: it decides whether a leg is buying or selling, and reversing it would
+    invert every spread in the system while leaving every number plausible.
+    """
+
+    reference_rate: float
+    """Price-currency units per one unit of the unit currency, at the reference. Strictly
+    positive, and **never transacted at on its own** (FR-010)."""
+
+    buy_side: ChannelSideTable
+    """Required. Applied when the unit currency is acquired."""
+
+    sell_side: ChannelSideTable
+    """Required, and **not** derived from :attr:`buy_side`. A system computing one from the
+    other would be using a mid-rate with extra steps, and would force a symmetric spread on
+    a market that is routinely asymmetric."""
+
+    observed_on: str
+    """ISO date this quote was seen. Data, never a clock."""
+
+    kind: str
+    """An ``ObservationKind`` id for the reference rate's own ageing."""
+
+    source: str
+
+    retrieved_on: str
+
+    verified_on: str
+
+
+class ChannelFile(BaseModel):
+    """A whole ``data/channels/<pair>.toml``: one or more channels for one pair."""
+
+    model_config = STRICT
+
+    channel: list[ChannelTable]
+
+
+class LegTable(BaseModel):
+    """One ``[[route.leg]]`` entry: a single movement of money, as declared."""
+
+    model_config = STRICT
+
+    index: int
+    """Position in the chain, from zero. Declared rather than taken from list order so a
+    load-time error can name the leg the file itself names -- and checked against the
+    position, because an index that disagrees with its own position makes every message
+    about that leg point at the wrong lines."""
+
+    kind: str
+    """A key of ``core.routes.legs.LEG_COST_FNS``: ``transfer``, ``fx``, ``trade``,
+    ``withdrawal``. An unknown kind fails at load naming the value and the known ones."""
+
+    from_venue: str
+
+    to_venue: str
+
+    from_ccy: str
+    """Currency in. Equal to :attr:`to_ccy` for every kind except ``fx``."""
+
+    to_ccy: str
+
+    channel: str | None = None
+    """The ``FxChannel`` id applied. **Required when ``kind == "fx"`` and forbidden
+    otherwise** (FR-011): a transfer with a channel is a declaration that means nothing,
+    and accepting it would let a reader believe a conversion happened."""
+
+    capacity_pool: str | None = None
+    """The shared rail whose monthly limit this leg consumes, or omitted for none.
+
+    Two legs on two different routes that both run over the owner's Monobank card name the
+    **same** pool, and the accumulator keys on the pool rather than the route -- otherwise
+    each route would receive its own full limit (research.md D10). A ``monthly_cap`` with no
+    pool is refused: there would be no key to accumulate it under, so capacity consumed
+    earlier in the month could never reduce it.
+    """
+
+    fee_pct: float
+    """A percentage of the amount entering this leg: ``0.5`` means 0.5%. Non-negative.
+    Divided by 100 exactly once, at the loader."""
+
+    fee_fixed: float
+    """A flat fee in the leg's ``from_ccy``. Non-negative."""
+
+    minimum: float | None = None
+    """The smallest amount this leg will carry, in ``from_ccy``, or omitted for none. An
+    amount below it makes the route unusable, reported with the shortfall (FR-014) -- never
+    rounded up."""
+
+    maximum: float | None = None
+    """The largest amount this leg will carry per movement, or omitted for none."""
+
+    monthly_cap: float | None = None
+    """The most the leg's rail carries in a calendar month, or omitted for none. Requires
+    :attr:`capacity_pool`."""
+
+    latency_days: int
+    """How long this leg takes. Non-negative. Reported beside the cost, never inside it --
+    a slow route is not an expensive one."""
+
+    available_from: str | None = None
+    """First ISO date this leg works, or omitted for "always".
+
+    **A fact about the leg, with a source** -- "this corridor closed in March 2025". Never
+    an assumption: a regime transition is scenario data with an explicit assumption marker,
+    because burying a guess in a field whose every other value is an observation would make
+    the two indistinguishable in every output (research.md D8).
+    """
+
+    available_until: str | None = None
+    """Last ISO date this leg works, or omitted. Same epistemic status as
+    :attr:`available_from`."""
+
+    disruption_probability: float
+    """The chance this leg stops working, in ``[0, 1]``. Reported, and **never folded into
+    a cost** (FR-026): the chance a route stops working is a different claim from what it
+    charges."""
+
+    kind_of_observation: str
+    """An ``ObservationKind`` id -- which staleness threshold this leg's numbers age under.
+
+    Named ``kind_of_observation`` rather than ``kind`` because ``kind`` on a leg is already
+    the *leg* kind. Where a leg's table carries values of two kinds, it names the
+    fastest-ageing one: a table is verified as a whole, and the shorter threshold is the
+    honest one.
+    """
+
+    source: str
+
+    retrieved_on: str
+
+    verified_on: str
+
+
+class RouteTable(BaseModel):
+    """``[route]`` -- one route and its ordered chain of legs."""
+
+    model_config = STRICT
+
+    id: str
+    """Unique across every route file. The resolver enforces that across files."""
+
+    provider: str
+    """The named provider -- ``Monobank``, ``Binance P2P``, ``Interactive Brokers``.
+
+    Registry identity is ``(provider x currency path x venue)`` and **not** provider alone
+    (FR-023), because the number of conversions is usually the largest difference between
+    two ways of doing the same thing.
+    """
+
+    origin: str
+    """Venue id the first leg starts at."""
+
+    destination: str
+    """Venue id the last leg ends at."""
+
+    direction: str
+    """``inbound`` or ``exit``, declared rather than inferred (FR-027). An exit route is a
+    separate declaration, never a reversal of the way in."""
+
+    partner_route: str | None = None
+    """The exit route paired with this inbound one. Omitted means **no round-trip figure
+    exists** for this route (FR-030) -- it yields ``ExitCostUnknown``, never a reversal and
+    never the one-way figure promoted into the gap. Forbidden on an ``exit`` route: a
+    pairing is declared once, by the inbound side, so the two halves cannot disagree."""
+
+    status: str
+    """``open``, ``constrained`` or ``closed``. ``constrained`` is ranked and flagged;
+    ``closed`` is excluded on the date **with its status recorded** (FR-014)."""
+
+    leg: list[LegTable]
+    """Non-empty. A route with no legs is refused at load rather than costed as free --
+    free is the answer a reader would least question and the one most likely to be wrong."""
+
+
+class RouteFile(BaseModel):
+    """A whole ``data/routes/<id>.toml``: exactly one route.
+
+    One route per file, named after the file, on the instrument precedent: a file declaring
+    several would make a duplicate id harder to see and would put two unrelated review
+    histories in one place. Inbound and exit are therefore two files, which is also what
+    FR-027 wants a reader to see.
+    """
+
+    model_config = STRICT
+
+    route: RouteTable
+
+
+class IndexationTable(BaseModel):
+    """``[stream.indexation]`` -- how the amount is expected to grow, as declared."""
+
+    model_config = STRICT
+
+    policy: str
+    """``none``, ``cpi`` or ``fixed_rate``. Required: a stream that does not index needs a
+    way to say so, and leaving the field out would make "not indexed" and "nobody said"
+    indistinguishable."""
+
+    rate_pct: float | None = None
+    """The annual rate as a **percentage**, or omitted.
+
+    Omission is legitimate for ``cpi`` (the rate comes from an inflation series nobody has
+    declared yet) and for ``none`` (there is no rate). For ``fixed_rate`` it is a
+    declaration that means nothing, and the loader refuses it.
+    """
+
+
+class StreamTable(BaseModel):
+    """One ``[[stream]]`` entry: an income stream the owner declares about himself.
+
+    No ``source`` and no ``verified_on``. An owner's own salary is not an observation
+    needing a citation; it is a statement of fact by the only person who can make it -- the
+    same exemption ``data/scenarios/`` has, and the reason ``check_provenance.py`` gains
+    ``channels`` and not ``streams``.
+    """
+
+    model_config = STRICT
+
+    id: str
+
+    owner_id: str
+    """Present from day one, while there is exactly one owner (Principle VII). Retrofitting
+    tenancy is the expensive mistake; an unused column is free."""
+
+    currency: str
+    """The denomination of :attr:`amount`.
+
+    Declared here and nowhere else in the record the core sees: ``IncomeStream`` has **no**
+    currency field, because two fields stating one fact can disagree, and the loader builds
+    one ``Money`` from this pair so ``amount.currency`` is the single place.
+    """
+
+    amount: float
+    """What arrives per :attr:`cadence`, in :attr:`currency`. Non-negative -- ``0.0`` is the
+    honest placeholder for a figure the owner has not stated (§11 item 3), and it produces a
+    zero result rather than a made-up one."""
+
+    cadence: str
+    """``monthly``, ``biweekly`` or ``semimonthly``."""
+
+    arrives_at: str
+    """Venue id where the money lands. A route whose ``origin`` differs from this is a
+    mismatch, reported rather than assumed away."""
+
+    income_tax_rate_pct: float | None = None
+    """Income tax withheld at source, as a **percentage**, or omitted.
+
+    Omitting it means **the owner has not stated one**, which is a different claim from
+    stating zero: ``streams.deployable`` then returns ``IncomeTaxRateUndeclared``, which has
+    no net field at all, rather than a net figure that quietly equals the gross (FR-007).
+    """
+
+    indexation: IndexationTable
+
+
+class StreamFile(BaseModel):
+    """A whole ``data/streams/<owner>.toml``: one owner's income streams."""
+
+    model_config = STRICT
+
+    stream: list[StreamTable]
+
+
+class FallbackTable(BaseModel):
+    """``[scenario.fallback]`` -- what happens to a contribution the route will not carry.
+
+    §4.3.4 calls this the *scenario's* fallback policy, which is why it is declared here
+    rather than on a route or a stream: it is a decision about the owner's money, not a
+    property of a corridor.
+    """
+
+    model_config = STRICT
+
+    policy: str
+    """``hold_as_cash``, ``redirect`` or ``skip`` -- three of §4.3.4's four. ``deposit``
+    needs a deposit instrument and fails at load naming the feature that will bring it,
+    because treating it as "hold as cash" would substitute a default for a policy the owner
+    explicitly chose (FR-013)."""
+
+    redirect_to: str
+    """Where the excess goes under ``redirect``, and ``""`` for every other policy.
+
+    Present-and-empty rather than omitted, on the ``verified_on`` precedent: a ``redirect``
+    whose destination line was forgotten must not read as a deliberate blank. FR-013
+    requires the redirect target be *named*.
+    """
+
+
+class RegimeTable(BaseModel):
+    """One ``[[scenario.regime]]`` entry: which routes a regime believes in.
+
+    No provenance, and the absence is load-bearing. A belief has nothing to cite; giving a
+    regime a source field would invite a citation for a guess.
+    """
+
+    model_config = STRICT
+
+    id: str
+    """``wartime``, ``normalized``."""
+
+    route_ids: list[str]
+    """Ids of the declared routes this regime includes. Non-empty, every one resolved
+    against ``data/routes/``, and **partner-closed**: including an inbound route while
+    excluding the exit route it names would make money one-way."""
+
+
+class TransitionTable(BaseModel):
+    """One ``[[scenario.transition]]`` entry: an assumed change of regime on a date."""
+
+    model_config = STRICT
+
+    on_date: str
+    """ISO date the regime is assumed to change. The date belongs to the regime *after*
+    it."""
+
+    before: str
+    """Regime id in force up to :attr:`on_date`."""
+
+    after: str
+    """Regime id in force from :attr:`on_date` onward."""
+
+    is_assumption: bool
+    """Must be declared, and must be ``true``.
+
+    Typed ``bool`` here and ``Literal[True]`` in the core: the loader refuses ``false`` with
+    a message that can say *why*, which pydantic could not. FR-020 requires a transition
+    date be presented as a stated assumption, and a marker that can be switched off is not
+    a marker.
+    """
+
+    rationale: str
+    """The owner's stated belief, in words. Required: it is what this record carries where
+    an observation carries a source."""
+
+
+class ScenarioTable(BaseModel):
+    """``[scenario]`` -- one scenario: its regimes, its transitions, its fallback."""
+
+    model_config = STRICT
+
+    id: str
+
+    owner_id: str
+    """Principle VII: every scenario carries an owner from the first commit."""
+
+    fallback: FallbackTable
+
+    regime: list[RegimeTable]
+    """At least two: a transition between one regime and itself is not a transition."""
+
+    transition: list[TransitionTable]
+    """Non-empty, strictly ascending by date, and joined end to end -- otherwise some date
+    falls in a regime nobody declared, and picking one would be inventing the owner's
+    belief."""
+
+
+class ScenarioFile(BaseModel):
+    """A whole ``data/scenarios/<id>.toml``: exactly one scenario."""
+
+    model_config = STRICT
+
+    scenario: ScenarioTable

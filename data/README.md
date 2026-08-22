@@ -11,11 +11,21 @@ Everything here is versioned, sourced, dated, and reviewed in git like code
 | Directory | Holds |
 |---|---|
 | `instruments/` | The instrument registry — five classes (spec §3). `instruments/nav/` holds low-frequency dated NAV and distribution series. |
-| `routes/` | Funding and exit routes: legs, caps, regimes, one entry per `(provider × currency path × venue)` (spec §4.3). |
+| `routes/` | Funding and exit routes, **declared in pairs**: legs, caps, rails, one entry per `(provider × currency path × venue)` (spec §4.3). |
+| `channels/` | Two-sided FX quotes per named channel — official, interbank, bank non-cash, cash desk, card, peer-to-peer (spec §4.3.1, FR-010). |
+| `streams/` | **Per-owner** income streams: currency, amount, cadence, arrival venue, indexation (spec §4.2). |
 | `tax/` | Jurisdiction rule packs with dated rate schedules (spec §4.5). |
 | `scenarios/` | FX paths, discrete events, regime transitions, risk assumptions (spec §4.3.4, §4.6). |
 | `strategies/` | Named allocations, per income stream (spec §5.1). |
 | `objectives/` | Objective + constraint sets (spec §4.10.3–4.10.4). |
+
+Two files sit at the root rather than in a directory, because each is a single flat list
+the whole repository refers to:
+
+| File | Holds |
+|---|---|
+| `observation_kinds.toml` | One staleness threshold per kind of observed value, with the reason for it. No default: a kind without `staleness_days` fails at load, and so does a sourced table naming a kind that is not declared here (FR-028). |
+| `venues.toml` | Where money can sit, and which currencies each place can hold. A leg moving a currency its venue cannot hold is a load-time failure naming the file and the leg index. |
 
 ## Rules that apply to every file here
 
@@ -25,6 +35,11 @@ Everything here is versioned, sourced, dated, and reviewed in git like code
    `verified_on`. An empty `verified_on` is permitted and expected — it must render
    visibly marked, and the mark propagates to everything derived from it. Omitting the
    key is *not* permitted. Enforced by `scripts/check_provenance.py` in CI.
+   Every sourced table also names the **observation kind** it ages under, declared in
+   `observation_kinds.toml`; a table naming a kind that file does not declare, and a kind
+   with no `staleness_days`, are both errors (FR-028). The script checks that the
+   *declaration* is complete and leaves the staleness verdict to the engine, which is
+   given an as-of date; the script has none and must not invent one.
 3. **Dated schedules, not constants.** Every rate must accept a dated schedule, so a
    legislated change is modelled rather than requiring a rebuild (spec §4.5.1).
    **Not yet true:** as of feature 001 a tax class carries a scalar rate, not a schedule.
@@ -43,3 +58,20 @@ Everything here is versioned, sourced, dated, and reviewed in git like code
 they hold the owner's own stated beliefs — a probability of sovereign restructuring, a
 war-end date, a MilTech loss probability. An assumption needs a **label and a visible
 consequence**, not a source. Never present one as though it were an observation.
+
+`streams/` carries the **same exemption, for a different reason**: an owner's own salary
+is not an observation needing a citation, it is a statement of fact by the only person
+who can make it. That covers `income_tax_rate_pct` too, and it needs saying rather than
+inheriting silently, because it looks like a tax rate and every *modelled* tax rate must
+carry a source. It is exempt because §4.2 puts the owner's own income-tax position
+outside the simulator entirely: the tool takes net-of-income-tax amounts as input, and
+the field exists only so the deployable figure is not overstated. A rate the engine
+*applies to a taxable event* needs a source; a rate the owner states about his own
+payslip does not. `scripts/check_provenance.py` therefore scans `tax/`, `instruments/`,
+`routes/` and `channels/` — and not `streams/`.
+
+Per-owner data being *inside* `data/` is a narrower claim than it looks: `streams/`
+holds one committed, reviewed declaration of where money lands and in what currency,
+with its amounts at `0.0` because the real figures have not been stated (§11 item 3).
+Holdings, goals, results and anything else describing what the owner actually did stay
+outside this directory and gitignored, which is the boundary rule 5 above is about.

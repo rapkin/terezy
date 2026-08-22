@@ -22,6 +22,7 @@ applies_to    = ["coupon", "disposal_gain"]
 pit_rate_pct  = 0.0
 levy_rate_pct = 0.0
 note          = "Interest on certain Ukrainian state securities is PIT-exempt; the military levy is not charged on income not subject to PIT. Verify against the Tax Code of Ukraine before any figure derived from this leaves the tool."
+kind          = "tax_rule"
 source        = "https://taxsummaries.pwc.com/ukraine/individual/income-determination"
 retrieved_on  = "2026-08-21"
 verified_on   = ""

@@ -1,0 +1,33 @@
+# The way back out of the fund, declared separately (FR-027) rather than derived.
+#
+# SYNTHETIC FIXTURE. Every number is invented and every `verified_on` is empty.
+#
+# **An exit route is not the inbound route reversed.** Redemption from a fund settles on
+# its own timetable and charges its own fees, and §4.3.3's rule is that getting money back
+# into **spendable** base currency has its own chain. So this file exists, it is named by
+# `inzhur_direct.toml`'s `partner_route`, and it ends holding hryvnia in the account the
+# owner actually spends from.
+
+[route]
+id            = "inzhur_to_monobank"
+provider      = "Inzhur"
+origin        = "inzhur"
+destination   = "monobank_uah"
+direction     = "exit"
+status        = "open"
+
+  [[route.leg]]
+  index                  = 0
+  kind                   = "withdrawal"
+  from_venue             = "inzhur"
+  to_venue               = "monobank_uah"
+  from_ccy               = "UAH"
+  to_ccy                 = "UAH"
+  fee_pct                = 0.0
+  fee_fixed              = 0.0
+  latency_days           = 3
+  disruption_probability = 0.01
+  kind_of_observation    = "bank_fee_schedule"
+  source                 = "SYNTHETIC FIXTURE — invented. Declared free so the domestic round trip is exactly zero and the SC-004 bar holds both ways; a real redemption fee is unobserved (§11 item 1). Three days is an invented settlement latency, reported beside the cost and never inside it."
+  retrieved_on           = "2026-08-22"
+  verified_on            = ""

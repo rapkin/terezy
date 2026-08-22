@@ -1,0 +1,95 @@
+# The same corridor with three conversions instead of one. The **G5** fixture.
+#
+# SYNTHETIC FIXTURE. Every number is invented and every `verified_on` is empty.
+#
+# **What this route is for.** Required test **G5** and FR-017: two variants of one route
+# differing **only** in the number of conversions must rank in the order cost implies, and
+# the difference must be attributable to the conversion count. So this file is
+# `monobank_to_binance_p2p.toml` with two extra `fx` legs and *nothing else changed* — the
+# same provider, the same endpoints, the same channel, the same zero fees, the same rail
+# and the same cap. Every fee here is zero, so the entire cost difference between the two
+# routes lands in the conversion-spread component and cannot be anything else.
+#
+# **The extra pair is a real pattern, not a contrivance.** Routing back through the base
+# currency at the far end is what happens whenever a corridor settles in hryvnia on the
+# way through — a counterparty who takes dollars but pays out hryvnia, and a second
+# purchase to get back into dollars. Each crossing pays a spread, which is why the shape is
+# worth being able to declare and compare rather than assume away.
+
+[route]
+id            = "monobank_to_binance_p2p_double"
+provider      = "Binance P2P"
+origin        = "monobank_uah"
+destination   = "binance"
+direction     = "inbound"
+partner_route = "binance_p2p_to_monobank"
+status        = "open"
+
+  [[route.leg]]
+  index                  = 0
+  kind                   = "fx"
+  capacity_pool          = "monobank_card_uah_usd"
+  monthly_cap            = 100000.0
+  from_venue             = "monobank_uah"
+  to_venue               = "monobank_uah"
+  from_ccy               = "UAH"
+  to_ccy                 = "USD"
+  channel                = "p2p"
+  fee_pct                = 0.0
+  fee_fixed              = 0.0
+  latency_days           = 0
+  disruption_probability = 0.05
+  kind_of_observation    = "regulatory_limit"
+  source                 = "SYNTHETIC FIXTURE — invented. The same 100 000 UAH card ceiling as the single-conversion variant, declared identically because it is the same card: two legs naming one pool must agree on the cap or the load fails (research.md D10)."
+  retrieved_on           = "2026-08-22"
+  verified_on            = ""
+
+  [[route.leg]]
+  index                  = 1
+  kind                   = "transfer"
+  from_venue             = "monobank_uah"
+  to_venue               = "binance"
+  from_ccy               = "USD"
+  to_ccy                 = "USD"
+  fee_pct                = 0.0
+  fee_fixed              = 0.0
+  latency_days           = 0
+  disruption_probability = 0.02
+  kind_of_observation    = "bank_fee_schedule"
+  source                 = "SYNTHETIC FIXTURE — invented, and identical to the single-conversion variant's transfer leg so the two routes differ in conversion count alone."
+  retrieved_on           = "2026-08-22"
+  verified_on            = ""
+
+  [[route.leg]]
+  index                  = 2
+  kind                   = "fx"
+  from_venue             = "binance"
+  to_venue               = "binance"
+  from_ccy               = "USD"
+  to_ccy                 = "UAH"
+  channel                = "p2p"
+  fee_pct                = 0.0
+  fee_fixed              = 0.0
+  latency_days           = 0
+  disruption_probability = 0.05
+  kind_of_observation    = "bank_fee_schedule"
+  source                 = "SYNTHETIC FIXTURE — invented. The dollars are sold back into hryvnia at the counterparty's settlement currency; the spread taken here is the sell side of the declared p2p channel, not a mid-rate."
+  retrieved_on           = "2026-08-22"
+  verified_on            = ""
+
+  [[route.leg]]
+  index                  = 3
+  kind                   = "fx"
+  from_venue             = "binance"
+  to_venue               = "binance"
+  from_ccy               = "UAH"
+  to_ccy                 = "USD"
+  channel                = "p2p"
+  fee_pct                = 0.0
+  fee_fixed              = 0.0
+  latency_days           = 0
+  disruption_probability = 0.05
+  kind_of_observation    = "bank_fee_schedule"
+  source                 = "SYNTHETIC FIXTURE — invented. The second purchase, paying the buy side of the same declared channel again. Two crossings, two spreads: that is the whole content of G5."
+  retrieved_on           = "2026-08-22"
+  verified_on            = ""

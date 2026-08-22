@@ -1,0 +1,62 @@
+# The §4.3.1 corridor: hryvnia off the card into dollars on the exchange, one conversion.
+#
+# SYNTHETIC FIXTURE. Every number here and in the channel it names is invented
+# (`SIMULATOR_SPEC.md` §11 item 1: the owner's real P2P premium, card limit and exchange
+# fees have never been observed). Every `verified_on` is empty and every figure derived
+# from this route renders marked.
+#
+# **This is the route the feature exists for.** One `fx` leg through the declared `p2p`
+# channel is where §4.3.1's 5–10% one-way cost actually lives, and the whole of that cost
+# is the channel's spread because every fee below is zero. Round trip is computed from
+# `binance_p2p_to_monobank.toml` (FR-027), which this route names as its partner.
+#
+# **The `capacity_pool` is the point of research.md D10.** The P2P purchase is funded off
+# the owner's Monobank card, so it consumes the *card's* monthly limit — and so does
+# `monobank_to_binance_p2p_double.toml` and `monobank_to_binance_card.toml`. All three name
+# the same pool with the same cap, because there is one card and one limit. Keying capacity
+# on the route instead would give each of the three its own full limit, which is the defect
+# D10 was written to fix.
+
+[route]
+id            = "monobank_to_binance_p2p"
+provider      = "Binance P2P"
+origin        = "monobank_uah"
+destination   = "binance"
+direction     = "inbound"
+partner_route = "binance_p2p_to_monobank"
+status        = "open"
+
+  [[route.leg]]
+  index                  = 0
+  kind                   = "fx"
+  capacity_pool          = "monobank_card_uah_usd"
+  monthly_cap            = 100000.0
+  from_venue             = "monobank_uah"
+  to_venue               = "monobank_uah"
+  from_ccy               = "UAH"
+  to_ccy                 = "USD"
+  channel                = "p2p"
+  fee_pct                = 0.0
+  fee_fixed              = 0.0
+  latency_days           = 0
+  disruption_probability = 0.05
+  kind_of_observation    = "regulatory_limit"
+  source                 = "SYNTHETIC FIXTURE — invented. The 100 000 UAH monthly ceiling stands in for the card limit §11 item 1 names as unobserved; it is not read off any NBU decision or bank page. The kind is 'regulatory_limit' because the cap is the fastest-ageing number in this table — the premium itself is declared in data/channels/uah_usd.toml under 'p2p_premium'. The disruption probability is the owner's placeholder assumption, reported and never folded into a cost (FR-026)."
+  retrieved_on           = "2026-08-22"
+  verified_on            = ""
+
+  [[route.leg]]
+  index                  = 1
+  kind                   = "transfer"
+  from_venue             = "monobank_uah"
+  to_venue               = "binance"
+  from_ccy               = "USD"
+  to_ccy                 = "USD"
+  fee_pct                = 0.0
+  fee_fixed              = 0.0
+  latency_days           = 0
+  disruption_probability = 0.02
+  kind_of_observation    = "bank_fee_schedule"
+  source                 = "SYNTHETIC FIXTURE — invented. Declared free so that every hryvnia this route costs is the channel's spread and nothing else, which is what makes the G2 arithmetic one division rather than a reconciliation."
+  retrieved_on           = "2026-08-22"
+  verified_on            = ""

@@ -46,6 +46,7 @@ is the engine's typed ``InconsistentTerms``, not a load error.
 from __future__ import annotations
 
 import tomllib
+from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final
@@ -63,12 +64,24 @@ from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance, SourceRef
+from terezy.core.primitives.staleness import ObservationKind
+from terezy.core.routes import capacity, legs
+from terezy.core.routes.channels import ChannelSide, FxChannel
+from terezy.core.routes.legs import Leg, Route
+from terezy.core.routes.venues import Venue
+from terezy.core.scenarios.regimes import Regime, RegimeTransition
+from terezy.core.streams import streams
+from terezy.core.streams.streams import IncomeStream, Indexation
 from terezy.core.tax.interface import TaxableEventKind, TaxClass
 from terezy.data.declarations import schema
 from terezy.data.declarations.errors import DeclarationError
 
 if TYPE_CHECKING:  # pragma: no cover -- typing only
     from collections.abc import Mapping
+
+_CURRENCY_PAIR_LENGTH: Final = 2
+"""A quote is between exactly two currencies. Named so the check reads as the rule it is
+rather than as a magic number."""
 
 _PERCENT: Final = 100.0
 """The divisor. Named so the one place it is used is greppable and cannot be mistaken for
@@ -347,13 +360,39 @@ def _source_ref(
     source: str,
     retrieved_on: str,
     verified_on: str,
+    kind: str | None,
 ) -> SourceRef:
     """One table's citation, as the core's ``SourceRef``.
 
     The id names the file and the table (see :func:`source_id`), the citation is required
     non-empty, and an empty ``verified_on`` becomes ``None`` -- the unverified mark that
     FR-015 propagates through every figure derived from this table.
+
+    ⚙ **``kind`` is checked here and carried nowhere**, for the tables whose core record has
+    no field for it -- feature 001's ``BondTerms``, ``InstrumentConstraints`` and
+    ``TaxClass``. The field is required in the file (FR-028: no sourced table ages under a
+    threshold nobody named), and it is checked non-empty at the one place every citation
+    passes through, so the check cannot be forgotten at a new call site. Resolution against
+    ``data/observation_kinds.toml`` is ``scripts/check_provenance.py``'s, which reads the
+    files rather than the records; see :class:`terezy.data.declarations.schema.BondTermsTable`
+    for why a kind resolved into these records would be a value nothing reads.
+
+    The parameter is **required and may be ``None``**, with no default, on the precedent
+    ``DeclarationError.remedy`` sets: a default would make "no kind check" the thing that
+    happens when nobody thought about it, which is the shape of mistake this project keeps
+    finding. ``None`` is passed only where the table's kind is checked at the record field it
+    becomes -- a leg's ``kind_of_observation``, a channel's ``kind`` -- because the error
+    there can name the field the file actually uses.
     """
+    if kind is not None:
+        _require_text(
+            path,
+            f"{table}.kind",
+            kind,
+            "every table of observed values names the kind it ages under, and there is no "
+            "default staleness threshold (FR-028): a value whose threshold nobody declared "
+            "could never be reported stale",
+        )
     return SourceRef(
         id=source_id(path, table),
         citation=_require_text(
@@ -385,6 +424,7 @@ def _bond_terms(
                 source=table.source,
                 retrieved_on=table.retrieved_on,
                 verified_on=table.verified_on,
+                kind=table.kind,
             )
         ]
     )
@@ -452,6 +492,7 @@ def _constraints(
                 source=table.source,
                 retrieved_on=table.retrieved_on,
                 verified_on=table.verified_on,
+                kind=table.kind,
             )
         ]
     )
@@ -594,6 +635,7 @@ def _tax_class(path: Path, entry: schema.TaxClassTable) -> TaxClass:
                 source=entry.source,
                 retrieved_on=entry.retrieved_on,
                 verified_on=entry.verified_on,
+                kind=entry.kind,
             )
         ]
     )
@@ -657,3 +699,1209 @@ def tax_classes_from_file(path: Path) -> tuple[TaxClass, ...]:
             "declare at least one [[jurisdiction.tax_class]]",
         )
     return tuple(_tax_class(path, entry) for entry in jurisdiction.tax_class)
+
+
+# ---------------------------------------------------------------------------
+# 002-ramp-cost: observation kinds, venues, channels, routes, streams, scenarios
+# ---------------------------------------------------------------------------
+#
+# Same four responsibilities as above, in the same order -- read, shape, meaning, construct
+# -- and the same two rules that make this boundary worth having: **percent becomes a
+# fraction exactly once, in** :func:`_as_fraction`, and **no pydantic type crosses this
+# line**.
+#
+# What is *not* here, and could not be: everything needing a second file. A leg naming a
+# venue, a channel or an observation kind is a reference, and whether it resolves depends on
+# files this function has never opened; leg-to-leg continuity is checkable here but is
+# checked beside the reference resolution so that one pass reports the whole shape of a
+# broken declaration (research.md D6). Those live in
+# :mod:`terezy.data.declarations.resolver`.
+#
+# ⚙ **Basis points are not percent.** ``markup_bps`` reaches the core *as basis points* and
+# ``ChannelSide`` divides by 10 000 itself, in one place beside the channel that uses it.
+# Passing a bps field through :func:`_as_fraction` would be the "twice" half of the
+# divided-once bug, and it would look plausible: a 150 bps markup would read as 1.5 bps.
+
+OBSERVATION_KIND_TABLE: Final = "kind"
+"""Root array of ``data/observation_kinds.toml``, and the prefix of every field path in
+one."""
+
+VENUE_TABLE: Final = "venue"
+"""Root array of ``data/venues.toml``."""
+
+CHANNEL_TABLE: Final = "channel"
+"""Root array of a channel file."""
+
+ROUTE_TABLE: Final = "route"
+"""Root table of a route file."""
+
+STREAM_TABLE: Final = "stream"
+"""Root array of a stream file."""
+
+SCENARIO_TABLE: Final = "scenario"
+"""Root table of a scenario file."""
+
+_CADENCES: Final[Mapping[str, streams.Cadence]] = {
+    "monthly": "monthly",
+    "biweekly": "biweekly",
+    "semimonthly": "semimonthly",
+}
+"""Declared cadence to the core's closed ``Cadence``.
+
+A mapping from a name to *itself* rather than an ``if`` chain: the keys are what an error
+message lists, and the values are what makes the result a ``Literal`` rather than a ``str``
+-- so a cadence this engine does not model is a load-time failure naming the file, and a
+misspelt one can never reach a record. Same shape as :data:`_INDEXATION_POLICIES`,
+:data:`_DIRECTIONS` and :data:`_STATUSES` below, and the same reason.
+"""
+
+_INDEXATION_POLICIES: Final[Mapping[str, streams.IndexationPolicy]] = {
+    "none": "none",
+    "cpi": "cpi",
+    "fixed_rate": "fixed_rate",
+}
+"""Declared indexation policy to the core's closed set."""
+
+_DIRECTIONS: Final[Mapping[str, legs.RouteDirection]] = {
+    "inbound": "inbound",
+    "exit": "exit",
+}
+"""Declared route direction to the core's closed set. Declared, never inferred (FR-027)."""
+
+_STATUSES: Final[Mapping[str, legs.RouteStatus]] = {
+    "open": "open",
+    "constrained": "constrained",
+    "closed": "closed",
+}
+"""Declared route status to the core's closed set."""
+
+_FALLBACK_POLICIES: Final[Mapping[str, capacity.FallbackPolicy]] = {
+    policy: policy for policy in capacity.POLICIES
+}
+"""Declared fallback policy to the core's closed set, built from the core's own tuple.
+
+Built from :data:`terezy.core.routes.capacity.POLICIES` rather than restated, so the data
+layer cannot come to accept a policy the engine does not implement, or refuse one it does.
+"""
+
+
+@dataclass(frozen=True, slots=True)
+class ScenarioDeclaration:
+    """One ``data/scenarios/<id>.toml``: the owner's regimes, transitions and fallback.
+
+    A data-layer aggregate rather than a core record, because the core takes the pieces
+    separately: ``regimes.routes_in_force`` wants a mapping of regimes and a sequence of
+    transitions, and ``capacity.deploy`` wants a policy. Nothing in the core needs the three
+    of them in one object, and inventing a core type to hold them would be adding a record
+    for the loader's convenience.
+
+    It carries **no provenance**, and the absence is the design. A regime is a belief and a
+    transition is a guess; ``is_assumption`` is what they carry where an observation carries
+    a source and a verification date. Giving them a provenance field would invite a citation
+    for a guess, which is the one thing Principle I forbids most firmly (research.md D8).
+    """
+
+    id: str
+    """Unique across every scenario file."""
+
+    owner_id: str
+    """Whose beliefs these are. Principle VII, from the first commit."""
+
+    regimes: tuple[Regime, ...]
+    """The declared regimes, in file order. Keyed by id by the resolver, which is also
+    where a duplicate across files is caught."""
+
+    transitions: tuple[RegimeTransition, ...]
+    """The declared transitions, in file order -- which the loader has already checked is
+    strictly ascending and joined end to end."""
+
+    fallback_policy: capacity.FallbackPolicy
+    """What happens to a contribution the route will not carry (FR-013)."""
+
+    redirect_to: str | None
+    """Where the excess goes under ``redirect``, and ``None`` for every other policy. A
+    ``redirect`` with no named destination is refused: FR-013 requires the target be
+    named."""
+
+
+def _bounded(path: Path, field_path: str, value: float, why: str) -> float:
+    """A fraction that must lie in ``[0, 1]`` -- a probability, not a rate.
+
+    Separate from :func:`_non_negative` because the upper bound is real: a disruption
+    probability above one is not a very likely disruption, it is a number that is not a
+    probability, and reporting it beside a cost would put a meaningless figure in front of
+    the owner. Refused rather than clamped, on the same reasoning as everywhere else here.
+    """
+    if not 0.0 <= value <= 1.0:
+        raise DeclarationError(
+            path,
+            field_path,
+            f"is {value!r}, and {why}. It is refused rather than clamped into range: a "
+            "clamped probability is a number no file declares.",
+            "write a value between 0 and 1 inclusive",
+        )
+    return value
+
+
+def _non_negative_days(path: Path, field_path: str, value: int, why: str) -> int:
+    """A whole number of days that may be zero but not negative.
+
+    Zero is a real declaration -- an instant transfer, a same-day threshold -- which is why
+    this is the day-count sibling of :func:`_non_negative` rather than a use of
+    :func:`_positive`.
+    """
+    if value < 0:
+        raise DeclarationError(
+            path,
+            field_path,
+            f"is {value!r}, and {why}. Zero is a valid declaration here; a negative number "
+            "of days is not, and it is refused rather than read as zero.",
+            "write zero or a positive whole number of days",
+        )
+    return value
+
+
+def _optional_money(
+    path: Path,
+    field_path: str,
+    value: float | None,
+    *,
+    currency: Currency,
+    sources: Provenance,
+    why: str,
+) -> Money | None:
+    """A limit that may be absent, as ``Money`` or ``None``.
+
+    ``None`` here means **the file declares no such limit**, which is why the field is
+    allowed to be absent at all -- the core's ``Leg.minimum`` and ``Leg.monthly_cap`` are
+    ``Money | None`` for exactly that reason. It is not a default standing in for a number:
+    there is no number, and every consumer of these fields branches on the absence rather
+    than treating it as zero (which would make every amount below a minimum, and every cap
+    binding at nothing).
+    """
+    if value is None:
+        return None
+    return Money(_positive(path, field_path, value, why), currency, sources)
+
+
+def _optional_date(path: Path, field_path: str, text: str | None) -> date | None:
+    """An availability window bound, or ``None`` for "always".
+
+    Distinct from :func:`_parse_verification_date`: there the empty *string* is the declared
+    statement "not verified", because the key must be present. Here the key may be absent,
+    and its absence is the declaration -- a leg with no window works on every date, which is
+    a claim a reader can check against the source beside it.
+    """
+    if text is None:
+        return None
+    return _parse_date(path, field_path, text)
+
+
+def observation_kinds_from_file(path: Path) -> tuple[ObservationKind, ...]:
+    """Every kind declared in ``data/observation_kinds.toml``, in file order.
+
+    No citation is read, and none is expected: a staleness threshold is the owner's policy
+    about how long he will trust a number of this kind, not an observation of the world.
+    What *is* enforced is that the threshold exists and is positive, because FR-028's whole
+    content is that there is no permissive default -- a kind with no threshold, or one of
+    zero days, would make every value of that kind either permanently fresh or permanently
+    stale, and both are warnings that get ignored.
+    """
+    document = read_document(path)
+    declared = _validate(schema.ObservationKindsFile, document, path).kind
+    if not declared:
+        raise DeclarationError(
+            path,
+            OBSERVATION_KIND_TABLE,
+            "declares no observation kinds. An empty kinds file is reported rather than "
+            "read as 'nothing ages': every sourced table in the project names a kind, so "
+            "every one of them would fail to resolve for a reason naming the wrong file.",
+            "declare at least one [[kind]]",
+        )
+    return tuple(
+        ObservationKind(
+            id=_require_text(
+                path,
+                f"{OBSERVATION_KIND_TABLE}[{entry.id}].id",
+                entry.id,
+                "a kind is referred to by id from every sourced table that ages under it",
+            ),
+            staleness_days=int(
+                _positive(
+                    path,
+                    f"{OBSERVATION_KIND_TABLE}[{entry.id}].staleness_days",
+                    float(entry.staleness_days),
+                    "a threshold of zero days or fewer makes every value of this kind stale "
+                    "the moment it is read, which is a warning that gets ignored rather than "
+                    "a policy",
+                )
+            ),
+            note=_require_text(
+                path,
+                f"{OBSERVATION_KIND_TABLE}[{entry.id}].note",
+                entry.note,
+                "a threshold nobody explained is a number nobody can argue with; the note is "
+                "where the reason is stated in words",
+            ),
+        )
+        for entry in declared
+    )
+
+
+def venues_from_file(path: Path) -> tuple[Venue, ...]:
+    """Every venue declared in ``data/venues.toml``, in file order.
+
+    A venue table carries no observed numeric value -- an id, a name and a set of currency
+    codes -- so no citation is read, and :class:`~terezy.core.routes.venues.Venue` has no
+    provenance field to carry one. Every *number* attached to a venue lives on a leg, in
+    ``data/routes/``, with its own source.
+
+    The currency set is required non-empty. A venue that can hold nothing is a place money
+    cannot sit, and every leg touching it would fail the can-hold check for a reason that
+    names the leg rather than the venue that is actually wrong.
+    """
+    document = read_document(path)
+    declared = _validate(schema.VenuesFile, document, path).venue
+    if not declared:
+        raise DeclarationError(
+            path,
+            VENUE_TABLE,
+            "declares no venues. An empty venue file is reported rather than read as "
+            "'money cannot sit anywhere': every route endpoint and every stream arrival "
+            "would fail to resolve, each naming its own file instead of this one.",
+            "declare at least one [[venue]]",
+        )
+    return tuple(
+        Venue(
+            id=_require_text(
+                path,
+                f"{VENUE_TABLE}[{entry.id}].id",
+                entry.id,
+                "a venue is referred to by id from every leg and every stream that touches it",
+            ),
+            name=_require_text(
+                path,
+                f"{VENUE_TABLE}[{entry.id}].name",
+                entry.name,
+                "a venue a reader cannot recognise by name is one they cannot check",
+            ),
+            currencies=frozenset(
+                _currency(path, f"{VENUE_TABLE}[{entry.id}].currencies", code)
+                for code in _non_empty_list(
+                    path,
+                    f"{VENUE_TABLE}[{entry.id}].currencies",
+                    entry.currencies,
+                    "a venue that can hold no currency is a place money cannot sit, and "
+                    "every leg touching it would be refused for a reason naming the leg "
+                    "rather than the venue",
+                )
+            ),
+        )
+        for entry in declared
+    )
+
+
+def _non_empty_list[T](path: Path, field_path: str, values: list[T], why: str) -> list[T]:
+    """A declared list that may not be empty, checked where the field can be named.
+
+    Generic because the three callers -- a venue's currencies, a regime's routes, a
+    scenario's transitions -- fail for the same reason in three different files, and one
+    message shape keeps them saying it the same way.
+    """
+    if not values:
+        raise DeclarationError(
+            path,
+            field_path,
+            f"is an empty list, and {why}.",
+            "list at least one entry",
+        )
+    return values
+
+
+def _channel_side(
+    path: Path,
+    table: schema.ChannelSideTable,
+    *,
+    field_prefix: str,
+    price_currency: Currency,
+) -> tuple[ChannelSide, SourceRef]:
+    """One side of a channel quote, and the citation it rests on.
+
+    **Exactly one of the two forms**, checked here where the file and the field can be
+    named (FR-010). Both set is refused because there is no precedence rule that does not
+    silently ignore one of the two numbers the owner wrote; neither set is refused because
+    an empty side is not a zero -- "at the reference" is declarable as ``0.0``, so an
+    absence can only mean an unfinished declaration, and reading an unfinished declaration
+    as free would make the cheapest route the one nobody described.
+
+    The premium is built as ``Money`` in the **price** currency, which is what a premium per
+    unit is denominated in: ``+3`` on a ``["UAH", "USD"]`` channel is three hryvnia per
+    dollar. It is deliberately **not** put through :func:`_positive` or
+    :func:`_non_negative` -- zero means at the reference and negative means below it, and
+    both are real declarations.
+
+    Basis points pass through untouched: ``ChannelSide`` divides by 10 000 itself, so
+    sending this field through :func:`_as_fraction` would be the "divided twice" bug in its
+    most plausible disguise.
+    """
+    ref = _source_ref(
+        path,
+        field_prefix,
+        source=table.source,
+        retrieved_on=table.retrieved_on,
+        verified_on=table.verified_on,
+        # A side is its own observation, read off its own line, and ``ChannelSide`` has no
+        # field to carry its kind -- so this is the only place the side's declared kind is
+        # checked present at all. See the resolver's note on the seam this leaves.
+        kind=table.kind,
+    )
+    sources = prov.of([ref])
+    if table.markup_bps is not None and table.premium_per_unit is not None:
+        raise DeclarationError(
+            path,
+            f"{field_prefix}.markup_bps",
+            f"declares both markup_bps={table.markup_bps!r} and "
+            f"premium_per_unit={table.premium_per_unit!r}. A side is declared in exactly "
+            "one of the two forms; there is no precedence rule, because 'the markup wins' "
+            "would silently ignore one of the two numbers written in this file (FR-010).",
+            "delete whichever of the two lines does not describe this side",
+        )
+    if table.markup_bps is not None:
+        return (
+            ChannelSide(
+                markup_bps=_non_negative(
+                    path,
+                    f"{field_prefix}.markup_bps",
+                    table.markup_bps,
+                    "a markup is a cost magnitude and a negative one would be a rebate this "
+                    "engine does not model; a channel that trades below the reference is "
+                    "declared as a negative premium_per_unit instead, where the sign has a "
+                    "meaning",
+                ),
+                premium_per_unit=None,
+            ),
+            ref,
+        )
+    if table.premium_per_unit is not None:
+        return (
+            ChannelSide(
+                markup_bps=None,
+                premium_per_unit=Money(table.premium_per_unit, price_currency, sources),
+            ),
+            ref,
+        )
+    raise DeclarationError(
+        path,
+        field_prefix,
+        "declares neither markup_bps nor premium_per_unit. An empty side is not a zero: "
+        "'at the reference' is declared as premium_per_unit = 0.0, so an absence can only "
+        "mean an unfinished declaration -- and reading an unfinished declaration as free "
+        "would make the cheapest route the one nobody described (FR-010).",
+        "declare exactly one of markup_bps or premium_per_unit",
+    )
+
+
+def channels_from_file(path: Path) -> tuple[FxChannel, ...]:
+    """Every channel declared in one ``data/channels/<pair>.toml``, in file order.
+
+    **Both sides required, neither derived from the other** (FR-010). A single mid-rate is
+    never used for a transaction, and a system computing the sell side from the buy side
+    would be using a mid-rate with extra steps -- so the shape validation requires both
+    sub-tables and this function reads each independently.
+
+    **The channel's provenance is the union of three citations**: the reference rate's and
+    both sides'. Each is its own observation, read off its own line, so each carries its own
+    ``SourceRef``; unioning them is what makes ``core.routes.legs`` able to attach the whole
+    mark to a converted figure through ``money.scale_sourced``, since it applies a spread
+    through ``channel.provenance``. Attaching only the reference rate's ref would silently
+    drop the mark on the number that actually costs the money, which is the top-severity
+    defect class.
+    """
+    document = read_document(path)
+    declared = _validate(schema.ChannelFile, document, path).channel
+    if not declared:
+        raise DeclarationError(
+            path,
+            CHANNEL_TABLE,
+            "declares no channels. An empty channel file is reported rather than read as "
+            "'this pair cannot be converted': every fx leg naming a channel would fail to "
+            "resolve, each naming its own route file instead of this one.",
+            "declare at least one [[channel]]",
+        )
+    return tuple(_channel(path, entry) for entry in declared)
+
+
+def _channel(path: Path, entry: schema.ChannelTable) -> FxChannel:
+    """One ``[[channel]]`` entry as an :class:`~terezy.core.routes.channels.FxChannel`.
+
+    The field path names the entry by its **id** rather than its index, on the tax-class
+    precedent: the id is what a reader searches for, and it does not change when entries are
+    reordered.
+    """
+    field_prefix = f"{CHANNEL_TABLE}[{entry.id}]"
+    channel_id = _require_text(
+        path,
+        f"{field_prefix}.id",
+        entry.id,
+        "a channel is referred to by id from every fx leg that converts through it, and the "
+        "id is what appears in a cost's channels_applied (FR-011)",
+    )
+    pair = _non_empty_list(
+        path,
+        f"{field_prefix}.pair",
+        entry.pair,
+        "a channel quotes one ordered currency pair and cannot quote none",
+    )
+    if len(pair) != _CURRENCY_PAIR_LENGTH:
+        raise DeclarationError(
+            path,
+            f"{field_prefix}.pair",
+            f"declares {len(pair)} currencies {pair!r}. A quote is between exactly two: the "
+            "price currency and the unit currency, in that order, because the order is what "
+            "decides whether a leg is buying or selling -- and reversing it would invert "
+            "every spread in the system while leaving every number plausible.",
+            'write it as ["UAH", "USD"], meaning UAH per USD',
+        )
+    price_currency = _currency(path, f"{field_prefix}.pair", pair[0])
+    unit_currency = _currency(path, f"{field_prefix}.pair", pair[1])
+    if price_currency is unit_currency:
+        raise DeclarationError(
+            path,
+            f"{field_prefix}.pair",
+            f"quotes {price_currency.value} against itself. A channel converts between two "
+            "different currencies; a self-quote has no side to take and no spread to cost.",
+            "name two different currencies",
+        )
+    buy_side, buy_ref = _channel_side(
+        path,
+        entry.buy_side,
+        field_prefix=f"{field_prefix}.buy_side",
+        price_currency=price_currency,
+    )
+    sell_side, sell_ref = _channel_side(
+        path,
+        entry.sell_side,
+        field_prefix=f"{field_prefix}.sell_side",
+        price_currency=price_currency,
+    )
+    reference_ref = _source_ref(
+        path,
+        field_prefix,
+        source=entry.source,
+        retrieved_on=entry.retrieved_on,
+        verified_on=entry.verified_on,
+        # Checked below, at ``FxChannel.kind``, where the message names ``channel[id].kind``.
+        kind=None,
+    )
+    return FxChannel(
+        id=channel_id,
+        pair=(price_currency, unit_currency),
+        reference_rate=_positive(
+            path,
+            f"{field_prefix}.reference_rate",
+            entry.reference_rate,
+            "a reference of zero or less is not a rate: a cost fraction divides by it and "
+            "an attribution translates through it, so either would produce a figure that "
+            "merely looks like a number",
+        ),
+        buy_side=buy_side,
+        sell_side=sell_side,
+        observed_on=_parse_date(path, f"{field_prefix}.observed_on", entry.observed_on),
+        kind=_require_text(
+            path,
+            f"{field_prefix}.kind",
+            entry.kind,
+            "every observed value names the kind it ages under, and there is no default "
+            "threshold (FR-028)",
+        ),
+        provenance=prov.of([reference_ref, buy_ref, sell_ref]),
+    )
+
+
+def _leg(path: Path, table: schema.LegTable, *, position: int) -> Leg:
+    """One ``[[route.leg]]`` entry as a :class:`~terezy.core.routes.legs.Leg`.
+
+    Three checks live here rather than in the resolver, because all three are properties of
+    one leg read in isolation:
+
+    * **The declared index matches the position.** A leg declaring index 3 in position 0
+      would make every message about it point at the wrong lines, including the chaining
+      errors the resolver raises by index.
+    * **A channel exactly when the kind converts** (FR-011). A ``transfer`` naming a channel
+      is a declaration that means nothing, and accepting it would let a reader believe a
+      conversion happened; an ``fx`` leg with no channel is a mid-rate transaction, which
+      FR-010 forbids outright.
+    * **A cap needs a rail.** A ``monthly_cap`` with no ``capacity_pool`` has no key to
+      accumulate under, so capacity consumed earlier in the month could never reduce it --
+      and a limit that is never consumed is not a limit (research.md D10).
+
+    Whether the *named* channel, venues and kind exist is the resolver's, and so is
+    continuity with the neighbouring legs.
+    """
+    field_prefix = f"{ROUTE_TABLE}.leg[{position}]"
+    if table.index != position:
+        raise DeclarationError(
+            path,
+            f"{field_prefix}.index",
+            f"declares index {table.index!r} but is the leg in position {position}. The "
+            "index is not renumbered to match: every load-time and run-time message about "
+            "this leg names it by the declared index, so a disagreement would point a "
+            "reader at the wrong lines.",
+            f"write index = {position}, or move the leg to position {table.index}",
+        )
+    kind = _known(path, f"{field_prefix}.kind", table.kind, legs.LEG_COST_FNS, "leg kind")
+    from_ccy = _currency(path, f"{field_prefix}.from_ccy", table.from_ccy)
+    to_ccy = _currency(path, f"{field_prefix}.to_ccy", table.to_ccy)
+    converts = kind == legs.FX
+    if converts and table.channel is None:
+        raise DeclarationError(
+            path,
+            f"{field_prefix}.channel",
+            f"is absent on a leg of kind {legs.FX!r}. A conversion with no declared "
+            "two-sided quote is a mid-rate transaction, which FR-010 forbids outright -- "
+            "and there is no default channel, because substituting one would reprice the "
+            "leg at a rate nobody declared.",
+            "name the channel this conversion goes through",
+        )
+    if not converts and table.channel is not None:
+        raise DeclarationError(
+            path,
+            f"{field_prefix}.channel",
+            f"names channel {table.channel!r} on a leg of kind {kind!r}, which converts "
+            f"nothing. Only an {legs.FX!r} leg converts, so the channel is refused rather "
+            "than ignored: an ignored channel is a declaration that lets a reader believe a "
+            "conversion happened (FR-011).",
+            f"delete the channel, or declare the leg as kind = {legs.FX!r}",
+        )
+    if not converts and from_ccy is not to_ccy:
+        raise DeclarationError(
+            path,
+            f"{field_prefix}.to_ccy",
+            f"moves {from_ccy.value} to {to_ccy.value} on a leg of kind {kind!r}, which "
+            f"converts nothing. Only an {legs.FX!r} leg changes currency; the only way to "
+            "satisfy this declaration would be to invent a rate.",
+            f"declare the leg as kind = {legs.FX!r} with a channel, or make the currencies match",
+        )
+    if converts and from_ccy is to_ccy:
+        raise DeclarationError(
+            path,
+            f"{field_prefix}.to_ccy",
+            f"declares a conversion from {from_ccy.value} to itself. A channel quotes an "
+            "ordered pair of two different currencies, so there is no side of it to take "
+            "here, and the leg would charge a spread for a conversion that did not happen.",
+            "make the currencies differ, or declare the leg as a transfer",
+        )
+    if table.monthly_cap is not None and table.capacity_pool is None:
+        raise DeclarationError(
+            path,
+            f"{field_prefix}.capacity_pool",
+            f"is absent on a leg declaring monthly_cap = {table.monthly_cap!r}. A monthly "
+            "limit belongs to a rail -- a card, an account, a corridor under a regulatory "
+            "ceiling -- and without a rail there is no key to accumulate consumption "
+            "under, so capacity already used in the same month could never reduce it "
+            "(FR-015). A limit that is never consumed is not a limit.",
+            "name the pool, even where only this leg uses it: a pool is a fact about the "
+            "world and is declared rather than inferred (research.md D10)",
+        )
+    if table.capacity_pool is not None and table.monthly_cap is None:
+        raise DeclarationError(
+            path,
+            f"{field_prefix}.monthly_cap",
+            f"is absent on a leg naming capacity_pool {table.capacity_pool!r}. A rail with "
+            "no declared limit consumes nothing and constrains nothing, so the pool would "
+            "be a name in a file that no figure ever reads.",
+            "declare the rail's monthly cap, or delete the capacity_pool",
+        )
+    ref = _source_ref(
+        path,
+        field_prefix,
+        source=table.source,
+        retrieved_on=table.retrieved_on,
+        verified_on=table.verified_on,
+        # Checked below, at ``Leg.kind_of_observation``: a leg's ``kind`` is the *leg* kind,
+        # so the message has to name the field the file actually uses.
+        kind=None,
+    )
+    sources = prov.of([ref])
+    return Leg(
+        index=position,
+        kind=kind,
+        from_venue=_require_text(
+            path,
+            f"{field_prefix}.from_venue",
+            table.from_venue,
+            "a leg starts at a named venue, so that 'this leg moves dollars into a "
+            "hryvnia-only account' is a question something can answer",
+        ),
+        to_venue=_require_text(
+            path,
+            f"{field_prefix}.to_venue",
+            table.to_venue,
+            "a leg ends at a named venue",
+        ),
+        from_ccy=from_ccy,
+        to_ccy=to_ccy,
+        channel=table.channel,
+        fee_pct=_as_fraction(
+            _non_negative(
+                path,
+                f"{field_prefix}.fee_pct",
+                table.fee_pct,
+                "a negative percentage fee would have the venue paying the owner to move "
+                "money, which this engine does not model",
+            )
+        ),
+        fee_fixed=Money(
+            _non_negative(
+                path,
+                f"{field_prefix}.fee_fixed",
+                table.fee_fixed,
+                "a negative flat fee would be a rebate this engine does not model; zero is "
+                "a real declaration and is what a free leg says",
+            ),
+            from_ccy,
+            sources,
+        ),
+        minimum=_optional_money(
+            path,
+            f"{field_prefix}.minimum",
+            table.minimum,
+            currency=from_ccy,
+            sources=sources,
+            why="a minimum of zero or less is not a constraint, and declaring one would make "
+            "every amount feasible by definition",
+        ),
+        maximum=_optional_money(
+            path,
+            f"{field_prefix}.maximum",
+            table.maximum,
+            currency=from_ccy,
+            sources=sources,
+            why="a maximum of zero or less would make every amount refused, which is a closed "
+            "leg rather than a limit -- a leg that does not work is declared with a status "
+            "or a window",
+        ),
+        monthly_cap=_optional_money(
+            path,
+            f"{field_prefix}.monthly_cap",
+            table.monthly_cap,
+            currency=from_ccy,
+            sources=sources,
+            why="a cap of zero or less carries nothing in a month, which is a closed rail "
+            "rather than a limited one",
+        ),
+        capacity_pool=table.capacity_pool,
+        latency_days=_non_negative_days(
+            path,
+            f"{field_prefix}.latency_days",
+            table.latency_days,
+            "a leg cannot take a negative number of days; a same-day leg declares zero",
+        ),
+        available_from=_optional_date(path, f"{field_prefix}.available_from", table.available_from),
+        available_until=_optional_date(
+            path, f"{field_prefix}.available_until", table.available_until
+        ),
+        disruption_probability=_bounded(
+            path,
+            f"{field_prefix}.disruption_probability",
+            table.disruption_probability,
+            "a disruption probability outside [0, 1] is not a probability (FR-026), and it "
+            "is reported beside the cost where the owner would read it as one",
+        ),
+        kind_of_observation=_require_text(
+            path,
+            f"{field_prefix}.kind_of_observation",
+            table.kind_of_observation,
+            "every table of observed values names the kind it ages under, and there is no "
+            "default threshold (FR-028)",
+        ),
+        provenance=sources,
+    )
+
+
+def route_from_file(path: Path) -> Route:
+    """One ``data/routes/<id>.toml`` as a :class:`~terezy.core.routes.legs.Route`.
+
+    Nothing is inferred from the file *name*, on the instrument precedent: a renamed file is
+    still the same declaration, and a file whose name disagrees with its ``id`` is not
+    silently reinterpreted.
+
+    **A route with no legs is refused, never costed as free.** Free is the answer a reader
+    would least question and the one most likely to be wrong.
+
+    **``partner_route`` is refused on an ``exit`` route.** A pairing is declared once, by
+    the inbound side (FR-027); allowing both halves to name each other would let the two
+    declarations disagree, and nothing in the model says which of them wins. Whether the
+    named partner *exists*, is an exit, starts where this route ends and finishes in the
+    base currency are cross-file questions and belong to the resolver.
+    """
+    document = read_document(path)
+    table = _validate(schema.RouteFile, document, path).route
+    if not table.leg:
+        raise DeclarationError(
+            path,
+            f"{ROUTE_TABLE}.leg",
+            "declares no legs. A route with no movements is refused rather than costed as "
+            "free: zero is the figure a reader would question least and the one most likely "
+            "to be wrong, and a route that moves nothing cannot deliver an amount either.",
+            "declare at least one [[route.leg]]",
+        )
+    direction = _DIRECTIONS[
+        _known(path, f"{ROUTE_TABLE}.direction", table.direction, _DIRECTIONS, "route direction")
+    ]
+    if direction == "exit" and table.partner_route is not None:
+        raise DeclarationError(
+            path,
+            f"{ROUTE_TABLE}.partner_route",
+            f"names {table.partner_route!r} on a route whose direction is {direction!r}. A "
+            "pairing is declared once, by the inbound route (FR-027): if both halves named "
+            "each other the two declarations could disagree, and nothing in the model says "
+            "which one wins.",
+            "delete the partner_route here, and declare it on the inbound route instead",
+        )
+    return Route(
+        id=_require_text(
+            path,
+            f"{ROUTE_TABLE}.id",
+            table.id,
+            "a route is referred to by id from every funding path and every regime that "
+            "includes it",
+        ),
+        provider=_require_text(
+            path,
+            f"{ROUTE_TABLE}.provider",
+            table.provider,
+            "registry identity is (provider x currency path x venue), so a route with no "
+            "named provider cannot be distinguished from another way of doing the same "
+            "thing (FR-023)",
+        ),
+        origin=_require_text(
+            path,
+            f"{ROUTE_TABLE}.origin",
+            table.origin,
+            "a route starts at a named venue, which is what a stream's arrival venue is "
+            "checked against",
+        ),
+        destination=_require_text(
+            path,
+            f"{ROUTE_TABLE}.destination",
+            table.destination,
+            "a route ends at a named venue, which is what a funding path's destination is",
+        ),
+        direction=direction,
+        partner_route=table.partner_route,
+        status=_STATUSES[
+            _known(path, f"{ROUTE_TABLE}.status", table.status, _STATUSES, "route status")
+        ],
+        legs=tuple(
+            _leg(path, entry, position=position) for position, entry in enumerate(table.leg)
+        ),
+    )
+
+
+def _indexation(path: Path, table: schema.IndexationTable, *, field_prefix: str) -> Indexation:
+    """``[stream.indexation]`` as :class:`~terezy.core.streams.streams.Indexation`.
+
+    A ``fixed_rate`` policy with no rate is refused: it is a declaration that means nothing,
+    and the two readings available to an engine -- treat it as zero, or treat it as ``cpi``
+    -- are both substituted defaults for a growth assumption the owner stated only half of.
+    A rate declared *with* ``none`` is refused for the mirror-image reason: a number nothing
+    will ever apply is a line a reader would expect to see in a figure.
+    """
+    policy = _INDEXATION_POLICIES[
+        _known(
+            path, f"{field_prefix}.policy", table.policy, _INDEXATION_POLICIES, "indexation policy"
+        )
+    ]
+    if policy == "fixed_rate" and table.rate_pct is None:
+        raise DeclarationError(
+            path,
+            f"{field_prefix}.rate_pct",
+            "is absent on an indexation policy of 'fixed_rate', which is a declaration "
+            "that means nothing. Reading it as zero would state that the amount never "
+            "grows, and falling back to 'cpi' would substitute a different policy: both "
+            "are the owner's assumption invented for him.",
+            "declare the annual rate as a percentage, or change the policy to 'none' or 'cpi'",
+        )
+    if policy != "fixed_rate" and table.rate_pct is not None:
+        raise DeclarationError(
+            path,
+            f"{field_prefix}.rate_pct",
+            f"declares {table.rate_pct!r} under an indexation policy of {policy!r}, which "
+            "takes no rate. It is refused rather than ignored: a rate nothing will ever "
+            "apply is a line a reader would reasonably expect to see in a figure.",
+            "delete the rate, or declare policy = 'fixed_rate'",
+        )
+    return Indexation(
+        policy=policy,
+        rate=(
+            None
+            if table.rate_pct is None
+            else _as_fraction(
+                _non_negative(
+                    path,
+                    f"{field_prefix}.rate_pct",
+                    table.rate_pct,
+                    "a negative indexation rate is a decline rather than an indexation, and "
+                    "this feature applies neither",
+                )
+            )
+        ),
+    )
+
+
+def streams_from_file(path: Path) -> tuple[IncomeStream, ...]:
+    """Every stream declared in one ``data/streams/<owner>.toml``, in file order.
+
+    **No citation is read, and that is the exemption argued in the contract**: an owner's
+    own salary is not an observation needing a source, it is a statement of fact by the only
+    person who can make it. The same exemption ``data/scenarios/`` has, and the reason
+    ``check_provenance.py`` gains ``channels`` and not ``streams``.
+
+    The declared ``currency`` and ``amount`` become **one** ``Money``: ``IncomeStream`` has
+    no currency field, because two fields stating one fact can disagree and a record with
+    ``currency = UAH`` and an amount in dollars would typecheck while being nonsense.
+
+    An omitted ``income_tax_rate_pct`` becomes ``None``, which means *the owner has not
+    stated a rate* -- a different claim from stating zero, and the reason ``deployable``
+    returns a record with no net field at all rather than a net figure that quietly equals
+    the gross (FR-007).
+    """
+    document = read_document(path)
+    declared = _validate(schema.StreamFile, document, path).stream
+    if not declared:
+        raise DeclarationError(
+            path,
+            STREAM_TABLE,
+            "declares no income streams. An empty stream file is reported rather than read "
+            "as 'no money arrives': access cost is keyed per (destination x stream x "
+            "route), so every funding path would fail to resolve its stream.",
+            "declare at least one [[stream]]",
+        )
+    return tuple(_stream(path, entry) for entry in declared)
+
+
+def _stream(path: Path, entry: schema.StreamTable) -> IncomeStream:
+    """One ``[[stream]]`` entry as an :class:`~terezy.core.streams.streams.IncomeStream`."""
+    field_prefix = f"{STREAM_TABLE}[{entry.id}]"
+    currency = _currency(path, f"{field_prefix}.currency", entry.currency)
+    return IncomeStream(
+        id=_require_text(
+            path,
+            f"{field_prefix}.id",
+            entry.id,
+            "a stream is referred to by id from every funding path funded out of it, and "
+            "the stream is the term that carries the whole per-stream finding (FR-008)",
+        ),
+        owner_id=_require_text(
+            path,
+            f"{field_prefix}.owner_id",
+            entry.owner_id,
+            "every per-owner row carries its owner from the first commit (Principle VII); "
+            "retrofitting tenancy is the expensive mistake",
+        ),
+        amount=Money(
+            _non_negative(
+                path,
+                f"{field_prefix}.amount",
+                entry.amount,
+                "a negative arrival is not income. Zero is a real declaration and is the "
+                "honest placeholder for a figure the owner has not stated (§11 item 3): it "
+                "produces a zero result rather than a made-up one",
+            ),
+            currency,
+            prov.EMPTY,
+        ),
+        cadence=_CADENCES[
+            _known(path, f"{field_prefix}.cadence", entry.cadence, _CADENCES, "income cadence")
+        ],
+        arrives_at=_require_text(
+            path,
+            f"{field_prefix}.arrives_at",
+            entry.arrives_at,
+            "a stream lands at a named venue, and a route whose origin differs from it is a "
+            "mismatch that is reported rather than assumed away",
+        ),
+        indexation=_indexation(path, entry.indexation, field_prefix=f"{field_prefix}.indexation"),
+        income_tax_rate=(
+            None
+            if entry.income_tax_rate_pct is None
+            else _as_fraction(
+                _non_negative(
+                    path,
+                    f"{field_prefix}.income_tax_rate_pct",
+                    entry.income_tax_rate_pct,
+                    "a negative income-tax rate would be a payment to the owner rather than "
+                    "a withholding. Zero is a real declaration -- it says nothing is "
+                    "withheld -- and is why omitting the field means something different",
+                )
+            )
+        ),
+    )
+
+
+def scenario_from_file(path: Path) -> ScenarioDeclaration:
+    """One ``data/scenarios/<id>.toml`` as a :class:`ScenarioDeclaration`.
+
+    **Exempt from the citation requirement, and it carries something else instead.** A
+    regime is a belief about which corridors exist and a transition is a guess about a date;
+    ``is_assumption`` is what they carry where an observation carries a source and a
+    verification date (research.md D8). Never present anything from here as though it were
+    observed.
+
+    Four properties are checked here because they are properties of this one file:
+    duplicate regime ids, an ``is_assumption`` that is not ``true``, transitions that are
+    not strictly ascending, and a chain that does not join up. The core refuses the last two
+    as well -- and *raises* when it sees them, because by then the caller bypassed this
+    check -- so checking here is what turns a raise mid-comparison into a message naming
+    this file and this row.
+
+    Whether a regime's ``route_ids`` resolve, and whether a regime is partner-closed, need
+    ``data/routes/`` and belong to the resolver.
+    """
+    document = read_document(path)
+    table = _validate(schema.ScenarioFile, document, path).scenario
+    scenario_id = _require_text(
+        path,
+        f"{SCENARIO_TABLE}.id",
+        table.id,
+        "a scenario is referred to by id from every run that uses its regimes",
+    )
+    _require_text(
+        path,
+        f"{SCENARIO_TABLE}.owner_id",
+        table.owner_id,
+        "every scenario carries its owner from the first commit (Principle VII)",
+    )
+    regimes = _regimes(path, table.regime)
+    transitions = _transitions(path, table.transition, regimes)
+    policy, redirect_to = _fallback(path, table.fallback)
+    return ScenarioDeclaration(
+        id=scenario_id,
+        owner_id=table.owner_id,
+        regimes=regimes,
+        transitions=transitions,
+        fallback_policy=policy,
+        redirect_to=redirect_to,
+    )
+
+
+def _regimes(path: Path, declared: list[schema.RegimeTable]) -> tuple[Regime, ...]:
+    """The declared regimes, refusing an empty set and a duplicate id within one file.
+
+    Two regimes with one id in one file is not a merge and not a preference: whichever was
+    read second would win by position, and every figure conditional on the regime would
+    silently describe the other one.
+    """
+    _non_empty_list(
+        path,
+        f"{SCENARIO_TABLE}.regime",
+        declared,
+        "a scenario with no regime states no belief about which corridors exist, and every "
+        "transition in it would name a regime that does not exist",
+    )
+    seen: dict[str, int] = {}
+    regimes: list[Regime] = []
+    for position, entry in enumerate(declared):
+        field_prefix = f"{SCENARIO_TABLE}.regime[{entry.id}]"
+        identifier = _require_text(
+            path,
+            f"{field_prefix}.id",
+            entry.id,
+            "a regime is referred to by id from the transitions that move between regimes",
+        )
+        if identifier in seen:
+            raise DeclarationError(
+                path,
+                f"{field_prefix}.id",
+                f"declares the regime id {identifier!r}, which entry {seen[identifier]} of "
+                "this file already declares. Two regimes with one id are not merged and "
+                "neither is preferred: the one read second would win by position, and every "
+                "figure conditional on the regime would describe the other one.",
+                "rename one of the two regimes",
+            )
+        seen[identifier] = position
+        regimes.append(
+            Regime(
+                id=identifier,
+                route_ids=frozenset(
+                    _non_empty_list(
+                        path,
+                        f"{field_prefix}.route_ids",
+                        entry.route_ids,
+                        "a regime that includes no route says money cannot move at all, "
+                        "which is a claim about the world rather than an empty list; if that "
+                        "is the belief, it is stated by a regime naming the routes that do "
+                        "work and leaving the rest out",
+                    )
+                ),
+            )
+        )
+    return tuple(regimes)
+
+
+def _transitions(
+    path: Path,
+    declared: list[schema.TransitionTable],
+    regimes: tuple[Regime, ...],
+) -> tuple[RegimeTransition, ...]:
+    """The declared transitions, checked for the four things that make a chain a chain.
+
+    Ascending, joined, naming declared regimes, and marked as assumptions. Every one of them
+    is refused rather than repaired: reordering, deduplicating or bridging a gap would be
+    choosing the owner's belief for him, and the whole point of the record is that the belief
+    is his and is visible.
+    """
+    _non_empty_list(
+        path,
+        f"{SCENARIO_TABLE}.transition",
+        declared,
+        "a scenario with no transition has no regime for any date, and there is no default "
+        "regime to fall back on: substituting one would state a belief about which "
+        "corridors exist that the owner never expressed (FR-019)",
+    )
+    known = {regime.id for regime in regimes}
+    transitions: list[RegimeTransition] = []
+    for position, entry in enumerate(declared):
+        field_prefix = f"{SCENARIO_TABLE}.transition[{position}]"
+        for field, named in (("before", entry.before), ("after", entry.after)):
+            if named not in known:
+                raise DeclarationError(
+                    path,
+                    f"{field_prefix}.{field}",
+                    f"names the regime {named!r}, which this scenario does not declare. A "
+                    "transition moves between two regimes stated in the same file; a name "
+                    f"that resolves to nothing would leave the dates on that side of "
+                    f"{entry.on_date!r} in no regime at all. Declared here: "
+                    f"{sorted(known)}.",
+                    "declare that regime, or correct the name",
+                )
+        if entry.before == entry.after:
+            raise DeclarationError(
+                path,
+                f"{field_prefix}.after",
+                f"names the same regime as 'before' ({entry.before!r}), so nothing changes "
+                f"on {entry.on_date!r}. A transition that transitions nothing would put an "
+                "assumption in the output with no consequence attached to it.",
+                "name the regime in force after the date, or delete the transition",
+            )
+        if not entry.is_assumption:
+            raise DeclarationError(
+                path,
+                f"{field_prefix}.is_assumption",
+                "is declared false. A regime transition is always an assumption: nobody "
+                "knows when a war ends, and FR-020 requires the date be presented as a "
+                "stated assumption rather than a known fact. The field exists to make that "
+                "claim unmissable in the output, not to be switched off -- which is why the "
+                "core types it as a Literal admitting one value.",
+                "write is_assumption = true, or move the fact into a leg's "
+                "available_from/available_until where an observation belongs",
+            )
+        transitions.append(
+            RegimeTransition(
+                on_date=_parse_date(path, f"{field_prefix}.on_date", entry.on_date),
+                before=entry.before,
+                after=entry.after,
+                is_assumption=True,
+                rationale=_require_text(
+                    path,
+                    f"{field_prefix}.rationale",
+                    entry.rationale,
+                    "the rationale is what a transition carries where an observation "
+                    "carries a source: it is the owner's stated belief in words, and a "
+                    "figure conditional on an unexplained guess cannot be argued with",
+                ),
+            )
+        )
+    _chained(path, transitions)
+    return tuple(transitions)
+
+
+def _chained(path: Path, transitions: list[RegimeTransition]) -> None:
+    """Refuse a sequence of transitions that does not describe one chain of regimes.
+
+    The same two properties ``core.scenarios.regimes`` refuses, checked where the file and
+    the row can be named. The core raises on them because reaching it with a broken chain
+    means this check was bypassed; here they are data errors with a location.
+    """
+    for position in range(1, len(transitions)):
+        earlier = transitions[position - 1]
+        later = transitions[position]
+        field_prefix = f"{SCENARIO_TABLE}.transition[{position}]"
+        if later.on_date <= earlier.on_date:
+            raise DeclarationError(
+                path,
+                f"{field_prefix}.on_date",
+                f"is dated {later.on_date.isoformat()}, which is not after transition "
+                f"{position - 1}'s {earlier.on_date.isoformat()}. Transitions are neither "
+                "reordered nor deduplicated: two regimes claiming one date is a "
+                "contradiction in the scenario, and choosing between them would be choosing "
+                "the owner's belief for him.",
+                "declare the transitions in strictly ascending date order",
+            )
+        if earlier.after != later.before:
+            raise DeclarationError(
+                path,
+                f"{field_prefix}.before",
+                f"begins in regime {later.before!r} while transition {position - 1} ends in "
+                f"{earlier.after!r}, so every date between "
+                f"{earlier.on_date.isoformat()} and {later.on_date.isoformat()} falls in a "
+                "regime nobody declared. A chain of regimes has to join up; a gap cannot be "
+                "bridged by picking one of the two.",
+                f"write before = {earlier.after!r}, or add the transition that is missing",
+            )
+
+
+def _fallback(
+    path: Path, table: schema.FallbackTable
+) -> tuple[capacity.FallbackPolicy, str | None]:
+    """``[scenario.fallback]`` as a policy and, for ``redirect``, its named destination.
+
+    **A policy this feature knows about but has not built fails by name.** ``deposit`` --
+    §4.3.4's "place it on deposit" -- needs a deposit instrument, and this feature adds no
+    instruments; treating it as *hold as cash* would substitute a default for a policy the
+    owner explicitly chose (FR-013). The message says which feature will bring it, because
+    an unrecognised policy and a real policy that is not built yet are different facts and
+    the owner acts differently on each: one is a typo, the other is a wait.
+
+    ``redirect_to`` is present-and-empty for every policy but ``redirect``, on the
+    ``verified_on`` precedent: a ``redirect`` whose destination line was forgotten must not
+    read as a deliberate blank, and FR-013 requires the target be *named*.
+    """
+    deferred = capacity.DEFERRED_POLICIES.get(table.policy)
+    if deferred is not None:
+        raise DeclarationError(
+            path,
+            f"{SCENARIO_TABLE}.fallback.policy",
+            f"declares the fallback policy {table.policy!r}, which this engine does not "
+            f"implement yet: {deferred}.",
+            f"declare one of {sorted(_FALLBACK_POLICIES)} until then, chosen deliberately "
+            "rather than as a stand-in for the one you wanted",
+        )
+    policy = _FALLBACK_POLICIES[
+        _known(
+            path,
+            f"{SCENARIO_TABLE}.fallback.policy",
+            table.policy,
+            _FALLBACK_POLICIES,
+            "fallback policy",
+        )
+    ]
+    if policy == capacity.REDIRECT:
+        return policy, _require_text(
+            path,
+            f"{SCENARIO_TABLE}.fallback.redirect_to",
+            table.redirect_to,
+            "a redirect sends the excess to a **named** destination (FR-013), and an empty "
+            "name would send it nowhere while reporting that it was redirected",
+        )
+    if table.redirect_to != "":
+        raise DeclarationError(
+            path,
+            f"{SCENARIO_TABLE}.fallback.redirect_to",
+            f"names {table.redirect_to!r} under a fallback policy of {policy!r}, which "
+            "redirects nothing. It is refused rather than ignored: a destination in the file "
+            "that no excess is ever sent to is a line a reader would take for a plan.",
+            f"leave it empty, or declare policy = {capacity.REDIRECT!r}",
+        )
+    return policy, None

@@ -30,6 +30,7 @@ maturity_date     = "2029-03-02"
 periodicity       = "quarterly"
 day_count         = "30/360"
 business_day_rule = "modified_following"
+kind              = "bond_terms"
 source            = "SYNTHETIC FIXTURE — terms chosen to differ from issue A in periodicity, day count and business-day rule. Not observed from any issue."
 retrieved_on      = "2026-08-21"
 verified_on       = ""
@@ -37,6 +38,7 @@ verified_on       = ""
 [instrument.constraints]
 min_ticket   = 5000.0
 min_unit     = 1.0
+kind         = "venue_terms"
 source       = "SYNTHETIC FIXTURE — invented minimum ticket, deliberately larger than issue A's. Not observed from any venue or prospectus."
 retrieved_on = "2026-08-21"
 verified_on  = ""

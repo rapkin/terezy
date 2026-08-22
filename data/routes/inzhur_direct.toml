@@ -1,0 +1,39 @@
+# The domestic path: hryvnia salary into a hryvnia fund, converting nothing.
+#
+# SYNTHETIC FIXTURE. Every number here is invented; `SIMULATOR_SPEC.md` §11 item 1 records
+# that the owner's real transfer fees have not been observed, so every `verified_on` is
+# empty and everything derived from this file renders marked.
+#
+# **Why a route of zero costs matters.** It is the bar every other route is measured
+# against (SC-004): a route whose every leg declares zero fees and no conversion must cost
+# **exactly** zero and deliver exactly what was sent — not a small residual. It is also
+# the honest floor under §4.3.1's finding: the cheapest thing a hryvnia salary can do is
+# stay in hryvnia.
+#
+# Declared **in a pair** with `inzhur_to_monobank.toml` (FR-027). Round-trip cost is
+# computed from that separately declared exit route and never by reversing this one.
+
+[route]
+id            = "inzhur_direct"
+provider      = "Inzhur"
+origin        = "monobank_uah"
+destination   = "inzhur"
+direction     = "inbound"
+partner_route = "inzhur_to_monobank"
+status        = "open"
+
+  [[route.leg]]
+  index                  = 0
+  kind                   = "transfer"
+  from_venue             = "monobank_uah"
+  to_venue               = "inzhur"
+  from_ccy               = "UAH"
+  to_ccy                 = "UAH"
+  fee_pct                = 0.0
+  fee_fixed              = 0.0
+  latency_days           = 1
+  disruption_probability = 0.01
+  kind_of_observation    = "bank_fee_schedule"
+  source                 = "SYNTHETIC FIXTURE — invented. A domestic hryvnia transfer is declared free here so this route can be the zero-cost bar of SC-004; it is not a fee schedule read off Monobank's tariff page. The disruption probability is the owner's placeholder assumption, reported and never folded into a cost (FR-026)."
+  retrieved_on           = "2026-08-22"
+  verified_on            = ""

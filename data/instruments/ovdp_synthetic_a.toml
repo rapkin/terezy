@@ -24,6 +24,7 @@ maturity_date     = "2028-01-15"
 periodicity       = "semiannual"
 day_count         = "act/365"
 business_day_rule = "following"
+kind              = "bond_terms"
 source            = "SYNTHETIC FIXTURE — terms chosen for a hand-checkable example, not observed from any issue."
 retrieved_on      = "2026-08-21"
 verified_on       = ""
@@ -31,6 +32,7 @@ verified_on       = ""
 [instrument.constraints]
 min_ticket   = 1000.0
 min_unit     = 1.0
+kind         = "venue_terms"
 source       = "SYNTHETIC FIXTURE — invented minimum ticket of one bond. Not observed from any venue or prospectus."
 retrieved_on = "2026-08-21"
 verified_on  = ""

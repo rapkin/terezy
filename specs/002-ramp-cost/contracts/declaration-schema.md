@@ -43,6 +43,23 @@ nobody explained is a number nobody can argue with.
 `bond_terms`, the tax class becomes `tax_rule`. That is a migration this feature owns, and
 it is the reason `check_provenance.py` must learn to require the field.
 
+## ⚙ `data/venues.toml` — a file this contract forgot
+
+Added during implementation. `Venue.currencies` exists so that a leg moving a currency its
+venue cannot hold fails at load, and SC-010 requires adding a **venue** to be a data-only
+change — but this contract enumerated routes, channels, streams and kinds and never mentioned
+venues. Without the file, "adding a venue" was a code change and the leg/venue currency check
+had nothing to check against. Same class of gap as Phase 7b's missing task.
+
+```toml
+[[venue]]
+id         = "monobank_uah"
+name       = "Monobank"
+currencies = ["UAH", "USD"]
+```
+
+No citation keys: a venue holds no observed number, and `Venue` has no provenance field.
+
 ## `data/channels/<pair>.toml`
 
 ```toml
@@ -99,13 +116,13 @@ provider      = "Binance P2P"
 origin        = "monobank_uah"
 destination   = "binance"
 direction     = "inbound"
-partner_route = "binance_p2p_to_monobank"   # null means NO round-trip figure exists
+partner_route = "binance_p2p_to_monobank"   # ⚙ OMIT the key for no exit; see below
 status        = "open"
 
   [[route.leg]]
   index         = 0
   kind          = "fx"
-  capacity_pool = "monobank_card_uah_usd"   # the shared rail; null if the leg shares none
+  capacity_pool = "monobank_card_uah_usd"   # the shared rail; ⚙ omit the key if none
   from_venue    = "monobank_uah"
   to_venue      = "monobank_uah"
   from_ccy      = "UAH"
@@ -141,8 +158,17 @@ status        = "open"
 channel is a declaration that means nothing, and accepting it would let a reader believe a
 conversion happened.
 
-`partner_route = null` is a legitimate declaration meaning *nobody has costed the way out*.
-It produces `ExitCostUnknown`, not a reversal (FR-027, FR-030).
+⚙ **TOML has no `null`, and this contract wrote one.** An earlier version showed
+`partner_route = null` and `capacity_pool = null`; no parser accepts that. **Absence is
+expressed by omitting the key**, which means those two pydantic fields carry `X | None = None`.
+
+That is the one qualification on the zero-defaults rule, and it is narrow: a `= None` default
+is permitted **only** where the core field is itself `X | None` meaning *the owner declared
+nothing*, and never where it would stand in for a number, a date or a policy. `verified_on`
+stays present-and-empty, because "unverified" is a state to record rather than an absence.
+
+An omitted `partner_route` means *nobody has costed the way out*. It produces
+`ExitCostUnknown`, not a reversal (FR-027, FR-030).
 
 ## `data/streams/<owner>.toml` — per-owner
 
@@ -215,7 +241,7 @@ Each maps to a requirement and to a case in `tests/contract/test_route_declarati
 | ⚙ Exit route whose `origin` is not the inbound route's `destination` | Error. A pair that does not meet would load and produce a **confident round-trip figure for two unrelated journeys** — the exact class of number FR-030 exists to refuse | FR-027 |
 | ⚙ Exit route whose `destination` does not hold the base currency | Error. "Getting money back into **spendable** base currency" is what §4.3.3 asks for; an exit ending in a third currency at an exchange has not got the money out | FR-027 |
 | ⚙ Two legs naming one `capacity_pool` with different `monthly_cap` values | Error naming both files. Two numbers for one real limit means at least one is wrong, and choosing either would be a guess | FR-015 |
-| ⚙ A fallback policy of `deposit` | Error naming the feature that will bring it. This feature adds no instruments, and treating it as "hold as cash" would be a substituted default | FR-013 |
+| ⚙ A fallback policy of `place_on_deposit` | Error naming the feature that will bring it. The core's `DEFERRED_POLICIES` key is `place_on_deposit`; this table said `deposit`, and an alias was **not** added — two spellings for one policy is the duplication this project removes everywhere else. Any other spelling gets the unknown-policy error listing the three that work. This feature adds no instruments, and treating it as "hold as cash" would be a substituted default | FR-013 |
 | A stream's `arrives_at` naming an unknown venue | Error | FR-024 |
 | Malformed TOML | Error naming the file | FR-024 |
 
@@ -230,8 +256,13 @@ Three, all small:
 
 1. `SOURCED_DIRS` gains `streams`... **no** — streams are exempt, as argued above. It gains
    **`channels`** only; `routes` is already there.
-2. Every sourced table must name a `kind`, and the kind must be declared in
+2. Every sourced table must name its observation kind, and it must be declared in
    `data/observation_kinds.toml`. This is the mechanical half of FR-028.
+
+   ⚙ **On a route leg the key is `kind_of_observation`, not `kind`** — a leg's own `kind` is
+   `transfer`/`fx`. Trying the two keys in order produced a *true statement about the wrong
+   field* ("names the observation kind 'transfer'"), so a leg table is recognised by name and
+   required to declare `kind_of_observation` and nothing else.
 3. `STRUCTURAL_KEYS` gains `kind`, `direction`, `provider`, `partner_route`, `channel`,
    `cadence`, `policy`, `index`, `pair` — identifiers and references, not observations, so
    they must not trip the "table carries observed values" heuristic.

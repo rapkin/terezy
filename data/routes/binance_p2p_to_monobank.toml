@@ -1,0 +1,58 @@
+# The way out: dollars on the exchange back into spendable hryvnia on the card.
+#
+# SYNTHETIC FIXTURE. Every number is invented and every `verified_on` is empty.
+#
+# **Declared, not derived** (FR-027). §4.3.3: getting money back into spendable base
+# currency has its own chain, its own spread and its own limits, and an asset that cannot
+# be liquidated at a reasonable cost is not worth its stated value. This is the route that
+# makes a round-trip figure exist at all for the Binance destination — three inbound
+# routes name it as their partner, because there is one way out and three ways in.
+#
+# It takes the **sell** side of the declared `p2p` channel, which is a different number
+# from the buy side and is declared in its own right. A system that computed one from the
+# other would be using a mid-rate with extra steps (FR-010).
+#
+# It ends holding UAH at `monobank_uah`, which is what "spendable base currency" means: an
+# exit that stopped in dollars at an exchange has not got the money out, and the resolver
+# refuses such a pairing at load.
+
+[route]
+id          = "binance_p2p_to_monobank"
+provider    = "Binance P2P"
+origin      = "binance"
+destination = "monobank_uah"
+direction   = "exit"
+status      = "open"
+
+  [[route.leg]]
+  index                  = 0
+  kind                   = "fx"
+  from_venue             = "binance"
+  to_venue               = "binance"
+  from_ccy               = "USD"
+  to_ccy                 = "UAH"
+  channel                = "p2p"
+  fee_pct                = 0.0
+  fee_fixed              = 0.0
+  latency_days           = 0
+  disruption_probability = 0.05
+  kind_of_observation    = "bank_fee_schedule"
+  source                 = "SYNTHETIC FIXTURE — invented. The fees are declared zero so the exit cost is the declared sell-side spread and nothing else; the spread is in data/channels/uah_usd.toml under 'p2p_premium'."
+  retrieved_on           = "2026-08-22"
+  verified_on            = ""
+
+  [[route.leg]]
+  index                  = 1
+  kind                   = "transfer"
+  from_venue             = "binance"
+  to_venue               = "monobank_uah"
+  from_ccy               = "UAH"
+  to_ccy                 = "UAH"
+  fee_pct                = 0.0
+  fee_fixed              = 0.0
+  latency_days           = 1
+  disruption_probability = 0.02
+  kind_of_observation    = "bank_fee_schedule"
+  source                 = "SYNTHETIC FIXTURE — invented. The counterparty's hryvnia payment reaching the card is declared as its own leg because it is a separate movement with its own latency, and one day of it is invented too."
+  retrieved_on           = "2026-08-22"
+  verified_on            = ""

@@ -185,7 +185,7 @@ field names.
 | `id` | `str` | `salary_uah`, `contract_usd` |
 | `owner_id` | `str` | Present from day one |
 | ~~`currency`~~ | — | ⚙ **Removed.** It duplicated `amount.currency`, and two fields stating one fact can disagree: a record with `currency=UAH` and an amount in USD typechecks and is nonsense. The mitigation on offer — "the loader builds both from one declared value" — puts the guarantee in a layer that cannot help anything constructing a stream in code. `amount.currency` is the single place. |
-| `amount` | `Money` | Positive |
+| `amount` | `Money` | ⚙ **Non-negative**, not positive: the contract prescribes `amount = 0.0` as the honest placeholder while §11 item 3's real figures are unstated, and a zero produces a zero rather than a made-up number. |
 | `cadence` | `str` | `monthly`, `biweekly`, `semimonthly` |
 | `arrives_at` | `str` | Venue id. A route whose `origin` differs from this is a mismatch, reported (spec edge case). |
 | `indexation` | `Indexation` | Policy plus an optional rate. ⚙ The policy set is closed at `none \| cpi \| fixed_rate` — `cpi` from §4.2, `fixed_rate` from the brief's "salary growth", and `none` because the field is required and the absence of indexation has to be sayable. **Nothing in this feature applies an indexation**, so no figure rests on the choice; it is written down here so a document owns the set before a figure does. A `fixed_rate` with no rate is a declaration that means nothing and is the loader's to refuse (T038/T040). |
