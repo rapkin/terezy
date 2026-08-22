@@ -1,6 +1,7 @@
 # The feature dependency graph. Parseable with tomllib; semantics in specs/README.md.
 #
-# status: spec | planned | in-progress | done
+# status: queued | spec | planned | in-progress | done
+#   queued       accepted by the owner; spec-writing may start, no spec.md yet
 #   spec         spec.md exists, clarifications resolved
 #   planned      plan.md + tasks.md exist
 #   in-progress  implementation started
@@ -36,12 +37,42 @@ id     = "005-route-diagrams"
 status = "spec"
 needs  = ["002-ramp-cost"]
 
+[[feature]]
+id     = "006-inzhur-instruments"
+status = "queued"
+needs  = ["001-ovdp-hurdle-rate"]
+why    = "REIT/MilTech as declared instruments: two tax classes on one instrument (E1), redemption windows and haircuts (J3), rates as dated schedules (E10)"
+
+[[feature]]
+id     = "007-cpi-real-terms"
+status = "queued"
+needs  = ["001-ovdp-hurdle-rate"]
+why    = "fill HurdleRate.real; 001 FR-022 reserved the slot"
+
+[[feature]]
+id     = "008-seed-and-goals"
+status = "queued"
+needs  = ["001-ovdp-hurdle-rate"]
+why    = "seed lots with known/estimated basis (J2) and target sum/date/contribution goals (J1)"
+
+[[feature]]
+id     = "009-tax-depth"
+status = "queued"
+needs  = ["001-ovdp-hurdle-rate", "006-inzhur-instruments"]
+why    = "loss offset and carryforward (E2), average/specific lot methods (E6), tax paid from cash next year (E7); 006's redemption is the first real disposal with a gain"
+
+[[feature]]
+id     = "010-full-tuple"
+status = "queued"
+needs  = ["002-ramp-cost", "006-inzhur-instruments"]
+why    = "connect ramp to instrument purchases: net-of-access-cost comparison (§8 q1) and the H1 data-only full-pipeline test"
+
 # Named future work — seams already recorded inside landed specs, not yet features.
 
 [[future]]
-id    = "cpi-real-terms"
+id    = "restructuring-scenario"
 after = ["001-ovdp-hurdle-rate"]
-note  = "fill HurdleRate.real; 001 FR-022 reserved the slot"
+note  = "OVDP 40% haircut + 2y delay, hand-computed (D3); proposed 2026-08-22, not yet taken"
 
 [[future]]
 id    = "coverage-enforcement"

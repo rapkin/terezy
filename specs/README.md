@@ -50,7 +50,8 @@ Every feature goes through the same six steps. None is optional.
 
 ## Adding a feature to the graph
 
-Add its `[[feature]]` entry (id = its `specs/` directory name) in the same commit that
-lands its spec. Declare `needs` honestly — a dependency discovered late is a schedule
+A feature the owner has accepted may enter the graph early as `status = "queued"` so
+ordering is plannable before its spec exists; otherwise add its `[[feature]]` entry
+(id = its `specs/` directory name) in the same commit that lands its spec. Declare `needs` honestly — a dependency discovered late is a schedule
 surprise; when a dependency is non-obvious, say `why`. Record known follow-up work as
 `[[future]]` entries so deferrals stay visible instead of living only inside spec prose.
