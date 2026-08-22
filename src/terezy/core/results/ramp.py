@@ -108,6 +108,22 @@ class OneWayCost:
     channel trades below its reference.
     """
 
+    spreads_over_reference: tuple[float, ...]
+    """One rate-space spread per converting leg, parallel to :attr:`channels_applied`.
+
+    ``p / r`` for a declared premium -- the figure ``SIMULATOR_SPEC.md`` §4.3.1 quotes. Present
+    so SC-002's "both figures present, each labelled" is true of this record rather than only
+    of a function the caller could have called.
+
+    **This is not the cost.** The cost is :attr:`fraction`, built from
+    ``channels.loss_fraction``, and the two differ on the buy side: 6.67% against 7.14% at
+    §4.3.1's numbers. Naming them differently, in parallel fields, is deliberate -- reporting
+    only the rate-space figure is the mistake this project made once already, and it reported
+    an arriving amount short of what the venue pays.
+
+    Empty for a route that converts nothing.
+    """
+
     channels_applied: tuple[str, ...]
     """Which channel each ``fx`` leg used, in leg order. Present because the choice changes
     the number (FR-011), and empty for a route that converts nothing."""
@@ -149,6 +165,22 @@ class RoundTripCost:
     fraction: float
     """Round-trip cost as a fraction of :attr:`sent`. The number §4.3.1's *9-19% round trip*
     refers to."""
+
+    spreads_over_reference: tuple[float, ...]
+    """One rate-space spread per converting leg, parallel to :attr:`channels_applied`.
+
+    ``p / r`` for a declared premium -- the figure ``SIMULATOR_SPEC.md`` §4.3.1 quotes. Present
+    so SC-002's "both figures present, each labelled" is true of this record rather than only
+    of a function the caller could have called.
+
+    **This is not the cost.** The cost is :attr:`fraction`, built from
+    ``channels.loss_fraction``, and the two differ on the buy side: 6.67% against 7.14% at
+    §4.3.1's numbers. Naming them differently, in parallel fields, is deliberate -- reporting
+    only the rate-space figure is the mistake this project made once already, and it reported
+    an arriving amount short of what the venue pays.
+
+    Empty for a route that converts nothing.
+    """
 
     channels_applied: tuple[str, ...]
     """Every channel used, inbound legs first and then exit legs. A round trip crossing the
@@ -278,3 +310,125 @@ class RouteUnusable:
 
     reason: str
     """Plain-language statement of what bound and by how much, for the output (FR-017)."""
+
+
+@dataclass(frozen=True, slots=True)
+class Ranking:
+    """Every candidate route, costed and ordered, with one of them recommended.
+
+    FR-016: *rank the available routes **lexicographically** on ``(round-trip cost, ceiling
+    descending, latency)``, recommend one, and report what each alternative would have cost.*
+    FR-018 adds that a tie is a tie. FR-029 is what the *shape* of this record enforces.
+
+    **The recommendation is an index, and that is the whole design** (research.md D3). The
+    winner is not compared against the alternatives -- it **is** one of them, so SC-016 can
+    assert identity (``recommended_cost(r) is r.costed[r.recommended]``) rather than equality.
+    Two numbers that agree today prove nothing about tomorrow; the same object cannot disagree
+    with itself. The natural shape, ``Ranking(recommended: RampCost, alternatives: ...)``, is
+    the rejected one: ``recommended`` would be a second place for a cost to come from, and a
+    test comparing the two places would be comparing numbers rather than establishing a shared
+    origin.
+
+    **A ranking always has a recommendation.** ``recommended`` is a valid index because a
+    ranking with nothing to rank is :class:`NothingComparable` instead -- see there for why a
+    sentinel index was not an option.
+    """
+
+    costed: tuple[RampCost, ...]
+    """Every comparison-ready candidate, each costed by the one costing function, ordered
+    **lexicographically** on ``(round-trip cost, ceiling descending, latency)``.
+
+    Lexicographic and not scored. Required test **B12** forbids a non-standard composite score
+    from driving the primary ordering, and a weighted score would have to weight hryvnia
+    against days -- a preference rather than a fact. The three keys were already put in
+    priority order by FR-016, so they are applied in that order rather than combined.
+    """
+
+    recommended: int
+    """An **index** into :attr:`costed`, never a copy of one of its entries.
+
+    Zero in practice, since :attr:`costed` is sorted -- but stated as an index rather than
+    assumed to be the head, because the claim being made is "the recommendation is one of the
+    alternatives" and an index is how that claim is expressed in a type.
+    """
+
+    excluded: tuple[RouteUnusable, ...]
+    """Candidates that could not carry the amount, each carrying the constraint that bound.
+
+    Present rather than dropped (FR-014). A silent exclusion is how a comparison comes to
+    recommend the only route left standing, with nothing in the output to say why the others
+    are missing.
+    """
+
+    ties: tuple[tuple[int, ...], ...]
+    """Groups of indices into :attr:`costed` that cost the same, within the project tolerance.
+
+    Tied **on round-trip cost alone** (FR-018) -- two routes costing the same are tied even
+    where their ceilings or their latencies differ. Deliberate: the owner asked which is
+    cheapest, and "these two cost the same, and here is how they differ" answers that, while
+    silently preferring one on a tiebreak he did not ask for does not. The ordering of
+    :attr:`costed` still breaks the tie so the sequence is deterministic; this field is what
+    stops the head of that sequence being read as a strict winner.
+
+    Only groups of two or more appear. A route tied with nothing is not a tie.
+    """
+
+    not_comparable: tuple[RampCost, ...]
+    """Candidates costed successfully whose :attr:`RampCost.round_trip` is
+    :class:`ExitCostUnknown`.
+
+    Costed, reported, and kept out of the ranking (FR-030). Round-trip cost is what belongs in
+    a comparison, so a destination whose exit nobody has declared is not comparison-ready --
+    and its one-way figure is not promoted into the gap, because "most of the cost" is not the
+    cost.
+    """
+
+
+@dataclass(frozen=True, slots=True)
+class NothingComparable:
+    """No candidate was comparison-ready, with the reasons carried rather than counted.
+
+    Returned *instead of* a :class:`Ranking`, on the precedent of ``RoundTripCost |
+    ExitCostUnknown`` one level down. Unrelated to :class:`Ranking`, so a caller that forgot
+    this case is a mypy error rather than an ``IndexError`` in front of the owner.
+
+    **Why this exists rather than an optional index.** ``Ranking.recommended`` is an ``int``,
+    and there is no honest integer for "nothing". A sentinel would be worse than the problem
+    it solved: ``-1`` indexes the last element of a tuple in Python, so a ranking that had
+    recommended nothing would silently recommend something -- the exact class of defect
+    Principle IV calls top-severity. Keeping the empty case out of :class:`Ranking` altogether
+    means every ranking in existence has a valid recommendation, which is what lets
+    :func:`recommended_cost` be a total function with no failure mode of its own.
+
+    ⚙ **The design documents did not settle this case.** data-model.md gives
+    ``recommended: int`` and contracts/route-costing.md gives ``rank(...) -> Ranking``, and
+    neither says what either means when every candidate is unusable or has no declared exit.
+    """
+
+    reason: str
+    """Why there was nothing to rank, in words, naming the counts behind it (FR-017).
+
+    "Every candidate was refused" and "every candidate lacks a declared exit route" are
+    different facts that the owner acts on differently -- the first is about limits and dates,
+    the second about a declaration nobody has written yet.
+    """
+
+    excluded: tuple[RouteUnusable, ...]
+    """The refusals, in the same shape a :class:`Ranking` would have carried them."""
+
+    not_comparable: tuple[RampCost, ...]
+    """The costed-but-not-comparable candidates, likewise. Their one-way figures are real and
+    are reported; what is missing is the round trip, and nothing here invents one."""
+
+
+def recommended_cost(ranking: Ranking) -> RampCost:
+    """The recommended candidate: the very object at :attr:`Ranking.recommended`.
+
+    An indexing expression and nothing else, which is the point (FR-029, SC-016). There is no
+    arithmetic here to drift from the arithmetic that produced :attr:`Ranking.costed`, because
+    the entry returned *is* an entry of that tuple -- assertable with ``is``.
+
+    Total, with no failure mode: a :class:`Ranking` cannot exist with an empty
+    :attr:`Ranking.costed`, because that case is :class:`NothingComparable`.
+    """
+    return ranking.costed[ranking.recommended]

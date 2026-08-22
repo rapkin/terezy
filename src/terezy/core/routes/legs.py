@@ -124,6 +124,9 @@ class Leg:
     """The largest amount this leg will carry per movement, or ``None``."""
 
     monthly_cap: Money | None
+    """The most this leg will carry in a calendar month, or ``None``. Capacity already
+    consumed in the same month is the accumulator's business (FR-015)."""
+
     capacity_pool: str | None
     """The shared resource whose monthly limit this leg consumes, or ``None`` for none.
 
@@ -138,8 +141,6 @@ class Leg:
     pool must declare the **same** cap; a mismatch is a load-time failure, because two numbers
     for one real limit means at least one is wrong and choosing either would be a guess.
     """
-    """The most this leg will carry in a calendar month, or ``None``. Capacity already
-    consumed in the same month is the accumulator's business (FR-015)."""
 
     latency_days: int
     """How long this leg takes. Non-negative. Summed over the chain, and reported beside
@@ -241,6 +242,18 @@ class LegOutcome:
     fixed_fee: Money
     """The declared flat fee, in its own currency, which must be :attr:`Leg.from_ccy`."""
 
+    spread_over_reference: float | None
+    """The leg's spread as a fraction of the reference **rate**, or ``None`` for a leg that
+    converts nothing.
+
+    ``p / r`` for a premium form -- the figure ``SIMULATOR_SPEC.md`` §4.3.1 quotes, and the
+    arithmetic behind its "4.8-9.5% one way". Carried through to the result so SC-002's "both
+    figures present, each labelled" is true of the *result record* and not only of a function
+    a caller could call. It is **not** the cost: that is ``conversion_spread``, derived from
+    :func:`channels.loss_fraction`. The two differ on the buy side and the difference is a
+    correction this project already got wrong once.
+    """
+
     channel_applied: str | None
     """Which channel this leg used, or ``None`` for a leg that converts nothing. Reaches
     the result's ``channels_applied`` because the choice changes the number (FR-011)."""
@@ -305,6 +318,10 @@ def _fee_only_cost(leg: Leg, amount: Money, channel: FxChannel | None) -> LegOut
         conversion_spread=money.scale_sourced(amount, 0.0, leg.provenance),
         percentage_fee=percentage,
         fixed_fee=fixed,
+        # ``None``, not ``0.0``: this leg has no reference rate to have a spread over, and a
+        # zero would read as "at the reference" -- a claim about a conversion that never
+        # happened (FR-009).
+        spread_over_reference=None,
         channel_applied=None,
     )
 
@@ -367,6 +384,9 @@ def _fx_cost(leg: Leg, amount: Money, channel: FxChannel | None) -> LegOutcome:
         conversion_spread=spread,
         percentage_fee=percentage,
         fixed_fee=fixed,
+        spread_over_reference=channels.spread_over_reference(
+            side, channel.reference_rate, role=role
+        ),
         channel_applied=channel.id,
     )
 

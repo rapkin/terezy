@@ -2,7 +2,8 @@
 
 **Date**: 2026-08-22
 
-Twelve decisions. D10–D12 were added after an external review of the artifacts. Each records what was chosen, why, and what was rejected. No
+Thirteen decisions. D10–D12 were added after an external review of the artifacts; D13 during
+implementation. Each records what was chosen, why, and what was rejected. No
 `NEEDS CLARIFICATION` remains — the spec's three were resolved by the owner before
 planning; everything below is a design question.
 
@@ -266,3 +267,129 @@ leaves the verdict to the engine.
 - *Threshold per value, inline.* Drift, invisibly.
 - *`datetime.now()` behind a "just for staleness" exemption.* It would make a run's output
   depend on the day it was run, breaking C4 determinism for a convenience.
+
+## D10 — A monthly cap belongs to a shared rail, not to a route
+
+**The defect this fixes**, found by review before `capacity.py` was written: caps were
+declared per leg and accumulated by `(route_id, year, month)`. Two different routes both
+using the owner's Monobank card would each get their **own full monthly limit**, when the
+real limit belongs to the card and is consumed by whichever route touches it. Monobank's
+monthly limit is one of the four numbers §11 item 1 names as the reason this feature exists,
+so a model that cannot express it is not a modelling nicety — it is the feature failing at
+its own purpose.
+
+**Decision**: a leg declares `capacity_pool: str | None` — an identifier for the *shared
+resource* whose limit it consumes. The accumulator keys on `(capacity_pool, year, month)`,
+not on the route.
+
+```toml
+[[route.leg]]                                 # a different route, the same card
+kind          = "fx"
+capacity_pool = "monobank_card_uah_usd"       # <- both routes name this
+monthly_cap   = 100000.0
+```
+
+`None` means the leg consumes no shared limit and its cap, if any, is its own. Two legs
+naming the same pool **must declare the same cap** — a mismatch is a load-time failure,
+because two different numbers for one real limit means at least one of them is wrong and
+picking either silently would be a guess.
+
+**Rationale**: a limit is a property of the *rail* — a card, an account, a corridor under a
+regulatory ceiling — and a route is a path that uses rails. Keying on the route conflates a
+path with a resource, which is the same category error as keying an access cost on an
+instrument (FR-008, D2). FR-015's "capacity already consumed in the same month" then holds
+*across* routes, which is the only reading under which it means anything.
+
+**Alternatives rejected**:
+
+- *Key on `(venue, year, month)`.* Closer, and still wrong: one venue can expose several
+  rails with separate limits (a card and a bank transfer at the same bank), and one rail can
+  span venues.
+- *Derive the pool from the leg's `(from_venue, to_venue, from_ccy, to_ccy)` tuple.* Would
+  work for the card case by accident and break the moment two products at one bank share a
+  regulatory ceiling. The pool is a fact about the world; it should be declared, not inferred.
+- *Leave it per route and document the limitation.* Rejected: the limitation is the feature's
+  own headline number.
+
+## D11 — Ranking is lexicographic, not scored
+
+**The gap this fills**: FR-016 says "rank by round-trip cost, ceiling and latency" — three
+keys and no aggregation rule. `Ranking.ties` implied a scalar score, and required-test row
+**B12** forbids a non-standard composite score from driving the primary ordering.
+
+**Decision**: **lexicographic** on `(round-trip cost, ceiling descending, latency)`, and a
+**tie is a tie on the first key only** — two routes whose round-trip costs are equal within
+the project tolerance are reported as tied even if their ceilings or latencies differ.
+
+**Rationale**: B12 forecloses a weighted score, so the three keys have to be ordered rather
+than combined, and FR-016 already states the order. Round-trip cost first is the whole point
+of the feature. Reporting the tie on cost alone rather than on the full tuple is deliberate:
+the owner asked "which is cheapest", and answering "these two cost the same, and here is how
+they differ on ceiling and latency" is more useful than silently preferring one on a tiebreak
+he did not ask for.
+
+A weighted score would also have to weight hryvnia against days, which is a preference and
+not a fact — precisely the kind of invented number Principle I refuses.
+
+⚙ **Three things implementation had to settle that this decision did not**, recorded here
+because they are now load-bearing:
+
+- **A `None` ceiling sorts first.** `None` means no leg declares a cap — the *least*
+  constrained a route can be — so it precedes every finite ceiling. Treating an absent cap as
+  zero would rank the freest route last while looking like a sensible default.
+- **Ties are anchored, not chained.** Tolerance equality is not transitive, so every member
+  of a tie group is within one tolerance of the group's **first** member. Chaining
+  neighbour-to-neighbour would let an arbitrarily wide band become one tie as candidates
+  accumulate — the tolerance absorbing a real difference.
+- **Ordering and tying are separate answers.** The sequence is ordered by all three keys, so
+  it is deterministic; the tie is *reported* on the first key. The recommendation may sit
+  inside a tie group, which is what stops the head of the sequence being read as a strict
+  winner while still giving a defined order.
+
+**Alternatives rejected**: a composite score (**B12** forbids it); cost-only with the other
+two as decoration (throws away FR-016's other two keys); asking the owner for weights (a
+decision-layer question, and this feature is not the decision layer).
+
+## D12 — Staleness ages from the later of verification and retrieval
+
+**The ambiguity this closes**: FR-025 says "verification **or** retrieval date has aged",
+and the first implementation looked only at `retrieved_on`.
+
+**Decision**: age from `verified_on` when it is set, otherwise from `retrieved_on` —
+equivalently, from the later of the two, since a verification cannot precede the retrieval it
+verifies.
+
+**Rationale**: verifying a value against a primary source is the strongest possible refresh
+of confidence in it, and stronger than re-fetching. A value retrieved two years ago and
+verified last week is not stale; treating it as stale would tell the owner to re-check the
+one thing he has actually checked, and a staleness warning that fires on verified values is
+one that gets ignored.
+
+The asymmetry is intentional and worth stating: an **unverified** value ages from retrieval,
+which is the common case today and the stricter one.
+
+## D13 — What `rank` returns when nothing is comparable
+
+**The gap**, found during implementation of T019: `data-model.md` gives
+`Ranking.recommended: int` and the contract gives `rank(...) -> Ranking`. Neither says what
+either means when every candidate was refused or has no declared exit route. There is no
+honest integer for "nothing".
+
+**Decision**: `rank` returns `Ranking | NothingComparable`, where `NothingComparable` is an
+unrelated frozen record carrying its reason plus the refused and exit-less candidates. Every
+`Ranking` that exists therefore has a valid index, and `recommended_cost` is total with no
+failure mode.
+
+**Rationale**: a sentinel index would be **worse than the gap**. `-1` indexes the last
+element of a tuple, so a ranking that had recommended nothing would silently recommend
+something — a wrong number produced by a value chosen to mean "no number", which is the top
+severity class. An `int | None` would work and forces narrowing at every call site including
+each SC-016 assertion, which buys nothing over a distinct type and reads worse.
+
+Same mechanism, same reason, as `RoundTripCost | ExitCostUnknown` (D4) and
+`RealRate | RealTermsUnavailable` in feature 001: when there is no answer, the type says so
+rather than a value standing in for it.
+
+**`NothingComparable` distinguishes four cases** in its reason — nothing was offered, all
+were refused, all lacked an exit route, or a mix — because the owner acts differently on
+each, and "no comparison available" alone would tell him nothing about what to fix.

@@ -272,7 +272,11 @@ Returned instead of a `RampCost` when a route cannot carry the amount on the dat
 ### `CapacityUsed`
 
 The monthly cap accumulator, folded into `LedgerState` beside the cash balances
-(research.md D7). Keyed by `(route_id, year, month)` taken from each event's `occurred_on`
+(research.md D7). Keyed by `(capacity_pool, year, month)` taken from each event's `occurred_on`
+— ⚙ **not by route** (research.md D10): two routes through one Monobank card consume one
+limit, and keying on the route would give each its own. This section still said `route_id`
+after the `Leg.capacity_pool` row was added to correct exactly that, so the document
+contradicted itself
 — data, never a clock. `remaining(cap, used)` is what feasibility consults, so FR-015's
 "capacity already consumed in the same month" is not a special case.
 

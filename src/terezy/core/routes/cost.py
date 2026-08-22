@@ -151,6 +151,14 @@ class _Walk:
     """Fixed fees so far, in the sending currency."""
 
     channels: tuple[str, ...]
+    spreads: tuple[float, ...]
+    """One rate-space spread per converting leg, parallel to :attr:`channels`.
+
+    §4.3.1's own figure, carried to the result so SC-002's "both figures present, each
+    labelled" holds of the record and not only of a function a caller could call. Per leg
+    rather than summed: §4.3.1 is about one conversion, and adding rate-space spreads across
+    legs would invent a quantity nothing means.
+    """
     """Channels applied so far, in leg order."""
 
     latency_days: int
@@ -203,6 +211,7 @@ def _initial(amount: Money) -> _Walk:
         percentage=money.zero(currency),
         fixed=money.zero(currency),
         channels=(),
+        spreads=(),
         latency_days=0,
         ceiling=None,
         disruption=0.0,
@@ -371,6 +380,11 @@ def _applied(
             if outcome.channel_applied is None
             else (*walk.channels, outcome.channel_applied)
         ),
+        spreads=(
+            walk.spreads
+            if outcome.spread_over_reference is None
+            else (*walk.spreads, outcome.spread_over_reference)
+        ),
         latency_days=walk.latency_days + leg.latency_days,
         ceiling=_ceiling_after(walk, leg, sending),
         disruption=max(walk.disruption, leg.disruption_probability),
@@ -486,6 +500,7 @@ def _one_way(sent: Money, walk: _Walk) -> OneWayCost:
         arrived=walk.amount,
         components=components,
         fraction=fraction,
+        spreads_over_reference=walk.spreads,
         channels_applied=walk.channels,
         provenance=provenance,
         staleness=walk.staleness,
@@ -561,6 +576,7 @@ def _round_trip(
         arrived=exited.amount,
         components=components,
         fraction=fraction,
+        spreads_over_reference=exited.spreads,
         channels_applied=exited.channels,
         provenance=provenance,
         staleness=exited.staleness,

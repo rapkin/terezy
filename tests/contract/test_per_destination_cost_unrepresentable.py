@@ -49,7 +49,7 @@ import dataclasses
 import importlib
 import inspect
 import pkgutil
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from typing import Any, get_type_hints
 
 import pytest
@@ -90,6 +90,20 @@ ROUTE_NAMES = frozenset({"route", "route_id", "routes", "path"})
 COST_RETURNS = frozenset({"RampCost", "OneWayCost", "RoundTripCost", "Ranking"})
 """Return types that make a function a costing function, whatever it is called."""
 
+PATH_NAMES = frozenset({"path", "paths"})
+"""Parameters that can carry the triple.
+
+The plural is ``ranking.rank``'s: it takes a sequence of whole ``FundingPath`` triples and
+costs them one at a time through ``cost_one``, which honours FR-008 exactly as the singular
+does. ``STREAM_NAMES`` and ``ROUTE_NAMES`` above already admit their plurals for the same
+reason; this set was written before any function took more than one path, and the omission was
+a gap in the heuristic rather than a rule.
+
+⚙ Naming a parameter is not enough -- :func:`_takes_the_triple` also requires the annotation to
+mention ``FundingPath``, so ``def cost_via(path: str) -> RampCost`` no longer passes. That is
+stricter than the first version of this scan, which matched on the name alone.
+"""
+
 COST_FIGURE_NAMES = frozenset(
     {"sent", "arrived", "fraction", "components", "one_way", "round_trip", "cost"}
 )
@@ -125,6 +139,21 @@ def _public_callables() -> Iterator[tuple[str, Any]]:
 
 def _parameters(target: Any) -> frozenset[str]:
     return frozenset(inspect.signature(target).parameters)
+
+
+def _takes_the_triple(target: Any) -> bool:
+    """Whether this signature takes the whole ``(destination x stream x route)`` key.
+
+    Checked on the *annotation* rather than on the parameter name, because the name is the
+    heuristic and the type is the guarantee: a parameter called ``path`` carrying a bare venue
+    id would satisfy a name check while reintroducing precisely the blended figure FR-008
+    exists to forbid.
+    """
+    signature = inspect.signature(target)
+    return any(
+        "FundingPath" in str(signature.parameters[name].annotation)
+        for name in frozenset(signature.parameters) & PATH_NAMES
+    )
 
 
 def _accepts_a_bare_destination(target: Any) -> bool:
@@ -188,9 +217,7 @@ def test_every_cost_returning_function_takes_the_whole_triple() -> None:
         if inspect.isclass(target):
             continue
         annotation = str(inspect.signature(target).return_annotation)
-        if any(cost in annotation for cost in COST_RETURNS) and not (
-            _parameters(target) & {"path"}
-        ):
+        if any(cost in annotation for cost in COST_RETURNS) and not _takes_the_triple(target):
             offenders.append(name)
     assert not offenders, (
         "these return a cost without taking a FundingPath, so the cost they produce is "
@@ -308,6 +335,25 @@ class TestTheScanWouldActuallyCatchAViolation:
             raise NotImplementedError
 
         assert not _accepts_a_bare_destination(cost_one)
+        assert _takes_the_triple(cost_one)
+
+    def test_a_sequence_of_triples_is_the_triple_too(self) -> None:
+        # ``rank``'s shape. Many whole keys is not a partial key, and refusing the plural
+        # would push a ranking function into taking three parallel lists -- which is the
+        # partial form with extra steps.
+        def rank(paths: Sequence[FundingPath], amount: object) -> object:
+            raise NotImplementedError
+
+        assert _takes_the_triple(rank)
+
+    def test_a_parameter_merely_named_path_does_not_count(self) -> None:
+        # The decoy the name-only version of this scan would have accepted: a bare venue id
+        # under a reassuring parameter name, producing the one blended access cost for
+        # "buying dollars" that hides the whole §4.3.1 finding.
+        def cost_via(path: str) -> object:
+            raise NotImplementedError
+
+        assert not _takes_the_triple(cost_via)
 
     def test_the_walk_actually_finds_the_modules(self) -> None:
         # If the package walk returned nothing, every scan above would pass vacuously.

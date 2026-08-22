@@ -319,7 +319,7 @@ def base_factor(legs: tuple[Leg, ...], start: Currency, reference: float) -> flo
     return factor
 
 
-def zero_cost_graph(*, fixed_fee: float = 0.0) -> Graph:
+def zero_cost_graph(*, fixed_fee: float = 0.0, with_exit: bool = False) -> Graph:
     """The domestic path: two ``transfer`` legs in one currency, declaring zero fees.
 
     Built by hand rather than drawn, because it is the *bar* the generated cases are
@@ -329,6 +329,12 @@ def zero_cost_graph(*, fixed_fee: float = 0.0) -> Graph:
 
     ``fixed_fee`` exists so the same shape can also express the degenerate case that most
     invites a silent clamp: a flat fee charged on an amount of zero.
+
+    ``with_exit`` declares the way back out, which is what makes this route *comparable*
+    rather than merely costed. Without it the round trip is ``ExitCostUnknown`` and the route
+    is kept out of every ranking (FR-030), so the default stays ``False`` -- the honest state
+    of a route nobody has costed the exit for -- and a comparison asks for the exit
+    explicitly.
     """
     legs = tuple(
         _leg(
@@ -342,22 +348,112 @@ def zero_cost_graph(*, fixed_fee: float = 0.0) -> Graph:
         )
         for index in range(2)
     )
+    routes: dict[str, Route] = {}
+    partner_id = "inzhur_exit" if with_exit else None
+    if partner_id is not None:
+        routes[partner_id] = Route(
+            id=partner_id,
+            provider="Inzhur",
+            origin="venue_2",
+            destination="venue_3",
+            direction="exit",
+            partner_route=None,
+            status="open",
+            legs=(
+                _leg(
+                    index=2,
+                    kind=TRANSFER,
+                    from_ccy=Currency.UAH,
+                    to_ccy=Currency.UAH,
+                    fee_pct=0.0,
+                    fee_fixed=fixed_fee,
+                    minimum=None,
+                ),
+            ),
+        )
     route = Route(
         id="inzhur_direct",
         provider="Inzhur",
         origin="venue_0",
         destination="venue_2",
         direction="inbound",
-        partner_route=None,
+        partner_route=partner_id,
         status="open",
         legs=legs,
     )
+    routes[route.id] = route
     return Graph(
         path=FundingPath(destination_id=route.destination, stream_id="salary", route_id=route.id),
         route=route,
-        routes={route.id: route},
+        routes=routes,
         channels={CHANNEL_ID: _channel(42.0, 0.0, 0.0)},
         reference_rate=42.0,
+    )
+
+
+def p2p_graph(
+    *, buy_premium: float = 3.0, sell_premium: float = -3.0, reference: float = 42.0
+) -> Graph:
+    """The §4.3.1 shape: one hryvnia-to-dollar conversion in, one declared conversion out.
+
+    Every fee is zero, so every hryvnia this route costs is the channel's spread and nothing
+    else. That is what makes the hand arithmetic in
+    ``tests/worked_examples/test_ramp_p2p_premium.py`` one division per leg rather than a
+    reconciliation, and it is why this fixture is built rather than drawn: a generated route
+    would put fees between one declared premium and one reported cost.
+
+    The exit route is **declared, not derived** (FR-027). Its premium is a separate argument
+    because a real P2P book is asymmetric, and a fixture that could only express a symmetric
+    spread would let a round trip computed as twice the one way pass.
+    """
+    exit_route = Route(
+        id="binance_p2p_to_monobank",
+        provider="Binance P2P",
+        origin="venue_1",
+        destination="venue_2",
+        direction="exit",
+        partner_route=None,
+        status="open",
+        legs=(
+            _leg(
+                index=1,
+                kind=FX,
+                from_ccy=Currency.USD,
+                to_ccy=Currency.UAH,
+                fee_pct=0.0,
+                fee_fixed=0.0,
+                minimum=None,
+            ),
+        ),
+    )
+    inbound = Route(
+        id="monobank_to_binance_p2p",
+        provider="Binance P2P",
+        origin="venue_0",
+        destination="venue_1",
+        direction="inbound",
+        partner_route=exit_route.id,
+        status="open",
+        legs=(
+            _leg(
+                index=0,
+                kind=FX,
+                from_ccy=Currency.UAH,
+                to_ccy=Currency.USD,
+                fee_pct=0.0,
+                fee_fixed=0.0,
+                minimum=None,
+            ),
+        ),
+    )
+    return Graph(
+        path=FundingPath(
+            destination_id=inbound.destination, stream_id="salary", route_id=inbound.id
+        ),
+        route=inbound,
+        routes={inbound.id: inbound, exit_route.id: exit_route},
+        channels={CHANNEL_ID: _channel(reference, buy_premium, sell_premium)},
+        reference_rate=reference,
     )
 
 

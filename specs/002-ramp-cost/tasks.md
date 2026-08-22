@@ -88,12 +88,12 @@ ceiling, latency and status, and which is cheapest.
 **Independent test**: state an amount and a declared premium; check both cost percentages
 against hand arithmetic.
 
-- [ ] T017 [US1] Write `tests/worked_examples/test_ramp_p2p_premium.py` — the **G2** example: +3 UAH at a stated reference reproduces the §4.3.1 percentage exactly, one way and round trip, with the arithmetic checked in beside the assertion. Closes **G2**, **SC-001**, **SC-002**. Must fail first
-- [ ] T018 [US1] Write `tests/contract/test_same_code_path.py` — `recommended_cost(r) is r.costed[r.recommended]`, asserted with **`is`**, not `==`. Closes **SC-016**, **FR-029**
-- [ ] T019 [US1] Implement `src/terezy/core/routes/ranking.py` — `rank` costing every candidate with `cost_one`, ordering **lexicographically** on `(round-trip cost, ceiling desc, latency)` with ties on **cost alone**, and returning `Ranking(costed, recommended: int, excluded, ties, not_comparable)`. **No composite score** — B12 forbids one (research.md D11). Closes **FR-016**, **FR-018**, **FR-029**
-- [ ] T020 [P] [US1] Write `tests/unit/test_ranking_ties_and_exclusions.py` — a tie is reported as a tie, never broken arbitrarily; an excluded route carries its reason; a destination whose round trip is `ExitCostUnknown` lands in `not_comparable` and out of the ranking. Closes **FR-018**, **FR-014**, **SC-014**
-- [ ] T021 [P] [US1] Write `tests/contract/test_cost_labels.py` — every cost figure in every result type is reachable only through a one-way or round-trip named field; no figure is unlabelled. Verified across every field, not sampled. Closes **G6**, **FR-002**, **SC-005**
-- [ ] T022 [P] [US1] Write `tests/unit/test_zero_cost_domestic_route.py` — a route whose every leg declares zero fees and no conversion costs **exactly** zero and delivers exactly what was sent. This is the bar the others are measured against. Closes **SC-004**
+- [x] T017 [US1] Write `tests/worked_examples/test_ramp_p2p_premium.py` — the **G2** example: +3 UAH at a stated reference reproduces the §4.3.1 percentage exactly, one way and round trip, with the arithmetic checked in beside the assertion. Closes **G2**, **SC-001**, **SC-002**. Must fail first
+- [x] T018 [US1] Write `tests/contract/test_same_code_path.py` — `recommended_cost(r) is r.costed[r.recommended]`, asserted with **`is`**, not `==`. Closes **SC-016**, **FR-029**
+- [x] T019 [US1] Implement `src/terezy/core/routes/ranking.py` — `rank` costing every candidate with `cost_one`, ordering **lexicographically** on `(round-trip cost, ceiling desc, latency)` with ties on **cost alone**, and returning `Ranking(costed, recommended: int, excluded, ties, not_comparable)`. **No composite score** — B12 forbids one (research.md D11). Closes **FR-016**, **FR-018**, **FR-029**
+- [x] T020 [P] [US1] Write `tests/unit/test_ranking_ties_and_exclusions.py` — a tie is reported as a tie, never broken arbitrarily; an excluded route carries its reason; a destination whose round trip is `ExitCostUnknown` lands in `not_comparable` and out of the ranking. Closes **FR-018**, **FR-014**, **SC-014**
+- [x] T021 [P] [US1] Write `tests/contract/test_cost_labels.py` — every cost figure in every result type is reachable only through a one-way or round-trip named field; no figure is unlabelled. Verified across every field, not sampled. Closes **G6**, **FR-002**, **SC-005**
+- [x] T022 [P] [US1] Write `tests/unit/test_zero_cost_domestic_route.py` — a route whose every leg declares zero fees and no conversion costs **exactly** zero and delivers exactly what was sent. This is the bar the others are measured against. Closes **SC-004**
 
 **Checkpoint**: the §4.3.1 finding is computed. **MVP. Commit.**
 

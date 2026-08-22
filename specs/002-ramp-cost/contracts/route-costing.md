@@ -18,13 +18,18 @@ def cost_one(
     amount: Money,
     *,
     routes: Mapping[str, Route],
-    streams: Mapping[str, IncomeStream],
     channels: Mapping[str, FxChannel],
+    venues: Mapping[str, Venue],
     kinds: Mapping[str, ObservationKind],
-    capacity_used: CapacityUsed,
     on_date: date,
     as_of: date,
 ) -> RampCost | RouteUnusable: ...
+
+
+# ⚙ Corrected after implementation. This first listed `streams` and `capacity_used`, whose
+#   types arrive with US2 (T024) and US3 (T029). Both are *feasibility* inputs producing
+#   further `RouteUnusable` reasons, not a second arithmetic — and they must be added to
+#   `cost_one` and `rank` together, or FR-029 acquires the second code path it forbids.
 
 
 # --- events derived from a costed figure, never recomputed beside it ---
@@ -41,13 +46,18 @@ def rank(
     amount: Money,
     *,
     routes: Mapping[str, Route],
-    streams: Mapping[str, IncomeStream],
     channels: Mapping[str, FxChannel],
+    venues: Mapping[str, Venue],
     kinds: Mapping[str, ObservationKind],
-    capacity_used: CapacityUsed,
     on_date: date,
     as_of: date,
-) -> Ranking: ...
+) -> Ranking | NothingComparable: ...
+
+
+# ⚙ The return type gained `NothingComparable` during implementation (research.md D13).
+#   `Ranking.recommended` is an `int`, and there is no honest integer for "nothing was
+#   comparable". A sentinel would be worse than the gap: `-1` indexes the last element, so a
+#   ranking that recommended nothing would silently recommend something.
 
 
 # ⚙ Spelled out after review. The first draft wrote `**costing_inputs: object`, which
@@ -77,8 +87,9 @@ the future report every input as stale.
 **One costing function.** `rank` is defined as costing each path with `cost_one` and sorting
 the results. There is no second implementation, no fast path, no summary mode. FR-029.
 
-**Ranking is lexicographic on `(round-trip cost, ceiling descending, latency)`**, never a
-composite score — required test **B12** forbids a non-standard score from driving the primary
+**Ranking is lexicographic on `(round-trip cost, ceiling descending, latency)`**, with a
+`None` ceiling sorting **first** (no declared cap is the least constrained a route can be),
+never a composite score — required test **B12** forbids a non-standard score from driving the primary
 ordering, and weighting hryvnia against days would be a preference rather than a fact. A
 **tie is decided on round-trip cost alone**: two routes costing the same within the project
 tolerance are reported tied even where their other keys differ.
