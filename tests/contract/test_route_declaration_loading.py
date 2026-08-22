@@ -963,6 +963,71 @@ class TestChannelSideForms:
         assert side.premium_per_unit is not None
         assert side.premium_per_unit.amount == 0.0
 
+    @pytest.mark.parametrize(
+        ("old", "new", "field"),
+        [
+            (
+                "  premium_per_unit = 3.0",
+                "  premium_per_unit = -42.0",
+                "channel[p2p].buy_side.premium_per_unit",
+            ),
+            (
+                "  premium_per_unit = -2.5",
+                "  premium_per_unit = -45.0",
+                "channel[p2p].sell_side.premium_per_unit",
+            ),
+        ],
+    )
+    def test_a_premium_that_zeroes_or_inverts_the_effective_rate_is_refused(
+        self, tmp_path: Path, old: str, new: str, field: str
+    ) -> None:
+        """A side that gives away the whole reference (or more) is not a rate.
+
+        ``-42`` on a reference of 42 makes the effective rate zero and the first costing
+        divides by it; ``-45`` makes it negative and the conversion refuses the rate
+        mid-costing. Both are load-time failures naming the file and the offset, not
+        arithmetic errors three layers later. A negative premium stays legal while the
+        effective rate stays positive -- the shipped ``-2.5`` is exactly that.
+        """
+        broken = _broken(tmp_path, CHANNELS, old, new)
+        with pytest.raises(DeclarationError) as raised:
+            loader.channels_from_file(broken)
+        _assert_names_file_and_field(raised.value, file=broken, field_path=field)
+        assert "42.0" in raised.value.problem, "the reason states the reference it is against"
+        assert "not a rate" in raised.value.problem
+
+    @pytest.mark.parametrize("bps", ["10000.0", "12000.0"])
+    def test_a_sell_markup_of_the_whole_reference_or_more_is_refused(
+        self, tmp_path: Path, bps: str
+    ) -> None:
+        """The markup form of the same defect: 10 000 bps subtracts the whole reference.
+
+        The sell side is ``reference * (1 - m)``, so exactly 10 000 bps is a zero rate and
+        anything above it a negative one. The first edit moves the *buy* markup to a
+        distinct legal value so the second edit lands on the sell side.
+        """
+        text = CHANNELS.read_text(encoding="utf-8")
+        text = _replace(text, "markup_bps   = 150.0", "markup_bps   = 175.0")
+        text = _replace(text, "markup_bps   = 150.0", f"markup_bps   = {bps}")
+        broken = tmp_path / "broken.toml"
+        broken.write_text(text, encoding="utf-8")
+        with pytest.raises(DeclarationError) as raised:
+            loader.channels_from_file(broken)
+        _assert_names_file_and_field(
+            raised.value, file=broken, field_path="channel[card].sell_side.markup_bps"
+        )
+        assert "not a rate" in raised.value.problem
+
+    def test_a_huge_buy_markup_is_expensive_but_legal(self, tmp_path: Path) -> None:
+        """The bound is on the effective rate per role, not on the declared number.
+
+        12 000 bps on the buy side is a terrible price -- reference * 2.2 -- and still a
+        rate. Refusing it would smuggle a plausibility judgement into a structural check.
+        """
+        broken = _broken(tmp_path, CHANNELS, "markup_bps   = 150.0", "markup_bps   = 12000.0")
+        channel = loader.channels_from_file(broken)[1]
+        assert channel.buy_side.markup_bps == 12000.0
+
     def test_a_missing_side_is_refused_and_no_mid_rate_is_synthesised(self, tmp_path: Path) -> None:
         head, _, _ = CHANNELS.read_text(encoding="utf-8").partition("  [channel.sell_side]")
         broken = tmp_path / "broken.toml"

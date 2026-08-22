@@ -66,7 +66,7 @@ from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance, SourceRef
 from terezy.core.primitives.staleness import ObservationKind
 from terezy.core.routes import capacity, legs
-from terezy.core.routes.channels import ChannelSide, FxChannel
+from terezy.core.routes.channels import ChannelSide, FxChannel, Side, effective_rate
 from terezy.core.routes.legs import Leg, Route
 from terezy.core.routes.venues import Venue
 from terezy.core.scenarios.regimes import Regime, RegimeTransition
@@ -1101,6 +1101,49 @@ def _channel_side(
     )
 
 
+def _check_effective(
+    path: Path,
+    side_prefix: str,
+    side: ChannelSide,
+    reference: float,
+    *,
+    role: Side,
+) -> None:
+    """A declared side must still be a rate on its own declared reference (FR-010).
+
+    The effective rate is what a conversion transacts at, and the costing arithmetic
+    divides by it on the buy side and converts through it on both. A side whose offset
+    gives away the whole reference -- ``premium_per_unit = -42`` against a reference of
+    42, or ``markup_bps >= 10000`` on the sell side -- makes it zero or negative, and
+    without this check the file loads and the first costing dies mid-walk in arithmetic
+    that can name neither the file nor the field.
+
+    The bound is on the **effective rate per role**, not on the declared number: a
+    negative premium is legal while the effective rate stays positive (a discount is a
+    real market fact), and a buy-side markup of any size is expensive rather than
+    impossible. Checked here rather than in ``core``, because the reference and the side
+    are declared in one table and the refusal can name both values.
+    """
+    effective = effective_rate(side, reference, role=role)
+    if effective <= 0.0:
+        field, declared = (
+            ("premium_per_unit", side.premium_per_unit.amount)
+            if side.premium_per_unit is not None
+            else ("markup_bps", side.markup_bps)
+        )
+        raise DeclarationError(
+            path,
+            f"{side_prefix}.{field}",
+            f"declares {field} = {declared!r} against reference_rate = {reference!r}, "
+            f"which makes this side's effective rate {effective!r}. A side that pays away "
+            "the whole reference or more is not a rate: a conversion divides by this "
+            "number, so the declaration would load and then fail mid-costing in "
+            "arithmetic that names neither the file nor the field. A discount is legal "
+            "only while the effective rate stays positive (FR-010).",
+            "declare an offset that leaves the effective rate above zero",
+        )
+
+
 def channels_from_file(path: Path) -> tuple[FxChannel, ...]:
     """Every channel declared in one ``data/channels/<pair>.toml``, in file order.
 
@@ -1172,6 +1215,14 @@ def _channel(path: Path, entry: schema.ChannelTable) -> FxChannel:
             "different currencies; a self-quote has no side to take and no spread to cost.",
             "name two different currencies",
         )
+    reference = _positive(
+        path,
+        f"{field_prefix}.reference_rate",
+        entry.reference_rate,
+        "a reference of zero or less is not a rate: a cost fraction divides by it and "
+        "an attribution translates through it, so either would produce a figure that "
+        "merely looks like a number",
+    )
     buy_side, buy_ref = _channel_side(
         path,
         entry.buy_side,
@@ -1184,6 +1235,8 @@ def _channel(path: Path, entry: schema.ChannelTable) -> FxChannel:
         field_prefix=f"{field_prefix}.sell_side",
         price_currency=price_currency,
     )
+    _check_effective(path, f"{field_prefix}.buy_side", buy_side, reference, role=Side.BUY)
+    _check_effective(path, f"{field_prefix}.sell_side", sell_side, reference, role=Side.SELL)
     reference_ref = _source_ref(
         path,
         field_prefix,
@@ -1196,14 +1249,7 @@ def _channel(path: Path, entry: schema.ChannelTable) -> FxChannel:
     return FxChannel(
         id=channel_id,
         pair=(price_currency, unit_currency),
-        reference_rate=_positive(
-            path,
-            f"{field_prefix}.reference_rate",
-            entry.reference_rate,
-            "a reference of zero or less is not a rate: a cost fraction divides by it and "
-            "an attribution translates through it, so either would produce a figure that "
-            "merely looks like a number",
-        ),
+        reference_rate=reference,
         buy_side=buy_side,
         sell_side=sell_side,
         observed_on=_parse_date(path, f"{field_prefix}.observed_on", entry.observed_on),

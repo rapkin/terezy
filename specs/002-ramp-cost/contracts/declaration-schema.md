@@ -234,6 +234,7 @@ Each maps to a requirement and to a case in `tests/contract/test_route_declarati
 | `channel` set on a non-`fx` leg, or missing on an `fx` leg | Error | FR-011 |
 | Both or neither of `markup_bps` / `premium_per_unit` on a side | Error | FR-010 |
 | A channel side missing entirely | Error — no mid-rate is ever synthesised | FR-010 |
+| ⚙ A side whose effective rate on its declared reference is zero or below (`premium_per_unit <= -reference`, or `markup_bps >= 10000` on the sell side) | Error naming the offset and the reference. A side that pays away the whole reference is not a rate; without the check the file loads and the first costing divides by zero. A negative premium stays legal while the effective rate stays positive | FR-010 |
 | `disruption_probability` outside `[0, 1]` | Error | FR-026 |
 | Negative `fee_pct`, `fee_fixed`, or `latency_days` | Error | FR-024 |
 | `partner_route` naming a route that does not exist | Error. `null` is legal; a dangling id is not | FR-027 |
