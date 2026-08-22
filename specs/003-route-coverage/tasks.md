@@ -205,7 +205,7 @@ itself, plus the documentation that is part of the feature.
 - [X] T040 [P] Add the coverage section to `docs/METHODOLOGY.md`: the plain-language definition of **comparison-readiness**, the **three deficits** and what different observation each calls for, and the **blocked-pair count** — including, in as many words, that the count is *pairs unblocked and never hryvnia*, and why that boundary is deliberate (valuing a corridor needs costing over a registry that does not yet contain the observation, which is an invented number by construction). State the advisory-not-binding deferral and the no-composition boundary. Add the new tests to the "Where to look next" table.
 - [X] T041 [P] Update `docs/REQUIRED_TESTS.md`: **flip no lettered row** — no row names a registry coverage audit, and the spec says so plainly rather than stretching one. Record in the file's notes that B10, B12, H2 and G6 are reinforced by this feature, naming the test paths that reinforce them.
 - [X] T042 Run the full quickstart verification of [quickstart.md](./quickstart.md) §1–§6 command by command, then the whole gate set: `uv run ruff check . && uv run ruff format --check .`, `uv run mypy`, `uv run lint-imports`, `uv run python scripts/check_provenance.py`, `uv run pytest --cov`, `uv run pytest -m "contract or invariant"`. **Checkpoint — commit** (`/commit`): the properties and the documentation.
-- [ ] T043 Final read-through of the branch diff against the twenty success criteria: every SC has a named test, every departure from a research.md decision is recorded in the report, and no tolerance and no `float` appears anywhere in this feature's source.
+- [X] T043 Final read-through of the branch diff against the twenty success criteria: every SC has a named test, every departure from a research.md decision is recorded in the report, and no tolerance and no `float` appears anywhere in this feature's source.
 
 ---
 
@@ -252,29 +252,33 @@ Commit points, all through `/commit`, all gate-clean: **T010**, **T028**, **T032
 
 ## Success-criteria map
 
-| SC | Where it lands |
+Every criterion, against the test that actually pins it. Recorded after the fact, so it names
+functions rather than tasks.
+
+| SC | Test |
 |---|---|
-| SC-001 | T011 `tests/worked_examples/test_coverage_table.py` |
-| SC-002 | T011, T013 |
-| SC-003 | T022 `tests/unit/test_coverage_deficits.py` |
-| SC-004 | T027 `tests/contract/test_coverage_no_figures.py` |
-| SC-005 | T022 |
-| SC-006 | T022 |
-| SC-007 | T029 `tests/unit/test_coverage_regimes.py` |
-| SC-008 | T027 |
-| SC-009 | T037 `tests/invariants/test_coverage_costing_agreement.py` |
-| SC-010 | T013 |
-| SC-011 | T013 |
-| SC-012 | T011 |
-| SC-013 | T012 `tests/unit/test_coverage_empty.py` |
-| SC-014 | T033 `tests/contract/test_coverage_data_only.py` |
-| SC-015 | T033 |
-| SC-016 | T039 |
-| SC-017 | T013 |
-| SC-018 | T029 |
-| SC-019 | T033 |
-| SC-020 | T039 |
-| FR-001 totality | T038 `tests/invariants/test_coverage_totality.py` |
+| SC-001 | `tests/worked_examples/test_coverage_table.py::test_every_pair_in_the_declared_universe_appears_exactly_once`, `::test_the_verdicts_match_the_hand_enumerated_table` |
+| SC-002 | `tests/worked_examples/test_coverage_table.py::test_no_verdict_is_an_undifferentiated_missing_route`; `tests/unit/test_coverage_deficits.py::test_deficit_{one,two,three}_*` |
+| SC-003 | `tests/unit/test_coverage_deficits.py::test_writing_the_named_inbound_declaration_and_nothing_else_flips_the_pair`, `::test_writing_an_exit_to_any_one_listed_candidate_is_enough` |
+| SC-004 | `tests/contract/test_coverage_no_figures.py::test_no_cost_figure_is_reachable_from_the_report`, `::test_no_field_anywhere_in_the_report_is_typed_to_hold_one`; `tests/unit/test_coverage_deficits.py::test_a_missing_exit_starts_at_the_destination_and_suggests_no_values` |
+| SC-005 | `tests/unit/test_coverage_deficits.py::test_the_todo_list_is_ordered_by_blocked_pair_count_and_ties_are_reported` |
+| SC-006 | `tests/unit/test_coverage_deficits.py::test_a_pair_missing_both_halves_counts_for_both_and_is_alone_sufficient_for_neither` |
+| SC-007 | `tests/unit/test_coverage_regimes.py::test_a_route_in_one_regime_and_not_the_other_yields_two_different_verdicts`, `::test_no_blended_verdict_and_no_summed_count_exists_anywhere`, `::test_the_shared_missing_declaration_is_one_item_with_per_regime_counts` |
+| SC-008 | `tests/contract/test_coverage_no_figures.py::test_no_cost_figure_is_reachable_from_the_report`, `::test_the_only_quantities_are_counts_and_indices` |
+| SC-009 | `tests/invariants/test_coverage_costing_agreement.py::test_a_ready_pair_is_one_costing_produces_a_round_trip_for`, `::test_a_not_ready_pair_is_one_costing_refuses_over_single_declared_routes` |
+| SC-010 | `tests/unit/test_coverage_deficits.py::test_a_missing_exit_starts_at_the_destination_and_suggests_no_values` |
+| SC-011 | `tests/unit/test_coverage_deficits.py::test_a_two_hop_way_out_is_deficit_three_and_is_never_composed`; `tests/worked_examples/test_coverage_table.py::test_the_two_hop_way_out_is_reported_as_a_hole_and_never_composed` |
+| SC-012 | `tests/worked_examples/test_coverage_table.py::test_a_destination_at_a_streams_arrival_point_is_satisfied_by_arrival` |
+| SC-013 | `tests/unit/test_coverage_empty.py::test_each_empty_dimension_is_a_typed_outcome_naming_it`, `::test_every_empty_dimension_is_named_not_only_the_first` |
+| SC-014 | `tests/contract/test_coverage_data_only.py::test_a_new_venue_with_no_routes_appears_as_named_no_inbound_deficits` |
+| SC-015 | `tests/contract/test_coverage_data_only.py::test_a_ready_verdict_says_whether_it_rests_on_open_or_closed_declarations`, `::test_a_ready_verdict_resting_on_closed_routes_is_still_distinct_from_a_hole` |
+| SC-016 | `tests/contract/test_coverage_no_figures.py::test_the_same_declarations_produce_the_identical_report`, `::test_the_report_names_the_declaration_set_it_audited` |
+| SC-017 | `tests/unit/test_coverage_deficits.py::test_an_orphan_exit_is_listed_as_unused_and_blocks_no_count`; `tests/invariants/test_coverage_totality.py::test_an_orphan_exit_is_never_a_deficit_and_never_blocks_a_count` |
+| SC-018 | `tests/unit/test_coverage_regimes.py::test_with_no_regime_declared_one_implicit_regime_covers_every_route_and_says_so` |
+| SC-019 | `tests/contract/test_coverage_data_only.py::test_adding_a_venue_to_the_spendable_list_flips_a_deficit_three_pair` |
+| SC-020 | `tests/contract/test_coverage_no_figures.py::test_producing_the_report_changes_no_ranking`, `::test_the_report_states_in_its_own_output_that_it_is_advisory` |
+| FR-001 totality | `tests/invariants/test_coverage_totality.py::test_every_declared_pair_appears_exactly_once_in_every_regime` |
+| contracts/spendable-schema.md refusals | `tests/contract/test_spendable_declaration_loading.py` (13 cases, one per row plus the two provenance-gate checks) |
 
 ## Notes
 
