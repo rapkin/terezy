@@ -57,7 +57,7 @@ why    = "seed lots with known/estimated basis (J2) and target sum/date/contribu
 
 [[feature]]
 id     = "009-tax-depth"
-status = "queued"
+status = "spec"
 needs  = ["001-ovdp-hurdle-rate", "006-inzhur-instruments"]
 why    = "loss offset and carryforward (E2), average/specific lot methods (E6), tax paid from cash next year (E7); 006's redemption is the first real disposal with a gain"
 
@@ -98,3 +98,8 @@ note  = "owner-requested (2026-08-22): automated fetch layer for external data â
 id    = "multi-currency-goals"
 after = ["008-seed-and-goals"]
 note  = "owner-requested (2026-08-22): goals in non-base currencies once multi-jurisdiction support lands (E8); refused-with-reason until then"
+
+[[future]]
+id    = "forced-sale-policy"
+after = ["009-tax-depth"]
+note  = "owner-deferred (2026-08-22): which positions a forced tax-payment sale draws on and how it is sized; until then insufficient cash is a typed insolvency report â€” E7 closes only partially in 009"
