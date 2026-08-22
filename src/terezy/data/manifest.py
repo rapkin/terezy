@@ -96,12 +96,18 @@ from terezy.core.results.project import Projection
 from terezy.data.declarations.errors import DeclarationError
 from terezy.data.declarations.resolver import Declarations
 
-ENCODING: Final = "terezy-canonical-v1"
+ENCODING: Final = "terezy-canonical-v2"
 """The name of the byte encoding a digest was taken under.
 
 Prefixed into every encoding, so a digest is comparable only against digests of the same
 scheme. Bump it when :func:`encode` changes shape; every previously recorded digest then
-visibly belongs to a different scheme instead of silently disagreeing.
+visibly belongs to a different scheme instead of silently disagreeing. The pinned pair in
+``tests/unit/test_results_canonical.py`` (``CANONICAL_SHAPE_BY_ENCODING``) makes a shape
+change under an unchanged tag a red test rather than a discovery.
+
+**v2** (2026-08): feature 002 gave the canonical event tuple ``capacity_pool`` and the
+ledger form the capacity accumulator, so a v1 digest of the same ledger no longer agrees
+with one taken here -- the tag says so instead of letting the two disagree under one name.
 """
 
 ALGORITHM: Final = "sha256"

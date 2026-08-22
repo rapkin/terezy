@@ -24,6 +24,10 @@ from dataclasses import replace
 from datetime import date
 
 from terezy.core.ledger import canonical as ledger_canonical
+from terezy.core.ledger import engine
+from terezy.core.ledger.accounts import CashBalance
+from terezy.core.ledger.events import CausationKind, CausationRef, Event, EventKind, LotRef
+from terezy.core.ledger.lots import Disposal, Lot, Position
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
@@ -31,6 +35,8 @@ from terezy.core.primitives.provenance import SourceRef
 from terezy.core.primitives.rates import RealRate, RealTermsUnavailable
 from terezy.core.results import canonical, project
 from terezy.core.results.project import Projection
+from terezy.core.routes import capacity
+from terezy.data import manifest
 from tests import synthetic
 
 UAH = Currency.UAH
@@ -165,3 +171,141 @@ def test_every_charge_names_the_class_that_produced_it() -> None:
         strict=True,
     ):
         assert rendered[5] == charge.tax_class_id
+
+
+# ---------------------------------------------------------------------------
+# The encoding tag moves whenever the canonical shape does
+# ---------------------------------------------------------------------------
+
+CANONICAL_SHAPE_BY_ENCODING = {
+    "terezy-canonical-v2": (
+        "((i,i,i),s,s,((s,(s,s),(s,s),(s,s))),"
+        "((s,s,(s,s),(s,s),((s,s,(i,i,i),s,(s,s),(s,s),s)))),"
+        "((i,(i,i,i),s,s,(s,s),(s,s),(s,s),(s,s),(s,s),(s,s),(s,s),(s,s),((s,s)),(s,s,s))),"
+        "((i,(i,i,i),s,(s,s),s,(s,s,s),(s,s),s,i,s)),"
+        "((s,i,i,(s,s))))"
+    ),
+}
+"""One recorded shape fingerprint per encoding tag, and exactly one entry: the current tag.
+
+The reproducibility contract (``manifest.ENCODING``'s own docstring): *bump it when the
+encoding changes shape; every previously recorded digest then visibly belongs to a
+different scheme instead of silently disagreeing*. Feature 002 broke that once -- the
+canonical tuple gained ``capacity_pool`` and the capacity accumulator while the tag stayed
+``terezy-canonical-v1``, so pre-002 digests silently disagreed under an unchanged name.
+This pinned pair is what makes the next such change a red test naming the remedy.
+"""
+
+
+def _shape(value: ledger_canonical.Canonical) -> str:
+    """The structure of a canonical value with its content erased: arity and types only.
+
+    ``None`` renders as ``0``, an integer as ``i``, a string as ``s``, and a tuple as its
+    elements' shapes in parentheses -- so two canonical forms have equal shapes exactly
+    when they differ only in content, which is what a digest scheme's identity is.
+    """
+    if value is None:
+        return "0"
+    if isinstance(value, int):
+        return "i"
+    if isinstance(value, str):
+        return "s"
+    return "(" + ",".join(_shape(element) for element in value) + ")"
+
+
+def _representative_state() -> engine.LedgerState:
+    """One ledger state with every optional branch populated, exactly once each.
+
+    Hand-built rather than folded so the fingerprint depends on the *shape* of the
+    canonical form alone and not on how many coupons a fixture happens to pay: one
+    account, one position with one lot, one disposal, one event, one capacity entry, and
+    no ``None`` anywhere a record could carry a value -- an optional field left absent
+    would hide its populated shape from the fingerprint.
+    """
+    sources = prov.EMPTY
+    cause = CausationRef(kind=CausationKind.ROUTE_TERM, id="fixture", detail="shape fixture")
+    one = Money(1.0, UAH, sources)
+    lot = Lot(
+        lot_id="lot-1",
+        instrument_id="fixture",
+        acquired_on=date(2026, 8, 21),
+        quantity=1.0,
+        cost_trade_ccy=one,
+        cost_base_ccy=one,
+        fx_rate_used=1.0,
+    )
+    return engine.LedgerState(
+        as_of=date(2026, 8, 21),
+        base_currency=UAH,
+        consumption_method="fifo",
+        accounts={
+            UAH: CashBalance(currency=UAH, inflows=one, outflows=one, balance=one),
+        },
+        positions={
+            "fixture": Position(
+                instrument_id="fixture",
+                quantity=1.0,
+                basis_trade_ccy=one,
+                basis_base_ccy=one,
+                lots=(lot,),
+            )
+        },
+        disposals=(
+            Disposal(
+                sequence=1,
+                occurred_on=date(2026, 8, 21),
+                instrument_id="fixture",
+                quantity=1.0,
+                proceeds_trade_ccy=one,
+                proceeds_base_ccy=one,
+                consumed_basis_trade_ccy=one,
+                consumed_basis_base_ccy=one,
+                allocated_fees_trade_ccy=one,
+                allocated_fees_base_ccy=one,
+                realised_gain_trade_ccy=one,
+                realised_gain_base_ccy=one,
+                consumed_from=(("lot-1", 1.0),),
+                caused_by=cause,
+            ),
+        ),
+        applied=(
+            Event(
+                sequence=1,
+                occurred_on=date(2026, 8, 21),
+                kind=EventKind.RAMP_MOVEMENT,
+                amount=one,
+                owner_id="owner-1",
+                caused_by=cause,
+                lot_ref=LotRef(instrument_id="fixture", lot_id="lot-1"),
+                quantity=1.0,
+                allocated_to=1,
+                capacity_pool="fixture_rail",
+            ),
+        ),
+        capacity={capacity.CapacityKey(pool="fixture_rail", year=2026, month=8): one},
+    )
+
+
+def test_the_encoding_tag_moves_whenever_the_canonical_shape_does() -> None:
+    """The reproducibility contract, made mechanical (manifest.py's own promise).
+
+    A digest is comparable only against digests of the same scheme, and the scheme is
+    named by ``manifest.ENCODING``. So a change to the canonical tuple's shape under an
+    unchanged tag makes old and new digests silently disagree while claiming one scheme --
+    which is exactly what a golden digest flipping under an unchanged tag looks like. This
+    test fails on either half changing alone, and its message says which line to move.
+    """
+    fingerprint = _shape(ledger_canonical.of_result(_representative_state()))
+    assert manifest.ENCODING in CANONICAL_SHAPE_BY_ENCODING, (
+        f"manifest.ENCODING is {manifest.ENCODING!r}, which this test does not know. "
+        "Record the tag with its shape fingerprint in CANONICAL_SHAPE_BY_ENCODING -- and "
+        "keep exactly one entry, because a digest names the scheme it was taken under."
+    )
+    assert CANONICAL_SHAPE_BY_ENCODING[manifest.ENCODING] == fingerprint, (
+        "the canonical tuple's shape changed while manifest.ENCODING stayed "
+        f"{manifest.ENCODING!r}. Every previously recorded digest would now silently "
+        "disagree under an unchanged scheme name. Bump ENCODING to the next version, "
+        "regenerate the golden artefacts by their documented procedure, and record the "
+        f"new shape here.\nrecorded: {CANONICAL_SHAPE_BY_ENCODING[manifest.ENCODING]}\n"
+        f"actual:   {fingerprint}"
+    )
