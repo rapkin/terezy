@@ -695,6 +695,12 @@ def _check_pools(
     one real limit means at least one of them is wrong, and picking either silently would be
     a guess -- so the error names both files and both legs.
 
+    **One currency, checked before the amounts.** A pool whose caps disagree about the
+    currency is a sharper defect than one whose caps disagree about the number: nothing can
+    accumulate consumption across two currencies without inventing a rate, and the amount
+    comparison itself would raise a currency mismatch naming neither file. So the currency
+    rule is its own refusal, first.
+
     ``core.routes.capacity.caps_of`` refuses the same disagreement within one route and
     raises, because reaching it means this check was bypassed.
     """
@@ -709,6 +715,20 @@ def _check_pools(
                 declared[leg.capacity_pool] = (route_id, leg.index, leg.monthly_cap)
                 continue
             first_route, first_index, first_cap = seen
+            if first_cap.currency is not leg.monthly_cap.currency:
+                raise DeclarationError(
+                    files[route_id],
+                    f"route.leg[{leg.index}].monthly_cap",
+                    f"declares its cap on capacity pool {leg.capacity_pool!r} in "
+                    f"{leg.monthly_cap.currency.value}, while leg {first_index} of route "
+                    f"{first_route!r} in {files[first_route]} declares the same pool's cap "
+                    f"in {first_cap.currency.value}. One rail has one limit in one "
+                    "currency: consumption cannot accumulate across two currencies without "
+                    "inventing a rate, and even comparing the two caps would raise a "
+                    "currency mismatch naming neither file.",
+                    "declare every leg naming this pool with its cap in one currency, or "
+                    "give the legs different pools if they really consume different limits",
+                )
             if money.compare(first_cap, leg.monthly_cap) != 0:
                 raise DeclarationError(
                     files[route_id],

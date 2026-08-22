@@ -1216,6 +1216,40 @@ class TestCapacityPools:
         assert "monobank_to_binance_p2p" in rendered
         assert "at least one of them is wrong" in raised.value.problem
 
+    def test_one_pool_with_caps_in_two_currencies_is_refused_naming_both_files(
+        self, tmp_path: Path
+    ) -> None:
+        """A rail has one limit in one currency, and the resolver says so with a location.
+
+        The mutation moves the p2p route's pool declaration from its UAH leg to its USD
+        leg, so the shared card pool is declared with a UAH cap in one file and a USD cap
+        in another. Without this rule the resolver's own comparison dies as a raw
+        CurrencyMismatchError naming no file at all -- and so would the ledger fold.
+        """
+        root = _root(tmp_path)
+        route_path = root / "routes" / "monobank_to_binance_p2p.toml"
+        text = route_path.read_text(encoding="utf-8")
+        text = _drop_line(text, 'capacity_pool          = "monobank_card_uah_usd"')
+        text = _drop_line(text, "monthly_cap            = 100000.0")
+        text = _replace(
+            text,
+            'kind                   = "transfer"',
+            'kind                   = "transfer"\n'
+            '  capacity_pool          = "monobank_card_uah_usd"\n'
+            "  monthly_cap            = 100000.0",
+        )
+        route_path.write_text(text, encoding="utf-8")
+        with pytest.raises(DeclarationError) as raised:
+            _resolve(root)
+        _assert_names_file_and_field(
+            raised.value, file=route_path, field_path="route.leg[1].monthly_cap"
+        )
+        rendered = str(raised.value)
+        assert "monobank_card_uah_usd" in rendered, "the reason names the pool"
+        assert "monobank_to_binance_card.toml" in rendered, "and the other file"
+        assert "UAH" in raised.value.problem
+        assert "USD" in raised.value.problem
+
     def test_a_cap_with_no_pool_is_refused(self, tmp_path: Path) -> None:
         broken = _without(tmp_path, P2P, '  capacity_pool          = "monobank_card_uah_usd"')
         with pytest.raises(DeclarationError) as raised:
