@@ -230,3 +230,62 @@ class TestADanglingPartnerIsNotAMissingRoundTrip:
         # And the one-way figure was not copied into its place: the record that occupies
         # the slot carries no number at all.
         assert not hasattr(costed.round_trip, "fraction")
+
+
+class TestAClosedExitPartnerIsNotACostableRoundTrip:
+    """FR-014 meets FR-030 at the exit: a declared way out that is closed is not a way out.
+
+    The inbound status is consulted before any leg is walked (``cost_one`` refuses a closed
+    inbound with its status recorded), and the exit's status deserves exactly the same
+    respect: an inbound whose declared partner is closed on the date has **no usable way
+    out**, and a confident ``RoundTripCost`` for it is a figure for a journey that cannot be
+    walked -- the class of number FR-030 exists to refuse. "Declared but closed" stays
+    distinct from "not declared": the reason names the partner and its status rather than
+    claiming nobody costed the exit.
+    """
+
+    def _costed_with_exit_status(self, status: str) -> RampCost:
+        graph = route_graphs.p2p_graph()
+        exit_id = graph.route.partner_route
+        assert exit_id is not None
+        routes = {
+            **graph.routes,
+            exit_id: dataclasses.replace(graph.routes[exit_id], status=status),  # type: ignore[arg-type]
+        }
+        costed = cost.cost_one(
+            graph.path,
+            Money(10_000.0, Currency.UAH, prov.EMPTY),
+            routes=routes,
+            channels=graph.channels,
+            streams=route_graphs.STREAMS,
+            kinds=route_graphs.KINDS,
+            on_date=route_graphs.ON_DATE,
+            as_of=route_graphs.AS_OF,
+        )
+        assert isinstance(costed, RampCost)
+        return costed
+
+    def test_a_closed_exit_partner_yields_no_round_trip_figure(self) -> None:
+        costed = self._costed_with_exit_status("closed")
+        assert isinstance(costed.round_trip, ExitCostUnknown)
+        assert costed.round_trip.missing_partner_for == "monobank_to_binance_p2p"
+
+    def test_the_reason_names_the_partner_and_its_status_not_a_missing_declaration(
+        self,
+    ) -> None:
+        # "Declared but closed" and "not declared" are different facts the owner acts on
+        # differently: one is a corridor that shut, the other a declaration nobody wrote.
+        costed = self._costed_with_exit_status("closed")
+        assert isinstance(costed.round_trip, ExitCostUnknown)
+        reason = costed.round_trip.reason
+        assert "binance_p2p_to_monobank" in reason, "the reason names the partner"
+        assert "closed" in reason, "and its status"
+        assert "declares no partner_route" not in reason, (
+            "a closed exit must not be reported as an undeclared one"
+        )
+
+    def test_a_constrained_exit_partner_is_still_costed(self) -> None:
+        # The mirror image, so the check cannot be over-broad: a constrained route is
+        # costed and reported as constrained (FR-014 excludes only what carries nothing).
+        costed = self._costed_with_exit_status("constrained")
+        assert isinstance(costed.round_trip, RoundTripCost)

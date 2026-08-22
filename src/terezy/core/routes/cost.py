@@ -630,9 +630,12 @@ def _round_trip(
     enters the exit route, with nothing re-derived in between.
 
     A route with no declared partner yields :class:`ExitCostUnknown` (FR-030). So does a
-    partner that will not carry what arrived -- the reason says which, because "nobody
-    declared the way out" and "the way out will not take this much" are different facts and
-    the owner acts on them differently. In neither case is the one-way figure promoted.
+    partner that is **declared closed** -- a way out that carries nothing on the date is not
+    a usable way out, and a confident round-trip figure through it would price a journey
+    that cannot be walked -- and so does a partner that will not carry what arrived. The
+    reason says which, because "nobody declared the way out", "the way out is closed" and
+    "the way out will not take this much" are different facts and the owner acts on them
+    differently. In no case is the one-way figure promoted.
     """
     if route.partner_route is None:
         return ExitCostUnknown(
@@ -653,6 +656,21 @@ def _round_trip(
             f"has costed the exit. Known routes: {sorted(routes)}"
         )
     partner = routes[route.partner_route]
+    if partner.status == "closed":
+        # The same respect ``cost_one`` pays the inbound status, at the seam where it was
+        # missing: a closed exit is a declared fact that the way out carries nothing on this
+        # date. Distinct from "not declared" -- the reason names the partner and its status,
+        # so a corridor that shut is never reported as a declaration nobody wrote (FR-014).
+        return ExitCostUnknown(
+            reason=(
+                f"exit route {partner.id!r} is declared closed, so it carries nothing on "
+                f"{on_date.isoformat()}: the way out is declared and is not usable. There "
+                "is therefore no round-trip figure for this path, and the one-way figure "
+                "is not promoted into its place (FR-030); the exclusion is recorded rather "
+                "than silent (FR-014)."
+            ),
+            missing_partner_for=route.id,
+        )
     exited = _walk(
         partner.legs,
         walk,
