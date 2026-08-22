@@ -1,0 +1,59 @@
+# The feature dependency graph. Parseable with tomllib; semantics in specs/README.md.
+#
+# status: spec | planned | in-progress | done
+#   spec         spec.md exists, clarifications resolved
+#   planned      plan.md + tasks.md exist
+#   in-progress  implementation started
+#   done         landed on main, required-test rows flipped
+#
+# needs: features that must be `done` on main before THIS feature's implementation
+# starts. Spec-writing is always parallelisable and ignores `needs`.
+# Two features are parallelisable iff neither transitively needs the other.
+
+[[feature]]
+id     = "001-ovdp-hurdle-rate"
+status = "done"
+needs  = []
+
+[[feature]]
+id     = "002-ramp-cost"
+status = "in-progress"
+needs  = ["001-ovdp-hurdle-rate"]
+
+[[feature]]
+id     = "003-route-coverage"
+status = "spec"
+needs  = ["002-ramp-cost"]
+
+[[feature]]
+id     = "004-composed-paths"
+status = "spec"
+needs  = ["002-ramp-cost", "003-route-coverage"]
+why    = "the spendable-endpoint list is declared by 003 (its FR-004); 004's composed exit chains end there (its FR-022)"
+
+[[feature]]
+id     = "005-route-diagrams"
+status = "spec"
+needs  = ["002-ramp-cost"]
+
+# Named future work — seams already recorded inside landed specs, not yet features.
+
+[[future]]
+id    = "cpi-real-terms"
+after = ["001-ovdp-hurdle-rate"]
+note  = "fill HurdleRate.real; 001 FR-022 reserved the slot"
+
+[[future]]
+id    = "coverage-enforcement"
+after = ["003-route-coverage"]
+note  = "advisory -> binding: ranking excludes non-spendable exits; 003 FR-019 deferral"
+
+[[future]]
+id    = "instrument-access-nodes"
+after = ["004-composed-paths"]
+note  = "instruments as terminal nodes; 004 FR-014 deferral, owner-confirmed future need"
+
+[[future]]
+id    = "fx-tax-asymmetry-f1"
+after = ["002-ramp-cost"]
+note  = "flat-in-USD posts taxable UAH gain; needs a taxable foreign instrument + dated official rates"

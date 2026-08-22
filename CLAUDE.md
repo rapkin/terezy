@@ -23,6 +23,11 @@ Work flows through Spec Kit: `/speckit-specify` → `/speckit-clarify` → `/spe
 → `/speckit-tasks` → `/speckit-implement`. **Do not implement a feature that has no
 specification in `specs/`.**
 
+**Feature order and parallelism** are declared in `specs/features.toml` (parseable, no
+dependencies), and the per-feature lifecycle — worktree, Spec Kit, gates, review,
+squash-landing — is `specs/README.md`. Do not start implementing a feature whose
+`needs` are not `done` on `main`; spec-writing is always parallelisable.
+
 When a specification is ambiguous, clarify. Do not guess — and never guess a legal, tax
 or fee value. Those come from a cited public source entered as data, or they do not go
 in at all.
