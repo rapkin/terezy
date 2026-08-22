@@ -182,12 +182,12 @@ named no-inbound deficits and nothing in `src/` changed.
 
 ### Tests for User Story 4 (write first, watch them fail)
 
-- [ ] T033 [US4] Write `tests/contract/test_coverage_data_only.py` (marker `contract`) — **SC-014, SC-019, SC-015**. Copy `data/` into a scratch root, add a venue declaring two currencies and no routes, resolve and report: two new destinations appear, each with a named `no_inbound` deficit per stream, **zero lines of source changed** (SC-014). Add a venue to `data/spendable/` in the scratch root and assert an exit ending in UAH there flips from `exit_not_spendable` to ready — a data change only (SC-019). Assert a ready verdict resting only on a `closed` route has `rests_on == "closed_only"`, one resting on an open route has `"open"`, and both are distinct from a hole (SC-015). Also assert, greppably, that no module under `src/terezy/core/routes/coverage.py` or `src/terezy/core/results/coverage.py` names a venue, route or stream id, on the pattern of `tests/contract/test_route_data_only.py`.
+- [X] T033 [US4] Write `tests/contract/test_coverage_data_only.py` (marker `contract`) — **SC-014, SC-019, SC-015**. Copy `data/` into a scratch root, add a venue declaring two currencies and no routes, resolve and report: two new destinations appear, each with a named `no_inbound` deficit per stream, **zero lines of source changed** (SC-014). Add a venue to `data/spendable/` in the scratch root and assert an exit ending in UAH there flips from `exit_not_spendable` to ready — a data change only (SC-019). Assert a ready verdict resting only on a `closed` route has `rests_on == "closed_only"`, one resting on an open route has `"open"`, and both are distinct from a hole (SC-015). Also assert, greppably, that no module under `src/terezy/core/routes/coverage.py` or `src/terezy/core/results/coverage.py` names a venue, route or stream id, on the pattern of `tests/contract/test_route_data_only.py`.
 
 ### Implementation for User Story 4
 
-- [ ] T034 [US4] Fix whatever T033 exposes in `src/terezy/core/routes/coverage.py` or the data layer. **No new branch per venue, corridor or currency** — if a fix wants one, the design is wrong and the fix belongs in `data/` (Principle II). Expected to be a no-op if T014–T031 held the line; the task exists so the check is run rather than assumed.
-- [ ] T035 [US4] Run T033 green, then the full gate set. **Checkpoint — commit** (`/commit`): data-only extensibility verified.
+- [X] T034 [US4] (no-op, as expected) Fix whatever T033 exposes in `src/terezy/core/routes/coverage.py` or the data layer. **No new branch per venue, corridor or currency** — if a fix wants one, the design is wrong and the fix belongs in `data/` (Principle II). Expected to be a no-op if T014–T031 held the line; the task exists so the check is run rather than assumed.
+- [X] T035 [US4] Run T033 green, then the full gate set. **Checkpoint — commit** (`/commit`): data-only extensibility verified.
 
 **Checkpoint**: growing the registry is a data change, proved by doing it.
 
