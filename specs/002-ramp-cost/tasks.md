@@ -104,11 +104,11 @@ against hand arithmetic.
 **Goal**: the same acquisition costs almost nothing from one stream and several percent from
 the other, and no cost is attributable to a destination alone.
 
-- [ ] T023 [US2] Write `tests/worked_examples/test_two_streams.py` — the **G1** example: the same USD acquisition funded from the UAH salary and from the USD contract income differs by exactly the hand-computed ramp cost. Arithmetic checked in. Closes **G1**, **SC-003**. Must fail first
-- [ ] T024 [US2] Implement `src/terezy/core/streams/streams.py` — `IncomeStream`, `Indexation`, and `deployable(stream)` returning the amount net of any declared income tax. Closes **FR-006**, **FR-007**
-- [ ] T025 [P] [US2] Write `tests/unit/test_deployable_capacity.py` — an undeclared `income_tax_rate` is **`None`, not zero**, and the output says "no rate declared" rather than showing a net figure that quietly equals the gross. Closes part of **FR-007**
-- [ ] T026 [P] [US2] Write `tests/unit/test_usd_stream_converts_nothing.py` — a route from the USD stream with no `fx` leg reports a conversion component of **exactly** zero, not a small residual. Closes **FR-009**, **SC-006**
-- [ ] T027 [P] [US2] Write `tests/unit/test_stream_venue_mismatch.py` — a route whose `origin` differs from the stream's `arrives_at` is reported, never assumed away. Closes a spec edge case
+- [x] T023 [US2] Write `tests/worked_examples/test_two_streams.py` — the **G1** example: the same USD acquisition funded from the UAH salary and from the USD contract income differs by exactly the hand-computed ramp cost. Arithmetic checked in. Closes **G1**, **SC-003**. Must fail first
+- [x] T024 [US2] Implement `src/terezy/core/streams/streams.py` — `IncomeStream`, `Indexation`, and `deployable(stream)` returning the amount net of any declared income tax. Closes **FR-006**, **FR-007**
+- [x] T025 [P] [US2] Write `tests/unit/test_deployable_capacity.py` — an undeclared `income_tax_rate` is **`None`, not zero**, and the output says "no rate declared" rather than showing a net figure that quietly equals the gross. Closes part of **FR-007**
+- [x] T026 [P] [US2] Write `tests/unit/test_usd_stream_converts_nothing.py` — a route from the USD stream with no `fx` leg reports a conversion component of **exactly** zero, not a small residual. Closes **FR-009**, **SC-006**
+- [x] T027 [P] [US2] Write `tests/unit/test_stream_venue_mismatch.py` — a route whose `origin` differs from the stream's `arrives_at` is reported, never assumed away. Closes a spec edge case
 
 **Checkpoint**: commit.
 

@@ -22,7 +22,7 @@ failed once in this project, on ``nominal_ytm`` in feature 001.
 **What this test adds on top of the type.** mypy enforces the triple at every call site that
 exists. It cannot notice a *new* signature that reintroduces the per-destination shape, since
 such a signature is perfectly well typed. So this module reads every public callable in
-``terezy.core.routes`` and fails on any that accepts a destination without also accepting a
+``terezy.core`` and fails on any that accepts a destination without also accepting a
 stream and a route. It is a structural scan, and its own ability to fail is asserted at the
 bottom -- a scan that silently matches nothing passes forever and protects nothing.
 
@@ -49,12 +49,13 @@ import dataclasses
 import importlib
 import inspect
 import pkgutil
+import re
 from collections.abc import Iterator, Sequence
 from typing import Any, get_type_hints
 
 import pytest
 
-import terezy.core.routes
+import terezy.core
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
@@ -104,27 +105,48 @@ mention ``FundingPath``, so ``def cost_via(path: str) -> RampCost`` no longer pa
 stricter than the first version of this scan, which matched on the name alone.
 """
 
-COST_FIGURE_NAMES = frozenset(
-    {"sent", "arrived", "fraction", "components", "one_way", "round_trip", "cost"}
-)
-"""Field names that make a record a *computed cost* rather than a declaration.
+COST_FIGURE_NAMES = frozenset({"sent", "arrived", "fraction", "components"})
+"""Field names that make a record a *computed access cost* rather than a declaration.
 
 A ``Route`` names a destination because a route is a corridor from one place to another. A
-record holding what was sent and what arrived is pricing that corridor, and pricing is the
-thing FR-008 requires to be keyed by all three terms.
+record holding what was **sent** and what **arrived**, with a fraction and an attribution, is
+pricing that corridor -- and pricing is what FR-008 requires to be keyed by all three terms.
+
+⚙ ``one_way``, ``round_trip`` and bare ``cost`` were removed when the scan widened from
+``core.routes`` to all of ``core``, and the removal is a **narrowing of the heuristic, not of
+the rule**:
+
+* ``one_way`` / ``round_trip`` name *fields that hold* a cost. The record holding them is
+  ``RampCost``, which carries the triple; requiring the holder to be keyed is right, and it is
+  what :data:`COST_FIGURE_NAMES`\'s remaining members already catch on the held records
+  themselves via :func:`_inherits_a_key`.
+* bare ``cost`` matched ``Holding.cost`` from feature 001 -- an **acquisition** cost, the basis
+  of a purchase. FR-008 is about **access** cost, what it costs to get money to where an
+  instrument is. A purchase price is not a ramp, and demanding a funding triple on a cost
+  basis would be enforcing the wrong requirement while looking like enforcement.
+
+The distinction that survives: a record priced *by this feature* states what went in and what
+came out. Nothing else does.
 """
 
 
 def _modules() -> Iterator[Any]:
-    """Every module in ``terezy.core.routes``, including ones added after this was written.
+    """Every module under ``terezy.core``, recursively.
 
-    Walked rather than listed. A hand-written list of modules stops covering the package the
-    moment someone adds a file, and it stops silently -- which is the failure mode this whole
-    module exists to prevent one level up.
+    Walked rather than listed. A hand-written list stops covering the package the moment
+    someone adds a file, and it stops silently -- which is the failure mode this whole module
+    exists to prevent one level up.
+
+    **The reach was widened from ``terezy.core.routes`` to all of ``terezy.core``.** FR-008 is
+    about *any* cost figure, and the narrower walk meant a costing function added under
+    ``core/streams``, ``core/results`` or anywhere else escaped the scan entirely. Nothing was
+    wrong when the gap was found -- ``streams.deployable`` returns capacity, not cost -- but a
+    guard whose reach is narrower than the requirement it guards is a guard that will one day
+    pass while the requirement is broken.
     """
-    yield terezy.core.routes
-    for info in pkgutil.iter_modules(terezy.core.routes.__path__):
-        yield importlib.import_module(f"terezy.core.routes.{info.name}")
+    yield terezy.core
+    for info in pkgutil.walk_packages(terezy.core.__path__, prefix="terezy.core."):
+        yield importlib.import_module(info.name)
 
 
 def _public_callables() -> Iterator[tuple[str, Any]]:
@@ -164,7 +186,7 @@ def _accepts_a_bare_destination(target: Any) -> bool:
     return not (names & STREAM_NAMES and names & ROUTE_NAMES)
 
 
-def test_no_public_function_in_core_routes_accepts_a_destination_alone() -> None:
+def test_no_public_function_in_core_accepts_a_destination_alone() -> None:
     """The scan FR-008 asks for, over every function in the package.
 
     A failure here is not a style problem. It is a signature in which the §4.3.1 finding
@@ -182,6 +204,58 @@ def test_no_public_function_in_core_routes_accepts_a_destination_alone() -> None
     )
 
 
+def _is_keyed(target: type) -> bool:
+    """Whether a record carries the whole triple, however it spells it."""
+    fields = {field.name for field in dataclasses.fields(target)}
+    return "path" in fields or {"destination_id", "stream_id", "route_id"} <= fields
+
+
+def _records_nested_in_keyed_records() -> frozenset[str]:
+    """Names of records that appear as a field of some record that IS keyed.
+
+    **Computed, never listed.** A record nested inside a keyed one is keyed *by its parent*:
+    ``OneWayCost`` sits on ``RampCost``, which carries the ``FundingPath``, so there is exactly
+    one triple per result and reading either figure tells you which funding path it belongs to.
+
+    Requiring the nested records to carry their own copy would put the same key in a result
+    three times -- and duplicated facts disagree, which is the reason ``IncomeStream.currency``
+    was removed one commit ago. The exemption is derived from the field graph rather than
+    written down, so a new nested cost record inherits it automatically and a cost record that
+    is *not* nested inside anything keyed does not.
+    """
+    nested: set[str] = set()
+    for _, target in _public_callables():
+        if not (inspect.isclass(target) and dataclasses.is_dataclass(target)):
+            continue
+        if not _is_keyed(target):
+            continue
+        for field in dataclasses.fields(target):
+            nested.update(re.findall(r"[A-Z]\w+", str(field.type)))
+    return frozenset(nested)
+
+
+def _selects_rather_than_produces(target: Any) -> bool:
+    """Whether a callable *picks out* an already-keyed cost instead of computing one.
+
+    ``recommended_cost(ranking)`` returns a ``RampCost`` that ``cost_one`` already built and
+    already keyed; it performs no arithmetic and has no path of its own to be keyed by.
+    Demanding a ``FundingPath`` from it would be asking a projection to re-state a key its
+    input carries -- and the honest signature, taking the container, is the one that makes
+    "the winner is one of the alternatives" expressible at all (research.md D3).
+
+    Recognised structurally: every parameter is annotated with a type that itself holds keyed
+    costs. A function taking an amount and a route does not qualify, whatever it returns.
+    """
+    parameters = inspect.signature(target).parameters
+    if not parameters:
+        return False
+    holders = {"Ranking"}
+    return all(
+        any(holder in str(parameter.annotation) for holder in holders)
+        for parameter in parameters.values()
+    )
+
+
 def test_no_record_carrying_a_cost_figure_is_keyed_by_a_destination_alone() -> None:
     """The record half of the same rule. A declaration may name a venue; a price may not.
 
@@ -190,15 +264,16 @@ def test_no_record_carrying_a_cost_figure_is_keyed_by_a_destination_alone() -> N
     a key that no longer says which income paid for the trip.
     """
     offenders = []
+    nested = _records_nested_in_keyed_records()
     for name, target in _public_callables():
         if not (inspect.isclass(target) and dataclasses.is_dataclass(target)):
             continue
         fields = {field.name for field in dataclasses.fields(target)}
         if not fields & COST_FIGURE_NAMES:
             continue
-        keyed = "path" in fields or {"destination_id", "stream_id", "route_id"} <= fields
-        if not keyed:
-            offenders.append(name)
+        if _is_keyed(target) or target.__name__ in nested:
+            continue
+        offenders.append(name)
     assert not offenders, (
         "these carry a computed cost without carrying the (destination x stream x route) "
         "key (FR-008): " + ", ".join(sorted(offenders))
@@ -217,8 +292,11 @@ def test_every_cost_returning_function_takes_the_whole_triple() -> None:
         if inspect.isclass(target):
             continue
         annotation = str(inspect.signature(target).return_annotation)
-        if any(cost in annotation for cost in COST_RETURNS) and not _takes_the_triple(target):
-            offenders.append(name)
+        if not any(cost in annotation for cost in COST_RETURNS):
+            continue
+        if _takes_the_triple(target) or _selects_rather_than_produces(target):
+            continue
+        offenders.append(name)
     assert not offenders, (
         "these return a cost without taking a FundingPath, so the cost they produce is "
         "not keyed by (destination x stream x route) (FR-008): " + ", ".join(sorted(offenders))
@@ -389,6 +467,7 @@ class TestTheTripleMustBeCoherentAndNotMerelyPresent:
             Money(1_000.0, Currency.UAH, prov.EMPTY),
             routes=graph.routes,
             channels=graph.channels,
+            streams=route_graphs.STREAMS,
             kinds=route_graphs.KINDS,
             on_date=route_graphs.ON_DATE,
             as_of=route_graphs.AS_OF,

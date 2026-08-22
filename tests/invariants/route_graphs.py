@@ -42,6 +42,7 @@ from terezy.core.primitives.staleness import ObservationKind
 from terezy.core.routes.channels import ChannelSide, FxChannel
 from terezy.core.routes.legs import FX, TRANSFER, Leg, Route, RouteStatus
 from terezy.core.routes.path import FundingPath
+from terezy.core.streams.streams import IncomeStream, Indexation
 
 ON_DATE = date(2026, 8, 21)
 """When the money moves, in every generated case. Data, never a clock."""
@@ -88,6 +89,63 @@ at 20 days old the premium is stale and the fee schedule is not."""
 CHANNEL_ID = "p2p"
 PAIR = (Currency.UAH, Currency.USD)
 """``(price currency, unit currency)``: the reference is UAH per USD."""
+
+OWNER_ID = "owner-001"
+"""The one owner. Carried from the first commit while there is exactly one (Principle VII)."""
+
+ORIGIN_VENUE = "venue_0"
+"""Where every fixture route starts, and therefore where both streams below arrive.
+
+**Both streams arriving at the same venue is deliberate, not a shortcut.** It is what makes
+the two-stream comparison a controlled experiment: same origin venue, same destination
+venue, same value deployed, and the *only* difference between the two funding paths is the
+currency the money arrived in -- which is exactly the variable §4.3.1's finding is about. It
+also makes the sharper point: a per-destination cost is wrong even when the venues on both
+sides are identical, because the term that differs is the stream. A multi-currency account
+holding both hryvnia and dollars is the ordinary case in any event -- it is what Monobank is.
+"""
+
+SALARY_UAH = IncomeStream(
+    id="salary_uah",
+    owner_id=OWNER_ID,
+    amount=Money(0.0, Currency.UAH, prov.EMPTY),
+    cadence="monthly",
+    arrives_at=ORIGIN_VENUE,
+    indexation=Indexation(policy="cpi", rate=None),
+    income_tax_rate=None,
+)
+"""The hryvnia salary. The stream that has to cross the ramp to reach a dollar asset.
+
+``amount`` is ``0.0`` and ``income_tax_rate`` is ``None`` because both are honestly unknown:
+``SIMULATOR_SPEC.md`` §11 item 3 records that the owner's monthly figures have not been
+stated, and ``None`` says *no rate has been declared* rather than asserting a zero one. No
+costing reads either field -- the amount to move is passed to ``cost_one`` explicitly -- so a
+fixture that invented them would be inventing numbers nothing needs. The tests that do need
+a stated amount or rate declare their own, and say there that they invented it.
+"""
+
+CONTRACT_USD = IncomeStream(
+    id="contract_usd",
+    owner_id=OWNER_ID,
+    amount=Money(0.0, Currency.USD, prov.EMPTY),
+    cadence="monthly",
+    arrives_at=ORIGIN_VENUE,
+    indexation=Indexation(policy="none", rate=None),
+    income_tax_rate=None,
+)
+"""The dollar contract income. The stream that needs no conversion at all, which is the
+whole of §4.2's structural point."""
+
+STREAMS: Mapping[str, IncomeStream] = {
+    SALARY_UAH.id: SALARY_UAH,
+    CONTRACT_USD.id: CONTRACT_USD,
+}
+"""The owner's declared streams, keyed by id -- what every ``cost_one`` call resolves a
+path's ``stream_id`` against.
+
+Two of them, in two currencies, because one stream makes the per-stream requirement
+untestable in exactly the way one currency made ``C5`` untestable in feature 001.
+"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -288,7 +346,7 @@ def route_graphs(
     return Graph(
         path=FundingPath(
             destination_id=inbound.destination,
-            stream_id="salary" if origin is Currency.UAH else "contract",
+            stream_id=SALARY_UAH.id if origin is Currency.UAH else CONTRACT_USD.id,
             route_id=inbound.id,
         ),
         route=inbound,
@@ -383,7 +441,9 @@ def zero_cost_graph(*, fixed_fee: float = 0.0, with_exit: bool = False) -> Graph
     )
     routes[route.id] = route
     return Graph(
-        path=FundingPath(destination_id=route.destination, stream_id="salary", route_id=route.id),
+        path=FundingPath(
+            destination_id=route.destination, stream_id=SALARY_UAH.id, route_id=route.id
+        ),
         route=route,
         routes=routes,
         channels={CHANNEL_ID: _channel(42.0, 0.0, 0.0)},
@@ -448,12 +508,66 @@ def p2p_graph(
     )
     return Graph(
         path=FundingPath(
-            destination_id=inbound.destination, stream_id="salary", route_id=inbound.id
+            destination_id=inbound.destination, stream_id=SALARY_UAH.id, route_id=inbound.id
         ),
         route=inbound,
         routes={inbound.id: inbound, exit_route.id: exit_route},
         channels={CHANNEL_ID: _channel(reference, buy_premium, sell_premium)},
         reference_rate=reference,
+    )
+
+
+def usd_direct_graph() -> Graph:
+    """The dollar stream's way in: one zero-fee ``transfer`` leg, and **no conversion at all**.
+
+    The other half of the **G1** comparison, and the reason the finding is a finding. It ends
+    at the same destination venue as :func:`p2p_graph` -- ``venue_1``, dollars at the
+    exchange -- and starts at the same origin venue. Same origin, same destination, same value
+    deployed; the only thing that differs is which stream funds it, and therefore whether a
+    hryvnia-to-dollar conversion has to happen at all.
+
+    There is deliberately **no** ``fx`` leg and the leg names **no channel**, so nothing in
+    this route consults a rate. That is what makes FR-009's *exactly* zero exact rather than
+    small: no conversion happens, so there is no spread to round. The channel is still
+    declared in the returned graph, which is the stronger statement -- a channel being
+    available does not make a conversion happen.
+
+    ``partner_route`` is ``None``, and that is honest rather than lazy: nobody has declared
+    how dollars at an exchange get back to spendable hryvnia, and §4.2 notes that converting
+    the dollar stream *to* hryvnia is the expensive direction. So the round trip is
+    ``ExitCostUnknown`` (FR-030) and this route is not comparison-ready -- which is exactly
+    what the owner should be told about it.
+    """
+    route = Route(
+        id="usd_direct_to_binance",
+        provider="Binance",
+        origin=ORIGIN_VENUE,
+        destination="venue_1",
+        direction="inbound",
+        partner_route=None,
+        status="open",
+        legs=(
+            _leg(
+                index=0,
+                kind=TRANSFER,
+                from_ccy=Currency.USD,
+                to_ccy=Currency.USD,
+                fee_pct=0.0,
+                fee_fixed=0.0,
+                minimum=None,
+            ),
+        ),
+    )
+    return Graph(
+        path=FundingPath(
+            destination_id=route.destination,
+            stream_id=CONTRACT_USD.id,
+            route_id=route.id,
+        ),
+        route=route,
+        routes={route.id: route},
+        channels={CHANNEL_ID: _channel(42.0, 3.0, -3.0)},
+        reference_rate=42.0,
     )
 
 
@@ -491,7 +605,9 @@ def capped_graph(
         legs=legs,
     )
     return Graph(
-        path=FundingPath(destination_id=route.destination, stream_id="salary", route_id=route.id),
+        path=FundingPath(
+            destination_id=route.destination, stream_id=SALARY_UAH.id, route_id=route.id
+        ),
         route=route,
         routes={route.id: route},
         channels={CHANNEL_ID: _channel(42.0, 0.0, 0.0)},

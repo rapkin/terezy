@@ -2,8 +2,8 @@
 
 **Date**: 2026-08-22
 
-Thirteen decisions. D10–D12 were added after an external review of the artifacts; D13 during
-implementation. Each records what was chosen, why, and what was rejected. No
+Fourteen decisions. D10–D12 were added after an external review of the artifacts; D13 during
+implementation, D14 during US2. Each records what was chosen, why, and what was rejected. No
 `NEEDS CLARIFICATION` remains — the spec's three were resolved by the owner before
 planning; everything below is a design question.
 
@@ -393,3 +393,42 @@ rather than a value standing in for it.
 **`NothingComparable` distinguishes four cases** in its reason — nothing was offered, all
 were refused, all lacked an exit route, or a mix — because the owner acts differently on
 each, and "no comparison available" alone would tell him nothing about what to fix.
+
+## D14 — One ranking spans one currency; comparing streams is a composition
+
+**The constraint implementation surfaced**, and no document had stated it: `rank` takes one
+`amount`, and `cost_one` refuses an amount that is not in its stream's currency. So every path
+in a single `rank` call must be funded by streams of the same currency. US2's second
+acceptance scenario — "when no stream is named, the tool reports a cost per stream rather than
+one blended figure" — is therefore **two rankings plus a stated valuation**, composed at the
+API layer, not one call.
+
+**Decision**: leave it that way, and write it down.
+
+**Rationale**: comparing "10 000 UAH through the P2P route" against "238 USD through the
+direct route" requires asserting that 238 USD *is* 10 000 UAH. That is a **valuation** — a
+judgement about which rate makes two amounts equivalent — and not a transaction: nothing
+crosses, no channel side is taken, no spread is paid. FR-010 forbids leaving a rate implicit
+in a transaction, and burying one inside `rank` so the signature could take a single amount
+would be doing exactly that, one level up and harder to see.
+
+Forcing the caller to state the valuation is the honest shape. It is also the shape FR-008
+already implies: if a cost is only meaningful per `(destination × stream × route)`, then a
+single ranking over several streams has to answer "cheaper per what?" — and the answer is a
+number somebody chose.
+
+**What this obliges the API layer to do**, recorded here because nothing else says it: rank
+per stream, then present the results side by side with the valuation rate named as an input,
+never as a derived detail. G1's own test does precisely this — it deploys "the same value" at
+the reference rate and says so in the docstring rather than converting anything.
+
+**Alternatives rejected**:
+
+- *`rank(paths, amounts: Mapping[str, Money])`, one amount per stream.* Removes the constraint
+  and hides the valuation: the caller supplies two amounts and the ranking silently treats
+  them as comparable, which is the blended figure FR-008 forbids with extra steps.
+- *`rank` converts internally at a reference rate.* A transaction rate used for a comparison,
+  chosen by the engine rather than stated by the caller. FR-010's prohibition exists for
+  smaller sins than this.
+- *Refuse mixed-currency rankings loudly instead of by type.* Already the effect; making it a
+  runtime error rather than an unrepresentable call would be strictly weaker.

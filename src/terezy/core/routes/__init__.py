@@ -42,6 +42,16 @@ request. Nothing here is a fifth, because nothing here has pluggable *behaviour*
               partial form, which is how FR-008 makes a per-destination cost
               *unrepresentable* rather than merely discouraged.
 ``cost``      ``cost_one``, the **only** function that costs a route (FR-029).
+``ranking``   ``rank`` -- ``cost_one`` once per candidate, then a lexicographic order. No
+              arithmetic of its own, which is how FR-029 is kept structurally true.
+
+**Streams come from ``terezy.core.streams`` and are an input, not a member of this package.**
+``cost_one`` and ``rank`` both take the owner's declared streams, because a cost is per
+``(destination x stream x route)`` and the stream decides whether a conversion has to happen
+at all. The records stay in their own package: a stream is per-owner data while a route is a
+curated public fact, and that Principle VII boundary is worth more than the convenience of
+one package. The two meet here, in the module that already holds both and can report a
+mismatch between them.
 
 **No clock, ever.** The two dates that matter are parameters and they mean different
 things: ``on_date`` is when the money moves, ``as_of`` is when the question is asked.

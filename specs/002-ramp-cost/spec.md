@@ -95,6 +95,14 @@ cost.
    hand-computed ramp cost, and the USD-funded route performs no conversion at all.
 2. **Given** a request for the cost of reaching a destination, **When** no stream is
    named, **Then** the tool reports a cost per stream rather than one blended figure.
+
+   ⚙ **This is a composition, not one call**, and that turned out to matter enough to write
+   down (research.md D14). A single ranking spans one currency, because comparing 10 000 UAH
+   against 238 USD requires asserting the two are equivalent — a **valuation**, a judgement
+   about which rate makes that true, and not a transaction. Burying that rate inside the
+   ranking so its signature could take one amount would leave a rate implicit exactly where
+   FR-010 forbids it. So: rank per stream, then present side by side with the valuation rate
+   named as an input.
 3. **Given** a stream that declares an income-tax rate, **When** deployable capacity is
    reported, **Then** it is net of that rate, so the amount available to invest is not
    overstated.
@@ -189,6 +197,11 @@ against the existing ones with no source edit.
   USD) — a broken route, reported at load, never silently bridged.
 - **A route whose start does not match the stream's arrival venue** — a mismatch, reported
   rather than assumed away.
+- **A route whose first leg moves a currency the stream does not deliver** — ⚙ a *second*
+  dimension of the same mismatch, and one this list originally missed. With a multi-currency
+  arrival venue the venue check passes, and without this the disagreement surfaced several
+  legs later as a currency error naming two currencies and neither the stream nor the
+  route: a true message about the wrong thing.
 - **Fees exceeding the amount being moved** — reported as such. **Never clamped to zero**;
   the money must not vanish with no diagnostic (predecessor defect B13).
 - **A fixed fee on a very small amount** — cost as a percentage can exceed 100%; reported

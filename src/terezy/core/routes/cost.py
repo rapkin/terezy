@@ -74,6 +74,10 @@ channels quoting different references.
 
 * **Cost a destination without a stream and a route.** There is no signature for it; the key
   is a ``FundingPath`` triple with no partial form (FR-008).
+* **Assume a stream's money is already where the route begins.** A route whose ``origin`` is
+  not the stream's arrival venue, or whose first leg moves a currency the stream does not
+  deliver, is reported as unusable naming both sides (spec.md, Edge Cases). Costing it would
+  price a journey that skips its own first and most expensive step.
 * **Reverse the inbound route to get a round trip.** The exit route is declared, and a route
   with no ``partner_route`` yields ``ExitCostUnknown`` -- never the one-way figure promoted
   into its place (FR-027, FR-030).
@@ -119,6 +123,7 @@ from terezy.core.routes import legs as leg_module
 from terezy.core.routes.channels import FxChannel, Side
 from terezy.core.routes.legs import FX, Leg, LegOutcome, Route
 from terezy.core.routes.path import FundingPath
+from terezy.core.streams.streams import IncomeStream
 
 
 @dataclass(frozen=True, slots=True)
@@ -200,6 +205,24 @@ def _route_for(routes: Mapping[str, Route], path: FundingPath) -> Route:
     return route
 
 
+def _stream_for(streams: Mapping[str, IncomeStream], path: FundingPath) -> IncomeStream:
+    """The declared income stream a path names, or a raise naming what is known.
+
+    A raise rather than a typed failure, on exactly the reasoning of :func:`_route_for`: a
+    funding path is built *from* the owner's declared streams, so a ``stream_id`` that does
+    not resolve means the caller assembled a path for a stream nobody declared. That is a
+    construction error rather than a fact about the money, and reporting it as a cost failure
+    would invite callers to keep building unresolvable paths and read the answer as a cost.
+    """
+    if path.stream_id not in streams:
+        raise KeyError(
+            f"unknown income stream {path.stream_id!r}: a funding path names a declared "
+            f"stream, because which stream funds a purchase is part of what a cost is "
+            f"(FR-008). Known streams: {sorted(streams)}"
+        )
+    return streams[path.stream_id]
+
+
 def _initial(amount: Money) -> _Walk:
     """A walk that has spent nothing, in the currency the money starts in."""
     currency = amount.currency
@@ -242,6 +265,56 @@ def _unusable(
         shortfall=shortfall,
         reason=reason,
     )
+
+
+def _funding_mismatch(
+    stream: IncomeStream, route: Route, path: FundingPath
+) -> RouteUnusable | None:
+    """Whether this stream's money can start down this route at all.
+
+    Two ways it cannot, and each is a *mismatch reported rather than assumed away* (spec.md,
+    Edge Cases). Both are facts about a declared pair rather than errors in the caller's
+    arithmetic, which is why they come back as :class:`RouteUnusable` naming what disagreed:
+    the owner's remedy is to declare a route from where his money actually lands, and a
+    refusal that names both ends says so without further investigation.
+
+    * **The venue.** A route whose ``origin`` is not where the stream's money arrives cannot
+      carry it. Costing it anyway would price a journey that starts with the money already
+      somewhere it is not -- the cost of getting it *there* being exactly the term this
+      feature exists to stop leaving out.
+    * **The currency.** A stream delivering dollars cannot start down a route whose first leg
+      moves hryvnia, even at the same venue -- and a multi-currency account is the ordinary
+      case, so the venues matching proves nothing about the currencies. Without this check the
+      arithmetic would fail several legs later inside ``money.sub``, as a currency mismatch
+      naming two currencies and neither the stream nor the route: a true message about the
+      wrong thing.
+
+    The first leg is the one that matters because it is the leg the stream's money enters. A
+    route with no legs is refused at load and never costed as free (data-model.md), so the
+    guard on ``route.legs`` here is only to keep that load-time defect from arriving as an
+    ``IndexError`` rather than as the error it is.
+    """
+    if route.origin != stream.arrives_at:
+        return _unusable(
+            path,
+            "stream.arrives_at",
+            f"stream {stream.id!r} arrives at venue {stream.arrives_at!r}, but route "
+            f"{route.id!r} starts at venue {route.origin!r}. The money is not where this "
+            "route begins, so the route cannot carry it: the mismatch is reported rather "
+            "than assumed away, because assuming it away would price a journey that skips "
+            "the part nobody has costed.",
+        )
+    if route.legs and stream.amount.currency is not route.legs[0].from_ccy:
+        return _unusable(
+            path,
+            "stream.amount.currency",
+            f"stream {stream.id!r} delivers {stream.amount.currency.value} at venue "
+            f"{stream.arrives_at!r}, but leg {route.legs[0].index} of route {route.id!r} "
+            f"moves {route.legs[0].from_ccy.value} out of it. Arriving at the right venue in "
+            "the wrong currency is still a mismatch, and no conversion is invented to bridge "
+            "it -- a conversion is a declared leg with a declared channel (FR-010).",
+        )
+    return None
 
 
 def _availability(leg: Leg, path: FundingPath, on_date: date) -> RouteUnusable | None:
@@ -589,6 +662,7 @@ def cost_one(
     *,
     routes: Mapping[str, Route],
     channels: Mapping[str, FxChannel],
+    streams: Mapping[str, IncomeStream],
     kinds: Mapping[str, ObservationKind],
     on_date: date,
     as_of: date,
@@ -608,13 +682,31 @@ def cost_one(
     a different route, declared separately (FR-027) -- so it can only be a caller's arithmetic
     error, and costing it would produce a negative cost that looks like a gain.
 
-    **Two arguments the contract in ``contracts/route-costing.md`` also names are not here
-    yet, and their absence is deliberate rather than an oversight.** ``streams`` arrives with
-    User Story 2, which is what makes the stream/venue mismatch reportable and deployable
-    capacity net of income tax computable; ``capacity_used`` arrives with User Story 3, which
-    is where the monthly-cap accumulator lives. Both are feasibility inputs that produce more
-    ``RouteUnusable`` reasons; neither changes an arithmetic already implemented, so adding
-    them is an extension of this signature and not a second code path through it.
+    **The order the refusals are checked in is deliberate**, because two of them can be true
+    at once and the one reported should be the one the owner acts on first. They run from the
+    least dependent on circumstance to the most: the path's own coherence (a raise -- three ids
+    that do not describe one journey are not a question about money), then the stream against
+    the route (true on every date and at every amount), then the route's status (true on this
+    date), then each leg's window and limits (true of this amount on this date). A funding path
+    whose stream does not reach its route is reported as such even if the route also happens to
+    be closed, because declaring a route from where the money actually lands is the owner's
+    next move either way.
+
+    **``streams`` landed here with User Story 2, and it landed in ``rank`` in the same
+    change.** ``contracts/route-costing.md`` requires the two together: had ranking costed its
+    candidates through a signature that did not know about streams while this one did, the
+    winner and the alternatives would have been priced by two different functions -- the second
+    code path FR-029 exists to forbid. ``capacity_used`` is still to come, with the monthly-cap
+    accumulator of User Story 3 (T029), and will be added to both signatures together for the
+    same reason.
+
+    ``amount`` and ``streams`` are separate arguments and the amount must be in the named
+    stream's currency; a disagreement raises. The amount is deliberately not read off the
+    stream: what to move is a decision (a whole month's arrival, a part of it, a figure from
+    :func:`terezy.core.streams.streams.deployable`), while the stream says where money lands
+    and in what currency. What the two may not do is disagree about the currency, because then
+    the cost would be attributed to a stream that never delivered the money being costed --
+    and the stream is the term that carries the finding (FR-008).
     """
     if amount.amount < 0.0:
         raise ValueError(
@@ -624,6 +716,19 @@ def cost_one(
             "the caller, and costing it would report a negative cost that reads as a gain"
         )
     route = _route_for(routes, path)
+    stream = _stream_for(streams, path)
+    if amount.currency is not stream.amount.currency:
+        raise ValueError(
+            f"an amount of {amount.amount!r} {amount.currency.value} cannot be funded from "
+            f"stream {stream.id!r}, which delivers {stream.amount.currency.value}: the stream is "
+            "part of what a cost *is* (FR-008), so costing money the named stream never "
+            "delivered would attribute a real figure to the wrong income. Like a currency "
+            "mismatch in ``money``, this is a caller's error rather than a fact about the "
+            "money, so it raises rather than returning a cost or a refusal."
+        )
+    mismatched = _funding_mismatch(stream, route, path)
+    if mismatched is not None:
+        return mismatched
     if route.status == "closed":
         return _unusable(
             path,

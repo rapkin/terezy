@@ -107,6 +107,7 @@ def _cost(graph: route_graphs.Graph, *, amount: float = SENT) -> RampCost:
         Money(amount, Currency.UAH, prov.EMPTY),
         routes=graph.routes,
         channels=graph.channels,
+        streams=route_graphs.STREAMS,
         kinds=route_graphs.KINDS,
         on_date=route_graphs.ON_DATE,
         as_of=route_graphs.AS_OF,
@@ -300,6 +301,7 @@ class TestTheFindingTheFeatureExistsFor:
             # silently pick one "p2p" channel over the other, and the one that lost would
             # be the one carrying the premium under test.
             channels=offshore.channels,
+            streams=route_graphs.STREAMS,
             kinds=route_graphs.KINDS,
             on_date=route_graphs.ON_DATE,
             as_of=route_graphs.AS_OF,

@@ -83,7 +83,7 @@ coupon = face_value × coupon_rate × year_fraction(accrual_start, accrual_end) 
   this period began (§7).
 
 The engine evaluates it as `face × (rate × fraction × units)`. The association is worth
-knowing about, because it is the reason a tolerance exists at all — see §10.
+knowing about, because it is the reason a tolerance exists at all — see §11.
 
 `coupon_rate` is a **fraction**, always: `0.155`, never `15.5`. Percent exists only in
 declaration files, and is converted exactly once, at the data boundary (§9).
@@ -343,7 +343,7 @@ resolution takes roughly sixty steps.
 There is no tuned convergence tolerance, and that is a decision rather than an omission.
 
 - **A tuned tolerance would be a second tolerance.** The project has exactly one
-  (§10), it is about comparing *money*, and a rate is not money. Introducing a separate
+  (§11), it is about comparing *money*, and a rate is not money. Introducing a separate
   convergence bound would be the first of the twenty local tolerances the single-tolerance
   rule exists to prevent.
 - **There is nothing to trade off.** Sixty iterations of a two-line loop over ten cash
@@ -1031,7 +1031,84 @@ running the identical projection with every source verified produces a byte-iden
 
 ---
 
-## 13. Where to look next
+## 13. Deployable capacity: what a stream can actually fund
+
+### 13.1 The formula
+
+```
+withheld = gross × income_tax_rate
+net      = gross − withheld
+```
+
+`gross` is what an income stream declares arriving per its declared cadence;
+`income_tax_rate` is a fraction (`0.1`, never `10` — percent lives only in declaration
+files, §9). Both terms are reported alongside the net figure, so an amount available to
+invest always shows what it is net *of*. Implemented as `deployable(stream)` in
+`terezy.core.streams.streams`.
+
+This exists for one reason: **the amount available to invest must never be overstated**
+(FR-007). Every funding decision downstream reads the net figure, so no other module has to
+remember to apply the rate — which is how a gross amount comes to be treated as investable.
+
+### 13.2 An undeclared rate produces no net figure at all
+
+The rate is optional, and omitting it means **the owner has not stated one**. That is a
+different claim from stating zero, and the two get different types:
+
+| declaration | result | net figure |
+| --- | --- | --- |
+| `income_tax_rate = 0.1` | `DeployableCapacity` | `gross × 0.9` |
+| `income_tax_rate = 0.0` | `DeployableCapacity` | exactly `gross` — because the owner said so |
+| omitted (`None`) | `IncomeTaxRateUndeclared` | **none: the record has no such field** |
+
+Returning the gross in the third case would produce a net figure that quietly equals the
+gross — right whenever the rate happens to be zero, wrong by the rate the rest of the time,
+and with nothing in the output to say which case a reader is looking at. So the third case is
+a typed value carrying the gross, the stream id and the reason *"no income-tax rate
+declared"*, and carrying no net field for a caller to read. Same shape, and the same
+argument, as `RealTermsUnavailable` occupying the real-terms slot and `ExitCostUnknown`
+occupying the round-trip slot.
+
+**Nothing is clamped.** A declared rate above 1.0 produces a negative net figure and is
+reported as such; a range check belongs to the loader, where the error can name the file and
+the field. Softening a mis-entered declaration into a plausible zero is predecessor defect
+B13 in a new place.
+
+### 13.3 Why this arithmetic uses `money.scale` and not `money.scale_sourced`
+
+The standing rule is that a factor which came from declared data goes through
+`scale_sourced`, so the declaration's mark cannot be dropped silently. The withholding rate
+is the one exception in the project, and the reason is that **a stream carries no source at
+all**: an owner's own salary is not an observation needing a citation but a statement of fact
+by the only person who can make it, and the exemption is argued in
+`specs/002-ramp-cost/contracts/declaration-schema.md`. The rate is not a *modelled* tax rate
+the engine applies to a taxable event — `SIMULATOR_SPEC.md` §4.2 puts the owner's own
+income-tax position outside the simulator — it exists so the deployable figure is not
+overstated, and nothing else.
+
+So there is no `Provenance` to merge: `scale_sourced(amount, factor, EMPTY)` would be the same
+arithmetic while implying a source was consulted. The gross's own provenance is carried
+through unchanged, and no mark is lost because there was never one to lose. **If a stream ever
+gains a citation, this is the line that has to change**, and the reason is recorded in the
+module.
+
+### 13.4 Worked example
+
+An invented gross of 100 000 UAH monthly at an invented rate of 10% — round numbers chosen to
+be checkable by eye and deliberately unlike any real Ukrainian schedule, because this project
+may not enter a legal rate it has not observed:
+
+```
+gross    = 100 000.00 UAH  per month
+withheld = 100 000 × 0.1 =  10 000.00 UAH
+net      = 100 000 − 10 000 = 90 000.00 UAH  per month
+```
+
+Checked in `tests/unit/test_deployable_capacity.py`.
+
+---
+
+## 14. Where to look next
 
 | question | file |
 | --- | --- |
@@ -1043,6 +1120,8 @@ running the identical projection with every source verified produces a byte-iden
 | Is the run reproducible? | `tests/invariants/test_determinism.py` |
 | Does the mark survive? | `tests/contract/test_provenance_propagation.py` |
 | Is a new instrument really data-only? | `tests/contract/test_data_only_extensibility.py` |
+| Does the ramp cost differ by stream? | `tests/worked_examples/test_two_streams.py` |
+| Is deployable capacity honest? | `tests/unit/test_deployable_capacity.py` |
 | What is still uncovered? | `docs/REQUIRED_TESTS.md` |
 
 The product specification is `docs/reference/SIMULATOR_SPEC.md`; the engine charter and the

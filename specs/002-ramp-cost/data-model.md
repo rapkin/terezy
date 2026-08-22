@@ -176,15 +176,25 @@ field names.
 |---|---|---|
 | `id` | `str` | `salary_uah`, `contract_usd` |
 | `owner_id` | `str` | Present from day one |
-| `currency` | `Currency` | |
+| ~~`currency`~~ | — | ⚙ **Removed.** It duplicated `amount.currency`, and two fields stating one fact can disagree: a record with `currency=UAH` and an amount in USD typechecks and is nonsense. The mitigation on offer — "the loader builds both from one declared value" — puts the guarantee in a layer that cannot help anything constructing a stream in code. `amount.currency` is the single place. |
 | `amount` | `Money` | Positive |
 | `cadence` | `str` | `monthly`, `biweekly`, `semimonthly` |
 | `arrives_at` | `str` | Venue id. A route whose `origin` differs from this is a mismatch, reported (spec edge case). |
-| `indexation` | `Indexation` | Policy plus an optional rate |
+| `indexation` | `Indexation` | Policy plus an optional rate. ⚙ The policy set is closed at `none \| cpi \| fixed_rate` — `cpi` from §4.2, `fixed_rate` from the brief's "salary growth", and `none` because the field is required and the absence of indexation has to be sayable. **Nothing in this feature applies an indexation**, so no figure rests on the choice; it is written down here so a document owns the set before a figure does. A `fixed_rate` with no rate is a declaration that means nothing and is the loader's to refuse (T038/T040). |
 | `income_tax_rate` | `float \| None` | Optional. When set, deployable capacity is net of it (FR-007). `None` means the owner has not stated one — **not** zero. |
 
-`deployable(stream)` is a free function returning the amount net of any declared income
-tax, so "how much can I actually invest" is never overstated.
+`deployable(stream)` returns **`DeployableCapacity | IncomeTaxRateUndeclared`** — ⚙ a tagged
+union, because no `Money` honestly represents "no rate declared". `IncomeTaxRateUndeclared`
+carries the reason, the stream id and the gross, and has **no net field at all**, so the
+figure is unreadable rather than merely discouraged. A *declared* zero returns a
+`DeployableCapacity` whose net is bit-identically the gross, because the owner said so.
+
+`DeployableCapacity` reports `gross`, `withheld`, `net` and `cadence` — all three terms of
+`net = gross − withheld` so it can be checked by reading, and the cadence because a monthly
+figure read as annual is wrong by twelve and nothing else in the record says which.
+
+Same precedent as `ExitCostUnknown` (D4) and `RealTermsUnavailable` in feature 001: when
+there is no answer, the type says so rather than a value standing in for it.
 
 ---
 

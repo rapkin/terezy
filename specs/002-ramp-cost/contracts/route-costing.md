@@ -30,6 +30,22 @@ def cost_one(
 #   types arrive with US2 (T024) and US3 (T029). Both are *feasibility* inputs producing
 #   further `RouteUnusable` reasons, not a second arithmetic — and they must be added to
 #   `cost_one` and `rank` together, or FR-029 acquires the second code path it forbids.
+#
+# ⚙ `streams` HAS LANDED (T023–T027, US2), in `cost_one` and `rank` in the same change, as
+#   the note above requires. It resolves `FundingPath.stream_id` and produces two further
+#   `RouteUnusable` reasons — `stream.arrives_at` (the route does not start where the money
+#   lands) and `stream.currency` (it starts at the right venue in the wrong currency, which
+#   matching venues do not rule out: a multi-currency account is the ordinary case). An
+#   unresolvable `stream_id` raises, on `route_id`'s precedent, and so does an `amount` whose
+#   currency is not the named stream's — a cost attributed to income that never delivered the
+#   money is the blended figure FR-008 forbids, wearing a stream id.
+#   `capacity_used` is still deferred, to T029 with the monthly-cap accumulator, and will be
+#   added to both signatures together for the same reason.
+#   `venues` is listed above and is **not** in either implementation: every venue rule this
+#   feature has — leg chaining, a currency a venue cannot hold — is checked at load, where the
+#   error can name the file and the leg index, and nothing in the costing arithmetic consults
+#   a `Venue`. Passing the mapping in order to ignore it would suggest a check that is not
+#   happening here.
 
 
 # --- events derived from a costed figure, never recomputed beside it ---

@@ -89,6 +89,7 @@ from terezy.core.routes import cost
 from terezy.core.routes.channels import FxChannel
 from terezy.core.routes.legs import Route
 from terezy.core.routes.path import FundingPath
+from terezy.core.streams.streams import IncomeStream
 
 _Comparable = tuple[RampCost, RoundTripCost]
 """A candidate paired with its narrowed round-trip figure.
@@ -206,6 +207,7 @@ def rank(
     *,
     routes: Mapping[str, Route],
     channels: Mapping[str, FxChannel],
+    streams: Mapping[str, IncomeStream],
     kinds: Mapping[str, ObservationKind],
     on_date: date,
     as_of: date,
@@ -220,13 +222,21 @@ def rank(
     :class:`NothingComparable` when no candidate was comparison-ready -- see that record for why
     the empty case is a separate type rather than an absent index.
 
-    **The signature is ``cost_one``'s**, and the two inputs
-    ``contracts/route-costing.md`` also names for both functions -- ``streams`` and
-    ``capacity_used`` -- are absent here for the same stated reason they are absent there.
-    ``streams`` arrives with User Story 2 and ``capacity_used`` with User Story 3; both are
-    feasibility inputs that produce more ``RouteUnusable`` reasons, and neither changes an
-    arithmetic. Adding them extends both signatures together, which is the only way they can be
-    added without creating the second code path FR-029 forbids.
+    **The signature is ``cost_one``'s**, and it stays that way as inputs arrive. ``streams``
+    landed in both functions in one change, which ``contracts/route-costing.md`` requires: a
+    ranking that costed its candidates through a signature not knowing about streams, while the
+    recommendation's own costing did, would price the winner and the alternatives by two
+    different functions -- precisely the second code path FR-029 exists to forbid.
+    ``capacity_used`` is still to come with User Story 3 and will be added to both together for
+    the same reason.
+
+    **One amount for every candidate has a consequence worth stating**: since ``cost_one``
+    refuses an amount that is not in its stream's currency, every path in one call must be
+    funded by streams of the *same* currency. A ranking is therefore a comparison of routes
+    within a stream currency, and comparing the hryvnia salary against the dollar contract
+    income is two rankings and a stated valuation rather than one call -- which is FR-008's
+    per-stream rule showing up in the type instead of in a convention. There is no blended
+    figure to accidentally produce, because there is no single amount that could produce one.
     """
     comparable: list[_Comparable] = []
     excluded: list[RouteUnusable] = []
@@ -237,6 +247,7 @@ def rank(
             amount,
             routes=routes,
             channels=channels,
+            streams=streams,
             kinds=kinds,
             on_date=on_date,
             as_of=as_of,

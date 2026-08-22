@@ -130,6 +130,7 @@ def _rank(*candidates: Candidate) -> Ranking | NothingComparable:
         _uah(AMOUNT),
         routes=routes,
         channels=_TEMPLATE.channels,
+        streams=route_graphs.STREAMS,
         kinds=route_graphs.KINDS,
         on_date=route_graphs.ON_DATE,
         as_of=route_graphs.AS_OF,
