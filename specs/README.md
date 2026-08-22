@@ -34,9 +34,15 @@ Every feature goes through the same six steps. None is optional.
    (correctness, then quality), plus the two manual reviews no gate can do — provenance
    marks surviving every figure-producing site, and every tolerance being the imported
    one. Findings are fixed on the branch; iterate until the review comes back clean.
-5. **Land on `main`, squashed.** One fresh commit per unit of work (a spec, a phase, a
-   small feature), message written to the `/commit` standards — intermediate branch
-   commits never reach `main`. The landing change also flips the feature's rows in
+5. **Land on `main`.** Two shapes, by the size of the unit:
+   - **Spec-only or doc-only work: squash** to one fresh commit per unit (one spec =
+     one commit); the branch's draft commits never reach `main`.
+   - **A full feature implementation: a regular merge** (`git merge --no-ff`), keeping
+     the branch's checkpoint commits — the phases and their green points are history
+     worth keeping. Because those commits reach `main`, every commit on the branch is
+     written to the `/commit` standards from the start; the merge is not a laundry.
+
+   Either way, the landing change also flips the feature's rows in
    `docs/REQUIRED_TESTS.md`, updates `docs/METHODOLOGY.md` for any new formula, and
    flips `status` in `features.toml`.
 6. **Clean up.** Remove the worktree and delete the branch immediately after landing.
