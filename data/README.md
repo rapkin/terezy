@@ -68,7 +68,16 @@ outside the simulator entirely: the tool takes net-of-income-tax amounts as inpu
 the field exists only so the deployable figure is not overstated. A rate the engine
 *applies to a taxable event* needs a source; a rate the owner states about his own
 payslip does not. `scripts/check_provenance.py` therefore scans `tax/`, `instruments/`,
-`routes/` and `channels/` — and not `streams/`.
+`routes/` and `channels/` — and not `streams/`. `strategies/` carries the assumption
+exemption too: a named allocation is the owner's decision, and a strategy file that ever
+carries a market observation moves that value into a sourced directory instead of
+widening the exemption.
+
+The two lists are **exhaustive, and the gate is fail-closed**: every directory under
+`data/` is either scanned or exempted *by name with its reason* in the script, files at
+the data root (`venues.toml`) are scanned too, and a directory the script does not know
+is an error — never a blind spot. A gate that passes over what it never looked at would
+be fail-open in the one script whose job is the opposite.
 
 Per-owner data being *inside* `data/` is a narrower claim than it looks: `streams/`
 holds one committed, reviewed declaration of where money lands and in what currency,
