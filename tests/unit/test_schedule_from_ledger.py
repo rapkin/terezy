@@ -54,6 +54,7 @@ def _event(sequence: int, kind: EventKind, amount: float, **extra: object) -> Ev
         lot_ref=extra.get("lot_ref"),  # type: ignore[arg-type]
         quantity=extra.get("quantity"),  # type: ignore[arg-type]
         allocated_to=None,
+        capacity_pool=None,
     )
 
 

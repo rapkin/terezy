@@ -85,14 +85,38 @@ class EventKind(Enum):
     FEE = "fee"
     """An explicit cost line. See the module docstring on ``allocated_to``."""
 
+    RAMP_MOVEMENT = "ramp_movement"
+    """Money crossing a funding route: out of one currency, into another.
+
+    A pair of these records one crossing -- what left the sending side, and what arrived at
+    the far end -- because the accounts here are per *currency* and a conversion touches two
+    of them. On a route that converts nothing the pair is in one currency and nets to zero,
+    which is the honest answer: the money moved between venues, and this ledger has no venue
+    dimension to record that in.
+
+    The sign carries the direction, as it does for every other kind. There is deliberately no
+    separate "out" and "in" kind: a direction flag beside a signed amount is a second place
+    for the direction to live, and two places disagree.
+
+    Distinct from ``CASH_DEPOSIT``, which is money arriving from outside the modelled system.
+    A ramp movement is money the owner already had, in a different currency or at a different
+    venue, and folding the two together would make the funding of an account
+    indistinguishable from the shuffling of it.
+    """
+
 
 class CausationKind(Enum):
-    """The two things that are allowed to cause an event.
+    """The kinds of declaration that are allowed to cause an event.
 
-    Exactly the two FR-008 names -- *"each such record MUST identify the instrument term
-    or tax rule that generated it"*. Deliberately not widened to an "owner action" or a
-    "system" cause: a third member would become the place every event whose cause nobody
-    tracked down ends up, and C6 would pass while meaning nothing.
+    The first two are exactly the two FR-008 names -- *"each such record MUST identify the
+    instrument term or tax rule that generated it"* -- and ``ROUTE_TERM`` joined them with
+    feature 002, which charges fees no instrument and no tax rule charges.
+
+    What the set is closed *against* is a **catch-all**: there is no "owner action" and no
+    "system" member, because such a member would become the place every event whose cause
+    nobody tracked down ends up, and C6 would pass while meaning nothing. Every member here
+    names a kind of *declaration* that can be resolved back to the file it was read from, and
+    that is the test a fourth member would have to pass.
     """
 
     INSTRUMENT_TERM = "instrument_term"
@@ -101,13 +125,29 @@ class CausationKind(Enum):
     TAX_RULE = "tax_rule"
     """A declared tax rule, identified by its class id."""
 
+    ROUTE_TERM = "route_term"
+    """A declared term of a funding route -- a leg's fee, a channel's premium, a spread.
+
+    ⚙ **The third member, added with feature 002.** The docstring above warns against a third
+    cause, and the warning stands as written: what it forbids is a *catch-all* -- "an owner
+    action", "the system" -- which would become the place every event whose cause nobody
+    tracked down ends up, leaving C6 passing while meaning nothing.
+
+    This is the opposite of that. A route term is resolvable to a declaration exactly as an
+    instrument term is: ``id`` is the route id and ``detail`` names the component that
+    charged. FR-005 requires every fee to be an explicit recorded line, and a ramp fee is
+    charged by neither an instrument term nor a tax rule -- so without this member such a fee
+    would have to claim a cause it does not have, which is worse than a widened set: a
+    traceable figure pointing at the wrong declaration.
+    """
+
 
 @dataclass(frozen=True, slots=True)
 class CausationRef:
     """What caused an event, in a form that can be looked up rather than guessed."""
 
     kind: CausationKind
-    """Which of the two permitted causes this is."""
+    """Which kind of declaration caused this event."""
 
     id: str
     """The identifier of the term or rule -- resolvable back to the declaration."""
@@ -183,6 +223,25 @@ class Event:
     rather than inferred.
     """
 
+    capacity_pool: str | None
+    """The shared rail this movement crossed, or ``None`` for a movement that crossed none.
+
+    A rail -- a card, an account, a corridor under a regulatory ceiling -- declares a monthly
+    limit, and what consumes that limit is the money put *through* it. ``ledger.engine``
+    accumulates the magnitude of every event naming a pool into
+    ``LedgerState.capacity``, keyed by the pool and by the month of ``occurred_on``, so a cap
+    is state in the fold rather than a clock lookup (research.md D7).
+
+    **Stored rather than inferred**, on exactly ``allocated_to``'s reasoning: which rail a
+    movement crossed is a fact about the transaction, and deducing it from the route, the
+    venue pair or the adjacency of dates would be a guess dressed as an audit trail. It is
+    also why the field is on the *event* and not on a parallel index the caller supplies: an
+    index can be forgotten, and a limit silently not consumed is a limit not enforced.
+
+    ``None`` is the ordinary case and is not a missing value: a coupon, a tax charge and a
+    purchase inside one venue cross no rail at all.
+    """
+
 
 LOT_OPENING_KINDS: Final[frozenset[EventKind]] = frozenset(
     {EventKind.PURCHASE, EventKind.REINVESTMENT}
@@ -193,7 +252,13 @@ LOT_CLOSING_KINDS: Final[frozenset[EventKind]] = frozenset({EventKind.PRINCIPAL_
 """The kinds that consume lots. Cash in, units out."""
 
 CASH_ONLY_KINDS: Final[frozenset[EventKind]] = frozenset(
-    {EventKind.CASH_DEPOSIT, EventKind.COUPON, EventKind.TAX_CHARGE, EventKind.FEE}
+    {
+        EventKind.CASH_DEPOSIT,
+        EventKind.COUPON,
+        EventKind.TAX_CHARGE,
+        EventKind.FEE,
+        EventKind.RAMP_MOVEMENT,
+    }
 )
 """The kinds that touch no holding at all."""
 
@@ -269,7 +334,13 @@ def check_shape(event: Event) -> None:
             _check_opening(event)
         case EventKind.PRINCIPAL_REPAYMENT:
             _check_closing(event)
-        case EventKind.CASH_DEPOSIT | EventKind.COUPON | EventKind.TAX_CHARGE | EventKind.FEE:
+        case (
+            EventKind.CASH_DEPOSIT
+            | EventKind.COUPON
+            | EventKind.TAX_CHARGE
+            | EventKind.FEE
+            | EventKind.RAMP_MOVEMENT
+        ):
             _check_cash_only(event)
         case _:  # pragma: no cover -- mypy proves this unreachable
             assert_never(event.kind)

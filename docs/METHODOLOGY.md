@@ -939,6 +939,10 @@ Note what is *not* in that union: `float`.
 - **The lot order inside a position is *not* normalised.** It is a fact about the history and
   the selection method depends on it, so a form that sorted it away could digest two
   positions identically that would be taxed differently.
+- **The capacity accumulator is included**, keys sorted by `(pool, year, month)`. It is
+  derived from the events, exactly as the cash balances are, and both are claims the state
+  makes about them — a form recording only a fold's inputs would agree between a right fold and
+  a wrong one.
 - **Provenance is deliberately excluded.** See §12.4.
 
 ### 12.2 The encoding
@@ -1108,7 +1112,123 @@ Checked in `tests/unit/test_deployable_capacity.py`.
 
 ---
 
-## 14. Where to look next
+## 14. Monthly capacity: whose limit it is, and what happens to the excess
+
+### 14.1 The limit belongs to a rail, not to a route
+
+A monthly cap is a property of the **rail** the money crosses — a card, an account, a corridor
+under a regulatory ceiling — and a route is a path that *uses* rails. So a leg declares
+
+```toml
+capacity_pool = "monobank_card_uah_usd"
+monthly_cap   = 100000.0
+```
+
+and consumed capacity is accumulated by `(capacity_pool, year, month)`. **Never by route.** Two
+different routes both moving money through the owner's Monobank card consume **one** limit;
+keying on the route would give each its own full monthly allowance, and Monobank's monthly limit
+is one of the four figures `SIMULATOR_SPEC.md` §11 item 1 names as the reason this feature
+exists.
+
+Two legs naming one pool must declare the **same** cap. Two numbers for one real limit means at
+least one is wrong, and choosing either silently would be a guess. A cap declared with **no**
+pool is refused rather than given an invented key: without a rail there is nothing to accumulate
+against, so capacity consumed earlier in the month could never reduce it.
+
+### 14.2 No clock
+
+The month comes from a date that arrives as data — a ledger event's `occurred_on`, or the
+`on_date` a plan is dated. `datetime.now` is blocked in `core` by `.importlinter`. Consumed
+capacity is one more accumulator in the fold that already accumulates cash per currency:
+
+```
+LedgerState.capacity : {(pool, year, month) -> Money}
+headroom             = cap − consumed(pool, month)
+```
+
+An **absent** key means that rail carried nothing that month, which is a different claim from a
+zero — so `consumed` returns `None` and the full declared cap is the honest headroom.
+
+The headroom is **not floored at zero**. A rail already over its cap reports a negative figure,
+because a floor would hide an overrun some earlier movement caused.
+
+### 14.3 What the cap does *not* do
+
+A cap does not make a route unusable. It makes the route unable to carry the whole amount **at
+once**, and the answer to that is the fallback policy — not a refusal, which would deploy
+nothing at all. So `cost_one` reports the declared ceiling and never consults the accumulator;
+`routes.capacity.deploy` decides what fits.
+
+### 14.4 The three fallbacks, and the fourth by name
+
+Of `SIMULATOR_SPEC.md` §4.3.4's four policies this engine implements **hold as cash**,
+**redirect** (to a named destination, which is a required field) and **skip**. All three deploy
+the same amount — what the rail allows — and differ in what the record says became of the rest.
+
+*Place on deposit* requires a deposit instrument, which no feature has yet added, so it **fails
+by name** saying what it needs. Treating it as "hold as cash" would be a substituted default for
+a policy the owner explicitly chose.
+
+"Queue" in §4.3.4 is the same policy as *hold as cash* — §4.3.4's own wording is "queue as UAH
+cash". It does **not** mean carrying the excess into next month's capacity: the next calendar
+month starts from the full cap.
+
+### 14.5 Worked example
+
+Every figure invented; §11 item 1 records that none of the real route numbers has been observed.
+
+```
+declared cap on the card                        100 000 UAH
+consumed in August 2026                               0
+headroom                                        100 000
+
+plan on 2026-08-21                              150 000
+deployed = min(plan, headroom)                  100 000   <- the cap, never the plan
+fallback = plan − deployed                       50 000   <- reported, with date and reason
+
+after the movement, consumed in August          100 000
+a second plan, on a DIFFERENT route, same card   80 000
+headroom                                              0
+deployed                                              0   <- one rail, one limit
+fallback                                         80 000
+
+occurrences reported                                  2
+total deployed in August                        100 000 == the cap
+```
+
+Checked in `tests/worked_examples/test_monthly_cap.py`; the accumulator's properties in
+`tests/invariants/test_capacity_accumulator.py`.
+
+### 14.6 Executing a costed ramp
+
+`cost_one` prices; `execute` records. `execute` takes the **costed figure** and nothing that
+could price anything — no route, no leg, no channel, no amount — so there is no arithmetic in it
+that could drift. It emits, from one `RampCost`:
+
+1. the **departure**, `sent − components`, negative, in the sending currency, and the anchor the
+   fee lines are allocated to;
+2. **one fee line per fee-bearing component**, negative, in the sending currency;
+3. the **arrival**, `one_way.arrived`, positive, in the destination currency.
+
+The crossing is a pair because cash accounts are per *currency* and a conversion touches two of
+them; expressing it as one event would need a rate, which is what FR-010 forbids leaving
+implicit. The agreement
+
+```
+Σ(fee events)  ==  Σ(one_way.components)
+```
+
+is asserted in `tests/invariants/test_cost_execute_agreement.py`, together with the cash effect
+per currency: the sending currency loses exactly `sent`, and the destination gains exactly
+`arrived`.
+
+The `capacity_pool` the movement crossed is named on the events denominated in the sending
+currency, the fee lines included — the fees came out of the money that crossed, so what the rail
+carried is the whole of `sent`.
+
+---
+
+## 15. Where to look next
 
 | question | file |
 | --- | --- |
@@ -1122,6 +1242,9 @@ Checked in `tests/unit/test_deployable_capacity.py`.
 | Is a new instrument really data-only? | `tests/contract/test_data_only_extensibility.py` |
 | Does the ramp cost differ by stream? | `tests/worked_examples/test_two_streams.py` |
 | Is deployable capacity honest? | `tests/unit/test_deployable_capacity.py` |
+| Does a monthly cap bind, and is the excess reported? | `tests/worked_examples/test_monthly_cap.py` |
+| Is anything silently clamped? | `tests/invariants/test_no_silent_clamping.py` |
+| Does the ledger agree with the comparison? | `tests/invariants/test_cost_execute_agreement.py` |
 | What is still uncovered? | `docs/REQUIRED_TESTS.md` |
 
 The product specification is `docs/reference/SIMULATOR_SPEC.md`; the engine charter and the

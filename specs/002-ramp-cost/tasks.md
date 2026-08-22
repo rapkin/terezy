@@ -118,13 +118,13 @@ the other, and no cost is attributable to a destination alone.
 
 **Goal**: caps, minimums, latency and status enforced; every fallback reported.
 
-- [ ] T028 [US3] Write `tests/invariants/test_capacity_accumulator.py` — over generated event streams, consumed capacity per `(route, year, month)` never exceeds the cap, and capacity consumed earlier in the same month reduces the headroom. Closes **FR-015**. Must fail first
-- [ ] T029 [US3] Implement `src/terezy/core/routes/capacity.py` and add the accumulator to `LedgerState` — keyed by `(capacity_pool, year, month)` taken from each event's `occurred_on`, **never a clock**, and **never by route**: two routes through one Monobank card consume one limit (research.md D10). Confirm C1–C6 still pass: this is new state in the fold. Closes **FR-012**
-- [ ] T030 [US3] Write `tests/invariants/test_cost_execute_agreement.py` — `execute`'s fee events sum to exactly `cost_one`'s figure and the ledger's arriving amount equals the `RampCost`'s. **This invariant is what allows the comparison to be pure while execution is recorded** (research.md D5). Must fail first
-- [ ] T031 [US3] Implement `src/terezy/core/routes/execute.py` — events **derived from** a `RampCost`'s per-leg attribution, never recomputed beside it. One fee event per fee-bearing component. Closes **FR-005**
-- [ ] T032 [US3] Write `tests/worked_examples/test_monthly_cap.py` — the **G3** example: a contribution over the cap deploys exactly the cap, the excess is handled by the declared fallback, and **every occurrence** appears with date, amount and reason. Closes **G3**, **FR-013**, **SC-007**
-- [ ] T033 [P] [US3] Write `tests/invariants/test_no_silent_clamping.py` — fees exceeding the amount are reported, `arrived` is not floored at zero, `fraction` may exceed 1.0, and total fees recorded equal total fees applied. Closes **B13**, **FR-005**, **SC-013**
-- [ ] T034 [P] [US3] Write `tests/unit/test_route_unusable.py` — below a minimum, over a maximum, or closed on the date: each reported with the binding constraint named and the shortfall, never silently rounded or dropped. Closes **FR-014**
+- [x] T028 [US3] Write `tests/invariants/test_capacity_accumulator.py` — over generated event streams, consumed capacity per `(route, year, month)` never exceeds the cap, and capacity consumed earlier in the same month reduces the headroom. Closes **FR-015**. Must fail first
+- [x] T029 [US3] Implement `src/terezy/core/routes/capacity.py` and add the accumulator to `LedgerState` — keyed by `(capacity_pool, year, month)` taken from each event's `occurred_on`, **never a clock**, and **never by route**: two routes through one Monobank card consume one limit (research.md D10). Confirm C1–C6 still pass: this is new state in the fold. Closes **FR-012**
+- [x] T030 [US3] Write `tests/invariants/test_cost_execute_agreement.py` — `execute`'s fee events sum to exactly `cost_one`'s figure and the ledger's arriving amount equals the `RampCost`'s. **This invariant is what allows the comparison to be pure while execution is recorded** (research.md D5). Must fail first
+- [x] T031 [US3] Implement `src/terezy/core/routes/execute.py` — events **derived from** a `RampCost`'s per-leg attribution, never recomputed beside it. One fee event per fee-bearing component. Closes **FR-005**
+- [x] T032 [US3] Write `tests/worked_examples/test_monthly_cap.py` — the **G3** example: a contribution over the cap deploys exactly the cap, the excess is handled by the declared fallback, and **every occurrence** appears with date, amount and reason. Closes **G3**, **FR-013**, **SC-007**
+- [x] T033 [P] [US3] Write `tests/invariants/test_no_silent_clamping.py` — fees exceeding the amount are reported, `arrived` is not floored at zero, `fraction` may exceed 1.0, and total fees recorded equal total fees applied. Closes **B13**, **FR-005**, **SC-013**
+- [x] T034 [P] [US3] Write `tests/unit/test_route_unusable.py` — below a minimum, over a maximum, or closed on the date: each reported with the binding constraint named and the shortfall, never silently rounded or dropped. Closes **FR-014**
 
 **Checkpoint**: commit.
 

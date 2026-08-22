@@ -99,7 +99,7 @@ that the pre-check had not:
 specs/002-ramp-cost/
 ├── spec.md              # Feature specification (complete, 30 FRs, 16 SCs)
 ├── plan.md              # This file
-├── research.md          # Phase 0 — twelve decisions with rationale
+├── research.md          # Phase 0 — fifteen decisions with rationale
 ├── data-model.md        # Phase 1 — entities, fields, validation rules
 ├── quickstart.md        # Phase 1 — how to verify the feature works
 ├── contracts/

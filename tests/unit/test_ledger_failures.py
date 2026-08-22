@@ -72,6 +72,7 @@ def _event(
     lot_ref: events.LotRef | None = None,
     quantity: float | None = None,
     allocated_to: int | None = None,
+    capacity_pool: str | None = None,
 ) -> events.Event:
     return events.Event(
         sequence=sequence,
@@ -83,6 +84,7 @@ def _event(
         lot_ref=lot_ref,
         quantity=quantity,
         allocated_to=allocated_to,
+        capacity_pool=capacity_pool,
     )
 
 

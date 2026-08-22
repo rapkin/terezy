@@ -43,7 +43,10 @@ from terezy.core.ledger import events as ev
 from terezy.core.ledger.accounts import CashBalance
 from terezy.core.ledger.events import Event
 from terezy.core.ledger.lots import Disposal, Position
+from terezy.core.primitives import money
 from terezy.core.primitives.currency import Currency
+from terezy.core.primitives.money import Money
+from terezy.core.routes import capacity as cap
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,6 +95,24 @@ class LedgerState:
     here was folded.
     """
 
+    capacity: Mapping[cap.CapacityKey, Money]
+    """How much each shared rail has carried in each calendar month.
+
+    One more accumulator in a fold that already accumulates cash per currency, and it is
+    accumulated the same way: from the events themselves, with the month read off
+    ``occurred_on`` because there is no clock in ``core`` (research.md D7). It is keyed by
+    ``(capacity_pool, year, month)`` and **never** by route -- two routes through one card
+    consume one limit (research.md D10, and ``routes.capacity``).
+
+    A rail with no key here carried nothing that month, which is a different claim from a
+    zero; ``routes.capacity.consumed`` returns ``None`` for it and the full declared cap is
+    the honest headroom.
+
+    **It changes no other figure in this state.** The accumulator is read by feasibility, not
+    by the cash, lot or basis arithmetic, so C1-C6 hold exactly as they did before it existed
+    -- which is a claim the conservation suite checks rather than one this docstring makes.
+    """
+
 
 def opening(base_currency: Currency, consumption_method: str) -> LedgerState:
     """The empty ledger: no dates, no balances, no holdings.
@@ -109,6 +130,7 @@ def opening(base_currency: Currency, consumption_method: str) -> LedgerState:
         positions={},
         disposals=(),
         applied=(),
+        capacity=cap.NOTHING_CONSUMED,
     )
 
 
@@ -123,6 +145,11 @@ def apply(state: LedgerState, event: Event, *, fees: Iterable[Event]) -> LedgerS
     The event's currency selects its account, opening one on first use. That is the only
     place an account comes into existence, so C1's "every currency that moved has an
     account" holds by construction rather than by remembering to pre-create them.
+
+    An event naming a ``capacity_pool`` also consumes that rail's monthly capacity. The
+    **magnitude** is what is accumulated, not the signed amount: a rail's limit is on the
+    money put through it, and a transfer out and a transfer in of the same size both used the
+    rail. The month comes from ``occurred_on``, which is data.
     """
     ev.check_shape(event)
     currency = event.amount.currency
@@ -142,6 +169,26 @@ def apply(state: LedgerState, event: Event, *, fees: Iterable[Event]) -> LedgerS
         positions=positions,
         disposals=state.disposals if disposal is None else (*state.disposals, disposal),
         applied=(*state.applied, event),
+        capacity=_consumed(state.capacity, event),
+    )
+
+
+def _consumed(
+    used: Mapping[cap.CapacityKey, Money], event: Event
+) -> Mapping[cap.CapacityKey, Money]:
+    """The capacity accumulator after one event, unchanged when it crossed no rail.
+
+    A separate function so that the ``None`` case is one branch in one place rather than a
+    conditional expression inside the state constructor: an event that names no pool is the
+    ordinary case, and the accumulator it is given back is the same object.
+    """
+    if event.capacity_pool is None:
+        return used
+    return cap.record(
+        used,
+        pool=event.capacity_pool,
+        amount=money.scale(event.amount, -1.0 if event.amount.amount < 0.0 else 1.0),
+        on_date=event.occurred_on,
     )
 
 

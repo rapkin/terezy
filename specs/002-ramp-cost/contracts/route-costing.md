@@ -39,8 +39,17 @@ def cost_one(
 #   unresolvable `stream_id` raises, on `route_id`'s precedent, and so does an `amount` whose
 #   currency is not the named stream's — a cost attributed to income that never delivered the
 #   money is the blended figure FR-008 forbids, wearing a stream id.
-#   `capacity_used` is still deferred, to T029 with the monthly-cap accumulator, and will be
-#   added to both signatures together for the same reason.
+#   `capacity_used` is **NOT** in either signature, and the promise above that it would be is
+#   withdrawn. T029 found the reason: a declared cap does not make a route *unusable*, it makes
+#   the route unable to carry the whole amount **at once**, and the answer to that is FR-013's
+#   fallback. A `RouteUnusable` here would deploy **nothing**, which is the exact opposite of
+#   SC-007's "a plan exceeding a monthly cap deploys exactly the cap". `RampCost.ceiling`'s own
+#   description already says so: the largest amount that may be *sent* depends on how much of
+#   the month is gone, "and that second figure is the capacity accumulator's". So the
+#   accumulator is consulted by `routes.capacity.deploy`, which decides what fits and reports
+#   every fallback, and the costing stays a pure function of route, stream, amount and dates.
+#   Passing `capacity_used` into `cost_one` in order to ignore it would suggest a check that is
+#   not happening there -- the same reason `venues` is absent.
 #   `venues` is listed above and is **not** in either implementation: every venue rule this
 #   feature has — leg chaining, a currency a venue cannot hold — is checked at load, where the
 #   error can name the file and the leg index, and nothing in the costing arithmetic consults
@@ -51,7 +60,37 @@ def cost_one(
 # --- events derived from a costed figure, never recomputed beside it ---
 
 
-def execute(cost: RampCost, *, owner_id: str, sequence_from: int) -> tuple[Event, ...]: ...
+def execute(
+    cost: RampCost,
+    *,
+    owner_id: str,
+    sequence_from: int,
+    on_date: date,
+    capacity_pool: str | None,
+) -> tuple[Event, ...]: ...
+
+
+# ⚙ Two inputs added during implementation (T031). Neither is a route, an amount or a rate, so
+#   the guarantee this signature exists to carry -- that there is nothing here that *could*
+#   price anything -- is unchanged.
+#
+#   `on_date` because an `Event` must be dated and a `RampCost` carries no date. `on_date` is an
+#   input to `cost_one` that selects a regime and a month; duplicating it on the result would be
+#   two places for one fact, and there is no clock to fall back on.
+#
+#   `capacity_pool` because a rail's monthly limit is consumed by the movement, the accumulator
+#   is folded from `Event.capacity_pool`, and a `RampCost` does not carry the legs. Inferring
+#   the rail from the route id or a venue pair is exactly the inference research.md D10
+#   rejected, so the caller states it. Required rather than defaulted: a rail whose limit is
+#   silently not consumed is a limit not enforced. It is named on the events denominated in the
+#   **sending** currency, the fee lines included, so what the rail carried is the whole of
+#   `sent`.
+#
+#   A route whose legs cross *different* rails cannot have its consumption attributed between
+#   them here -- that needs a movement event per leg, which this feature does not model, and
+#   splitting the amount by any rule available would be inventing a number.
+#   `routes.capacity.caps_of` enumerates a route's rails so a caller can see when there is more
+#   than one.
 
 
 # --- ranking; the recommendation is an index into what it ranked ---

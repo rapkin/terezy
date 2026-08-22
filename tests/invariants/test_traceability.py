@@ -266,10 +266,17 @@ def test_the_canonical_form_names_every_event_and_no_amount_as_a_float(
     so a digest taken over it is a digest over the audit trail and not only over the
     totals. And it contains no ``float`` anywhere: every amount has been rendered by
     ``float.hex()``, so nothing in it can be compared at the wrong precision.
+
+    ⚙ The events are ``form[-2]`` rather than ``form[-1]`` since feature 002 appended the
+    capacity accumulator, which is asserted here too: an accumulator in the state and absent
+    from the canonical form would let two runs with different monthly consumption digest
+    identically, and C4 would pass while covering less than it says.
     """
     state = _fold(stream)
     form = canonical.of_result(state)
-    assert len(form[-1]) == len(state.applied)  # type: ignore[arg-type]
+    applied_form, capacity_form = form[-2], form[-1]
+    assert len(applied_form) == len(state.applied)  # type: ignore[arg-type]
+    assert len(capacity_form) == len(state.capacity)  # type: ignore[arg-type]
     assert not _floats_in(form)
 
 

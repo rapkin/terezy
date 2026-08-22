@@ -281,6 +281,10 @@ Returned instead of a `RampCost` when a route cannot carry the amount on the dat
 
 ### `CapacityUsed`
 
+⚙ Lives in `core/routes/capacity.py`, not `core/results/`: `core.ledger.engine` must import the
+key type and `core.routes.execute` imports `core.ledger.events`, so the key had to sit
+somewhere the ledger can reach without a cycle. `capacity.py` imports nothing from `ledger`.
+
 The monthly cap accumulator, folded into `LedgerState` beside the cash balances
 (research.md D7). Keyed by `(capacity_pool, year, month)` taken from each event's `occurred_on`
 — ⚙ **not by route** (research.md D10): two routes through one Monobank card consume one
@@ -294,4 +298,4 @@ contradicted itself
 
 | Field | Rule |
 |---|---|
-| `occurred_on`, `amount`, `policy`, `reason` | Every occurrence is a record, and **every one appears in the output** (FR-013). A silently executed infeasible plan is a top-severity defect. |
+| `occurred_on`, `amount`, `policy`, `reason`, `redirect_to` | ⚙ `redirect_to` added: FR-013 requires redirect to a **named** destination, and putting the name in `reason` would make a caller parse prose to group occurrences. `None` for the other policies. Every occurrence is a record, and **every one appears in the output** (FR-013). A silently executed infeasible plan is a top-severity defect. |

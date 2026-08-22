@@ -125,6 +125,10 @@ def of_event(value: Event) -> tuple[Canonical, ...]:
     ``owner_id`` is included. There is one owner today, so it contributes nothing to the
     digest in practice -- and the day there are two, a result computed for one of them must
     not be able to digest identically to the other's (Principle VII).
+
+    ``capacity_pool`` is included for the same reason: two streams identical but for which
+    rail each movement crossed consume different monthly limits, so a digest that could not
+    tell them apart would let a feasibility change pass as a no-op.
     """
     return (
         value.sequence,
@@ -136,6 +140,7 @@ def of_event(value: Event) -> tuple[Canonical, ...]:
         of_lot_ref(value.lot_ref),
         of_optional_number(value.quantity),
         value.allocated_to,
+        value.capacity_pool,
     )
 
 
@@ -208,6 +213,13 @@ def of_result(value: LedgerState) -> tuple[Canonical, ...]:
     ``applied`` is included in full rather than summarised. The state is a claim about
     those events; recording only the totals would make the digest agree between a correct
     fold and a fold of a different stream that happened to end in the same place.
+
+    The capacity accumulator is included on the same footing as the cash accounts. Both are
+    derived from ``applied`` and both are claims the state makes about it, and a canonical
+    form that recorded only the inputs to a fold would agree between a right fold and a wrong
+    one. Its keys are sorted by ``(pool, year, month)``, never by insertion order: a digest
+    that depended on the order the events happened to arrive in would disagree with itself
+    for reasons no reader could find.
     """
     return (
         of_optional_date(value.as_of),
@@ -220,6 +232,12 @@ def of_result(value: LedgerState) -> tuple[Canonical, ...]:
         tuple(of_position(value.positions[key]) for key in sorted(value.positions)),
         tuple(of_disposal(disposal) for disposal in value.disposals),
         tuple(of_event(event) for event in value.applied),
+        tuple(
+            (key.pool, key.year, key.month, of_money(value.capacity[key]))
+            for key in sorted(
+                value.capacity, key=lambda entry: (entry.pool, entry.year, entry.month)
+            )
+        ),
     )
 
 

@@ -127,6 +127,7 @@ def event_streams(draw: st.DrawFn, currency: Currency = Currency.UAH) -> Stream:
             lot_ref=None,
             quantity=None,
             allocated_to=None,
+            capacity_pool=None,
         )
     ]
 
@@ -159,6 +160,7 @@ def event_streams(draw: st.DrawFn, currency: Currency = Currency.UAH) -> Stream:
                     lot_ref=LotRef(instrument_id=INSTRUMENT, lot_id=f"lot-{lots_created}"),
                     quantity=float(quantity),
                     allocated_to=None,
+                    capacity_pool=None,
                 )
             )
         elif operation == "coupon":
@@ -173,6 +175,7 @@ def event_streams(draw: st.DrawFn, currency: Currency = Currency.UAH) -> Stream:
                     lot_ref=None,
                     quantity=None,
                     allocated_to=None,
+                    capacity_pool=None,
                 )
             )
         elif operation == "tax":
@@ -187,6 +190,7 @@ def event_streams(draw: st.DrawFn, currency: Currency = Currency.UAH) -> Stream:
                     lot_ref=None,
                     quantity=None,
                     allocated_to=None,
+                    capacity_pool=None,
                 )
             )
         else:
@@ -205,6 +209,7 @@ def event_streams(draw: st.DrawFn, currency: Currency = Currency.UAH) -> Stream:
                     lot_ref=None,
                     quantity=None,
                     allocated_to=disposal_sequence,
+                    capacity_pool=None,
                 )
             )
             events.append(
@@ -218,6 +223,7 @@ def event_streams(draw: st.DrawFn, currency: Currency = Currency.UAH) -> Stream:
                     lot_ref=LotRef(instrument_id=INSTRUMENT, lot_id=None),
                     quantity=float(quantity),
                     allocated_to=None,
+                    capacity_pool=None,
                 )
             )
 

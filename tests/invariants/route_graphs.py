@@ -241,7 +241,14 @@ _MONTHLY_CAP = st.one_of(
     st.none(),
     st.floats(min_value=1_000.0, max_value=1_000_000.0, allow_nan=False, allow_infinity=False),
 )
-"""A cap does not stop a costing -- it sets the reported ceiling -- so it needs no weighting."""
+"""A cap does not stop a costing -- it sets the reported ceiling -- so it needs no weighting.
+
+A generated cap always comes with a **pool**, one per leg. A monthly limit belongs to a rail,
+and a limit with no rail has no key to accumulate under, so ``capacity.caps_of`` refuses the
+combination rather than inventing one (research.md D10). One pool per leg rather than one
+shared across the route because two legs naming the same pool must declare the *same* cap, and
+independently drawn caps would not.
+"""
 
 _WINDOW = st.one_of(
     st.just((None, None)),
@@ -277,7 +284,8 @@ def _chain(
                 fee_fixed=draw(_FEE_FIXED),
                 minimum=draw(_MINIMUM),
                 maximum=draw(_MAXIMUM),
-                monthly_cap=draw(_MONTHLY_CAP),
+                monthly_cap=(cap := draw(_MONTHLY_CAP)),
+                pool=None if cap is None else f"pool_{first_index + offset}",
                 window=draw(_WINDOW),
                 disruption=draw(_DISRUPTION),
             )
@@ -571,14 +579,33 @@ def usd_direct_graph() -> Graph:
     )
 
 
+CARD_POOL = "monobank_card_uah_usd"
+"""The rail the capped fixtures run over: the owner's Monobank card.
+
+Named rather than anonymous because it is the point. Monobank's monthly limit is one of the
+four figures ``SIMULATOR_SPEC.md`` §11 item 1 records as the reason this feature exists, and it
+belongs to the **card** -- so two routes both touching the card consume one limit, and both
+name this pool (research.md D10). The limit's *value* is still a fixture and unobserved.
+"""
+
+
 def capped_graph(
-    *, cap: float | None = None, disruption: tuple[float, float] = (0.0, 0.0)
+    *,
+    cap: float | None = None,
+    disruption: tuple[float, float] = (0.0, 0.0),
+    pool: str = CARD_POOL,
+    route_id: str = "inzhur_direct",
 ) -> Graph:
     """The zero-cost domestic shape, with a declared monthly cap and per-leg disruption.
 
     Built by hand for the same reason :func:`zero_cost_graph` is: these tests are about one
     declared field reaching one reported field, and a generated route would put noise between
     the two.
+
+    Both legs name the **same** pool and declare the **same** cap, which is what D10 requires
+    of two legs sharing a rail -- and it means ``capacity.caps_of`` reports the card's limit
+    once rather than twice. ``route_id`` varies so that a second route can be built over the
+    same rail, which is the property the accumulator exists for.
     """
     legs = tuple(
         _leg(
@@ -590,12 +617,13 @@ def capped_graph(
             fee_fixed=0.0,
             minimum=None,
             monthly_cap=cap,
+            pool=None if cap is None else pool,
             disruption=disruption[index],
         )
         for index in range(2)
     )
     route = Route(
-        id="inzhur_direct",
+        id=route_id,
         provider="Inzhur",
         origin="venue_0",
         destination="venue_2",

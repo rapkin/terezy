@@ -56,18 +56,18 @@ hidden. Sizing it on the net amount needs the charge to be known before the sche
 exists, which is a different pipeline than the one research.md D3 chose.
 
 **Reinvestment is caused by an instrument term, and the policy is named in the detail.**
-``CausationKind`` has exactly two members by design, and neither is "the owner decided
-something"; the data model refused a third precisely so that no event could be attributed
-to a vague cause nobody tracked down. So a reinvestment names the term that priced it, as
-the purchase already names the term it acquired, and its ``detail`` states the declared
-policy, the coupon that funded it and the remainder retained.
+``CausationKind`` admits no "the owner decided something" member, by design; the data
+model refuses a *catch-all* precisely so that no event can be attributed to a vague cause
+nobody tracked down, and every member of it names a kind of declaration. So a reinvestment
+names the term that priced it, as the purchase already names the term it acquired, and its
+``detail`` states the declared policy, the coupon that funded it and the remainder retained.
 
 **No cash deposit funds the purchase.** The cash balance goes negative on the purchase
 date and recovers as coupons arrive, and that is the honest ledger for a feature whose
 spec says "the purchase is taken as given". Inventing a funding deposit would require an
-event caused by an owner action, and ``CausationKind`` has exactly two members --
-instrument term and tax rule -- precisely so that no event can be attributed to a
-vague third cause nobody tracked down.
+event caused by an owner action, and ``CausationKind`` has no such member -- every member
+of it names a kind of *declaration* -- precisely so that no event can be attributed to a
+vague cause nobody tracked down.
 
 **Deliberately absent rather than stubbed**: secondary-market sale before maturity, the
 thin-market haircut that would apply to one, accrued interest settled at purchase,
@@ -357,8 +357,8 @@ def _purchase(
     """Cash out, one lot in, at the cost the owner stated.
 
     The cause is recorded as an instrument term rather than an owner action because
-    ``CausationKind`` has exactly two members by design (see ``ledger.events``): the term
-    named is the declared instrument the purchase acquired, which is the fact a reader
+    ``CausationKind`` admits no owner-action member by design (see ``ledger.events``): the
+    term named is the declared instrument the purchase acquired, which is the fact a reader
     following the audit trail actually wants.
     """
     return Event(
@@ -377,6 +377,7 @@ def _purchase(
         lot_ref=LotRef(instrument_id=declaration.id, lot_id=lot_id_for(holding)),
         quantity=holding.quantity,
         allocated_to=None,
+        capacity_pool=None,
     )
 
 
@@ -738,6 +739,7 @@ def _coupon(
         lot_ref=None,
         quantity=None,
         allocated_to=None,
+        capacity_pool=None,
     )
 
 
@@ -790,6 +792,7 @@ def _reinvestment(
         ),
         quantity=decision.units_bought,
         allocated_to=None,
+        capacity_pool=None,
     )
 
 
@@ -854,4 +857,5 @@ def _redemption(
         lot_ref=LotRef(instrument_id=declaration.id, lot_id=None),
         quantity=quantity,
         allocated_to=None,
+        capacity_pool=None,
     )

@@ -326,7 +326,12 @@ def _taxable_kind(kind: EventKind) -> TaxableEventKind | None:
             | EventKind.CASH_DEPOSIT
             | EventKind.TAX_CHARGE
             | EventKind.FEE
+            | EventKind.RAMP_MOVEMENT
         ):
+            # A ramp movement is the owner's own money changing currency or venue. Nothing is
+            # earned and nothing is disposed of, so there is no taxable event -- and it is
+            # listed explicitly rather than falling through, because the ``assert_never``
+            # below is what makes "nobody thought about this kind" a type error.
             return None
         case _:  # pragma: no cover -- mypy proves this unreachable
             assert_never(kind)
@@ -417,4 +422,5 @@ def _tax_event(taxed: Event, charge: TaxCharge, *, sequence: int) -> Event:
         lot_ref=None,
         quantity=None,
         allocated_to=None,
+        capacity_pool=None,
     )

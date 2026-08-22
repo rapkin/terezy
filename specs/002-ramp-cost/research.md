@@ -2,8 +2,8 @@
 
 **Date**: 2026-08-22
 
-Fourteen decisions. D10–D12 were added after an external review of the artifacts; D13 during
-implementation, D14 during US2. Each records what was chosen, why, and what was rejected. No
+Fifteen decisions. D10–D12 were added after an external review of the artifacts; D13 during
+implementation, D14 during US2, D15 during US3. Each records what was chosen, why, and what was rejected. No
 `NEEDS CLARIFICATION` remains — the spec's three were resolved by the owner before
 planning; everything below is a design question.
 
@@ -289,8 +289,13 @@ capacity_pool = "monobank_card_uah_usd"       # <- both routes name this
 monthly_cap   = 100000.0
 ```
 
-`None` means the leg consumes no shared limit and its cap, if any, is its own. Two legs
-naming the same pool **must declare the same cap** — a mismatch is a load-time failure,
+`None` means the leg declares **no cap at all**. ⚙ The first wording said "its cap, if any,
+is its own", and that does not survive: a cap with no pool has no accumulator key, so FR-015
+could never apply to it and the leg would silently receive its full cap on every consultation
+— a limit that is never consumed is not a limit. `caps_of` refuses the combination, on this
+decision's own argument that a pool is a fact declared rather than inferred.
+
+Two legs naming the same pool **must declare the same cap** — a mismatch is a load-time failure,
 because two different numbers for one real limit means at least one of them is wrong and
 picking either silently would be a guess.
 
@@ -432,3 +437,29 @@ the reference rate and says so in the docstring rather than converting anything.
   smaller sins than this.
 - *Refuse mixed-currency rankings loudly instead of by type.* Already the effect; making it a
   runtime error rather than an unrepresentable call would be strictly weaker.
+
+## D15 — A declared cap limits the amount; it does not refuse the route
+
+**The promise this withdraws.** `contracts/route-costing.md` said `capacity_used` would join
+`cost_one` and `rank` in US3, described as "a *feasibility* input producing further
+`RouteUnusable` reasons". Implementation showed that is the wrong shape, and the reason is
+sharp enough to record rather than quietly drop.
+
+**A `RouteUnusable` deploys nothing.** SC-007 requires that a plan exceeding a monthly cap
+deploys **exactly the cap** — so a cap that refused the route would produce the exact opposite
+of the stated criterion. A cap is not a door; it is a valve.
+
+**Decision**: the accumulator belongs to `capacity.deploy`, which answers "how much of this
+can move", not to `cost_one`, which answers "what does moving it cost". `cost_one` keeps
+`RampCost.ceiling` — the tightest declared cap, whose own docstring already said the
+accumulator's figure is a different figure that does not live there.
+
+**Corroborating evidence that a refusal was wrong**, found rather than argued:
+`tests/unit/test_ranking_ties_and_exclusions.py` already carried a capped route through an
+amount larger than its cap in order to make a B12 point. Under a refusal that test's premise
+collapses — the route would never have been costed at all. A test written for another purpose
+had already assumed the correct model.
+
+`tests/unit/test_route_unusable.py` now asserts the distinction so it cannot be collapsed
+later: over-cap is *not* a `RouteUnusable`, and the things that are — below minimum, over
+maximum, closed on the date, stream mismatch — still are.

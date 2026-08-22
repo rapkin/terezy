@@ -57,6 +57,7 @@ EVENT = Event(
     lot_ref=None,
     quantity=None,
     allocated_to=None,
+    capacity_pool=None,
 )
 
 
