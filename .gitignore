@@ -37,3 +37,6 @@ data/user/
 
 # --- Agent folders may hold credentials (spec-kit init advisory) ---
 .claude/settings.local.json
+
+# --- Agent worktrees are checkouts, not content; their work lands via their own branches ---
+.claude/worktrees/
