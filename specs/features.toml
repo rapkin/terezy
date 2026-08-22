@@ -45,7 +45,7 @@ why    = "REIT/MilTech as declared instruments: two tax classes on one instrumen
 
 [[feature]]
 id     = "007-cpi-real-terms"
-status = "queued"
+status = "spec"
 needs  = ["001-ovdp-hurdle-rate"]
 why    = "fill HurdleRate.real; 001 FR-022 reserved the slot"
 
