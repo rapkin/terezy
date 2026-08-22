@@ -19,7 +19,7 @@ routinely asymmetric.
 a percentage; a P2P screen shows a price per dollar against a reference. Converting the
 second into a percentage by hand before entering it into a data file would put an arithmetic
 step somewhere no test can see it, so both forms are declarable and the conversion happens
-in :func:`cost_fraction` -- once, here, with a worked example beside it in
+in :func:`_offset` -- once, here, with a worked example beside it in
 ``tests/worked_examples/test_channel_rates.py``.
 
 **The sign conventions of the two forms differ, deliberately.**
@@ -36,17 +36,24 @@ Reading one form with the other's convention is the likeliest bug in this module
 is pinned by a hand-computed assertion, and the role -- buy or sell -- is a required
 keyword so that no call site can leave the direction implicit.
 
-**The cost convention, stated once for the whole feature.** FR-004 fixes it: a premium of
-``p`` against a reference ``r`` costs ``p / r``. That is a markup on the *reference price*,
-not a fraction of the amount handed over, and the difference is second order but real -- see
-the extended note in ``terezy.core.routes.cost``, which is where the consequence lands.
+**Two measures, and they are not interchangeable.** :func:`loss_fraction` is **the cost** --
+what fraction of the money the spread took, ``p / (r + p)`` buying and ``p / r`` selling.
+:func:`spread_over_reference` is ``p / r``, the spread over the reference *rate*, and is the
+figure ``SIMULATOR_SPEC.md`` §4.3.1 quotes. They differ on the buy side: 6.67% against 7.14%
+at §4.3.1's numbers.
+
+The conversion itself happens at :func:`effective_rate`, so the arriving amount is the one
+the venue would really hand over. An earlier version charged ``p / r`` of the amount and
+converted the remainder at the reference -- reproducing §4.3.1's percentage exactly while
+reporting an arriving amount short of reality. The full account is in
+``terezy.core.routes.cost``.
 
 **Where ``Provider`` will slot in.** A channel's reference rate is declared data today
 because there is no network, no cache and no rate snapshot, and inventing a rate source is
 the one thing Principle I forbids most firmly. The seam is the pair
 ``(channel, date) -> two-sided rate``: when ``Provider`` arrives, :class:`FxChannel` keeps
 its markup fields and gets its reference from a provider call, and nothing that consumes
-:func:`cost_fraction` changes (research.md D1).
+:func:`effective_rate` or :func:`loss_fraction` changes (research.md D1).
 """
 
 from __future__ import annotations

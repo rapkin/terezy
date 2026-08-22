@@ -12,6 +12,7 @@ interface — routes are data, and leg kinds are an algorithm registry (research
 ```python
 # --- the ONLY function that costs a route ---
 
+
 def cost_one(
     path: FundingPath,
     amount: Money,
@@ -28,10 +29,12 @@ def cost_one(
 
 # --- events derived from a costed figure, never recomputed beside it ---
 
+
 def execute(cost: RampCost, *, owner_id: str, sequence_from: int) -> tuple[Event, ...]: ...
 
 
 # --- ranking; the recommendation is an index into what it ranked ---
+
 
 def rank(
     paths: Sequence[FundingPath],
@@ -45,6 +48,8 @@ def rank(
     on_date: date,
     as_of: date,
 ) -> Ranking: ...
+
+
 # ⚙ Spelled out after review. The first draft wrote `**costing_inputs: object`, which
 #   would not survive mypy strict and hid every required input behind a bag — sloppy in a
 #   document calling itself a contract. The inputs are exactly `cost_one`'s.

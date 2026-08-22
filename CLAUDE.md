@@ -40,7 +40,8 @@ rewriting history.
 
 ```bash
 uv sync --all-extras --dev
-uv run pytest                                 # coverage floor enforced
+uv run pytest                                 # fast: no coverage instrumentation
+uv run pytest --cov                           # coverage floor enforced (blocking in CI)
 uv run pytest -m "contract or invariant"      # constitution compliance tests
 uv run ruff check . && uv run ruff format .
 uv run mypy                                   # strict

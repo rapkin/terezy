@@ -19,8 +19,16 @@ decision is not the choice of ETF — it is that the domestic route costs **0%**
 a crypto ramp of **5–10% one way**, and that OVDP is taxed at **0%** against **23%**
 elsewhere.
 
-**Status:** foundation. Specification and governance are in place; the engine is not
-yet implemented.
+**Status:** two features in. **001 — the OVDP hurdle rate** is complete: an event-sourced
+ledger with tax lots, currency-tagged money whose provenance propagates through every
+derivation, declared instruments and tax classes, and a hand-verified after-tax return.
+**002 — the ramp** is in progress: income streams, routes as chains of legs, two-sided FX
+channels, and what it actually costs to move money to where an instrument lives.
+
+The number the tool currently produces is marked **unverified**, and that is the honest
+state: the OVDP yield it rests on is an owner-reported observation nobody has checked
+against a primary source. The arithmetic is verified; the input is not, and the output
+says so.
 
 ## What it is, and what it is not
 
@@ -91,7 +99,8 @@ Requires [uv](https://docs.astral.sh/uv/) and Python 3.12+.
 
 ```bash
 uv sync --all-extras --dev     # install
-uv run pytest                  # tests, with the coverage floor enforced
+uv run pytest                  # tests
+uv run pytest --cov            # tests with the coverage floor enforced
 uv run ruff check .            # lint
 uv run ruff format .           # format
 uv run mypy                    # strict typing

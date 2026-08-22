@@ -17,34 +17,43 @@ Neither is read from a clock; both are inputs to the run and are recorded in the
 
 ## The cost convention, stated once and in full
 
-This is the one place where two defensible readings of a declared premium diverge, and the
-choice is deliberate.
+A declared premium admits two readings, and getting this wrong once already produced a wrong
+number, so the resolution is written out rather than assumed.
 
-FR-004 fixes the reported cost: *a declared premium in base currency per unit of foreign
-currency MUST produce a cost percentage equal to the premium divided by the stated reference
-rate, reproducing ``SIMULATOR_SPEC.md`` §4.3.1 exactly.* §4.3.1's own arithmetic confirms it
--- "+2 to +4 UAH per dollar is roughly 4.8-9.5% one way" is ``2/42`` to ``4/42`` and nothing
-else. So a premium of ``p`` against a reference ``r`` costs ``p / r`` of the amount crossing
-the leg, and what remains crosses at the reference. A side's spread is always charged before
-the reference is used, which is what FR-010's prohibition on transacting at a mid-rate
-protects; the side taken and the channel used are recorded in ``channels_applied`` (FR-011).
+**The conversion happens at the rate actually transacted at.** A premium ``p`` against a
+reference ``r`` means the price is ``r + p`` when buying the unit currency and ``r - p`` when
+selling, and that is the rate the money crosses at. 10 000 UAH at a P2P price of 45 buys
+222.22 USD, which is what the screen says and what the venue would hand over. The reference
+itself is never transacted at, which is what FR-010's prohibition on a mid-rate protects; the
+side taken and the channel used are recorded in ``channels_applied`` (FR-011).
 
-The consequence, stated plainly rather than buried: on the **sell** side this is exactly the
-price a screen shows, because the spread is charged in the unit currency and the rate
-multiplies -- ``N(1 - p/r) * r`` is ``N(r - p)``. On the **buy** side the rate divides, so the
-all-in price implied is ``r / (1 - p/r)`` rather than ``r + p`` -- a second-order difference of
-``p^2 / r`` per unit, about 0.5% of the spread itself at §4.3.1's numbers. The alternative
-convention -- convert at ``r + p`` and report the loss as a fraction of the amount handed over
--- reports ``p / (r + p)``, which is 6.67% where FR-004 and §4.3.1 say 7.14%.
+**The spread is then derived from that conversion**, not charged before it: it is the
+difference between the value handed over and what the arriving amount is worth at the
+reference, expressed in the sending currency. Because it comes from the same effective rate
+the conversion used, the components sum to the whole cost exactly rather than approximately,
+and FR-003's attribution closes on the nose.
 
-Only one of the two can be implemented, and this one is chosen for three reasons. It
-reproduces the mandated percentage exactly (FR-004, SC-002, G2). It keeps every figure in a
-result derivable from every other, so the components sum to the whole cost *exactly* and
-FR-003's attribution is checkable rather than approximately true. And it applies the same
-algebra to a spread as to a percentage fee -- cost is a fraction of the amount crossing the
-leg, whatever charged it -- rather than making ``fx`` the one leg kind whose arithmetic is
-shaped differently. The reported figure is also the more conservative of the two, which is
-the right direction for a number whose job is to be a hurdle.
+**Two figures, and both are reported.** They differ on the buy side and the difference is the
+whole point:
+
+* ``channels.loss_fraction`` -- **the cost**: ``p / (r + p)`` buying, ``p / r`` selling. What
+  fraction of the money the spread took. 6.67% at §4.3.1's numbers.
+* ``channels.spread_over_reference`` -- ``p / r``, the spread over the reference *rate*.
+  7.14% at the same numbers, and the figure §4.3.1 itself quotes.
+
+**This is a correction, recorded because the wrong version shipped.** FR-004 originally named
+``p / r`` as *the* cost, on the reading that §4.3.1 defined it, and the first implementation
+did exactly that: it charged ``p / r`` of the amount and converted the remainder at the
+reference. That reproduced the mandated percentage exactly and reported **221.09 USD arriving
+where the venue pays 222.22** -- an implied all-in price of ``r / (1 - p/r)`` = 45.23 rather
+than 45. The arriving amount was wrong, not merely differently framed, and no amount of
+internal consistency rescues a figure that says the owner ends up with less money than he
+does.
+
+§4.3.1 labels its own arithmetic illustrative -- "substitute the live rate; this is
+illustrative" -- so reading it as a definition of cost was the error. FR-004 was corrected
+rather than the arithmetic bent to it. On the **sell** side the two conventions coincide
+exactly (``N(1 - p/r) * r`` is ``N(r - p)``), so only the buy side moved.
 
 ## How a cost in a foreign currency becomes a component
 
