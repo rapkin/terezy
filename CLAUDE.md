@@ -32,9 +32,20 @@ in at all.
 checkpoint — a half-finished edit is not, and broken work never gets committed to
 checkpoint it. Feature work lands on `main` by design; there are no feature branches.
 
+**Every commit goes through the `/commit` skill** — in worktrees too. Never hand-roll
+`git commit`: the skill owns the gates and the message standards (conventional commits,
+concise body, no `Co-Authored-By` or other attribution trailers).
+
 **Never `git push`**, never open a PR, and never amend, rebase or reset unless asked for
 exactly that. The commit grant is about not making the user click a button, not about
 rewriting history.
+
+**Worktrees for parallel work.** Work that must not collide with `main`'s working tree
+(parallel spec-writing, an isolated experiment) runs in a git worktree under
+`.claude/worktrees/` (gitignored). Name the directory and the branch for the work, never
+an agent id: `.claude/worktrees/spec-006-goals` on branch `spec/006-goals`. These are
+short-lived plumbing, not feature branches: the work lands on `main` promptly, and the
+worktree and its branch are removed right after.
 
 ## Commands
 
