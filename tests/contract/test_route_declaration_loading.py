@@ -1086,6 +1086,34 @@ class TestPartnerRoute:
         assert raised.value.field_path == "route.partner_route"
         assert "two unrelated journeys" in raised.value.problem
 
+    def test_an_exit_starting_in_a_currency_the_inbound_never_delivers_is_refused(
+        self, tmp_path: Path
+    ) -> None:
+        """The seam is a currency as well as a venue, and both halves must meet.
+
+        A pair meeting at the venue but not in the currency loads only if this check is
+        missing -- and then costing it dies mid-walk as a raw currency mismatch naming
+        neither file. The rewritten exit starts in UAH at binance while every inbound
+        route delivers USD there.
+        """
+        root = _root(tmp_path)
+        exit_path = root / "routes" / "binance_p2p_to_monobank.toml"
+        text = exit_path.read_text(encoding="utf-8")
+        text = _replace(
+            text, 'kind                   = "fx"', 'kind                   = "transfer"'
+        )
+        text = _replace(text, 'from_ccy               = "USD"', 'from_ccy               = "UAH"')
+        text = _drop_line(text, 'channel                = "p2p"')
+        exit_path.write_text(text, encoding="utf-8")
+        with pytest.raises(DeclarationError) as raised:
+            _resolve(root)
+        assert raised.value.field_path == "route.partner_route"
+        rendered = str(raised.value)
+        assert "binance_p2p_to_monobank" in rendered, "the reason must name the partner"
+        assert "binance_p2p_to_monobank.toml" in rendered, "and the partner's file"
+        assert "UAH" in raised.value.problem
+        assert "USD" in raised.value.problem
+
     def test_an_exit_not_ending_in_the_base_currency_is_refused(self, tmp_path: Path) -> None:
         root = _root(tmp_path)
         with pytest.raises(DeclarationError) as raised:

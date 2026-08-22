@@ -270,7 +270,8 @@ def from_data_root(root: Path) -> Declarations:
 # 5. **Leg chaining** (research.md D6): leg *n* ends where leg *n+1* begins, the first leg
 #    starts at the route's ``origin``, the last ends at its ``destination``.
 # 6. **``partner_route`` resolution** (FR-027): the id exists, names an ``exit`` route,
-#    starts where the inbound route ends, and finishes holding the base currency.
+#    starts where the inbound route ends -- at that venue **and in the currency the inbound
+#    delivers there** -- and finishes holding the base currency.
 # 7. **``capacity_pool`` cap agreement** across *files* (research.md D10). Two legs naming
 #    one rail must declare one cap.
 # 8. **A regime's ``route_ids``** resolve, and a regime is **partner-closed**.
@@ -584,11 +585,11 @@ def _check_chain(route: Route, *, path: Path) -> None:
 def _check_partner(
     route: Route,
     routes: Mapping[str, Route],
+    files: Mapping[str, Path],
     *,
-    path: Path,
     base_currency: Currency,
 ) -> None:
-    """The four things a declared exit route must be (FR-027), each refused by name.
+    """The five things a declared exit route must be (FR-027), each refused by name.
 
     ``partner_route`` absent is **legal and expected**: it means nobody has costed the way
     out, and it produces ``ExitCostUnknown`` rather than a reversal or a promoted one-way
@@ -599,9 +600,14 @@ def _check_partner(
     * **A partner whose direction is not ``exit``.** An inbound route is not an exit; pairing
       two ways *in* would produce a round trip that never comes back.
     * **A partner that does not start where this route ends.** This is the sharpest of the
-      four: a pair that does not meet would load and produce a *confident round-trip figure
+      five: a pair that does not meet would load and produce a *confident round-trip figure
       for two unrelated journeys*, which is the exact class of number FR-030 exists to
       refuse.
+    * **A partner whose first leg does not take in the currency this route delivers.** The
+      seam is a currency as well as a venue: a pair meeting at the venue but not in the
+      currency could only be walked through a conversion nobody declared, at a rate nobody
+      chose -- the implicit mid-rate FR-010 forbids -- and without this check it loads and
+      then dies mid-costing as a raw currency mismatch naming neither file.
     * **A partner that does not end holding the base currency.** §4.3.3 asks for money back
       in **spendable** base currency; an exit that stops in dollars at an exchange has not
       got the money out, and an asset that cannot be liquidated into spendable base currency
@@ -609,6 +615,7 @@ def _check_partner(
     """
     if route.partner_route is None:
         return
+    path = files[route.id]
     field_path = "route.partner_route"
     partner = routes.get(route.partner_route)
     if partner is None:
@@ -643,6 +650,23 @@ def _check_partner(
             "figure FR-030 exists to refuse.",
             f"declare an exit route starting at {route.destination!r}, or correct one of the "
             "two endpoints",
+        )
+    arrives_in = route.legs[-1].to_ccy
+    starts_in = partner.legs[0].from_ccy
+    if starts_in is not arrives_in:
+        raise DeclarationError(
+            path,
+            field_path,
+            f"names {partner.id!r} as its exit route, but leg 0 of that route (declared in "
+            f"{files[partner.id]}) takes in {starts_in.value} while this route delivers "
+            f"{arrives_in.value} at {route.destination!r}. The seam is a currency as well as "
+            "a venue: the only way to walk this pair would be a conversion nobody declared, "
+            "at a rate nobody chose -- exactly the implicit mid-rate FR-010 forbids -- and "
+            "costing it would otherwise fail mid-walk as a currency mismatch naming neither "
+            "file.",
+            f"make the exit route's first leg take in {arrives_in.value} (an fx leg with a "
+            "declared channel, where the conversion really happens), or pair this route "
+            "with an exit that starts in it",
         )
     ends_in = partner.legs[-1].to_ccy
     if ends_in is not base_currency:
@@ -840,8 +864,8 @@ def _resolved_routes(
         files[route.id] = path
         identities[identity] = path
 
-    for route_id, route in routes.items():
-        _check_partner(route, routes, path=files[route_id], base_currency=base_currency)
+    for route in routes.values():
+        _check_partner(route, routes, files, base_currency=base_currency)
     _check_pools(routes, files)
     return routes, files
 
