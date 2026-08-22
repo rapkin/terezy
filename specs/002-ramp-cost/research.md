@@ -2,7 +2,7 @@
 
 **Date**: 2026-08-22
 
-Nine decisions. Each records what was chosen, why, and what was rejected. No
+Twelve decisions. D10–D12 were added after an external review of the artifacts. Each records what was chosen, why, and what was rejected. No
 `NEEDS CLARIFICATION` remains — the spec's three were resolved by the owner before
 planning; everything below is a design question.
 
@@ -147,9 +147,15 @@ events for all of them would put fees in the ledger for money that never moved.
 **Decision**: two functions, one arithmetic.
 
 ```
-cost_one(path, amount, as_of)  -> RampCost        pure, no ledger, run for every candidate
-execute(path, amount, as_of)   -> Sequence[Event] one fee event per fee-bearing leg
+cost_one(path, amount, ...)      -> RampCost        pure, no ledger, run for every candidate
+execute(cost: RampCost, ...)     -> Sequence[Event] one fee event per fee-bearing component
 ```
+
+⚙ **Corrected after review.** This decision originally wrote `execute(path, amount, as_of)`,
+which contradicts its own conclusion: taking the path and the amount would mean `execute`
+recomputes the arithmetic, which is exactly the second code path the paragraph below rejects.
+It takes the **costed figure**. `contracts/route-costing.md` had it right; this decision did
+not.
 
 `execute` is defined in terms of `cost_one`'s per-leg attribution: it walks the same
 `RampCost` and emits an event per component. So the ledger cannot disagree with the
@@ -244,8 +250,11 @@ threshold is invisible.
 manifest. This keeps the whole computation reproducible: the same inputs produce the same
 staleness verdicts forever, which would be false if "now" were read from the machine.
 
-`scripts/check_provenance.py` gains `streams` and `channels` to `SOURCED_DIRS`, and a check
-that every sourced table names a declared kind. It cannot check staleness itself — it has no
+⚙ **Corrected after review.** `scripts/check_provenance.py` gains **`channels` only** —
+not `streams`. A stream is the owner's own salary: a statement of fact by the only person who
+can make it, not an observation needing a citation, and it carries the same exemption
+`data/scenarios/` already has. `contracts/declaration-schema.md` had this right and this
+decision did not. It also gains a check that every sourced table names a declared kind. It cannot check staleness itself — it has no
 as-of date and should not invent one — so it verifies the *declaration* is complete and
 leaves the verdict to the engine.
 

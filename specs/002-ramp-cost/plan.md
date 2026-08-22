@@ -22,7 +22,8 @@ distinct types, so a missing exit route cannot be papered over with the figure t
 available.
 
 Nothing in `core` gains a clock: staleness is measured against an as-of date passed in, and
-a monthly cap is an accumulator in the fold.
+a monthly cap is an accumulator in the fold — keyed by the **shared rail** it belongs to, not
+by the route, so two routes through one Monobank card consume one limit.
 
 ## Technical Context
 
@@ -98,7 +99,7 @@ that the pre-check had not:
 specs/002-ramp-cost/
 ├── spec.md              # Feature specification (complete, 30 FRs, 16 SCs)
 ├── plan.md              # This file
-├── research.md          # Phase 0 — nine decisions with rationale
+├── research.md          # Phase 0 — twelve decisions with rationale
 ├── data-model.md        # Phase 1 — entities, fields, validation rules
 ├── quickstart.md        # Phase 1 — how to verify the feature works
 ├── contracts/
@@ -177,13 +178,13 @@ value in the project, not only route costs — the OVDP yield is stale-able too.
 | 5 | `results/ramp.py` — `OneWayCost`, `RoundTripCost`, `ExitCostUnknown`, `RampCost` | FR-002, FR-030 | 4 |
 | 6 | `routes/cost.py` — the single costing function, attributed | FR-003, FR-004, FR-005 | 3, 5 |
 | 7 | `streams/streams.py` — deployable capacity net of income tax | FR-006, FR-007, FR-009 | 1 |
-| 8 | `routes/capacity.py` + `LedgerState` accumulator | FR-012, FR-015 | 6 |
+| 8 | `routes/capacity.py` + `LedgerState` accumulator, keyed by **`capacity_pool`** | FR-012, FR-015 | 6 |
 | 9 | `routes/execute.py` — events derived from the costed figure | FR-005, FR-013 | 6, 8 |
 | 10 | `routes/ranking.py` — recommendation as an index | FR-016, FR-017, FR-018, FR-029 | 6 |
 | 11 | Regimes in scenario data | FR-019, FR-020 | 10 |
 | 12 | `data.declarations` extension: schema, loader, chaining resolver | FR-021, FR-024 | 1–11 |
 | 13 | Declaration files: routes in pairs, channels, streams, kinds | FR-023, SC-010 | 12 |
-| 14 | `check_provenance.py`: `streams`, `channels`, kind resolution | FR-022 | 13 |
+| 14 | `check_provenance.py`: **`channels` only** (streams are exempt), kind resolution | FR-022 | 13 |
 | 15 | Golden artefact for the ramp comparison; flip the eight rows | — | all |
 
 Steps 1–6 are the spine and are worth landing as one green checkpoint. Steps 7 and 12–13 are
@@ -198,7 +199,9 @@ parallelisable against 8–11.
 | A one-way figure promoted to round-trip | A confident number for an exit nobody costed | Distinct types; mypy strict catches the assignment (D4) |
 | Fees silently clamped at zero | Predecessor defect B13; money vanishes with no diagnostic | Invariant suite plus an explicit test for fees exceeding the amount |
 | Cost and execution drift apart | Ledger would disagree with the comparison that chose the route | `execute` derives from `cost_one`'s attribution; agreement is a property test (D5) |
-| A stale route cost passes unnoticed | Invalidates every comparison built on it, silently | Per-kind thresholds, no permissive default; a kind without one fails at load |
+| A stale route cost passes unnoticed | Invalidates every comparison built on it, silently | Per-kind thresholds, no permissive default; a kind without one fails at load; ages from the later of verification and retrieval (D12) |
+| Two routes sharing one card each get a full monthly limit | Monobank's limit is one of the four figures this feature exists for (§11 item 1) | Caps key on a declared `capacity_pool`, not on the route (D10). Found by review before `capacity.py` was written |
+| A route ranking that hides a preference in a score | **B12** forbids a composite score in the primary ordering | Lexicographic on the three keys FR-016 already ordered (D11) |
 | A clock creeps in for staleness | Would break C4 determinism for a convenience | `datetime.now` blocked in core; as-of date is an input recorded in the manifest |
 | Leg kinds drift toward a fifth interface | Principle II amendment by accident | The registry is `Mapping[str, LegCostFn]` on the day-count precedent; contract test asserts the four interfaces are still four |
 

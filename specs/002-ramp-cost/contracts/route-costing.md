@@ -36,8 +36,18 @@ def execute(cost: RampCost, *, owner_id: str, sequence_from: int) -> tuple[Event
 def rank(
     paths: Sequence[FundingPath],
     amount: Money,
-    **costing_inputs: object,
+    *,
+    routes: Mapping[str, Route],
+    streams: Mapping[str, IncomeStream],
+    channels: Mapping[str, FxChannel],
+    kinds: Mapping[str, ObservationKind],
+    capacity_used: CapacityUsed,
+    on_date: date,
+    as_of: date,
 ) -> Ranking: ...
+# ⚙ Spelled out after review. The first draft wrote `**costing_inputs: object`, which
+#   would not survive mypy strict and hid every required input behind a bag — sloppy in a
+#   document calling itself a contract. The inputs are exactly `cost_one`'s.
 
 
 # --- leg kinds: an algorithm registry, not an interface ---
@@ -61,6 +71,12 @@ the future report every input as stale.
 
 **One costing function.** `rank` is defined as costing each path with `cost_one` and sorting
 the results. There is no second implementation, no fast path, no summary mode. FR-029.
+
+**Ranking is lexicographic on `(round-trip cost, ceiling descending, latency)`**, never a
+composite score — required test **B12** forbids a non-standard score from driving the primary
+ordering, and weighting hryvnia against days would be a preference rather than a fact. A
+**tie is decided on round-trip cost alone**: two routes costing the same within the project
+tolerance are reported tied even where their other keys differ.
 
 **The recommendation is an index.** `Ranking.recommended` is an `int` into
 `Ranking.costed`, and `recommended_cost(r)` returns `r.costed[r.recommended]`. The winner
@@ -94,11 +110,20 @@ that could drift from `cost_one`.
 The invariant, asserted as a property over generated routes and amounts:
 
 ```
-sum(fee events from execute(c)) == c.one_way.sent − c.one_way.arrived
+sum(fee events from execute(c)) == sum(c.one_way.components.values())
 ```
 
-within the project tolerance, and the arriving amount in the ledger equals
-`c.one_way.arrived`. **Cost-then-execute agreement is tested, not assumed** — this is what
+⚙ **Corrected after review.** This was written as `sent − arrived`, which does not typecheck
+and could not: on an FX route `sent` is UAH and `arrived` is USD, and `money.sub` refuses a
+mismatch by design (C5). Restating `arrived` in the sending currency would need a rate, and
+the only rate available is a channel side — so "the difference" is not a well-defined
+quantity without saying *which side at which reference*, which is precisely what FR-010
+forbids leaving implicit.
+
+The invariant is therefore stated over the **components**, which are all in the sending
+currency by construction, and closes exactly. Two further clauses carry what the original
+wording was reaching for: the arriving amount in the ledger equals `c.one_way.arrived`
+currency and all, and `c.one_way.fraction` equals the component total over `sent`. **Cost-then-execute agreement is tested, not assumed** — this is what
 allows the comparison to be pure while the execution is recorded (research.md D5).
 
 ## What implementations must NOT do
@@ -111,6 +136,14 @@ allows the comparison to be pure while the execution is recorded (research.md D5
   promoted into its place (FR-030).
 - **Fold `disruption_probability` into a cost.** The chance a route stops working is a
   different claim from what it charges (FR-026). It rides beside the cost.
+- **Compound `disruption_probability` across legs.** `RampCost.disruption_probability` is
+  the **maximum** over the route's legs, documented as a *lower bound*. Compounding
+  (`1 − Π(1−pᵢ)`) would smuggle in an unstated assumption that leg failures are independent,
+  which for two legs at one bank they are not. A lower bound that says it is one is honest;
+  a compounded figure that looks exact is not.
+- **Report a round-trip latency as if it were one-way.** `RampCost.latency_days` is the sum
+  over the **inbound** route's legs. A round-trip comparison sums both routes' latencies, and
+  the two figures are separate fields — the same rule as cost (FR-002).
 - **Use a mid-rate.** Every conversion picks a side of a two-sided channel quote, and the
   channel used appears in `channels_applied` (FR-010, FR-011).
 - **Read a clock.** `datetime.now` is blocked in `core` by `.importlinter`, and the two dates

@@ -103,21 +103,22 @@ partner_route = "binance_p2p_to_monobank"   # null means NO round-trip figure ex
 status        = "open"
 
   [[route.leg]]
-  index        = 0
-  kind         = "fx"
-  from_venue   = "monobank_uah"
-  to_venue     = "monobank_uah"
-  from_ccy     = "UAH"
-  to_ccy       = "USD"
-  channel      = "p2p"
-  fee_pct      = 0.0
-  fee_fixed    = 0.0
-  latency_days = 0
+  index         = 0
+  kind          = "fx"
+  capacity_pool = "monobank_card_uah_usd"   # the shared rail; null if the leg shares none
+  from_venue    = "monobank_uah"
+  to_venue      = "monobank_uah"
+  from_ccy      = "UAH"
+  to_ccy        = "USD"
+  channel       = "p2p"
+  fee_pct       = 0.0
+  fee_fixed     = 0.0
+  latency_days  = 0
   disruption_probability = 0.0
-  kind_of_observation = "p2p_premium"
-  source       = "SYNTHETIC FIXTURE — invented leg."
-  retrieved_on = "2026-08-21"
-  verified_on  = ""
+  kind_of_observation    = "p2p_premium"
+  source        = "SYNTHETIC FIXTURE — invented leg."
+  retrieved_on  = "2026-08-21"
+  verified_on   = ""
 
   [[route.leg]]
   index        = 1
@@ -160,6 +161,11 @@ income_tax_rate_pct = 0.0
   rate_pct = 0.0
 ```
 
+⚙ **`via` and `arrival_form` from §4.2 are deliberately absent.** Whether Deel money arrives
+as USD or as a stablecoin (§11 item 4) changes which conversions are taxable events, and
+changes nothing about the ramp cost. Declaring the fields without the tax treatment would be
+a declaration the engine ignores. Named in the spec's Out of scope alongside F1.
+
 `amount = 0.0` is the honest placeholder: `SIMULATOR_SPEC.md` §11 item 3 records that the
 owner's actual monthly figures have not been stated. A zero produces a zero result rather
 than a made-up one.
@@ -172,6 +178,15 @@ than showing a net figure that quietly equals the gross.
 Streams carry no `source`/`verified_on`: an owner's own salary is not an observation needing
 a citation, it is a statement of fact by the only person who can make it. This is the same
 exemption `data/scenarios/` already has.
+
+⚙ **The exemption covers `income_tax_rate_pct` too, and that needs saying rather than
+inheriting silently.** It looks like a tax rate, and every other tax rate in this project
+must carry a citation (Principle I). It is exempt because it is not a *modelled* rate: §4.2
+puts the owner's own income-tax position outside the simulator entirely — the tool takes
+net-of-income-tax amounts as input, and this field exists only so the deployable figure is
+not overstated. A rate the engine *applies to a taxable event* would need a source; a rate
+the owner states about his own payslip does not. If that ever changes, this sentence is the
+thing to revisit.
 
 ## Enforced rules
 
@@ -197,6 +212,10 @@ Each maps to a requirement and to a case in `tests/contract/test_route_declarati
 | Negative `fee_pct`, `fee_fixed`, or `latency_days` | Error | FR-024 |
 | `partner_route` naming a route that does not exist | Error. `null` is legal; a dangling id is not | FR-027 |
 | `partner_route` whose `direction` is not `exit` | Error — an inbound route is not an exit | FR-027 |
+| ⚙ Exit route whose `origin` is not the inbound route's `destination` | Error. A pair that does not meet would load and produce a **confident round-trip figure for two unrelated journeys** — the exact class of number FR-030 exists to refuse | FR-027 |
+| ⚙ Exit route whose `destination` does not hold the base currency | Error. "Getting money back into **spendable** base currency" is what §4.3.3 asks for; an exit ending in a third currency at an exchange has not got the money out | FR-027 |
+| ⚙ Two legs naming one `capacity_pool` with different `monthly_cap` values | Error naming both files. Two numbers for one real limit means at least one is wrong, and choosing either would be a guess | FR-015 |
+| ⚙ A fallback policy of `deposit` | Error naming the feature that will bring it. This feature adds no instruments, and treating it as "hold as cash" would be a substituted default | FR-013 |
 | A stream's `arrives_at` naming an unknown venue | Error | FR-024 |
 | Malformed TOML | Error naming the file | FR-024 |
 

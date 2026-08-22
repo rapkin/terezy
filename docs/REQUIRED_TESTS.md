@@ -121,7 +121,7 @@ xfailed, or deleted without an amendment.
 |---|---|---|
 | G1 | The same crypto purchase funded from the UAH salary and from the USD income yields different net positions, differing by exactly the hand-computed ramp cost. | `[ ]` |
 | G2 | A P2P premium of +3 UAH at a stated reference rate reproduces the `SIMULATOR_SPEC.md` §4.3.1 percentage. | `[ ]` |
-| G3 | A plan exceeding a monthly cap queues the excess per the fallback policy and reports each occurrence; total deployed equals the cap, never the plan. | `[ ]` |
+| G3 | A plan exceeding a monthly cap queues the excess per the fallback policy and reports each occurrence; total deployed equals the cap, never the plan. ("Queues" is §4.3.4's own wording for *hold as cash* — not carrying the excess into next month's capacity, which no policy in the closed set expresses. Of the four policies, feature 002 implements **hold as cash, redirect, skip**; *place on deposit* needs a deposit instrument and fails at load naming the feature that will bring it.) | `[ ]` |
 | G4 | A regime transition on the war-end date switches the route set; round-trip cost drops by exactly the hand-computed difference. | `[ ]` |
 | G5 | Two variants of one route differing only in conversion count rank in the expected order. | `[ ]` |
 | G6 | No comparison reports a one-way cost as if it were round-trip. | `[ ]` |

@@ -21,8 +21,11 @@
 > or all of a year of the risk-free domestic return — and it is invisible in every chart
 > the predecessor produced.
 
-Feature 001 made the hurdle real: 15.5%, tax-free, hand-verified. This feature makes the
-thing that has to *beat* it real. Until the cost of getting money to an instrument is
+Feature 001 made the hurdle **computable**: an OVDP held to maturity now produces a
+hand-checkable schedule, exactly zero tax, and an effective return — carrying an
+**unverified** mark, because the yield it rests on is an owner-reported observation nobody
+has checked against a primary source (§11 item 2). The arithmetic is verified; the *number*
+is not, and the output says so. This feature makes the thing that has to *beat* it real. Until the cost of getting money to an instrument is
 computed rather than asserted, every comparison the tool offers is flattering the
 expensive options.
 
@@ -273,8 +276,18 @@ against the existing ones with no source edit.
 - **FR-012**: Declared caps, minimums, latency and status MUST be enforced. Total deployed
   MUST equal what the route allows, never what the plan requested.
 - **FR-013**: When a contribution cannot execute, the declared fallback policy MUST be
-  applied — hold as cash, place on deposit, redirect to a named destination, or skip — and
-  **every occurrence MUST be reported** with its date, amount and reason.
+  applied and **every occurrence MUST be reported** with its date, amount and reason.
+
+  ⚙ **Of §4.3.4's four policies, this feature implements three**: hold as cash, redirect to
+  a named destination, and skip. *Place on deposit* requires a deposit instrument, and this
+  feature adds no instruments — declaring it and silently treating it as "hold as cash"
+  would be a substituted default. A plan naming it fails at load, saying which feature will
+  bring it.
+
+  "Queue" in §4.3.4 and in required test **G3** is the same thing as *hold as cash* — §4.3.4's
+  own wording is "queue as UAH cash". It does **not** mean carrying the excess into next
+  month's capacity, which nothing in the spec asks for and which would need a policy the
+  closed set does not contain.
 - **FR-014**: A route unusable for a stated amount or date MUST be reported as such with
   the binding constraint named, and MUST NOT be silently adjusted, rounded, or omitted
   from the comparison without a recorded reason.
@@ -284,8 +297,15 @@ against the existing ones with no source edit.
 **Comparison and selection**
 
 - **FR-016**: Given an amount and a destination, the system MUST rank the available routes
-  by round-trip cost, ceiling and latency, recommend one, and report what each alternative
-  would have cost. Route choice is a modelled comparison, never a configuration constant.
+  **lexicographically** on `(round-trip cost, ceiling descending, latency)`, recommend one,
+  and report what each alternative would have cost. Route choice is a modelled comparison,
+  never a configuration constant.
+
+  ⚙ **The aggregation rule was missing** from the first draft, which named the three keys
+  and left how to combine them unstated. Lexicographic rather than scored, because required
+  test **B12** forbids a non-standard composite score from driving the primary ordering —
+  and because a weighted score would have to weight hryvnia against days, which is a
+  preference and not a fact.
 - **FR-029**: Every candidate route MUST be costed **in full, through the same path as the
   recommendation** — never summarised, estimated, or costed by a cheaper approximation.
   A comparison whose alternatives were priced differently from its winner is not a
@@ -293,7 +313,11 @@ against the existing ones with no source edit.
   an unexplained gap the first time someone checked one by hand.
 - **FR-017**: Two routes differing only in the number of conversions MUST rank in the
   order that cost implies, and the difference MUST be attributable to the conversion count.
-- **FR-018**: A tie MUST be reported as a tie.
+- **FR-018**: A tie MUST be reported as a tie, and a tie is decided **on round-trip cost
+  alone** — two routes costing the same within the project tolerance are tied even where
+  their ceilings or latencies differ. Reporting "these two cost the same, and here is how
+  they differ" answers what was asked; silently preferring one on a tiebreak the owner did
+  not ask for does not.
 
 **Regimes**
 
@@ -315,8 +339,13 @@ against the existing ones with no source edit.
 - **FR-024**: A declaration that is malformed, unrecognised, incomplete, duplicated, or
   whose legs do not chain by currency and venue MUST fail at load time naming file and
   field, with no default substituted.
-- **FR-025**: Staleness MUST surface. A value whose verification or retrieval date has
-  aged past its threshold MUST be reported as stale on every figure derived from it.
+- **FR-025**: Staleness MUST surface. A value MUST be reported as stale on every figure
+  derived from it once **the later of its verification and retrieval dates** has aged past
+  its threshold — that is, from `verified_on` where one is set, and from `retrieved_on`
+  otherwise. Verifying a value against a primary source is the strongest possible refresh
+  of confidence in it, and a warning that fired on the one thing the owner had actually
+  checked is a warning that gets ignored. An **unverified** value therefore ages from
+  retrieval, which is the common case today and the stricter one.
   A silently stale route cost invalidates every comparison built on it.
 - **FR-028**: The staleness threshold MUST be **per kind of value**, declared alongside the
   kind rather than fixed once for the project. A peer-to-peer premium ages in days; a
@@ -461,7 +490,7 @@ which is the class of figure this whole project exists to refuse.
 It does mean the route registry has to be populated in pairs before the first comparison
 appears. That cost is accepted.
 
-## Required tests this feature closes## Required tests this feature closes
+## Required tests this feature closes
 
 | Row | What it asserts |
 |---|---|
@@ -480,6 +509,14 @@ Named explicitly so the plan does not drift: new instruments of any kind, market
 and return models, the display-currency switch, inflation and CPI, the decision layer and
 candidate generation, objectives and constraints, Monte Carlo, the web interface, and the
 command-line interface.
+
+**The USDC question is also out of scope, and named here rather than left silent.** §4.2
+gives an income stream `via` and `arrival_form` fields, and §11 item 4 records that whether
+Deel money reaches Coinbase as USD or as a stablecoin is unresolved and materially changes
+which conversions are taxable events. This feature's `IncomeStream` carries neither field:
+the ramp cost is identical either way, and the difference is entirely a tax question in a
+regime that does not exist in adopted law. Adding the fields without the tax treatment would
+be a declaration the engine ignores.
 
 And one boundary worth stating on its own, because it becomes tempting the moment FX
 exists: **the tax asymmetry where a position flat in USD across a devaluation posts a

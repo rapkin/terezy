@@ -169,26 +169,51 @@ def age_in_days(retrieved_on: date, *, as_of: date) -> int:
     return (as_of - retrieved_on).days
 
 
-def is_stale(retrieved_on: date, kind: ObservationKind, *, as_of: date) -> bool:
-    """Whether a value of this kind, read on this date, is stale at the as-of date.
+def freshest_date(source: SourceRef) -> date:
+    """The date a value's age is measured from: ``verified_on`` if set, else ``retrieved_on``.
 
-    ``as_of - retrieved_on > staleness_days``: strictly past the threshold, so a value on
+    FR-025 says "verification **or** retrieval date has aged" and left which one open. It is
+    the later of the two -- and since a verification cannot precede what it verifies, that is
+    ``verified_on`` whenever there is one.
+
+    Verifying a value against a primary source is the strongest possible refresh of
+    confidence in it, stronger than re-fetching. A value retrieved two years ago and verified
+    last week is not stale, and reporting it as stale would tell the owner to re-check the one
+    thing he has actually checked -- a warning that fires on verified values is one that gets
+    ignored, which is worse than none.
+
+    The asymmetry is deliberate: an **unverified** value ages from retrieval, which is every
+    value in this project today and the stricter of the two readings.
+    """
+    return source.verified_on if source.verified_on is not None else source.retrieved_on
+
+
+def is_stale(source: SourceRef, kind: ObservationKind, *, as_of: date) -> bool:
+    """Whether a value of this kind is stale at the as-of date.
+
+    Ages from :func:`freshest_date`, so a verified value ages from its verification.
+
+    ``as_of - freshest > staleness_days``: strictly past the threshold, so a value on
     the boundary is still current. ``as_of`` is keyword-only, because it is the argument a
     caller is most likely to confuse with ``on_date`` -- the date money moves -- and the
     two are never interchangeable.
     """
-    return age_in_days(retrieved_on, as_of=as_of) > kind.staleness_days
+    return age_in_days(freshest_date(source), as_of=as_of) > kind.staleness_days
 
 
 def _verdict_for(source: SourceRef, kind: ObservationKind, *, as_of: date) -> StaleSource | None:
-    """One source aged against one kind, or ``None`` when it is still current."""
-    age = age_in_days(source.retrieved_on, as_of=as_of)
+    """One source aged against one kind, or ``None`` when it is still current.
+
+    Ages from :func:`freshest_date`, the same date :func:`is_stale` uses -- if the two aged
+    from different dates, a value could be stale by one and current by the other.
+    """
+    age = age_in_days(freshest_date(source), as_of=as_of)
     if age <= kind.staleness_days:
         return None
     return StaleSource(
         source_id=source.id,
         kind_id=kind.id,
-        retrieved_on=source.retrieved_on,
+        retrieved_on=freshest_date(source),
         age_days=age,
         threshold_days=kind.staleness_days,
         overdue_days=age - kind.staleness_days,

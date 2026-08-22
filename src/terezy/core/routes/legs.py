@@ -124,6 +124,20 @@ class Leg:
     """The largest amount this leg will carry per movement, or ``None``."""
 
     monthly_cap: Money | None
+    capacity_pool: str | None
+    """The shared resource whose monthly limit this leg consumes, or ``None`` for none.
+
+    A limit belongs to a **rail** -- a card, an account, a corridor under a regulatory
+    ceiling -- and a route is a path that *uses* rails. Two different routes both moving money
+    through the owner's Monobank card consume **one** limit, so both legs name the same pool
+    and the accumulator keys on the pool rather than on the route.
+
+    Keying on the route instead was the first design, and it was wrong in a way that mattered:
+    each route would have received its own full monthly limit, and Monobank's limit is one of
+    the four figures §11 item 1 names as the reason this feature exists. Two legs naming one
+    pool must declare the **same** cap; a mismatch is a load-time failure, because two numbers
+    for one real limit means at least one is wrong and choosing either would be a guess.
+    """
     """The most this leg will carry in a calendar month, or ``None``. Capacity already
     consumed in the same month is the accumulator's business (FR-015)."""
 

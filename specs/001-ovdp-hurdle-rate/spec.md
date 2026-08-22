@@ -200,6 +200,20 @@ projection on it without editing any source file.
 - **FR-005**: The system MUST report both a contractual yield-to-maturity and a
   cash-flow-weighted return, kept as separate figures and separately labelled, and MUST
   NOT present either as a substitute for the other.
+- **FR-023**: ⚙ **Added after review.** Of the two figures FR-005 requires, the
+  **contractual yield-to-maturity** is the hurdle rate that later features compare against,
+  and the system MUST identify it as such. The two are not interchangeable and the choice is
+  not arbitrary:
+  - the contractual yield is a property of the **paper**, invariant to what the owner does
+    with the coupons, so it is stable enough to be a benchmark;
+  - the cash-flow-weighted return describes **one particular plan** — it moves with the
+    coupon policy, the purchase size and the timing — so a comparison against it would
+    measure the plan as much as the alternative.
+
+  This ambiguity was real and it had already cost something: `nominal_ytm` shipped moving
+  with the coupon policy, correctly computed under a wrong label, and passed review twice
+  before implementation of feature 002 caught it. FR-004 speaking of "the hurdle rate" in the
+  singular while FR-005 required two figures is what left room for that.
 - **FR-022**: The hurdle-rate figure MUST be reported in nominal terms in this feature,
   and MUST state on its face that it is nominal and excludes inflation. The result
   structure MUST carry a defined, currently-unpopulated place for the corresponding

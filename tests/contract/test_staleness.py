@@ -79,6 +79,16 @@ def _provenance(name: str) -> Provenance:
     return prov.of([_source(name)])
 
 
+def _unverified_source(*, verified_on: date | None = None) -> SourceRef:
+    """A source retrieved on RETRIEVED, unverified unless a verification date is given."""
+    return SourceRef(
+        id="fixture",
+        citation="SYNTHETIC FIXTURE",
+        retrieved_on=RETRIEVED,
+        verified_on=verified_on,
+    )
+
+
 class TestTheThresholdIsPerKind:
     """FR-028, SC-015: same retrieval date, different kinds, different verdicts."""
 
@@ -86,22 +96,22 @@ class TestTheThresholdIsPerKind:
         # 30 days after retrieval: the premium is long past its 7-day threshold, the fee
         # schedule is nowhere near its 365-day one. One threshold could not say both.
         as_of = date(2026, 1, 31)
-        assert staleness.is_stale(RETRIEVED, P2P_PREMIUM, as_of=as_of)
-        assert not staleness.is_stale(RETRIEVED, FEE_SCHEDULE, as_of=as_of)
+        assert staleness.is_stale(_unverified_source(), P2P_PREMIUM, as_of=as_of)
+        assert not staleness.is_stale(_unverified_source(), FEE_SCHEDULE, as_of=as_of)
 
     def test_the_longer_threshold_does_go_stale_eventually(self) -> None:
         # The complement of the test above: the fee schedule is not exempt, only slower.
         # Asserted so that a threshold accidentally read as "never" would fail here.
         as_of = date(2027, 6, 1)
-        assert staleness.is_stale(RETRIEVED, FEE_SCHEDULE, as_of=as_of)
+        assert staleness.is_stale(_unverified_source(), FEE_SCHEDULE, as_of=as_of)
 
     def test_the_boundary_is_strictly_past_the_threshold(self) -> None:
         # 7 days after retrieval a 7-day threshold has been *reached*, not exceeded:
         # ``as_of - retrieved_on > staleness_days`` (research.md D9). Asserted on both
         # sides of the boundary, because an off-by-one here is invisible in normal use
         # and would silently shift every warning by a day.
-        assert not staleness.is_stale(RETRIEVED, P2P_PREMIUM, as_of=date(2026, 1, 8))
-        assert staleness.is_stale(RETRIEVED, P2P_PREMIUM, as_of=date(2026, 1, 9))
+        assert not staleness.is_stale(_unverified_source(), P2P_PREMIUM, as_of=date(2026, 1, 8))
+        assert staleness.is_stale(_unverified_source(), P2P_PREMIUM, as_of=date(2026, 1, 9))
 
 
 class TestAKindWithoutAThresholdCannotExist:
@@ -352,3 +362,47 @@ def test_the_clock_scan_would_actually_catch_a_violation() -> None:
     assert CLOCK.search("    today = date.today()")
     assert CLOCK.search("    stamp = time.time()")
     assert not CLOCK.search("def is_stale(retrieved_on: date, *, as_of: date) -> bool:")
+
+
+@pytest.mark.contract
+class TestVerificationRefreshesTheAge:
+    """FR-025 says "verification **or** retrieval date"; this is which one, and why.
+
+    A value retrieved long ago and verified recently is **not** stale. Verifying against a
+    primary source is the strongest refresh of confidence there is, and a staleness warning
+    that fired on the one value the owner had actually checked is a warning that gets
+    ignored -- worse than none at all.
+
+    The asymmetry is deliberate: an unverified value ages from retrieval, which is every
+    value in this project today and the stricter of the two readings.
+    """
+
+    def test_an_unverified_value_ages_from_retrieval(self) -> None:
+        stale_by_then = date(2026, 1, 9)  # RETRIEVED + 8 days, p2p threshold is 7
+        assert staleness.is_stale(_unverified_source(), P2P_PREMIUM, as_of=stale_by_then)
+
+    def test_a_verification_refreshes_it(self) -> None:
+        """Same retrieval date, same as-of date, verified in between: no longer stale."""
+        stale_by_then = date(2026, 1, 9)
+        verified = _unverified_source(verified_on=date(2026, 1, 8))
+        assert not staleness.is_stale(verified, P2P_PREMIUM, as_of=stale_by_then)
+
+    def test_the_verdict_ages_from_the_same_date_as_the_predicate(self) -> None:
+        """If the two disagreed, a value could be stale by one measure and current by the
+        other -- and the mark on a figure would not match the boolean beside it."""
+        as_of = date(2026, 1, 9)
+        verified = _unverified_source(verified_on=date(2026, 1, 8))
+        verdict = staleness.staleness_of(
+            prov.of([verified]),
+            {P2P_PREMIUM.id: P2P_PREMIUM},
+            kind=P2P_PREMIUM.id,
+            as_of=as_of,
+        )
+        assert not verdict.stale
+        assert not staleness.is_stale(verified, P2P_PREMIUM, as_of=as_of)
+
+    def test_freshest_date_prefers_verification(self) -> None:
+        assert staleness.freshest_date(_unverified_source()) == RETRIEVED
+        assert staleness.freshest_date(_unverified_source(verified_on=date(2026, 6, 1))) == date(
+            2026, 6, 1
+        )

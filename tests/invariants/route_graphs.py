@@ -131,6 +131,7 @@ def _leg(
     monthly_cap: float | None = None,
     window: tuple[date | None, date | None] = (None, None),
     disruption: float = 0.0,
+    pool: str | None = None,
 ) -> Leg:
     return Leg(
         index=index,
@@ -145,6 +146,7 @@ def _leg(
         minimum=None if minimum is None else Money(minimum, from_ccy, FEE_SOURCES),
         maximum=None if maximum is None else Money(maximum, from_ccy, FEE_SOURCES),
         monthly_cap=None if monthly_cap is None else Money(monthly_cap, from_ccy, FEE_SOURCES),
+        capacity_pool=pool,
         latency_days=index,
         available_from=window[0],
         available_until=window[1],

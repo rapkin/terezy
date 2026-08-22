@@ -28,9 +28,16 @@ Declared in `data/observation_kinds.toml`. One kind per sort of thing the owner 
 Free functions in `core/primitives/staleness.py`. There is **no clock**:
 
 ```
-is_stale(retrieved_on, kind, *, as_of) -> bool
-staleness_of(provenance, kinds, *, as_of) -> StalenessVerdict
+is_stale(source, kind, *, as_of) -> bool          # ages from the LATER of the two dates
+staleness_of(provenance, kind, *, as_of) -> StalenessVerdict
 ```
+
+⚙ **Which date ages** was left ambiguous by FR-025's "verification **or** retrieval date".
+Resolved: from `verified_on` where one is set, from `retrieved_on` otherwise — the later of
+the two, since a verification cannot precede what it verifies. Verifying against a primary
+source is the strongest refresh of confidence there is, and a warning that fired on the one
+value the owner had actually checked is one that gets ignored. An unverified value therefore
+ages from retrieval, the common case today and the stricter one (research.md D12).
 
 `as_of` is an input to the run, recorded in the manifest. The same inputs therefore produce
 the same staleness verdicts forever — which would be false if "now" were read from the
@@ -78,8 +85,17 @@ entering it would be a place to make an arithmetic error in a data file.
 | `markup_bps` | `float \| None` | Exactly one of `markup_bps` / `premium_per_unit` is set. Both set, or neither, is a load-time failure — a "helpful" precedence rule here would silently ignore one of the two numbers the owner wrote. |
 | `premium_per_unit` | `Money \| None` | May be **zero** (the channel is at reference) and may be **negative** (P2P sometimes trades below reference). A *missing* premium is refused; a zero one is not. |
 
-`effective_rate(side, reference)` is a free function. FR-004: a premium of `p` against
-reference `r` costs `p / r`, which reproduces §4.3.1 exactly.
+Three free functions, and the distinction between the last two is the correction FR-004
+went through:
+
+- `effective_rate(side, reference, *, role)` — the rate actually transacted at, `r + p` when
+  buying and `r - p` when selling. **The conversion happens at this rate**, so the arriving
+  amount is the one the venue would really hand over.
+- `loss_fraction(side, reference, *, role)` — **the cost**: the fraction of money actually
+  lost, `p / (r + p)` buying and `p / r` selling.
+- `spread_over_reference(side, reference, *, role)` — `p / r`, the spread over the reference
+  *rate*. This is §4.3.1's figure and stays reproducible, reported **beside** the cost and
+  never instead of it.
 
 ### `Leg`
 
@@ -94,6 +110,7 @@ reference `r` costs `p / r`, which reproduces §4.3.1 exactly.
 | `fee_fixed` | `Money` | Non-negative |
 | `minimum`, `maximum` | `Money \| None` | |
 | `monthly_cap` | `Money \| None` | |
+| `capacity_pool` | `str \| None` | ⚙ **Added after review.** The shared rail whose limit this leg consumes. Two legs on different routes both using the owner's Monobank card name the **same** pool, and the accumulator keys on the pool — not on the route, which was the first design and gave each route its own full limit. They must declare the **same** cap; a mismatch is a load-time failure (research.md D10). |
 | `latency_days` | `int` | Non-negative |
 | `available_from`, `available_until` | `date \| None` | **A fact** about the leg, with a source — never an assumption. See `Regime`. |
 | `disruption_probability` | `float` | In `[0, 1]`. Reported, **never folded into a cost** (FR-026): the chance a route stops working is a different claim from what it charges. |
@@ -109,7 +126,7 @@ reference `r` costs `p / r`, which reproduces §4.3.1 exactly.
 | `origin`, `destination` | `str` | Venue ids |
 | `direction` | `"inbound" \| "exit"` | Declared, not inferred. FR-027: exit routes are separate, not reversals. |
 | `partner_route` | `str \| None` | The exit route paired with this inbound one. `None` means **no round-trip figure exists** for this route (FR-030). |
-| `status` | `"open" \| "constrained" \| "closed"` | |
+| `status` | `"open" \| "constrained" \| "closed"` | ⚙ **`constrained` needed defining.** `open` — usable as declared. `constrained` — usable, but a declared cap or window binds in normal use, so it is **ranked and flagged** rather than excluded. `closed` — not usable on the date, excluded with its status recorded (FR-014). The middle value exists because §4.3 uses it for the IBKR route: reachable, but not freely. |
 | `legs` | `tuple[Leg, ...]` | Non-empty. A route with no legs is refused, never costed as free. |
 
 **Registry identity is `(provider × currency path × venue)`, not provider** (FR-023),
@@ -130,6 +147,13 @@ Scenario data, not route data — the division is about epistemic status (resear
 | `route_ids` | `frozenset[str]` | Which routes exist under this regime |
 
 ### `RegimeTransition`
+
+⚙ **One transition, and that is a stated limit rather than an oversight.** FR-019 is worded
+generally ("a scenario MAY declare a transition date and a route set per regime"), and this
+record expresses exactly one. A chain of regimes is representable as a sequence of these, and
+the selection function takes the whole sequence — but this feature declares and tests one,
+because a second transition needs a second assumption the owner has not stated. The type does
+not forbid more; the fixtures do not exercise more.
 
 | Field | Type | Rule |
 |---|---|---|
@@ -202,7 +226,7 @@ error (research.md D4).
 |---|---|---|
 | `sent` | `Money` | What departed |
 | `arrived` | `Money` | What reached the far end |
-| `components` | `Mapping[CostComponent, Money]` | Every component present, zero where it does not apply. Their sum equals `sent − arrived` in base terms — the invariant behind FR-003. |
+| `components` | `Mapping[CostComponent, Money]` | Every component present, zero where it does not apply. **All in the sending currency**, which is what makes them summable at all. ⚙ This row previously said their sum equals `sent − arrived` "in base terms" — which does not typecheck on an FX route, where `sent` is UAH and `arrived` is USD and `money.sub` refuses the mismatch by design (C5). Restating `arrived` would need a rate, and naming which side at which reference is exactly what FR-010 forbids leaving implicit. The invariant is over the components, and `fraction` is their total over `sent`. |
 | `fraction` | `float` | Cost as a fraction of `sent`. **May exceed 1.0** on a small amount with a fixed fee; reported honestly rather than capped, since a cap here is B13's silent clamp in a new hat. |
 | `channels_applied` | `tuple[str, ...]` | Which channel each `fx` leg used (FR-011) |
 | `provenance` | `Provenance` | Merged from every declared value that fed the figure |
@@ -222,10 +246,10 @@ error (research.md D4).
 | `path` | `FundingPath` | The triple. Never a bare destination. |
 | `one_way` | `OneWayCost` | |
 | `round_trip` | `RoundTripCost \| ExitCostUnknown` | Present and typed either way; never absent, never a promoted one-way figure (FR-030) |
-| `latency_days` | `int` | Sum over legs |
+| `latency_days` | `int` | Sum over the **inbound** route's legs. ⚙ A round-trip comparison sums both routes' latencies and keeps them as separate fields — the same one-way/round-trip rule as cost (FR-002). |
 | `ceiling` | `Money \| None` | Effective monthly deployment ceiling |
 | `status` | `str` | |
-| `disruption_probability` | `float` | Reported beside the cost, never inside it (FR-026) |
+| `disruption_probability` | `float` | The **maximum** over the route's legs, and documented as a *lower bound*. ⚙ Compounding (`1 − Π(1−pᵢ)`) would assume leg failures are independent, which for two legs at one bank they are not; a lower bound that says it is one is honest, a compounded figure that looks exact is not. Reported beside the cost, never inside it (FR-026). |
 
 ### `RouteUnusable`
 
@@ -239,10 +263,10 @@ Returned instead of a `RampCost` when a route cannot carry the amount on the dat
 
 | Field | Type | Rule |
 |---|---|---|
-| `costed` | `tuple[RampCost, ...]` | Every candidate, each costed by the single costing function |
+| `costed` | `tuple[RampCost, ...]` | Every candidate, each costed by the single costing function, ordered **lexicographically** on `(round-trip cost, ceiling descending, latency)`. ⚙ Lexicographic and not scored: **B12** forbids a non-standard composite score in the primary ordering, and weighting hryvnia against days would be a preference rather than a fact (research.md D11). |
 | `recommended` | `int` | An **index** into `costed`, not a copy (research.md D3). `recommended_cost(r)` returns `r.costed[r.recommended]`, so the winner *is* one of the alternatives and SC-016 can assert identity rather than equality. |
 | `excluded` | `tuple[RouteUnusable, ...]` | With reasons |
-| `ties` | `tuple[tuple[int, ...], ...]` | Indices that scored equal within the project tolerance. A tie is reported as a tie (FR-018), never broken arbitrarily. |
+| `ties` | `tuple[tuple[int, ...], ...]` | Indices tied **on round-trip cost alone**, within the project tolerance — even where their ceilings or latencies differ. ⚙ Deliberate: the owner asked which is cheapest, and "these two cost the same, here is how they differ" answers that; preferring one on an unasked-for tiebreak does not. A tie is reported as a tie (FR-018). |
 | `not_comparable` | `tuple[RampCost, ...]` | Those whose `round_trip` is `ExitCostUnknown` — costed, reported, and kept out of the ranking (FR-030) |
 
 ### `CapacityUsed`

@@ -89,6 +89,7 @@ def _leg(
         minimum=None,
         maximum=None,
         monthly_cap=None,
+        capacity_pool=None,
         latency_days=0,
         available_from=None,
         available_until=None,
