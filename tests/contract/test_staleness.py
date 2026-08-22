@@ -33,6 +33,7 @@ it is a green tick over an unchecked value.
 from __future__ import annotations
 
 import re
+from dataclasses import replace
 from datetime import date
 from pathlib import Path
 
@@ -40,8 +41,14 @@ import pytest
 
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives import staleness
+from terezy.core.primitives.currency import Currency
+from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance, SourceRef
 from terezy.core.primitives.staleness import ObservationKind, StalenessVerdict
+from terezy.core.results.ramp import RampCost
+from terezy.core.routes import cost
+from terezy.core.routes.channels import ChannelSide, FxChannel
+from tests.invariants import route_graphs
 
 pytestmark = pytest.mark.contract
 
@@ -406,3 +413,116 @@ class TestVerificationRefreshesTheAge:
         assert staleness.freshest_date(_unverified_source(verified_on=date(2026, 6, 1))) == date(
             2026, 6, 1
         )
+
+    def test_a_re_retrieval_after_an_old_verification_ages_from_the_retrieval(self) -> None:
+        """FR-025 promises the *later* of the two dates, in both orderings.
+
+        A value verified in 2024 and re-fetched on 2026-08-01 is 21 days old on
+        2026-08-22, not 964: the retrieval is the more recent look at the source, and
+        reporting it stale would tell the owner to re-fetch the value he just fetched.
+        """
+        re_retrieved = SourceRef(
+            id="fixture",
+            citation="SYNTHETIC FIXTURE",
+            retrieved_on=date(2026, 8, 1),
+            verified_on=date(2024, 1, 1),
+        )
+        assert staleness.freshest_date(re_retrieved) == date(2026, 8, 1)
+        assert not staleness.is_stale(re_retrieved, P2P_PREMIUM, as_of=date(2026, 8, 7))
+        # And the other ordering: a verification after retrieval wins, as before.
+        re_verified = SourceRef(
+            id="fixture",
+            citation="SYNTHETIC FIXTURE",
+            retrieved_on=date(2024, 1, 1),
+            verified_on=date(2026, 8, 1),
+        )
+        assert staleness.freshest_date(re_verified) == date(2026, 8, 1)
+        assert not staleness.is_stale(re_verified, P2P_PREMIUM, as_of=date(2026, 8, 7))
+
+
+@pytest.mark.contract
+class TestAChannelSideAgesUnderItsOwnDeclaredKind:
+    """FR-028 at the channel seam: every source ages under the kind ITS table declared.
+
+    A channel file declares a kind three times -- once for the reference rate and once per
+    side -- because they are three observations that go out of date at three speeds. The
+    defect this pins: the sides' declared kinds were validated at load and then discarded,
+    so a 7-day P2P premium aged under the channel's 365-day bank-schedule threshold and a
+    cost resting on an 82-day-old premium reported ``stale=()``. Both directions are
+    asserted, because the opposite failure -- a slow side reported stale under a fast
+    channel kind -- is the cry-wolf warning the per-kind design exists to avoid.
+    """
+
+    SIDE_SOURCE = SourceRef(
+        id="synthetic:p2p-premium-side",
+        citation="SYNTHETIC FIXTURE -- an invented side observation, distinct from the "
+        "reference's, so the verdict can be attributed per source.",
+        retrieved_on=route_graphs.RETRIEVED_ON,  # 20 days before the as-of date
+        verified_on=None,
+    )
+
+    def _mixed_channel(self, *, channel_kind: str, side_kind: str) -> FxChannel:
+        base = route_graphs.p2p_graph().channels[route_graphs.CHANNEL_ID]
+        side_sources = prov.of([self.SIDE_SOURCE])
+        return replace(
+            base,
+            kind=channel_kind,
+            buy_side=ChannelSide(
+                markup_bps=None,
+                premium_per_unit=Money(3.0, Currency.UAH, side_sources),
+                kind=side_kind,
+                provenance=side_sources,
+            ),
+            sell_side=ChannelSide(
+                markup_bps=None,
+                premium_per_unit=Money(-3.0, Currency.UAH, side_sources),
+                kind=side_kind,
+                provenance=side_sources,
+            ),
+        )
+
+    def _staleness_of_cost(self, channel: FxChannel) -> StalenessVerdict:
+        graph = route_graphs.p2p_graph()
+        costed = cost.cost_one(
+            graph.path,
+            Money(10_000.0, Currency.UAH, prov.EMPTY),
+            routes=graph.routes,
+            channels={route_graphs.CHANNEL_ID: channel},
+            streams=route_graphs.STREAMS,
+            kinds=route_graphs.KINDS,
+            on_date=route_graphs.ON_DATE,
+            as_of=route_graphs.AS_OF,
+        )
+        assert isinstance(costed, RampCost)
+        return costed.one_way.staleness
+
+    def test_a_fast_side_under_a_slow_channel_kind_is_reported_stale(self) -> None:
+        # The reproduced defect: side kind p2p_premium (7 days), channel kind
+        # bank_fee_schedule (365), everything retrieved 20 days before as-of. The side's
+        # figure is 13 days overdue under ITS kind and must say so.
+        verdict = self._staleness_of_cost(
+            self._mixed_channel(
+                channel_kind=route_graphs.BANK_FEE_SCHEDULE.id,
+                side_kind=route_graphs.P2P_PREMIUM.id,
+            )
+        )
+        by_source = {entry.source_id: entry.kind_id for entry in verdict.stale}
+        assert by_source.get(self.SIDE_SOURCE.id) == route_graphs.P2P_PREMIUM.id, (
+            "the side's premium must age under the side's own declared kind, "
+            f"got stale set {sorted(by_source)}"
+        )
+
+    def test_a_slow_side_under_a_fast_channel_kind_is_not_falsely_stale(self) -> None:
+        # The mirror image: the side declared under the slow kind stays current, while the
+        # reference -- declared under the fast kind -- is the one reported stale. A side
+        # falsely aged under the channel's kind here would be the warning that fires on
+        # the one value the owner declared slow, which is the warning that gets ignored.
+        verdict = self._staleness_of_cost(
+            self._mixed_channel(
+                channel_kind=route_graphs.P2P_PREMIUM.id,
+                side_kind=route_graphs.BANK_FEE_SCHEDULE.id,
+            )
+        )
+        stale_ids = {entry.source_id for entry in verdict.stale}
+        assert self.SIDE_SOURCE.id not in stale_ids
+        assert route_graphs.RATE_SOURCE.id in stale_ids

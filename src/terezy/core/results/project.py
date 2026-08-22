@@ -260,6 +260,14 @@ def _charge_every_taxable_event(
             continue
         class_id = declaration.tax_classes.get(kind)
         if class_id is None:
+            if not any(kind in declared.applies_to for declared in tax_classes.values()):
+                # Not applicable, and the claim is the data's: no class in the declared
+                # tax pack applies to this event kind, so there is no rule to run and
+                # nothing to cite. Distinct from an exemption, whose zero charge cites
+                # its class (E11), and distinct from the unresolved reference below,
+                # which fires exactly when the pack *does* declare a class for the kind
+                # and the instrument fails to say which treatment governs it.
+                continue
             return UnresolvedTaxClass(
                 tax_class_id=f"<none declared for {kind.value}>",
                 instrument_id=declaration.id,
@@ -320,18 +328,26 @@ def _taxable_kind(kind: EventKind) -> TaxableEventKind | None:
             # principal returned. For a bond redeemed at par that gain is exactly zero,
             # and taxing the principal instead would tax the owner's own money back.
             return TaxableEventKind.DISPOSAL_GAIN
+        case EventKind.RAMP_MOVEMENT:
+            # Whether a conversion is taxable is a *declaration*, never a claim of this
+            # engine (SIMULATOR_SPEC §4.2: a stablecoin's later conversion may itself be
+            # taxable, and both interpretations must be modellable). The kind maps
+            # mechanically; the charge happens only under a declared class whose
+            # ``applies_to`` covers it, and a kind no declared class applies to is *not
+            # applicable* -- see ``_charge_every_taxable_event``.
+            return TaxableEventKind.CONVERSION
         case (
             EventKind.PURCHASE
             | EventKind.REINVESTMENT
             | EventKind.CASH_DEPOSIT
             | EventKind.TAX_CHARGE
             | EventKind.FEE
-            | EventKind.RAMP_MOVEMENT
         ):
-            # A ramp movement is the owner's own money changing currency or venue. Nothing is
-            # earned and nothing is disposed of, so there is no taxable event -- and it is
-            # listed explicitly rather than falling through, because the ``assert_never``
-            # below is what makes "nobody thought about this kind" a type error.
+            # Mechanics, not tax policy: a purchase and a reinvestment are money going
+            # out, a deposit arrives from outside the modelled system, a fee is a cost,
+            # and a tax charge is the output of this very process. Listed explicitly
+            # rather than falling through, because the ``assert_never`` below is what
+            # makes "nobody thought about this kind" a type error.
             return None
         case _:  # pragma: no cover -- mypy proves this unreachable
             assert_never(kind)
@@ -346,7 +362,16 @@ def _taxable_base(event: Event, kind: TaxableEventKind, state: LedgerState) -> M
     in hryvnia -- the trade-currency figure would be the wrong number to tax.
     """
     match kind:
-        case TaxableEventKind.COUPON | TaxableEventKind.INTEREST | TaxableEventKind.DISTRIBUTION:
+        case (
+            TaxableEventKind.COUPON
+            | TaxableEventKind.INTEREST
+            | TaxableEventKind.DISTRIBUTION
+            # The base a declared conversion class applies to is the amount the movement
+            # records. A gain-based reading of a conversion needs a basis model for the
+            # converted asset, which arrives with the feature that models virtual-asset
+            # bases -- as cited data, not as an assumption here.
+            | TaxableEventKind.CONVERSION
+        ):
             return event.amount
         case TaxableEventKind.DISPOSAL_GAIN:
             for disposal in state.disposals:

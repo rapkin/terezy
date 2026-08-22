@@ -68,6 +68,19 @@ class TaxableEventKind(Enum):
     INTEREST = "interest"
     """Interest that is not a contractual bond coupon -- a deposit, a cash balance."""
 
+    CONVERSION = "conversion"
+    """Value converted along a funding route -- a ramp movement.
+
+    Whether a conversion is taxable **at all** is not this engine's claim to make:
+    ``SIMULATOR_SPEC.md`` §4.2 records that a stablecoin's later conversion may itself be
+    a taxable disposal under a regime that is genuinely unsettled, and asks for both
+    interpretations to be modellable. So the kind exists in the vocabulary, and the
+    treatment is a declaration: a jurisdiction that taxes conversions declares a class
+    whose ``applies_to`` includes this kind, and one that does not declares none -- in
+    which case no rule runs, because no declared class applies, not because a comment
+    says nothing was earned.
+    """
+
 
 @dataclass(frozen=True, slots=True)
 class TaxClass:

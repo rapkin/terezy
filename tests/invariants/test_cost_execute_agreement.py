@@ -48,6 +48,7 @@ from collections.abc import Mapping
 
 import pytest
 from hypothesis import given
+from hypothesis import strategies as st
 
 from terezy.core.ledger import engine
 from terezy.core.ledger.events import CausationKind, Event, EventKind
@@ -296,6 +297,49 @@ class TestExecuteDerivesRatherThanRecomputes:
         key = capacity.key_for(POOL, route_graphs.ON_DATE)
         assert set(folded.capacity) == {key}
         assert_money_close(folded.capacity[key], costed.one_way.sent)
+
+    @given(
+        # Signed on purpose, and bounded so the effective rate 42 + p stays positive:
+        # a side that pays away the whole reference is refused at load (FR-010).
+        buy_premium=st.floats(min_value=-4.0, max_value=4.0, allow_nan=False),
+        amount=route_graphs.AMOUNTS,
+    )
+    def test_the_rail_consumes_what_was_sent_whatever_the_components_signs(
+        self, buy_premium: float, amount: float
+    ) -> None:
+        # FR-015 over *signed* components. A negative buy premium is a legal discount
+        # channel: the conversion-spread component goes negative, the departure is then
+        # larger than ``sent`` and the fee line is a credit. An accumulator summing the
+        # magnitude of every pool-tagged event counts both -- 110 000 consumed where
+        # 100 000 was sent -- so headroom goes falsely negative and fallbacks fire despite
+        # room. What the rail carried is the whole of ``sent`` (execute's own contract),
+        # for every sign the components can take.
+        graph = route_graphs.p2p_graph(buy_premium=buy_premium)
+        costed = _costed(graph, amount)
+        if not isinstance(costed, RampCost):
+            return
+        folded = engine.fold(_events(costed), base_currency=Currency.UAH, consumption_method="fifo")
+        key = capacity.key_for(POOL, route_graphs.ON_DATE)
+        assert_money_close(folded.capacity[key], costed.one_way.sent)
+
+    def test_a_discount_channel_leaves_the_headroom_the_rail_really_has(self) -> None:
+        # The reproduced defect, in the numbers it was reproduced with: 100 000 UAH sent
+        # through a channel buying below the reference must consume exactly 100 000 of a
+        # 100 000 cap -- zero headroom, not negative headroom on money never sent.
+        graph = route_graphs.p2p_graph(buy_premium=-2.0)
+        costed = _costed(graph, 100_000.0)
+        assert isinstance(costed, RampCost)
+        assert costed.one_way.components[CostComponent.CONVERSION_SPREAD].amount < 0.0, (
+            "the fixture must exercise a negative component, or this test shows nothing"
+        )
+        folded = engine.fold(_events(costed), base_currency=Currency.UAH, consumption_method="fifo")
+        headroom = capacity.headroom(
+            folded.capacity,
+            pool=POOL,
+            cap=Money(100_000.0, Currency.UAH, prov.EMPTY),
+            on_date=route_graphs.ON_DATE,
+        )
+        assert_money_close(headroom, Money(0.0, Currency.UAH, prov.EMPTY))
 
     def test_naming_no_rail_consumes_no_capacity(self) -> None:
         graph = route_graphs.p2p_graph()

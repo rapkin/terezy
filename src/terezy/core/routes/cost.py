@@ -398,6 +398,36 @@ def _factor_after(walk: _Walk, leg: Leg, channel: FxChannel) -> tuple[float, Pro
     return factor, prov.merge(walk.factor_sources, channel.provenance)
 
 
+def _channel_verdicts(
+    channel: FxChannel,
+    kinds: Mapping[str, ObservationKind],
+    as_of: date,
+) -> tuple[StalenessVerdict, ...]:
+    """One verdict per observation in a channel, each aged under its own declared kind.
+
+    A channel file declares a kind **three times** -- once for the reference rate and once
+    per side -- because they are three observations that go out of date at three speeds. A
+    single verdict over ``channel.provenance`` under ``channel.kind`` was the first
+    implementation, and it aged a 7-day P2P premium under the reference's 365-day schedule
+    threshold: reported fresh at 82 days, which is the silent permissive default FR-028
+    exists to close. The reference's own sources are what remain of the union once the
+    sides' are taken out, so no source is aged under a kind its table did not declare --
+    in either direction, since the opposite error (a slow side reported stale under a fast
+    reference kind) is the cry-wolf warning the per-kind design exists to avoid.
+    """
+    side_sources = channel.buy_side.provenance.sources | channel.sell_side.provenance.sources
+    reference = prov.of(ref for ref in channel.provenance.sources if ref not in side_sources)
+    return (
+        stale.staleness_of(reference, kinds, kind=channel.kind, as_of=as_of),
+        stale.staleness_of(
+            channel.buy_side.provenance, kinds, kind=channel.buy_side.kind, as_of=as_of
+        ),
+        stale.staleness_of(
+            channel.sell_side.provenance, kinds, kind=channel.sell_side.kind, as_of=as_of
+        ),
+    )
+
+
 def _aged(
     walk: _Walk,
     leg: Leg,
@@ -407,19 +437,18 @@ def _aged(
 ) -> StalenessVerdict:
     """The walk's verdict extended with this leg's -- and its channel's -- observations.
 
-    Two declarations, two kinds: a leg's fee schedule ages on the bank's timetable while the
-    premium on the channel it uses ages in days. Aging both under one threshold is what
-    FR-028 exists to prevent, so each is aged under the kind its own table declared and the
-    verdicts are merged.
+    Several declarations, several kinds: a leg's fee schedule ages on the bank's timetable
+    while the premium on the channel it uses ages in days. Aging both under one threshold is
+    what FR-028 exists to prevent, so each is aged under the kind its own table declared --
+    the channel's sides included, per :func:`_channel_verdicts` -- and the verdicts are
+    merged.
     """
     verdicts = [
         walk.staleness,
         stale.staleness_of(leg.provenance, kinds, kind=leg.kind_of_observation, as_of=as_of),
     ]
     if channel is not None:
-        verdicts.append(
-            stale.staleness_of(channel.provenance, kinds, kind=channel.kind, as_of=as_of)
-        )
+        verdicts.extend(_channel_verdicts(channel, kinds, as_of))
     return stale.merge_all(verdicts)
 
 
@@ -601,9 +630,12 @@ def _round_trip(
     enters the exit route, with nothing re-derived in between.
 
     A route with no declared partner yields :class:`ExitCostUnknown` (FR-030). So does a
-    partner that will not carry what arrived -- the reason says which, because "nobody
-    declared the way out" and "the way out will not take this much" are different facts and
-    the owner acts on them differently. In neither case is the one-way figure promoted.
+    partner that is **declared closed** -- a way out that carries nothing on the date is not
+    a usable way out, and a confident round-trip figure through it would price a journey
+    that cannot be walked -- and so does a partner that will not carry what arrived. The
+    reason says which, because "nobody declared the way out", "the way out is closed" and
+    "the way out will not take this much" are different facts and the owner acts on them
+    differently. In no case is the one-way figure promoted.
     """
     if route.partner_route is None:
         return ExitCostUnknown(
@@ -624,6 +656,21 @@ def _round_trip(
             f"has costed the exit. Known routes: {sorted(routes)}"
         )
     partner = routes[route.partner_route]
+    if partner.status == "closed":
+        # The same respect ``cost_one`` pays the inbound status, at the seam where it was
+        # missing: a closed exit is a declared fact that the way out carries nothing on this
+        # date. Distinct from "not declared" -- the reason names the partner and its status,
+        # so a corridor that shut is never reported as a declaration nobody wrote (FR-014).
+        return ExitCostUnknown(
+            reason=(
+                f"exit route {partner.id!r} is declared closed, so it carries nothing on "
+                f"{on_date.isoformat()}: the way out is declared and is not usable. There "
+                "is therefore no round-trip figure for this path, and the one-way figure "
+                "is not promoted into its place (FR-030); the exclusion is recorded rather "
+                "than silent (FR-014)."
+            ),
+            missing_partner_for=route.id,
+        )
     exited = _walk(
         partner.legs,
         walk,

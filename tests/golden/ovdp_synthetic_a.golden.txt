@@ -26,7 +26,7 @@ cost               10000.0 UAH
 horizon            2026-01-15 .. 2028-01-31
 consumption_method fifo
 coupon_policy      hold_cash
-canonical_encoding terezy-canonical-v1
+canonical_encoding terezy-canonical-v2
 
 == inputs ==
 
@@ -221,4 +221,4 @@ event  10  2028-01-17  ovdp_synthetic_a  quantity 10.0
 # sha256 over core.results.canonical.of_projection, taken by
 # data.manifest.digest_of_projection. Amounts reach it as float.hex(), so this
 # asserts bit-identity -- deliberately stricter than the project tolerance.
-sha256:49a9ca3ad77ce9678929319a909fb7cd67b3947c35b5c73fa566ce2ded7782e0
+sha256:395d18a4f5d7e1c73cefa5ecf8e197e747ff6ccb84081075e3f212212e98d406

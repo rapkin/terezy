@@ -64,12 +64,16 @@ def _premium(amount: float) -> ChannelSide:
     return ChannelSide(
         markup_bps=None,
         premium_per_unit=Money(amount, Currency.UAH, SOURCES),
+        kind="p2p_premium",
+        provenance=SOURCES,
     )
 
 
 def _markup(bps: float) -> ChannelSide:
     """A side declared as a markup in basis points -- the form a bank publishes."""
-    return ChannelSide(markup_bps=bps, premium_per_unit=None)
+    return ChannelSide(
+        markup_bps=bps, premium_per_unit=None, kind="bank_fee_schedule", provenance=SOURCES
+    )
 
 
 class TestAPremiumInBaseCurrencyPerUnit:
@@ -222,7 +226,12 @@ class TestASideDeclaresExactlyOneOfTheTwoForms:
         # ignore one of the two numbers the owner wrote, and there is no reading of that
         # which is not a bug. The loader refuses it too (FR-010); this is the second gate,
         # for a record built in code.
-        side = ChannelSide(markup_bps=150.0, premium_per_unit=Money(3.0, Currency.UAH, SOURCES))
+        side = ChannelSide(
+            markup_bps=150.0,
+            premium_per_unit=Money(3.0, Currency.UAH, SOURCES),
+            kind="p2p_premium",
+            provenance=SOURCES,
+        )
         with pytest.raises(ValueError, match="exactly one"):
             channels.spread_over_reference(side, REFERENCE, role=Side.BUY)
 
@@ -230,7 +239,9 @@ class TestASideDeclaresExactlyOneOfTheTwoForms:
         # Not treated as zero. "The channel is at the reference" is declarable as a zero
         # premium; an empty side is an incomplete declaration, and reading it as free
         # would make the cheapest possible route the one nobody finished describing.
-        side = ChannelSide(markup_bps=None, premium_per_unit=None)
+        side = ChannelSide(
+            markup_bps=None, premium_per_unit=None, kind="p2p_premium", provenance=SOURCES
+        )
         with pytest.raises(ValueError, match="exactly one"):
             channels.spread_over_reference(side, REFERENCE, role=Side.SELL)
 

@@ -90,7 +90,15 @@ class Side(Enum):
 
 @dataclass(frozen=True, slots=True)
 class ChannelSide:
-    """One side of a channel's quote, declared in exactly one of the two forms."""
+    """One side of a channel's quote, declared in exactly one of the two forms.
+
+    A side is **its own observation**: it is read off its own line of the declaration, on
+    its own date, and it goes out of date at its own speed. That is why it carries its own
+    ``kind`` and its own ``provenance`` rather than borrowing the channel's -- a P2P
+    premium shifts within a week while the reference it is quoted against may be a bank
+    schedule, and a side aged under the channel's kind would be reported fresh long after
+    its own declared threshold had passed (FR-028).
+    """
 
     markup_bps: float | None
     """A cost in basis points, always positive as a cost. ``None`` when the premium form
@@ -115,6 +123,22 @@ class ChannelSide:
     ``money.scale_sourced`` unions into every figure the premium touches, which is how a
     route cost admits which screenshot it rests on.
     """
+
+    kind: str
+    """An ``ObservationKind`` id -- which staleness threshold **this side's** declared
+    number ages under (FR-028).
+
+    Declared per side in the file and carried here so the verdict can honour it: the
+    channel's own :attr:`FxChannel.kind` governs the reference rate, not the sides. A side
+    whose kind was validated at load and then dropped would age under the channel's
+    threshold, which is the silent permissive default FR-028 forbids whenever the side's
+    kind is the faster one.
+    """
+
+    provenance: Provenance
+    """The sources this side's declared number rests on -- its own observation, distinct
+    from the reference rate's. Required, so the staleness verdict can age this side under
+    :attr:`kind` and nothing else."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -153,11 +177,15 @@ class FxChannel:
 
     kind: str
     """An ``ObservationKind`` id -- ``p2p_premium``, ``bank_fee_schedule``. Selects the
-    staleness threshold applied to this channel's sources (FR-028)."""
+    staleness threshold applied to the **reference rate's** observation (FR-028). Each
+    side ages under its own :attr:`ChannelSide.kind`, because a side is its own
+    observation with its own speed of going out of date."""
 
     provenance: Provenance
-    """The sources this quote rests on. Required, and unioned into every figure the
-    channel touches through ``money.scale_sourced``."""
+    """The sources this quote rests on -- the reference rate's and both sides', unioned.
+    Required, and unioned into every figure the channel touches through
+    ``money.scale_sourced``. For *staleness* the parts are aged separately, each under its
+    own declared kind; see ``cost._aged``."""
 
 
 def _checked_reference(reference: float) -> float:

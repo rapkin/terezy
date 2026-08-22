@@ -170,22 +170,26 @@ def age_in_days(retrieved_on: date, *, as_of: date) -> int:
 
 
 def freshest_date(source: SourceRef) -> date:
-    """The date a value's age is measured from: ``verified_on`` if set, else ``retrieved_on``.
+    """The date a value's age is measured from: the **later** of the two dates on the source.
 
     FR-025 says "verification **or** retrieval date has aged" and left which one open. It is
-    the later of the two -- and since a verification cannot precede what it verifies, that is
-    ``verified_on`` whenever there is one.
+    the later of the two, taken literally: a verification after retrieval refreshes the age,
+    and a re-retrieval after an old verification refreshes it just the same. A value verified
+    in 2024 and re-fetched last month is weeks old, not years -- both dates are looks at the
+    source, and the age runs from the most recent look.
 
     Verifying a value against a primary source is the strongest possible refresh of
-    confidence in it, stronger than re-fetching. A value retrieved two years ago and verified
-    last week is not stale, and reporting it as stale would tell the owner to re-check the one
-    thing he has actually checked -- a warning that fires on verified values is one that gets
-    ignored, which is worse than none.
+    confidence in it. A value retrieved two years ago and verified last week is not stale,
+    and reporting it as stale would tell the owner to re-check the one thing he has actually
+    checked -- a warning that fires on refreshed values is one that gets ignored, which is
+    worse than none.
 
     The asymmetry is deliberate: an **unverified** value ages from retrieval, which is every
     value in this project today and the stricter of the two readings.
     """
-    return source.verified_on if source.verified_on is not None else source.retrieved_on
+    if source.verified_on is None:
+        return source.retrieved_on
+    return max(source.verified_on, source.retrieved_on)
 
 
 def is_stale(source: SourceRef, kind: ObservationKind, *, as_of: date) -> bool:

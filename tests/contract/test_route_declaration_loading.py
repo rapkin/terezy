@@ -785,8 +785,18 @@ class TestChannelExactlyWhenTheLegConverts:
             id="self_quote",
             pair=(Currency.UAH, Currency.UAH),
             reference_rate=42.0,
-            buy_side=ChannelSide(markup_bps=150.0, premium_per_unit=None),
-            sell_side=ChannelSide(markup_bps=150.0, premium_per_unit=None),
+            buy_side=ChannelSide(
+                markup_bps=150.0,
+                premium_per_unit=None,
+                kind="bank_fee_schedule",
+                provenance=prov.EMPTY,
+            ),
+            sell_side=ChannelSide(
+                markup_bps=150.0,
+                premium_per_unit=None,
+                kind="bank_fee_schedule",
+                provenance=prov.EMPTY,
+            ),
             observed_on=date(2026, 8, 22),
             kind="p2p_premium",
             provenance=prov.EMPTY,
@@ -963,6 +973,71 @@ class TestChannelSideForms:
         assert side.premium_per_unit is not None
         assert side.premium_per_unit.amount == 0.0
 
+    @pytest.mark.parametrize(
+        ("old", "new", "field"),
+        [
+            (
+                "  premium_per_unit = 3.0",
+                "  premium_per_unit = -42.0",
+                "channel[p2p].buy_side.premium_per_unit",
+            ),
+            (
+                "  premium_per_unit = -2.5",
+                "  premium_per_unit = -45.0",
+                "channel[p2p].sell_side.premium_per_unit",
+            ),
+        ],
+    )
+    def test_a_premium_that_zeroes_or_inverts_the_effective_rate_is_refused(
+        self, tmp_path: Path, old: str, new: str, field: str
+    ) -> None:
+        """A side that gives away the whole reference (or more) is not a rate.
+
+        ``-42`` on a reference of 42 makes the effective rate zero and the first costing
+        divides by it; ``-45`` makes it negative and the conversion refuses the rate
+        mid-costing. Both are load-time failures naming the file and the offset, not
+        arithmetic errors three layers later. A negative premium stays legal while the
+        effective rate stays positive -- the shipped ``-2.5`` is exactly that.
+        """
+        broken = _broken(tmp_path, CHANNELS, old, new)
+        with pytest.raises(DeclarationError) as raised:
+            loader.channels_from_file(broken)
+        _assert_names_file_and_field(raised.value, file=broken, field_path=field)
+        assert "42.0" in raised.value.problem, "the reason states the reference it is against"
+        assert "not a rate" in raised.value.problem
+
+    @pytest.mark.parametrize("bps", ["10000.0", "12000.0"])
+    def test_a_sell_markup_of_the_whole_reference_or_more_is_refused(
+        self, tmp_path: Path, bps: str
+    ) -> None:
+        """The markup form of the same defect: 10 000 bps subtracts the whole reference.
+
+        The sell side is ``reference * (1 - m)``, so exactly 10 000 bps is a zero rate and
+        anything above it a negative one. The first edit moves the *buy* markup to a
+        distinct legal value so the second edit lands on the sell side.
+        """
+        text = CHANNELS.read_text(encoding="utf-8")
+        text = _replace(text, "markup_bps   = 150.0", "markup_bps   = 175.0")
+        text = _replace(text, "markup_bps   = 150.0", f"markup_bps   = {bps}")
+        broken = tmp_path / "broken.toml"
+        broken.write_text(text, encoding="utf-8")
+        with pytest.raises(DeclarationError) as raised:
+            loader.channels_from_file(broken)
+        _assert_names_file_and_field(
+            raised.value, file=broken, field_path="channel[card].sell_side.markup_bps"
+        )
+        assert "not a rate" in raised.value.problem
+
+    def test_a_huge_buy_markup_is_expensive_but_legal(self, tmp_path: Path) -> None:
+        """The bound is on the effective rate per role, not on the declared number.
+
+        12 000 bps on the buy side is a terrible price -- reference * 2.2 -- and still a
+        rate. Refusing it would smuggle a plausibility judgement into a structural check.
+        """
+        broken = _broken(tmp_path, CHANNELS, "markup_bps   = 150.0", "markup_bps   = 12000.0")
+        channel = loader.channels_from_file(broken)[1]
+        assert channel.buy_side.markup_bps == 12000.0
+
     def test_a_missing_side_is_refused_and_no_mid_rate_is_synthesised(self, tmp_path: Path) -> None:
         head, _, _ = CHANNELS.read_text(encoding="utf-8").partition("  [channel.sell_side]")
         broken = tmp_path / "broken.toml"
@@ -1086,6 +1161,34 @@ class TestPartnerRoute:
         assert raised.value.field_path == "route.partner_route"
         assert "two unrelated journeys" in raised.value.problem
 
+    def test_an_exit_starting_in_a_currency_the_inbound_never_delivers_is_refused(
+        self, tmp_path: Path
+    ) -> None:
+        """The seam is a currency as well as a venue, and both halves must meet.
+
+        A pair meeting at the venue but not in the currency loads only if this check is
+        missing -- and then costing it dies mid-walk as a raw currency mismatch naming
+        neither file. The rewritten exit starts in UAH at binance while every inbound
+        route delivers USD there.
+        """
+        root = _root(tmp_path)
+        exit_path = root / "routes" / "binance_p2p_to_monobank.toml"
+        text = exit_path.read_text(encoding="utf-8")
+        text = _replace(
+            text, 'kind                   = "fx"', 'kind                   = "transfer"'
+        )
+        text = _replace(text, 'from_ccy               = "USD"', 'from_ccy               = "UAH"')
+        text = _drop_line(text, 'channel                = "p2p"')
+        exit_path.write_text(text, encoding="utf-8")
+        with pytest.raises(DeclarationError) as raised:
+            _resolve(root)
+        assert raised.value.field_path == "route.partner_route"
+        rendered = str(raised.value)
+        assert "binance_p2p_to_monobank" in rendered, "the reason must name the partner"
+        assert "binance_p2p_to_monobank.toml" in rendered, "and the partner's file"
+        assert "UAH" in raised.value.problem
+        assert "USD" in raised.value.problem
+
     def test_an_exit_not_ending_in_the_base_currency_is_refused(self, tmp_path: Path) -> None:
         root = _root(tmp_path)
         with pytest.raises(DeclarationError) as raised:
@@ -1122,6 +1225,40 @@ class TestCapacityPools:
         assert "monobank_to_binance_card.toml" in rendered
         assert "monobank_to_binance_p2p" in rendered
         assert "at least one of them is wrong" in raised.value.problem
+
+    def test_one_pool_with_caps_in_two_currencies_is_refused_naming_both_files(
+        self, tmp_path: Path
+    ) -> None:
+        """A rail has one limit in one currency, and the resolver says so with a location.
+
+        The mutation moves the p2p route's pool declaration from its UAH leg to its USD
+        leg, so the shared card pool is declared with a UAH cap in one file and a USD cap
+        in another. Without this rule the resolver's own comparison dies as a raw
+        CurrencyMismatchError naming no file at all -- and so would the ledger fold.
+        """
+        root = _root(tmp_path)
+        route_path = root / "routes" / "monobank_to_binance_p2p.toml"
+        text = route_path.read_text(encoding="utf-8")
+        text = _drop_line(text, 'capacity_pool          = "monobank_card_uah_usd"')
+        text = _drop_line(text, "monthly_cap            = 100000.0")
+        text = _replace(
+            text,
+            'kind                   = "transfer"',
+            'kind                   = "transfer"\n'
+            '  capacity_pool          = "monobank_card_uah_usd"\n'
+            "  monthly_cap            = 100000.0",
+        )
+        route_path.write_text(text, encoding="utf-8")
+        with pytest.raises(DeclarationError) as raised:
+            _resolve(root)
+        _assert_names_file_and_field(
+            raised.value, file=route_path, field_path="route.leg[1].monthly_cap"
+        )
+        rendered = str(raised.value)
+        assert "monobank_card_uah_usd" in rendered, "the reason names the pool"
+        assert "monobank_to_binance_card.toml" in rendered, "and the other file"
+        assert "UAH" in raised.value.problem
+        assert "USD" in raised.value.problem
 
     def test_a_cap_with_no_pool_is_refused(self, tmp_path: Path) -> None:
         broken = _without(tmp_path, P2P, '  capacity_pool          = "monobank_card_uah_usd"')

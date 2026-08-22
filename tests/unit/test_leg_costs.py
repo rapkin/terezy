@@ -105,10 +105,16 @@ def _channel(premium: float) -> FxChannel:
         pair=(UAH, USD),
         reference_rate=REFERENCE,
         buy_side=ChannelSide(
-            markup_bps=None, premium_per_unit=Money(premium, UAH, CHANNEL_SOURCES)
+            markup_bps=None,
+            premium_per_unit=Money(premium, UAH, CHANNEL_SOURCES),
+            kind="p2p_premium",
+            provenance=CHANNEL_SOURCES,
         ),
         sell_side=ChannelSide(
-            markup_bps=None, premium_per_unit=Money(-premium, UAH, CHANNEL_SOURCES)
+            markup_bps=None,
+            premium_per_unit=Money(-premium, UAH, CHANNEL_SOURCES),
+            kind="p2p_premium",
+            provenance=CHANNEL_SOURCES,
         ),
         observed_on=date(2026, 8, 21),
         kind="p2p_premium",
