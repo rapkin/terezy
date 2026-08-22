@@ -65,6 +65,7 @@ from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance, SourceRef
 from terezy.core.primitives.staleness import ObservationKind
+from terezy.core.results.coverage import SpendableEndpoint
 from terezy.core.routes import capacity, legs
 from terezy.core.routes.channels import ChannelSide, FxChannel
 from terezy.core.routes.legs import Leg, Route
@@ -1905,3 +1906,93 @@ def _fallback(
             f"leave it empty, or declare policy = {capacity.REDIRECT!r}",
         )
     return policy, None
+
+
+# ---------------------------------------------------------------------------
+# 003-route-coverage: the spendable-endpoint list
+# ---------------------------------------------------------------------------
+#
+# Same four responsibilities -- read, shape, meaning, construct -- and the one difference worth
+# stating: **no citation is read and none is expected.** An owner's statement about where he
+# spends is not an observation of the world; it is a fact about his own life, the same exemption
+# `data/streams/` and `data/scenarios/` already have. `scripts/check_provenance.py` therefore
+# does not scan `data/spendable/` and its `SOURCED_DIRS` is not extended (research.md D4) -- a
+# contract test asserts that rather than assuming it.
+#
+# What is *not* here, because it needs a second file: whether the venue exists, whether it can
+# hold the currency, whether the currency is the run's base currency, and whether the owner owns
+# the streams. All four are relations, and they live in the resolver where the whole set is in
+# hand.
+
+SPENDABLE_TABLE: Final = "spendable"
+"""Root array of a spendable file, and the prefix of every field path in one."""
+
+OWNER_TABLE: Final = "owner"
+"""The owner table of a spendable file."""
+
+
+def spendable_from_file(path: Path) -> tuple[str, tuple[SpendableEndpoint, ...]]:
+    """One ``data/spendable/<owner>.toml`` as its owner id and its declared endpoints.
+
+    Returns the owner id beside the endpoints rather than folding it into each record: the
+    endpoints are `(venue x currency)` pairs and the owner is a property of the *file*, so
+    putting him on every row would be one fact in as many places as there are venues.
+
+    Three refusals belong here because all three are properties of this one file read in
+    isolation:
+
+    * **An empty ``[[spendable]]`` list.** A file with no entries would make every exit deficit
+      3 -- a report full of confident wrong verdicts built out of a forgotten line (research.md
+      D13). Refused for the same reason an empty venue file is.
+    * **A duplicate ``(venue, currency)`` pair.** The loader's existing duplicate-id precedent:
+      the second entry says nothing the first does not, so a file that repeats itself is a file
+      somebody edited twice, and merging the two silently would hide that.
+    * **A currency this engine does not model.** A closed enum, so a typo is a load-time failure
+      rather than a fourth currency that never matches anything.
+    """
+    document = read_document(path)
+    file = _validate(schema.SpendableFile, document, path)
+    owner_id = _require_text(
+        path,
+        f"{OWNER_TABLE}.id",
+        file.owner.id,
+        "the spendable list is one person's statement about his own life, and it is resolved "
+        "against that person's income streams (Principle VII)",
+    )
+    if not file.spendable:
+        raise DeclarationError(
+            path,
+            SPENDABLE_TABLE,
+            "declares no spendable endpoints. An empty list is reported rather than read as "
+            "'money can never come back out': it would make every declared exit fail the "
+            "spendable test at once, and the coverage report would name a third deficit for "
+            "every destination in the registry -- a confident wrong answer built out of a "
+            "forgotten line.",
+            "declare at least one [[spendable]] entry, naming a venue you actually spend from",
+        )
+    endpoints: list[SpendableEndpoint] = []
+    seen: dict[tuple[str, Currency], int] = {}
+    for position, entry in enumerate(file.spendable):
+        field_prefix = f"{SPENDABLE_TABLE}[{position}]"
+        venue_id = _require_text(
+            path,
+            f"{field_prefix}.venue",
+            entry.venue,
+            "a spendable endpoint is a named venue the owner spends from, and it is checked "
+            "against the declared venues",
+        )
+        currency = _currency(path, f"{field_prefix}.currency", entry.currency)
+        if (venue_id, currency) in seen:
+            raise DeclarationError(
+                path,
+                f"{field_prefix}.venue",
+                f"declares {venue_id!r} holding {currency.value} for the second time; entry "
+                f"{seen[(venue_id, currency)]} of this file already declares it. The two are "
+                "not merged: the second says nothing the first does not, so a repeated pair is "
+                "a file that was edited twice and one of the edits is probably not the one that "
+                "was meant.",
+                "delete the duplicate entry",
+            )
+        seen[(venue_id, currency)] = position
+        endpoints.append(SpendableEndpoint(venue_id=venue_id, currency=currency))
+    return owner_id, tuple(endpoints)

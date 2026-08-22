@@ -23,7 +23,7 @@ needs  = ["001-ovdp-hurdle-rate"]
 
 [[feature]]
 id     = "003-route-coverage"
-status = "spec"
+status = "in-progress"
 needs  = ["002-ramp-cost"]
 
 [[feature]]

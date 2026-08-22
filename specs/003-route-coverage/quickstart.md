@@ -1,0 +1,138 @@
+# Quickstart: verifying 003-route-coverage
+
+**Date**: 2026-08-22
+
+How to confirm this feature works, ordered so problems surface soonest. No implementation
+code — see [data-model.md](./data-model.md) and [contracts/](./contracts/) for shapes.
+
+## Prerequisites
+
+```bash
+uv sync --all-extras --dev
+```
+
+Python 3.13. No network at any point; `tests/conftest.py` blocks sockets. Every registry in
+these tests is built in-process or read from `data/`; nothing is fetched.
+
+## The one-command check
+
+```bash
+uv run pytest -q
+```
+
+## 1. The audit the feature exists for
+
+```bash
+uv run pytest -m worked_example -k coverage -v
+```
+
+A hand-declared registry — two streams, three destinations, a deliberate mix of complete
+pairs and each kind of hole — checked against a coverage table enumerated by hand and
+checked in beside the assertion (SC-001). What it pins:
+
+- every `(destination × stream × regime)` pair appears exactly once, none silently absent;
+- each of the three deficits appears, distinguished, with no bare "missing route" anywhere
+  (SC-002);
+- a destination equal to a stream's arrival point reports **satisfied by arrival** and is
+  ready if and only if its exit exists (SC-012).
+
+If a pair is missing from the report, suspect the destination universe: it is venue ×
+*holdable currency*, so a venue declaring two currencies contributes two destinations, and
+building it from routes instead of venues is the way to lose the very holes the report
+exists to find.
+
+## 2. The to-do list, and the loop closing
+
+```bash
+uv run pytest tests/unit/test_coverage_deficits.py -v
+```
+
+| Covers | Asserts |
+|---|---|
+| SC-003 | Writing precisely the declaration the report names — and nothing else — flips the pair to ready in the next report. For a missing exit, an exit to **any one** of the listed spendable endpoints suffices. This is the loop measured by doing it, not by inspection |
+| SC-005 | A missing exit blocking two pairs outranks a missing inbound blocking one; equal counts are reported in `ties`, not ordered arbitrarily |
+| SC-006 | A pair missing both halves appears in both entries' `blocked`, both marked `alone_sufficient = False` |
+| SC-010 | A missing exit's origin is the destination venue, and nothing in the report reproduces the inbound route's shape as a suggestion |
+| SC-011 | A two-hop way out is **not** composed: deficit 3, and the report says composition is deliberately not done here |
+| SC-017 | An orphan exit is listed as unused, appears in no deficit, and blocks no count |
+
+If the to-do list has more entries than expected, suspect the missing-exit identity: it is
+origin + direction, **not** one item per spendable candidate (FR-007 ⚙). Multiplying by the
+candidate list is the failure mode that also inflates every blocked count.
+
+## 3. Regimes stay separate
+
+```bash
+uv run pytest tests/unit/test_coverage_regimes.py -v
+```
+
+- A route named by one regime and not the other yields a pair ready in the first and not
+  ready in the second; **no blended verdict and no summed cross-regime count exists
+  anywhere** (SC-007).
+- The shared missing declaration is one value-equal record with per-regime counts — which is
+  why `MissingDeclaration` has no regime field (research.md D8).
+- With no regime declared, one implicit regime covers every route and the report says so
+  (SC-018).
+
+## 4. The structural guarantees
+
+```bash
+uv run pytest -m contract -k "coverage or spendable" -v
+```
+
+| Covers | Asserts |
+|---|---|
+| SC-004, SC-008 | A recursive walk over `dataclasses.fields` of the whole report: no `Money`, no `Provenance`, no `StalenessVerdict`, no `float` is reachable. **Across the whole output, not sampled** — which is what makes "no cost figures" a property rather than a promise |
+| SC-014 | A venue declared as data, with no routes, appears as destinations with named no-inbound deficits — zero lines of source changed |
+| SC-019 | An exit ending in UAH at a venue absent from the spendable list is deficit 3; adding that venue to the list flips the pair to ready — zero lines of source changed |
+| SC-015 | A ready verdict resting only on a closed route is visibly distinct (`rests_on == "closed_only"`) from one resting on an open route, and both from a hole |
+| SC-016 | The same declarations produce the identical report on every run, and `audited` names the declaration set |
+| SC-020 | Feature 002's ranking over one registry is identical with and without the report produced, and `enforcement` states the advisory status in the output |
+| SC-013 | Each empty dimension — venues, streams, routes, spendable — produces a typed outcome naming it; none produces an empty report |
+| — | Every refusal in [contracts/spendable-schema.md](./contracts/spendable-schema.md): unknown venue, non-base currency, venue that cannot hold it, duplicate pair, empty list, empty directory, extra key |
+
+## 5. Agreement with costing
+
+```bash
+uv run pytest -m invariant -k coverage -v
+```
+
+Over registries generated by `tests/invariants/route_graphs.py`: every pair marked ready is
+one that `cost_one` produces a `RoundTripCost` for, and every pair whose costing over single
+declared routes is refused is marked not ready (SC-009).
+
+**Read the scope before debugging a failure.** The property covers *route-existence*
+refusals — no matching route, and `ExitCostUnknown`. It does **not** cover `RouteUnusable`:
+below a minimum, above a cap, outside a window. Those are statements about today, and
+coverage is a statement about declarations (research.md D11). If this test fails with a
+`RouteUnusable`, the generator has drifted into feasibility territory — fix the generator's
+amount and dates, not the coverage rule.
+
+## 6. The gates
+
+```bash
+uv run ruff check . && uv run ruff format --check .
+uv run mypy
+uv run lint-imports
+uv run python scripts/check_provenance.py
+uv run pytest --cov
+```
+
+`check_provenance.py` must stay green **with the new file present and unmodified**: the
+spendable list carries no observed value, so `SOURCED_DIRS` is not extended (research.md
+D4). If someone had to add `spendable` to that tuple, a number leaked into the file.
+
+`lint-imports` is the check that catches the likeliest architectural mistake here: reaching
+for `pathlib` in `core/routes/coverage.py` to record which file a declaration came from.
+Ids are the identity in core; files stay in the data layer (research.md D16).
+
+## What "done" looks like
+
+- All twenty success criteria have a named test above.
+- `docs/REQUIRED_TESTS.md` gains **no flipped row** — no lettered row names a registry
+  coverage audit, and the spec says so plainly rather than stretching one. B10, B12, H2 and
+  G6 are reinforced, and the landing commit records that in the file's notes rather than in
+  its checkboxes.
+- `docs/METHODOLOGY.md` gains the plain-language definition of comparison-readiness, the
+  three deficits, and the blocked-pair count — including the sentence that the count is
+  pairs unblocked, never hryvnia, and why that boundary is deliberate.

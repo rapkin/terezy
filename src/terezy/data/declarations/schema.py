@@ -832,3 +832,72 @@ class ScenarioFile(BaseModel):
     model_config = STRICT
 
     scenario: ScenarioTable
+
+
+# ---------------------------------------------------------------------------
+# 003-route-coverage: the spendable-endpoint list
+# ---------------------------------------------------------------------------
+#
+# One new declaration, and no other format (spec Assumptions). Same three settings as every
+# model above, and the same standing rule: **zero field defaults**. There is nothing here that
+# could legitimately be omitted -- a venue with no currency and a currency at no venue are both
+# half a statement -- so no field below is `X | None`.
+#
+# ⚙ **No citation keys, and their absence is the design.** `contracts/spendable-schema.md` and
+# research.md D4 both argue it: there is no observed value in this file for a source to vouch
+# for -- an id, a currency code, and the owner's statement about where he spends. Adding
+# `source` / `retrieved_on` / `verified_on` here would invite a citation for a fact about a
+# person's life, which is the same category error as citing a regime. The same reading
+# `data/venues.toml` already carries in its own header. Every *number* attached to a venue
+# lives on a leg, in `data/routes/`, cited.
+
+
+class OwnerTable(BaseModel):
+    """``[owner]`` -- whose list this is.
+
+    A table rather than a bare `owner_id` key beside the array, on the `[jurisdiction]` and
+    `[scenario]` precedent: the file declares one owner's facts, so the owner is the document's
+    subject rather than a column of it.
+    """
+
+    model_config = STRICT
+
+    id: str
+    """Non-empty, and checked by the resolver against the owner of the streams it is resolved
+    with. Where the owner spends is a fact about *this* person's life (Principle VII)."""
+
+
+class SpendableTable(BaseModel):
+    """One ``[[spendable]]`` entry: a ``(venue x currency)`` where money counts as spent."""
+
+    model_config = STRICT
+
+    venue: str
+    """Must name a declared venue that can hold :attr:`currency`. Typed ``str`` and resolved by
+    the loader and resolver, which know the file and the field; pydantic would know neither."""
+
+    currency: str
+    """Must be the base currency the set was resolved against (FR-004).
+
+    Base currency only, at the specific venues the owner actually spends from -- not "UAH
+    anywhere", and not foreign cash in hand. An exit ending in hryvnia at a venue this list does
+    not name is deficit 3, exactly as one ending in dollars is.
+    """
+
+
+class SpendableFile(BaseModel):
+    """A whole ``data/spendable/<owner_id>.toml``: one owner's spendable endpoints.
+
+    Per-owner, beside ``data/streams/`` and **not** at the root beside curated ``venues.toml``
+    (research.md D3). A curated declaration is a public fact about the world; a per-owner one is
+    a fact about this person, and putting both at one filesystem level would make the boundary a
+    matter of reading field names.
+    """
+
+    model_config = STRICT
+
+    owner: OwnerTable
+
+    spendable: list[SpendableTable]
+    """Non-empty, checked by the loader. A file with no entries would make every exit deficit 3
+    -- a confident wrong answer built out of a forgotten line (research.md D13)."""
