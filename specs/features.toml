@@ -88,3 +88,13 @@ note  = "instruments as terminal nodes; 004 FR-014 deferral, owner-confirmed fut
 id    = "fx-tax-asymmetry-f1"
 after = ["002-ramp-cost"]
 note  = "flat-in-USD posts taxable UAH gain; needs a taxable foreign instrument + dated official rates"
+
+[[future]]
+id    = "provider-automation"
+after = ["006-inzhur-instruments"]
+note  = "owner-requested (2026-08-22): automated fetch layer for external data — fund terms, CPI, FX rates — via the reserved Provider interface; cached with provenance, never silently"
+
+[[future]]
+id    = "multi-currency-goals"
+after = ["008-seed-and-goals"]
+note  = "owner-requested (2026-08-22): goals in non-base currencies once multi-jurisdiction support lands (E8); refused-with-reason until then"
