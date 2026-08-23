@@ -166,24 +166,24 @@ mode and back within the imported tolerance; each mode reproduces hand arithmeti
 
 ### Tests for User Story 3 (write first)
 
-- [ ] T020 [P] [US3] SC-001 / FR-013 / G3: `tests/invariants/test_goal_mode_consistency.py` — over
+- [x] T020 [P] [US3] SC-001 / FR-013 / G3: `tests/invariants/test_goal_mode_consistency.py` — over
       generated pairs, date→sum and sum→date and contribution→sum round trips all close within the
       **imported** tolerance, and no float literal near a comparison anywhere in the solver
-- [ ] T021 [P] [US3] FR-014: `tests/worked_examples/test_goal_arithmetic.py` — one solved figure per
+- [x] T021 [P] [US3] FR-014: `tests/worked_examples/test_goal_arithmetic.py` — one solved figure per
       mode against arithmetic worked out by hand and checked in, plus the zero-growth degenerate case
-- [ ] T022 [P] [US3] FR-015 / G5: `tests/unit/test_solved_date_two_answers.py` — the exact
+- [x] T022 [P] [US3] FR-015 / G5: `tests/unit/test_solved_date_two_answers.py` — the exact
       real-valued solution **and** the first calendar date the target is reached, each labelled,
       neither rounded into the other
-- [ ] T023 [P] [US3] FR-017 / SC-009 / FR-021 / SC-010: every figure labelled nominal, the real slot
+- [x] T023 [P] [US3] FR-017 / SC-009 / FR-021 / SC-010: every figure labelled nominal, the real slot
       present and explicitly empty, the determinism note present, and a marked growth assumption
       reaching every solved figure — `tests/unit/test_goal_result_shape.py`
 
 ### Implementation for User Story 3
 
-- [ ] T024 [US3] The result records in `src/terezy/core/results/goal.py`: `Goal`, `GrowthAssumption`,
+- [x] T024 [US3] The result records in `src/terezy/core/results/goal.py`: `Goal`, `GrowthAssumption`,
       `GoalInputs`, `Conventions` (+ the one implemented convention as a module constant),
       `GoalOutcome`, `SolvedDate`, `RealTargetSum`, the feasibility union and the typed refusals
-- [ ] T025 [US3] `solve` in `src/terezy/core/goals/solve.py`: the three closed forms over
+- [x] T025 [US3] `solve` in `src/terezy/core/goals/solve.py`: the three closed forms over
       `V(t) = (S − L)(1 + i)^t + L`, marks propagated through `money.scale_sourced`, the conventions
       carried in the result, no solver library and no iteration to a tolerance
 
@@ -198,18 +198,18 @@ and "no contribution needed" instead of a negative instruction.
 
 ### Tests for User Story 4 (write first)
 
-- [ ] T026 [P] [US4] SC-006 / G8–G10: `tests/unit/test_goal_feasibility.py` — met with margin, missed
+- [x] T026 [P] [US4] SC-006 / G8–G10: `tests/unit/test_goal_feasibility.py` — met with margin, missed
       with the amount short **and** the date it would arrive, unreachable with its reason and no
       finite date, a non-positive solved contribution as `NoContributionNeeded` with the margin, and
       no declared variable adjusted in any case
-- [ ] T027 [P] [US4] G1, G2, G11: `tests/unit/test_goal_refusals.py` — fewer than two variables names
+- [x] T027 [P] [US4] G1, G2, G11: `tests/unit/test_goal_refusals.py` — fewer than two variables names
       what is missing, a missing starting amount and a missing growth assumption are named and never
       defaulted, and a non-base currency is refused as **not yet modelled** naming the missing FX
       modelling, never as an invalid currency
 
 ### Implementation for User Story 4
 
-- [ ] T028 [US4] Feasibility and the refusals in `src/terezy/core/goals/solve.py`: reachability
+- [x] T028 [US4] Feasibility and the refusals in `src/terezy/core/goals/solve.py`: reachability
       decided in closed form before any date is reported, and the determinism note stating the
       verdict is one path under one stated assumption rather than a probability
 
