@@ -31,6 +31,7 @@ import pytest
 from terezy.core.primitives.currency import Currency
 from terezy.core.results.coverage import (
     EXIT_NOT_SPENDABLE,
+    NO_EXIT_DECLARED,
     NO_INBOUND,
     SATISFIED_BY_ARRIVAL,
     SATISFIED_BY_IDENTITY,
@@ -464,8 +465,11 @@ def test_a_ready_verdict_resting_on_closed_routes_is_still_distinct_from_a_hole(
     assert isinstance(produced, CoverageReport)
     (block,) = produced.regimes
     verdict = next(v for v in block.verdicts if v.destination.venue_id == "broker")
+    # Not ready, and for the reason that distinguishes the two: nothing leaves ``broker`` at
+    # all. ``closed_only`` would have said a way out is declared and shut, which is a different
+    # instruction to the owner -- wait, rather than go and observe.
     assert isinstance(verdict, NotReady)
-    assert {deficit.kind for deficit in verdict.deficits} != {EXIT_NOT_SPENDABLE}
+    assert {deficit.kind for deficit in verdict.deficits} == {NO_EXIT_DECLARED}
 
 
 # ---------------------------------------------------------------------------

@@ -225,7 +225,18 @@ def _endpoint_key(endpoint: SpendableEndpoint) -> tuple[str, str]:
 
 
 def _sorted_routes(routes: Mapping[str, Route]) -> tuple[Route, ...]:
+    """A regime's routes in id order, computed **once per regime**.
+
+    Every matcher below takes the result rather than the mapping. Sorting inside the matchers
+    was correct and quadratic-ish -- ``destinations x streams`` calls, each re-sorting every
+    route -- and the fix is one line at the fold rather than a cache anywhere.
+    """
     return tuple(routes[route_id] for route_id in sorted(routes))
+
+
+def _relied(routes: tuple[Route, ...]) -> tuple[RouteRelied, ...]:
+    """Declared routes as the ``(id, status)`` pairs a verdict carries."""
+    return tuple(RouteRelied(route_id=route.id, status=route.status) for route in routes)
 
 
 # ---------------------------------------------------------------------------
@@ -234,8 +245,8 @@ def _sorted_routes(routes: Mapping[str, Route]) -> tuple[Route, ...]:
 
 
 def _inbound_matches(
-    routes: Mapping[str, Route], destination: Destination, stream: IncomeStream
-) -> tuple[RouteRelied, ...]:
+    ordered: tuple[Route, ...], destination: Destination, stream: IncomeStream
+) -> tuple[Route, ...]:
     """Every declared route that carries **this stream's** money to **this** destination.
 
     Four conditions, and the two about currency are the ones that do the work. A route leaving
@@ -249,8 +260,8 @@ def _inbound_matches(
     partner-less one behind the word *ready*.
     """
     return tuple(
-        RouteRelied(route_id=route.id, status=route.status)
-        for route in _sorted_routes(routes)
+        route
+        for route in ordered
         if route.direction == "inbound"
         and route.origin == stream.arrives_at
         and route.destination == destination.venue_id
@@ -259,7 +270,7 @@ def _inbound_matches(
     )
 
 
-def _exits_from(routes: Mapping[str, Route], destination: Destination) -> tuple[RouteRelied, ...]:
+def _exits_from(ordered: tuple[Route, ...], destination: Destination) -> tuple[Route, ...]:
     """Every declared way out of this destination, whether or not it reaches somewhere spendable.
 
     Found by the route's **own** direction and origin. Never by following an inbound route's
@@ -267,8 +278,8 @@ def _exits_from(routes: Mapping[str, Route], destination: Destination) -> tuple[
     out, and reading the partner link would be one step from reversing the inbound (FR-006).
     """
     return tuple(
-        RouteRelied(route_id=route.id, status=route.status)
-        for route in _sorted_routes(routes)
+        route
+        for route in ordered
         if route.direction == "exit"
         and route.origin == destination.venue_id
         and route.legs[0].from_ccy is destination.currency
@@ -398,7 +409,7 @@ def _verdict(
     destination: Destination,
     stream: IncomeStream,
     *,
-    routes: Mapping[str, Route],
+    ordered: tuple[Route, ...],
     spendable: frozenset[SpendableEndpoint],
     candidates: tuple[SpendableEndpoint, ...],
 ) -> PairVerdict:
@@ -420,19 +431,17 @@ def _verdict(
     that needs no corridor because the money is already on the right side of it.
     """
     arrival = _satisfied_by_arrival(destination, stream)
-    matches = () if arrival else _inbound_matches(routes, destination, stream)
-    inbound: InboundEvidence = SATISFIED_BY_ARRIVAL if arrival else matches
+    matches = () if arrival else _inbound_matches(ordered, destination, stream)
+    inbound: InboundEvidence = SATISFIED_BY_ARRIVAL if arrival else _relied(matches)
 
     # The exit half, satisfied by identity when the destination *is* a declared spendable
     # endpoint (FR-002, owner decision 2026-08-23). Read before the routes are consulted at
     # all, exactly as arrival is: the money is already where it needed to come back out to, so
     # there is nothing for a way out to do and nothing for the verdict to rest on.
     identity = is_spendable(destination, spendable)
-    declared = () if identity else _exits_from(routes, destination)
-    reaching = tuple(
-        relied for relied in declared if _lands_spendable(routes[relied.route_id], spendable)
-    )
-    exits: ExitEvidence = SATISFIED_BY_IDENTITY if identity else reaching
+    declared = () if identity else _exits_from(ordered, destination)
+    reaching = tuple(route for route in declared if _lands_spendable(route, spendable))
+    exits: ExitEvidence = SATISFIED_BY_IDENTITY if identity else _relied(reaching)
 
     deficits: list[Deficit] = []
     if not arrival and not matches:
@@ -464,7 +473,7 @@ def _verdict(
                 # The exits that *do* exist, so the owner can see the corridor was already
                 # observed and why it does not count -- the difference between this and
                 # NO_EXIT_DECLARED, which is a different errand.
-                observed_exits=declared,
+                observed_exits=_relied(declared),
             )
         )
 
@@ -550,7 +559,7 @@ def _ties(todo: tuple[TodoEntry, ...]) -> tuple[tuple[int, ...], ...]:
 
 
 def _orphan_exits(
-    routes: Mapping[str, Route],
+    ordered: tuple[Route, ...],
     *,
     reachable: frozenset[Destination],
     spendable: frozenset[SpendableEndpoint],
@@ -569,7 +578,7 @@ def _orphan_exits(
             origin=_leaves_from(route),
             reaches_spendable=_lands_spendable(route, spendable),
         )
-        for route in _sorted_routes(routes)
+        for route in ordered
         if route.direction == "exit" and _leaves_from(route) not in reachable
     )
 
@@ -628,12 +637,12 @@ def _regime_block(
     normalized regime produces two different verdicts for one pair, and there is no place for a
     blended third.
     """
-    in_force = {route_id: routes[route_id] for route_id in route_ids}
+    ordered = _sorted_routes({route_id: routes[route_id] for route_id in route_ids})
     verdicts = tuple(
         _verdict(
             destination,
             stream,
-            routes=in_force,
+            ordered=ordered,
             spendable=spendable,
             candidates=candidates,
         )
@@ -645,7 +654,7 @@ def _regime_block(
         for destination in universe
         for stream in streams
         if _satisfied_by_arrival(destination, stream)
-        or _inbound_matches(in_force, destination, stream)
+        or _inbound_matches(ordered, destination, stream)
     )
     todo = _todo(verdicts)
     return RegimeCoverage(
@@ -655,7 +664,7 @@ def _regime_block(
         verdicts=verdicts,
         todo=todo,
         ties=_ties(todo),
-        orphan_exits=_orphan_exits(in_force, reachable=reachable, spendable=spendable),
+        orphan_exits=_orphan_exits(ordered, reachable=reachable, spendable=spendable),
     )
 
 

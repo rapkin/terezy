@@ -231,8 +231,10 @@ def test_an_unknown_venue_is_refused(tmp_path: Path) -> None:
 
 
 def test_a_venue_that_cannot_hold_the_currency_is_refused(tmp_path: Path) -> None:
-    """``inzhur`` is declared hryvnia-only, so spending dollars from it is a contradiction --
-    and ``Venue.currencies`` already exists for exactly this class of check."""
+    """``coinbase`` is declared dollar-only, so naming it as somewhere the owner spends
+    *hryvnia* is a contradiction -- and ``Venue.currencies`` already exists for exactly this
+    class of check, which is why the resolver reuses ``_check_venue`` rather than writing a
+    second one."""
     root = _scratch_root(tmp_path)
     target = root / "spendable" / "owner-001.toml"
     target.write_text(

@@ -230,9 +230,13 @@ def test_a_two_hop_way_out_is_deficit_three_and_is_never_composed() -> None:
     verdict = _verdicts(block)[("vault", "salary_uah")]
     assert isinstance(verdict, NotReady)
     assert tuple(d.kind for d in verdict.deficits) == (EXIT_NOT_SPENDABLE,)
-    # And nothing anywhere in the report claims the composed path exists.
-    for entry in block.todo:
-        assert entry.missing.direction == "exit" or entry.missing.candidates == ()
+    # And nothing anywhere in the report claims the composed path exists: the only way *out*
+    # it asks anybody to observe is one leaving ``vault`` -- not the second hop, and not the
+    # chain. (It also asks for a way *in* to ``broker``, which the salary cannot reach in this
+    # registry; that is the other half of a different pair.)
+    assert [
+        entry.missing.origin_venue for entry in block.todo if entry.missing.direction == "exit"
+    ] == ["vault"]
 
 
 # ---------------------------------------------------------------------------
@@ -713,7 +717,6 @@ def test_a_route_arriving_in_the_wrong_currency_reaches_a_different_destination(
         routes=routes,
         spendable_set=SPENDABLE_AT_MONO,
     )
-    verdicts = _verdicts(block)
     dollars = next(
         v
         for v in block.verdicts
@@ -727,4 +730,7 @@ def test_a_route_arriving_in_the_wrong_currency_reaches_a_different_destination(
     assert isinstance(dollars, Ready)
     assert isinstance(hryvnia, NotReady)
     assert NO_INBOUND in {deficit.kind for deficit in hryvnia.deficits}
-    assert verdicts  # two balances at one venue are two verdicts, not one
+    # Two balances at one venue are two verdicts. Counted here because ``_verdicts`` keys on
+    # ``(venue_id, stream_id)`` and would silently collapse them into one -- which is exactly
+    # the conflation this test exists to rule out, so it is asserted on the raw tuple.
+    assert len([v for v in block.verdicts if v.destination.venue_id == "broker"]) == 2
