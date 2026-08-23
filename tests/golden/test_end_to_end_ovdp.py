@@ -28,7 +28,10 @@ tax charge, and the whole folded ledger including each event's causation string.
 what makes a failure diagnosable: ``git diff`` on this file says which coupon moved and by
 how much, and the causation lines say what the engine thought it was doing. Amounts are
 rendered with ``repr``, which for a float64 is exact and round-trippable, so the readable
-half is no weaker than the digest -- it is the same claim, written out.
+half is **stricter** than the digest rather than the same claim written out: ``repr``
+distinguishes ``-0.0`` from ``0.0`` and ``canonical.of_number`` deliberately does not. The
+one negative zero in this artefact is therefore pinned by the rendering alone, and it is a
+pin on how a figure prints -- nothing computed depends on the sign of a zero.
 
 Both halves live in **one** file and the test compares the whole text, so the digest cannot
 drift away from the rendering it describes.
@@ -288,10 +291,11 @@ def _verified_declarations(declarations: resolver.Declarations) -> resolver.Decl
 
 # --- the rendering --------------------------------------------------------------------
 #
-# Every amount goes through ``repr``, which round-trips a float64 exactly, so the readable
-# half of the artefact is as strict as the digest. Nothing here renders provenance: see
-# the module docstring for why that exclusion is deliberate and where the mark is asserted
-# instead.
+# Every amount goes through ``repr``, which round-trips a float64 exactly -- and also
+# distinguishes ``-0.0`` from ``0.0``, which the digest deliberately does not, so the readable
+# half is stricter than the digest rather than equal to it. Nothing here renders provenance:
+# see the module docstring for why that exclusion is deliberate and where the mark is
+# asserted instead.
 
 
 def _money(value: Money) -> str:

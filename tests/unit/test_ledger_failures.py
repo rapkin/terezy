@@ -36,7 +36,7 @@ from terezy.core.ledger import accounts, canonical, engine, events, lots
 from terezy.core.primitives import money, provenance
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
-from terezy.core.primitives.tolerance import assert_money_close
+from terezy.core.primitives.tolerance import TOLERANCE, assert_money_close
 
 OWNER = "owner-001"
 INSTRUMENT = "ovdp-synthetic-a"
@@ -421,6 +421,21 @@ def test_selecting_more_units_than_the_lots_hold_is_refused_at_the_selection_too
 
     with pytest.raises(LedgerInvariantError, match="not a disposal"):
         lots.basis_consumed(held, 0.0, method=lots.FIFO)
+
+
+@pytest.mark.parametrize("method", [lots.FIFO, lots.LIFO, lots.AVERAGE_COST, lots.SPECIFIC_LOT])
+def test_selecting_from_a_position_holding_nothing_is_refused_under_every_method(
+    method: str,
+) -> None:
+    """The gap the size comparison alone leaves open, at exactly one tolerance.
+
+    ``quantity > held + TOLERANCE`` is false for a request of ``1e-9`` against nothing held,
+    and each method then failed its own way: FIFO returned a selection of no lots at all --
+    the short selection the guard exists to prevent -- and average cost divided by zero, an
+    untyped failure in an engine whose rule is that failure is explicit.
+    """
+    with pytest.raises(LedgerInvariantError, match="no basis to consume"):
+        lots.basis_consumed((), TOLERANCE, method=method, named_lot="lot-1")
 
 
 def _lot(lot_id: str, *, quantity: float, cost: float) -> lots.Lot:

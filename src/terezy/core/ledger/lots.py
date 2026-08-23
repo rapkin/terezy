@@ -392,13 +392,8 @@ def _named_lot(lots: tuple[Lot, ...], quantity: float, named: str | None) -> Sel
 
 
 def _position_of(lots: tuple[Lot, ...]) -> str:
-    """Which position a refusal is about, or a stand-in where there is no lot to ask.
-
-    An empty tuple reaches here only from a disposal against a position holding nothing, which
-    ``consume`` refuses first -- so the stand-in is for a caller of :func:`basis_consumed`
-    testing the selection directly.
-    """
-    return lots[0].instrument_id if lots else "<no position>"
+    """Which position a refusal is about."""
+    return lots[0].instrument_id
 
 
 def _refuse_naming(
@@ -487,13 +482,19 @@ def basis_consumed(
     what makes C2 a comparison of two figures rather than of a number with itself. Without
     this one, a caller reaching the selection directly would get a short selection under FIFO
     and an over-100% fraction under average cost -- a wrong answer rather than a refusal.
+
+    **A holding of nothing is refused on its own clause**, not left to the comparison above.
+    At a request of exactly ``TOLERANCE`` against lots holding nothing the comparison is
+    ``1e-9 > 0.0 + 1e-9``, which is false, and each method then failed differently and none of
+    them well: a short selection under FIFO, a division by zero under average cost. There is
+    no basis in an empty position to select from at any tolerance.
     """
     held = sum(lot.quantity for lot in lots)
-    if quantity <= 0.0 or quantity > held + TOLERANCE:
+    if quantity <= 0.0 or held <= 0.0 or quantity > held + TOLERANCE:
         raise LedgerInvariantError(
             f"cannot select {quantity!r} units from lots holding {held!r}. A disposal of "
-            "nothing is not a disposal, and one larger than the holding would consume a basis "
-            "that was never paid."
+            "nothing is not a disposal, a position holding nothing has no basis to consume, "
+            "and a disposal larger than the holding would consume a basis that was never paid."
         )
     return selection_for(method)(lots, quantity, named_lot)
 

@@ -32,7 +32,7 @@ from terezy.core.ledger.lots import LotMethod
 from terezy.core.primitives import money
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
-from terezy.core.tax.year import AnnualStatement, SettlementBehaviour, liability_total
+from terezy.core.tax.year import AnnualStatement, ChargeRef, SettlementBehaviour, liability_total
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,10 +43,18 @@ class TaxPayment:
     category: str
     due_on: date
     """From the declared timing rule and its non-business-day convention -- never computed by
-    the engine, and never today's date."""
+    the engine, and never today's date.
+
+    A bare ``date``, because only ``Money`` carries provenance in this codebase: the rule's
+    own ``verified_on`` cannot ride here, so it rides on :attr:`amount` instead.
+    """
 
     amount: Money
-    """What was paid, as a positive magnitude, in the tax currency."""
+    """What was paid, as a positive magnitude, in the tax currency.
+
+    Carries the sources of everything that decided it, the timing rule included -- so an
+    unverified deadline marks the payment even though the date beside it cannot be marked.
+    """
 
     sequence: int
     """The sequence number of the ``TAX_PAYMENT`` event in the settled stream, so the figure
@@ -101,6 +109,25 @@ class Settlement:
     outstanding: tuple[OpenObligation, ...]
     carryforward: tuple[OpenCarryforward, ...]
 
+    statements: tuple[AnnualStatement, ...]
+    """The statements that were settled, with every charge's ``event_sequence`` moved to where
+    that event now sits in :attr:`stream`.
+
+    Inserting a payment renumbers everything after it, and a statement's charges point *into*
+    the stream from outside it. The ones handed in still carry the old numbers, so a reader
+    following ``charges[].charge.event_sequence`` from them lands on whatever event inherited
+    the number -- a tax payment, in the case that made this field necessary. These are the
+    copies whose references resolve, and they are the ones to report from.
+    """
+
+    renumbered: Mapping[int, int]
+    """Old sequence number -> new, for every event that was in the stream handed in.
+
+    :attr:`statements` is moved by this map already. Anything else a caller is still holding
+    that points into the pre-settlement stream -- a ``schedule.ChargedOn``, a schedule row --
+    has to be moved by it too, or it points at the wrong event.
+    """
+
 
 @dataclass(frozen=True, slots=True)
 class InsufficientCashForTax:
@@ -153,7 +180,23 @@ class WithholdingNotModelled:
     reason: str
 
 
-SettlementRefused = InsufficientCashForTax | WithholdingNotModelled
+@dataclass(frozen=True, slots=True)
+class MethodDisagreesWithStatements:
+    """The method this settlement folds under is not the one the statements were assessed on.
+
+    :func:`settle` re-folds the whole stream, and the fold consumes lots -- so ``method`` here
+    decides the basis of every disposal in :attr:`Settlement.ledger`, while the amounts being
+    paid were computed by ``tax.year.statements`` under whatever method it was given. Left
+    unchecked, a settled run reports a LIFO ledger paying a FIFO tax bill: two different
+    answers to the same question, side by side, with nothing saying they disagree.
+    """
+
+    settling_under: LotMethod
+    assessed_under: tuple[LotMethod, ...]
+    reason: str
+
+
+SettlementRefused = InsufficientCashForTax | WithholdingNotModelled | MethodDisagreesWithStatements
 """Why a set of statements could not be settled. Match exhaustively."""
 
 
@@ -184,7 +227,15 @@ def settle(
     ``owner_id`` is required rather than read off the first event, on Principle VII: whose
     money is leaving is a fact the caller states, and a stream with no events at all would
     otherwise have to invent one.
+
+    **The method is checked against the statements first.** The fold here consumes lots under
+    ``method``, and the amounts being paid were assessed under whatever method produced them;
+    a run in which those differ reports two different answers side by side
+    (:class:`MethodDisagreesWithStatements`).
     """
+    mismatch = _method_mismatch(statements, method)
+    if mismatch is not None:
+        return mismatch
     ordered = ev.in_sequence(events)
     due, refusal = _due(statements)
     if refusal is not None:
@@ -193,7 +244,7 @@ def settle(
     outstanding = tuple(
         _open(statement, day, horizon_end) for day, statement in due if day > horizon_end
     )
-    stream, settling = _merged(ordered, payable, owner_id=owner_id)
+    stream, settling, moved = _merged(ordered, payable, owner_id=owner_id)
     folded = _fold(stream, settling, base_currency=base_currency, method=method)
     if isinstance(folded, InsufficientCashForTax):
         return folded
@@ -204,7 +255,60 @@ def settle(
         payments=payments,
         outstanding=outstanding,
         carryforward=open_carryforward(statements),
+        statements=tuple(_restated(statement, moved) for statement in statements),
+        renumbered=moved,
     )
+
+
+def _method_mismatch(
+    statements: Sequence[AnnualStatement], method: LotMethod
+) -> MethodDisagreesWithStatements | None:
+    """The methods the statements were assessed under that this settlement does not fold by."""
+    assessed = {statement.liability.method for statement in statements}
+    if not assessed - {method}:
+        return None
+    named = tuple(sorted(assessed, key=lambda found: found.value))
+    return MethodDisagreesWithStatements(
+        settling_under=method,
+        assessed_under=named,
+        reason=(
+            f"this settlement folds the stream under {method.value!r} and the statements it "
+            f"is asked to pay were assessed under {', '.join(found.value for found in named)}. "
+            "The fold decides which lots every disposal in the settled ledger draws on, so a "
+            "mismatch puts one method's ledger beside another method's tax bill -- two "
+            "answers to the same question, neither of them labelled as disagreeing with the "
+            "other (FR-024). Settle under the method the statements were assessed with."
+        ),
+    )
+
+
+def _restated(statement: AnnualStatement, moved: Mapping[int, int]) -> AnnualStatement:
+    """One statement with each charge pointing at the event's new place in the settled stream.
+
+    Only the sequence numbers move. Every amount, every citation and every label is the object
+    the assessment produced, so a restated statement cannot differ from its original in any
+    figure -- which is what makes handing back the copy safe rather than a second answer.
+    """
+    return replace(
+        statement,
+        charges=tuple(
+            replace(item, charge=replace(item.charge, event_sequence=_moved_to(item, moved)))
+            for item in statement.charges
+        ),
+    )
+
+
+def _moved_to(item: ChargeRef, moved: Mapping[int, int]) -> int:
+    """Where the event this charge was computed for now sits, or a raise naming the gap."""
+    found = moved.get(item.charge.event_sequence)
+    if found is None:
+        raise LedgerInvariantError(
+            f"charge on event {item.charge.event_sequence} is being settled against a stream "
+            "that has no such event, so the statement it belongs to could not be made to "
+            "point at what it was charged on. A charge and its event are produced together; "
+            "one without the other means two different runs were mixed."
+        )
+    return found
 
 
 def _due(
@@ -247,12 +351,16 @@ def _merged(
     payable: Sequence[tuple[date, AnnualStatement]],
     *,
     owner_id: str,
-) -> tuple[tuple[Event, ...], Mapping[int, AnnualStatement]]:
+) -> tuple[tuple[Event, ...], Mapping[int, AnnualStatement], Mapping[int, int]]:
     """The stream with payments in place, renumbered **once**, allocations moved with it.
 
     Once is the whole point. Numbering the events, inserting, and numbering again is how an
     ``allocated_to`` ends up pointing at a fee's former neighbour -- so the merge and the
     numbering happen in the same pass, and the old-to-new mapping is built as it goes.
+
+    That mapping is returned rather than discarded, because it is the only thing that can move
+    a reference held **outside** the stream -- a statement's charges, a schedule's pairing --
+    onto the events they were about.
 
     A payment is emitted after every event dated on or before its due date, which is what puts
     the day's income on the paying side of the balance.
@@ -270,24 +378,30 @@ def _merged(
         settling[payment.sequence] = statement
     for event in events[index:]:
         built.append(_moved(event, moved, sequence=len(built) + 1))
-    return tuple(built), settling
+    return tuple(built), settling, moved
 
 
 def _moved(event: Event, moved: dict[int, int], *, sequence: int) -> Event:
     """One event at its new sequence number, with its fee allocation following it.
 
-    The mapping is filled as the stream is walked, and an allocation always points *backwards*
-    or at an event already emitted -- ``events.allocated_fees`` refuses a fee naming an event
-    that is not in the stream, and ``events.in_sequence`` has already established the order. A
-    forward-pointing allocation would raise a ``KeyError`` here, which is the right answer: it
-    would mean the stream was not the history it claims to be.
+    The mapping is filled as the stream is walked, so it holds only events already emitted.
+    A fee allocated to an event further down the stream is therefore not resolvable here, and
+    is refused by name rather than by ``KeyError``: a fee that names a later event is a stream
+    that is not the history it claims to be, and nothing upstream checks the direction --
+    ``allocated_fees`` checks membership and ``in_sequence`` checks the order, and neither is
+    a statement about which way an allocation points.
     """
     moved[event.sequence] = sequence
-    return replace(
-        event,
-        sequence=sequence,
-        allocated_to=None if event.allocated_to is None else moved[event.allocated_to],
-    )
+    target = None if event.allocated_to is None else moved.get(event.allocated_to)
+    if event.allocated_to is not None and target is None:
+        raise LedgerInvariantError(
+            f"fee event {event.sequence} is allocated to event {event.allocated_to}, which "
+            "comes after it in the stream. A fee is a cost of something that has already "
+            "happened, so an allocation points backwards; one pointing forwards means the "
+            "stream is not the history it claims to be, and renumbering it would silently "
+            "move the allocation onto whichever event inherits that number."
+        )
+    return replace(event, sequence=sequence, allocated_to=target)
 
 
 def _fold(

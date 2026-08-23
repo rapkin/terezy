@@ -283,11 +283,20 @@ class TestNoFigureHidesItsMethod:
     """FR-024, in the results this example produces."""
 
     @pytest.mark.parametrize("method", list(LotMethod))
-    def test_the_liability_states_the_method_and_what_backs_it(self, method: LotMethod) -> None:
+    def test_the_stated_method_is_the_one_whose_arithmetic_produced_the_figure(
+        self, method: LotMethod
+    ) -> None:
+        """The label is checkable rather than merely present.
+
+        The method is read **off the record** and used to pick which hand-computed figure the
+        liability must equal. Because the four taxes above are pairwise distinct, no other
+        method's label would satisfy this -- which is what makes it a test of the label and
+        not a restatement of the argument that was passed in.
+        """
         liability = _statement(method).liability
 
-        assert liability.method is method
-        assert liability.standing.method is method
+        assert_money_close(tax_year.liability_total(liability), _uah(TAX[liability.method]))
+        assert liability.standing.method is liability.method
         assert liability.standing.what_the_law_says
 
 

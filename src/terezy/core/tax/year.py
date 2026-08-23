@@ -45,9 +45,14 @@ _NO_CASH_EFFECT: Final = -0.0
 an amount -- ``0.0 == -0.0`` -- and the sign convention in this ledger is that an outflow is
 negative. A charge is recorded on the outflow side of the account (it is a debt being
 recognised, never a receipt), and multiplying by ``-0.0`` keeps the recorded amount on that
-side while making its magnitude nothing. It also keeps the recorded stream byte-identical to
-feature 001's for an exempt class, where the charge was zero and the old negation produced
-``-0.0`` -- which is why 001's golden artefact does not move (FR-026, research.md D9).
+side while making its magnitude nothing.
+
+**The sign is a cosmetic pin, not a regression guard.** ``canonical.of_number`` normalises
+``-0.0`` before hashing, every comparison in this engine is ``==``/``<``/``>``, and
+``money.total`` starts from ``+0.0``, so the sign changes no figure, no digest and no ranking.
+The single place it survives is the ``repr`` in 001's golden rendering. Flipping it would
+therefore move that artefact while proving nothing had changed -- which is a reason to leave
+it alone, and not a claim that anything rests on it.
 """
 
 
@@ -392,9 +397,12 @@ class AssessedLiability:
     """What both rates were applied to: the netted, carryforward-reduced figure."""
 
     method: LotMethod
-    """Which basis method produced the disposals behind the base. Here as well as on the
-    statement, deliberately: a liability lifted out of its statement still says what produced
-    it."""
+    """Which basis method produced the disposals behind the base.
+
+    Not a stamp. :func:`statements` refuses a method that is not the one the ledger's
+    disposals were consumed under (:class:`MethodDisagreesWithLedger`), so this names the
+    arithmetic that actually ran rather than the argument that happened to be passed.
+    """
 
     standing: MethodStanding
     """What the law is found to say about that method, so the citation travels with the
@@ -530,7 +538,15 @@ class AnnualStatement:
     due_on: date | None
     """The date the liability is payable, from the declared rule and its non-business-day
     convention. ``None`` only for a withheld-at-source class, where there is no later date
-    because there is no later payment."""
+    because there is no later payment.
+
+    **A bare date, because a date cannot carry a mark here.** ``Money`` is the only record in
+    this codebase that carries :class:`~terezy.core.primitives.provenance.Provenance`, so the
+    timing rule's own ``verified_on`` cannot ride on this field. It rides on the money
+    instead: the rule's provenance is unioned into every amount this statement carries, so an
+    unverified deadline marks the liability and the payment that settles it rather than
+    quietly marking nothing (``tests/contract/test_provenance_propagation.py``).
+    """
 
     unsettled: tuple[UnsettledSwitch, ...]
     """Every declared switch this statement's figures actually rest on (SC-012).
@@ -592,6 +608,25 @@ class MethodStandingUndeclared:
 
 
 @dataclass(frozen=True, slots=True)
+class MethodDisagreesWithLedger:
+    """The method a year is assessed under is not the one its disposals were consumed by.
+
+    The two are separate arguments to two separate functions -- ``engine.opening`` takes the
+    consumption method, :func:`statements` takes the assessing one -- and only the first one
+    decides which lots a disposal actually drew on. Left unchecked, the second is a label:
+    ``AssessedLiability.method`` would say LIFO over a FIFO gain, which is not a rounding
+    difference but a different tax on the same trade, and FR-024 exists precisely so a figure
+    cannot hide its basis convention.
+
+    Both are named because the fix is one or the other, and which one is the caller's to know.
+    """
+
+    assessed_under: LotMethod
+    ledger_folded_under: str
+    reason: str
+
+
+@dataclass(frozen=True, slots=True)
 class RateChangedWithinTaxYear:
     """A netting year's items fall under two different dated rate entries.
 
@@ -647,6 +682,7 @@ TaxYearRefused = (
     | FilingStatusUndeclared
     | UnsettledPositionUndeclared
     | MethodStandingUndeclared
+    | MethodDisagreesWithLedger
     | RateChangedWithinTaxYear
     | CategoryTaxedByTwoClasses
     | TaxCurrencyConversionUnavailable
@@ -692,26 +728,19 @@ def statements(
     Years run from the first to the last event in the ledger, so a year in which a category
     saw nothing still produces a statement saying so -- FR-006's third distinguishable zero,
     and the difference between "nothing was owed" and "nobody looked".
+
+    **The method is checked against the ledger before anything is assessed.** ``state`` was
+    folded under one method and ``method`` labels every figure produced here; where they
+    differ the label would be false, so the assessment refuses rather than stamping it.
     """
+    basis = _basis_for(state, rules=rules, method=method, switches=switches)
+    if not isinstance(basis, tuple):
+        return basis
+    standing, method_switch = basis
+
     grouped = _items(state, charges, rules)
     if isinstance(grouped, CategoryUndeclared | TaxCurrencyConversionUnavailable):
         return grouped
-
-    standing = rules.methods.get(method)
-    if standing is None:
-        return MethodStandingUndeclared(
-            method=method,
-            reason=(
-                f"no declared finding about what the law says for the {method.value!r} basis "
-                "method, so a figure produced under it could not state what backs it. A tax "
-                "figure that does not name its basis convention hides the one input the "
-                "sources disagree about (FR-024). Declare a [[timing.lot_method]] entry for "
-                f"{method.value!r} with its citation."
-            ),
-        )
-    method_switch = _method_switch(standing, switches)
-    if isinstance(method_switch, UnsettledPositionUndeclared):
-        return method_switch
 
     built: list[AnnualStatement] = []
     for category_id in sorted(grouped):
@@ -744,6 +773,52 @@ def statements(
             return assessed
         built.extend(assessed)
     return tuple(sorted(built, key=lambda statement: (statement.tax_year, statement.category)))
+
+
+def _basis_for(
+    state: LedgerState,
+    *,
+    rules: AssessmentRules,
+    method: LotMethod,
+    switches: UnsettledPositions,
+) -> tuple[MethodStanding, UnsettledSwitch | None] | TaxYearRefused:
+    """Everything about the basis method a year needs before any figure exists.
+
+    Three questions, answered together because a figure cannot be produced until all three
+    are: is this the method the ledger actually consumed by, what does the law say about it,
+    and does a figure under it rest on an unanswered question.
+    """
+    if method.value != state.consumption_method:
+        return MethodDisagreesWithLedger(
+            assessed_under=method,
+            ledger_folded_under=state.consumption_method,
+            reason=(
+                f"this assessment is asked to label its figures {method.value!r} and the "
+                f"ledger it reads consumed its lots by {state.consumption_method!r}. The "
+                "ledger's method is the one that decided which lots each disposal drew on, "
+                "so the realised gains here are that method's and no other's -- labelling "
+                "them with a second method would put a basis convention on a figure that was "
+                "never computed under it, which is a different tax on the same trade "
+                "(FR-024). Fold the ledger under the method you mean to assess under, or "
+                "assess under the method the ledger was folded with."
+            ),
+        )
+    standing = rules.methods.get(method)
+    if standing is None:
+        return MethodStandingUndeclared(
+            method=method,
+            reason=(
+                f"no declared finding about what the law says for the {method.value!r} basis "
+                "method, so a figure produced under it could not state what backs it. A tax "
+                "figure that does not name its basis convention hides the one input the "
+                "sources disagree about (FR-024). Declare a [[timing.lot_method]] entry for "
+                f"{method.value!r} with its citation."
+            ),
+        )
+    switch = _method_switch(standing, switches)
+    if isinstance(switch, UnsettledPositionUndeclared):
+        return switch
+    return standing, switch
 
 
 def _method_switch(
@@ -854,9 +929,9 @@ class _Carried:
     """The running carryforward between the years of one category.
 
     ``shadow`` is the counterfactual balance under *every declaration filed*. Carrying it
-    alongside the real balance is what makes :attr:`CarryforwardState.relief_forgone`
-    readable from one run instead of by running the other branch and subtracting -- which is
-    SC-010's requirement in as many words.
+    alongside the real balance is what makes
+    :attr:`CarryforwardState.cost_of_not_filing_to_date` readable from one run instead of by
+    running the other branch and subtracting -- which is SC-010's requirement in as many words.
     """
 
     balance: Money
@@ -1016,9 +1091,18 @@ def _per_event_year(
     distinguishes the two treatments is not the arithmetic but the claim, and
     :attr:`AnnualStatement.treatment` carries it.
     """
-    pit = money.total([item.charge.pit for item in items], currency)
-    levy = money.total([item.charge.levy for item in items], currency)
-    base = money.total([item.result for item in items], currency)
+    # ``declared`` is unioned into the amounts and not only into ``rests_on``: the category's
+    # treatment is why these items were summed rather than netted, and the timing rule is why
+    # the sum falls due when it does. A mark that reached the record's provenance field and
+    # stopped there would leave the money it governs -- and the payment that settles it --
+    # looking checked (FR-027).
+    pit = money.also_resting_on(
+        money.total([item.charge.pit for item in items], currency), declared
+    )
+    levy = money.also_resting_on(
+        money.total([item.charge.levy for item in items], currency), declared
+    )
+    base = money.also_resting_on(money.total([item.result for item in items], currency), declared)
     liability = AssessedLiability(
         pit=pit,
         levy=levy,
@@ -1110,7 +1194,11 @@ def _netting_year(
     if not isinstance(single, RateEntry):
         return single
 
-    netted = money.total([item.result for item in items], currency)
+    # See ``_per_event_year``: the mark on a declared rule rides on the money, because the
+    # money is what a reader is handed. Attaching it to ``netted`` is enough for the whole
+    # year -- the base, both lines, the carryforward and the payment are all derived from it
+    # by ``money`` functions, and every one of those unions provenance (FR-027).
+    netted = money.also_resting_on(money.total([item.result for item in items], currency), declared)
     claimable = available if filed else zero
     outcome = _apply_carryforward(
         netted=netted,
@@ -1278,7 +1366,11 @@ def _apply_carryforward(
     identities the tests assert (``base = netted - applied``, ``open = available - applied``)
     hold to the bit rather than to a tolerance.
     """
-    if netted.amount > 0.0:
+    # ``>= 0.0`` rather than ``> 0.0``: a year netting to exactly nothing is not a loss year.
+    # Sending it down the loss branch produced a ``created`` of ``-0.0`` and appended an
+    # origin holding nothing, which reports a loss that never happened and puts an empty
+    # shell in the queue ``_consume`` draws from.
+    if netted.amount >= 0.0:
         applied = _smaller(claimable, netted)
         base = money.sub(netted, applied)
         shadow_used = _smaller(shadow, netted)

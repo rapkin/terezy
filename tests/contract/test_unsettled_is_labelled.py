@@ -158,7 +158,10 @@ def _assessed(
     method: LotMethod = LotMethod.FIFO,
     declared_method: LotMethod | None = LotMethod.AVERAGE_COST,
 ) -> tuple[tax_year.AnnualStatement, ...] | tax_year.TaxYearRefused:
-    state = engine.fold(_events(), base_currency=UAH, consumption_method=LotMethod.FIFO.value)
+    # Folded under the method it is assessed under, because ``statements`` refuses the two
+    # disagreeing. Every lot here holds 100 units at 10 000.00, so the consumed basis -- and
+    # therefore every figure below -- is the same under all four; only the label moves.
+    state = engine.fold(_events(), base_currency=UAH, consumption_method=method.value)
     return tax_year.statements(
         state,
         _charges(state),

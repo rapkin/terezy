@@ -173,9 +173,39 @@ def _statements() -> tuple[tax_year.AnnualStatement, ...]:
     return built
 
 
-def _settled() -> settlement.Settlement:
+def _charged_events() -> tuple[Event, ...]:
+    """The same three events with the assessment memo recorded beside the disposal.
+
+    Built exactly as ``results.project`` builds one -- ``tax_year.memo_amount`` of the charge's
+    own total, dated with the income it taxes -- so the thing under test is the memo the
+    engine produces and not a hand-written zero that happens to look like it.
+    """
+    charge = _charge(_gross_ledger())
+    events = _gross_events()
+    return (
+        *events,
+        Event(
+            sequence=4,
+            occurred_on=SOLD_ON,
+            kind=EventKind.TAX_CHARGE,
+            amount=tax_year.memo_amount(charge.total),
+            owner_id=OWNER,
+            caused_by=CausationRef(
+                kind=CausationKind.TAX_RULE,
+                id=charge.tax_class_id,
+                detail=f"charged on event {charge.event_sequence}",
+            ),
+            lot_ref=None,
+            quantity=None,
+            allocated_to=None,
+            capacity_pool=None,
+        ),
+    )
+
+
+def _settled(*, charged: bool = False) -> settlement.Settlement:
     outcome = settlement.settle(
-        _gross_events(),
+        _charged_events() if charged else _gross_events(),
         _statements(),
         owner_id=OWNER,
         base_currency=UAH,
@@ -244,11 +274,29 @@ class TestTheYearIsAssembledAfterwards:
         assert quiet.zero_because is tax_year.ZeroReason.NO_TAXABLE_EVENTS
         assert_money_close(tax_year.liability_total(quiet.liability), _uah(0.0))
 
-    def test_every_liability_names_the_method_that_produced_its_basis(self) -> None:
-        """FR-024: there is no way to read a figure here without its basis convention."""
+    def test_a_liability_cannot_name_a_method_the_ledger_did_not_consume_by(self) -> None:
+        """FR-024, checked rather than stamped.
+
+        The label on every figure is read back against ``LedgerState.consumption_method`` --
+        the field that actually decided which lots the disposal drew on -- and assessing the
+        same ledger under another method is refused by name rather than relabelled.
+        """
+        state = _gross_ledger()
         for statement in _statements():
-            assert statement.liability.method is LotMethod.FIFO
-            assert statement.liability.standing.method is LotMethod.FIFO
+            assert statement.liability.method.value == state.consumption_method
+            assert statement.liability.standing.method.value == state.consumption_method
+
+        relabelled = tax_year.statements(
+            state,
+            (_charge(state),),
+            rules=tax_years.rules(),
+            tax_classes=tax_years.TAX_PACK,
+            filing=tax_years.filing(y2027=True),
+            method=LotMethod.LIFO,
+            switches=tax_years.positions(),
+        )
+
+        assert isinstance(relabelled, tax_year.MethodDisagreesWithLedger), relabelled
 
 
 class TestTheMoneyLeavesOnTheDeclaredDate:
@@ -284,10 +332,21 @@ class TestTheMoneyLeavesOnTheDeclaredDate:
         assert_money_close(_settled().ledger.accounts[UAH].balance, _uah(CASH_AFTER_PAYMENT))
 
     def test_no_charge_event_moved_anything(self) -> None:
-        """The other half of the same claim: the assessment memo settles nothing."""
-        charges = [event for event in _settled().stream if event.kind is EventKind.TAX_CHARGE]
+        """The other half of the same claim: the assessment memo settles nothing.
 
-        assert all(event.amount.amount == 0.0 for event in charges)
+        Settled from the **charged** stream, which is the only stream that has a memo in it to
+        be about. Over the gross events this assertion ranges over nothing and passes for it,
+        and a length guard is checked in as well so that it cannot start doing so again.
+
+        The balance is the assertion that carries the claim: 53 400.00 after the payment, the
+        same figure the gross stream reaches, so adding the memo moved nothing.
+        """
+        settled = _settled(charged=True)
+        charges = [event for event in settled.stream if event.kind is EventKind.TAX_CHARGE]
+
+        assert len(charges) == 1, settled.stream
+        assert charges[0].amount.amount == 0.0
+        assert_money_close(settled.ledger.accounts[UAH].balance, _uah(CASH_AFTER_PAYMENT))
 
 
 class TestALiabilityDueAfterTheHorizonIsReportedNotDropped:

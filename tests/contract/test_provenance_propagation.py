@@ -76,6 +76,7 @@ from terezy.core.primitives.provenance import Provenance, SourceRef
 from terezy.core.primitives.rates import NominalRate, RealRate
 from terezy.core.results import fund as fund_results
 from terezy.core.results import hurdle, project
+from terezy.core.results import tax_year as settlement
 from terezy.core.results.fund import FundAssumptions, FundProjection
 from terezy.core.results.project import Projection
 from terezy.core.tax import flat_rate
@@ -994,18 +995,105 @@ def _unverified_rules() -> tax_year.AssessmentRules:
     )
 
 
+def _unverified_timing() -> tax_year.AssessmentRules:
+    """The fixture rules with one legal value -- the payment deadline -- left unchecked."""
+    verified = tax_years.rules()
+    rule = verified.timing[tax_years.INVESTMENT]
+    return dataclasses.replace(
+        verified,
+        timing={
+            **verified.timing,
+            tax_years.INVESTMENT: dataclasses.replace(
+                rule, provenance=prov.of([tax_years.UNVERIFIED_SOURCE])
+            ),
+        },
+    )
+
+
+def _settled_under(rules: tax_year.AssessmentRules) -> settlement.Settlement:
+    """The same fixture assessed and then paid, so the sweep reaches the cash that left."""
+    outcome = settlement.settle(
+        _tax_year_events(),
+        _assessed_under(rules),
+        owner_id="owner-1",
+        base_currency=Currency.UAH,
+        method=lots.LotMethod.FIFO,
+        horizon_end=date(2028, 12, 31),
+    )
+    assert isinstance(outcome, settlement.Settlement), outcome
+    return outcome
+
+
 def test_an_unverified_assessment_rule_marks_every_figure_of_the_year_it_governs() -> None:
-    """SC-008's 100%: the sweep is over the records' own fields, not a list somebody kept."""
+    """SC-008's 100%: the sweep is over the records' own fields, not a list somebody kept.
+
+    The rule left unchecked is the netting treatment, and the base is what it is *because*
+    that rule says the year's operations net -- so a mark that reached ``rests_on`` and
+    stopped there would leave the liability, the netted base and the carryforward looking
+    checked while the input behind all three was not.
+    """
+    marked = 0
     for statement in _assessed_under(_unverified_rules()):
         if statement.category != tax_years.INVESTMENT:
             continue
         assert prov.is_unverified(statement.liability.rests_on), statement.tax_year
+        for name, amount in _statement_amounts(statement):
+            if amount.amount == 0.0:
+                continue
+            assert prov.is_unverified(amount.provenance), f"{statement.tax_year} {name}"
+            marked += 1
+    assert marked, "the sweep found no non-zero figure to be about"
+
+
+def test_the_unverified_rule_reaches_the_payment_that_settles_the_year() -> None:
+    """FR-027 names payment events, and they are the last figure in the chain.
+
+    A run whose statements are marked and whose ``TAX_PAYMENT`` is not would put an unmarked
+    amount in the ledger -- the one place a reader looks to see what actually left.
+    """
+    settled = _settled_under(_unverified_rules())
+
+    assert settled.payments, "the fixture must owe something for this to be about anything"
+    for payment in settled.payments:
+        assert prov.is_unverified(payment.amount.provenance), payment.tax_year
+    paid = [event for event in settled.stream if event.kind is EventKind.TAX_PAYMENT]
+    assert len(paid) == len(settled.payments)
+    for event in paid:
+        assert prov.is_unverified(event.amount.provenance), event.sequence
+
+
+def test_an_unverified_deadline_marks_the_money_even_though_it_cannot_mark_the_date() -> None:
+    """The omission a ``date`` forces, made visible instead of left silent.
+
+    ``AnnualStatement.due_on`` and ``TaxPayment.due_on`` are bare dates and nothing in this
+    codebase lets a date carry a mark -- ``Money`` is the only record with provenance. So the
+    timing rule's own ``verified_on`` has to travel on the amounts, and this is the assertion
+    that it does: leave the *deadline* unchecked and the liability and the payment say so.
+    """
+    settled = _settled_under(_unverified_timing())
+
+    assert settled.payments
+    for statement in settled.statements:
+        assert statement.due_on is not None
+        for name, amount in _statement_amounts(statement):
+            if amount.amount == 0.0:
+                continue
+            assert prov.is_unverified(amount.provenance), f"{statement.tax_year} {name}"
+    for payment in settled.payments:
+        assert prov.is_unverified(payment.amount.provenance), payment.tax_year
 
 
 def test_the_mark_is_falsifiable_on_a_tax_year_too() -> None:
-    """The same assessment with everything checked is unmarked, so the test above can fail."""
-    for statement in _assessed_under(tax_years.rules()):
+    """The same assessment with everything checked is unmarked, so the tests above can fail."""
+    settled = _settled_under(tax_years.rules())
+
+    for statement in settled.statements:
         assert not prov.is_unverified(statement.liability.rests_on), statement.tax_year
+        for name, amount in _statement_amounts(statement):
+            assert not prov.is_unverified(amount.provenance), f"{statement.tax_year} {name}"
+    assert settled.payments
+    for payment in settled.payments:
+        assert not prov.is_unverified(payment.amount.provenance), payment.tax_year
 
 
 def test_the_unverified_rule_is_named_on_the_figure_rather_than_merely_flagged() -> None:

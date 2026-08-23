@@ -5,14 +5,18 @@ individual, they give **different numbers** on the same trades, and nothing sett
 single figure called "the tax you would owe" would therefore be more confident than its
 inputs, where the input is an unanswered legal question.
 
-So the claim under test is about the **types**, not about a particular run: no record this
-feature emits can be built holding a liability without the method that produced it, and no
-name is a method until it has been checked against the closed set.
+So the claims under test are about the **types** and about the **check**: no record this
+feature emits can be built holding a liability without the method that produced it, no name is
+a method until it has been checked against the closed set, and the method a figure is labelled
+with is the one the ledger's disposals were actually consumed by -- refused by name where it
+is not, because a label nothing checks is not a label.
 """
 
 from __future__ import annotations
 
 import dataclasses
+from datetime import date
+from pathlib import Path
 from typing import Final
 
 import pytest
@@ -20,12 +24,21 @@ import pytest
 from terezy.core.errors import LedgerInvariantError
 from terezy.core.ledger import engine, lots
 from terezy.core.ledger.engine import LedgerState
+from terezy.core.ledger.events import CausationKind, CausationRef, Event, EventKind, LotRef
 from terezy.core.ledger.lots import LotMethod
+from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
+from terezy.core.primitives.money import Money
+from terezy.core.results import tax_year as settlement
+from terezy.core.tax import flat_rate
 from terezy.core.tax import year as tax_year
+from terezy.core.tax.interface import TaxableEventKind, TaxCharge, TaxContext
+from terezy.data.declarations import loader
 from tests import tax_years
 
 pytestmark = pytest.mark.contract
+
+SHIPPED_TIMING: Final = Path(__file__).resolve().parents[2] / "data" / "tax" / "timing" / "ua.toml"
 
 LIABILITY_FIELDS: Final = {field.name for field in dataclasses.fields(tax_year.AssessedLiability)}
 
@@ -61,13 +74,20 @@ class TestALiabilityCannotBeBuiltWithoutItsMethod:
         assert "total" not in LIABILITY_FIELDS
         assert callable(tax_year.liability_total)
 
-    def test_a_statement_names_the_method_too(self) -> None:
-        """A liability lifted out of its statement still says what produced it, and so does
-        the statement it came from -- neither depends on the other being read."""
+    def test_the_only_route_from_a_statement_to_its_method_is_the_liability(self) -> None:
+        """A statement carries no method of its own, and that is the point.
+
+        A second copy would be a second answer, and the two would eventually disagree. So the
+        method is reachable from a statement only through the record that also carries the
+        standing behind it -- there is no field a reader can take the method from while
+        leaving the citation behind.
+        """
         statement_fields = {field.name for field in dataclasses.fields(tax_year.AnnualStatement)}
 
+        assert "method" not in statement_fields
+        assert "standing" not in statement_fields
         assert "liability" in statement_fields
-        assert "method" in LIABILITY_FIELDS
+        assert {"method", "standing"} <= LIABILITY_FIELDS
 
 
 class TestTheMethodSetIsClosed:
@@ -105,10 +125,65 @@ class TestAStandingIsDeclaredRatherThanCompiledIn:
         assert isinstance(outcome, tax_year.MethodStandingUndeclared), outcome
         assert outcome.method is LotMethod.FIFO
 
-    def test_a_standing_carries_its_own_citation(self) -> None:
-        for standing in tax_years.STANDINGS.values():
-            assert standing.provenance.sources
-            assert standing.what_the_law_says
+    def test_every_shipped_standing_carries_its_own_citation(self) -> None:
+        """The claim is about the file that ships, not about the fixture beside these tests.
+
+        A fixture's citations say only that the fixture has some. What has to be true is that
+        the four findings the project actually loads each name a source and say what the law
+        was found to say -- including the two whose finding is *no source prescribes this*,
+        which is itself a claim about the law and uncheckable uncited.
+        """
+        declared = loader.timing_from_file(SHIPPED_TIMING)
+
+        assert {standing.method for standing in declared.methods} == set(LotMethod)
+        for standing in declared.methods:
+            assert standing.provenance.sources, standing.method
+            assert standing.what_the_law_says, standing.method
+
+
+class TestAMethodIsCheckedAgainstTheLedgerItAssesses:
+    """A label nothing checks is not a label. FR-024 is about the figure, not the argument."""
+
+    def test_the_two_methods_would_genuinely_produce_different_tax(self) -> None:
+        """The premise: a mismatch is a wrong number, not a wrong word."""
+        assert _gain_under(LotMethod.FIFO) == FIFO_GAIN
+        assert _gain_under(LotMethod.LIFO) == LIFO_GAIN
+        assert _gain_under(LotMethod.FIFO) != _gain_under(LotMethod.LIFO)
+
+    def test_assessing_under_a_method_the_ledger_did_not_consume_by_is_refused(self) -> None:
+        state = _folded(LotMethod.FIFO)
+
+        outcome = _assess(state, method=LotMethod.LIFO)
+
+        assert isinstance(outcome, tax_year.MethodDisagreesWithLedger), outcome
+        assert outcome.assessed_under is LotMethod.LIFO
+        assert outcome.ledger_folded_under == LotMethod.FIFO.value
+
+    def test_the_matching_method_assesses_the_ledgers_own_gain(self) -> None:
+        """The falsifying half: the refusal is about disagreement, not about assessing."""
+        assessed = _assess(_folded(LotMethod.FIFO), method=LotMethod.FIFO)
+
+        assert isinstance(assessed, tuple), assessed
+        year = next(item for item in assessed if item.tax_year == SOLD_ON.year)
+        assert year.liability.method is LotMethod.FIFO
+        assert year.liability.base.amount == FIFO_GAIN
+
+    def test_settling_under_a_method_the_statements_were_not_assessed_on_is_refused(self) -> None:
+        assessed = _assess(_folded(LotMethod.FIFO), method=LotMethod.FIFO)
+        assert isinstance(assessed, tuple), assessed
+
+        outcome = settlement.settle(
+            _events(),
+            assessed,
+            owner_id=OWNER,
+            base_currency=Currency.UAH,
+            method=LotMethod.LIFO,
+            horizon_end=date(2029, 1, 1),
+        )
+
+        assert isinstance(outcome, settlement.MethodDisagreesWithStatements), outcome
+        assert outcome.settling_under is LotMethod.LIFO
+        assert outcome.assessed_under == (LotMethod.FIFO,)
 
 
 def _empty_ledger() -> LedgerState:
@@ -117,3 +192,96 @@ def _empty_ledger() -> LedgerState:
 
 def _rules_without_standings() -> tax_year.AssessmentRules:
     return tax_years.rules(methods={})
+
+
+# --- two lots at different prices, so the method changes the number -----------------------
+
+OWNER: Final = "owner-1"
+INSTRUMENT: Final = "fixture_two_lots"
+SOLD_ON: Final = date(2027, 3, 5)
+FIFO_GAIN: Final = 15_000.00
+"""25 000.00 proceeds less the 10 000.00 the older lot cost."""
+
+LIFO_GAIN: Final = 5_000.00
+"""The same proceeds less the 20 000.00 the newer one cost."""
+
+
+def _events() -> tuple[Event, ...]:
+    source = prov.of([tax_years.FIXTURE_SOURCE])
+
+    def event(sequence: int, on: date, kind: EventKind, amount: float, **extra: object) -> Event:
+        return Event(
+            sequence=sequence,
+            occurred_on=on,
+            kind=kind,
+            amount=Money(amount, Currency.UAH, source),
+            owner_id=OWNER,
+            caused_by=CausationRef(
+                kind=CausationKind.INSTRUMENT_TERM, id=f"{INSTRUMENT}:terms", detail="fixture"
+            ),
+            lot_ref=extra.get("lot_ref"),  # type: ignore[arg-type]
+            quantity=extra.get("quantity"),  # type: ignore[arg-type]
+            allocated_to=None,
+            capacity_pool=None,
+        )
+
+    return (
+        event(1, date(2026, 1, 5), EventKind.CASH_DEPOSIT, 100_000.00),
+        event(
+            2,
+            date(2026, 1, 5),
+            EventKind.PURCHASE,
+            -10_000.00,
+            lot_ref=LotRef(instrument_id=INSTRUMENT, lot_id="lot-a"),
+            quantity=100.0,
+        ),
+        event(
+            3,
+            date(2026, 2, 5),
+            EventKind.PURCHASE,
+            -20_000.00,
+            lot_ref=LotRef(instrument_id=INSTRUMENT, lot_id="lot-b"),
+            quantity=100.0,
+        ),
+        event(
+            4,
+            SOLD_ON,
+            EventKind.PRINCIPAL_REPAYMENT,
+            25_000.00,
+            lot_ref=LotRef(instrument_id=INSTRUMENT, lot_id=None),
+            quantity=100.0,
+        ),
+    )
+
+
+def _folded(method: LotMethod) -> LedgerState:
+    return engine.fold(_events(), base_currency=Currency.UAH, consumption_method=method.value)
+
+
+def _gain_under(method: LotMethod) -> float:
+    return _folded(method).disposals[0].realised_gain_base_ccy.amount
+
+
+def _assess(
+    state: LedgerState, *, method: LotMethod
+) -> tuple[tax_year.AnnualStatement, ...] | tax_year.TaxYearRefused:
+    charged = flat_rate.charge(
+        _events()[3],
+        tax_years.TAXED_CLASS,
+        TaxContext(
+            instrument_id=INSTRUMENT,
+            taxable_event=TaxableEventKind.DISPOSAL_GAIN,
+            taxable_base=state.disposals[0].realised_gain_base_ccy,
+            charged_for_year=SOLD_ON.year,
+        ),
+    )
+    assert isinstance(charged, TaxCharge), charged
+    return tax_year.statements(
+        state,
+        (charged,),
+        rules=tax_years.rules(),
+        tax_classes=tax_years.TAX_PACK,
+        filing=tax_years.filing(y2027=True),
+        method=method,
+        switches=tax_years.positions(),
+    )

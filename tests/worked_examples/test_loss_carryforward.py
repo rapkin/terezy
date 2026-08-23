@@ -123,19 +123,26 @@ def _sell(sequence: int, on: date, *, instrument: str, proceeds: float, units: f
     )
 
 
-def _events(*, with_exempt_loss: bool = False, with_gain: bool = True) -> tuple[Event, ...]:
-    """The fixture above, with two optional variants each isolating one claim.
+def _events(
+    *,
+    with_exempt_loss: bool = False,
+    with_gain: bool = True,
+    proceeds_2025: float = 7_000.00,
+) -> tuple[Event, ...]:
+    """The fixture above, with three optional variants each isolating one claim.
 
     ``with_exempt_loss`` adds an exempt-security loss beside the 2026 gain (SC-005).
     ``with_gain`` drops the gain year, leaving the carryforward unabsorbed at the horizon so
     that FR-019's reporting has something to report; a 2026 cash event keeps the ledger's span
     two years either way, so the quiet-year statement is the same one in both.
+    ``proceeds_2025`` at 10 000.00 makes the loss year net to **exactly nothing**, which is
+    the boundary where a sign is all that separates a break-even year from a loss year.
     """
     base = [
         _cash(1, date(2025, 1, 5), 40_000.00),
         _buy(2, date(2025, 1, 5), instrument=TAXABLE, lot="lot-a", cost=10_000.00, units=100.0),
         _buy(3, date(2025, 1, 6), instrument=TAXABLE, lot="lot-b", cost=10_000.00, units=100.0),
-        _sell(4, date(2025, 6, 10), instrument=TAXABLE, proceeds=7_000.00, units=100.0),
+        _sell(4, date(2025, 6, 10), instrument=TAXABLE, proceeds=proceeds_2025, units=100.0),
         (
             _sell(5, date(2026, 9, 15), instrument=TAXABLE, proceeds=18_000.00, units=100.0)
             if with_gain
@@ -199,9 +206,15 @@ def _charges(state: engine.LedgerState, events: tuple[Event, ...]) -> tuple[TaxC
 
 
 def _statements(
-    *, filed_2025: bool, with_exempt_loss: bool = False, with_gain: bool = True
+    *,
+    filed_2025: bool,
+    with_exempt_loss: bool = False,
+    with_gain: bool = True,
+    proceeds_2025: float = 7_000.00,
 ) -> tuple[tax_year.AnnualStatement, ...]:
-    events = _renumbered(_events(with_exempt_loss=with_exempt_loss, with_gain=with_gain))
+    events = _renumbered(
+        _events(with_exempt_loss=with_exempt_loss, with_gain=with_gain, proceeds_2025=proceeds_2025)
+    )
     state = _ledger(events)
     built = tax_year.statements(
         state,
@@ -271,6 +284,42 @@ class TestTheFiledBranch:
             assert carried is not None
             assert_money_close(carried.forfeited, _uah(0.0))
             assert_money_close(carried.cost_of_not_filing_to_date, _uah(0.0))
+
+
+class TestAYearNettingToExactlyNothingIsNotALossYear:
+    """The boundary at zero, where a sign is all that separates two different claims.
+
+    Selling lot-a for exactly what it cost gives a 2025 result of ``0.00``. That is a
+    break-even year: nothing is owed and nothing carries. Sent down the loss branch instead it
+    reports a *loss* of ``-0.0`` and files an origin holding nothing -- a loss year in the
+    output that never happened, and an empty shell in the queue later years draw from.
+    """
+
+    @staticmethod
+    def _break_even() -> tax_year.AnnualStatement:
+        return _investment(_statements(filed_2025=True, proceeds_2025=10_000.00), 2025)
+
+    def test_it_creates_no_loss_and_files_no_origin(self) -> None:
+        carried = self._break_even().carryforward
+        assert carried is not None
+
+        # ``repr`` rather than ``== 0.0``, which -0.0 also satisfies: the sign is the defect.
+        assert repr(carried.created.amount) == "0.0"
+        assert carried.origins == ()
+        assert_money_close(carried.open_balance, _uah(0.0))
+
+    def test_the_zero_is_a_netted_zero_and_not_an_exemption(self) -> None:
+        year = self._break_even()
+
+        assert_money_close(year.netted_base, _uah(0.0))
+        assert year.zero_because is tax_year.ZeroReason.NETTED_TO_ZERO
+
+    def test_the_following_gain_year_is_therefore_taxed_in_full(self) -> None:
+        # Nothing carried out of 2025, so 2026's 8 000.00 is charged whole: 800.00 + 400.00.
+        year = _investment(_statements(filed_2025=True, proceeds_2025=10_000.00), 2026)
+
+        assert_money_close(year.liability.base, _uah(GAIN))
+        assert_money_close(tax_year.liability_total(year.liability), _uah(UNFILED_LIABILITY))
 
 
 class TestTheUnfiledBranch:
