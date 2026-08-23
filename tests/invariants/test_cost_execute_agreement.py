@@ -59,6 +59,7 @@ from terezy.core.primitives.money import Money
 from terezy.core.primitives.tolerance import TOLERANCE, assert_money_close, is_close
 from terezy.core.results.ramp import CostComponent, RampCost, RouteUnusable
 from terezy.core.routes import capacity, cost, execute
+from terezy.core.routes.path import candidate_id
 from tests.invariants import route_graphs
 
 pytestmark = pytest.mark.invariant
@@ -273,7 +274,7 @@ class TestExecuteDerivesRatherThanRecomputes:
         assert isinstance(costed, RampCost)
         for event in _events(costed):
             assert event.caused_by.kind is CausationKind.ROUTE_TERM
-            assert event.caused_by.id == graph.path.route_id
+            assert event.caused_by.id == candidate_id(graph.path)
             assert event.caused_by.detail
 
     def test_every_component_has_prose_and_an_unexplained_one_would_raise(self) -> None:

@@ -50,9 +50,9 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.primitives.currency import Currency
     from terezy.core.primitives.money import Money
     from terezy.core.primitives.staleness import ObservationKind
+    from terezy.core.results.composed import SegmentBound
     from terezy.core.results.coverage import SpendableEndpoint
     from terezy.core.routes.channels import FxChannel
-    from terezy.core.routes.compose import SegmentBound
     from terezy.core.routes.legs import Leg, Route
     from terezy.core.routes.venues import Venue
     from terezy.core.scenarios.regimes import Regime

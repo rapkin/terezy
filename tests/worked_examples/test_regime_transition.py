@@ -98,7 +98,7 @@ from terezy.core.results.ramp import NothingComparable, RampCost, RoundTripCost,
 from terezy.core.routes import cost, ranking
 from terezy.core.routes.channels import FxChannel
 from terezy.core.routes.legs import Route
-from terezy.core.routes.path import FundingPath
+from terezy.core.routes.path import FundingPath, candidate_id
 from terezy.core.scenarios import regimes
 from tests.invariants import route_graphs
 
@@ -406,7 +406,7 @@ class TestARankingSeesOnlyTheCorridorsInForce:
         assert ranked.excluded == (), ranked.excluded
         recommended = recommended_cost(ranked)
         assert isinstance(recommended.round_trip, RoundTripCost)
-        return recommended.path.route_id, recommended.round_trip.fraction
+        return candidate_id(recommended.path), recommended.round_trip.fraction
 
     def test_the_same_contribution_is_ranked_through_a_different_corridor_on_each_side(
         self,

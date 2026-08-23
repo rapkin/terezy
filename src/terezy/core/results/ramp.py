@@ -50,7 +50,7 @@ from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance
 from terezy.core.primitives.staleness import StalenessVerdict
 from terezy.core.routes.legs import RouteStatus
-from terezy.core.routes.path import FundingPath
+from terezy.core.routes.path import Candidate, ExitChain, Segment
 
 
 class CostComponent(Enum):
@@ -74,6 +74,40 @@ class CostComponent(Enum):
 
     FIXED_FEE = "fixed_fee"
     """Flat fees. The term that makes a small transfer's cost fraction exceed ``1.0``."""
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class SegmentAttribution:
+    """What one segment of a candidate charged, by component (FR-020, research.md D7).
+
+    The **second axis** of attribution. :attr:`OneWayCost.components` says which *term* charged
+    -- spread, percentage, flat -- and this says which *segment* did, so a reader can see which
+    declaration dominates and trace it there. SC-014 wants the dominating segment named, and two
+    flat mappings each summing to the same total is the smallest shape that gives both axes.
+
+    A nested ``Mapping[segment, Mapping[component, Money]]`` carries no more information and
+    makes the invariant harder to state; two parallel sums are two assertions a reader can check
+    by eye.
+
+    **A declared route has exactly one of these, and that is not a special case in the code.**
+    SC-002's "same costing function" applies to attribution too: if a one-segment candidate took
+    a different path through the attribution, the composed figures would be the only ones the
+    invariant ever exercised.
+
+    The figures are in the **sending** currency, like every other component figure, because that
+    is the currency the fold values charges in as it goes.
+    """
+
+    position: int
+    """0-based place in the chain, matching :attr:`terezy.core.routes.path.Segment.position`."""
+
+    route_id: str
+    """The declared route this segment is -- what a reader opens to check the figure."""
+
+    components: Mapping[CostComponent, Money]
+    """What this segment charged, split by term. Every member present, zero where it does not
+    apply, for the reason :attr:`OneWayCost.components` gives: a component that is zero and a
+    component nobody costed are different claims."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -138,6 +172,20 @@ class OneWayCost:
     """Which of those observations have aged past their kind's threshold, and by how many
     days, at the run's as-of date (FR-025)."""
 
+    by_segment: tuple[SegmentAttribution, ...]
+    """The same charge, split by **segment** instead of by term (FR-020).
+
+    One entry per declared route in the candidate, in chain order -- one entry for a declared
+    route, several for a composition. Sums to the same total as :attr:`components`, within the
+    project tolerance, and both sums are asserted: a leg cannot hide in either axis.
+
+    ⚙ **Within the tolerance rather than bit-for-bit**, and the reason is the trap this feature
+    was warned about. The whole-candidate accumulators keep the exact addition order feature 002
+    established, and these are accumulated **beside** them rather than summed into them --
+    because the rounding of a sum of sums is not the rounding of one fold, and reconstructing the
+    total from the segments would move numbers 002 recorded.
+    """
+
 
 @dataclass(frozen=True, slots=True)
 class RoundTripCost:
@@ -192,6 +240,18 @@ class RoundTripCost:
     staleness: StalenessVerdict
     """The merged verdict over both routes' observations."""
 
+    by_segment: tuple[SegmentAttribution, ...]
+    """The whole round trip's charge, split by segment: the inbound chain's segments and then
+    the exit chain's, numbered continuously (FR-020).
+
+    Continuous numbering because the round trip is **one** journey -- the amount that leaves the
+    inbound chain is the amount that enters the exit chain, with nothing re-derived in between --
+    and two independent numberings would make position 0 ambiguous in a report.
+
+    Empty of exit entries when the exit is :data:`~terezy.core.routes.path.EXIT_BY_IDENTITY`:
+    there are no exit legs to charge, because the money is already where it can be spent.
+    """
+
 
 @dataclass(frozen=True, slots=True)
 class ExitCostUnknown:
@@ -222,8 +282,32 @@ class RampCost:
     Keyed by the whole triple, never by a destination alone (FR-008).
     """
 
-    path: FundingPath
-    """Which destination, from which stream, by which route. Never a bare destination."""
+    path: Candidate
+    """Which destination, from which stream, by which way in. Never a bare destination.
+
+    Widened from ``FundingPath`` by feature 004 (FR-013): a declared route and a composed chain
+    are two **types**, matched with ``match``, so which comparisons rest on composition is
+    visible in every report rather than inferable from an id.
+    """
+
+    exit_path: ExitChain | None
+    """Which way back out this figure is keyed by, or ``None`` when there is none.
+
+    FR-012: the exit chain is part of the ranked unit's **identity**. Two exit chains from one
+    destination are two ``RampCost`` records in one ranking, each with its own round-trip figure,
+    because a record holding several has no defined position in a ranking ordered by round-trip
+    cost -- and picking one to order by is the blend FR-012 forbids, arrived at by accident.
+
+    ``None`` **exactly when** :attr:`round_trip` is :class:`ExitCostUnknown`, and never
+    otherwise: a candidate nobody has costed a way out for has no exit chain to be keyed by. The
+    correspondence is asserted rather than assumed, in
+    ``tests/contract/test_composed_distinct.py``.
+
+    ⚙ **A departure from data-model.md**, which types this field ``ExitChain`` outright. Three
+    members cannot express "there is no way out" without a fourth that would then have to be
+    kept in step with the round-trip slot's own statement of it -- two places for one fact. The
+    ``None`` reads as *no chain in the key*, and the reason is in :attr:`round_trip`.
+    """
 
     one_way: OneWayCost
     """The cost in. Always computable, since the inbound route is the one that was declared."""
@@ -284,9 +368,23 @@ class RouteUnusable:
     route is not a cost of zero, and zero is the answer a reader would least question.
     """
 
-    path: FundingPath
+    path: Candidate
     """Which way was tried. The same key a successful cost carries, so an exclusion can be
     reported beside the alternatives it was excluded from."""
+
+    binding_segment: Segment | None
+    """Which segment of the chain bound, or ``None`` for a constraint that belongs to no one
+    segment.
+
+    FR-015: a composed candidate containing a closed, disrupted or out-of-window segment is
+    excluded **with the binding segment recorded**. Without this field the exclusion would name a
+    field -- ``leg.minimum`` -- on a chain of several routes, and the reader would have to open
+    every declaration to find which one it was.
+
+    ``None`` where the constraint is about the candidate rather than about a segment: a stream
+    that does not reach the way in at all is the case that exists today, and inventing a
+    position 0 for it would point a reader at a route that is not at fault.
+    """
 
     binding_constraint: str
     """What bound, named as the declared field that bound it -- ``leg.minimum``,

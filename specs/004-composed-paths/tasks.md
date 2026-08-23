@@ -102,41 +102,41 @@ invisible afterwards; the types second because nothing costs until they exist.
 
 ### The widened path type (FR-013, research.md D2, D4)
 
-- [ ] T009 Write `tests/unit/test_composed_path_types.py` — `ComposedPath` needs at least two
+- [X] T009 Write `tests/unit/test_composed_path_types.py` — `ComposedPath` needs at least two
       segments to mean anything, `Candidate` is matched with `match` and carries no
       `is_composed` flag, `ExitChain` has exactly three shapes, `EXIT_BY_IDENTITY` is a distinct
       value rather than an empty `ComposedExit` or `None`, and no record in the feature has a
       field for a path score or a combined disruption probability (FR-019, research.md D12).
-- [ ] T010 Extend `src/terezy/core/routes/path.py` with `ComposedPath`, `Segment`, `Candidate`,
+- [X] T010 Extend `src/terezy/core/routes/path.py` with `ComposedPath`, `Segment`, `Candidate`,
       `DeclaredExit`, `ComposedExit`, `EXIT_BY_IDENTITY`, `ExitChain`, `Journey`,
       `FROM_THE_DECLARATION`, and the free functions `segments_of`, `exit_segments_of`,
       `candidate_id`, `journey_of`. `FundingPath` is **not** repurposed and gains nothing.
-- [ ] T011 Extend `src/terezy/core/results/ramp.py`: `RampCost.path: Candidate`,
+- [X] T011 Extend `src/terezy/core/results/ramp.py`: `RampCost.path: Candidate`,
       `RampCost.exit_path: ExitChain | None`, `SegmentAttribution`, `OneWayCost.by_segment`,
       `RoundTripCost.by_segment`, `RouteUnusable.binding_segment: Segment | None`. No field for a
       path-level disruption probability, and that absence is the requirement.
-- [ ] T012 Add `src/terezy/core/results/composed.py`: `Enumeration` and `CompositionRefused`.
+- [X] T012 Add `src/terezy/core/results/composed.py`: `Enumeration` and `CompositionRefused`.
 
 **Checkpoint**: `uv run mypy` green on `src/`. **Commit.**
 
 ### `legs_of`, and the golden file still green (FR-003, FR-004, SC-002)
 
-- [ ] T013 Write `tests/contract/test_composed_same_costing.py` (SC-002, SC-006, SC-009, SC-011)
+- [X] T013 Write `tests/contract/test_composed_same_costing.py` (SC-002, SC-006, SC-009, SC-011)
       — asserted **by construction** as 002's `test_same_code_path.py` asserts its own: `legs_of`
       is the only producer of a leg sequence, `cost_one` is the only costing function, a composed
       candidate reaches neither by a second path; provenance and staleness on a composed
       candidate are the concatenation's (SC-006); no cost figure is attributable to a destination
       alone (SC-009); per-leg disruption everywhere and no combined figure anywhere (SC-011).
-- [ ] T014 Add `legs_of(candidate, routes)` to `src/terezy/core/routes/cost.py` together with the
+- [X] T014 Add `legs_of(candidate, routes)` to `src/terezy/core/routes/cost.py` together with the
       private `_chain` that pairs each leg with its `Segment`, and widen `cost_one` to take a
       `Candidate` and an `exit_path`. **T-2**: the whole-candidate accumulators keep their exact
       addition order and the per-segment attribution is a separate accumulator beside them.
-- [ ] T015 Widen `src/terezy/core/routes/ranking.py` to one league over `Candidate | Journey`
+- [X] T015 Widen `src/terezy/core/routes/ranking.py` to one league over `Candidate | Journey`
       (FR-010) — no bonus, no penalty, no separate league, 002's ties unchanged.
-- [ ] T016 Widen `src/terezy/core/routes/execute.py` to derive its events from a composed figure,
+- [X] T016 Widen `src/terezy/core/routes/execute.py` to derive its events from a composed figure,
       and `paths_in_force` in `src/terezy/core/scenarios/regimes.py` to narrow a `Candidate` by
       every segment.
-- [ ] T017 Get `tests/golden/test_ramp_comparison.py` green **without the artefact moving**
+- [X] T017 Get `tests/golden/test_ramp_comparison.py` green **without the artefact moving**
       (**T-1**), updating only the rendering where the widened type forces it, and run the whole
       existing suite to confirm 002's and 003's numbers did not move.
 

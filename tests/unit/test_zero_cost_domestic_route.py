@@ -44,6 +44,7 @@ from terezy.core.results.ramp import (
     recommended_cost,
 )
 from terezy.core.routes import cost, ranking
+from terezy.core.routes.path import candidate_id
 from tests.invariants import route_graphs
 
 SENT = 10_000.0
@@ -170,7 +171,7 @@ class TestTheBarIsWhatARankingMeasuresAgainst:
 
     def test_the_free_route_is_the_recommendation_and_its_cost_is_zero(self) -> None:
         recommended = recommended_cost(self._ranked())
-        assert recommended.path.route_id == "inzhur_direct"
+        assert candidate_id(recommended.path) == "inzhur_direct"
         assert isinstance(recommended.round_trip, RoundTripCost)
         assert recommended.round_trip.fraction == 0.0
 

@@ -170,10 +170,20 @@ def _takes_the_triple(target: Any) -> bool:
     heuristic and the type is the guarantee: a parameter called ``path`` carrying a bare venue
     id would satisfy a name check while reintroducing precisely the blended figure FR-008
     exists to forbid.
+
+    ⚙ **``Candidate`` and ``Journey`` count too**, since feature 004. ``Candidate`` is
+    ``FundingPath | ComposedPath`` and both members carry the destination **and** the stream --
+    a ``ComposedPath`` names its whole chain of segments where a ``FundingPath`` names one
+    route, which is more of the key rather than less. A ``Journey`` pairs a candidate with its
+    way out, so it is the key plus the exit chain (FR-012). What the widening does *not* admit
+    is a bare venue id: a ``str`` still fails, which is the property this function exists for.
     """
     signature = inspect.signature(target)
     return any(
-        "FundingPath" in str(signature.parameters[name].annotation)
+        any(
+            key in str(signature.parameters[name].annotation)
+            for key in ("FundingPath", "Candidate", "Journey")
+        )
         for name in frozenset(signature.parameters) & PATH_NAMES
     )
 
@@ -223,14 +233,26 @@ def _records_nested_in_keyed_records() -> frozenset[str]:
     written down, so a new nested cost record inherits it automatically and a cost record that
     is *not* nested inside anything keyed does not.
     """
+    records = {
+        target.__name__: target
+        for _, target in _public_callables()
+        if inspect.isclass(target) and dataclasses.is_dataclass(target)
+    }
+
+    def held_by(record: Any) -> set[str]:
+        names: set[str] = set()
+        for field in dataclasses.fields(record):
+            names.update(re.findall(r"[A-Z]\w+", str(field.type)))
+        return names
+
     nested: set[str] = set()
-    for _, target in _public_callables():
-        if not (inspect.isclass(target) and dataclasses.is_dataclass(target)):
-            continue
-        if not _is_keyed(target):
-            continue
-        for field in dataclasses.fields(target):
-            nested.update(re.findall(r"[A-Z]\w+", str(field.type)))
+    frontier = [target for target in records.values() if _is_keyed(target)]
+    while frontier:
+        held = held_by(frontier.pop())
+        for name in held - nested:
+            nested.add(name)
+            if name in records:
+                frontier.append(records[name])
     return frozenset(nested)
 
 

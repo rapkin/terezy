@@ -69,24 +69,3 @@ make an exclusion silent, which is precisely what FR-014 forbids.
 """
 
 from __future__ import annotations
-
-from dataclasses import dataclass
-
-
-@dataclass(frozen=True, slots=True, kw_only=True)
-class SegmentBound:
-    """How many declared routes may be chained into one candidate. Declared, never inferred.
-
-    FR-006: the bound is data. It has no default here and none at the data boundary, because a
-    forgotten line must never read as a chosen policy -- the rule that refuses a default
-    staleness threshold (002 FR-028), applied to the one knob this feature adds.
-
-    Carries no ``owner_id``: the owner is a property of the *file* the bound was declared in and
-    is checked there, so putting him on the record would be one fact in two places.
-    """
-
-    max_segments: int
-    """At least one. **One means composition is off** -- only declared routes are candidates,
-    which is a legal choice and the explicit way to disable it. Zero admits nothing at all,
-    including declared routes, and is refused at load as a broken registry rather than read as
-    a way to turn the feature off."""

@@ -175,8 +175,20 @@ class TestARouteThatCannotCarryTheAmountSaysWhatBound:
     """FR-014: the binding constraint is named, with the shortfall, and never omitted."""
 
     def test_route_unusable_carries_the_path_the_constraint_and_the_reason(self) -> None:
+        # ``binding_segment`` joined with feature 004 (FR-015): on a chain of several declared
+        # routes, "leg.minimum bound" is not actionable until the reader knows which
+        # declaration to open. It is ``None`` for a declared route, where ``path`` already
+        # names the only route there is.
         fields = {field.name for field in dataclasses.fields(RouteUnusable)}
-        assert {"path", "binding_constraint", "required", "actual", "shortfall", "reason"} == fields
+        assert {
+            "path",
+            "binding_segment",
+            "binding_constraint",
+            "required",
+            "actual",
+            "shortfall",
+            "reason",
+        } == fields
 
     def test_it_is_unrelated_to_a_cost_so_it_cannot_fill_a_cost_slot(self) -> None:
         # The same discipline as the round-trip split: an unusable route is not a cost of

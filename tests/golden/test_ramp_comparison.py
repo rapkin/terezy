@@ -64,7 +64,7 @@ from terezy.core.results.ramp import (
     recommended_cost,
 )
 from terezy.core.routes import ranking
-from terezy.core.routes.path import FundingPath
+from terezy.core.routes.path import FundingPath, candidate_id
 from terezy.data import manifest
 from terezy.data.declarations import resolver
 
@@ -147,7 +147,7 @@ def _money(value: Money) -> str:
 
 
 def _cost(index: int, cost: RampCost) -> Iterable[str]:
-    yield f"[{index}] {cost.path.route_id}"
+    yield f"[{index}] {candidate_id(cost.path)}"
     yield f"      stream            {cost.path.stream_id}"
     yield f"      destination       {cost.path.destination_id}"
     yield f"      status            {cost.status}"
@@ -198,14 +198,16 @@ def _render(result: Ranking, declared: resolver.RampDeclarations) -> str:
     for index, cost in enumerate(result.costed):
         lines.extend(_cost(index, cost))
         lines.append("")
-    lines.append(f"recommended   {result.recommended} ({recommended_cost(result).path.route_id})")
+    lines.append(
+        f"recommended   {result.recommended} ({candidate_id(recommended_cost(result).path)})"
+    )
     lines.append(f"ties          {result.ties}")
     lines.append(f"excluded      {len(result.excluded)}")
     for unusable in result.excluded:
-        lines.append(f"      {unusable.path.route_id}: {unusable.binding_constraint}")
+        lines.append(f"      {candidate_id(unusable.path)}: {unusable.binding_constraint}")
     lines.append(f"not_comparable {len(result.not_comparable)}")
     for cost in result.not_comparable:
-        lines.append(f"      {cost.path.route_id}")
+        lines.append(f"      {candidate_id(cost.path)}")
 
     lines += ["", "## digest over core.routes.ranking output", digest_of(result), ""]
     return "\n".join(lines)
@@ -220,7 +222,7 @@ def digest_of(result: Ranking) -> str:
 def manifest_shape(cost: RampCost) -> tuple[str | tuple[str, ...], ...]:
     """The parts of a cost the digest covers. Provenance is excluded, deliberately."""
     return (
-        cost.path.route_id,
+        candidate_id(cost.path),
         cost.path.stream_id,
         cost.path.destination_id,
         cost.one_way.sent.amount.hex(),
@@ -287,20 +289,20 @@ class TestTheArtefactCannotBeGreenAndWrong:
         The zero-cost claim itself is checked where it belongs, in
         ``tests/unit/test_zero_cost_domestic_route.py``.
         """
-        route_ids = {cost.path.route_id for cost in _ranking().costed}
+        route_ids = {candidate_id(cost.path) for cost in _ranking().costed}
         assert route_ids, "the ranking is empty, so nothing below proves anything"
         assert "inzhur_direct" not in route_ids
         assert all(cost.path.destination_id == DESTINATION for cost in _ranking().costed)
 
     def test_the_p2p_route_reproduces_the_hand_computed_cost(self) -> None:
-        p2p = next(c for c in _ranking().costed if c.path.route_id == P2P_ROUTE)
+        p2p = next(c for c in _ranking().costed if candidate_id(c.path) == P2P_ROUTE)
         assert is_close(p2p.one_way.fraction, P2P_ONE_WAY)
         assert isinstance(p2p.round_trip, RoundTripCost), p2p.round_trip
         assert is_close(p2p.round_trip.fraction, P2P_ROUND_TRIP)
 
     def test_the_rate_space_spread_is_reported_beside_the_cost_not_as_it(self) -> None:
         """METHODOLOGY §16.2: `p/r` is §4.3.1's figure and is not the cost."""
-        p2p = next(c for c in _ranking().costed if c.path.route_id == P2P_ROUTE)
+        p2p = next(c for c in _ranking().costed if candidate_id(c.path) == P2P_ROUTE)
         assert p2p.one_way.spreads_over_reference == (P2P_SPREAD_OVER_REFERENCE,)
         assert not is_close(p2p.one_way.fraction, P2P_SPREAD_OVER_REFERENCE)
 
@@ -313,4 +315,4 @@ class TestTheArtefactCannotBeGreenAndWrong:
         """None of §11 item 1's numbers has been observed, and the output says so."""
         for cost in _ranking().costed:
             if cost.one_way.provenance.sources:
-                assert prov.is_unverified(cost.one_way.provenance), cost.path.route_id
+                assert prov.is_unverified(cost.one_way.provenance), candidate_id(cost.path)

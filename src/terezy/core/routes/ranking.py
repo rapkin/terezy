@@ -88,7 +88,7 @@ from terezy.core.results.ramp import (
 from terezy.core.routes import cost
 from terezy.core.routes.channels import FxChannel
 from terezy.core.routes.legs import Route
-from terezy.core.routes.path import FundingPath
+from terezy.core.routes.path import Candidate, Journey, journey_of
 from terezy.core.streams.streams import IncomeStream
 
 _Comparable = tuple[RampCost, RoundTripCost]
@@ -202,7 +202,7 @@ def _nothing_comparable(
 
 
 def rank(
-    paths: Sequence[FundingPath],
+    paths: Sequence[Candidate | Journey],
     amount: Money,
     *,
     routes: Mapping[str, Route],
@@ -212,7 +212,21 @@ def rank(
     on_date: date,
     as_of: date,
 ) -> Ranking | NothingComparable:
-    """Cost every path with ``cost_one`` and order the comparable ones. FR-016, FR-018, FR-029.
+    """Cost every candidate with ``cost_one`` and order the comparable ones. FR-016, FR-029.
+
+    **One league, over both kinds of candidate** (004 FR-010). A composed chain enters the same
+    lexicographic ordering as a declared route, under the same tie rules, with no bonus and no
+    penalty for being composed: there is no second sort here, and nothing in the key knows which
+    kind it is looking at. Composition adds reach, and reach is more rows.
+
+    An element may be a bare candidate or a
+    :class:`~terezy.core.routes.path.Journey` pairing one with a way out. A bare candidate means
+    *use the way out the declaration names* -- 002's FR-027 rule, unchanged. A ``Journey`` is how
+    FR-012's second consequence is expressed: two exit chains from one destination are **two
+    entries** in this sequence and two round-trip figures in the result, ranked against each
+    other like anything else and tied when they agree within the project tolerance. A single
+    record holding both figures would have no defined position in an ordering by round-trip
+    cost, and picking one to order by is the blend FR-012 forbids.
 
     One amount for every candidate, because a comparison of costs at different amounts is not a
     comparison. The amount is a separate argument from the paths for the same reason
@@ -241,9 +255,10 @@ def rank(
     comparable: list[_Comparable] = []
     excluded: list[RouteUnusable] = []
     not_comparable: list[RampCost] = []
-    for path in paths:
+    for item in paths:
+        journey = journey_of(item)
         outcome = cost.cost_one(
-            path,
+            journey.path,
             amount,
             routes=routes,
             channels=channels,
@@ -251,6 +266,7 @@ def rank(
             kinds=kinds,
             on_date=on_date,
             as_of=as_of,
+            exit_path=journey.exit_path,
         )
         match outcome:
             case RouteUnusable():
