@@ -34,7 +34,7 @@ from terezy.core.ledger.events import Event
 from terezy.core.primitives import money
 from terezy.core.primitives import provenance as prov
 from terezy.core.tax.interface import TaxCharge, TaxClass, TaxContext, TaxRuleOps
-from terezy.core.tax.schedule import RateEntry, RateUndeclaredBefore, rate_on
+from terezy.core.tax.schedule import RateUndeclaredBefore, rate_on
 
 
 def charge(event: Event, tax_class: TaxClass, context: TaxContext) -> TaxCharge | TaxFailure:
@@ -99,18 +99,6 @@ def charge(event: Event, tax_class: TaxClass, context: TaxContext) -> TaxCharge 
         charged_for_year=context.charged_for_year,
         provenance=prov.merge(base.provenance, in_force.provenance),
     )
-
-
-def entry_for(tax_class: TaxClass, event: Event) -> RateEntry | RateUndeclaredBefore:
-    """Which dated entry :func:`charge` would use for this event, without charging it.
-
-    Exposed because a result that reports *which* rate applied has to name the entry, and
-    re-deriving it at the reporting site would be a second place for the selection rule to
-    live -- two places that can disagree about which date selected a rate. The selection is
-    :func:`terezy.core.tax.schedule.rate_on` in both, called from here so the reporting
-    path cannot drift from the charging one.
-    """
-    return rate_on(tax_class, event.occurred_on)
 
 
 OPS = TaxRuleOps(charge=charge)

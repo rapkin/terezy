@@ -134,18 +134,18 @@ entry in a data file with no source change. Closes required test **E10**.
 taxable events on both sides, check both charges by hand; then add a third entry as a
 data-only edit and confirm it takes effect.
 
-- [ ] T017 [US2] Write the failing hand-computed worked example for the straddle — a
+- [x] T017 [US2] Write the failing hand-computed worked example for the straddle — a
       synthetic two-entry schedule, taxable events before and after the effective date,
       the arithmetic for both charges written out beside the assertion, and the
       difference between the two periods equal to exactly the declared step — in
       `tests/worked_examples/test_rate_schedule_straddle.py` (SC-003)
-- [ ] T018 [US2] Extend that module with the data-only proof: a third dated entry added
+- [x] T018 [US2] Extend that module with the data-only proof: a third dated entry added
       to a scratch copy of the tax file takes effect in the next run with **zero** source
       lines changed (SC-004, FR-013)
-- [ ] T019 [US2] Extend `tests/unit/test_schedule_refusals.py` so the refusal is asserted
+- [x] T019 [US2] Extend `tests/unit/test_schedule_refusals.py` so the refusal is asserted
       end to end — a projection whose first taxable event precedes the earliest entry
       returns the typed error rather than a projection (FR-012, SC-005)
-- [ ] T020 [US2] Assert the two-class isolation property: editing one class's schedule
+- [x] T020 [US2] Assert the two-class isolation property: editing one class's schedule
       changes only that class's subtotal and leaves the other class's figures
       bit-identical, in `tests/invariants/test_rate_schedule_isolation.py` (SC-002)
 
