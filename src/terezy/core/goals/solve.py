@@ -742,7 +742,7 @@ def _unreachable_reason(
     target: Money,
     growth: GrowthAssumption,
 ) -> str:
-    """Why a target is never reached, naming which of the three shapes it is.
+    """Why a target is never reached, naming which of the four shapes it is.
 
     Each branch tests the expression that actually produced the failure rather than a
     restatement of it, because a restatement is how a message comes to say something true of the
@@ -752,7 +752,7 @@ def _unreachable_reason(
     moving at a rate of zero or more passes any target above it eventually, so "not constant"
     and "never reached" together leave only decay. Within decay there are four shapes, and the
     sign of ``S*i + C`` -- the same quantity :func:`_never_moves` tests against zero -- tells
-    them apart, so the three cases partition rather than overlap:
+    them apart, so the four cases partition rather than overlap:
 
     * **The balance never moves** (``S*i + C == 0``): the contribution exactly offsets the loss
       on the balance it sits on, or nothing goes in and there is nothing to lose it from.
