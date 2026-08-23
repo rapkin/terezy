@@ -9,8 +9,10 @@
 # then read the diff and say in the commit message why each changed line is intended.
 #
 # Every amount is repr of a float64: exact and round-trippable, so this rendering is
-# as strict as the digest at the foot of the file. Provenance and the code version are
-# deliberately absent; the declaration files' digests are deliberately present.
+# STRICTER than the digest at the foot of the file, not merely as strict -- repr tells
+# -0.0 from 0.0 and the digest deliberately does not. A -0.0 below is pinned by this
+# text alone: a pin on how a figure prints, not a guard on any figure. Provenance and
+# the code version are deliberately absent; the declaration files' digests are present.
 #
 # THE TERMS PROJECTED HERE ARE SYNTHETIC AND UNVERIFIED. No figure below describes a
 # bond anyone can buy, and none of them accounts for funding-route cost or exit cost.
@@ -45,9 +47,9 @@ instrument           ovdp_synthetic_a             instruments/ovdp_synthetic_a.t
 instrument           ovdp_synthetic_b             instruments/ovdp_synthetic_b.toml        sha256:d28b43c7a66d320ecb7e6f9e5c3195a68f36fb4eb0ad11cf11b688a9c85df0f5
 tax_class            synthetic_fund_disposal      tax/synthetic_fixture.toml               sha256:d0e3848a8f82e3cabf8d8e9a1c7b5c76e288883a240c744a813c379743f27d12
 tax_class            synthetic_fund_payout        tax/synthetic_fixture.toml               sha256:d0e3848a8f82e3cabf8d8e9a1c7b5c76e288883a240c744a813c379743f27d12
-tax_class            ua_ci_fund_distribution      tax/ua.toml                              sha256:b78b8571a2fd5c85e5e6989e784ed0daecf252802405925ff0b7fcd3c5d95bb0
-tax_class            ua_government_bond           tax/ua.toml                              sha256:b78b8571a2fd5c85e5e6989e784ed0daecf252802405925ff0b7fcd3c5d95bb0
-tax_class            ua_investment_profit         tax/ua.toml                              sha256:b78b8571a2fd5c85e5e6989e784ed0daecf252802405925ff0b7fcd3c5d95bb0
+tax_class            ua_ci_fund_distribution      tax/ua.toml                              sha256:0bd0a4fc056cda98114de083f376eb886be7ba6757f5c774f328b8661722adac
+tax_class            ua_government_bond           tax/ua.toml                              sha256:0bd0a4fc056cda98114de083f376eb886be7ba6757f5c774f328b8661722adac
+tax_class            ua_investment_profit         tax/ua.toml                              sha256:0bd0a4fc056cda98114de083f376eb886be7ba6757f5c774f328b8661722adac
 
 == figures ==
 
