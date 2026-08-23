@@ -11,6 +11,8 @@ def render_graph(
     routes: Mapping[str, Route],
     regime: Regime,
     mode: Mode,
+    kinds: Mapping[str, ObservationKind],   # ⚙ added at implementation — see below
+    as_of: date,                            # ⚙ added at implementation — see below
 ) -> Diagram | NothingToDraw
 
 def render_path(
@@ -20,6 +22,33 @@ def render_path(
     regime: Regime,
 ) -> Diagram | NothingToDraw
 ```
+
+⚙ **`kinds` and `as_of` were added to `render_graph` during implementation, and the
+signature above as first written could not satisfy G10.** Staleness is
+`as_of - retrieved_on` against a **declared per-kind** threshold (FR-013, feature 002's
+FR-025/FR-028), so a registry graph cannot carry a `STALE` mark without both. Three options
+were weighed:
+
+* **omit staleness from the registry graph** — rejected: FR-015 requires the five states plus
+  synthetic to be *pairwise distinguishable in one diagram*, and a closed route never reaches
+  a costed path, so no single diagram could then carry all of them;
+* **make them optional** — rejected: an unassessed diagram would be indistinguishable from a
+  clean one, which is the silent permissive default FR-028 forbids outright and the exact
+  ambiguity `staleness.UNASSESSED` exists to remove;
+* **require them** — taken. Both are inputs, never a clock, exactly as `cost_one` takes them,
+  and the resolved `as_of` is printed on the face of the diagram.
+
+`render_path` needs neither: `OneWayCost.staleness` and `RoundTripCost.staleness` are verdicts
+feature 002 already computed under each leg's own declared threshold, so the path renderer
+**reads** the result's verdict instead of recomputing it. Two computations of one fact
+eventually disagree.
+
+⚙ **A channel's premium is not on the registry graph.** FR-006's with-figures mode names
+"fees, premiums"; a premium is declared on an `FxChannel`, and `render_graph`'s declared inputs
+are venues and routes. Rather than widen the signature a third time, the renderer shows the
+per-leg figures the `Leg` record carries — `fee_pct` and `fee_fixed` — and the premium surfaces
+where a *result* carries it: on the costed path, as the spread over reference, labelled as
+itself and never as the cost (G7). Stated as a limit rather than left to be discovered.
 
 `regime` is required on both and has no default, sentinel or overload: FR-019 says a merged
 graph existing under no regime must not be **producible**, and the strongest reading of that
@@ -54,6 +83,13 @@ occupy. (FR-010)
 
 **G9 — A refusal is a refusal.** Typed `NothingToDraw` carrying the reason; never an empty
 diagram, never a drawn path. (FR-011, SC-010)
+
+⚙ **No input to `render_graph` produces one.** The union is the shape both renderers share, so
+a caller matches once over both — but the spec turns every candidate refusal on the registry
+side into either a diagram that *says* it is empty (an empty registry, a regime with no routes
+— spec.md's own edge cases) or a loud failure (a regime naming an undeclared route, a leg
+naming an undeclared venue, two records declaring one id). Refusals belong to costed results,
+where the input is itself a typed refusal carrying a reason.
 
 **G10 — Marks propagate and survive.** Unverified, stale and synthetic reach the diagram and
 live in the label text, not only in styling. (FR-012, FR-013, FR-014, FR-015, SC-005)

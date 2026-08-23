@@ -188,6 +188,20 @@ it reinforces:
 | **H2** | Relied on and extended, not re-derived: the one new declaration (`data/spendable/`) fails at load naming file and field for every refusal in its contract, on the existing loader path. `tests/contract/test_spendable_declaration_loading.py`. The row's own test stays `tests/contract/test_declaration_loading.py`. |
 | **G6** | Extended in visibility: feature 002's per-route *exit cost unknown* refusal becomes an audit of the whole registry, and `tests/invariants/test_coverage_costing_agreement.py` pins the two views together — a pair the audit marks ready is one costing produces a round-trip figure for, within this feature's single-route scope. |
 
+**005-route-diagrams** closes **no** row either. No lettered behaviour above names a diagram,
+and the feature's spec states that plainly rather than stretching one. It extends two standing
+obligations into a new surface, and its tests assert the extension:
+
+| Row | How, and why the box does not move |
+|---|---|
+| **E5** | The mark propagates into the *picture*, not only into tables. One unverified route input marks 100% of the diagram elements depicting figures derived from it, and the assertion strips every style declaration first so a mark carried by a colour fails. `tests/contract/test_diagram_marks.py`. The row is about every figure in the engine, so one more surface carrying the mark does not close it — it is the row still holding. |
+| **B10** | Exercised again in its visual form: a refusal renders as a typed `NothingToDraw` carrying the refusal's own reason verbatim, never an empty diagram — because an empty picture is indistinguishable from a graph with nothing in it. `tests/contract/test_diagram_refusals.py`. Same reading as 003: a whole-engine row, and one more typed outcome does not close it. |
+
+Feature 002's **SC-014** — no exit route means no round-trip figure, and the destination is
+excluded from comparison — is likewise extended rather than restated: the exclusion becomes
+*visible*, as an explicitly absent edge and a `NO EXIT DECLARED` mark on the destination,
+never an omission. `tests/contract/test_diagram_refusals.py`.
+
 ---
 
 ## On tolerance

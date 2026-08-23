@@ -22,7 +22,14 @@ uv run pytest -q
 ```bash
 uv run python scripts/render_diagram.py graph --regime wartime --mode topology
 uv run python scripts/render_diagram.py graph --regime wartime --mode declared-figures
+uv run python scripts/render_diagram.py path --regime wartime \
+    --route monobank_to_binance_p2p --stream salary_uah --destination binance --amount 10000
 ```
+
+⚙ Add `--as-of 2026-08-21` to pin the date staleness is assessed against; without it the script
+uses today, and the date it used is printed on the face of the diagram. That default is the only
+clock in the feature — the library takes `as_of` as data and never reads one — and it is why the
+golden suite always passes the flag.
 
 Paste either into any Mermaid renderer. This is a feature whose defects are visible, and the
 fastest review is your own eyes on the picture before any assertion runs.
@@ -45,6 +52,7 @@ uv run pytest -m contract -k diagram -v
 | SC-007 | A destination with no declared exit renders the explicit mark, not an omission |
 | SC-012 | Topology-only and with-figures differ only by figures, and **neither** carries a computed ramp cost |
 | SC-010 | A refusal yields `NothingToDraw` with the reason, never an empty diagram and never a drawn path |
+| SC-002 | A corridor added to a scratch data root appears, correctly connected and correctly marked, with no line of source changed |
 
 SC-006 is the one to read if something drifts. The failure mode is not a wrong number, it is
 a *second* rounding: one call site formatting to three decimals because two looked coarse.
@@ -83,7 +91,8 @@ render will be to add a helper in `core`. The contract will refuse it.
 ## What "done" looks like
 
 - All twelve success criteria have a named test.
-- `docs/METHODOLOGY.md` gains the number-rendering rule — stated as *the* rule, with its
-  decimal places and the fact that it rounds — and the mark vocabulary a diagram uses.
+- `docs/METHODOLOGY.md` §21 gains the number-rendering rule — stated as *the* rule, with its
+  decimal places and the fact that it rounds — the mark vocabulary a diagram uses, the two
+  things a diagram may never do, and the positional node-id rule.
 - `docs/REQUIRED_TESTS.md` flips no row; this feature closes none.
 - No new dependency, and `core` is untouched.

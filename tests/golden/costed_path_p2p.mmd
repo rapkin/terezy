@@ -1,0 +1,19 @@
+flowchart LR
+    meta["costed path · regime: wartime · destination: binance · stream: salary_uah · route: monobank_to_binance_p2p · status: open · marks: UNVERIFIED + SYNTHETIC"]
+    x0["one-way cost 6.67% of 10000.00 UAH sent · arrived 222.22 USD · conversion_spread 666.67 UAH · fixed_fee 0.00 UAH · percentage_fee 0.00 UAH · marks: UNVERIFIED + SYNTHETIC"]:::unverified
+    x1["round-trip cost 12.22% of 10000.00 UAH sent · arrived 8777.78 UAH · conversion_spread 1222.22 UAH · fixed_fee 0.00 UAH · percentage_fee 0.00 UAH · marks: UNVERIFIED + SYNTHETIC"]:::unverified
+    x2["spread over reference (one-way): 7.14% via p2p · this is NOT the cost -- the cost is the one-way cost figure above"]
+    x3["spread over reference (round-trip): 7.14% via p2p, 5.95% via p2p · this is NOT the cost -- the cost is the round-trip cost figure above"]
+    x4["reported beside the cost, never folded into it · latency 0 days · tightest declared monthly ceiling: 100000.00 UAH · disruption probability (largest single leg, so a lower bound): 5.00%"]
+    n0["venue binance"]
+    n1["venue monobank_uah"]
+    n1 -->|"inbound · route monobank_to_binance_p2p · Binance P2P · leg 0 fx · UAH to USD · via channel p2p · declared fee 0.00% + 0.00 UAH · status: open · marks: UNVERIFIED + SYNTHETIC"| n1
+    n1 -->|"inbound · route monobank_to_binance_p2p · Binance P2P · leg 1 transfer · USD · declared fee 0.00% + 0.00 USD · status: open · marks: UNVERIFIED + SYNTHETIC"| n0
+    n0 -->|"exit · route binance_p2p_to_monobank · Binance P2P · leg 0 fx · USD to UAH · via channel p2p · declared fee 0.00% + 0.00 USD · status: open · marks: UNVERIFIED + SYNTHETIC"| n0
+    n0 -->|"exit · route binance_p2p_to_monobank · Binance P2P · leg 1 transfer · UAH · declared fee 0.00% + 0.00 UAH · status: open · marks: UNVERIFIED + SYNTHETIC"| n1
+    classDef unverified stroke-dasharray: 4 2
+    classDef stale stroke-dasharray: 1 3
+    classDef synthetic stroke-width: 1px
+    classDef closedRoute stroke-dasharray: 8 4
+    classDef noExitDeclared stroke-width: 3px
+    classDef exitCostUnknown stroke-width: 3px

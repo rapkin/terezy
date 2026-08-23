@@ -1,0 +1,23 @@
+flowchart LR
+    meta["route graph · regime: wartime · mode: with-declared-figures (declared per-leg fees only -- no computed ramp cost appears on a registry graph) · staleness assessed as of 2026-08-21 · marks: SYNTHETIC"]
+    n0["venue binance · Binance account, including its UAH peer-to-peer book (SYNTHETIC FIXTURE)"]
+    n1["venue coinbase · Coinbase account — where the USD contract income arrives (SYNTHETIC FIXTURE)"]
+    n2["venue ibkr_usd · Interactive Brokers, USD cash account (SYNTHETIC FIXTURE)"]
+    n3["venue inzhur · Inzhur fund platform, hryvnia only (SYNTHETIC FIXTURE)"]
+    n4["venue monobank_uah · Monobank multi-currency card — the UAH salary rail (SYNTHETIC FIXTURE)"]
+    n0 -->|"route binance_p2p_to_monobank · Binance P2P · leg 0 fx · USD to UAH · via channel p2p · declared fee 0.00% + 0.00 USD · status: open · marks: UNVERIFIED + SYNTHETIC"| n0
+    n0 -->|"route binance_p2p_to_monobank · Binance P2P · leg 1 transfer · UAH · declared fee 0.00% + 0.00 UAH · status: open · marks: UNVERIFIED + SYNTHETIC"| n4
+    n4 -->|"route inzhur_direct · Inzhur · leg 0 transfer · UAH · declared fee 0.00% + 0.00 UAH · status: open · marks: UNVERIFIED + SYNTHETIC"| n3
+    n3 -->|"route inzhur_to_monobank · Inzhur · leg 0 withdrawal · UAH · declared fee 0.00% + 0.00 UAH · status: open · marks: UNVERIFIED + SYNTHETIC"| n4
+    n4 -->|"route monobank_to_binance_p2p · Binance P2P · leg 0 fx · UAH to USD · via channel p2p · declared fee 0.00% + 0.00 UAH · status: open · marks: UNVERIFIED + SYNTHETIC"| n4
+    n4 -->|"route monobank_to_binance_p2p · Binance P2P · leg 1 transfer · USD · declared fee 0.00% + 0.00 USD · status: open · marks: UNVERIFIED + SYNTHETIC"| n0
+    n4 -->|"route monobank_to_binance_p2p_double · Binance P2P · leg 0 fx · UAH to USD · via channel p2p · declared fee 0.00% + 0.00 UAH · status: open · marks: UNVERIFIED + SYNTHETIC"| n4
+    n4 -->|"route monobank_to_binance_p2p_double · Binance P2P · leg 1 transfer · USD · declared fee 0.00% + 0.00 USD · status: open · marks: UNVERIFIED + SYNTHETIC"| n0
+    n0 -->|"route monobank_to_binance_p2p_double · Binance P2P · leg 2 fx · USD to UAH · via channel p2p · declared fee 0.00% + 0.00 USD · status: open · marks: UNVERIFIED + SYNTHETIC"| n0
+    n0 -->|"route monobank_to_binance_p2p_double · Binance P2P · leg 3 fx · UAH to USD · via channel p2p · declared fee 0.00% + 0.00 UAH · status: open · marks: UNVERIFIED + SYNTHETIC"| n0
+    classDef unverified stroke-dasharray: 4 2
+    classDef stale stroke-dasharray: 1 3
+    classDef synthetic stroke-width: 1px
+    classDef closedRoute stroke-dasharray: 8 4
+    classDef noExitDeclared stroke-width: 3px
+    classDef exitCostUnknown stroke-width: 3px

@@ -1610,7 +1610,100 @@ reader of the artifact sees it. The owner's rule remains the destination: making
 ranking excluding a destination with no spendable way out — is a recorded deferral to a later
 feature, not a softer reading of the rule.
 
-## 21. Where to look next
+## 21. Diagrams: the one number rule, and what a mark on a picture claims
+
+Feature 005 renders two things as Mermaid text: the declared route graph for one named regime,
+and the path of one costed result. Both are derived — nothing in either is hand-maintained —
+and both must be **as honest as the numbers**, because the picture travels further than the
+tables. It gets pasted into reports and read by people who never open the TOML.
+
+### 21.1 The number-rendering rule — there is exactly one
+
+Every figure on every diagram is rendered by
+`terezy.api.diagrams.numbers`, and by nothing else:
+
+| what | how it renders | example |
+| --- | --- | --- |
+| a fraction, as a percentage | fixed **two** decimals, then `%` | `0.0666…` → `6.67%` |
+| an amount of money | fixed **two** decimals, then the currency **code** | `1234.5678 UAH` → `1234.57 UAH` |
+
+Two decimals, one private helper, and both public functions go through it. This is the
+single-tolerance discipline of §11 applied to formatting: defined in one place, imported
+everywhere, and a second rule anywhere is a **defect** rather than a preference.
+`tests/contract/test_diagram_one_number_rule.py` greps the whole `api.diagrams` package for a
+second one — `:.2f`, `round(`, `format(`, `%.2f`, `Decimal` — and proves the grep can fail.
+
+**Why the rule had to exist at all.** Results carry `float`, and this project's canonical float
+form is hexadecimal (§12.2), chosen because determinism means bit-identity. So "the diagram
+shows the result's figure" was undefined until a human-readable decimal form was named. That
+gap was found on external review and closed by naming this rule rather than by softening the
+criterion.
+
+**The rule rounds, and the diagram is therefore not the audit trail.** This is the *one*
+transformation a renderer may apply; it may not compute, derive, aggregate or round again. If a
+decision turns on the third decimal, the diagram is the wrong instrument — the figure itself is
+in the result record, in the golden artifact, and in `float.hex()` where bit-identity is what is
+being asserted. Rounding is half-to-even on the double, so `0.125` renders `0.12` and `0.135`
+(really `0.13500000000000001`) renders `0.14`. A rounded-away negative keeps its sign: `-0.00`
+rather than `0.00`, because a negative arriving amount is a fact this project reports and never
+clamps.
+
+### 21.2 The mark vocabulary, and what each token claims
+
+Marks live in the **label text**. Mermaid `classDef` styling may add emphasis on top; it may
+never be the only carrier, because a mark carried by a colour is lost the moment the text is
+diffed, re-themed, or read as source in a golden file — and golden files are one of exactly two
+places this output lands. Every mark assertion strips all styling first.
+
+Every mark-bearing label ends in a `marks: …` field. Six marks, plus three named ways of saying
+that none applies:
+
+| token | what it claims |
+| --- | --- |
+| `UNVERIFIED` | some source behind this figure has no verification date (§10.2) |
+| `STALE` | some source aged past **its kind's** declared threshold (§18) |
+| `SYNTHETIC` | some source's citation says `SYNTHETIC FIXTURE`, so this is invented data |
+| `CLOSED` | the route is declared closed — present and marked, never omitted |
+| `NO EXIT DECLARED` | nothing this regime includes leaves this destination, so it is not comparison-ready (§17, §20.1) |
+| `EXIT COST UNKNOWN` | a costed result whose round-trip slot is `ExitCostUnknown` — drawn where the exit would be, with no round-trip figure anywhere |
+| `VERIFIED AND CURRENT` | cited, checked, and inside its kind's threshold — no mark applies |
+| `NO SOURCE CITED` | the figure rests on `provenance.EMPTY`: not unverified, and not verified either |
+| `AGE NOT ASSESSED` | nobody aged the sources against a threshold — distinct from having aged them and found nothing |
+
+The last three exist for the same reason `StalenessVerdict.assessed` does: an empty marks field
+is indistinguishable from a renderer that forgot, and "nobody checked" must never wear "checked
+and clean"'s tick. `STALE` and `UNVERIFIED` are independent claims and a figure can carry both;
+neither swallows the other. No token is a substring of another, so `token in label` is a safe
+question to ask of a diagram's text — an earlier `STALENESS NOT ASSESSED` contained `STALE` and
+was renamed for exactly that reason.
+
+### 21.3 Two things a diagram may never do
+
+**A computed ramp cost never appears on a registry graph**, in either mode. Such a figure exists
+only per `(destination × stream × route)` (§16, and feature 002's FR-008), which a registry graph
+does not name; a number there would be keyed by nothing. The two modes —
+`topology-only` and `with-declared-figures` — differ by the **declared per-leg fee** field and
+nothing else, and each names itself on the face of the diagram so a numberless picture is never
+read as "zero fees".
+
+**A refusal is never drawn as a path.** `RouteUnusable`, `ExitCostUnknown` and
+`NothingComparable` each produce a typed `NothingToDraw` carrying the refusal's own reason
+verbatim — never a partial path and never an empty diagram, because an empty picture is
+indistinguishable from a graph that genuinely has nothing in it.
+
+### 21.4 Node identity is positional
+
+A node's Mermaid id is `n0`, `n1`, … — its index in a **sorted** list of the entities drawn. The
+declared id and name live in the quoted, escaped label and nowhere else.
+
+Deriving the id from the declared id would mean sanitising, and sanitising is a non-injective
+map: `binance-p2p` and `binance_p2p` both become `binance_p2p`, two venues collapse into one
+node, and nothing in the output says so. Positional ids are injective by construction, which
+turns every hostile character — quotes, pipes, arrows, Cyrillic, emoji — into a *labelling*
+problem that the escaping solves, and never an identity problem. The cost, accepted: the raw
+text is less readable to a human reading the source. The diagram is meant to be rendered.
+
+## 22. Where to look next
 
 | question | file |
 | --- | --- |
@@ -1633,6 +1726,11 @@ feature, not a softer reading of the rule.
 | Which observation should I make next? | `tests/unit/test_coverage_deficits.py` |
 | Does the audit agree with what costing actually does? | `tests/invariants/test_coverage_costing_agreement.py` |
 | Can a cost figure leak into the coverage report? | `tests/contract/test_coverage_no_figures.py` |
+| Is the declared graph what I think it is? | `tests/golden/route_graph_wartime.mmd` |
+| What does one costed route look like? | `tests/golden/costed_path_p2p.mmd` |
+| Is there a second number-rendering rule? | `tests/contract/test_diagram_one_number_rule.py` |
+| Do the marks survive the picture? | `tests/contract/test_diagram_marks.py` |
+| Can a hostile venue name break a diagram? | `tests/unit/test_diagram_escaping.py` |
 | What is still uncovered? | `docs/REQUIRED_TESTS.md` |
 
 The product specification is `docs/reference/SIMULATOR_SPEC.md`; the engine charter and the

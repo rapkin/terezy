@@ -212,7 +212,7 @@ field and confirm the diff is confined to what that field affects.
 
 ### Tests first
 
-- [ ] T020 [US4] Write `tests/golden/test_diagrams.py`: byte-identity across a **separate
+- [x] T020 [US4] Write `tests/golden/test_diagrams.py`: byte-identity across a **separate
   process** and across permuted input ordering, per mode; a changed declared field produces a
   non-empty diff confined to what it affects; the two checked-in artifacts match today's render;
   a missing artifact is a failure and never a silent regeneration; and the stdout script prints
@@ -221,11 +221,11 @@ field and confirm the diff is confined to what that field affects.
 
 ### Implementation
 
-- [ ] T021 [US4] `scripts/render_diagram.py` — argument parsing, one call into
+- [x] T021 [US4] `scripts/render_diagram.py` — argument parsing, one call into
   `terezy.api.diagrams`, write to stdout. No file writing, no reports directory, no formatting of
   its own; the only clock in the feature is this script's `--as-of` default, and the resolved
   date is printed on the face of the diagram (FR-021, research.md D11)
-- [ ] T022 [US4] Generate the two golden artifacts **last**, deliberately, and read them before
+- [x] T022 [US4] Generate the two golden artifacts **last**, deliberately, and read them before
   committing: `tests/golden/route_graph_wartime.mmd` and `tests/golden/costed_path_p2p.mmd`
   (SC-011)
 
@@ -243,7 +243,7 @@ regenerated diagram contains the added venue and route, correctly connected and 
 
 ### Tests first
 
-- [ ] T023 [US5] Write `tests/contract/test_diagram_data_only.py` on the pattern of
+- [x] T023 [US5] Write `tests/contract/test_diagram_data_only.py` on the pattern of
   `tests/contract/test_data_only_extensibility.py`: a new provider, venue and corridor written to
   a scratch data root appear in the regenerated diagram with **zero** lines of source changed, and
   no module under `src/terezy/api/diagrams/` names a venue, provider, route or corridor —
@@ -251,7 +251,7 @@ regenerated diagram contains the added venue and route, correctly connected and 
 
 ### Implementation
 
-- [ ] T024 [US5] Fix anything the scan finds. If nothing is found the task is the scan itself;
+- [x] T024 [US5] Fix anything the scan finds. If nothing is found the task is the scan itself;
   a renderer that needed a change here would mean the graph was not derived
 
 **Checkpoint**: all five stories independently functional.
@@ -260,22 +260,22 @@ regenerated diagram contains the added venue and route, correctly connected and 
 
 ## Phase 8: Polish & cross-cutting
 
-- [ ] T025 [P] `docs/METHODOLOGY.md` gains a new section: **the** number-rendering rule, stated
+- [x] T025 [P] `docs/METHODOLOGY.md` gains a new section: **the** number-rendering rule, stated
   once, with its decimal places and the fact that it **rounds** (and that the diagram is therefore
   not the audit trail), plus the mark vocabulary a diagram uses and what each token claims
   ("documentation is part of the feature")
-- [ ] T026 [P] Add the feature's rows to §21's "where to look next" table in
+- [x] T026 [P] Add the feature's rows to §21's "where to look next" table in
   `docs/METHODOLOGY.md`
-- [ ] T027 Record in `docs/REQUIRED_TESTS.md` that this feature flips **no** row and why — it
+- [x] T027 Record in `docs/REQUIRED_TESTS.md` that this feature flips **no** row and why — it
   extends E5 and 002's SC-014 into a new surface rather than closing either (spec.md, "Required
   tests this feature closes")
-- [ ] T028 Flip `005-route-diagrams` to `status = "in-progress"` in `specs/features.toml` in the
+- [x] T028 Flip `005-route-diagrams` to `status = "in-progress"` in `specs/features.toml` in the
   first implementation commit. **Do not flip it to `done`** — the owner reviews and lands
-- [ ] T029 Run every gate from the worktree and record the numbers:
+- [x] T029 Run every gate from the worktree and record the numbers:
   `uv run ruff check . && uv run ruff format --check .`, `uv run mypy`, `uv run lint-imports`,
   `uv run python scripts/check_provenance.py`, `uv run pytest --cov`,
   `uv run pytest -m "contract or invariant"`
-- [ ] T030 Walk `specs/005-route-diagrams/quickstart.md` end to end, including looking at the two
+- [x] T030 Walk `specs/005-route-diagrams/quickstart.md` end to end, including looking at the two
   rendered diagrams with your own eyes, and correct the quickstart where the built commands differ
 
 ---
