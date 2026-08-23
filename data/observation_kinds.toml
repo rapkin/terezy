@@ -46,3 +46,8 @@ note           = "A tax rule changes by legislation, not by drift, and a change 
 id             = "venue_terms"
 staleness_days = 365
 note           = "A venue's published minimum ticket or lot size changes on the venue's own schedule, like a tariff. Declared separately from bank_fee_schedule because a minimum ticket is a condition of dealing rather than a price, and the two are read off different pages."
+
+[[kind]]
+id             = "cpi_index"
+staleness_days = 45
+note           = "A published price index for a month that has ended is a historical fact and does not decay -- what ages here is the RETRIEVAL, because the publisher adds a month roughly every month and a series fetched long ago is a series missing its recent end. Forty-five days is the re-fetch prompt, not a claim that an old month's value went wrong. Whether a series is complete up to a given date is a different question entirely, answered from its coverage window rather than from this threshold, and the deflation feature owns it."
