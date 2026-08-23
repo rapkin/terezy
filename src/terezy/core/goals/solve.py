@@ -194,11 +194,27 @@ def projected_value(inputs: GoalInputs, *, contribution: Money, months: float) -
     rate = monthly_rate(growth)
     if rate == 0.0:
         return money.add(starting, money.scale_sourced(contribution, months, growth.provenance))
-    factor = (1.0 + rate) ** months
+    grown_by = _growth_over(months, rate)
     return money.add(
-        money.scale_sourced(starting, factor, growth.provenance),
-        money.scale_sourced(contribution, (factor - 1.0) / rate, growth.provenance),
+        money.scale_sourced(starting, 1.0 + grown_by, growth.provenance),
+        money.scale_sourced(contribution, grown_by / rate, growth.provenance),
     )
+
+
+def _growth_over(months: float, rate: float) -> float:
+    """``(1+i)^t - 1``, computed as ``expm1(t * log1p(i))`` rather than by subtracting one.
+
+    Algebraically the same number and arithmetically a different one. The annuity term divides
+    this by the rate, so at a small rate or a short horizon the subtraction ``(1+i)**t - 1``
+    throws away most of the significant digits of a quantity the answer then multiplies back up
+    by ``1/i`` -- the error in the sum scales with ``contribution / rate`` instead of with the
+    sum. ``expm1`` and ``log1p`` are built for exactly that shape.
+
+    It is not a tolerance and it hides no disagreement: the same value, computed the way it
+    should have been computed in the first place. What it buys is a round trip that closes on a
+    five-thousand-hryvnia goal, which is a goal the declaration file accepts.
+    """
+    return math.expm1(months * math.log1p(rate))
 
 
 def _stated(inputs: GoalInputs) -> tuple[Money, GrowthAssumption]:
@@ -377,10 +393,10 @@ def _solve_contribution(
             money.sub(target_sum, grown), 1.0 / months, growth.provenance
         )
     else:
-        factor = (1.0 + rate) ** months
-        grown = money.scale_sourced(starting, factor, growth.provenance)
+        grown_by = _growth_over(months, rate)
+        grown = money.scale_sourced(starting, 1.0 + grown_by, growth.provenance)
         required = money.scale_sourced(
-            money.sub(target_sum, grown), rate / (factor - 1.0), growth.provenance
+            money.sub(target_sum, grown), rate / grown_by, growth.provenance
         )
 
     # "At or below zero" (FR-020) under float64: a required contribution that comes out at a
@@ -597,25 +613,31 @@ def _crossing(*, starting: float, contribution: float, target: float, rate: floa
 
         V(t) = (S + C/i) * (1+i)^t  -  C/i
         t    = ln((target + C/i) / (S + C/i)) / ln(1+i)
+             = log1p((target - S) * i / (S*i + C)) / log1p(i)
+
+    The second line is the one computed, and it is the first with the division by ``i`` cleared
+    and the ratio written as one plus the *change* it represents. Both are the same number in
+    exact arithmetic; in float64 the first takes the logarithm of a ratio that sits a hair above
+    one for any short horizon, which is where its significant digits go. See
+    :func:`_growth_over` -- this is the same conditioning problem in the inverse direction.
 
     ``None`` covers the two shapes of "never", and neither is a search that gave up:
 
     * the balance does not move at all -- no contribution and no growth, or a contribution
       exactly offset by the loss on the balance it sits on;
-    * the target is on the far side of the level the balance converges to, which makes the
-      ratio above zero or negative and its logarithm undefined. Under a negative assumption
-      that level is a genuine ceiling, and a target above it is not reached however long
-      anyone waits.
+    * the target is on the far side of the level the balance converges to, so reaching it would
+      take a growth factor of zero or less and the logarithm is undefined. Under a negative
+      assumption that level is a genuine ceiling, and a target above it is not reached however
+      long anyone waits.
     """
     if _never_moves(starting=starting, contribution=contribution, rate=rate):
         return None
     if rate == 0.0:
         return (target - starting) / contribution
-    level = contribution / rate
-    ratio = (target + level) / (starting + level)
-    if ratio <= 0.0:
+    growth_needed = (target - starting) * rate / (starting * rate + contribution)
+    if growth_needed <= -1.0:
         return None
-    return math.log(ratio) / math.log1p(rate)
+    return math.log1p(growth_needed) / math.log1p(rate)
 
 
 def _never_moves(*, starting: float, contribution: float, rate: float) -> bool:
@@ -631,13 +653,15 @@ def _never_moves(*, starting: float, contribution: float, rate: float) -> bool:
     """
     if rate == 0.0:
         return contribution == 0.0
-    return starting + contribution / rate == 0.0
+    return starting * rate + contribution == 0.0
 
 
 def _first_month_end_at_or_after(as_of: date, crossing: float) -> date | None:
     """The first contribution date on or after the crossing, or ``None`` past the calendar.
 
-    Taking the ceiling is exact rather than a rounding, and the distinction is FR-015's:
+    Taking the ceiling is exact rather than a rounding -- a crossing already *on* a month end
+    excepted, where the tolerance decides whether the last bits of a float or the schedule is
+    telling the truth. The distinction is FR-015's:
     whenever a crossing is reported at all the balance is strictly increasing through it, so
     the first month end past the crossing *is* the first schedule date on which the target is
     reached. The crossing itself is kept beside it, in months, because they are different
@@ -648,7 +672,14 @@ def _first_month_end_at_or_after(as_of: date, crossing: float) -> date | None:
     the last expressible date would be the nearest answer FR-019 forbids, and crashing would
     make an arithmetic limit look like a failure of the plan.
     """
-    months = math.ceil(crossing)
+    whole = round(crossing)
+    # A crossing that lands *on* a contribution date is that date, and float64 will not always
+    # say so exactly: the twelve-month example solves to 12.000000000000004, and a bare ceiling
+    # turns "you get there in a year" into "you get there in thirteen months". The comparison
+    # is between a computed crossing and a schedule position, so the single project tolerance
+    # governs it -- the same rule the met-or-missed boundary follows, and never a bound of this
+    # module's own.
+    months = whole if is_close(crossing, float(whole)) else math.ceil(crossing)
     representable = (date.max.year - as_of.year) * MONTHS_IN_YEAR + (date.max.month - as_of.month)
     if months > representable:
         return None

@@ -22,14 +22,14 @@ noise. The band spans zero, small, ordinary and large rates, and includes a nega
 the asymptote branch is exercised; what it excludes is arithmetic that would test the
 floating-point unit instead of the solver.
 
-**And why the generated targets start at ten thousand.** The same reason, from the other side:
-the annuity term and the opening term are large numbers that cancel down to the target, so the
-absolute error in the result scales with ``contribution / monthly rate`` rather than with the
-target. Against a target of one hryvnia that cancellation exceeds the project tolerance while
-the model is exactly right, which would make the suite a test of float64. The floor keeps the
-comparison a test of the arithmetic; the cancellation itself is the reason the closed forms are
-written the way the hand computation is, rather than in some algebraically equivalent
-rearrangement.
+**The generated targets start at one hryvnia**, and an earlier version of this module floored
+them at ten thousand on the grounds that the cancellation below that was intrinsic. It was not.
+The annuity term and the opening term are large numbers that cancel down to the target, so the
+error scales with ``contribution / monthly rate`` rather than with the target -- but computing
+``(1+i)^t - 1`` with ``expm1`` and inverting with ``log1p`` keeps the small quantity small
+instead of recovering it from the difference of two large ones. Same closed forms, same
+tolerance, no floor. A five-thousand-hryvnia goal is one the declaration file accepts, so a
+property that could not see it was leaving a loadable goal outside J1.
 """
 
 from __future__ import annotations
@@ -83,7 +83,7 @@ absorption FR-013 exists to prevent.
 """
 _STARTING = st.integers(min_value=0, max_value=5_000_000)
 _CONTRIBUTIONS = st.integers(min_value=0, max_value=200_000)
-_TARGETS = st.integers(min_value=10_000, max_value=20_000_000)
+_TARGETS = st.integers(min_value=1, max_value=20_000_000)
 _MONTHS = st.floats(min_value=0.5, max_value=480.0, allow_nan=False, allow_infinity=False)
 _AS_OF = st.dates(min_value=date(2024, 1, 1), max_value=date(2030, 12, 31))
 _HORIZONS = st.integers(min_value=1, max_value=480)
@@ -124,6 +124,8 @@ def _solve(goal: Goal, inputs: GoalInputs) -> SolveOutcome:
 
 
 @pytest.mark.invariant
+@example(as_of=date(2026, 1, 31), starting=0, annual=0.01, contribution=200_000, target=1)
+@example(as_of=date(2026, 1, 31), starting=0, annual=0.005, contribution=200_000, target=5)
 @given(
     as_of=_AS_OF,
     starting=_STARTING,
@@ -140,6 +142,12 @@ def test_the_date_solved_from_a_pair_reproduces_the_sum(
     FR-015 calls "the one for which the consistency property holds". The first calendar date
     beside it is a different fact and closes on a different, larger number -- asserted in
     ``tests/unit/test_solved_date_two_answers.py``.
+
+    The two ``@example`` cases are the worst of the small-target corner: a large contribution
+    against a tiny target, where the annuity and opening terms are eight orders of magnitude
+    above the answer they cancel down to. Computed by subtracting one from a power they miss the
+    project tolerance by a factor of twenty; computed with ``expm1`` and ``log1p`` they close.
+    Random draws find that corner rarely, so it is pinned.
     """
     inputs = _inputs(as_of, starting, annual)
     outcome = _solve(_goal(contribution=float(contribution), target_sum=float(target)), inputs)

@@ -1931,6 +1931,15 @@ date         t = ln((target + C/i) / (S + C/i)) / ln(1+i)
 that turns an annuity into a plain power — which is what makes the date mode a formula rather
 than a search.
 
+**Both are computed in the `expm1`/`log1p` form**: `(1+i)^t − 1` as `expm1(t·log1p(i))`, and
+the date as `log1p((target − S)·i / (S·i + C)) / log1p(i)`. Algebraically identical, and
+arithmetically not: the annuity term divides that first quantity by the rate, so recovering it
+by subtracting one from a power throws away the digits the answer then multiplies back up. The
+error would scale with `contribution / rate` instead of with the sum, and a five-thousand-hryvnia
+goal — one the declaration file accepts — would miss the project tolerance while the model was
+exactly right. It is not a tolerance and it hides no disagreement; it is the same number,
+computed the way it should be.
+
 There is no bisection, no `scipy`, and no iteration to a tolerance. An iterative solver
 converges to *a* number while the hand computation checks a different model, and the project
 tolerance quietly absorbs the difference between the two. Because the three modes are
