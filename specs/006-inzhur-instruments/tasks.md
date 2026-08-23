@@ -458,12 +458,12 @@ is unchanged.
 
 | Gate | Baseline (T001) | Now | Delta |
 |---|---|---|---|
-| `pytest --cov` | 1198 passed | **1393 passed** | +195 |
-| coverage (floor 90%) | 99.77% | **99.11%** | −0.66 pt |
-| `pytest -m "contract or invariant"` | — | **642 passed**, 751 deselected | — |
+| `pytest --cov` | 1198 passed | **1407 passed** | +209 |
+| coverage (floor 90%) | 99.77% | **99.51%** | −0.26 pt |
+| `pytest -m "contract or invariant"` | — | **642 passed**, 765 deselected | — |
 | `check_provenance.py` | 0 errors, 24 unverified, 12 files | **0 errors, 52 unverified, 16 files** | +28 unverified, +4 files |
 | `ruff check` / `ruff format --check` | clean | clean | — |
-| `mypy` (strict) | clean, 144 files | clean, **155 files** | +11 |
+| `mypy` (strict) | clean, 144 files | clean, **156 files** | +12 |
 | `lint-imports` | 4 contracts kept | 4 kept, 0 broken | — |
 
 The 28 new unverified values are the expected state, not a regression: every term of both

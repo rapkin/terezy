@@ -1086,7 +1086,7 @@ def _assemble(
     """Read every reported figure off the folded ledger and say what it rests on."""
     currency = declaration.unit_currency
     by_event = {charge.event_sequence: charge for charge in charges}
-    lines = _distribution_lines(state, by_event, payouts, tax_classes, currency)
+    lines = _distribution_lines(state, by_event, payouts, tax_classes)
     exit_line = _exit_line(
         declaration, holding, plan, state, by_event=by_event, tax_classes=tax_classes
     )
@@ -1139,7 +1139,6 @@ def _distribution_lines(
     by_event: Mapping[int, TaxCharge],
     payouts: Sequence[tuple[Event, PeggedAmount | None, bool, date]],
     tax_classes: Mapping[str, TaxClass],
-    currency: Currency,
 ) -> tuple[DistributionLine, ...]:
     """One line per payout, carrying which dated rate entry taxed it and which peg sized it."""
     peg_facts = {
@@ -1165,7 +1164,6 @@ def _distribution_lines(
                 cap_bound=bound,
             )
         )
-    del currency
     return tuple(lines)
 
 
