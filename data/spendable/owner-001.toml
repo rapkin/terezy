@@ -1,0 +1,41 @@
+# Where money counts as having come back out.
+#
+# **Per-owner data, not curated data.** This directory sits beside `data/streams/` and not at
+# the root beside `venues.toml`, for the structural reason Principle VII gives: a venue is a
+# public fact about the world, shared across owners, while *where this person spends* is one
+# person's life. Putting both at one filesystem level would make the boundary a matter of
+# reading field names, and that boundary is what makes multi-user cheap later.
+#
+# **Base currency only, at the venues the owner actually spends from** — not "UAH anywhere",
+# and not foreign cash in hand (spec FR-004, owner decision 2026-08-22). An exit ending in UAH
+# at a venue absent from this list is deficit 3 — *exit exists but does not reach a spendable
+# endpoint* — exactly as one ending in dollars is. That is the point of declaring the list at
+# all: what counts as "out" is a fact about the owner's life, entered as data, so changing it
+# changes verdicts with no source-code change.
+#
+# **NO CITATION KEYS, and that is deliberate.** There is no observed value here for a source to
+# vouch for — an id, a currency code, and the owner's statement about himself. The same reading
+# `data/venues.toml` and `data/streams/owner-001.toml` already carry.
+#
+# `scripts/check_provenance.py` therefore does not scan this directory — but **not** because it
+# is absent from `SOURCED_DIRS`. That gate is fail-closed over the whole data tree: a directory
+# in neither list is an error, never a blind spot. `spendable` is named in `EXEMPT_DIRS` **with
+# this reason recorded beside it**, which is the only way a directory is permitted to go
+# unscanned. If a number ever has to live here, it moves to a sourced directory instead of the
+# exemption widening to cover it. Every *number* attached to a venue lives on a leg, in
+# `data/routes/`, cited.
+
+[owner]
+id = "owner-001"
+
+[[spendable]]
+venue    = "monobank_uah"
+currency = "UAH"
+
+# Only the venues the owner actually spends from.
+#
+# `binance` can hold UAH (see `data/venues.toml`) and is deliberately **not** listed: holding
+# hryvnia on an exchange is not the same as being able to spend it, and treating the two as one
+# would make a round trip that stops at the exchange look finished. `inzhur` holds UAH too and
+# is a fund platform rather than a payment rail, so it is not listed either — money in a fund is
+# an asset, not spendable cash.

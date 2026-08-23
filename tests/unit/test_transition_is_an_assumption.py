@@ -84,6 +84,18 @@ REGIMES = {WARTIME.id: WARTIME, NORMALIZED.id: NORMALIZED}
 ROUTES_ROOT = Path(inspect.getfile(cost)).parent
 """``src/terezy/core/routes/`` -- the costing engine, scanned by the boundary test below."""
 
+REGIME_AWARE = frozenset({"coverage.py"})
+"""The only module in ``core.routes`` allowed to import the scenarios package, and why.
+
+Feature 003's coverage audit is a fold over route declarations that FR-013 requires to state
+every verdict **per regime**, so it has to be handed the regimes -- and it belongs beside the
+other route folds (003 research.md D1). It is not on the costing path: it computes no figure,
+consults no leg window and produces no ``RouteUnusable``, which is the whole hazard the scan
+above exists to close. The test immediately after the scan holds it to exactly that, which is a
+stricter bar than the import ban it is exempt from. **Nothing else goes in this set** without
+the same argument written out beside it.
+"""
+
 
 def _world() -> dict[str, Route]:
     """Every declared route in both corridors, exactly as the worked example declares them."""
@@ -277,17 +289,85 @@ class TestARegimeCannotBeExpressedAsALegWindow:
 
     def test_the_costing_engine_has_never_heard_of_a_regime(self) -> None:
         # The boundary that makes the collapse unreachable rather than merely discouraged: no
-        # module in ``core.routes`` imports the scenarios package or names either record, so
+        # module on the costing path imports the scenarios package or names either record, so
         # there is no function a regime could be handed to that could turn it into a leg field.
         # A textual scan, with the same limits as ``test_money_construction_guard``: it would
         # not catch an alias. What it does catch is the obvious version, which is the one that
         # gets written.
         offenders: list[tuple[str, int, str]] = []
         for path in sorted(ROUTES_ROOT.glob("*.py")):
+            if path.name in REGIME_AWARE:
+                continue
             for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
                 if line.lstrip().startswith(("import ", "from ")) and "scenarios" in line:
                     offenders.append((path.name, number, line.strip()))
         assert offenders == []
+
+    def test_the_one_regime_aware_route_module_still_cannot_reach_a_leg_window(self) -> None:
+        # ``coverage.py`` is exempt from the scan above and this is what it is held to instead
+        # -- a stricter test than the one it is exempt from, applied to the one module that
+        # needs a regime.
+        #
+        # Feature 003's FR-013 requires every coverage verdict to be stated **per regime**: a
+        # corridor present in wartime and absent from the normalized regime is exactly the fact
+        # the audit exists to surface, and a report that blended the two would be the
+        # confident-but-wrong summary this project refuses. So the audit has to be handed the
+        # regimes, and it lives in ``core/routes/`` because it is a fold over route
+        # declarations (003 research.md D1).
+        #
+        # That is a widening of the scan's *rule* and not of its *reason*. The reason is the
+        # hazard named in this module's docstring: a regime reaching a leg's window field, so
+        # that an assumption and an observation arrive in the same shape. ``coverage.py`` cannot
+        # cause it -- it computes no cost, it consults no window, and it produces no
+        # ``RouteUnusable`` -- and the three assertions below are what keep that true rather
+        # than merely true today.
+        source = (ROUTES_ROOT / "coverage.py").read_text(encoding="utf-8")
+        # Comment lines are stripped; **docstrings are not**, and that is intended rather than
+        # overlooked. The most natural sentence to write in that module is "this module never
+        # reads ``available_until``", and it would fail this test. That is the right trade: the
+        # scan is cheap and blunt, and a prose mention is the one false positive it can have.
+        # Say it another way if it ever bites -- "no leg availability window is consulted here"
+        # -- rather than weakening the scan to allow the field name back into the file.
+        code = "\n".join(line for line in source.splitlines() if not line.lstrip().startswith("#"))
+        # It never reads a leg's availability window, so no regime it holds can become one.
+        assert "available_from" not in code
+        assert "available_until" not in code
+        # It never sees a transition -- the dated guess itself -- only the regimes' route sets.
+        assert "RegimeTransition" not in code
+        # And it never costs anything, so there is no figure for a belief to reach.
+        assert "cost_one" not in code
+        assert "RouteUnusable" not in code
+
+    def test_the_exempt_module_cannot_become_a_side_door_to_the_scenarios_package(self) -> None:
+        # The scan's stated limit -- "it would not catch an alias" -- stopped being
+        # hypothetical the moment ``coverage.py`` became a module *inside the scanned
+        # directory* that names ``Regime``. ``from terezy.core.routes.coverage import Regime``
+        # in ``cost.py`` would satisfy both tests above: the line does not contain
+        # "scenarios", and it is not in ``coverage.py``.
+        #
+        # It fails at runtime today for two accidental reasons -- the import is inside
+        # ``if TYPE_CHECKING`` so the name does not exist at run time, and it is absent from
+        # ``__all__``. Accidental is not a guarantee, so both are asserted here, and so is the
+        # thing that actually matters: no *other* module in the directory names the record.
+        source = (ROUTES_ROOT / "coverage.py").read_text(encoding="utf-8")
+        before, _, after = source.partition("if TYPE_CHECKING:")
+        assert "from terezy.core.scenarios" in after, (
+            "coverage.py's scenarios import must stay inside `if TYPE_CHECKING`, so the name "
+            "it introduces does not exist at run time for another module to reach through"
+        )
+        assert "from terezy.core.scenarios" not in before
+        assert '"Regime"' not in source, "Regime must not be re-exported from this package"
+
+        offenders = [
+            path.name
+            for path in sorted(ROUTES_ROOT.glob("*.py"))
+            if path.name != "coverage.py" and "Regime" in path.read_text(encoding="utf-8")
+        ]
+        assert offenders == [], (
+            f"{offenders} name Regime. The import scan above only looks for the word "
+            "'scenarios', so a module reaching the record through coverage.py's re-export "
+            "would pass it -- this is the assertion that closes that door."
+        )
 
     def test_the_dependency_points_one_way_and_the_selection_needs_no_as_of(self) -> None:
         # Scenarios depend on routes; routes do not depend on scenarios. And the selection

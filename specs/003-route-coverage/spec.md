@@ -235,11 +235,30 @@ report gains the corresponding verdicts and to-do items with zero source changes
   declared venue × every currency it declares it can hold. This is what makes a venue
   with zero routes visible as a hole the moment it is declared, instead of invisible
   until someone tries to cost it.
-- **FR-002**: A comparison-ready verdict MUST require, within the regime: at least one
-  declared inbound route from the stream's arrival venue and arrival currency to the
-  destination, AND at least one declared exit route from the destination that ends at
-  a spendable endpoint. This is the owner's rule — a declared way in and a declared
-  way out, at least through one other venue — made checkable.
+- **FR-002**: A comparison-ready verdict MUST require, within the regime, that **both halves
+  of the owner's rule hold** — a way in and a way out. Each half is satisfied either by a
+  declaration or by the destination's own position, and the two forms MUST be reported
+  distinctly:
+  1. **the way in** — at least one declared inbound route from the stream's arrival venue and
+     arrival currency to the destination, **or** the destination being that stream's own
+     arrival venue and currency (*satisfied by arrival*, FR-005);
+  2. **the way out** — at least one declared exit route from the destination that ends at a
+     spendable endpoint, **or** the destination itself being a declared spendable endpoint
+     (*satisfied by identity*).
+
+  ⚙ **The second form of the second half is an owner decision, 2026-08-23, and it replaces a
+  stricter reading.** This requirement originally admitted only a declared exit route, with no
+  exception. Implemented literally, that made the hryvnia balance on the owner's own salary
+  rail a hole: no route out of it is declared, so the report demanded an observation of how to
+  get money out of the account the money is spent from. The owner's answer is that the money is
+  **already where it needed to come back out to** — requiring a corridor out of a spendable
+  endpoint would have made the salary rail the first finding in the first real report, and it
+  would have been wrong.
+
+  So a destination in FR-004's declared spendable set has its exit half satisfied by identity,
+  produces no deficit 2 and no deficit 3, and contributes no missing-exit item to the to-do
+  list. The replaced reading is recorded here rather than deleted: it was the correct reading
+  of the original sentence, and the sentence was amended rather than the code bent around it.
 - **FR-003**: The system MUST distinguish three deficits, because they call for
   different observations, and MUST NOT collapse them into one "missing route":
   1. **no inbound route from this stream** — nothing declared carries money from the
@@ -257,8 +276,10 @@ report gains the corresponding verdicts and to-do items with zero source changes
   is deficit 3, exactly as one ending in a foreign currency is.
 - **FR-005**: A destination identical to a stream's arrival venue and currency MUST
   report inbound as **satisfied by arrival**, explicitly distinct from satisfied by a
-  route, and MUST still require the declared exit before the pair is
-  comparison-ready.
+  route, and MUST still require the exit half of FR-002 to be satisfied before the pair is
+  comparison-ready — by a declared route, or by identity where the destination is itself a
+  declared spendable endpoint. Arrival answers one half of the owner's rule and says nothing
+  whatever about the other.
 - **FR-006**: The report MUST NOT invent, infer or compose a link: no reversing an
   inbound route as an exit (feature 002 FR-027), no chaining two declared routes into
   a way out, no assuming a same-currency transfer is free of declaration. Composition
@@ -335,6 +356,15 @@ report gains the corresponding verdicts and to-do items with zero source changes
   round-trip figure, and a pair whose costing over single declared routes is refused
   (no route, or *exit cost unknown* per FR-030) MUST NOT be marked ready. Two views of
   one registry MUST NOT disagree about what is comparable.
+
+  ⚙ **A pair that names no route is outside this agreement's domain, not in disagreement
+  with it** (added 2026-08-23). Costing is keyed by a `(destination × stream × route)` triple,
+  so a pair whose way in is satisfied by arrival and/or whose way out is satisfied by identity
+  has no route for costing to be asked about: it produces neither a figure nor a refusal. The
+  hole already existed for arrival under FR-005; the FR-002 decision above widened it to the
+  exit side. Such pairs MUST be partitioned out of the consistency claim **explicitly and
+  asserted to be outside it**, never skipped silently, so the exclusion cannot swallow a real
+  disagreement.
 
   ⚙ **Forward note for composed paths (feature 004).** The owner has decided, in
   004's clarification, that a chain of separately declared exit segments DOES satisfy
@@ -460,8 +490,9 @@ report gains the corresponding verdicts and to-do items with zero source changes
   spendable currency is reported not ready with deficit 3 — the two-hop path is never
   composed. (FR-006)
 - **SC-012**: A destination equal to a stream's arrival venue and currency reports
-  inbound satisfied by arrival, and is comparison-ready if and only if its exit
-  exists. (FR-005)
+  inbound satisfied by arrival, and is comparison-ready if and only if its exit half is
+  satisfied — by a declared exit route, or by the destination itself being a declared
+  spendable endpoint, each reported as its own distinct sentinel. (FR-002, FR-005)
 - **SC-013**: Each empty registry dimension produces a typed outcome naming that
   dimension; none produces an empty report. (FR-020)
 - **SC-014**: A new venue declared as data, with no routes, appears in the next report
@@ -499,7 +530,10 @@ report gains the corresponding verdicts and to-do items with zero source changes
 - **"At least through one other venue"** in the owner's rule is read as: the exit
   leaves the destination venue — a way out exists to somewhere else that is spendable
   — not as a requirement that the exit differ from the inbound's venues. Where it must
-  land is FR-004's declared list: UAH at the venues the owner spends from.
+  land is FR-004's declared list: UAH at the venues the owner spends from. **Amended
+  2026-08-23**: this reading governs a destination that is *not* itself on that list. Where
+  the destination **is** on it, no corridor is needed at all and the exit half is satisfied
+  by identity (FR-002 ⚙) — money already at a spendable endpoint has nowhere left to go.
 - **Coverage is about declarations, not availability** (FR-022 ⚙). Closed and
   out-of-window routes count as declared, visibly annotated. The alternative reading —
   coverage as "usable today" — is feature 002's feasibility reporting, which already
@@ -521,6 +555,7 @@ Both answered by the owner on 2026-08-22.
 |---|---|---|---|
 | 1 | What counts as a **spendable endpoint** — UAH at any venue, UAH at named venues only, or also foreign cash in hand? | **UAH only, at the specific venues the owner actually spends from**, declared as a data-file list of `(venue × currency)` pairs. A fact about the owner's life, entered as data. | FR-004, SC-019 |
 | 2 | Does the coverage verdict **bind comparisons**, or is it advisory? | **Advisory for now** — feature 002's ranking does not change in this feature. The owner explicitly kept binding on the table: the rule "before it may appear in any comparison" remains the destination, and enforcement is a **recorded deferral** to a later feature, stated on the spec's face and in the report's own output. | FR-019, SC-020 |
+| 3 | Does a destination that **is** a declared spendable endpoint still need a declared exit route? Answered **2026-08-23**, after implementation surfaced it. | **No — the exit half is satisfied by identity.** The money is already where it needed to come back out to. The reading this replaces (an exit route required without exception) made the owner's own salary rail a hole demanding an observation of how to get money out of his bank account. Reported as a distinct sentinel, mirroring *satisfied by arrival*, so it is never confused with a declared way out. | FR-002, FR-005, FR-018 ⚙, SC-012 |
 
 **The second decision leaves a deliberate gap worth stating plainly.** Until
 enforcement lands, a destination whose only exit is non-spendable still appears in

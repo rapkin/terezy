@@ -1489,7 +1489,128 @@ recommendation is an *index into the costed set* rather than a separate value. A
 whose alternatives were priced by a cheaper path than its winner is not a comparison; it is a
 recommendation with decoration.
 
-## 20. Where to look next
+## 20. Comparison-readiness: what the coverage report claims
+
+### 20.1 The rule, in plain language
+
+A destination is **comparison-ready** when the declarations support both halves of the owner's
+rule:
+
+> Everything money can be moved into must have a declared way in AND a declared way out — at
+> least through one other venue — before it may appear in any comparison.
+
+Matching reads the **endpoints** of a route's chain — the first leg's currency in and the last
+leg's currency out — and never its interior. Made checkable, per
+`(destination × income stream × regime)`:
+
+- **a way in** — at least one declared route with direction `inbound`, from the stream's arrival
+  venue, whose first leg takes in the stream's arrival currency and whose last leg hands out the
+  destination's currency. A destination that *is* the stream's arrival venue and currency needs
+  no route: the money is born there, and the report says **satisfied by arrival**, which is
+  explicitly not the same statement as "satisfied by a route";
+- **a way out** — at least one declared route with direction `exit`, from the destination, whose
+  last leg lands on a declared **spendable endpoint**. A destination that *is* a declared
+  spendable endpoint needs no route: the money is already where it had to come back out to, and
+  the report says **satisfied by identity** (owner decision, 2026-08-23). That is the mirror of
+  *satisfied by arrival*, and it is reported as its own distinct sentinel for the same reason —
+  "already out" is not the claim "a declared route gets it out".
+
+The two route-free forms behave the same way in every consequence. Neither produces a deficit or
+a to-do item for the half it satisfies; neither is a route, so neither can be closed and neither
+contributes to `rests_on`; and each **supersedes** the routes it stands in for, so a spendable
+destination's declared exits are not listed as relied upon. The first reading of the rule
+required an exit route without exception, which made the hryvnia balance on the owner's own
+salary rail a hole demanding an observation of how to get money out of his own bank account.
+
+A **spendable endpoint** is a declared `(venue × currency)` pair: base currency only, at the
+venues the owner actually spends from (`data/spendable/`). Not "UAH anywhere", and not foreign
+cash in hand. An exit ending in hryvnia at a venue the list does not name does not get the money
+out, exactly as one ending in dollars does not.
+
+The **destination universe is derived**: every declared venue × every currency that venue
+declares it can hold — including a venue that appears only as an interior leg endpoint, because
+money can sit there too. That is what makes a venue with zero routes visible as a hole the moment
+it is declared, rather than invisible until somebody tries to cost it.
+
+### 20.2 The three deficits, and why they are three
+
+They are kept apart because each calls for a **different observation**, and collapsing them into
+one "missing route" would tell the owner to go and do the wrong thing:
+
+| deficit | what is true | what to observe |
+| --- | --- | --- |
+| **no inbound route from this stream** | nothing declared carries this stream's money here | a way **in**, from the stream's arrival venue in its arrival currency |
+| **no exit declared** | the destination is reachable and nothing leaves it | a way **out**, to any declared spendable endpoint |
+| **exit does not reach a spendable endpoint** | a way out exists and lands somewhere unspendable | a way out **that lands on the list** — the corridor that exists is already observed |
+
+The third carries the exits that *do* exist, so a reader can see that the corridor was looked at
+and why it does not count. Without that it would read as the second, and the owner would go and
+observe something he had already observed.
+
+**A pair can carry two of them at once** — one on the inbound side and one on the exit side.
+That matters for the count below: a destination missing both halves needs two observations, and
+a report that listed only one would make the second invisible until the first had been made.
+
+**Nothing is composed.** If a destination's exit lands at a venue that itself has a spendable
+exit, a human sees a path home; the report does not, and says the exit does not reach a spendable
+endpoint. Composing multi-route paths is deliberately a later feature, and it will arrive as a
+distinct *"reachable by composition only"* annotation **beside** the verdict rather than as a
+change to what comparison-ready means.
+
+**Declaration, not availability.** A route declared but closed, or outside its window, still
+counts as declared: the hole this report exists to surface is a corridor **nobody has observed**,
+and the fix for a closed corridor is not an observation. What that leaves owing is discharged by
+a `rests_on` field on every ready verdict — `open`, `constrained`, or `closed_only` — so a ready
+verdict resting only on closed routes never looks like one resting on open routes.
+
+### 20.3 The blocked-pair count — and why it is pairs, never hryvnia
+
+For each missing declaration the report counts how many `(destination × stream)` pairs it blocks,
+per regime, and orders the to-do list by that count descending. A declaration *blocks* a pair
+when the pair is not comparison-ready and that declaration is among those required to make it so.
+
+The count is a **plain count of pairs**. `count == len(blocked)`, with no weighting and no
+composite score (required test **B12**). Equal counts are reported as a **tie** rather than
+broken: the sequence is still ordered so the report is reproducible, but a position in it is not
+a claim of precedence — the same separation `Ranking.ties` makes in §19. Where a pair needs two
+declarations, both list it and both mark it **not alone sufficient**, so a necessary-but-not-
+sufficient observation is never presented as if it would unlock the pair by itself.
+
+**The count is pairs unblocked, and never hryvnia, and that boundary is deliberate.** The obvious
+next question — *which observation is worth the most money?* — cannot be answered honestly here.
+Valuing a corridor needs costing, and costing needs the very numbers the corridor has not been
+observed for: the fee, the spread, the cap. Any figure the report produced would be a cost
+computed over a registry that does not contain the observation — an invented number by
+construction, and precisely the kind Principle I forbids. Counting what an observation unblocks
+needs only declarations, which is why the report can do it at all.
+
+For the same reason the report carries **no cost figure anywhere** — no percentage, no amount,
+one way or round trip — and no provenance or staleness mark of its own. It contains no observed
+value: the existence of a declaration is a fact about the registry, not an observation of the
+world, and a summarized second copy of a provenance mark would drift from the authoritative one.
+The guarantee is structural rather than editorial: no field reachable from the report can hold a
+`Money`, a `Provenance`, a `StalenessVerdict` or a bare `float`, and a recursive walk over the
+whole output asserts it. **This is why the coverage feature imports no tolerance** — there is no
+float in it to compare within one.
+
+**The same missing declaration in two regimes is one declaration**, with its count stated per
+regime and never summed. Which observation to make is one decision; what it unlocks differs by
+regime, and the owner weighs regimes — the tool supplies the per-regime facts and refuses to
+weigh them for him.
+
+### 20.4 Advisory, not binding — a dated gap
+
+The verdict **informs and enforces nothing** (owner decision, 2026-08-22). Producing the report
+changes no costing and no ranking output. So today a destination whose only exit is
+non-spendable still appears in the round-trip ranking of §19 while this report says it should not
+be compared.
+
+That gap is deliberate, dated, and stated in the report's own output rather than only here, so a
+reader of the artifact sees it. The owner's rule remains the destination: making it binding —
+ranking excluding a destination with no spendable way out — is a recorded deferral to a later
+feature, not a softer reading of the rule.
+
+## 21. Where to look next
 
 | question | file |
 | --- | --- |
@@ -1508,6 +1629,10 @@ recommendation with decoration.
 | Does the ledger agree with the comparison? | `tests/invariants/test_cost_execute_agreement.py` |
 | What does the war ending change? | `tests/worked_examples/test_regime_transition.py` |
 | Can an assumption be mistaken for an observation? | `tests/unit/test_transition_is_an_assumption.py` |
+| Which comparisons can the declared registry support? | `tests/worked_examples/test_coverage_table.py` |
+| Which observation should I make next? | `tests/unit/test_coverage_deficits.py` |
+| Does the audit agree with what costing actually does? | `tests/invariants/test_coverage_costing_agreement.py` |
+| Can a cost figure leak into the coverage report? | `tests/contract/test_coverage_no_figures.py` |
 | What is still uncovered? | `docs/REQUIRED_TESTS.md` |
 
 The product specification is `docs/reference/SIMULATOR_SPEC.md`; the engine charter and the

@@ -50,6 +50,7 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.primitives.currency import Currency
     from terezy.core.primitives.money import Money
     from terezy.core.primitives.staleness import ObservationKind
+    from terezy.core.results.coverage import SpendableEndpoint
     from terezy.core.routes.channels import FxChannel
     from terezy.core.routes.legs import Leg, Route
     from terezy.core.routes.venues import Venue
@@ -1106,4 +1107,193 @@ def ramp_from_data_root(root: Path, *, base_currency: Currency) -> RampDeclarati
         stream_files=streams,
         scenario_files=scenarios,
         base_currency=base_currency,
+    )
+
+
+# ---------------------------------------------------------------------------
+# 003-route-coverage: the coverage report's cross-file pass
+# ---------------------------------------------------------------------------
+#
+# One new declaration and four relations, each of which needs a file the spendable list has
+# never opened:
+#
+# 1. **The venue exists**, on the loader's existing `_known` path -- a spendable endpoint at a
+#    venue nobody declared cannot be checked against anything.
+# 2. **The venue can hold the currency.** `Venue.currencies` already exists for this class of
+#    contradiction and `_check_venue` already owns it for legs; a place that cannot hold
+#    hryvnia is not a place the owner spends hryvnia from.
+# 3. **The currency is the run's base currency** (FR-004). Accepting a foreign one would make
+#    the report decide that foreign cash counts as spent.
+# 4. **The owner owns the streams** the list is resolved with. Where a person spends is a fact
+#    about *that* person, and one owner's spendable venues deciding another's verdicts would
+#    put two people's facts in one report (Principle VII).
+
+SPENDABLE_DIR = "spendable"
+"""Where the per-owner spendable-endpoint list lives under a data root.
+
+**Per-owner, beside `streams/`, not at the root beside curated `venues.toml`** -- the same
+Principle VII boundary, made structural (research.md D3). A corridor is a public fact about the
+world; where this person spends is not.
+"""
+
+
+@dataclass(frozen=True, slots=True)
+class CoverageDeclarations:
+    """Every declaration a coverage report needs: the ramp's, plus the spendable list.
+
+    ⚙ **A record beside :class:`RampDeclarations` rather than more fields on it**, on the
+    precedent `RampDeclarations` itself sets against :class:`Declarations`. The two describe
+    different runs: a data root with no spendable file must still be able to cost a ramp, and
+    folding the list into the ramp record would make every existing caller require a file this
+    feature invented.
+    """
+
+    ramp: RampDeclarations
+    """The venues, streams, routes, channels, kinds and scenarios the report audits -- the same
+    registry a ramp comparison costs, which is what makes FR-018's agreement checkable at all
+    rather than a claim about two different worlds."""
+
+    spendable: frozenset[SpendableEndpoint]
+    """Where money counts as having come back out (FR-004). A ``frozenset`` because membership
+    is the whole question and order means nothing; the report sorts it where it reports it."""
+
+    spendable_file: Path
+    """Which file declared the list. Not decoration: it is what lets a later failure still name
+    the file after the TOML has been discarded."""
+
+
+def _check_spendable(
+    endpoint: SpendableEndpoint,
+    *,
+    position: int,
+    venues: Mapping[str, Venue],
+    base_currency: Currency,
+    path: Path,
+) -> None:
+    """One spendable endpoint against the venues and the base currency (FR-004).
+
+    The venue check is ``_check_venue``'s, unchanged, so "this venue cannot hold that currency"
+    is asked in the same words wherever it is asked. The base-currency check is separate and is
+    this feature's own: FR-004 says base currency only, and it is refused rather than converted,
+    because the alternative -- accepting dollars at an exchange as somewhere money has "come
+    back out" -- is the report quietly deciding that foreign cash counts as spent, which is the
+    single most flattering possible error it could make about the registry.
+    """
+    field_path = f"{loader.SPENDABLE_TABLE}[{position}].venue"
+    _check_venue(endpoint.venue_id, endpoint.currency, venues, path=path, field_path=field_path)
+    if endpoint.currency is not base_currency:
+        raise DeclarationError(
+            path,
+            f"{loader.SPENDABLE_TABLE}[{position}].currency",
+            f"declares {endpoint.currency.value} as spendable at venue "
+            f"{endpoint.venue_id!r}, but this run's base currency is {base_currency.value}. A "
+            "spendable endpoint is where money counts as having come **back out**, and money "
+            "sitting in a foreign currency has not come out -- an asset that cannot be "
+            "liquidated into spendable base currency is not worth its stated value (Principle "
+            f"VI). Here, {BASE_CURRENCY_ROLE}",
+            f"declare the endpoint in {base_currency.value}, or delete it: a venue holding "
+            "foreign cash is a destination in this report, not a place to spend from",
+        )
+
+
+def _check_spendable_owner(
+    owner_id: str,
+    streams: Mapping[str, IncomeStream],
+    *,
+    path: Path,
+) -> None:
+    """The list must belong to the owner whose streams it is resolved with (Principle VII).
+
+    Checked against the *streams* rather than against a configured owner id, because the streams
+    are the other per-owner declaration in the run and the report pairs the two on every line:
+    every verdict is a `(destination x stream)`, and the spendable list is what decides half of
+    it. A list belonging to somebody else would answer this owner's question with that owner's
+    life.
+    """
+    owners = sorted({stream.owner_id for stream in streams.values()})
+    if owner_id not in owners:
+        raise DeclarationError(
+            path,
+            f"{loader.OWNER_TABLE}.id",
+            f"declares owner {owner_id!r}, but the income streams this list is resolved with "
+            f"belong to {owners}. The spendable list decides half of every verdict in the "
+            "coverage report -- where money counts as having come back out -- so a list "
+            "belonging to somebody else would answer this owner's question with another "
+            "person's life.",
+            f"name one of {owners}, or resolve this list against that owner's streams",
+        )
+
+
+def resolve_coverage(
+    *,
+    ramp: RampDeclarations,
+    spendable_file: Path,
+) -> CoverageDeclarations:
+    """The ramp declarations plus a resolved spendable list, checked against them.
+
+    Takes the resolved :class:`RampDeclarations` rather than the paths that produced them: the
+    spendable list is checked against the *venues*, the *base currency* and the *streams*, all
+    three of which are already resolved by then, and re-resolving them here would give a data
+    root two chances to disagree with itself.
+    """
+    owner_id, endpoints = loader.spendable_from_file(spendable_file)
+    _check_spendable_owner(owner_id, ramp.streams, path=spendable_file)
+    for position, endpoint in enumerate(endpoints):
+        _check_spendable(
+            endpoint,
+            position=position,
+            venues=ramp.venues,
+            base_currency=ramp.base_currency,
+            path=spendable_file,
+        )
+    return CoverageDeclarations(
+        ramp=ramp,
+        spendable=frozenset(endpoints),
+        spendable_file=spendable_file,
+    )
+
+
+def coverage_from_data_root(root: Path, *, base_currency: Currency) -> CoverageDeclarations:
+    """Every declaration a coverage report needs, under one data root.
+
+    :func:`ramp_from_data_root`'s six families, plus ``spendable/*.toml``. An empty
+    ``spendable/`` directory is an **error** for the reason that function already gives: a
+    mistyped path and an empty world are indistinguishable downstream, and one of them is a
+    mistake -- and here the mistake would be the loudest possible one, since a report with no
+    spendable endpoints marks every destination in the registry deficit 3.
+
+    ⚙ **Exactly one file, and a second is refused by name.** ``contracts/spendable-schema.md``
+    gives :class:`CoverageDeclarations` one ``spendable_file``, and the spec assumes one owner.
+    A second file is refused rather than merged, on the precedent of the ``deposit`` fallback
+    policy: a real thing that is not built yet and an unrecognised thing are different facts,
+    and the owner acts differently on each. Merging two owners' lists silently would let one
+    person's spendable venues decide the other person's verdicts -- and this file is per-owner
+    precisely so that cannot happen.
+    """
+    declared = sorted((root / SPENDABLE_DIR).glob("*.toml"))
+    if not declared:
+        raise DeclarationError(
+            root / SPENDABLE_DIR,
+            "",
+            f"contains no *.toml declarations. An empty {SPENDABLE_DIR} directory is reported "
+            "rather than read as 'money can never come back out': every declared exit would "
+            "fail the spendable test at once, and the report would name a deficit for every "
+            "destination in the registry while the real fault was a mistyped path.",
+            "check the data root, or declare the venues you actually spend from",
+        )
+    if len(declared) > 1:
+        raise DeclarationError(
+            root / SPENDABLE_DIR,
+            "",
+            f"holds {len(declared)} spendable declarations "
+            f"({', '.join(path.name for path in declared)}), and this engine resolves one. "
+            "There is exactly one owner today (spec Assumptions), and a coverage run audits one "
+            "person's registry: merging two lists would let one owner's spendable venues decide "
+            "the other's verdicts. Multi-owner resolution is a later feature, not a defect "
+            "here.",
+            "keep one file per data root until multi-owner support lands",
+        )
+    return resolve_coverage(
+        ramp=ramp_from_data_root(root, base_currency=base_currency),
+        spendable_file=declared[0],
     )

@@ -65,6 +65,13 @@ EXEMPT_DIRS: dict[str, str] = {
         "engine applies to a taxable event needs a source; a rate the owner states about "
         "his own payslip does not (contracts/declaration-schema.md, data/README.md)"
     ),
+    "spendable": (
+        "the owner's own statement of where he spends -- a venue id and a currency code, "
+        "and nothing a source could vouch for. It is the same exemption `streams` has and "
+        "for the same reason: where a person's money counts as having come back out is a "
+        "fact about his life rather than an observation of the world. Every *number* "
+        "attached to a venue lives on a leg, in data/routes/, cited (003 research.md D4)"
+    ),
     "user": (
         "gitignored per-user data -- holdings, goals, results. Never curated, never "
         "committed, and outside this gate by the Principle VII boundary"
