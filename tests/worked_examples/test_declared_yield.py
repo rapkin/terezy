@@ -89,9 +89,10 @@ from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance, SourceRef
-from terezy.core.primitives.rates import NominalRate, RealTermsUnavailable
+from terezy.core.primitives.rates import NominalRate
 from terezy.core.primitives.tolerance import is_close
 from terezy.core.results import fund as fund_results
+from terezy.core.results import hurdle
 from terezy.core.results.fund import (
     BesideTheHurdle,
     FundAssumptions,
@@ -431,9 +432,11 @@ class TestBesideTheHurdleRate:
         return HurdleRate(
             nominal_ytm=NominalRate(HURDLE_YTM),
             nominal_cash_flow_return=NominalRate(HURDLE_YTM),
-            real=RealTermsUnavailable(
-                reason="FIXTURE — inflation is not modelled in this comparison."
-            ),
+            # ⚙ A `RealTerms` since 007 filled the slot: still one field, now holding two
+            # independently typed figures. This fixture deflates nothing, so it takes the
+            # constant whose two reasons say exactly that -- no series and no assumption were
+            # given -- rather than inventing a reason of its own.
+            real=hurdle.NOT_DEFLATED,
             total_tax=Money(0.0, UAH, prov.EMPTY),
             accounts_for=frozenset({"tax on every taxable event over the holding's life"}),
             excludes=frozenset({"funding route costs (in)", "exit route costs (out)"}),

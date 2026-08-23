@@ -207,9 +207,9 @@ NO_REAL_TERMS: Final[RealTermsUnavailable] = RealTermsUnavailable(
         "inflation is not modelled in this feature, so the target and every figure solved "
         "against it are nominal and say so. No real figure is computed and none is assumed: a "
         "real target derived from a guessed inflation rate would be a fabricated number "
-        "wearing the same label as a measured one. The slot is filled by the CPI feature; "
-        "whether a real figure then becomes the headline is a separate decision the owner has "
-        "not taken."
+        "wearing the same label as a measured one. Feature 007 filled the *hurdle rate's* "
+        "real slot from declared CPI; this is a different slot on a different result, and "
+        "whether a goal is restated in real terms is a decision the owner has not taken."
     )
 )
 """The occupant of the real-terms slot for every goal this feature solves (FR-017, SC-009).

@@ -1,0 +1,50 @@
+# The owner's declared belief about future inflation.
+#
+# **Everything in this file is an assumption, and that is what it carries instead of a
+# citation.** `data/scenarios/` is exempt from the provenance requirement by design (see
+# `data/README.md`): a belief about next year's prices has no publisher, and
+# `is_assumption = true` is what it carries where an observation carries a `source` and a
+# `verified_on`. Never present anything here as though it were measured.
+#
+# **A subdirectory, and the nesting is deliberate.** `data/scenarios/*.toml` is globbed and
+# validated as scenario documents (regimes and transitions); `glob` does not recurse, so this
+# file keeps the directory's citation exemption without pretending to be a scenario. The same
+# reading `data/instruments/nav/` already carries.
+#
+# **Why a belief is allowed here at all when 001's FR-022 forbade one.** The owner resolved
+# that collision on 2026-08-22: the prohibition was refined, not repealed. A real figure from
+# an *implicit or invented* inflation rate is still forbidden. This is a *declared, dated,
+# labelled* assumption entered as data, and it is permitted precisely because it is visible as
+# an assumption on every figure it touches -- realized and assumed real figures are reported
+# separately and no single number ever blends them (007 FR-009, FR-010).
+#
+# **Replacing this with an external forecast is a data-only change.** Fill in `source`,
+# `retrieved_on` and `kind` together -- say, the National Bank's published inflation forecast
+# -- and the figure carries that citation. It stays an assumption either way: a forecast is a
+# statement about a year that has not happened, and no source makes it observed. Running both
+# is two runs, each naming the declaration it used, not one run holding both.
+
+[inflation_assumption]
+id            = "owner_placeholder_inflation"
+owner_id      = "owner-001"
+
+# PLACEHOLDER BELIEF. Ten percent is a round number chosen so the arithmetic is checkable by
+# hand -- it is not a forecast, not observed, and not derived from the declared CPI series.
+# Nobody knows next year's prices. It is here so the projected half of the horizon can be
+# modelled at all, and every figure that depends on it is conditional on it and says so. The
+# owner is expected to replace this with his own figure or with a cited published forecast;
+# the engine will keep calling it an assumption either way.
+annual_rate_pct = 10.0
+
+is_assumption   = true
+rationale       = "PLACEHOLDER BELIEF, not a forecast and not an observation. Ten percent per annum is a round number chosen so the deflation arithmetic is checkable on paper; it is not derived from the declared CPI series, from the National Bank, or from anyone else. Nobody knows next year's prices. Replace it with your own figure, or declare a published forecast with its citation, retrieved_on and kind — it remains an assumption either way, because a forecast is a statement about a year that has not happened."
+
+# The citation keys of an external forecast: present and empty, because this is the owner's
+# own belief and there is nothing to cite. A forgotten line must not read as a deliberate
+# blank, which is why they are here rather than absent — the same reading an empty
+# `verified_on` carries. All three of `kind`, `source` and `retrieved_on` are filled together
+# or left empty together; a half-filled citation is refused at load.
+kind            = ""
+source          = ""
+retrieved_on    = ""
+verified_on     = ""

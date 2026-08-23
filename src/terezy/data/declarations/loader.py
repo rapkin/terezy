@@ -49,10 +49,16 @@ import tomllib
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Final, Literal, cast
+from typing import TYPE_CHECKING, Any, Final, Literal, assert_never, cast
 
 from pydantic import BaseModel, ValidationError
 
+from terezy.core.inflation.series import (
+    CpiObservation,
+    CpiSeries,
+    InflationAssumption,
+    Periodicity,
+)
 from terezy.core.instruments import registry as instrument_registry
 from terezy.core.instruments.fund import (
     CapEntry,
@@ -74,7 +80,7 @@ from terezy.core.instruments.interface import (
 )
 from terezy.core.ledger import seeds
 from terezy.core.ledger.seeds import SeedLot
-from terezy.core.primitives import conventions
+from terezy.core.primitives import conventions, periods
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
@@ -2977,4 +2983,375 @@ def _require_two_variables(path: Path, entry: schema.GoalTable, *, field_prefix:
         "would be the tool inventing the plan rather than solving it.",
         "declare two of monthly_contribution, target_sum and target_date -- or all three, "
         "which asks whether they are consistent",
+    )
+
+
+# ---------------------------------------------------------------------------
+# 007-cpi-real-terms: the CPI series and the inflation assumption
+# ---------------------------------------------------------------------------
+#
+# Same four responsibilities -- read, shape, meaning, construct -- over two declarations of
+# opposite epistemic kinds, and the difference is the whole point of loading them separately.
+#
+# A CPI file is the most heavily cited declaration in the project: **one `SourceRef` per
+# observation**, 411 of them in the shipped Ukrainian series. Not one per file, which would
+# collapse into a single ref in a frozenset and make a real figure over a long window look as
+# though it rested on one thing. It rests on every month it chained, and research.md D6 says
+# to report that honestly rather than summarise it.
+#
+# An inflation assumption is a *belief*, and carries `is_assumption` where an observation
+# carries a source. An external forecast may carry a citation as well -- and is still an
+# assumption (FR-010).
+#
+# **No network, no cache, and no knowledge that a fetcher exists.** `scripts/fetch_cpi.py`
+# wrote `data/cpi/ua.toml` and is tooling outside the package; this module reads a committed
+# file (research.md D10, Principle III).
+#
+# What is *not* here, because it needs a second file: whether two series declare one identity.
+# That is a relation and lives in the resolver, where the whole set is in hand.
+
+CPI_SERIES_TABLE: Final = "series"
+"""The identity table of a CPI file, and the prefix of every field path in it."""
+
+CPI_OBSERVATION_TABLE: Final = "observation"
+"""The observation array of a CPI file."""
+
+INFLATION_ASSUMPTION_TABLE: Final = "inflation_assumption"
+"""Root table of an inflation-assumption file."""
+
+_PERIODICITIES: Final[Mapping[str, Periodicity]] = {"monthly": "monthly"}
+"""The publication cadences this engine can annualise, keyed by their declared name.
+
+A registry with one entry rather than a bare string comparison, so an unknown cadence fails
+naming what would have worked (FR-021's pattern) instead of silently annualising a quarterly
+series by twelve -- which is wrong by a factor of three and produces a plausible number.
+"""
+
+_MINIMUM_ANNUAL_RATE: Final = -1.0
+"""Prices cannot fall to nothing. The bound that keeps the Fisher denominator away from zero."""
+
+
+def _cpi_period(path: Path, field_path: str, period: str, periodicity: Periodicity) -> str:
+    """A declared period, checked against the series' declared periodicity.
+
+    For a monthly series that means ``YYYY-MM`` and nothing else: ``2025-01-15`` is a day,
+    ``2025-Q1`` is a quarter and ``2025`` is a year, and each of them would chain into a
+    figure covering a span nobody declared. The message names both the value and the
+    periodicity it failed, because the fix is one or the other.
+    """
+    match periodicity:
+        case "monthly":
+            if periods.is_period(period):
+                return period
+        case _:  # pragma: no cover -- mypy proves this unreachable
+            assert_never(periodicity)
+    raise DeclarationError(
+        path,
+        field_path,
+        f"declares the period {period!r}, which is not a whole month and so does not conform "
+        f"to this series' declared {periodicity!r} periodicity. Periods are not reinterpreted: "
+        "reading a day or a quarter as a month would chain a value into a figure covering a "
+        "span nobody declared.",
+        "write the period as YYYY-MM, in quotes",
+    )
+
+
+def _elapsed_when_retrieved(path: Path, field_path: str, period: str, retrieved_on: date) -> None:
+    """Refuse an observation whose period had not ended when the value was read.
+
+    A published index for a month covers a month that has **finished**. A value for a month
+    still running is a forecast wearing an observation's clothes, and it would chain into a
+    real figure indistinguishable from a measured one -- the exact confusion FR-010 exists to
+    prevent, arriving through the back door.
+
+    Aged against the observation's **own** ``retrieved_on`` rather than a clock, so the same
+    file loads the same way for ever. There is no wall clock in this project and there is not
+    one here either: a run's ``as_of`` answers staleness, and this is not a staleness question.
+    """
+    retrieval_month = periods.month_of(retrieved_on)
+    if period >= retrieval_month:
+        raise DeclarationError(
+            path,
+            field_path,
+            f"declares a value for {period!r} but was retrieved on "
+            f"{retrieved_on.isoformat()}, in {retrieval_month}. A published price index covers "
+            "a period that has ended, so a value read before its own period finished is a "
+            "forecast rather than an observation -- and a forecast chained into a real figure "
+            "would be indistinguishable from a measured one.",
+            "remove the row, or re-fetch the series once the period has been published",
+        )
+
+
+def cpi_from_file(path: Path) -> CpiSeries:
+    """One ``data/cpi/<economy>.toml`` as a :class:`~terezy.core.inflation.series.CpiSeries`.
+
+    Every refusal below is a property of this one file read in isolation, and every one names
+    the file and the offending field or period (FR-003):
+
+    * **An empty series.** A file declaring no observations would make every window uncovered
+      for a reason naming the *window*, sending the reader to the wrong place.
+    * **A non-positive index value.** See :class:`schema.CpiObservationTable.value`.
+    * **A period that does not conform to the declared periodicity**, and an unknown
+      periodicity, both with the alternatives listed.
+    * **A period that had not elapsed when the value was retrieved.**
+    * **A duplicate period**, and **periods running backwards**. Strictly ascending is what
+      "overlapping" means for a series of whole months, and a file that jumps backwards is one
+      somebody edited twice.
+
+    **Gaps between declared months are permitted** and load. A month the publisher did not
+    publish is a fact about the world, and FR-004 forbids inventing one. The refusal for a gap
+    belongs to ``core.inflation.series.coverage``, which knows the window being asked about
+    and can name the missing month for *that* question.
+    """
+    document = read_document(path)
+    file = _validate(schema.CpiFile, document, path)
+    series_id = _require_text(
+        path,
+        f"{CPI_SERIES_TABLE}.id",
+        file.series.id,
+        "a series is referred to by id from every figure it deflates, and two series "
+        "declaring one id are refused across the whole data root",
+    )
+    periodicity = _PERIODICITIES[
+        _known(
+            path,
+            f"{CPI_SERIES_TABLE}.periodicity",
+            file.series.periodicity,
+            _PERIODICITIES,
+            "publication periodicity this engine can annualise",
+        )
+    ]
+    if not file.observation:
+        raise DeclarationError(
+            path,
+            CPI_OBSERVATION_TABLE,
+            "declares no observations. An empty series is reported rather than read as 'prices "
+            "never moved': every deflation window would come back uncovered for a reason "
+            "naming the window, which would send a reader to check the wrong thing.",
+            "declare at least one [[observation]], or delete the file",
+        )
+
+    observations: list[CpiObservation] = []
+    seen: dict[str, int] = {}
+    for position, entry in enumerate(file.observation):
+        field_prefix = f"{CPI_OBSERVATION_TABLE}[{position}]"
+        period = _cpi_period(path, f"{field_prefix}.period", entry.period, periodicity)
+        if period in seen:
+            raise DeclarationError(
+                path,
+                f"{field_prefix}.period",
+                f"declares {period!r} for the second time; entry {seen[period]} of this file "
+                "already declares it. The two are not merged and neither wins: one value per "
+                "period is what makes a chained product reproducible, and a repeated period is "
+                "a file that was edited twice.",
+                "delete the duplicate entry",
+            )
+        if observations and period <= observations[-1].period:
+            raise DeclarationError(
+                path,
+                f"{field_prefix}.period",
+                f"declares {period!r} after {observations[-1].period!r}, so the series runs "
+                "backwards here. Observations are declared in strictly ascending order and are "
+                "not reordered: a series that jumps backwards is one somebody edited twice, and "
+                "sorting it silently would hide which edit was meant.",
+                "put the observations in calendar order",
+            )
+        seen[period] = position
+        retrieved_on = _parse_date(path, f"{field_prefix}.retrieved_on", entry.retrieved_on)
+        _elapsed_when_retrieved(path, f"{field_prefix}.period", period, retrieved_on)
+        observations.append(
+            CpiObservation(
+                period=period,
+                value=_positive(
+                    path,
+                    f"{field_prefix}.value",
+                    entry.value,
+                    "a price index is a strictly positive factor: 100.9 means prices rose 0.9% "
+                    "that month. Zero or below would make the chained product zero or negative "
+                    "and leave the real rate undefined",
+                ),
+                kind=_require_text(
+                    path,
+                    f"{field_prefix}.kind",
+                    entry.kind,
+                    "every observation names the kind it ages under, and there is no default "
+                    "staleness threshold (FR-028)",
+                ),
+                provenance=prov.of(
+                    [
+                        _source_ref(
+                            path,
+                            field_prefix,
+                            source=entry.source,
+                            retrieved_on=entry.retrieved_on,
+                            verified_on=entry.verified_on,
+                            kind=entry.kind,
+                        )
+                    ]
+                ),
+            )
+        )
+    return CpiSeries(
+        id=series_id,
+        country=_require_text(
+            path,
+            f"{CPI_SERIES_TABLE}.country",
+            file.series.country,
+            "a series states which economy it measures; that is half of what makes a second "
+            "country's index a data-only addition (FR-002)",
+        ),
+        index=_require_text(
+            path,
+            f"{CPI_SERIES_TABLE}.index",
+            file.series.index,
+            "a series states which index it is; two indices for one country are two series",
+        ),
+        periodicity=periodicity,
+        base=_require_text(
+            path,
+            f"{CPI_SERIES_TABLE}.base",
+            file.series.base,
+            "the form the values are in decides how they chain, and reading a month-on-month "
+            "series as a level index gives a wrong answer that looks entirely plausible",
+        ),
+        observations=tuple(observations),
+    )
+
+
+def _forecast_citation(
+    path: Path, table: schema.InflationAssumptionTable
+) -> tuple[Provenance | None, str | None]:
+    """An external forecast's citation and staleness kind, or ``(None, None)`` for a belief.
+
+    Three keys decide it together -- ``source``, ``retrieved_on`` and ``kind`` -- and they are
+    all empty or all filled. A **half-filled** citation is refused rather than half-read: a
+    source with no retrieval date is a quotation nobody can date, and a retrieval date with no
+    source is a date attached to nothing. Either one is an edit somebody abandoned, and
+    guessing which half was meant would put an unfinished claim in the output.
+
+    ``verified_on`` is not part of that group and may be empty either way, exactly as it is on
+    an observation -- and verifying a forecast vouches for the *quotation*, never for the
+    number.
+    """
+    declared = {
+        "source": table.source.strip(),
+        "retrieved_on": table.retrieved_on.strip(),
+        "kind": table.kind.strip(),
+    }
+    filled = {name for name, value in declared.items() if value}
+    if not filled:
+        if table.verified_on.strip():
+            raise DeclarationError(
+                path,
+                f"{INFLATION_ASSUMPTION_TABLE}.verified_on",
+                "declares a verification date for an assumption that cites no source. There is "
+                "nothing to have verified it against: the owner's own belief about future "
+                "inflation has no publisher, and a date here would claim a check that cannot "
+                "have happened.",
+                "leave verified_on empty, or declare the forecast's source, retrieved_on and "
+                "kind as well",
+            )
+        return None, None
+    missing = sorted(set(declared) - filled)
+    if missing:
+        raise DeclarationError(
+            path,
+            f"{INFLATION_ASSUMPTION_TABLE}.{missing[0]}",
+            f"is empty while {sorted(filled)} are declared, so this assumption cites a source "
+            "only halfway. An external forecast carries its citation, its retrieval date and "
+            "its staleness kind together; a partial one is an edit somebody abandoned, and "
+            "there is no honest way to guess which half was meant.",
+            f"declare {missing}, or clear source, retrieved_on and kind to declare the owner's "
+            "own belief instead",
+        )
+    return (
+        prov.of(
+            [
+                _source_ref(
+                    path,
+                    INFLATION_ASSUMPTION_TABLE,
+                    source=table.source,
+                    retrieved_on=table.retrieved_on,
+                    verified_on=table.verified_on,
+                    kind=table.kind,
+                )
+            ]
+        ),
+        declared["kind"],
+    )
+
+
+def inflation_assumption_from_file(path: Path) -> tuple[str, InflationAssumption]:
+    """One ``data/scenarios/inflation/<owner>.toml`` as its owner id and the declared belief.
+
+    Returns the owner id beside the record rather than folding it into it, on
+    ``spendable_from_file``'s precedent: the belief is a rate and the owner is a property of
+    the *file*.
+
+    **Exempt from the citation requirement, and it carries something else instead.** A belief
+    about next year's prices has no publisher; ``is_assumption`` is what it carries where an
+    observation carries a source. An external published forecast *may* carry a citation as
+    well and remains an assumption (FR-010) -- cited does not make it observed, because there
+    is no primary source for a year that has not happened.
+
+    Two refusals are this function's own. ``is_assumption = false`` is refused, because the
+    field exists to make the claim unmissable in the output rather than to be switched off. A
+    rate at or below -100% is refused, because prices cannot fall to nothing and every real
+    rate against such a figure would be infinite.
+    """
+    document = read_document(path)
+    table = _validate(schema.InflationAssumptionFile, document, path).inflation_assumption
+    if not table.is_assumption:
+        raise DeclarationError(
+            path,
+            f"{INFLATION_ASSUMPTION_TABLE}.is_assumption",
+            "is declared false. A future-inflation rate is always an assumption: nobody knows "
+            "next year's prices, and FR-010 requires the figure be presented as a stated "
+            "belief rather than as a measurement. The field exists to make that unmissable in "
+            "the output, not to be switched off -- which is why the core types it as a Literal "
+            "admitting one value.",
+            "write is_assumption = true, or declare the value in data/cpi/ where an observation "
+            "belongs",
+        )
+    annual_rate = _as_fraction(table.annual_rate_pct)
+    if annual_rate <= _MINIMUM_ANNUAL_RATE:
+        raise DeclarationError(
+            path,
+            f"{INFLATION_ASSUMPTION_TABLE}.annual_rate_pct",
+            f"declares {table.annual_rate_pct!r}%, which is prices falling to nothing or worse. "
+            "Every real rate deflated by it would be infinite or undefined. The value is "
+            "refused rather than corrected: clamping it would put a belief in the model that "
+            "no file declares.",
+            "write a percentage above -100",
+        )
+    provenance, kind = _forecast_citation(path, table)
+    return (
+        _require_text(
+            path,
+            f"{INFLATION_ASSUMPTION_TABLE}.owner_id",
+            table.owner_id,
+            "a belief about the future is one person's, and every declaration carries its "
+            "owner from the first commit (Principle VII)",
+        ),
+        InflationAssumption(
+            id=_require_text(
+                path,
+                f"{INFLATION_ASSUMPTION_TABLE}.id",
+                table.id,
+                "the run manifest records which assumption produced a result, so two runs with "
+                "two different beliefs are two results rather than one (FR-015)",
+            ),
+            annual_rate=annual_rate,
+            is_assumption=True,
+            rationale=_require_text(
+                path,
+                f"{INFLATION_ASSUMPTION_TABLE}.rationale",
+                table.rationale,
+                "the rationale is what an assumption carries where an observation carries a "
+                "source: it is the owner's stated belief in words, and a figure conditional on "
+                "an unexplained guess cannot be argued with",
+            ),
+            provenance=provenance,
+            kind=kind,
+        ),
     )

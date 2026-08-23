@@ -92,13 +92,14 @@ from terezy.core.instruments.interface import (
 from terezy.core.ledger.canonical import Canonical
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.provenance import Provenance
+from terezy.core.primitives.rates import RealRate
 from terezy.core.results import canonical
 from terezy.core.results.project import Projection
 from terezy.core.tax.interface import TaxClass
 from terezy.data.declarations.errors import DeclarationError
-from terezy.data.declarations.resolver import Declarations
+from terezy.data.declarations.resolver import Declarations, InflationDeclarations
 
-ENCODING: Final = "terezy-canonical-v2"
+ENCODING: Final = "terezy-canonical-v3"
 """The name of the byte encoding a digest was taken under.
 
 Prefixed into every encoding, so a digest is comparable only against digests of the same
@@ -110,6 +111,12 @@ change under an unchanged tag a red test rather than a discovery.
 **v2** (2026-08): feature 002 gave the canonical event tuple ``capacity_pool`` and the
 ledger form the capacity accumulator, so a v1 digest of the same ledger no longer agrees
 with one taken here -- the tag says so instead of letting the two disagree under one name.
+
+**v3** (2026-08): feature 007 filled the reserved real-terms slot. Where v2 rendered the slot
+as one ``(tag, value)`` pair, v3 renders two figures -- realized and assumed -- each carrying
+its basis, the series it is real against and the window it covers. No nominal figure, no
+schedule row and no tax charge moved; the tag moves because the *form* did, and a v2 digest
+of the same projection would otherwise silently disagree under an unchanged name.
 """
 
 ALGORITHM: Final = "sha256"
@@ -119,12 +126,23 @@ Carried in the value rather than only in this constant so that a stored digest c
 compared against one taken with a different algorithm by accident.
 """
 
-InputKind = Literal["instrument", "tax_class", "fund"]
+InputKind = Literal["cpi_series", "fund", "inflation_assumption", "instrument", "tax_class"]
 """What kind of declaration an :class:`InputRef` describes. A closed set, not a free string.
 
 ⚙ ``"fund"`` joined with feature 006. Kept distinct from ``"instrument"`` rather than folded
 into it: the two are different declarations in the same directory, and a manifest that
-called them one thing would hide which kind of file a run was actually fed."""
+called them one thing would hide which kind of file a run was actually fed.
+
+⚙ ``"cpi_series"`` and ``"inflation_assumption"`` joined with feature 007. FR-015 requires the
+manifest to record *which* inflation declaration produced a result -- two runs differing only
+in their declared belief are two results, and a manifest that did not name the belief could
+not tell them apart. The CPI series is recorded for the same reason from the other side: a
+real figure is only reproducible if the manifest says which series deflated it, at which
+version.
+
+Listed alphabetically because :func:`input_refs` sorts by ``(kind, id)``, so the order here is
+the order a manifest reads in.
+"""
 
 
 def encode(value: Canonical) -> bytes:
@@ -220,7 +238,7 @@ class InputRef:
     """One declaration a run was given: what it is, where it came from, which version."""
 
     kind: InputKind
-    """Whether this is an instrument or a tax class. A closed set (:data:`InputKind`)."""
+    """What sort of declaration this is. A closed set (:data:`InputKind`)."""
 
     id: str
     """The declared id, as every figure and every reference names it."""
@@ -293,11 +311,19 @@ class RunManifest:
     """``"sha256:<hex>"`` over the canonical form of the projection (:func:`digest`)."""
 
     unverified_sources: tuple[str, ...]
-    """Ids of every source behind the headline figure with no verification date, sorted.
+    """Ids of every source behind the reported figures with no verification date, sorted.
 
-    The roll-up of what :attr:`inputs` records per file, taken from the figure's own
+    The roll-up of what :attr:`inputs` records per file, taken from the figures' own
     provenance so it describes what the *result* rests on rather than what happened to be
     loaded. Non-empty is the expected state for feature 001 (FR-014, FR-015).
+
+    ⚙ **The real figures are included, and they had to be** (007 FR-013). The nominal figure's
+    provenance deliberately excludes the CPI observations -- putting them there would make the
+    *nominal* rate appear to rest on a price index it does not -- so a roll-up taken from
+    ``hurdle.provenance`` alone would omit every observation behind a real figure. With the
+    shipped Ukrainian series that is 411 unverified values behind a reported number, absent
+    from the field whose whole job is to name them. A long window therefore makes this list
+    long, which is the honest answer rather than a reason to trim it (research.md D6).
     """
 
 
@@ -379,6 +405,51 @@ def _tax_class_provenance(declared: TaxClass) -> Provenance:
     return prov.merge_all(entry.provenance for entry in declared.rates)
 
 
+def inflation_input_refs(declarations: InflationDeclarations) -> tuple[InputRef, ...]:
+    """Every price series and the declared belief, as manifest input references (007 FR-015).
+
+    A separate function beside :func:`input_refs` rather than more branches inside it,
+    mirroring the resolver's own split: the two declaration sets describe different runs, and
+    a projection given no CPI is a legitimate run whose manifest simply lists none of these.
+
+    **The assumption is recorded even though it carries no citation.** Its
+    ``unverified_sources`` is empty for the owner's own belief -- there is nothing to verify a
+    belief against, and an empty list here says exactly that rather than claiming it was
+    checked. What the manifest is recording is *which declaration was in force*, which is the
+    question FR-015 asks: two runs with two beliefs must be tellable apart afterwards.
+    """
+    series = [
+        InputRef(
+            kind="cpi_series",
+            id=identifier,
+            file=file_name(declarations.series_files[identifier]),
+            version=file_version(declarations.series_files[identifier]),
+            unverified_sources=_unverified_ids(
+                prov.merge_all(item.provenance for item in declared.observations)
+            ),
+        )
+        for identifier, declared in declarations.series.items()
+    ]
+    assumptions = (
+        []
+        if declarations.assumption is None or declarations.assumption_file is None
+        else [
+            InputRef(
+                kind="inflation_assumption",
+                id=declarations.assumption.id,
+                file=file_name(declarations.assumption_file),
+                version=file_version(declarations.assumption_file),
+                unverified_sources=_unverified_ids(
+                    declarations.assumption.provenance
+                    if declarations.assumption.provenance is not None
+                    else prov.EMPTY
+                ),
+            )
+        ]
+    )
+    return tuple(sorted([*series, *assumptions], key=lambda ref: (ref.kind, ref.id)))
+
+
 def _instrument_provenance(declaration: InstrumentDeclaration) -> Provenance:
     """Every source behind one instrument declaration: its terms and its constraints.
 
@@ -402,8 +473,14 @@ def of_run(
     horizon: DateRange,
     assumptions: Assumptions,
     seed: int | None,
+    inflation: InflationDeclarations | None = None,
 ) -> RunManifest:
     """The manifest of one projection: its inputs, their versions, and its digest.
+
+    ⚙ **``inflation`` records which price series and which declared belief were in force**
+    (007 FR-015). It defaults to ``None`` because a run given no CPI is a legitimate run whose
+    real-terms slot reports both absences in words; the default records nothing rather than
+    recording a default, and the result itself already says what it was not given.
 
     Every argument is required and keyword-only. There is nothing this function can
     reasonably guess: a manifest built from defaults would be a record of a run that did
@@ -428,8 +505,32 @@ def of_run(
         holding=holding,
         horizon=horizon,
         assumptions=assumptions,
-        inputs=input_refs(declarations),
+        inputs=(
+            input_refs(declarations)
+            if inflation is None
+            else tuple(
+                sorted(
+                    [*input_refs(declarations), *inflation_input_refs(inflation)],
+                    key=lambda ref: (ref.kind, ref.id),
+                )
+            )
+        ),
         seed=seed,
         result_digest=digest_of_projection(result),
-        unverified_sources=_unverified_ids(result.hurdle.provenance),
+        unverified_sources=_unverified_ids(_reported_provenance(result)),
     )
+
+
+def _reported_provenance(result: Projection) -> Provenance:
+    """Every source behind a figure this result reports: the nominal one, and each real one.
+
+    Two sides, unioned, because they are genuinely different source sets and the manifest is
+    the one place that answers *"what did this whole result rest on?"*. An unavailable real
+    figure contributes nothing -- there is no figure -- which is why the match is over the
+    union type rather than an attribute read.
+    """
+    sources = [result.hurdle.provenance]
+    for figure in (result.hurdle.real.realized, result.hurdle.real.assumed):
+        if isinstance(figure, RealRate):
+            sources.append(figure.provenance)
+    return prov.merge_all(sources)

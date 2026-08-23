@@ -154,6 +154,11 @@ ADJUSTED_MATURITY: Final = date(2028, 1, 17)
 
 UAH: Final = Currency.UAH
 
+CPI_SERIES_ID: Final = "ua_cpi_monthly"
+"""The declared series this run deflates by. Named here because it is a *choice about the
+run* -- which economy's prices this owner's purchasing power is measured against -- and not a
+constant of the engine, which holds no CPI of its own (FR-002)."""
+
 
 # --- the run under test ---------------------------------------------------------------
 
@@ -183,13 +188,26 @@ def _declarations() -> resolver.Declarations:
     return resolver.from_data_root(DATA_ROOT)
 
 
+def _inflation() -> resolver.InflationDeclarations:
+    """The declared price series and the declared future-inflation belief (007).
+
+    Read from ``data/`` like every other declaration. The run is given **both**, so this
+    artefact records the real-terms slot doing each of the two things it can do: refusing
+    with a specific reason, and holding a figure.
+    """
+    return resolver.inflation_from_data_root(DATA_ROOT)
+
+
 def _project(declarations: resolver.Declarations) -> Projection:
+    inflation = _inflation()
     outcome = project.project(
         declarations.instruments[INSTRUMENT_ID],
         _holding(),
         _horizon(),
         _assumptions(),
         tax_classes=declarations.tax_classes,
+        cpi_series=inflation.series[CPI_SERIES_ID],
+        inflation_assumption=inflation.assumption,
     )
     assert isinstance(outcome, Projection), f"expected a projection, got {outcome!r}"
     return outcome
@@ -290,16 +308,35 @@ def _optional(value: object) -> str:
     return "none" if value is None else str(value)
 
 
+def _real_figure(label: str, figure: RealRate | RealTermsUnavailable) -> Iterable[str]:
+    """One half of the real-terms slot: the number and what it rests on, or the reason not.
+
+    ⚙ **Two entries where feature 001 rendered one** (007 FR-009). The realized figure and
+    the assumed one are two claims and are rendered as two, each labelled, so that a reader
+    of this artefact cannot take either for the other and a diff shows which one moved.
+
+    A figure renders its ``basis``, the series it is real *against* and its window beside its
+    value, because a bare real rate is not checkable: the same nominal figure deflated by
+    observed prices and by a belief, or over two different spans, gives different answers and
+    a single number cannot say which question it answered (FR-010, FR-011).
+    """
+    match figure:
+        case RealRate():
+            yield f"{label:<28} {figure.value!r}"
+            yield f"{label + '_basis':<28} {figure.basis}"
+            yield f"{label + '_against':<28} {figure.series_id}"
+            yield f"{label + '_window':<28} {figure.window.first} .. {figure.window.last}"
+        case RealTermsUnavailable():
+            yield f"{label:<28} unavailable"
+            yield f"{label + '_because':<28} {figure.reason}"
+
+
 def _figures(result: Projection) -> Iterable[str]:
     hurdle = result.hurdle
     yield f"nominal_ytm                  {hurdle.nominal_ytm.value!r}"
     yield f"nominal_cash_flow_return     {hurdle.nominal_cash_flow_return.value!r}"
-    match hurdle.real:
-        case RealRate():  # pragma: no cover -- nothing in feature 001 produces one
-            yield f"real                         {hurdle.real.value!r}"
-        case RealTermsUnavailable():
-            yield "real                         unavailable"
-            yield f"real_unavailable_because     {hurdle.real.reason}"
+    yield from _real_figure("real_realized", hurdle.real.realized)
+    yield from _real_figure("real_assumed", hurdle.real.assumed)
     yield f"total_tax                    {_money(hurdle.total_tax)}"
     for item in sorted(hurdle.accounts_for):
         yield f"accounts_for                 {item}"
@@ -420,8 +457,12 @@ def _inputs(declarations: resolver.Declarations) -> Iterable[str]:
     file digests are kept precisely because a change to a declaration file *should* fail
     this test, on the line that names the file.
     """
-    for ref in manifest.input_refs(declarations):
-        yield f"{ref.kind:<10} {ref.id:<20} {ref.file:<40} {ref.version}"
+    refs = sorted(
+        [*manifest.input_refs(declarations), *manifest.inflation_input_refs(_inflation())],
+        key=lambda ref: (ref.kind, ref.id),
+    )
+    for ref in refs:
+        yield f"{ref.kind:<20} {ref.id:<28} {ref.file:<40} {ref.version}"
 
 
 HEADER: Final = (
@@ -440,8 +481,14 @@ HEADER: Final = (
     "# deliberately absent; the declaration files' digests are deliberately present.",
     "#",
     "# THE TERMS PROJECTED HERE ARE SYNTHETIC AND UNVERIFIED. No figure below describes a",
-    "# bond anyone can buy, and none of them accounts for funding-route cost, exit cost or",
-    "# inflation. See docs/METHODOLOGY.md.",
+    "# bond anyone can buy, and none of them accounts for funding-route cost or exit cost.",
+    "#",
+    "# The nominal figures exclude inflation and say so. Beside them the real-terms slot",
+    "# carries two figures that never mix: one deflated by declared CPI observations, one",
+    "# by a declared belief about future inflation. The second is an ASSUMPTION on its",
+    "# face -- the declared rate is a placeholder, not a forecast -- and the first refuses",
+    "# today, because the declared series ends before this holding does. See",
+    "# docs/METHODOLOGY.md.",
 )
 
 
@@ -584,7 +631,10 @@ class TestTheRecordedResultIsStillTheResult:
         """A record of inputs nobody can identify is not a record (Principle III)."""
         declarations = _declarations()
         recorded = _recorded()
-        for ref in manifest.input_refs(declarations):
+        for ref in (
+            *manifest.input_refs(declarations),
+            *manifest.inflation_input_refs(_inflation()),
+        ):
             assert ref.file in recorded, f"the artefact does not name {ref.file}"
             assert ref.version in recorded, (
                 f"{ref.file} has changed since the artefact was recorded, so the run this "
@@ -669,3 +719,119 @@ class TestTheArtefactAgreesWithTheHandComputedSchedule:
             result.hurdle.nominal_cash_flow_return.value,
         )
         assert result.hurdle.nominal_ytm.value > 0.0
+
+
+class TestFillingTheRealSlotChangedNothingNominal:
+    """007 FR-014, and this feature's entire claim to being additive.
+
+    *"This feature MUST NOT change how any nominal figure is computed, and MUST NOT change
+    any realised amount, any tax figure, or any ranking. Filling the real slot is additive;
+    every 001 behaviour is preserved bit-for-bit on identical inputs."*
+
+    The artefact comparison above already covers all of that -- but it covers it as one
+    assertion over 230 lines, and a reader who sees it go red cannot tell whether a coupon
+    moved or a reason was reworded. These pin the figures that must **never** move, to the
+    last bit, with the value written out. Feeding the run a CPI series is what makes the
+    pinning worth doing: it is the change most likely to disturb something it should not.
+    """
+
+    NOMINAL_YTM: Final = 0.16058553778779106
+    """001's recorded contractual yield, transcribed from the artefact before this feature
+    touched it. A literal rather than a reference, so the two cannot drift together."""
+
+    def test_the_contractual_yield_is_the_bit_that_feature_001_recorded(self) -> None:
+        result, _ = _run()
+
+        assert result.hurdle.nominal_ytm.value == self.NOMINAL_YTM
+
+    def test_the_cash_flow_return_is_the_bit_that_feature_001_recorded(self) -> None:
+        result, _ = _run()
+
+        assert result.hurdle.nominal_cash_flow_return.value == self.NOMINAL_YTM
+
+    def test_deflating_moves_no_realised_amount_and_no_tax_charge(self) -> None:
+        """The same run with and without the deflation inputs: every amount identical.
+
+        Not "close": identical. A deflation that touched a cash flow would be a defect of
+        the first order, and the tolerance exists for hand arithmetic rather than for this.
+        """
+        declarations = _declarations()
+        with_cpi, _ = _run()
+        without = project.project(
+            declarations.instruments[INSTRUMENT_ID],
+            _holding(),
+            _horizon(),
+            _assumptions(),
+            tax_classes=declarations.tax_classes,
+        )
+        assert isinstance(without, Projection)
+
+        assert [row.gross.amount for row in with_cpi.schedule.rows] == [
+            row.gross.amount for row in without.schedule.rows
+        ]
+        assert [row.tax.amount for row in with_cpi.schedule.rows] == [
+            row.tax.amount for row in without.schedule.rows
+        ]
+        assert [row.net.amount for row in with_cpi.schedule.rows] == [
+            row.net.amount for row in without.schedule.rows
+        ]
+        assert [charge.total.amount for charge in with_cpi.charges] == [
+            charge.total.amount for charge in without.charges
+        ]
+        assert with_cpi.hurdle.total_tax.amount == without.hurdle.total_tax.amount
+
+    def test_the_two_nominal_figures_are_identical_with_and_without_the_deflation(
+        self,
+    ) -> None:
+        """The falsifier's other half: the *only* field that may differ is ``real``."""
+        declarations = _declarations()
+        with_cpi, _ = _run()
+        without = project.project(
+            declarations.instruments[INSTRUMENT_ID],
+            _holding(),
+            _horizon(),
+            _assumptions(),
+            tax_classes=declarations.tax_classes,
+        )
+        assert isinstance(without, Projection)
+
+        assert with_cpi.hurdle.nominal_ytm == without.hurdle.nominal_ytm
+        assert with_cpi.hurdle.nominal_cash_flow_return == without.hurdle.nominal_cash_flow_return
+        assert with_cpi.hurdle.excludes == without.hurdle.excludes
+        assert with_cpi.hurdle.accounts_for == without.hurdle.accounts_for
+        assert with_cpi.hurdle.provenance == without.hurdle.provenance
+        assert with_cpi.hurdle.real != without.hurdle.real
+
+
+class TestTheRealSlotSaysWhatItCanAndRefusesWhatItCannot:
+    """007 FR-009 and FR-012, end to end on the declarations the project actually ships."""
+
+    def test_the_realized_figure_refuses_and_names_the_months_it_is_missing(self) -> None:
+        """The shipped series ends 2025-10 and this holding runs into 2028. That is the
+        feature working, not a gap in it: re-running the fetcher is the fix, and the refusal
+        is what stops a number being invented in the meantime (research.md D4)."""
+        result, _ = _run()
+        realized = result.hurdle.real.realized
+        assert isinstance(realized, RealTermsUnavailable)
+
+        assert CPI_SERIES_ID in realized.reason
+        assert "2026-02" in realized.reason
+        assert "2028-01" in realized.reason
+
+    def test_the_assumed_figure_is_computed_and_labelled_an_assumption(self) -> None:
+        """The other half of FR-009: the projected portion is answered, and says what it rests
+        on. 1.16058553778779106 / 1.10 - 1 = 0.055077761625264454, the declared 10% belief."""
+        result, _ = _run()
+        assumed = result.hurdle.real.assumed
+        assert isinstance(assumed, RealRate)
+
+        assert is_close(assumed.value, 0.055077761625264454)
+        assert assumed.basis == "declared_assumption"
+        assert assumed.series_id == "owner_placeholder_inflation"
+
+    def test_the_two_figures_are_never_the_same_kind_of_answer(self) -> None:
+        """One refuses and one answers, in the same result, and the artefact shows both."""
+        result, _ = _run()
+
+        assert isinstance(result.hurdle.real.realized, RealTermsUnavailable)
+        assert isinstance(result.hurdle.real.assumed, RealRate)

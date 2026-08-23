@@ -48,6 +48,7 @@ from terezy.data.declarations.errors import DeclarationError
 if TYPE_CHECKING:  # pragma: no cover -- typing only
     from collections.abc import Mapping, Sequence
 
+    from terezy.core.inflation.series import CpiSeries, InflationAssumption
     from terezy.core.instruments.fund import FundDeclaration
     from terezy.core.instruments.interface import InstrumentDeclaration
     from terezy.core.ledger.seeds import SeedLot
@@ -1962,4 +1963,139 @@ def seeds_and_goals_from_data_root(
         goal_file=_at_most_one(root, GOALS_DIR),
         instruments=from_data_root(root).instruments,
         base_currency=base_currency,
+    )
+
+
+# ---------------------------------------------------------------------------
+# 007-cpi-real-terms: the CPI series and the inflation assumption
+# ---------------------------------------------------------------------------
+#
+# One relation a per-file validator structurally cannot check: **two files declaring one
+# series identity**. Each is individually valid; together they declare two different things
+# with one name, whichever loaded second would win by directory order, and every real figure
+# would silently rest on the other one. The error names both files, on this module's own
+# precedent, because knowing one of them leaves the reader to find the other by hand.
+#
+# ⚙ **An absent series and an absent assumption are reported states, not load failures**, and
+# this is the one place this feature departs from `composition`'s precedent deliberately. An
+# empty `composition/` directory is an error because the absence of the bound would silently
+# turn a search off -- nothing in the output would say a corridor had been skipped. An absent
+# CPI series is the opposite: every figure that wanted it comes back typed-unavailable naming
+# the absence (FR-012), in words, where the owner reads it. Refusing to load would move an
+# honest message from the result into a stack trace.
+
+CPI_DIR = "cpi"
+"""Where declared price-index series live under a data root. Cited; in `SOURCED_DIRS`."""
+
+INFLATION_ASSUMPTION_DIR = "scenarios/inflation"
+"""Where the declared future-inflation belief lives under a data root.
+
+**A subdirectory of `scenarios/`, and the nesting is load-bearing.** `ramp_from_data_root`
+globs `scenarios/*.toml` and validates every match as a scenario document, and `glob` does not
+recurse -- so a belief declared here keeps the citation exemption `data/scenarios/` carries
+(it is a belief, there is nothing to cite) without pretending to be a scenario. The same
+reading `data/instruments/nav/` already has: a subdirectory holds a different shape of file.
+"""
+
+
+@dataclass(frozen=True, slots=True)
+class InflationDeclarations:
+    """Every declaration the real-terms slot needs: the price series, and the belief.
+
+    ⚙ **A record beside the others rather than more fields on `Declarations`**, on
+    `CompositionDeclarations`' own precedent. The sets describe different runs: a projection
+    with no CPI declared is a legitimate run that produces a shape-identical result, and
+    folding these fields into `Declarations` would make every existing caller require files
+    this feature invented.
+    """
+
+    series: Mapping[str, CpiSeries]
+    """Declared series by their own declared id, never by file name or load order (FR-002).
+
+    Empty is a valid state and is reported by the figures that wanted one, not here.
+    """
+
+    series_files: Mapping[str, Path]
+    """Which file declared each series. Not decoration: it is what lets a later failure -- a
+    manifest entry, a duplicate discovered downstream -- still name the file after the TOML has
+    been discarded."""
+
+    assumption: InflationAssumption | None
+    """The declared future-inflation belief, or ``None`` when this run was given none.
+
+    ``None`` is a *reported reason* rather than an error: the assumed real figure comes back
+    typed-unavailable naming the absence (FR-012), and there is no default rate anywhere for it
+    to fall back on (FR-015).
+    """
+
+    assumption_file: Path | None
+    """Which file declared the belief, so the run manifest can record it (FR-015)."""
+
+
+def _resolved_cpi(files: Sequence[Path]) -> tuple[dict[str, CpiSeries], dict[str, Path]]:
+    """Every declared series by id, refusing two files that claim one identity."""
+    series: dict[str, CpiSeries] = {}
+    declaring: dict[str, Path] = {}
+    for path in files:
+        declared = loader.cpi_from_file(path)
+        if declared.id in series:
+            raise DeclarationError(
+                path,
+                f"{loader.CPI_SERIES_TABLE}.id",
+                f"declares the series id {declared.id!r}, which "
+                f"{declaring[declared.id].name} already declares. Two series cannot share an "
+                "identity: whichever loaded second would win by directory order, and every "
+                "real figure would rest on the other one with nothing in the output to say "
+                "which. A second economy's index is a second id.",
+                f"give one of {declaring[declared.id].name} and {path.name} a distinct series id",
+            )
+        series[declared.id] = declared
+        declaring[declared.id] = path
+    return series, declaring
+
+
+def _resolved_inflation_assumption(
+    root: Path,
+) -> tuple[InflationAssumption | None, Path | None]:
+    """The one declared belief under a data root, or ``None`` when none is declared.
+
+    Exactly one file, and a second is refused by name on feature 003's precedent for the
+    spendable list: two beliefs cannot both be in force, and choosing between them -- by
+    directory order, or by taking the higher rate -- would be stating the owner's belief for
+    him. Running two assumptions is FR-015's *two runs*, each naming what it used, not one run
+    holding both.
+    """
+    declared = sorted((root / INFLATION_ASSUMPTION_DIR).glob("*.toml"))
+    if not declared:
+        return None, None
+    if len(declared) > 1:
+        raise DeclarationError(
+            root / INFLATION_ASSUMPTION_DIR,
+            "",
+            f"holds {len(declared)} inflation assumptions "
+            f"({', '.join(path.name for path in declared)}), and one run rests on one belief. "
+            "They are not merged and neither is preferred: FR-015 says two assumptions are two "
+            "results, each naming the declaration it used, and picking one here would state "
+            "the owner's belief for him.",
+            "keep one file, and run the alternative belief as a separate run",
+        )
+    return loader.inflation_assumption_from_file(declared[0])[1], declared[0]
+
+
+def inflation_from_data_root(root: Path) -> InflationDeclarations:
+    """Every price series and the declared belief under one data root.
+
+    ``cpi/*.toml`` and ``scenarios/inflation/*.toml``. Sorted, so a run does not depend on the
+    order a filesystem happens to return, and neither directory is required to exist: an
+    absent series and an absent assumption are reported by the figures that wanted them, in
+    words, rather than as a load failure. See this section's banner for why that differs from
+    `composition`.
+    """
+    series, declaring = _resolved_cpi(sorted((root / CPI_DIR).glob("*.toml")))
+    assumption, assumption_file = _resolved_inflation_assumption(root)
+    return InflationDeclarations(
+        series=series,
+        series_files=declaring,
+        assumption=assumption,
+        assumption_file=assumption_file,
     )

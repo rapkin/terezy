@@ -228,11 +228,14 @@ class TestTheSecondIssueProducesACompleteResult:
         assert projection.ledger.applied
         assert projection.hurdle.nominal_ytm.value > 0.0
         assert projection.hurdle.nominal_cash_flow_return.value > 0.0
-        # Present and explicitly empty, never absent and never a nominal figure standing
-        # in for a real one (SC-011). The isinstance check is the assertion: the two are
-        # unrelated types, so this cannot pass by holding a rate.
-        assert isinstance(projection.hurdle.real, RealTermsUnavailable)
-        assert projection.hurdle.real.reason
+        # Present and, with no CPI declared for this run, explicitly empty on both halves --
+        # never absent and never a nominal figure standing in for a real one (SC-011; 007
+        # FR-012). The isinstance checks are the assertion: the rate records are unrelated
+        # types, so this cannot pass by holding a rate.
+        assert isinstance(projection.hurdle.real.realized, RealTermsUnavailable)
+        assert isinstance(projection.hurdle.real.assumed, RealTermsUnavailable)
+        assert projection.hurdle.real.realized.reason
+        assert projection.hurdle.real.assumed.reason
 
     def test_each_coupon_is_the_hand_computed_thirty_three_sixtieths_amount(self) -> None:
         """1000.00 x 0.1225 x 0.25 x 10 = 306.25, twelve times over three years.

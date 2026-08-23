@@ -222,6 +222,20 @@ projection on it without editing any source file.
   nominal figure as though it were a real one, and MUST NOT compute a real figure from an
   assumed inflation rate.
 
+  ⚙ **Refined, not repealed, by feature 007 (`specs/007-cpi-real-terms`, owner decision
+  2026-08-22).** The reserved slot is filled and the reservation held: `HurdleRate.real` is
+  still exactly one field and nothing that consumed a 001 result needed to change. The last
+  clause is the one that moved, and only in what it distinguishes. A real figure from an
+  *implicit or invented* inflation rate stays forbidden — that is what this requirement was
+  written to prevent and it is still prevented. What 007 permits is a *declared, dated,
+  labelled* owner assumption entered as scenario data (`data/scenarios/inflation/`), in the
+  same epistemic category as 002's regime transition date, and it is permitted precisely
+  because it is visible as an assumption on every figure it touches: the slot now carries
+  **two** figures, one deflated by declared CPI observations and one by the declared belief,
+  each labelled with its basis, and no reported number ever blends them. An external
+  published forecast is an assumption too — cited does not make it observed. See 007's
+  FR-009, FR-010 and FR-015, and `docs/METHODOLOGY.md` §23.
+
 **Money and currency**
 
 - **FR-006**: Every monetary amount in the system MUST carry the currency it is

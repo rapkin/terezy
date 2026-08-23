@@ -40,8 +40,9 @@ from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance, SourceRef
-from terezy.core.primitives.rates import NominalRate, RealTermsUnavailable
+from terezy.core.primitives.rates import NominalRate
 from terezy.core.results import fund as fund_results
+from terezy.core.results import hurdle
 from terezy.core.results.fund import (
     AwaitingVerification,
     BesideTheHurdle,
@@ -310,7 +311,9 @@ class TestTheAnnualisationGuard:
         return HurdleRate(
             nominal_ytm=NominalRate(0.16),
             nominal_cash_flow_return=NominalRate(0.16),
-            real=RealTermsUnavailable(reason="FIXTURE — inflation is not modelled here."),
+            # ⚙ A `RealTerms` since 007. Nothing here deflates, so the slot takes the
+            # constant that names both absences (no series, no assumption).
+            real=hurdle.NOT_DEFLATED,
             total_tax=Money(0.0, UAH, prov.EMPTY),
             accounts_for=frozenset({"FIXTURE"}),
             excludes=frozenset({"FIXTURE"}),

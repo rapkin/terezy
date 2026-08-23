@@ -112,5 +112,8 @@ class TestAssembly:
         )
         assert is_close(figure.nominal_ytm.value, 0.20)
         assert is_close(figure.nominal_cash_flow_return.value, 0.10)
-        assert figure.real is hurdle.NO_REAL_TERMS
+        # No deflation input was given, so the slot holds the two named refusals rather
+        # than a number -- and `is` rather than `==`, because `NOT_DEFLATED` is the one
+        # value every undeflated figure shares (007 FR-006).
+        assert figure.real is hurdle.NOT_DEFLATED
         assert figure.excludes == hurdle.EXCLUDES
