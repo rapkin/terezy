@@ -128,6 +128,27 @@ tests/unit/
 tests/golden/                        UNCHANGED FILES — 001, 002 and 007's goldens must not move
 ```
 
+## Departures from the specification as written
+
+Recorded here rather than only in a test docstring, because a departure a reader of the spec
+cannot find is one that gets read as a satisfied criterion.
+
+**SC-002, as literally written, does not hold.** The criterion asks that *the OVDP evaluated
+as a tuple through its zero-cost domestic routes reproduces feature 001's hurdle rate within
+the project tolerance*. Over the domestic pair **as declared** the two figures are 0.1598 and
+0.16059, which is outside the tolerance. The whole gap is the one day in and the three days
+out that those routes declare, and FR-015 puts waiting **inside** the span the rate is
+measured over — an owner decision of 2026-08-22, not an inference from it. The two claims are
+therefore incompatible as stated, and the equality is asserted over a `without_latency`
+fixture that zeroes those declarations.
+
+That is the right reading rather than a workaround: the criterion is about the *pipeline*
+producing 001's number, and latency is a term 001 never had. But it is an edit to the
+declarations, and the criterion does not say so. `tests/contract/test_the_hurdle_is_a_tuple.py`
+asserts the equality over the edited pair and, separately, that the shipped pair's gap is four
+days of it and nothing else — the amounts are equal at the project tolerance and only the
+dates moved.
+
 ## Complexity Tracking
 
 | Added complexity | Why | Alternative rejected because |

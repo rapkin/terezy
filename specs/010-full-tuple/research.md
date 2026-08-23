@@ -77,15 +77,25 @@ finding that out is part of this feature's value.
 **Do not add a special case inside the join to make H1 pass.** That converts the one test
 that can falsify the architecture into a test that cannot.
 
-## D7 — Partial deployment reports the remainder; it never rounds
+## D7 — Nothing is rounded, and what cannot be deployed is reported where it sits
 
-**Decision.** A route cap forcing an acquisition to be split reports each tranche and the
-undeployed remainder. An arriving amount below the instrument's minimum ticket makes the
-tuple infeasible, named.
+**Decision.** An arriving amount below the instrument's minimum ticket makes the tuple
+infeasible, named. A remainder the declared increment cannot deploy is reported with its
+amount and its venue, kept out of what reaches the endpoint, and **netted off the outlay the
+rate is measured against** — it is cash at the purchase venue, and discounting the arrivals
+back to the whole outlay would price it as a total loss.
 
-**Rationale.** FR-017, FR-018. Rounding up to the minimum, or silently deploying what fits
-and dropping the rest, are both figures more confident than their inputs — and the second is
-the one that looks right.
+**Rationale.** FR-003, FR-017. Rounding up to the minimum, or silently deploying what fits and
+dropping the rest, are both figures more confident than their inputs — and the second is the
+one that looks right. Charging the remainder as a loss is the same error mirrored, and it is
+the one that actually shipped: 500 UAH stranded at `inzhur` reported a 16% sovereign bond
+at −7%.
+
+⚙ **Corrected 2026-08-24.** This decision was written before clarification 3 and said that a
+cap forcing a split "reports each tranche and the undeployed remainder", citing FR-018. FR-018
+**defers** partial deployment (owner decision, 2026-08-22): this feature evaluates single-shot
+acquisitions only, there is no tranche, and `PartiallyDeployable` was never built. The
+sentence described the pre-clarification design and is deleted rather than reinterpreted.
 
 ## D8 — Two figures per outcome: the amount and the rate, both labelled
 

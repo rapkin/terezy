@@ -19,6 +19,27 @@ that cannot. This feature did hit such a gap and fixed it in the abstraction rat
 around it: nothing declared *where* an instrument is bought, so the join could anchor neither
 seam. The fix is a declaration kind (``data/access/``), which is why the new instrument below
 needs an access file and gets one -- as data.
+
+⚙ **A second FR-023 gap, recorded rather than closed (2026-08-24): the jurisdiction is
+validated and then discarded.** The seam is ``data/tax/<pack>.toml``'s ``[jurisdiction]``
+table. ``loader.tax_classes_from_file`` checks its ``id``, ``name`` and ``base_currency`` and
+returns only the classes; nothing keys a registry by jurisdiction and ``TaxClass`` carries no
+jurisdiction field. So the fourth of H1's four declaration kinds is exercised **as a
+container** -- a new file with a new id parses and the classes inside it resolve and charge --
+and not as a *term*: no figure below would move if this fixture's jurisdiction id were the
+shipped one, and its ``base_currency = "UAH"`` matches the shipped pack, so the tax-currency
+role is not exercised either. ``data/tax/synthetic_fixture.toml`` already shipped on ``main``,
+so "a second tax file parses" was true before this feature.
+
+Closing it is a feature rather than a line: a jurisdiction record carrying the base currency,
+keyed in ``Registries``, and a jurisdiction on ``TaxClass`` so a charge can name the pack it
+came from and the tax currency can be read from the jurisdiction rather than from
+``Registries.base_currency``. It is **not** worked around inside the join.
+
+⚙ **What H1 does not cover, said plainly.** There is no new income stream here: the tuple
+below is funded from the shipped ``salary_uah``, so the stream term of Principle VI's tuple is
+not among the things this row proves data-only. It is exercised in
+``tests/unit/test_two_streams_two_outcomes.py`` instead, against the streams already declared.
 """
 
 from __future__ import annotations
@@ -36,6 +57,7 @@ from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.rates import NominalRate
+from terezy.core.primitives.tolerance import is_close
 from terezy.core.results.tuple import Comparison, Tuple
 from terezy.core.routes.path import FROM_THE_DECLARATION, FundingPath
 from terezy.data.declarations import resolver
@@ -55,6 +77,8 @@ INSTRUMENT: Final = "h1_note"
 ROUTE_IN: Final = "h1_desk_in"
 ROUTE_OUT: Final = "h1_desk_out"
 
+RISK_CLASS: Final = "h1_fixture"
+
 NEW_IDS: Final = (
     VENUE,
     JURISDICTION,
@@ -63,7 +87,21 @@ NEW_IDS: Final = (
     INSTRUMENT,
     ROUTE_IN,
     ROUTE_OUT,
+    RISK_CLASS,
 )
+"""Every string this module invents. The list is the scan below's input, so a new id that is
+not here is a new id nothing checks -- which is what happened to the risk class."""
+
+SENT: Final = 20_000.0
+FACE: Final = 500.0
+QUOTE: Final = 480.0
+UNITS: Final = 41.0
+"""floor((20 000 - 0.4% - 12.00) / 480) = floor(19 908 / 480) = 41, leaving 228.00 undeployed."""
+
+COUPON_PIT: Final = 0.06
+COUPON_LEVY: Final = 0.01
+DISPOSAL_PIT: Final = 0.08
+DISPOSAL_LEVY: Final = 0.02
 
 HORIZON: Final = DateRange(start=fixtures.ISSUE_DATE, end=fixtures.HORIZON_END)
 
@@ -83,8 +121,8 @@ note       = "FIXTURE -- an invented coupon class in an invented jurisdiction."
 
   [[jurisdiction.tax_class.rate]]
   effective_from = "2020-01-01"
-  pit_rate_pct   = 6.0
-  levy_rate_pct  = 1.0
+  pit_rate_pct   = {COUPON_PIT * 100.0}
+  levy_rate_pct  = {COUPON_LEVY * 100.0}
   note           = "FIXTURE -- invented rates on an invented date."
   kind           = "tax_rule"
   source         = "SYNTHETIC FIXTURE -- not an observation of anything."
@@ -98,8 +136,8 @@ note       = "FIXTURE -- an invented disposal class in an invented jurisdiction.
 
   [[jurisdiction.tax_class.rate]]
   effective_from = "2020-01-01"
-  pit_rate_pct   = 8.0
-  levy_rate_pct  = 2.0
+  pit_rate_pct   = {DISPOSAL_PIT * 100.0}
+  levy_rate_pct  = {DISPOSAL_LEVY * 100.0}
   note           = "FIXTURE -- invented rates on an invented date."
   kind           = "tax_rule"
   source         = "SYNTHETIC FIXTURE -- not an observation of anything."
@@ -118,7 +156,7 @@ currency     = "UAH"
 is_synthetic = true
 
 [instrument.terms]
-face_value        = 500.0
+face_value        = {FACE}
 coupon_rate_pct   = 20.0
 issue_date        = "2026-01-15"
 maturity_date     = "2028-01-14"
@@ -145,15 +183,21 @@ disposal_gain = "{DISPOSAL_CLASS}"
 
 _ACCESS = f"""
 # SYNTHETIC FIXTURE, written by a contract test.
+#
+# The quote is deliberately **below par** -- 480.00 against a face value of 500.00. At par the
+# note would be bought and redeemed for the same number, the disposal gain would be exactly
+# zero, and the new jurisdiction's disposal class would charge nothing however its rates were
+# declared: zeroing them left every assertion in this module green. A 20.00 gain a unit gives
+# that class something to bite on and makes it hand-checkable.
 
 [[access]]
 instrument_id = "{INSTRUMENT}"
 bought_at     = "{VENUE}"
 proceeds_to   = "{VENUE}"
-risk_class    = "h1_fixture"
+risk_class    = "{RISK_CLASS}"
 
   [access.price]
-  per_unit     = 500.0
+  per_unit     = {QUOTE}
   currency     = "UAH"
   kind         = "venue_terms"
   source       = "SYNTHETIC FIXTURE -- an invented quote for an invented note."
@@ -239,7 +283,7 @@ def _comparison(tmp_path: Path) -> Comparison:
     comparison = compare(
         (_new_tuple(),),
         benchmark=fixtures.hurdle_tuple(),
-        amount=Money(20_000.0, Currency.UAH, prov.EMPTY),
+        amount=Money(SENT, Currency.UAH, prov.EMPTY),
         horizon=HORIZON,
         as_of=fixtures.AS_OF,
         continuation=fixtures.HOLD_AS_CASH,
@@ -302,18 +346,46 @@ class TestItRunsTheFullPipelineAndAppearsInTheComparison:
         ]
         assert outcome.arrivals
         assert isinstance(outcome.implied_rate, NominalRate)
-        assert outcome.risk_class == "h1_fixture"
+        assert outcome.risk_class == RISK_CLASS
         assert outcome.rests_on
 
     def test_the_new_jurisdictions_rates_actually_charged(self, tmp_path: Path) -> None:
-        # The tax class is not decoration: a fixture whose rates never applied would prove the
-        # file loads and nothing else. Six and one on coupons, eight and two on the disposal,
-        # against the shipped OVDP's nil.
+        # The tax class is not decoration, and a sign check would not say so: a rate of
+        # 0.001% is also negative. Both of the new jurisdiction's classes are pinned by one
+        # identity, and every term of it is read off the outcome or hand-computed here.
+        #
+        #   principal    41 x 500.00                        =  20 500.00
+        #   coupons      the lifecycle line, less principal  (7% of it is the coupon class)
+        #   gain         41 x (500.00 - 480.00)             =     820.00
+        #   disposal     820.00 x (8% + 2%)                 =      82.00
+        #
+        # Zeroing either pair of rates breaks it, which is what the old assertion could not
+        # notice: at par the gain was zero and the disposal class charged nothing either way.
         outcome = next(
             item for item in _comparison(tmp_path).ranked if item.key.instrument_id == INSTRUMENT
         )
+        lifecycle = next(line.amount for line in outcome.parts if line.part == "lifecycle")
         charged = next(line.amount for line in outcome.parts if line.part == "tax")
-        assert charged.amount < 0.0
+        coupons = lifecycle.amount - UNITS * FACE
+        gain = UNITS * (FACE - QUOTE)
+        assert is_close(gain, 820.0)
+        assert is_close(
+            -charged.amount,
+            coupons * (COUPON_PIT + COUPON_LEVY) + gain * (DISPOSAL_PIT + DISPOSAL_LEVY),
+        )
+        assert is_close(gain * (DISPOSAL_PIT + DISPOSAL_LEVY), 82.0)
+
+    def test_the_quote_below_par_is_what_the_purchase_was_sized_from(self, tmp_path: Path) -> None:
+        # The precondition of the identity above, and the thing that makes the disposal class
+        # reachable at all: the note is bought at the venue's quote and redeemed at its face
+        # value, and those are two different numbers.
+        outcome = next(
+            item for item in _comparison(tmp_path).ranked if item.key.instrument_id == INSTRUMENT
+        )
+        entry = next(line.amount for line in outcome.parts if line.part == "entry")
+        assert is_close(entry.amount, -UNITS * QUOTE)
+        assert outcome.undeployed is not None
+        assert is_close(outcome.undeployed.amount.amount, SENT - 92.0 - UNITS * QUOTE)
 
     def test_the_new_routes_charge_and_the_figure_shows_it(self, tmp_path: Path) -> None:
         # 0.4% plus 12.00 each way, and two days each way. A pipeline that loaded the routes
@@ -323,7 +395,7 @@ class TestItRunsTheFullPipelineAndAppearsInTheComparison:
         )
         ramp_in = next(line.amount for line in outcome.parts if line.part == "ramp_in")
         ramp_out = next(line.amount for line in outcome.parts if line.part == "ramp_out")
-        assert ramp_in.amount == -(20_000.0 * 0.004 + 12.0)
+        assert ramp_in.amount == -(SENT * 0.004 + 12.0)
         assert ramp_out.amount < 0.0
         for arrival in outcome.arrivals:
             assert (arrival.arrived_on - arrival.released_on).days == 2

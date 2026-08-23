@@ -35,8 +35,8 @@ golden this feature must not move. The long-term home is recorded in METHODOLOGY
       a duplicate entry across two files, an unknown field, malformed TOML. Each names file
       and field; nothing defaults.
 - [x] **T002** `src/terezy/core/instruments/access.py` — `InstrumentAccess`, a frozen record:
-      `instrument_id`, `bought_at`, `proceeds_to`, `price_per_unit: Money | None`,
-      `risk_class`. No behaviour.
+      `instrument_id`, `bought_at`, `proceeds_to`, `quote: VenueQuote | None`
+      (the price and the observation kind it ages under, together), `risk_class`. No behaviour.
 - [x] **T003** `data/declarations/{schema,loader,resolver}.py` — a `010-full-tuple` section
       appended to each, matching the 006 banner shape. `AccessTable`/`AccessFile`,
       `access_from_file`, `_check_access`, `AccessDeclarations`, `Registries`,
