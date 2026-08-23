@@ -45,6 +45,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from terezy.core.tax.schedule import RateUndeclaredBefore
+
 if TYPE_CHECKING:  # pragma: no cover -- import-time cycle avoidance, see below
     from terezy.core.primitives.money import Money
 
@@ -203,8 +205,15 @@ which failures it can produce, which is narrower and more useful than saying it 
 produce any of them.
 """
 
-TaxFailure = UnresolvedTaxClass
-"""What a tax rule operation may fail with."""
+TaxFailure = UnresolvedTaxClass | RateUndeclaredBefore
+"""What a tax rule operation may fail with.
+
+``RateUndeclaredBefore`` joined with feature 006, when rates became dated schedules: a
+class can now exist, cover the income kind, and still have nothing to say about an event
+that predates its earliest cited entry. That is a third thing, distinct from "no class"
+and from "the wrong class", and it is in the union so every consumer must match it
+exhaustively rather than inherit a default (FR-012, research.md D2).
+"""
 
 SeedFailure = SeedInstrumentUndeclared | InconsistentTerms
 """What opening a ledger from declared seed lots may fail with (feature 008).

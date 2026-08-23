@@ -3,9 +3,9 @@
 The second of the four plugin interfaces permitted by Principle II, and the one whose
 governing constraint is the strictest in the project: **no tax value may originate from
 an implementer's or an agent's memory.** Every rate arrives in a ``TaxClass`` loaded from
-``data/tax/``, carrying a citation, a retrieval date and a verification date. A rate
-literal in a Python file is a defect regardless of whether it happens to be correct --
-including ``0.0``.
+``data/tax/`` as a **dated schedule**, each entry carrying its own citation, retrieval
+date and verification date. A rate literal in a Python file is a defect regardless of
+whether it happens to be correct -- including ``0.0``, and including an effective date.
 
 Per owner decision D-E the interface is a function signature plus records of data. Note
 what the signature does *not* do: it takes the ``TaxClass`` as an **argument** rather than
@@ -15,10 +15,10 @@ to configure.
 **Three obligations that shape the records below.**
 
 *Zero is a charge, not an absence.* For an exempt class the rule returns a ``TaxCharge``
-of zero **carrying the class's provenance** -- not ``None``, not a skipped event. A zero
-charge that cites its exemption is the evidence the exemption was applied; a missing
-charge is indistinguishable from a rule that never ran, and SC-002's "exactly zero" is
-only checkable if the zeroes are recorded.
+of zero **carrying the citation of the entry that produced it** -- not ``None``, not a
+skipped event. A zero charge that cites its exemption is the evidence the exemption was
+applied; a missing charge is indistinguishable from a rule that never ran, and SC-002's
+"exactly zero" is only checkable if the zeroes are recorded.
 
 *PIT and levy are separate lines on separate bases.* The military levy is not a surcharge
 folded into a rate. Nothing in feature 001 exercises the difference -- both rates are zero
@@ -42,6 +42,7 @@ from terezy.core.errors import TaxFailure
 from terezy.core.ledger.events import Event
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance
+from terezy.core.tax.schedule import RateEntry
 
 
 class TaxableEventKind(Enum):
@@ -84,11 +85,12 @@ class TaxableEventKind(Enum):
 
 @dataclass(frozen=True, slots=True)
 class TaxClass:
-    """A declared tax treatment: what is charged on which kinds of income, and by whom.
+    """A declared tax treatment: what is charged on which kinds of income, and from when.
 
-    Every field except ``id`` and ``applies_to`` is an observed value with a citation.
-    The exempt class is not a special type and has no special branch anywhere: it is this
-    record with both rates declared zero and a source that says why.
+    Every rate is an observed legal value with a citation, carried on the dated entry it
+    belongs to. The exempt class is not a special type and has no special branch
+    anywhere: it is this record with an entry declaring both rates zero and a source that
+    says why.
     """
 
     id: str
@@ -102,16 +104,24 @@ class TaxClass:
     opposite claims, and only one of them is cited.
     """
 
-    pit_rate: float
-    """Personal income tax as a fraction of the taxable base. ``0.0`` for an exemption."""
+    rates: tuple[RateEntry, ...]
+    """The class's rates as a **dated schedule**, sorted by effective date, non-empty.
 
-    levy_rate: float
-    """Military levy as a fraction of **its own** base. ``0.0`` for an exemption."""
+    ⚙ **Feature 006 replaced feature 001's scalar ``pit_rate`` / ``levy_rate`` pair with
+    this field**, closing the gap `data/README.md` rule 3 recorded and required test E10
+    named. The scalar was removed rather than kept alongside: two code paths reading a
+    rate would mean the older one kept working, and nothing would ever force the
+    migration (research.md D1).
 
-    provenance: Provenance
-    """Where these rates came from. Required, and required for a zero as much as for a
-    non-zero: the exemption is the single most decision-relevant number in the model, and
-    an uncited zero is exactly the figure that gets believed without checking."""
+    **Provenance lives on each entry, not on the class.** The rate before a legislated
+    change and the rate after it are two observations from two sources with two
+    verification dates, and one mark for both would let a checked figure vouch for an
+    unchecked one. That is why this record no longer carries a ``provenance`` field: a
+    charge takes its citation from the entry that produced it.
+
+    Sorted and non-empty are enforced at the data boundary, where the file can be named;
+    :func:`terezy.core.tax.schedule.rate_on` relies on both.
+    """
 
 
 @dataclass(frozen=True, slots=True)
@@ -174,8 +184,14 @@ class TaxCharge:
     """The tax year this liability accrues to."""
 
     provenance: Provenance
-    """Union of the base's sources and the class's. This is how an exemption's citation
-    reaches the total tax figure, and how an unverified rate marks it (FR-015)."""
+    """Union of the base's sources and those of the **dated entry** that supplied the
+    rates. This is how an exemption's citation reaches the total tax figure, and how an
+    unverified rate marks it (FR-015).
+
+    The entry's rather than the whole class's: a class whose December entry is verified
+    and whose January entry is not must mark a January charge and only a January charge,
+    which a single class-level mark could not express (research.md D1).
+    """
 
 
 ChargeFn = Callable[[Event, TaxClass, TaxContext], TaxCharge | TaxFailure]

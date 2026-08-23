@@ -1,28 +1,115 @@
-# Ukraine, tax-resident individual: the rule pack feature 001 needs.
+# Ukraine, tax-resident individual: the rule pack features 001 and 006 need.
 #
-# One class, and it is the most decision-relevant number in the whole model: the
-# exemption that makes a 15.5% government bond beat a 15.5% deposit taxed at 23%.
-# Constitution Principle I -- no tax value comes from an implementer's or an agent's
-# memory. The rates below are read off the cited source, and the zeroes carry that
+# Constitution Principle I — no tax value comes from an implementer's or an agent's
+# memory. Every rate below is read off the cited source, and the zeroes carry that
 # citation exactly as a non-zero rate would: an uncited zero is the figure that gets
 # believed without checking.
 #
-# `verified_on` is empty: this has not been checked against the Tax Code itself, only
-# against the secondary source named. Everything derived from it renders marked, which
-# is the honest state of affairs and not a defect to work around (FR-014, FR-015).
+# `verified_on` is empty throughout: nothing here has been checked against a primary
+# source by the owner. Everything derived from these rates renders marked, which is the
+# honest state of affairs and not a defect to work around (FR-014, FR-015).
+#
+# ---------------------------------------------------------------------------
+# Rates are DATED SCHEDULES (feature 006, required test E10)
+# ---------------------------------------------------------------------------
+#
+# Each class carries `[[jurisdiction.tax_class.rate]]` entries, oldest first, each with
+# its own citation. A legislated change is one entry added here and nothing rebuilt
+# (`data/README.md` rule 3, `SIMULATOR_SPEC.md` §4.5.1).
+#
+# **`effective_from` is a cited legal fact.** A taxable event dated before a class's
+# earliest entry produces a typed refusal naming the class and the date, rather than a
+# defaulted rate or a silent zero (FR-012). A schedule that never refuses is a schedule
+# someone back-dated.
+#
+# ---------------------------------------------------------------------------
+# THE TWO RULES THAT PRODUCED THE DATES BELOW
+# ---------------------------------------------------------------------------
+#
+# Every entry names which rule dated it. Stating the rule matters as much as stating the
+# date: two entries in this repository take **opposite** readings of a vague citation, and
+# a reader who cannot see which rule applied cannot tell a principle from an accident.
+#
+# **Rule A — a pair is dated by the later of its halves.** An entry declares PIT and the
+# military levy together, so it comes into force on the later of the two commencements its
+# citations attest. Where one half has a legislated date and the other does not, rule B
+# governs the half that does not, and rule A still picks the later of the two.
+#
+# **Rule B — where a citation attests a value but not when it commenced.** Two cases, and
+# they deliberately go opposite ways:
+#
+#   B1. If the choice of date would change a reported **figure**, take the reading that is
+#       conservative by consequence — the one under which the tool claims less. Which
+#       direction that is has to be worked out per case from what the figure does, and it
+#       is not always "earlier": a «граничний курс» is applied as `min(assumed, cap)`, so a
+#       *higher* ceiling in force *earlier* makes a pegged payment **larger**, and B1 would
+#       therefore date a cap increase as late as its citation allows.
+#
+#       ⚙ **B1 has no instance in this repository today.** It was credited with dating the
+#       REIT's cap ladder and it did not: that ladder is a B2 case (see the entries), and
+#       the sentence that used to stand here claimed the first-day-of-year reading made the
+#       payment smallest, which is backwards for a rising ladder. The rule is kept because
+#       the next vague citation may well need it; the false worked example is not.
+#
+#   B2. If the choice changes **no** figure — a class with a single entry, where the date
+#       decides only how far back a run is possible — take the earliest date the citation
+#       itself asserts, and record it as a *citation-currency* date rather than a legal
+#       commencement. Refusing to use attested reach buys no caution when there is no
+#       competing number to be cautious about; it only narrows what can be projected.
+#       The moment such a class gains a second entry, B1 applies to it instead.
 
 [jurisdiction]
 id            = "ua"
 name          = "Ukraine (tax resident)"
 base_currency = "UAH"
 
+# ---------------------------------------------------------------------------
+
 [[jurisdiction.tax_class]]
-id            = "ua_government_bond"
-applies_to    = ["coupon", "disposal_gain"]
-pit_rate_pct  = 0.0
-levy_rate_pct = 0.0
-note          = "Interest on certain Ukrainian state securities is PIT-exempt; the military levy is not charged on income not subject to PIT. Verify against the Tax Code of Ukraine before any figure derived from this leaves the tool."
-kind          = "tax_rule"
-source        = "https://taxsummaries.pwc.com/ukraine/individual/income-determination"
-retrieved_on  = "2026-08-21"
-verified_on   = ""
+id         = "ua_government_bond"
+applies_to = ["coupon", "disposal_gain"]
+note       = "Interest on certain Ukrainian state securities is PIT-exempt, and the military levy is not charged on income not subject to PIT. Applies to coupon and to gain on disposal. The single most decision-relevant number in the model: it is what makes a 15.5% OVDP beat a 15.5% deposit taxed at 23%."
+
+  [[jurisdiction.tax_class.rate]]
+  effective_from = "2026-06-30"
+  pit_rate_pct   = 0.0
+  levy_rate_pct  = 0.0
+  note           = "DATED BY RULE B2 — a citation-currency date, NOT a legislated commencement. The cited page lists 'Interest from securities issued by certain state bodies of Ukraine' among the exempt incomes and states that the 5% military levy applies to income taxed with PIT, so an exempt income bears neither; but it gives no date for when the exemption began, and the Tax Code's own text could not be retrieved (zakon.rada.gov.ua serves only a table of contents for 2755-VI). 2026-06-30 is the page's own stated 'Last reviewed' date — the earliest date at which this citation asserts the rate was in force. B2 rather than B1 because this class has one entry and both halves are zero: the date changes no figure anywhere, only how far back a run is possible. Everything before it is refused (FR-012). Note the consequence, which is real and deliberate: data/instruments/ovdp_synthetic_b.toml pays its first coupon on 2026-06-02 and therefore cannot be projected from its own issue date. Verify against the Tax Code and add an entry for the actual commencement."
+  kind           = "tax_rule"
+  source         = "https://taxsummaries.pwc.com/ukraine/individual/income-determination — PwC Worldwide Tax Summaries, Ukraine, individual income determination; listed in SIMULATOR_SPEC.md §12. The page states 'Last reviewed - 30 June 2026'. Rate values first recorded in §12 on 2026-08-21; the review date and the absence of a commencement date were read from the page itself on 2026-08-23."
+  retrieved_on   = "2026-08-23"
+  verified_on    = ""
+
+# ---------------------------------------------------------------------------
+
+[[jurisdiction.tax_class]]
+id         = "ua_ci_fund_distribution"
+applies_to = ["distribution"]
+note       = "Distributions paid by a Ukrainian collective-investment institution (ІСІ) to an individual: 9% PIT, because the payer is a mutual investment fund rather than a CIT payer, plus the 5% military levy on income taxed with PIT — 14% in total. This is the class an Inzhur payout falls under, and it is NOT the class its redemption falls under (see ua_investment_profit). The REIT's own page showing 14% dividend withholding corroborates the split; corroboration is recorded, it is not verification. ⚙ This class starts LATER than ua_investment_profit even though both carry the same 5% levy, and the difference is evidence rather than oversight: the levy half of both is legally dated, but nothing retrievable dates the 9% PIT rate, while the 18% one is dated. See each entry's note."
+
+  [[jurisdiction.tax_class.rate]]
+  effective_from = "2026-06-30"
+  pit_rate_pct   = 9.0
+  levy_rate_pct  = 5.0
+  note           = "DATED BY RULE A over RULE B2. The levy half is legally dated: Закон України № 4015-IX raised the military levy from 1.5% to 5% with effect from 2024-12-01. The PIT half is NOT: the cited page states 'Dividends paid by non-residents, mutual investment funds, and non-payers of CIT in Ukraine are taxed at 9%' and gives no commencement for it, so B2 dates that half at the page's 'Last reviewed - 30 June 2026'. Rule A takes the later of the two, which is 2026-06-30. Dating this pair at the levy's 2024-12-01 would assert that the 9% applied then, which no source in hand says — that is the invented legal fact D2 forbids, and it is why this class and ua_investment_profit start on different days."
+  kind           = "tax_rule"
+  source         = "https://taxsummaries.pwc.com/ukraine/individual/income-determination (9% PIT; page states 'Last reviewed - 30 June 2026'; listed in SIMULATOR_SPEC.md §12) — levy half: https://zakon.rada.gov.ua/laws/show/4015-20 (Закон № 4015-IX, ухвалений 10.10.2024) with https://ibuhgalter.net/news/25264 for the publication date. Corroborated on the 9% by https://itandem.com.ua/podatky-investoriv-isi/ and https://kinto.com/investing-from-a-tax?language_content_entity=uk, both listed in §12 and neither retrievable on 2026-08-23 (HTTP 403). Read 2026-08-23."
+  retrieved_on   = "2026-08-23"
+  verified_on    = ""
+
+# ---------------------------------------------------------------------------
+
+[[jurisdiction.tax_class]]
+id         = "ua_investment_profit"
+applies_to = ["disposal_gain"]
+note       = "Investment profit — the gain realised on disposing of a security, a redemption of collective-investment units included: 18% PIT plus the 5% military levy, 23% in total. Charged on the gain (proceeds less basis less allocated fees), never on the proceeds. This engine reports the charge only; the filing mechanics SIMULATOR_SPEC.md §4.5 records — that the fund redeeming its own securities is not a tax agent, so the individual self-declares — are a later feature, and so is loss carryforward."
+
+  [[jurisdiction.tax_class.rate]]
+  effective_from = "2024-12-01"
+  pit_rate_pct   = 18.0
+  levy_rate_pct  = 5.0
+  note           = "DATED BY RULE A, and both halves are legally dated. PIT: the cited PwC page states 'Bank interest, as well as most other passive income, is subject to 18% PIT starting from 1 January 2016'. Levy: Закон України № 4015-IX «Про внесення змін до Податкового кодексу України та інших законів України щодо забезпечення збалансованості бюджетних надходжень у період дії воєнного стану» від 10.10.2024 raised the levy from 1,5% to 5%; it was published in «Голос України» on 30.11.2024 (№ 179) and the law takes effect 'з дня, наступного за днем його опублікування', hence 2024-12-01 — and the 5% applies 'до доходів, нарахованих у бухгалтерському обліку фізичним особам починаючи з 1 грудня 2024 року'. The later of 2016-01-01 and 2024-12-01 is 2024-12-01. NO EARLIER ENTRY IS WRITTEN: the pair 18% + 1,5% would need a commencement for the 1,5% levy, and none could be retrieved — Закон № 1621-VII (31.07.2014) is listed on zakon.rada.gov.ua but the portal serves no article text, and the source that attests the rise attests only that 1,5% applied through November 2024, not from when. An event before 2024-12-01 is therefore refused rather than charged."
+  kind           = "tax_rule"
+  source         = "https://zakon.rada.gov.ua/laws/show/4015-20 — Закон України № 4015-IX, adopted 10.10.2024; the portal states the law enters into force the day after publication and sets the levy at '5 відсотків від об'єкта оподаткування', reverting to '1,5 відсотка' from 1 January of the year following the end of martial law. Publication date and the accrual rule from https://ibuhgalter.net/news/25264 (01.12.2024). PIT half from https://taxsummaries.pwc.com/ukraine/individual/income-determination (SIMULATOR_SPEC.md §12). The primary ДПС page listed in §12 could not be retrieved on 2026-08-23 (HTTP 403), nor could roedl.ua (bad certificate). Corroborated by https://yankiv.com/opodatkuvannya-investytsiy-ukraina-pdfo-vijskovyj-zbir-ovdp/ on the 18% + 5% for investment profit under art. 170.2. Read 2026-08-23."
+  retrieved_on   = "2026-08-23"
+  verified_on    = ""

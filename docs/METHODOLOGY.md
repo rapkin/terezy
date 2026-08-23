@@ -460,8 +460,10 @@ Both figures are labelled **nominal**, and both are accompanied by
 ## 5. Tax
 
 No tax rate exists anywhere in the source code. Every rate arrives in a declared `TaxClass`
-loaded from `data/tax/`, carrying a citation, a retrieval date and a verification date — and
-that holds for a rate of **zero** exactly as it does for a non-zero one.
+loaded from `data/tax/` as a **dated schedule**, each entry carrying its own citation,
+retrieval date and verification date — and that holds for a rate of **zero** exactly as it
+does for a non-zero one. How the entry in force is chosen, and what happens to an event the
+schedule does not reach, is §25.
 
 The one rule implemented is a flat rate on a stated base:
 
@@ -504,9 +506,18 @@ charge records `charged_for_year` — the tax year the liability accrues to — 
 fact a later feature needs.
 
 A **negative** base (a realised loss) yields a negative charge, and is deliberately not
-clamped to zero. Whether the loss is creditable against other income is a loss-offset rule
-this feature does not model; a visible line computed as declared is the honest way to say
-so, and a clamp would be a silent one.
+clamped to zero *by the rule*. Whether the loss is creditable against other income is a
+loss-offset rule this feature does not model; a visible line computed as declared is the
+honest way to say so, and a clamp would be a silent one.
+
+⚙ **A fund disposal at a loss is the one place a base is floored, and it is not silent.**
+Investment profit tax is charged on profit: a fund redemption that realises a loss has a
+taxable base of **zero**, not a negative one, so the charge is exactly zero and never a
+refund. The loss itself is not swallowed — `ExitLine.realised_loss` carries it as its own
+figure with `carryforward_note` beside it saying that loss offset and carryforward are not
+modelled here — and the zero base keeps the gain's provenance, so it still cites what it
+was computed from. The flat-rate rule is unchanged; what changed is what the fund
+projection hands it, and it hands it a figure with a named line beside it. See §26.
 
 ---
 
@@ -2268,10 +2279,214 @@ the twelve contributions      =  10 000.00 * 12.682503013196973 = 126 825.030131
 Solving the contribution back from that sum and that date returns 10 000.00; solving the date
 back from that sum and that contribution returns 12 months. That is the round trip, on one
 example; the property suite runs it over a generated body.
+## 25. Dated rate schedules: which rate applied, and when a run stops
+
+A tax rate is not a constant, it is a schedule. Ukrainian law moved the military levy from
+1.5% to 5% in December 2024, and several published sources still show the old figure — so
+this is the shape the domain already has rather than future-proofing.
+
+### 25.1 The lookup
+
+A `TaxClass` carries `rates: tuple[RateEntry, ...]`, sorted oldest first and non-empty.
+`terezy.core.tax.schedule.rate_on(tax_class, on_date)` returns
+
+> the entry with the latest `effective_from` **on or before** `on_date`
+
+and the boundary is inclusive: an entry effective 2027-01-01 governs an event dated
+2027-01-01. That is stated once, in one function, and tested *at* the boundary in
+`tests/unit/test_rate_lookup_boundary.py` rather than re-derived wherever a rate is read.
+
+The date the lookup uses is the date the **ledger event occurred**. For a payout that is
+the date it was paid; for an exit whose settlement lags execution it is the date the
+proceeds were received, and `ExitLine.settles_on` and `DistributionLine.rate_effective_from`
+both appear in the output so that "which date chose this rate" is stated rather than
+inferred.
+
+A declared entry stays in force until a later one supersedes it. Adding a legislated change
+is one `[[jurisdiction.tax_class.rate]]` block appended to a data file: no source line
+changes and nothing is rebuilt, which is asserted in
+`tests/worked_examples/test_rate_schedule_straddle.py`.
+
+### 25.2 The effective date is a cited legal fact
+
+`effective_from` is **exactly the date its citation attests**, and nothing looser. Where a
+source establishes the current rate but says nothing about when it began, **no earlier entry
+is invented**: the schedule starts at the attested date, and every event before it produces
+a typed `RateUndeclaredBefore` naming the class, the event date and the earliest date the
+schedule does declare.
+
+That refusal is what makes the honest schedule safe to write. The alternative — back-dating
+an entry so that "everything just works" — would put an invented legal fact in a data file
+while every gate stayed green, which is the one mistake in this area that no test can catch
+after the fact. **A schedule that never refuses is a schedule someone back-dated.**
+
+Every entry in `data/tax/ua.toml` is currently dated **2026-06-30**, because that is the
+"Last reviewed" date printed on the cited source and the earliest date at which it attests
+each rate was in force. None of the three classes has a legislated commencement date behind
+it, and each entry's `note` says so in as many words. An event dated before 2026-06-30 stops
+the run; the remedy is a citation for an earlier entry, never a widened date.
+
+### 25.3 Provenance is per entry
+
+Not per class. The rate before a legislated change and the rate after it were read from
+different sources on different days, and one of them may be verified while the other is
+not. A single mark on the class would attach one verification date to two independent
+observations — which is the quiet way a checked figure ends up vouching for an unchecked
+one. A `TaxCharge` therefore carries the citation of the **entry** that produced it, and
+`ClassSubtotal.provenance` is the union over the entries a class actually used.
 
 ---
 
-## 25. Where to look next
+## 26. Collective-investment funds: what is declared, and what is refused
+
+A bond's schedule comes from a contract that says what it will pay. A fund's comes from
+**what the fund says about itself**, and every part of the model below is shaped by that.
+
+### 26.1 The declared net yield, and how NAV moves
+
+One rate drives everything (owner decision B). There is no NAV series, no market price and
+no return model — only the fund's own stated rate, applied **pro rata and simply**:
+
+```
+nav(t)          = nav(0) × (1 + rate × retained_share × years(purchase, t))
+payout per month = nav(0) × rate × payout_share / 12
+```
+
+`years` is measured by the fund's own declared day count. `payout_share` is the declared
+share of the rate that is paid out; `retained_share` is the rest, and it is `1.0` for an
+accumulation fund, which distributes nothing at all. One formula covers both cases, so a
+fund that pays out most of what it earns and keeps the rest is an ordinary case rather than
+a third kind of thing.
+
+Three deliberate choices in that arithmetic:
+
+- **Simple, not compounded.** Both funds state a *simple annual* rate. Compounding it would
+  report a number the fund never claimed — for a two-year 25% holding, 1.5625× rather than
+  1.5×.
+- **The payout is a share of the fund's declared NAV**, not of the accreted NAV of the month
+  in question. The fund states an annual rate on NAV, not a compounding one.
+- **A fund that pays out everything it earns has a NAV that does not move.** That is not a
+  claim that property never revalues; it is the refusal to put a revaluation figure nobody
+  published into a model. For the REIT, `payout_share` is 100%.
+
+Distributions run monthly, with the record date on the last day of the month and payment on
+the declared day of the month after. **The first month counted is the one after the purchase
+settles**: the funds' documents state no pro-rating rule for a part month, so none is
+invented — a part month simply does not pay, and that is stated here rather than assumed
+either way.
+
+### 26.2 Assumption-driven means the metric is refused
+
+Both Inzhur funds are declared `is_assumption_driven`, and the field is `Literal[True]`
+because this feature has no other case. Asking either of them for a volatility, a Sharpe or
+a Sortino returns a typed `MetricRefused` carrying its reason, and — the half that lasts —
+**no fund result record has a field such a number could be written into**. A caveated number
+gets copied without its caveat; a refusal cannot be.
+
+Every projection also carries `rests_on`: what the figure depends on that is not an
+observation of a market, written out in words. The unverified *mark* says that a figure is
+uncertain; `rests_on` says what a reader would have to go and check.
+
+### 26.3 A range stays a range
+
+MilTech states 25–29%. That is two numbers the fund published, not a figure with error bars.
+A projection either
+
+- reports **both ends** — `RangeProjection`, two complete projections — or
+- takes an explicitly declared `ChosenPoint` inside the range, labelled the owner's
+  assumption and carrying his rationale.
+
+**There is no midpoint helper anywhere in this project**, and the absence is the
+requirement: the midpoint of a fund-stated range is the most seductive invented number in
+the model, because it looks like arithmetic. A chosen point outside the declared range is
+refused rather than clamped to the nearer end.
+
+### 26.4 The peg: a term, not a conversion licence
+
+Ukrainian commercial rent is priced against the dollar and settled in hryvnia under a
+«граничний курс» — a ceiling on the rate the lease converts at. So the REIT's income is
+*declared* in USD-equivalent terms while every hryvnia of it moves in hryvnia (owner
+decision A):
+
+```
+per unit in the peg's currency = nav_per_unit / assumed_rate
+pegged (a PeggedAmount, NOT money) = per unit × units × rate × payout_share / 12
+payment (hryvnia) = pegged × min(assumed_rate, declared ceiling)
+```
+
+Below the ceiling the assumed rate cancels and the payment is simply NAV × units × the
+monthly rate: the hryvnia tracks the dollar exactly. Above it the payment is scaled by
+`ceiling / assumed_rate` — the peg partially breaking under a devaluation the ceiling does
+not follow — and `DistributionLine.cap_bound` and the projection's `peg_statement` both say
+so, because a hryvnia total alone would hide it.
+
+Three refusals hold this together:
+
+- **`PeggedAmount` is not `Money`.** It cannot be added to an amount, summed with one or
+  converted; it becomes hryvnia only through `money.from_pegged_term`, which demands a rate
+  and its sources in its signature. The type refuses the conflation so a reviewer does not
+  have to catch it.
+- **No stated rate, no figure.** Absent an `ExchangeRateAssumption` the run is a typed
+  `PegUnsizable` naming exactly that input. There is no rate feed and no forecast.
+- **No declared ceiling for a payment's date, no figure.** A payment dated before the
+  declared ladder begins returns `AwaitingVerification` naming the recorded open question.
+  "No ceiling is declared here" and "there is no ceiling" are different claims, and the
+  second one is the favourable one.
+
+### 26.5 The spread is the modelled access cost; fees are context
+
+A purchase executes at NAV **plus** the declared entry markup and an exit at NAV **less** the
+declared discount, and both appear as their own lines with `round_trip_spread` beside them —
+a one-way figure is never presented as a round trip. Under the **legal** terms the maxima
+apply, because the регламент guarantees only a ceiling and reporting the live setting would
+present a discretionary favour as a right; under the **practice** mode the live settings
+apply, and they are unverified and labelled so.
+
+The management and performance fee clauses are recorded as `fee_context` — provenance for
+the declared net yield, so a reader can see what it is net *of*. **Nothing computes from
+them, and no result record has a field for a computed fee.** Modelling a fund's internal
+profitability from outside would mean inventing its books.
+
+### 26.6 Liquidity: two claims, and no default between them
+
+`LiquidityTerms` holds two records rather than one with a flag, because the регламент's
+obligations and the company's current practice are different kinds of claim and only one of
+them is revocable:
+
+| | legal terms | observed practice |
+|---|---|---|
+| buyback before termination | **discretionary** — no obligation | at NAV, by current habit |
+| discount | up to the declared maximum | the live setting |
+| settlement | up to the declared business days | same day |
+| status | what the fund owes | **revocable at any time** |
+
+`liquidity_mode` is a required, keyword-only parameter with **no default anywhere in the
+stack**. A default would make the more optimistic reading the silent one: defaulting to the
+practice mode would quietly promise same-day liquidity at NAV that the fund does not owe.
+
+Under the legal terms with the buyback declared unavailable, a redemption request is a typed
+`RedemptionRefused` naming the termination date as the next guaranteed exit — and **the
+holding stays open**. Nothing is executed at the legal discount instead, because a number
+was wanted. Under the legal terms with the buyback assumed available, the exit executes and
+the result *states on its face* that it was discretionary rather than owed.
+
+A purchase after the declared subscription cutoff is refused naming the cutoff. A holding
+never silently outlives its fund: reaching `terminates_on` produces a dated termination
+payout, taxed as a disposal, at NAV with **no** discount — the contract ended, nobody asked
+a favour.
+
+### 26.7 Researched is not verified
+
+Every term of both real funds was read from the funds' own primary documents on 2026-08-22,
+and every `verified_on` is empty until the owner checks it against his investor cabinet.
+That is the expected state, not a defect. Six things the documents do not answer are recorded
+as `verification_task` entries, which **carry no value field at all** — there is nowhere for
+a later contributor in a hurry to put a plausible number, and a projection that needs one
+refuses by naming the task.
+
+---
+
+## 27. Where to look next
 
 | question | file |
 | --- | --- |
@@ -2312,6 +2527,12 @@ example; the property suite runs it over a generated body.
 | Do the three goal modes agree? | `tests/invariants/test_goal_mode_consistency.py` |
 | Is the goal arithmetic right? | `tests/worked_examples/test_goal_arithmetic.py` |
 | What happens when a goal cannot be met? | `tests/unit/test_goal_feasibility.py` |
+| Which rate applied, and when does a run stop? | `tests/worked_examples/test_rate_schedule_straddle.py` |
+| Can two tax classes on one instrument collide? | `tests/worked_examples/test_two_tax_classes.py` |
+| What does relying on the legal floor cost? | `tests/worked_examples/test_fund_liquidity.py` |
+| What survives the spread and the tax? | `tests/worked_examples/test_declared_yield.py` |
+| What happens when the peg's ceiling binds? | `tests/worked_examples/test_pegged_distribution.py` |
+| Can a fund be asked for a Sharpe ratio? | `tests/contract/test_assumption_driven_refusal.py` |
 | What is still uncovered? | `docs/REQUIRED_TESTS.md` |
 
 The product specification is `docs/reference/SIMULATOR_SPEC.md`; the engine charter and the

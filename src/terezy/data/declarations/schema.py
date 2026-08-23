@@ -232,8 +232,13 @@ class InstrumentFile(BaseModel):
     place."""
 
 
-class TaxClassTable(BaseModel):
-    """One ``[[jurisdiction.tax_class]]`` entry: a declared tax treatment.
+class RateEntryTable(BaseModel):
+    """One ``[[jurisdiction.tax_class.rate]]`` entry: the rates in force from a date.
+
+    ⚙ **Feature 006 moved the rates out of the class table and into these entries**, so a
+    legislated change is one entry added to a file rather than a rebuild (`data/README.md`
+    rule 3, ``SIMULATOR_SPEC.md`` §4.5.1, required test E10). The scalar pair the class
+    used to carry is gone rather than deprecated (research.md D1).
 
     Every numeric field here is an observed legal value, so the citation keys are not
     optional -- **including for a rate of zero**. The exemption is the single most
@@ -243,12 +248,16 @@ class TaxClassTable(BaseModel):
 
     model_config = STRICT
 
-    id: str
-    """Unique across every tax file."""
+    effective_from: str
+    """ISO date this entry comes into force, inclusive.
 
-    applies_to: list[str]
-    """Which income kinds this class governs. Non-empty; resolved against the core's
-    closed ``TaxableEventKind`` by the loader."""
+    **A cited legal fact, and the sharpest trap in the tax data.** It must be exactly the
+    date this entry's citation attests. Where a source establishes the current rate but
+    not the date the previous one began, no earlier entry is invented: the schedule starts
+    at the attested date, and an event before it is a typed refusal rather than a
+    defaulted rate (research.md D2, FR-012). Back-dating an entry so that "everything just
+    works" would put an invented legal fact in this file while every gate stayed green.
+    """
 
     pit_rate_pct: float
     """Personal income tax as a **percentage** of the taxable base. ``0.0`` for an
@@ -260,28 +269,18 @@ class TaxClassTable(BaseModel):
     withholding creditable against one and not the other unrepresentable."""
 
     note: str
-    """Plain-language statement of what this class claims and what it does not.
+    """What this entry claims, and **what its citation says about the date**.
 
-    Required, not optional. Every tax figure links to its rule, its source and its
-    verification date (constitution, *Documentation is part of the feature*), and the
-    note is where the rule is stated in words a reader can check the citation against.
+    Required per entry rather than only per class, because the effective date is the field
+    a reviewer most needs prose for: the rate can be checked against the source in a
+    glance, and the date it came into force usually cannot.
     """
 
     kind: str
     """An ``ObservationKind`` id -- which staleness threshold these values age under.
 
-    ⚙ **Added by feature 002 as a migration**, and required rather than optional: FR-028
-    says the threshold is per kind of value with no permissive default, so a sourced table
-    that names no kind is a table whose values could never be reported stale. Every
-    declaration in the project gained the field in one change, because a half-applied
-    requirement makes ``scripts/check_provenance.py`` red for every file that has not caught
-    up yet.
-
-    Resolved against ``data/observation_kinds.toml`` by ``check_provenance.py`` rather than
-    by the loader: the feature-001 core records this table becomes -- ``BondTerms``,
-    ``InstrumentConstraints``, ``TaxClass`` -- have no field to carry a kind, because their
-    staleness verdict is a later feature's, so a kind resolved here would be a value the
-    engine reads nowhere. The gate is blocking, so the check is enforced either way.
+    Per entry, like the citation: the entry in force before a legislated change and the
+    one after it are two observations, and they may age differently.
     """
 
     source: str
@@ -289,6 +288,41 @@ class TaxClassTable(BaseModel):
     retrieved_on: str
 
     verified_on: str
+
+
+class TaxClassTable(BaseModel):
+    """One ``[[jurisdiction.tax_class]]`` entry: a declared tax treatment.
+
+    Carries no rate and no citation of its own. Both live on the dated entries below,
+    because two rates cited by two sources are two observations with two verification
+    dates, and one mark for both would let a checked figure vouch for an unchecked one
+    (research.md D1).
+    """
+
+    model_config = STRICT
+
+    id: str
+    """Unique across every tax file."""
+
+    applies_to: list[str]
+    """Which income kinds this class governs. Non-empty; resolved against the core's
+    closed ``TaxableEventKind`` by the loader."""
+
+    note: str
+    """Plain-language statement of what this class claims and what it does not.
+
+    Required, not optional. Every tax figure links to its rule, its source and its
+    verification date (constitution, *Documentation is part of the feature*), and the
+    note is where the rule is stated in words a reader can check the citation against.
+    """
+
+    rate: list[RateEntryTable]
+    """``[[jurisdiction.tax_class.rate]]`` -- the dated schedule, in effective-date order.
+
+    Non-empty, strictly increasing and non-duplicated: all three are checked by the
+    loader, where the file and the field can be named. A class with no entry cannot charge
+    anything, and a silent zero is the worst available reading of that.
+    """
 
 
 class JurisdictionTable(BaseModel):
@@ -901,6 +935,277 @@ class SpendableFile(BaseModel):
     spendable: list[SpendableTable]
     """Non-empty, checked by the loader. A file with no entries would make every exit deficit 3
     -- a confident wrong answer built out of a forgotten line (research.md D13)."""
+
+
+# ---------------------------------------------------------------------------
+# 006-inzhur-instruments: collective-investment funds
+# ---------------------------------------------------------------------------
+#
+# Same three settings and the same standing rule: ``STRICT`` everywhere, and **zero field
+# defaults** except where TOML's lack of a null leaves an omitted key as the only way to
+# say "nothing is declared here" -- which here is exactly three fields, each feeding a core
+# field that is itself ``X | None``: ``subscription_cutoff`` (a fund that never stops
+# accepting money), ``peg`` (a payout that is not pegged to another currency) and
+# ``distribution`` (an accumulation fund, which owes no dividend at all).
+#
+# ⚙ **A fund file and a bond file share a directory and a root table**, and are told apart
+# by ``[instrument] class``. The resolver reads that one key and picks a loader, because
+# the two declarations have almost nothing in common beyond an id: a fund has no coupon, no
+# maturity and no face value, and forcing them into one model would mean a table of
+# optional fields where every combination is loadable and only two are meaningful.
+#
+# ⚙ **``[[instrument.verification_task]]`` carries no numeric leaf and therefore no
+# citation**, deliberately. It is the record of a question nobody has answered; a source
+# would be a source for *what*?
+
+
+class FundNavTable(BaseModel):
+    """``[instrument.nav]`` -- the declared net asset value of one unit."""
+
+    model_config = STRICT
+
+    per_unit: float
+    """In the instrument's unit currency. Strictly positive: a unit worth nothing has no
+    price to charge a markup on, and every figure computed from it would be zero while the
+    projection still looked complete."""
+
+    kind: str
+    source: str
+    retrieved_on: str
+    verified_on: str
+
+
+class DeclaredYieldTable(BaseModel):
+    """``[instrument.declared_yield]`` -- the rate the fund states about itself.
+
+    Two fields rather than one because a fund may state a range, and the range is the
+    answer: MilTech's 25-29% is not a figure with error bars, it is two numbers the fund
+    published. A fund stating one figure writes it twice, which reads oddly and is correct
+    -- it says "the low end and the high end are the same", which is what a point rate is.
+    """
+
+    model_config = STRICT
+
+    low_pct: float
+    high_pct: float
+    basis: str
+    """``simple_annual`` or ``usd_equivalent_annual``, resolved by the loader."""
+
+    kind: str
+    source: str
+    retrieved_on: str
+    verified_on: str
+
+
+class PegCapTable(BaseModel):
+    """One ``[[instrument.distribution.peg.cap]]`` entry -- a dated «граничний курс»."""
+
+    model_config = STRICT
+
+    effective_from: str
+    uah_per_unit: float
+    """Hryvnia per one unit of the pegged currency. Strictly positive: a ceiling of zero
+    would size every payment at nothing, which is not what an undeclared ceiling means."""
+
+    kind: str
+    source: str
+    retrieved_on: str
+    verified_on: str
+
+
+class PegTable(BaseModel):
+    """``[instrument.distribution.peg]`` -- what the payout is sized in, and its ceiling.
+
+    Carries no numeric leaf of its own and therefore no citation: the currency is a
+    reference to the core's enum, and every number lives on a dated cap entry that cites
+    itself.
+    """
+
+    model_config = STRICT
+
+    sized_in: str
+    cap: list[PegCapTable]
+    """Oldest first. May be **empty**, which declares that no ceiling is known -- and a
+    payment dated where no ceiling is declared is refused rather than sized at the full
+    assumed rate."""
+
+
+class DistributionTable(BaseModel):
+    """``[instrument.distribution]`` -- what the fund pays out, when, and sized in what."""
+
+    model_config = STRICT
+
+    frequency: str
+    basis_note: str
+    """The declared basis in words. Required and non-empty: a payout whose basis nobody
+    wrote down is one a reader cannot check against the регламент."""
+
+    record_day: str
+    payment_day: int
+    paid_in: str
+    payout_share_pct: float
+    """The declared share of the yield paid out; the rest accretes to NAV. ``100.0`` for a
+    fund that distributes everything it earns."""
+
+    peg: PegTable | None = None
+    """Omitted where the payout is not pegged to another currency. One of the three
+    permitted ``= None`` defaults; see the section comment above."""
+
+    kind: str
+    source: str
+    retrieved_on: str
+    verified_on: str
+
+
+class SpreadTable(BaseModel):
+    """``[instrument.spread]`` -- the markup and discount around NAV.
+
+    Four numbers, not two. "Up to 1%" is what the terms allow and "1% is what is charged
+    today" is a different claim that nobody has verified; collapsing them would lose the
+    distinction FR-024 exists to keep.
+    """
+
+    model_config = STRICT
+
+    entry_markup_max_pct: float
+    exit_discount_max_pct: float
+    live_entry_markup_pct: float
+    live_exit_discount_pct: float
+    kind: str
+    source: str
+    retrieved_on: str
+    verified_on: str
+
+
+class LegalTermsTable(BaseModel):
+    """``[instrument.liquidity.legal]`` -- what the регламент owes, and when it settles."""
+
+    model_config = STRICT
+
+    buyback_before_termination: str
+    """``discretionary`` is the only value this engine models, and it is written out rather
+    than assumed: the one word that matters about the exit is not a default."""
+
+    settlement_business_days: int
+    note: str
+    kind: str
+    source: str
+    retrieved_on: str
+    verified_on: str
+
+
+class ObservedPracticeTable(BaseModel):
+    """``[instrument.liquidity.practice]`` -- what the company currently does."""
+
+    model_config = STRICT
+
+    settlement_business_days: int
+    is_revocable: bool
+    """Must be ``true``; the loader refuses ``false``. A buyback that could not be withdrawn
+    would be an obligation, and an obligation is declared in the legal terms."""
+
+    note: str
+    kind: str
+    source: str
+    retrieved_on: str
+    verified_on: str
+
+
+class LiquidityTable(BaseModel):
+    """``[instrument.liquidity]`` -- both readings of the same exit, kept apart."""
+
+    model_config = STRICT
+
+    legal: LegalTermsTable
+    practice: ObservedPracticeTable
+
+
+class FundConstraintsTable(BaseModel):
+    """``[instrument.constraints]`` -- the smallest purchase the fund accepts."""
+
+    model_config = STRICT
+
+    minimum_units: float
+    kind: str
+    source: str
+    retrieved_on: str
+    verified_on: str
+
+
+class FeeFactTable(BaseModel):
+    """One ``[[instrument.fee_fact]]`` -- a researched fee term, recorded as context.
+
+    Nothing computes from these. They exist so a reader can see what the declared net yield
+    is net *of*, and the core record they become has no numeric field at all -- which is
+    the structural half of owner decision B.
+    """
+
+    model_config = STRICT
+
+    what: str
+    kind: str
+    source: str
+    retrieved_on: str
+    verified_on: str
+
+
+class VerificationTaskTable(BaseModel):
+    """One ``[[instrument.verification_task]]`` -- a question the documents did not answer.
+
+    **No value field, and no citation.** The record exists precisely because nothing is
+    known, so there is nowhere for a later contributor in a hurry to put a plausible
+    number, and nothing for a source to vouch for.
+    """
+
+    model_config = STRICT
+
+    question: str
+    searched: str
+    searched_on: str
+
+
+class FundTable(BaseModel):
+    """``[instrument]`` for a collective-investment fund."""
+
+    model_config = STRICT
+
+    id: str
+    name: str
+    instrument_class: str = Field(alias="class")
+    """``collective_investment_fund``. Aliased for the same reason a bond's is."""
+
+    unit_currency: str
+    is_assumption_driven: bool
+    """Must be ``true``; the loader refuses ``false``. A fund whose terms are observed
+    rather than stated is a different declaration and a different feature, and the core
+    field is ``Literal[True]`` so there is nothing for ``false`` to become."""
+
+    day_count: str
+    terminates_on: str
+    subscription_cutoff: str | None = None
+    """Omitted by a fund that never stops accepting subscriptions. One of the three
+    permitted ``= None`` defaults; see the section comment above."""
+
+    nav: FundNavTable
+    declared_yield: DeclaredYieldTable
+    distribution: DistributionTable | None = None
+    """Omitted by an accumulation fund, which owes no dividend at all. That is a declared
+    fact rather than a missing field, and it is why nothing invents a payout for MilTech."""
+
+    spread: SpreadTable
+    liquidity: LiquidityTable
+    constraints: FundConstraintsTable
+    tax_classes: dict[str, str]
+    fee_fact: list[FeeFactTable]
+    verification_task: list[VerificationTaskTable]
+
+
+class FundFile(BaseModel):
+    """A whole fund declaration document: exactly one fund, as with an instrument."""
+
+    model_config = STRICT
+
+    instrument: FundTable
 
 
 # ---------------------------------------------------------------------------

@@ -55,8 +55,10 @@ from pathlib import Path
 
 import pytest
 
+from terezy.core.instruments.fund import ExchangeRateAssumption
 from terezy.core.instruments.interface import (
     BondTerms,
+    DateRange,
     Holding,
     InstrumentConstraints,
     InstrumentDeclaration,
@@ -66,7 +68,9 @@ from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance, SourceRef
+from terezy.core.results import fund as fund_results
 from terezy.core.results import project
+from terezy.core.results.fund import FundAssumptions, FundProjection
 from terezy.core.results.project import Projection
 from terezy.core.tax.interface import TaxClass
 from terezy.data.declarations import resolver
@@ -89,7 +93,7 @@ Asserted literally, because the *shape* of the id is what makes a marked figure 
 back to the line of the file that declared it rather than only to a URL.
 """
 
-LOADED_EXEMPTION_SOURCE_ID = "tax/ua.toml#jurisdiction.tax_class[ua_government_bond]"
+LOADED_EXEMPTION_SOURCE_ID = "tax/ua.toml#jurisdiction.tax_class[ua_government_bond].rate[0]"
 """The loader's id for the exemption -- the zero whose citation matters most."""
 
 
@@ -121,9 +125,10 @@ def _from_code(*, verified: bool) -> Projection:
     exempt_class = TaxClass(
         id=synthetic.EXEMPT_CLASS.id,
         applies_to=synthetic.EXEMPT_CLASS.applies_to,
-        pit_rate=synthetic.EXEMPT_CLASS.pit_rate,
-        levy_rate=synthetic.EXEMPT_CLASS.levy_rate,
-        provenance=exemption_provenance,
+        rates=tuple(
+            replace(entry, provenance=exemption_provenance)
+            for entry in synthetic.EXEMPT_CLASS.rates
+        ),
     )
     declaration: InstrumentDeclaration = synthetic.declaration(
         terms=terms,
@@ -139,6 +144,10 @@ def _from_code(*, verified: bool) -> Projection:
     )
 
 
+# ⚙ This run projects `ovdp_synthetic_a`, whose first *taxable* event is its 2026-07-15
+# coupon -- fifteen days after the earliest entry the `ua_government_bond` exemption's
+# citation reaches. That dependency is asserted, once, in
+# `tests/contract/test_declaration_loading.py::TestTheShippedRegistryRefusesAnUncoveredEvent`.
 def _from_data() -> Projection:
     """The same purchase, from the declaration files, through the loader.
 
@@ -520,3 +529,186 @@ def _cost_only(result: Projection) -> frozenset[SourceRef]:
     later feature's ancillary figure would break for an uninteresting reason.
     """
     return result.ledger.applied[0].amount.provenance.sources
+
+
+# ---------------------------------------------------------------------------
+# 006-inzhur-instruments: the fund terms join the walk
+# ---------------------------------------------------------------------------
+#
+# SC-008: *with any fund term left unverified, 100% of figures derived from it carry the
+# unverified mark, and no derived figure appears unmarked.* A fund has more independent
+# unverified observations than a bond does -- its NAV, its stated yield, its distribution
+# terms, its spread, both readings of its liquidity and each dated ceiling -- and the
+# figures below are built by a different projection function from the one above, so the
+# earlier walk cannot stand in for this one.
+#
+# The same discipline applies: an explicit walk rather than a reflective sweep, so a new
+# figure has to be added here and the addition is where a reviewer asks whether it carries
+# its mark.
+
+
+def _fund_amounts(result: FundProjection) -> Iterator[tuple[str, Money]]:
+    """Every ``Money`` in a fund projection, labelled with where it was found."""
+    for event in result.ledger.applied:
+        yield f"event {event.sequence} ({event.kind.value}).amount", event.amount
+
+    for currency, balance in result.ledger.accounts.items():
+        where = f"balance[{currency.value}]"
+        yield f"{where}.inflows", balance.inflows
+        yield f"{where}.outflows", balance.outflows
+        yield f"{where}.balance", balance.balance
+
+    for disposal in result.ledger.disposals:
+        where = f"disposal {disposal.sequence}"
+        yield f"{where}.proceeds_base_ccy", disposal.proceeds_base_ccy
+        yield f"{where}.consumed_basis_base_ccy", disposal.consumed_basis_base_ccy
+        yield f"{where}.realised_gain_base_ccy", disposal.realised_gain_base_ccy
+
+    for charge in result.charges:
+        where = f"charge on event {charge.event_sequence}"
+        yield f"{where}.pit", charge.pit
+        yield f"{where}.levy", charge.levy
+        yield f"{where}.total", charge.total
+        yield f"{where}.taxable_base", charge.taxable_base
+
+    for subtotal in result.tax_by_class:
+        where = f"subtotal[{subtotal.tax_class_id}]"
+        yield f"{where}.pit", subtotal.pit
+        yield f"{where}.levy", subtotal.levy
+        yield f"{where}.total_charged", subtotal.total_charged
+
+    for line in result.distributions:
+        where = f"distribution paid {line.paid_on.isoformat()}"
+        yield f"{where}.gross", line.gross
+        yield f"{where}.tax", line.tax
+        yield f"{where}.net", line.net
+
+    exit_line = result.exit_line
+    if exit_line is not None:
+        yield "exit.nav_per_unit", exit_line.nav_per_unit
+        yield "exit.gross_proceeds", exit_line.gross_proceeds
+        yield "exit.discount_amount", exit_line.discount_amount
+        yield "exit.realised_gain", exit_line.realised_gain
+        yield "exit.taxable_base", exit_line.taxable_base
+        yield "exit.tax", exit_line.tax
+        if exit_line.realised_loss is not None:
+            yield "exit.realised_loss", exit_line.realised_loss
+
+    yield "entry_spread", result.entry_spread
+    yield "exit_spread", result.exit_spread
+    if result.exit_discount is not None:
+        yield "exit_discount", result.exit_discount
+    yield "round_trip_spread", result.round_trip_spread
+    yield "total_tax", result.total_tax
+    yield "net_proceeds", result.net_proceeds
+
+
+REIT_ID = "inzhur_reit"
+REIT_NAV_SOURCE_ID = f"instruments/{REIT_ID}.toml#instrument.nav"
+REIT_YIELD_SOURCE_ID = f"instruments/{REIT_ID}.toml#instrument.declared_yield"
+REIT_CEILING_SOURCE_ID = f"instruments/{REIT_ID}.toml#instrument.distribution.peg.cap[1]"
+
+
+def _reit_projection() -> FundProjection:
+    """The real REIT, projected from ``data/`` with an owner-stated rate and an early exit.
+
+    The shipped declaration rather than a fixture, because the claim under test is that the
+    *loader* attaches a real mark and nothing between the file and the figure launders it.
+    Every ``verified_on`` in that file is empty, which is the honest state of a fund read
+    from its own documents on one afternoon.
+    """
+    declarations = resolver.from_data_root(DATA_ROOT)
+    declared = declarations.funds[REIT_ID]
+    outcome = fund_results.project_fund(
+        declared,
+        Holding(
+            owner_id="owner-1",
+            instrument_id=REIT_ID,
+            quantity=500.0,
+            purchased_on=date(2027, 2, 10),
+            cost=Money(5_500.0, UAH, prov.of([_OWNER_STATED_COST])),
+        ),
+        DateRange(start=date(2027, 2, 10), end=date(2028, 12, 31)),
+        FundAssumptions(
+            liquidity_mode="legal",
+            buyback="available",
+            exit_on=date(2028, 2, 10),
+            yield_point=None,
+            exchange_rate=ExchangeRateAssumption(
+                uah_per_unit=48.0,
+                is_assumption=True,
+                rationale="TEST — an owner-stated rate above the declared ceiling.",
+            ),
+            consumption_method="fifo",
+        ),
+        tax_classes=declarations.tax_classes,
+    )
+    assert isinstance(outcome, FundProjection), f"expected a projection, got {outcome!r}"
+    return outcome
+
+
+class TestNoFundFigureIsUnmarked:
+    """SC-008, over every amount a fund projection produces."""
+
+    def test_every_non_zero_amount_carries_the_mark(self) -> None:
+        result = _reit_projection()
+        unmarked = [
+            (label, amount)
+            for label, amount in _fund_amounts(result)
+            if not prov.is_unverified(amount.provenance)
+        ]
+        for label, amount in unmarked:
+            assert amount.amount == 0.0, (
+                f"{label} is {amount.amount!r} and carries no unverified mark, although "
+                "every term of the fund it was computed from has an empty verification "
+                "date (FR-015, SC-008)"
+            )
+
+    def test_the_walk_actually_reaches_something(self) -> None:
+        """A walk over nothing passes forever, which is how this class would rot."""
+        found = list(_fund_amounts(_reit_projection()))
+        assert len(found) > 30
+        assert any(label.startswith("distribution paid") for label, _ in found)
+        assert any(label.startswith("subtotal[") for label, _ in found)
+        assert any(label == "exit.realised_gain" for label, _ in found)
+
+    def test_the_headline_figures_name_the_terms_they_came_from(self) -> None:
+        """Not merely marked: marked **by the source that made them uncertain**.
+
+        A figure marked by some unrelated unverified input would satisfy a boolean check
+        and tell the reader nothing about what to go and verify.
+        """
+        result = _reit_projection()
+        nav_derived = {
+            label
+            for label, amount in _fund_amounts(result)
+            if any(ref.id == REIT_NAV_SOURCE_ID for ref in amount.provenance.sources)
+        }
+        assert "entry_spread" in nav_derived
+        assert "exit.gross_proceeds" in nav_derived
+        assert "net_proceeds" in nav_derived
+
+    def test_the_declared_yield_reaches_every_payout_and_its_tax(self) -> None:
+        result = _reit_projection()
+        assert result.distributions
+        for line in result.distributions:
+            ids = {ref.id for ref in line.gross.provenance.sources}
+            assert REIT_YIELD_SOURCE_ID in ids
+            assert REIT_CEILING_SOURCE_ID in ids, (
+                "the ceiling is an input to a pegged payment, so its citation has to "
+                "reach the figure it bounded"
+            )
+            assert REIT_YIELD_SOURCE_ID in {ref.id for ref in line.tax.provenance.sources}
+
+    def test_the_per_class_subtotals_carry_the_rate_entries_own_citations(self) -> None:
+        for subtotal in _reit_projection().tax_by_class:
+            ids = {ref.id for ref in subtotal.provenance.sources}
+            assert any("jurisdiction.tax_class" in name and ".rate[" in name for name in ids), (
+                f"{subtotal.tax_class_id} cites no dated rate entry, so its charge cannot "
+                "say which entry produced it"
+            )
+
+    def test_the_projections_own_provenance_is_the_union_of_what_it_rests_on(self) -> None:
+        result = _reit_projection()
+        every = {ref for _, amount in _fund_amounts(result) for ref in amount.provenance.sources}
+        assert every <= result.provenance.sources

@@ -220,6 +220,58 @@ def convert(amount: Money, *, to_currency: Currency, rate: float, sources: Prove
     return Money(amount.amount * rate, to_currency, prov.merge(amount.provenance, sources))
 
 
+def from_pegged_term(
+    quantity: float,
+    *,
+    sized_in: Currency,
+    paid_in: Currency,
+    rate: float,
+    sources: Provenance,
+) -> Money:
+    """Size a term denominated in one currency into money paid in another.
+
+    ⚙ **Added by feature 006** for owner decision A: a Ukrainian commercial lease is
+    priced in USD-equivalent terms and settled in hryvnia, so the fund's income is
+    *declared* in one currency and *paid* in another. The USD-equivalent figure is a term
+    of the lease, not a dollar anyone holds -- it is a
+    :class:`terezy.core.instruments.fund.PeggedAmount`, deliberately not a ``Money`` --
+    and this is the one function that turns such a term into an amount.
+
+    It lives here for the same reason :func:`convert` does: this module is the only place
+    a currency can appear, so it is the only place a rate's provenance can be forgotten,
+    and demanding ``sources`` in the signature is what stops that. The difference from
+    :func:`convert` is only in what it starts from: ``convert`` restates money that
+    already exists, and this creates money from a term that was never money.
+
+    ``rate`` is **units of ``paid_in`` per one unit of ``sized_in``**, stated in the
+    parameter names because an inverted rate is the classic FX defect: every figure stays
+    plausible and every one is wrong by the rate squared. What rate to apply -- a market
+    quote, an owner's assumption, a lease's capped ceiling -- is the caller's decision and
+    deliberately not this function's.
+
+    **Sizing into the same currency is refused.** A term already denominated in what it is
+    paid in is not pegged to anything, and accepting it here would let a lost currency pass
+    through while collecting a rate's provenance it never used.
+
+    **A rate of zero or less is refused**, exactly as in :func:`convert`: neither is a
+    rate, and both would produce something that looks like money. A declined question, not
+    a clamp.
+    """
+    if sized_in is paid_in:
+        raise ValueError(
+            f"a term sized in {sized_in.value} and paid in {paid_in.value} is not pegged "
+            "to anything. Same-currency amounts are declared as money at the data "
+            "boundary; reaching here means a currency was lost track of."
+        )
+    if rate <= 0.0:
+        raise ValueError(
+            f"a rate of {rate!r} is not a rate: sizing a {sized_in.value} term into "
+            f"{paid_in.value} needs a strictly positive number of {paid_in.value} per "
+            f"{sized_in.value}"
+        )
+    return Money(quantity * rate, paid_in, sources)
+
+
 def total(items: Iterable[Money], currency: Currency) -> Money:
     """Sum an iterable of amounts, resting on the union of all their sources.
 

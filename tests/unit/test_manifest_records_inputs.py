@@ -58,6 +58,20 @@ DATA_ROOT = REPO_ROOT / "data"
 ISSUE_A = "ovdp_synthetic_a"
 ISSUE_B = "ovdp_synthetic_b"
 EXEMPT_CLASS = "ua_government_bond"
+DISTRIBUTION_CLASS = "ua_ci_fund_distribution"
+DISPOSAL_CLASS = "ua_investment_profit"
+REIT = "inzhur_reit"
+MILTECH = "inzhur_miltech"
+FUND_C = "synthetic_fund_c"
+FIXTURE_PAYOUT_CLASS = "synthetic_fund_payout"
+FIXTURE_DISPOSAL_CLASS = "synthetic_fund_disposal"
+"""⚙ Feature 006 added two fund files and two tax classes to the shipped data root.
+
+They are named here rather than the set being loosened to "whatever is on disk", because
+the claim under test is that the manifest records **every** declaration a run was given:
+a set computed from the directory would agree with the manifest by construction and
+assert nothing.
+"""
 
 HORIZON_END = date(2028, 1, 31)
 
@@ -170,7 +184,14 @@ class TestEveryDeclarationAndVersionThatFedTheRun:
         assert {(ref.kind, ref.id) for ref in record.inputs} == {
             ("instrument", ISSUE_A),
             ("instrument", ISSUE_B),
+            ("fund", REIT),
+            ("fund", MILTECH),
+            ("fund", FUND_C),
             ("tax_class", EXEMPT_CLASS),
+            ("tax_class", DISTRIBUTION_CLASS),
+            ("tax_class", DISPOSAL_CLASS),
+            ("tax_class", FIXTURE_PAYOUT_CLASS),
+            ("tax_class", FIXTURE_DISPOSAL_CLASS),
         }
 
     def test_the_second_issue_is_named_although_this_run_did_not_project_it(self) -> None:
@@ -199,7 +220,14 @@ class TestEveryDeclarationAndVersionThatFedTheRun:
         assert files == {
             ISSUE_A: f"instruments/{ISSUE_A}.toml",
             ISSUE_B: f"instruments/{ISSUE_B}.toml",
+            REIT: f"instruments/{REIT}.toml",
+            MILTECH: f"instruments/{MILTECH}.toml",
+            FUND_C: f"instruments/{FUND_C}.toml",
             EXEMPT_CLASS: "tax/ua.toml",
+            DISTRIBUTION_CLASS: "tax/ua.toml",
+            DISPOSAL_CLASS: "tax/ua.toml",
+            FIXTURE_PAYOUT_CLASS: "tax/synthetic_fixture.toml",
+            FIXTURE_DISPOSAL_CLASS: "tax/synthetic_fixture.toml",
         }
         for name in files.values():
             assert not Path(name).is_absolute()
@@ -214,7 +242,14 @@ class TestEveryDeclarationAndVersionThatFedTheRun:
         expected = {
             ISSUE_A: DATA_ROOT / "instruments" / f"{ISSUE_A}.toml",
             ISSUE_B: DATA_ROOT / "instruments" / f"{ISSUE_B}.toml",
+            REIT: DATA_ROOT / "instruments" / f"{REIT}.toml",
+            MILTECH: DATA_ROOT / "instruments" / f"{MILTECH}.toml",
+            FUND_C: DATA_ROOT / "instruments" / f"{FUND_C}.toml",
             EXEMPT_CLASS: DATA_ROOT / "tax" / "ua.toml",
+            DISTRIBUTION_CLASS: DATA_ROOT / "tax" / "ua.toml",
+            DISPOSAL_CLASS: DATA_ROOT / "tax" / "ua.toml",
+            FIXTURE_PAYOUT_CLASS: DATA_ROOT / "tax" / "synthetic_fixture.toml",
+            FIXTURE_DISPOSAL_CLASS: DATA_ROOT / "tax" / "synthetic_fixture.toml",
         }
         for ref in _manifest().inputs:
             digest = hashlib.sha256(expected[ref.id].read_bytes()).hexdigest()
@@ -290,7 +325,10 @@ class TestTheManifestCarriesTheProvenanceOfWhatFedIt:
     def test_the_roll_up_names_every_unverified_source_behind_the_headline_figure(self) -> None:
         record = _manifest()
         assert f"instruments/{ISSUE_A}.toml#instrument.terms" in record.unverified_sources
-        assert "tax/ua.toml#jurisdiction.tax_class[ua_government_bond]" in record.unverified_sources
+        assert (
+            "tax/ua.toml#jurisdiction.tax_class[ua_government_bond].rate[0]"
+            in record.unverified_sources
+        )
         assert list(record.unverified_sources) == sorted(record.unverified_sources)
 
     def test_the_roll_up_describes_the_result_rather_than_the_directory(self) -> None:

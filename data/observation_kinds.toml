@@ -48,6 +48,21 @@ staleness_days = 365
 note           = "A venue's published minimum ticket or lot size changes on the venue's own schedule, like a tariff. Declared separately from bank_fee_schedule because a minimum ticket is a condition of dealing rather than a price, and the two are read off different pages."
 
 [[kind]]
+id             = "fund_terms"
+staleness_days = 365
+note           = "A collective-investment fund's contractual terms — minimum ticket, term end, subscription cutoff, the spread around NAV, the leases' capped peg — are read off a регламент or проспект that is amended on the manager's own schedule. Like bond_terms, they do not drift, but a new redaction supersedes them, so a yearly re-read is the review prompt. Feature 006's fund declarations name this kind."
+
+[[kind]]
+id             = "fund_stated_yield"
+staleness_days = 180
+note           = "A rate the fund states about itself — a target, or a range — is a claim the fund may restate at any time, and it is the single figure a reader is most likely to believe without checking. Half the fund_terms interval, because the terms are contractual and the stated yield is not."
+
+[[kind]]
+id             = "fund_liquidity"
+staleness_days = 30
+note           = "A buyback the manager performs by current practice rather than by obligation can be withdrawn the day it becomes expensive. Thirty days is the shortest prompt in this file after a peer-to-peer premium, because what ages here is not a price but a permission."
+
+[[kind]]
 id             = "cpi_index"
 staleness_days = 45
 note           = "A published price index for a month that has ended is a historical fact and does not decay -- what ages here is the RETRIEVAL, because the publisher adds a month roughly every month and a series fetched long ago is a series missing its recent end. Forty-five days is the re-fetch prompt, not a claim that an old month's value went wrong. Whether a series is complete up to a given date is a different question entirely, answered from its coverage window rather than from this threshold, and the deflation feature owns it."

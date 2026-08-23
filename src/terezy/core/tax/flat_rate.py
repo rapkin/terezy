@@ -1,11 +1,17 @@
-"""``flat_rate``: apply whatever rates the declared class carries. No rates live here.
+"""``flat_rate``: apply whatever rates the declared class carries **on the event's date**.
 
-The whole rule is "multiply the base by the declared rate, twice, on two lines". That is
-not a placeholder for something richer: a flat rate on a stated base is genuinely what
-Ukrainian PIT and the military levy do to investment income, and every case that is more
-complicated than this (foreign withholding credits, loss offset, annualisation) is a
-*different rule*, which arrives as another entry in the registry rather than as a branch
-here.
+No rates live here, and no dates either. The whole rule is "find the entry in force on the
+event's date, then multiply the base by its two rates, on two lines". That is not a
+placeholder for something richer: a flat rate on a stated base is genuinely what Ukrainian
+PIT and the military levy do to investment income, and every case that is more complicated
+than this (foreign withholding credits, loss offset, annualisation) is a *different rule*,
+which arrives as another entry in the registry rather than as a branch here.
+
+⚙ **Feature 006 made the rates a dated schedule** (research.md D1, required test E10). The
+selection is one call to :func:`terezy.core.tax.schedule.rate_on`, and the date it selects
+on is the date the ledger event occurred -- so a run whose events straddle a legislated
+change charges the old rate before it and the new rate from it, with no branch here and no
+source change when the next change is declared.
 
 **There is no exempt rule, and there is no exempt branch.** The exemption is this
 function applied to a class declaring zeroes -- data, not code. If the exempt case needed
@@ -28,6 +34,7 @@ from terezy.core.ledger.events import Event
 from terezy.core.primitives import money
 from terezy.core.primitives import provenance as prov
 from terezy.core.tax.interface import TaxCharge, TaxClass, TaxContext, TaxRuleOps
+from terezy.core.tax.schedule import RateUndeclaredBefore, rate_on
 
 
 def charge(event: Event, tax_class: TaxClass, context: TaxContext) -> TaxCharge | TaxFailure:
@@ -41,10 +48,17 @@ def charge(event: Event, tax_class: TaxClass, context: TaxContext) -> TaxCharge 
     which part of a total was which. The structure is built now for exactly the reason
     currency tagging is.
 
+    **The rates come from the entry in force on the event's date.** An event dated before
+    the schedule's earliest entry returns ``RateUndeclaredBefore`` rather than a charge:
+    no rate is defaulted and no zero is silently charged (FR-012). That refusal is what
+    makes an honest schedule safe to declare -- a class may start at the date its citation
+    attests, and everything earlier stops the run instead of being quietly covered.
+
     **Provenance is unioned, not chosen.** Each line goes through
-    ``money.scale_sourced``, which merges the class's sources into the base's, so the
+    ``money.scale_sourced``, which merges the *entry's* sources into the base's, so the
     resulting zero *cites the exemption that produced it*. That citation is the evidence
-    the exemption was applied.
+    the exemption was applied. The entry's rather than the class's: two rates cited by two
+    sources are two observations, and one of them may be verified while the other is not.
 
     **A negative base yields a negative charge**, and is deliberately not clamped. A
     realised loss times a declared rate is what this rule computes; whether that loss is
@@ -68,9 +82,13 @@ def charge(event: Event, tax_class: TaxClass, context: TaxContext) -> TaxCharge 
             ),
         )
 
+    in_force = rate_on(tax_class, event.occurred_on)
+    if isinstance(in_force, RateUndeclaredBefore):
+        return in_force
+
     base = context.taxable_base
-    pit = money.scale_sourced(base, tax_class.pit_rate, tax_class.provenance)
-    levy = money.scale_sourced(base, tax_class.levy_rate, tax_class.provenance)
+    pit = money.scale_sourced(base, in_force.pit_rate, in_force.provenance)
+    levy = money.scale_sourced(base, in_force.levy_rate, in_force.provenance)
     return TaxCharge(
         event_sequence=event.sequence,
         pit=pit,
@@ -79,7 +97,7 @@ def charge(event: Event, tax_class: TaxClass, context: TaxContext) -> TaxCharge 
         taxable_base=base,
         tax_class_id=tax_class.id,
         charged_for_year=context.charged_for_year,
-        provenance=prov.merge(base.provenance, tax_class.provenance),
+        provenance=prov.merge(base.provenance, in_force.provenance),
     )
 
 

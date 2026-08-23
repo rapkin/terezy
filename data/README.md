@@ -46,11 +46,19 @@ the whole repository refers to:
    *declaration* is complete and leaves the staleness verdict to the engine, which is
    given an as-of date; the script has none and must not invent one.
 3. **Dated schedules, not constants.** Every rate must accept a dated schedule, so a
-   legislated change is modelled rather than requiring a rebuild (spec §4.5.1).
-   **Not yet true:** as of feature 001 a tax class carries a scalar rate, not a schedule.
-   Tracked as **E10** in `docs/REQUIRED_TESTS.md`. This rule states the requirement, and
-   the checklist states how far off we are — a rule that quietly contradicted the code
-   would be worse than either.
+   legislated change is modelled rather than requiring a rebuild (spec §4.5.1). **True as
+   of feature 006:** a tax class carries `[[jurisdiction.tax_class.rate]]` entries, oldest
+   first, each with its own `effective_from` and its own citation, and the scalar rate was
+   removed rather than deprecated. Adding a legislated change is one block appended to a
+   file (**E10**).
+
+   Two things follow, and both are load-bearing. **`effective_from` is a cited legal fact**
+   — exactly the date its citation attests, never a convenient earlier one; where a source
+   gives the current rate and not its commencement, the schedule simply starts where the
+   citation reaches and no earlier entry is invented. And **an event before a schedule's
+   earliest entry stops the run**, as a typed refusal naming the class and the date, rather
+   than being charged at the nearest rate or at zero. A schedule that never refuses is a
+   schedule someone back-dated. See `docs/METHODOLOGY.md` §25.
 4. **No legal value from memory.** Tax and legal values come from a cited public
    source, entered as data. Not from an implementer, and not from an agent.
 5. **No real personal data, ever — public facts and labelled synthetic fixtures only.**

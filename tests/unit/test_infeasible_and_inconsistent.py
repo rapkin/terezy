@@ -229,9 +229,7 @@ class TestAnUnresolvedTaxClass:
         narrow = TaxClass(
             id="disposals_only",
             applies_to=frozenset({TaxableEventKind.DISPOSAL_GAIN}),
-            pit_rate=0.0,
-            levy_rate=0.0,
-            provenance=prov.of([synthetic.EXEMPTION_SOURCE]),
+            rates=synthetic.rates(0.0, 0.0, source=synthetic.EXEMPTION_SOURCE),
         )
         outcome = project.project(
             synthetic.declaration(

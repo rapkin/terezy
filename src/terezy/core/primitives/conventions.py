@@ -216,6 +216,19 @@ def _is_weekend(day: date) -> bool:
     return day.weekday() >= _SATURDAY
 
 
+def is_business_day(day: date) -> bool:
+    """Whether a date is a business day -- that is, not a weekend.
+
+    ⚙ **Made public by feature 006**, which needs to count *forward* N business days to a
+    settlement date rather than merely adjust one off a weekend. Exposed here rather than
+    reimplemented beside the caller so that "what counts as a business day" has one home:
+    the day public holidays arrive as declared data, one function changes and every
+    settlement date changes with it. The weekends-only limitation and its reason are
+    :func:`_is_weekend`'s, unchanged.
+    """
+    return not _is_weekend(day)
+
+
 def _unadjusted(day: date) -> date:
     """Leave the date where the schedule put it.
 

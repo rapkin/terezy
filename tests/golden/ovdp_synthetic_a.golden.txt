@@ -30,9 +30,16 @@ canonical_encoding terezy-canonical-v2
 
 == inputs ==
 
+fund       inzhur_miltech       instruments/inzhur_miltech.toml          sha256:d80c52a1796787565e62fb3a65f2f2214630a602bb482e0497c1577d80576ea5
+fund       inzhur_reit          instruments/inzhur_reit.toml             sha256:95c2b5d997c2e9d686e730dbbe2b7ca5ab63ce8c5e219af74508fff142a76f4c
+fund       synthetic_fund_c     instruments/synthetic_fund_c.toml        sha256:39ed338a5a88918dfd813a2b0401e6fca6172ad9c10eebf21c32d77c361a232a
 instrument ovdp_synthetic_a     instruments/ovdp_synthetic_a.toml        sha256:6d6fcafc9e3da360c2f2c523704b488065f253c2db5fce362b3ad72cd6b5e49e
-instrument ovdp_synthetic_b     instruments/ovdp_synthetic_b.toml        sha256:3293c9bd0a9429223cd095c27585cb5ac9da3ba07d519be1d7f2fd69341fae7f
-tax_class  ua_government_bond   tax/ua.toml                              sha256:5806064ee33fa590756f31e6a07eea88a1c12ef04434426a527864a0a5bc7b77
+instrument ovdp_synthetic_b     instruments/ovdp_synthetic_b.toml        sha256:d28b43c7a66d320ecb7e6f9e5c3195a68f36fb4eb0ad11cf11b688a9c85df0f5
+tax_class  synthetic_fund_disposal tax/synthetic_fixture.toml               sha256:d0e3848a8f82e3cabf8d8e9a1c7b5c76e288883a240c744a813c379743f27d12
+tax_class  synthetic_fund_payout tax/synthetic_fixture.toml               sha256:d0e3848a8f82e3cabf8d8e9a1c7b5c76e288883a240c744a813c379743f27d12
+tax_class  ua_ci_fund_distribution tax/ua.toml                              sha256:b78b8571a2fd5c85e5e6989e784ed0daecf252802405925ff0b7fcd3c5d95bb0
+tax_class  ua_government_bond   tax/ua.toml                              sha256:b78b8571a2fd5c85e5e6989e784ed0daecf252802405925ff0b7fcd3c5d95bb0
+tax_class  ua_investment_profit tax/ua.toml                              sha256:b78b8571a2fd5c85e5e6989e784ed0daecf252802405925ff0b7fcd3c5d95bb0
 
 == figures ==
 

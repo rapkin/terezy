@@ -1,0 +1,60 @@
+# SYNTHETIC FIXTURE JURISDICTION. Every rate and every date in this file is invented.
+#
+# It exists for SC-010: a third fund declared purely as data, with a **different tax
+# schedule** from the two real ones, must produce complete results with zero lines of
+# source code changed. A fixture that reused `data/tax/ua.toml` would prove the fund is
+# data; it would not prove the *schedule* is, because both real classes carry a single
+# dated entry.
+#
+# So the payout class below carries **two** dated entries, which makes the third fund a
+# working example of a rate that changes mid-holding as well as a working example of a
+# data-only instrument.
+#
+# NOTHING HERE DESCRIBES ANY REAL TAX SYSTEM. The rates are chosen to be unmistakable —
+# 7%, 3%, 11%, 4% — precisely so that no figure computed from them could be mistaken for a
+# Ukrainian one, and no value here may be quoted as if it were law.
+
+[jurisdiction]
+id            = "synthetic_fixture"
+name          = "SYNTHETIC FIXTURE jurisdiction — invented rates, not any real law"
+base_currency = "UAH"
+
+[[jurisdiction.tax_class]]
+id         = "synthetic_fund_payout"
+applies_to = ["distribution"]
+note       = "FIXTURE — an invented payout class whose rates step on an invented date, so that a data-only fund can also exercise a dated schedule."
+
+  [[jurisdiction.tax_class.rate]]
+  effective_from = "2026-01-01"
+  pit_rate_pct   = 7.0
+  levy_rate_pct  = 3.0
+  note           = "FIXTURE — invented rates on an invented date. Read off nothing; not a claim about any jurisdiction."
+  kind           = "tax_rule"
+  source         = "SYNTHETIC FIXTURE — not an observation of anything."
+  retrieved_on   = "2026-08-23"
+  verified_on    = ""
+
+  [[jurisdiction.tax_class.rate]]
+  effective_from = "2028-01-01"
+  pit_rate_pct   = 11.0
+  levy_rate_pct  = 4.0
+  note           = "FIXTURE — the second entry, so a holding spanning 2028 is charged at both. Invented, like the first."
+  kind           = "tax_rule"
+  source         = "SYNTHETIC FIXTURE — not an observation of anything."
+  retrieved_on   = "2026-08-23"
+  verified_on    = ""
+
+[[jurisdiction.tax_class]]
+id         = "synthetic_fund_disposal"
+applies_to = ["disposal_gain"]
+note       = "FIXTURE — an invented disposal class, so the third fund declares two classes that are not the two real ones."
+
+  [[jurisdiction.tax_class.rate]]
+  effective_from = "2026-01-01"
+  pit_rate_pct   = 13.0
+  levy_rate_pct  = 2.0
+  note           = "FIXTURE — invented rates on an invented date."
+  kind           = "tax_rule"
+  source         = "SYNTHETIC FIXTURE — not an observation of anything."
+  retrieved_on   = "2026-08-23"
+  verified_on    = ""

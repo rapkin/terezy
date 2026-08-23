@@ -117,6 +117,7 @@ from terezy.core.primitives.tolerance import assert_money_close, is_close
 from terezy.core.results import project
 from terezy.core.results.project import Projection
 from terezy.core.tax.interface import TaxableEventKind, TaxClass
+from terezy.core.tax.schedule import RateEntry
 
 pytestmark = pytest.mark.worked_example
 
@@ -182,12 +183,25 @@ CONSTRAINTS = InstrumentConstraints(
     provenance=prov.of([CONSTRAINTS_SOURCE]),
 )
 
+EXEMPTION_EFFECTIVE_FROM = date(2020, 1, 1)
+"""A FIXTURE effective date, chosen well before the schedule this example projects.
+
+It is not a claim about Ukrainian law. The real exemption in ``data/tax/ua.toml`` starts
+at the date its citation attests, and this example is about coupon arithmetic rather than
+about when an exemption came into force.
+"""
+
 EXEMPT_CLASS = TaxClass(
     id="ua_government_bond",
     applies_to=frozenset({TaxableEventKind.COUPON, TaxableEventKind.DISPOSAL_GAIN}),
-    pit_rate=0.0,
-    levy_rate=0.0,
-    provenance=prov.of([EXEMPTION_SOURCE]),
+    rates=(
+        RateEntry(
+            effective_from=EXEMPTION_EFFECTIVE_FROM,
+            pit_rate=0.0,
+            levy_rate=0.0,
+            provenance=prov.of([EXEMPTION_SOURCE]),
+        ),
+    ),
 )
 
 DECLARATION = InstrumentDeclaration(
