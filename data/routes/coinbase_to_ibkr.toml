@@ -15,9 +15,12 @@
 # fraction 0.005, divided by 100 exactly once at the loader boundary. A route where every
 # fee is zero could not tell a conversion done twice from one done not at all.
 #
-# The USD contract income arrives at Coinbase already in dollars, so this route converts
-# nothing — which is the other half of §4.2's finding and why FR-009 insists the conversion
-# component here be **exactly** zero rather than a small residual.
+# The contract income reaches Coinbase in dollars — since 2026-08-23 by way of `deel_to_coinbase`
+# rather than by arriving there, because the owner's income lands at Deel and Coinbase is one of
+# the two places he can send it on to. So this route converts nothing, which is the other half of
+# §4.2's finding and why FR-009 insists the conversion component here be **exactly** zero rather
+# than a small residual. Nothing here is reachable from the dollar stream on its own any more:
+# it is the second segment of a chain, and that is how feature 002's costing reaches it.
 
 [route]
 id          = "coinbase_to_ibkr"

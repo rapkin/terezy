@@ -48,6 +48,9 @@ owner_id = "owner-001"
     "monobank_to_binance_p2p",
     "monobank_to_binance_p2p_double",
     "binance_p2p_to_monobank",
+    "deel_to_fop",
+    "deel_to_coinbase",
+    "fop_usd_to_monobank_uah",
   ]
 
   [[scenario.regime]]
@@ -60,6 +63,9 @@ owner_id = "owner-001"
     "monobank_to_binance_card",
     "binance_p2p_to_monobank",
     "coinbase_to_ibkr",
+    "deel_to_fop",
+    "deel_to_coinbase",
+    "fop_usd_to_monobank_uah",
   ]
 
   [[scenario.transition]]

@@ -54,7 +54,7 @@ from terezy.core.results.ramp import (
 from terezy.core.routes import legs, ranking
 from terezy.core.routes.channels import ChannelSide, FxChannel
 from terezy.core.routes.legs import Leg, Route
-from terezy.core.routes.path import FundingPath, candidate_id
+from terezy.core.routes.path import ComposedPath, FundingPath, candidate_id
 from terezy.core.streams.streams import IncomeStream, Indexation
 from terezy.data.declarations import resolver
 
@@ -212,14 +212,20 @@ class TestTheShippedCorridorsRankAsHandComputed:
         Funded from the dollar stream, which is also the other half of §4.2's finding: money
         that arrives in dollars needs no conversion, so the conversion component is exactly
         zero rather than a small residual (FR-009).
+
+        **Reached as a chain, because that is how the declarations reach it.** The contract
+        income lands at ``deel``, not at ``coinbase`` (corrected 2026-08-23), so the way to the
+        broker is ``deel_to_coinbase`` and then this route. Neither half declares a partner, so
+        the missing exit is the chain's and the figures below are still this route's alone --
+        ``deel_to_coinbase`` charges nothing, which is what makes the arithmetic unchanged.
         """
         declarations = _declarations()
         ranked = ranking.rank(
             [
-                FundingPath(
+                ComposedPath(
                     destination_id="ibkr_usd",
                     stream_id="contract_usd",
-                    route_id="coinbase_to_ibkr",
+                    segments=("deel_to_coinbase", "coinbase_to_ibkr"),
                 )
             ],
             Money(1_000.0, Currency.USD, prov.EMPTY),
@@ -235,7 +241,9 @@ class TestTheShippedCorridorsRankAsHandComputed:
             "the only candidate has no declared exit, so there is nothing comparable to rank "
             "-- and the type says so rather than an index standing in for it"
         )
-        assert [candidate_id(cost.path) for cost in ranked.not_comparable] == ["coinbase_to_ibkr"]
+        assert [candidate_id(cost.path) for cost in ranked.not_comparable] == [
+            "deel_to_coinbase+coinbase_to_ibkr"
+        ]
         assert "exit" in ranked.reason
         one_way = ranked.not_comparable[0].one_way
         # 1 000 USD, 0.5% plus a flat 25: 5.00 + 25.00 = 30.00, and nothing converted.
@@ -521,12 +529,17 @@ class TestTheFourPluginInterfacesAreStillFour:
     def test_adding_a_leg_that_uses_a_kind_needs_no_code(self) -> None:
         """The boundary, stated as a fact about the shipped data.
 
-        Four kinds in code; thirteen legs across seven files in data, every one of them
-        selecting a kind by name. Adding the fourteenth is a line in a file.
+        Four kinds in code; many times that many legs in ``data/routes/``, every one of them
+        selecting a kind by name. Adding the next one is a line in a file — which is why the
+        assertion is a ratio and not a census: a count would have to be edited by every data
+        change, and a test that is edited by every data change stops being read.
         """
         declared = [leg for route in _declarations().routes.values() for leg in route.legs]
-        assert len(declared) == 13
         assert {leg.kind for leg in declared} <= set(legs.LEG_COST_FNS)
+        assert len(declared) > 3 * len(legs.LEG_COST_FNS), (
+            "far more declared legs than kinds in code is the whole shape of the boundary; "
+            "if the two numbers ever converge, kinds are being added per corridor"
+        )
 
 
 class TestTheLoaderAndTheHandBuiltRecordsAgree:

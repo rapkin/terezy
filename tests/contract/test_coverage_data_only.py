@@ -143,7 +143,16 @@ def test_a_new_venue_with_no_routes_appears_as_named_no_inbound_deficits(tmp_pat
         if deficit.kind == NO_INBOUND
     )
     assert missing.direction == "inbound"
-    assert missing.origin_venue in {"monobank_uah", "coinbase"}
+    # Named against *where the money actually is*: the venue some declared stream arrives at,
+    # read from the declarations rather than listed here, so correcting an arrival venue in
+    # `data/streams/` cannot leave this assertion quietly asserting the old registry.
+    arrivals = {
+        stream.arrives_at
+        for stream in resolver.coverage_from_data_root(
+            root, base_currency=Currency.UAH, scenario_id=None
+        ).ramp.streams.values()
+    }
+    assert missing.origin_venue in arrivals
     assert missing.candidates == ()
 
 
