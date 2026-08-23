@@ -76,6 +76,7 @@ def _cost_through(graph: route_graphs.Graph, amount: float) -> RampCost | RouteU
         kinds=route_graphs.KINDS,
         on_date=route_graphs.ON_DATE,
         as_of=route_graphs.AS_OF,
+        spendable=graph.spendable,
     )
 
 

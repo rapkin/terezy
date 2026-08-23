@@ -85,6 +85,7 @@ def _cost(
         kinds=route_graphs.KINDS,
         on_date=route_graphs.ON_DATE,
         as_of=route_graphs.AS_OF,
+        spendable=graph.spendable,
     )
 
 
@@ -236,6 +237,7 @@ class TestARankingExcludesTheMismatchWithItsReasonRatherThanDroppingIt:
             kinds=route_graphs.KINDS,
             on_date=route_graphs.ON_DATE,
             as_of=route_graphs.AS_OF,
+            spendable=graph.spendable,
         )
         assert isinstance(outcome, Ranking), outcome
         return outcome
@@ -268,6 +270,7 @@ class TestARankingExcludesTheMismatchWithItsReasonRatherThanDroppingIt:
             kinds=route_graphs.KINDS,
             on_date=route_graphs.ON_DATE,
             as_of=route_graphs.AS_OF,
+            spendable=graph.spendable,
         )
         assert ranked.excluded[0] == directly
 
@@ -284,6 +287,7 @@ class TestARankingExcludesTheMismatchWithItsReasonRatherThanDroppingIt:
             kinds=route_graphs.KINDS,
             on_date=route_graphs.ON_DATE,
             as_of=route_graphs.AS_OF,
+            spendable=graph.spendable,
         )
         assert isinstance(outcome, NothingComparable)
         assert len(outcome.excluded) == 1

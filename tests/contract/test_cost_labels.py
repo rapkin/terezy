@@ -36,6 +36,7 @@ import dataclasses
 import importlib
 import inspect
 import pkgutil
+import re
 from collections.abc import Iterator, Mapping
 from typing import Any, get_type_hints
 
@@ -46,6 +47,7 @@ import terezy.core.routes
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
+from terezy.core.results.coverage import SpendableEndpoint
 from terezy.core.results.ramp import (
     CostComponent,
     ExitCostUnknown,
@@ -55,6 +57,7 @@ from terezy.core.results.ramp import (
     Ranking,
     RoundTripCost,
     RouteUnusable,
+    SegmentAttribution,
     recommended_cost,
 )
 from terezy.core.routes import cost, ranking
@@ -62,15 +65,31 @@ from tests.invariants import route_graphs
 
 pytestmark = pytest.mark.contract
 
+SPENDABLE: frozenset[SpendableEndpoint] = frozenset()
+"""**Nowhere is declared spendable here, and that is deliberate.**
+
+These fixtures predate the spendable list and their subject is 002's partner rule: a route
+with a declared way out, and one without. A destination that happened to appear in this set
+would satisfy its own exit requirement by identity (003 FR-002) and quietly acquire a
+round-trip figure, turning "nobody costed the way out" into "there was nothing to do" --
+which is a different claim and is exercised where it belongs, in the composed suites and in
+``tests/invariants/test_coverage_costing_agreement.py``.
+"""
+
 LABELS = ("one_way", "round_trip")
 """The only two labels a cost figure may carry, and the only two field names that carry them."""
 
-COST_FIGURE_FIELDS = frozenset({"sent", "arrived", "components", "fraction"})
+COST_FIGURE_FIELDS = frozenset({"sent", "arrived", "components", "fraction", "by_segment"})
 """The fields that *are* a cost figure, rather than merely sitting near one.
 
 What was sent, what arrived, how the gap between them breaks down, and that gap as a fraction.
 Any record carrying one of these is pricing something, and pricing is what FR-002 requires to be
 labelled.
+
+⚙ ``by_segment`` joined with feature 004. It is the **same charge as ``components``, split by
+segment instead of by term** (004 FR-020), so it is a cost figure by every reading that makes
+``components`` one -- and putting it anywhere else would let the second axis of an attribution
+grow outside a labelled record while the first stayed inside one.
 """
 
 NON_COST_MONEY_FIELDS = frozenset(
@@ -107,6 +126,13 @@ NON_COST_FIELDS = frozenset(
         # Keys and identity.
         "path",
         "id",
+        # 004: which way back out this figure is keyed by (FR-012), and which segment of a
+        # chain refused (FR-015). Both are identity -- a chain of route ids and a position --
+        # and neither is a number a reader could mistake for a price.
+        "exit_path",
+        "binding_segment",
+        "position",
+        "route_id",
         # Reported beside a cost, never inside one.
         "latency_days",
         "status",
@@ -142,6 +168,7 @@ record -- that totality is the "not sampled" clause, and an unclassified field f
 RESULT_RECORDS = (
     OneWayCost,
     RoundTripCost,
+    SegmentAttribution,
     ExitCostUnknown,
     RampCost,
     RouteUnusable,
@@ -225,6 +252,7 @@ def _cost_one_of(graph: route_graphs.Graph) -> RampCost | Any:
         kinds=route_graphs.KINDS,
         on_date=route_graphs.ON_DATE,
         as_of=route_graphs.AS_OF,
+        spendable=SPENDABLE,
     )
 
 
@@ -246,6 +274,7 @@ def _ranked() -> Ranking:
         kinds=route_graphs.KINDS,
         on_date=route_graphs.ON_DATE,
         as_of=route_graphs.AS_OF,
+        spendable=SPENDABLE,
     )
     assert isinstance(ranked, Ranking), ranked
     return ranked
@@ -254,10 +283,16 @@ def _ranked() -> Ranking:
 class TestACostFigureLivesOnlyInALabelledRecord:
     """The structural half: there is no third place for a price to appear."""
 
-    def test_only_the_two_labelled_records_carry_a_cost_figure(self) -> None:
+    def test_only_labelled_records_and_their_parts_carry_a_cost_figure(self) -> None:
         # A ``fraction`` promoted onto ``RampCost`` "for convenience" would be an unlabelled
         # cost, and it would be the one a caller reached for first. So the set of records
-        # carrying a cost figure is asserted to be exactly the two that carry a label.
+        # carrying a cost figure is pinned, and it is short.
+        #
+        # ⚙ ``SegmentAttribution`` joined it with feature 004 (FR-020). It is not a third
+        # labelled record: it is a *part* of the two, reachable only through a field named
+        # ``one_way`` or ``round_trip``, so the label still travels with the figure. The next
+        # test is what turns that sentence into a check -- without it, this list would be an
+        # allowlist and the exemption would be the hole.
         carriers = {
             name
             for name, record in _records()
@@ -266,7 +301,30 @@ class TestACostFigureLivesOnlyInALabelledRecord:
         assert carriers == {
             "terezy.core.results.ramp.OneWayCost",
             "terezy.core.results.ramp.RoundTripCost",
+            "terezy.core.results.ramp.SegmentAttribution",
         }
+
+    def test_every_unlabelled_cost_carrier_is_reachable_only_through_a_label(self) -> None:
+        # The claim the exemption above rests on, checked rather than asserted in prose: a
+        # record carrying a cost figure that is neither labelled itself nor a field of a
+        # labelled record would be a price a reader could reach without ever passing the words
+        # "one way" or "round trip" (FR-002).
+        labelled = {OneWayCost.__name__, RoundTripCost.__name__}
+        held: set[str] = set()
+        for record in (OneWayCost, RoundTripCost):
+            for field in dataclasses.fields(record):
+                held.update(re.findall(r"[A-Z]\w+", str(field.type)))
+        unreachable = [
+            record.__name__
+            for _, record in _records()
+            if {field.name for field in dataclasses.fields(record)} & COST_FIGURE_FIELDS
+            and record.__name__ not in labelled
+            and record.__name__ not in held
+        ]
+        assert not unreachable, (
+            "these carry a cost figure and are not reachable through a field named one_way or "
+            "round_trip, so nothing labels them (FR-002): " + ", ".join(sorted(unreachable))
+        )
 
     def test_every_field_holding_a_one_way_figure_is_named_one_way(self) -> None:
         offenders = [

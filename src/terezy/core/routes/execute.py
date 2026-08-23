@@ -79,6 +79,7 @@ from terezy.core.ledger.events import CausationKind, CausationRef, Event, EventK
 from terezy.core.primitives import money
 from terezy.core.primitives.money import Money
 from terezy.core.results.ramp import CostComponent, RampCost
+from terezy.core.routes.path import candidate_id, segments_of
 
 COMPONENT_DETAIL: dict[CostComponent, str] = {
     CostComponent.CONVERSION_SPREAD: (
@@ -119,13 +120,27 @@ def _cause(cost: RampCost, detail: str) -> CausationRef:
     neither, and making it claim one of those two would produce a traceable figure pointing at
     the wrong declaration -- worse than a widened set of causes, which is why ``CausationKind``
     gained a third member with this feature rather than this module borrowing an existing one.
+
+    **A composed candidate names its whole chain**, joined by ``+`` (004 FR-013). A declared
+    route is one id and every event feature 002 emitted is unchanged. For a chain the ``id`` is
+    every segment in order, because the charge this line records is the **chain's**: the events
+    below carry one figure per component for the whole movement, and naming one segment for a
+    fee several of them contributed to would point a reader at the wrong declaration. Which
+    segment charged what is on the cost itself, in ``RampCost.one_way.by_segment``, and the
+    ``detail`` says so in words.
     """
+    segments = segments_of(cost.path)
+    through = (
+        f"route {segments[0]!r}"
+        if len(segments) == 1
+        else f"the chain {' -> '.join(segments)}, segment by segment in RampCost.by_segment"
+    )
     return CausationRef(
         kind=CausationKind.ROUTE_TERM,
-        id=cost.path.route_id,
+        id=candidate_id(cost.path),
         detail=(
             f"{detail}, funding {cost.path.destination_id!r} from stream "
-            f"{cost.path.stream_id!r} by route {cost.path.route_id!r}"
+            f"{cost.path.stream_id!r} by {through}"
         ),
     )
 
