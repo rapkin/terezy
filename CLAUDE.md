@@ -45,6 +45,14 @@ concise body, no `Co-Authored-By` or other attribution trailers).
 exactly that. The commit grant is about not making the user click a button, not about
 rewriting history.
 
+**`/condense` runs after the work is green and before the review.** It reads the branch diff
+and cuts the prose that does not earn its place — restatement, and claims about elsewhere
+that nothing checks — while keeping what prevents a named defect. In that order for two
+reasons: the review then reads the text that will land, and the review's own check on
+unverifiable claims applies to the condensed version rather than to prose about to be
+deleted. It is also the one pass that re-reads every comment on the branch, which is where a
+stale claim otherwise survives.
+
 **A code review is a blocking gate before anything lands on `main`.** Not a courtesy pass
 and not something to note as skipped: run `/code-review` over the diff and iterate until it
 comes back clean. It is the only gate that catches what the machine cannot — a guard whose
