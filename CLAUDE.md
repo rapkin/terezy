@@ -45,6 +45,19 @@ concise body, no `Co-Authored-By` or other attribution trailers).
 exactly that. The commit grant is about not making the user click a button, not about
 rewriting history.
 
+**A code review is a blocking gate before anything lands on `main`.** Not a courtesy pass
+and not something to note as skipped: run `/code-review` over the diff and iterate until it
+comes back clean. It is the only gate that catches what the machine cannot — a guard whose
+message is false, a test that passes for the wrong reason, a claim in a docstring that the
+code stopped honouring. The commit grant does **not** extend to landing unreviewed work.
+
+**The review must cover the diff that is actually merged.** If the branch changes after a
+review — new commits fixing the findings, or `main` merged in — that review is spent, and
+the new work is reviewed before landing. Merging `main` in counts: it can turn a gate red
+that was green (a stricter gate on `main` meeting a file the branch added) and it can change
+a function the branch's tests pin. "The earlier round was reviewed" is not a review of what
+is being merged. Say plainly which diff was reviewed and which was not.
+
 **Worktrees for parallel work.** Work that must not collide with `main`'s working tree
 (parallel spec-writing, an isolated experiment) runs in a git worktree under
 `.claude/worktrees/` (gitignored). Name the directory and the branch for the work, never

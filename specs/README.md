@@ -30,10 +30,27 @@ Every feature goes through the same six steps. None is optional.
 3. **Gates at every checkpoint.** `ruff check` + `ruff format --check .`, `mypy`,
    `pytest --cov`, `lint-imports`, `check_provenance.py` — all green before any commit
    (the `/commit` skill runs them). Never loosen a gate to pass it.
-4. **Review, then iterate.** Before landing: a code review pass over the branch diff
-   (correctness, then quality), plus the two manual reviews no gate can do — provenance
-   marks surviving every figure-producing site, and every tolerance being the imported
-   one. Findings are fixed on the branch; iterate until the review comes back clean.
+4. **Review, then iterate. This is a blocking gate, not a courtesy pass.** Before
+   landing: a `/code-review` pass over the branch diff (correctness, then quality), plus
+   the two manual reviews no gate can do — provenance marks surviving every
+   figure-producing site, and every tolerance being the imported one. Findings are fixed
+   on the branch; iterate until the review comes back clean. **Nothing lands on `main`
+   without it**, and a review that was skipped is reported as skipped rather than
+   quietly omitted.
+
+   **The review must cover the diff that is actually merged.** A review is spent the
+   moment the branch changes after it — commits fixing its own findings, or `main`
+   merged in. Both need reviewing before landing, and the second is the one that gets
+   forgotten: merging `main` in can turn a green gate red (a gate that grew stricter on
+   `main`, meeting a file only this branch has) and can change a function the branch's
+   tests pin. "The earlier round was reviewed" is a statement about a diff that no
+   longer exists.
+
+   The gates and the review answer different questions. Green gates say the code runs,
+   types and stays inside its layer. The review is what catches a guard whose refusal
+   message is false, a test green because it asserts nothing, a docstring teaching a rule
+   the code abandoned, and a passing property whose scope quietly excludes the case it
+   claims to cover — every one of which has happened here, on work whose gates were green.
 5. **Land on `main`.** Two shapes, by the size of the unit:
    - **Spec-only or doc-only work: squash** to one fresh commit per unit (one spec =
      one commit); the branch's draft commits never reach `main`.
