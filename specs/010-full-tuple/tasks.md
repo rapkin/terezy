@@ -102,8 +102,9 @@ golden this feature must not move. The long-term home is recorded in METHODOLOGY
 
 ## Phase 9 — documentation and the ledger of what is covered
 
-- [ ] **T080** `docs/METHODOLOGY.md` §28, and §28 "Where to look next" renumbered to §29.
-- [ ] **T081** `docs/REQUIRED_TESTS.md` — H1 flipped with its path, plus the reinforcement
+- [x] **T080** `docs/METHODOLOGY.md` §28, `data/README.md`'s directory table, and §28
+      "Where to look next" renumbered to §29.
+- [x] **T081** `docs/REQUIRED_TESTS.md` — H1 flipped with its path, plus the reinforcement
       table for the rows this feature strengthens without closing.
-- [ ] **T082** `specs/features.toml` — `010-full-tuple` to `in-progress` (the landing change
+- [x] **T082** `specs/features.toml` — `010-full-tuple` to `in-progress` (the landing change
       flips it to `done`; that is the owner's).

@@ -132,7 +132,7 @@ Compliance tests for Principle II. May not be skipped without an amendment.
 
 | # | Example | Test |
 |---|---|---|
-| H1 | Adding a new instrument, route, tax class and jurisdiction **in data only** — no engine edit — runs the full pipeline and appears in the comparison. | `[ ]` |
+| H1 | Adding a new instrument, route, tax class and jurisdiction **in data only** — no engine edit — runs the full pipeline and appears in the comparison. **Closed by feature 010**, and it did not pass for free: nothing declared *where* an instrument is bought, so the join could anchor neither of its two seams. That gap was closed as a declaration kind (`data/access/`, `docs/METHODOLOGY.md` §28.6) rather than as a special case inside the join — FR-023's rule, and the reason this row is worth having. | `[x]` `tests/contract/test_h1_data_only.py` |
 | H2 | A malformed or unknown field in any data file fails loudly at load time, naming file and field; it never silently defaults. | `[x]` `tests/contract/test_declaration_loading.py` |
 | H3 | Every data file's values round-trip through the run manifest, so a result traces to the exact configuration that produced it. | `[ ]` |
 | H4 | Architecture boundaries hold: the core imports no I/O, no network, no framework, and nothing from a layer above it. | `[x]` `tests/contract/test_architecture_boundaries.py` |
@@ -230,6 +230,15 @@ never an omission. `tests/contract/test_diagram_refusals.py`.
 | **E5** | Pressed on from a new direction: the propagating mark now describes the *owner's own memory* rather than only a market observation, and it reaches the tax through the transforms that already existed rather than through a second system. `tests/contract/test_estimated_basis_propagates.py` sweeps every money field of `TaxCharge` from the dataclass, so a field added later is inside the 100% claim. The row's own test stays `tests/contract/test_provenance_propagation.py`. |
 | **B10** | Exercised again, and deliberately in the opposite direction from 003: no seeds and no goals is an **ordinary run**, not a typed empty outcome, because an absent holding cannot be mistaken for a mistyped path. `tests/contract/test_empty_seeds_and_goals.py`. The row is about insufficient data anywhere in the engine, so one feature's rule about emptiness does not close it. |
 | **H2** | Two new declarations fail at load naming file and field for every refusal in their contract, on the existing loader path: `tests/contract/test_seed_declaration_loading.py`, `tests/contract/test_goal_declaration_loading.py`. The row's own test stays `tests/contract/test_declaration_loading.py`. |
+
+**010-full-tuple** closes **H1**. Four rows it reinforces without closing:
+
+| Row | How, and why the box does not move |
+|---|---|
+| **G6** | Extended, not re-derived: a third labelled cost record, `WayOutCost`, prices what an instrument *released* rather than what a ramp delivered — unrelated to `OneWayCost` and `RoundTripCost` by type, so none can stand in for another. `tests/contract/test_cost_labels.py` was widened to pin it. The row is 002's and stays where it is. |
+| **I4** | *Naive baseline strategies always scored.* Half of it is now structural: the hurdle is always scored, always shown, and held as an **index** into the ranking rather than as a second figure beside it (`tests/contract/test_the_hurdle_is_a_tuple.py`). The box stays open because I4 is about a *strategy* shortlist, and there is no decision layer to shortlist anything yet. |
+| **F1** | The FX tax asymmetry stays with the feature that introduces a real taxable foreign instrument. What 010 adds is the refusal in its place: a taxable event in a currency the tax is not assessed in names the missing official-rate machinery rather than converting at a channel rate (`tests/unit/test_rate_and_horizon_boundaries.py`). Unreachable through the shipped registry, which is a property of today's data. |
+| **H3** | Unmoved and worth naming: the new `data/access/` declarations are **not** in the run manifest's input references, so a result does not yet trace to the access file that priced its purchase. H3 asks for every data file's values to round-trip through the manifest, and this feature widened what a run reads without widening what it records. |
 
 ---
 
