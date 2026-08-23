@@ -518,8 +518,10 @@ class TestAComposedCandidateDrawsAsTheChainItIs:
     the ``COMPOSED`` mark, the caption saying so in words, and a ``segment`` field on every
     edge naming the declared route that hop **is**.
 
-    The fixture is hand-built because the shipped registry composes nothing — see
-    ``diagram_registries.CHAIN_IN`` for why searching for one would have produced no test.
+    The fixture is hand-built rather than searched for: the shipped registry does now hold one
+    inbound chain (``deel_to_coinbase`` + ``coinbase_to_ibkr``), but a fixture pins the *drawing*
+    of a chain, which is this feature's claim, while the search is 004's and is tested there.
+    See ``diagram_registries.CHAIN_IN``.
     """
 
     @staticmethod

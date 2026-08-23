@@ -1634,6 +1634,19 @@ The gap it closes grows with the registry. UAH salary → Binance is declared; B
 declared; UAH salary → IBKR **via** Binance did not exist until somebody sat down and hand-wrote
 the concatenation, and every new venue multiplies the concatenations nobody will write.
 
+The shipped registry gained its first such chain on 2026-08-23, when the owner's contract income
+was declared to arrive at Deel rather than at Coinbase. `deel_to_coinbase` is declared and
+`coinbase_to_ibkr` is declared; **contract income → IBKR** is neither, and exists only as the
+composition of the two. Nothing about the broker corridor changed — it is the arrival venue that
+moved one hop upstream, and composition is what keeps the corridor reachable without anybody
+writing a third file that duplicates the two.
+
+Note what composition does **not** do: the coverage audit (§20) measures one declared hop from
+where the money is and does not chain two, so it reports `(ibkr_usd, USD) × contract_usd` as
+short a way in under both declared regimes even though a costable chain reaches it. The audit
+answers *what has been declared*; composition answers *what can be costed today*. Reading either
+as the other overstates one of them.
+
 **A composed candidate is its own kind of candidate**, not a route with a joined id. Where a
 declared route is a `FundingPath`, a chain is a `ComposedPath` carrying its segments in order, and
 every ranking, report and recommendation shows it segment by segment with each segment naming the
