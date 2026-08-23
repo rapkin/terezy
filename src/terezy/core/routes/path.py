@@ -305,6 +305,25 @@ def exit_segments_of(chain: ExitChain) -> tuple[str, ...]:
             assert_never(chain)
 
 
+def exit_chain_of(candidate: Candidate) -> ExitChain:
+    """One enumerated way out, read as the exit chain a round trip is keyed by.
+
+    :func:`terezy.core.routes.compose.compose` answers both directions in the same shape -- a
+    tuple of candidates -- because it is the same search. This is the one-line translation on
+    the way out: one segment is a :class:`DeclaredExit`, several are a :class:`ComposedExit`,
+    and the two are different claims about how much was observed rather than two spellings of
+    one.
+
+    **It never returns :data:`EXIT_BY_IDENTITY`.** That case is not a chain and cannot be found
+    by searching for one: it is the destination appearing in the owner's declared spendable
+    list, which is a fact about his life and is his to state rather than the search's to infer.
+    """
+    segments = segments_of(candidate)
+    if len(segments) == 1:
+        return DeclaredExit(route_id=segments[0])
+    return ComposedExit(segments=segments)
+
+
 def candidate_id(candidate: Candidate) -> str:
     """A candidate as one string, for a ledger line's causation reference.
 

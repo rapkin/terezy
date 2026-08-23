@@ -212,7 +212,7 @@ def rank(
     on_date: date,
     as_of: date,
 ) -> Ranking | NothingComparable:
-    """Cost every candidate with ``cost_one`` and order the comparable ones. FR-016, FR-029.
+    """Cost every candidate with ``cost_one`` and order the comparable ones. FR-016, FR-018, FR-029.
 
     **One league, over both kinds of candidate** (004 FR-010). A composed chain enters the same
     lexicographic ordering as a declared route, under the same tie rules, with no bonus and no

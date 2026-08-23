@@ -173,8 +173,15 @@ def _normalised(
     exactly what SC-013 checks for. So the index is renumbered first and compared second, and
     that is said here rather than left for a reader to notice.
 
-    Every other field is compared as declared. Two chains differing in any leg or any term are
-    genuinely different candidates and both stand.
+    Every declared **term** is compared: kind, endpoints, currencies, channel, both fees, the
+    limits, the rail, the latency, the window and the disruption probability. Two chains
+    differing in any one of them are genuinely different candidates and both stand.
+
+    ⚙ **Provenance is deliberately not compared.** It records *which file declared* a movement,
+    not what the movement is, so two declarations of the same real-world sequence differing only
+    in their citations are still the same sequence -- and FR-009 is about a ranking never holding
+    one movement twice. Including it would make the rule unreachable in exactly the case it was
+    written for.
     """
     fields: list[tuple[object, ...]] = []
     position = 0
@@ -209,21 +216,24 @@ def _normalised(
     return tuple(fields)
 
 
-def _candidate(
-    chain: tuple[str, ...], *, destination_id: str, stream_id: str, routes: Mapping[str, Route]
-) -> Candidate:
+def _candidate(chain: tuple[str, ...], *, stream_id: str, routes: Mapping[str, Route]) -> Candidate:
     """One chain as the candidate it is: a declared route, or a composition of several.
 
     A one-segment chain **is** a declared route and is emitted as a :class:`FundingPath`, so a
     single-element ``ComposedPath`` never exists. The distinction is the type and not a flag
     (FR-013): a reader of a ranking can see which comparisons rest on composition without
     parsing an id.
+
+    **Both kinds take their destination from where the last segment arrives**, rather than from
+    the target that was asked for. The two coincide for an inbound enumeration and they do
+    **not** for an exit one, where the target is a set of spendable endpoints and the question
+    started at the destination: a one-segment way out labelled with the venue it left would name
+    the wrong end of its own journey.
     """
+    arrival = routes[chain[-1]].destination
     if len(chain) == 1:
-        return FundingPath(destination_id=destination_id, stream_id=stream_id, route_id=chain[0])
-    return ComposedPath(
-        destination_id=routes[chain[-1]].destination, stream_id=stream_id, segments=chain
-    )
+        return FundingPath(destination_id=arrival, stream_id=stream_id, route_id=chain[0])
+    return ComposedPath(destination_id=arrival, stream_id=stream_id, segments=chain)
 
 
 def _deduplicated(
@@ -293,9 +303,12 @@ def compose(
     For ``direction="inbound"`` a chain starts where the stream's money arrives and ends at
     ``destination``. For ``direction="exit"`` it starts at ``destination`` and ends at any
     declared spendable endpoint -- the same function, the same rules, the bound applying to each
-    chain **separately** (research.md D9): a shared budget across the pair would make an inbound
-    path's reachability depend on which exit chain it happened to be paired with, entangling two
-    independently declared facts.
+    chain **separately** (research.md D9). An exit enumeration's candidates describe **ways
+    out**: each one's ``destination_id`` is the spendable endpoint it reaches, and
+    :func:`terezy.core.routes.path.exit_chain_of` turns one into the
+    :class:`~terezy.core.routes.path.ExitChain` a round trip is keyed by. A shared budget across
+    the pair would make an inbound path's reachability depend on which exit chain it happened to
+    be paired with, entangling two independently declared facts.
 
     Returns an :class:`~terezy.core.results.composed.Enumeration` -- possibly with **no**
     candidates, which is a legitimate answer meaning "nothing connects" -- or a
@@ -329,15 +342,7 @@ def compose(
     # declared route rather than whichever concatenation happened to be visited first.
     ordered = tuple(sorted(set(chains), key=lambda chain: (len(chain), chain)))
     candidates = _deduplicated(
-        [
-            _candidate(
-                chain,
-                destination_id=destination.venue_id,
-                stream_id=stream.id,
-                routes=routes,
-            )
-            for chain in ordered
-        ],
+        [_candidate(chain, stream_id=stream.id, routes=routes) for chain in ordered],
         routes,
         ordered,
     )

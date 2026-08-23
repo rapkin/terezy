@@ -74,10 +74,12 @@ from terezy.core.routes.path import (
     FROM_THE_DECLARATION,
     ComposedExit,
     ComposedPath,
+    DeclaredExit,
     ExitChoice,
     FundingPath,
     Journey,
     candidate_id,
+    exit_chain_of,
 )
 from tests import composed_registries as fixtures
 
@@ -231,6 +233,50 @@ class TestAWayOutReachableOnlyByChaining:
             "out_broker_to_exchange",
             "out_exchange_to_home",
         ]
+
+    def test_an_enumerated_way_out_reads_as_the_chain_a_round_trip_is_keyed_by(self) -> None:
+        """The bridge between the two halves of the feature.
+
+        ``compose`` answers both directions in the same shape, because it is the same search;
+        ``exit_chain_of`` is the one-line translation that turns a way out into the key a
+        round-trip figure carries. Without it every caller would rebuild the chain by hand, and
+        the two spellings would eventually disagree.
+        """
+        world = fixtures.two_hop()
+        result = compose.compose(
+            routes=world.routes,
+            stream=world.streams[fixtures.SALARY.id],
+            destination=fixtures.BROKER_USD,
+            direction="exit",
+            regime_id=fixtures.REGIME_ID,
+            bound=SegmentBound(max_segments=3),
+            spendable=world.spendable,
+        )
+        assert isinstance(result, Enumeration)
+        (way_out,) = result.candidates
+        assert exit_chain_of(way_out) == EXIT_CHAIN
+        # And the way out is labelled by the venue it **reaches**, not the one it left: the
+        # target of an exit enumeration is the spendable list, and a candidate naming the
+        # broker would be naming the wrong end of its own journey.
+        assert way_out.destination_id == fixtures.HOME
+
+    def test_a_single_declared_way_out_reads_as_a_declared_exit(self) -> None:
+        """One segment is a ``DeclaredExit`` and several are a ``ComposedExit``: two different
+        claims about how much was observed, not two spellings of one."""
+        world = fixtures.two_hop()
+        result = compose.compose(
+            routes=world.routes,
+            stream=world.streams[fixtures.SALARY.id],
+            destination=fixtures.EXCHANGE_USD,
+            direction="exit",
+            regime_id=fixtures.REGIME_ID,
+            bound=SegmentBound(max_segments=3),
+            spendable=world.spendable,
+        )
+        assert isinstance(result, Enumeration)
+        (way_out,) = result.candidates
+        assert exit_chain_of(way_out) == DeclaredExit(route_id="out_exchange_to_home")
+        assert way_out.destination_id == fixtures.HOME
 
     def test_the_exit_chain_is_part_of_the_figure_s_identity(self) -> None:
         """FR-012's first consequence: a round-trip figure is keyed per exit chain, so the
