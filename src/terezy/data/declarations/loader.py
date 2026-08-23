@@ -68,6 +68,7 @@ from terezy.core.primitives.staleness import ObservationKind
 from terezy.core.results.coverage import SpendableEndpoint
 from terezy.core.routes import capacity, legs
 from terezy.core.routes.channels import ChannelSide, FxChannel, Side, effective_rate
+from terezy.core.routes.compose import SegmentBound
 from terezy.core.routes.legs import Leg, Route
 from terezy.core.routes.venues import Venue
 from terezy.core.scenarios.regimes import Regime, RegimeTransition
@@ -2062,3 +2063,63 @@ def spendable_from_file(path: Path) -> tuple[str, tuple[SpendableEndpoint, ...]]
         seen[(venue_id, currency)] = position
         endpoints.append(SpendableEndpoint(venue_id=venue_id, currency=currency))
     return owner_id, tuple(endpoints)
+
+
+# ---------------------------------------------------------------------------
+# 004-composed-paths: the segment bound
+# ---------------------------------------------------------------------------
+#
+# Same four responsibilities -- read, shape, meaning, construct -- over the smallest declaration
+# in the project, and the same difference `spendable` already has: **no citation is read and
+# none is expected.** How far the owner is willing to let a search run is a statement about his
+# own preferences, not an observation of the world.
+#
+# `scripts/check_provenance.py` therefore does not scan `data/composition/` -- but **not**
+# because the directory is absent from `SOURCED_DIRS`. That gate is fail-closed over the whole
+# data tree: a directory in neither list is an *error*, never a blind spot. `composition` goes
+# unscanned only because it is named in `EXEMPT_DIRS` **with its reason recorded beside it**,
+# which is the one way a directory is permitted to be out of scope. If a number that describes
+# the world ever has to live here it moves to a sourced directory, rather than the exemption
+# widening to cover it.
+#
+# **The one refusal that is this feature's own**: `max_segments` below 1. It is checked here
+# rather than in the schema because the message has to name the file and say what the number
+# would mean -- a bound of 0 admits nothing at all, including declared routes, so it is a broken
+# registry and not a way to turn composition off. A bound of 1 *is* that way, and it loads.
+#
+# What is *not* here, because it needs a second file: whether the owner owns the streams the
+# bound is resolved with. That is a relation, and it lives in the resolver where both are in
+# hand.
+
+COMPOSITION_TABLE: Final = "composition"
+"""Root table of a composition file, and the prefix of every field path in one."""
+
+
+def composition_from_file(path: Path) -> tuple[str, SegmentBound]:
+    """One ``data/composition/<owner>.toml`` as its owner id and the declared bound.
+
+    Returns the owner id beside the bound rather than folding it into the record: the bound is
+    a number and the owner is a property of the *file*, and a core record carrying him would be
+    one fact in two places (the same shape as ``spendable_from_file``).
+    """
+    document = read_document(path)
+    file = _validate(schema.CompositionFile, document, path)
+    owner_id = _require_text(
+        path,
+        f"{OWNER_TABLE}.id",
+        file.owner.id,
+        "the segment bound is one person's policy about his own registry, and it is resolved "
+        "against that person's income streams (Principle VII)",
+    )
+    if file.composition.max_segments < 1:
+        raise DeclarationError(
+            path,
+            f"{COMPOSITION_TABLE}.max_segments",
+            f"declares {file.composition.max_segments}, and a candidate has at least 1 segment. "
+            "A bound below 1 admits nothing at all -- not even a declared route -- so it is a "
+            "broken registry rather than a way to switch composition off. Enumerating nothing "
+            "for it would report every corridor as unreachable while the fault was one digit.",
+            "write max_segments = 1 to consider only declared routes, or a larger number to "
+            "chain that many",
+        )
+    return owner_id, SegmentBound(max_segments=file.composition.max_segments)

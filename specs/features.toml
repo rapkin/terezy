@@ -28,7 +28,7 @@ needs  = ["002-ramp-cost"]
 
 [[feature]]
 id     = "004-composed-paths"
-status = "spec"
+status = "in-progress"
 needs  = ["002-ramp-cost", "003-route-coverage"]
 why    = "the spendable-endpoint list is declared by 003 (its FR-004); 004's composed exit chains end there (its FR-022)"
 

@@ -65,6 +65,13 @@ EXEMPT_DIRS: dict[str, str] = {
         "engine applies to a taxable event needs a source; a rate the owner states about "
         "his own payslip does not (contracts/declaration-schema.md, data/README.md)"
     ),
+    "composition": (
+        "the owner's own policy on how far a search may run -- how many declared routes may "
+        "be chained into one candidate. Nothing here describes the world, so there is nothing "
+        "for a source to vouch for: it is the same exemption `objectives` and `strategies` "
+        "carry, and for the same reason. Every *number* that describes a corridor lives on a "
+        "leg, in data/routes/, cited (004 research.md D8)"
+    ),
     "spendable": (
         "the owner's own statement of where he spends -- a venue id and a currency code, "
         "and nothing a source could vouch for. It is the same exemption `streams` has and "
