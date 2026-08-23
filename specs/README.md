@@ -17,7 +17,7 @@ A stale graph misdirects every agent that reads it.
 
 ## The lifecycle of one feature
 
-Every feature goes through the same six steps. None is optional.
+Every feature goes through the same seven steps. None is optional.
 
 1. **Worktree.** Create a readable worktree and branch named for the work —
    `git worktree add .claude/worktrees/006-goals -b feat/006-goals` (spec-only work:
@@ -30,7 +30,12 @@ Every feature goes through the same six steps. None is optional.
 3. **Gates at every checkpoint.** `ruff check` + `ruff format --check .`, `mypy`,
    `pytest --cov`, `lint-imports`, `check_provenance.py` — all green before any commit
    (the `/commit` skill runs them). Never loosen a gate to pass it.
-4. **Review, then iterate. This is a blocking gate, not a courtesy pass.** Before
+4. **Condense.** Once the work is green, `/condense` over the branch diff: cut what does not
+   earn its place, in prose and in code, on one rule — **one fact, one place**. Keep what
+   prevents a named defect and what makes a wrong state unrepresentable. Before the review, not after, so the
+   review reads what will land. It is also the only pass that re-reads every comment on the
+   branch, which is where a stale claim otherwise survives to be found expensively later.
+5. **Review, then iterate. This is a blocking gate, not a courtesy pass.** Before
    landing: a `/code-review` pass over the branch diff (correctness, then quality), plus
    the two manual reviews no gate can do — provenance marks surviving every
    figure-producing site, and every tolerance being the imported one. Findings are fixed
@@ -51,7 +56,7 @@ Every feature goes through the same six steps. None is optional.
    message is false, a test green because it asserts nothing, a docstring teaching a rule
    the code abandoned, and a passing property whose scope quietly excludes the case it
    claims to cover — every one of which has happened here, on work whose gates were green.
-5. **Land on `main`.** Two shapes, by the size of the unit:
+6. **Land on `main`.** Two shapes, by the size of the unit:
    - **Spec-only or doc-only work: squash** to one fresh commit per unit (one spec =
      one commit); the branch's draft commits never reach `main`.
    - **A full feature implementation: a regular merge** (`git merge --no-ff`), keeping
@@ -62,7 +67,7 @@ Every feature goes through the same six steps. None is optional.
    Either way, the landing change also flips the feature's rows in
    `docs/REQUIRED_TESTS.md`, updates `docs/METHODOLOGY.md` for any new formula, and
    flips `status` in `features.toml`.
-6. **Clean up.** Remove the worktree and delete the branch immediately after landing.
+7. **Clean up.** Remove the worktree and delete the branch immediately after landing.
    `main` is the only long-lived branch.
 
 ## Adding a feature to the graph
