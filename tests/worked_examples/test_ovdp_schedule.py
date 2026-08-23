@@ -400,8 +400,13 @@ class TestTheHurdleRate:
         # states its own boundaries instead of letting a reader assume it is
         # comparison-ready.
         hurdle: HurdleRate = _projection().hurdle
-        assert isinstance(hurdle.real, RealTermsUnavailable)
-        assert "inflation" in hurdle.real.reason
+        # This projection declares no CPI series and no inflation assumption, so both real
+        # figures are unavailable and each names its own absence (007 FR-012). The two
+        # nominal figures are unaffected, which is the point of the assertion below them.
+        assert isinstance(hurdle.real.realized, RealTermsUnavailable)
+        assert isinstance(hurdle.real.assumed, RealTermsUnavailable)
+        assert "CPI" in hurdle.real.realized.reason
+        assert "inflation" in hurdle.real.assumed.reason
         assert hurdle.excludes
         assert any("inflation" in item for item in hurdle.excludes)
         assert any("route" in item for item in hurdle.excludes)

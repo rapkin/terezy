@@ -1,10 +1,17 @@
-"""SC-011: the real-terms slot is present, explicitly empty, and carries its reason.
+"""SC-011: the real-terms slot is present, says what is in it, and never holds a nominal figure.
 
-FR-022 leaves a known incompleteness open on purpose. Inflation is not modelled in this
-feature, so the hurdle rate is nominal -- and a nominal 15.5% against double-digit
-inflation is a materially different proposition from a real one. The requirement is
-therefore not "compute a real figure" but "never let a reader mistake the nominal one for
-it": the slot must be **present**, **explicitly empty**, and must **say why**.
+FR-022 reserved this slot and required that a reader never mistake the nominal figure for a
+real one -- a nominal 15.5% against double-digit inflation being a materially different
+proposition. Feature 001 satisfied that by keeping the slot **present**, **explicitly empty**
+and **saying why**.
+
+⚙ **Feature 007 filled it, and this module is the record that the promise held.** The slot is
+still exactly one field named ``real``; what it holds is now a ``RealTerms`` carrying two
+independently typed figures. A projection given no CPI series -- which is what the fixture
+below does, calling ``project`` exactly as feature 001 called it -- still produces a
+shape-identical result, with both figures unavailable and each naming its own absence
+(FR-006, US1 scenario 5). That call being unchanged is the assertion, not an accident of the
+fixture.
 
 Three lines of defence, and only two of them are here.
 
@@ -13,8 +20,9 @@ and ``RealRate`` are unrelated frozen records, so::
 
     HurdleRate(..., real=NominalRate(0.16), ...)   # error: incompatible type
 
-is a mypy failure at the assignment. That check cannot be written as a runtime test --
-asserting it here would mean asserting that the type checker ran -- so it lives in the
+is a mypy failure at the assignment, and it survived the slot changing occupant: a
+``NominalRate`` is not a ``RealTerms`` either. That check cannot be written as a runtime test
+-- asserting it here would mean asserting that the type checker ran -- so it lives in the
 ``mypy`` gate, and this module's job is the second line: the runtime shape. The third is
 review.
 """
@@ -25,7 +33,7 @@ import pytest
 
 from terezy.core.primitives.rates import NominalRate, RealRate, RealTermsUnavailable
 from terezy.core.results import project
-from terezy.core.results.hurdle import HurdleRate
+from terezy.core.results.hurdle import HurdleRate, RealTerms
 from terezy.core.results.project import Projection
 from tests import synthetic
 
@@ -42,33 +50,51 @@ def _hurdle() -> HurdleRate:
     return outcome.hurdle
 
 
-def test_the_real_slot_is_present_and_explicitly_empty() -> None:
-    """Never absent. An absent field would read as an oversight; this reads as a decision."""
-    assert isinstance(_hurdle().real, RealTermsUnavailable)
+def test_the_real_slot_is_present_and_is_still_exactly_one_field() -> None:
+    """Never absent, and never split in two. FR-006's invariance, asserted on the record itself.
+
+    Two figures arrived without the result growing a field, which is the whole content of
+    001's reservation: a second field beside ``real`` would have broken every consumer the
+    reservation existed to protect.
+    """
+    hurdle = _hurdle()
+    assert isinstance(hurdle.real, RealTerms)
+    assert [field for field in HurdleRate.__dataclass_fields__ if "real" in field] == ["real"]
 
 
-def test_the_empty_slot_carries_a_reason_naming_inflation() -> None:
-    """FR-017: every degraded outcome carries its reason, and the reason reaches output."""
+def test_a_projection_given_no_cpi_reports_both_absences_and_neither_as_a_number() -> None:
+    """FR-017 and FR-012: every degraded outcome carries a reason, and the reason is specific."""
     real = _hurdle().real
-    assert isinstance(real, RealTermsUnavailable)
-    assert "inflation" in real.reason
-    assert real.reason.strip()
+    assert isinstance(real.realized, RealTermsUnavailable)
+    assert isinstance(real.assumed, RealTermsUnavailable)
+    assert "no CPI series" in real.realized.reason
+    assert "assumption" in real.assumed.reason
 
 
-def test_the_slot_never_holds_a_real_rate_this_feature_did_not_compute() -> None:
-    """Nothing in feature 001 measures inflation, so nothing may fill this with a number."""
-    assert not isinstance(_hurdle().real, RealRate)
+def test_the_slot_never_holds_a_real_rate_that_was_not_computed_from_declared_data() -> None:
+    """No CPI was given, so no number may appear in either half."""
+    real = _hurdle().real
+    assert not isinstance(real.realized, RealRate)
+    assert not isinstance(real.assumed, RealRate)
 
 
 def test_the_slot_never_holds_a_nominal_figure_standing_in_for_a_real_one() -> None:
     """The failure SC-011 is actually about: the nominal figure copied into the real slot.
 
     mypy rejects the assignment outright, which is the guard that matters. This asserts
-    the consequence at runtime as well, because the two records are structurally similar
-    enough -- both a single ``float`` named ``value`` -- that a dynamic construction could
-    still put one where the other belongs.
+    the consequence at runtime as well, because the rate records are structurally similar
+    enough -- each a ``float`` named ``value`` -- that a dynamic construction could still put
+    one where the other belongs.
+
+    Written over a widened tuple rather than as three ``isinstance`` calls: mypy proves each
+    of those unreachable and, under ``warn_unreachable``, refuses them. That refusal *is* the
+    guarantee -- the type checker saying the substitution cannot happen -- and the runtime
+    check is kept beside it for the dynamic case the type checker never sees.
     """
-    assert not isinstance(_hurdle().real, NominalRate)
+    real = _hurdle().real
+    occupants: tuple[object, ...] = (real, real.realized, real.assumed)
+
+    assert not any(isinstance(occupant, NominalRate) for occupant in occupants)
 
 
 def test_both_returned_rates_are_labelled_nominal() -> None:

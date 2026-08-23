@@ -21,11 +21,27 @@ fact worth asserting rather than a reason to collapse them into one field. The m
 taxed instrument arrives they diverge, and code that had only ever seen them equal would
 have picked whichever it happened to store.
 
-**Both are nominal, and the real slot is present and explicitly empty** (FR-022, SC-011).
-Inflation is not modelled in this feature, so no real figure is computed and none is
-assumed. :attr:`HurdleRate.real` is typed ``RealRate | RealTermsUnavailable`` and holds the
-latter, carrying its reason -- so a nominal figure cannot be assigned into it without a
-mypy error, which is the mechanism decision D4 chose over a naming convention.
+**Both are nominal, and the real slot beside them holds two figures** (FR-022; 007 FR-006,
+FR-009). Feature 001 reserved :attr:`HurdleRate.real` and left it holding a typed
+"unavailable" carrying its reason, so that the feature which introduced CPI could fill it
+without changing the shape of the result or anything that consumes it. Feature 007 is that
+feature, and the promise held: ``real`` is still exactly **one** field, and what it holds is
+now a :class:`RealTerms` carrying two independently typed outcomes.
+
+**Two, because the horizon has two halves and only one of them has been observed.** 001's
+FR-022 forbade a real figure computed from an assumed inflation rate, and a hurdle projects
+into the future where only assumptions exist. The owner resolved the collision on 2026-08-22:
+*both figures, separately labelled, never mixed into one number.*
+:attr:`RealTerms.realized` is deflated by declared CPI observations,
+:attr:`RealTerms.assumed` by a declared future-inflation assumption, and neither ever stands
+in for the other. The prohibition was refined rather than repealed -- a real figure from an
+*implicit or invented* rate is still forbidden; a *declared, dated, labelled* assumption
+entered as scenario data is a different thing and is visible as an assumption on every figure
+it touches.
+
+**A nominal figure still cannot be assigned into the slot without a mypy error**, which is
+the mechanism decision D4 chose over a naming convention, and it survived the slot changing
+occupant: ``NominalRate`` and ``RealRate`` share no base class and no protocol.
 
 **The figure states its own boundaries** (:attr:`HurdleRate.excludes`). Principle VI
 forbids quoting an access cost per instrument, so rather than pretending this number is
@@ -50,7 +66,13 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Final
 
+from terezy.core.inflation import series as cpi
+from terezy.core.inflation.deflate import deflate
+from terezy.core.inflation.series import CpiSeries, InflationAssumption
+from terezy.core.primitives import periods
+from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.money import Money
+from terezy.core.primitives.periods import Window
 from terezy.core.primitives.provenance import Provenance
 from terezy.core.primitives.rates import NominalRate, RealRate, RealTermsUnavailable
 
@@ -98,19 +120,279 @@ move a term from one set to the other: adding route costs means deleting a line 
 adding one there, in the same change, where a reviewer sees both.
 """
 
-NO_REAL_TERMS: Final[RealTermsUnavailable] = RealTermsUnavailable(
-    reason=(
-        "inflation is not modelled in this feature, so no real figure can be computed. "
-        "None is assumed either: a real rate derived from a guessed inflation rate would "
-        "be a fabricated number wearing the same label as a measured one."
-    )
-)
-"""The occupant of the real-terms slot for every figure this feature produces.
+# ---------------------------------------------------------------------------
+# 007-cpi-real-terms: the real slot, filled
+# ---------------------------------------------------------------------------
+#
+# Feature 001 left one generic sentence here -- that the feature did not model inflation at
+# all -- and it was true then. It stops being true the moment this feature lands, so it
+# survives nowhere in `src/`, and a test greps for it. FR-012 replaces it with reasons that
+# name the specific absence, built by the functions below so that every result says it the
+# same way and no call site improvises.
+#
+# `real_terms` is the only place a `RealTerms` is built, and it checks coverage BEFORE any
+# arithmetic runs. That ordering is the design (plan.md, Complexity Tracking): a check inside
+# the computation is a check someone later moves, reorders or short-circuits.
 
-A module constant rather than a value built at each call site, so that every result gives
-the same reason and the reason can be improved in one place. It is not an error -- nothing
-failed -- which is why it lives with the rate records rather than in ``core.errors``.
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class RealTerms:
+    """The real-terms slot: two figures, computed independently, never mixed.
+
+    **Never itself unavailable.** When neither figure can be computed this record still
+    exists and holds two unavailable values, each with its own reason -- because *"which of
+    the two is missing"* is exactly what FR-012 requires answering, and a single unavailable
+    value cannot answer it (research.md D2).
+
+    **And it is what the one reserved field holds**, rather than being two fields on
+    :class:`HurdleRate`. FR-009 wants two figures and FR-006 wants the result's shape
+    unchanged; those are only compatible if the *slot* stays one field and the *occupant*
+    carries both. A second field on ``HurdleRate`` would have broken the invariance that
+    001's FR-022 existed to create, which would be an odd way to honour it.
+
+    There is deliberately **no third field** combining the two. No reported number blends
+    observed and assumed inflation (FR-010), and the way to keep that true is to have nowhere
+    to put one.
+    """
+
+    realized: RealRate | RealTermsUnavailable
+    """Deflated by declared CPI observations covering the whole window, or the reason not."""
+
+    assumed: RealRate | RealTermsUnavailable
+    """Deflated by the declared future-inflation assumption, or the reason not.
+
+    Independent of :attr:`realized`: one being unavailable never makes the other unavailable,
+    and one being available never stands in for the other.
+    """
+
+
+def no_series_declared() -> RealTermsUnavailable:
+    """FR-012: no CPI series was declared for this run."""
+    return RealTermsUnavailable(
+        reason=(
+            "no CPI series was declared for this run, so there is nothing to deflate by. "
+            "None is assumed: a real rate derived from an undeclared inflation rate would be "
+            "a fabricated number wearing the same label as a measured one."
+        )
+    )
+
+
+def no_nominal_figure() -> RealTermsUnavailable:
+    """FR-012: there is a deflator but no figure to deflate.
+
+    Distinct from :func:`no_series_declared`, and the distinction is the requirement: *"there
+    is nothing to deflate"* and *"there is nothing to deflate by"* send a reader to two
+    different files.
+    """
+    return RealTermsUnavailable(
+        reason=(
+            "there is no nominal figure to deflate, so no real counterpart of it exists. "
+            "This is distinct from having no price data: the deflator may be complete and "
+            "there is still nothing for it to act on."
+        )
+    )
+
+
+def no_assumption_declared() -> RealTermsUnavailable:
+    """FR-012 and FR-015: the projected portion has no declared inflation assumption.
+
+    **No default rate, and none may be added.** The refusal is the feature, not a gap in it:
+    a default would be an invented belief about the future wearing the owner's label.
+    """
+    return RealTermsUnavailable(
+        reason=(
+            "no future-inflation assumption was declared for this run, so the projected "
+            "portion of the horizon has no inflation rate to deflate by. There is no default "
+            "rate: one would be a belief about the future that the owner never stated, "
+            "presented as though he had."
+        )
+    )
+
+
+def window_not_covered(
+    series_id: str, window: Window, missing: Sequence[str]
+) -> RealTermsUnavailable:
+    """FR-004 and FR-012: the declared series has a gap inside the window, named month by month."""
+    return RealTermsUnavailable(
+        reason=(
+            f"the declared CPI series {series_id!r} does not cover every month of "
+            f"{window.first}..{window.last}: {len(missing)} month(s) have no declared "
+            f"observation ({', '.join(missing)}). Nothing is interpolated and nothing is "
+            "carried forward, and the window is not shortened to the part that is covered -- "
+            "a real rate over the covered months would be a correct answer to a question "
+            "nobody asked. Declaring the missing observations is the fix."
+        )
+    )
+
+
+def window_has_no_elapsed_month(window: Window) -> RealTermsUnavailable:
+    """FR-012: the window spans no month, so there is no price change to deflate by.
+
+    Refused rather than answered with "zero inflation", which would come back as a real rate
+    exactly equal to the nominal one -- a confident wrong answer that looks entirely
+    reasonable.
+    """
+    return RealTermsUnavailable(
+        reason=(
+            f"the deflation window {window.first}..{window.last} contains no elapsed month, "
+            "so there is no measured price change to deflate by. It is reported rather than "
+            "treated as zero inflation: that would return a real rate equal to the nominal "
+            "one, which is a confident answer to a question that has no data behind it."
+        )
+    )
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Deflation:
+    """What one run brings to the deflation: the span, and the two possible deflators.
+
+    A record rather than three parameters on :func:`of_flows`, because the three are one
+    statement -- *"deflate over this window, with whatever of these two is declared"* -- and a
+    window without either deflator, or a deflator without a window, is half a statement. The
+    caller assembles it once from the run's inputs.
+
+    Both deflators are ``None``-able and neither has a default: their absence is a *reported
+    reason* rather than an error (FR-012), and which one is absent decides which half of
+    :class:`RealTerms` says so.
+    """
+
+    window: Window
+    """The span the figures are deflated over, inclusive. See ``project._deflation_window``."""
+
+    series: CpiSeries | None
+    """The declared CPI series, or ``None`` when the run was given none."""
+
+    assumption: InflationAssumption | None
+    """The declared future-inflation assumption, or ``None`` when the run was given none."""
+
+
+NOT_DEFLATED: Final[RealTerms] = RealTerms(
+    realized=no_series_declared(),
+    assumed=no_assumption_declared(),
+)
+"""The real slot of a figure assembled without any deflation input.
+
+Every reason in it is one of FR-012's named ones -- it says *no series was declared* and *no
+assumption was declared*, which is exactly what happened. It is not a permissive default
+hiding a skipped step: nothing was computed and the output says which two things were
+missing.
 """
+
+
+def real_terms(
+    *,
+    nominal: NominalRate | None,
+    nominal_provenance: Provenance,
+    series: CpiSeries | None,
+    window: Window,
+    assumption: InflationAssumption | None,
+) -> RealTerms:
+    """Both real figures for one nominal rate over one window. The only place a slot is filled.
+
+    Pure: no clock, no I/O. ``series`` and ``assumption`` are ``None``-able because their
+    absence is a *reported reason* rather than an error -- the whole point of FR-012 -- and
+    ``nominal`` is ``None``-able for the same reason, so that "there is nothing to deflate" is
+    a named answer instead of an unrepresentable state.
+
+    ``nominal_provenance`` is required and separate from ``nominal`` because a
+    :class:`~terezy.core.primitives.rates.NominalRate` carries no sources of its own: the
+    union FR-013 requires is over the *holding's* provenance and every observation used, and
+    only the caller holds the first half.
+
+    The two figures are computed independently and neither is derived from the other. That is
+    not an implementation detail: FR-010 forbids a single reported number blending observed
+    and assumed inflation, and computing one from the other is how a blend gets in.
+    """
+    return RealTerms(
+        realized=_realized(
+            nominal=nominal,
+            nominal_provenance=nominal_provenance,
+            series=series,
+            window=window,
+        ),
+        assumed=_assumed(
+            nominal=nominal,
+            nominal_provenance=nominal_provenance,
+            window=window,
+            assumption=assumption,
+        ),
+    )
+
+
+def _realized(
+    *,
+    nominal: NominalRate | None,
+    nominal_provenance: Provenance,
+    series: CpiSeries | None,
+    window: Window,
+) -> RealRate | RealTermsUnavailable:
+    """The figure deflated by declared observations, or the specific reason there is none.
+
+    **Coverage is checked before any arithmetic**, and the order of the guards below is the
+    order of the questions: is there a figure, is there a series, does the window span
+    anything, does the series cover it. Each one that fails names itself and stops.
+    """
+    if nominal is None:
+        return no_nominal_figure()
+    if series is None:
+        return no_series_declared()
+    if not periods.months_in(window):
+        return window_has_no_elapsed_month(window)
+
+    covered = cpi.coverage(series, window)
+    match covered:
+        case cpi.NotCovered():
+            return window_not_covered(series.id, window, covered.missing)
+        case cpi.Covered():
+            cumulative = cpi.cumulative_inflation(covered.observations)
+            annual = cpi.annualised(
+                cumulative,
+                periods=len(covered.observations),
+                per_year=cpi.periods_per_year(series.periodicity),
+            )
+            return RealRate(
+                value=deflate(nominal=nominal.value, inflation=annual),
+                basis="realized_cpi",
+                series_id=series.id,
+                window=window,
+                provenance=prov.merge(nominal_provenance, cpi.provenance_of(covered.observations)),
+            )
+
+
+def _assumed(
+    *,
+    nominal: NominalRate | None,
+    nominal_provenance: Provenance,
+    window: Window,
+    assumption: InflationAssumption | None,
+) -> RealRate | RealTermsUnavailable:
+    """The figure deflated by the declared assumption, or the specific reason there is none.
+
+    No coverage question arises: an assumption is a single rate per annum covering whatever
+    span it is applied to, which is precisely what makes it an assumption rather than an
+    observation. What the figure carries instead is ``basis="declared_assumption"`` on its
+    face, everywhere it appears.
+
+    A cited external forecast contributes its citation to the provenance and is **still**
+    labelled an assumption (FR-010). The citation says where the belief was read; it does not
+    make next year's prices observed.
+    """
+    if nominal is None:
+        return no_nominal_figure()
+    if assumption is None:
+        return no_assumption_declared()
+    return RealRate(
+        value=deflate(nominal=nominal.value, inflation=assumption.annual_rate),
+        basis="declared_assumption",
+        series_id=assumption.id,
+        window=window,
+        provenance=(
+            nominal_provenance
+            if assumption.provenance is None
+            else prov.merge(nominal_provenance, assumption.provenance)
+        ),
+    )
+
 
 _LOWEST_RATE: Final = -0.999999
 """The bottom of the bracket: a loss of all but a millionth of the investment.
@@ -141,12 +423,17 @@ class HurdleRate:
     nominal_cash_flow_return: NominalRate
     """The cash-flow-weighted return net of tax, in nominal terms. Kept separate."""
 
-    real: RealRate | RealTermsUnavailable
-    """The real-terms figure, or a typed statement of why there is none.
+    real: RealTerms
+    """The real-terms figures: one deflated by observation, one by assumption, never mixed.
 
-    Always ``RealTermsUnavailable`` in this feature. Present and explicitly empty rather
-    than absent, so that the feature which introduces CPI fills the slot without changing
-    the shape of the result or anything that consumes it (SC-011).
+    ⚙ **Still exactly one field, and that is FR-006's whole content.** Feature 001 reserved
+    this slot and left it holding a typed "unavailable"; feature 007 changed what occupies it
+    and did not change the result's shape. Adding a second field beside this one would have
+    broken the invariance the reservation existed to create.
+
+    Never ``None`` and never a bare unavailable: :class:`RealTerms` always exists, and when
+    neither figure can be computed it holds two reasons rather than one, because *which* half
+    is missing is the question a reader is actually asking (FR-012).
     """
 
     total_tax: Money
@@ -240,6 +527,7 @@ def of_flows(
     received: Sequence[CashFlow],
     total_tax: Money,
     provenance: Provenance,
+    deflate_with: Deflation | None = None,
 ) -> HurdleRate:
     """Assemble the result from the two series, the tax total and the merged sources.
 
@@ -248,11 +536,35 @@ def of_flows(
     they happen to be identical -- and passing the same series twice would be a caller's
     honest statement that the flows really are the same, not this function's assumption
     that they always are.
+
+    ⚙ **The figure that gets deflated is this function's own ``nominal_ytm``** (007 FR-007),
+    which is why the deflation happens here rather than in the caller. The contractual yield
+    is the benchmark the spec designates, and the real figure is *its* counterpart; computing
+    the yield in one place and deflating a separately-derived copy of it in another would be
+    two roots of the same equation with two chances to disagree. The caller supplies the
+    window and the deflators; the rate comes from here.
+
+    ``deflate_with`` defaults to ``None``, and the default is **not** a permissive one: the
+    slot then holds :data:`NOT_DEFLATED`, two of FR-012's named refusals saying that no series
+    and no assumption were supplied -- which is exactly what happened. FR-006 and US1's fifth
+    scenario require a call that ran under feature 001 to run here unchanged and produce a
+    shape-identical result, and this is what makes that literally true.
     """
+    nominal_ytm = NominalRate(internal_rate_of_return(contractual))
     return HurdleRate(
-        nominal_ytm=NominalRate(internal_rate_of_return(contractual)),
+        nominal_ytm=nominal_ytm,
         nominal_cash_flow_return=NominalRate(internal_rate_of_return(received)),
-        real=NO_REAL_TERMS,
+        real=(
+            NOT_DEFLATED
+            if deflate_with is None
+            else real_terms(
+                nominal=nominal_ytm,
+                nominal_provenance=provenance,
+                series=deflate_with.series,
+                window=deflate_with.window,
+                assumption=deflate_with.assumption,
+            )
+        ),
         total_tax=total_tax,
         accounts_for=ACCOUNTS_FOR,
         excludes=EXCLUDES,

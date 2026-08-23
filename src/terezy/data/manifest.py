@@ -96,7 +96,7 @@ from terezy.core.results.project import Projection
 from terezy.data.declarations.errors import DeclarationError
 from terezy.data.declarations.resolver import Declarations
 
-ENCODING: Final = "terezy-canonical-v2"
+ENCODING: Final = "terezy-canonical-v3"
 """The name of the byte encoding a digest was taken under.
 
 Prefixed into every encoding, so a digest is comparable only against digests of the same
@@ -108,6 +108,12 @@ change under an unchanged tag a red test rather than a discovery.
 **v2** (2026-08): feature 002 gave the canonical event tuple ``capacity_pool`` and the
 ledger form the capacity accumulator, so a v1 digest of the same ledger no longer agrees
 with one taken here -- the tag says so instead of letting the two disagree under one name.
+
+**v3** (2026-08): feature 007 filled the reserved real-terms slot. Where v2 rendered the slot
+as one ``(tag, value)`` pair, v3 renders two figures -- realized and assumed -- each carrying
+its basis, the series it is real against and the window it covers. No nominal figure, no
+schedule row and no tax charge moved; the tag moves because the *form* did, and a v2 digest
+of the same projection would otherwise silently disagree under an unchanged name.
 """
 
 ALGORITHM: Final = "sha256"

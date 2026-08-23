@@ -31,9 +31,10 @@ from terezy.core.ledger.lots import Disposal, Lot, Position
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
+from terezy.core.primitives.periods import Window
 from terezy.core.primitives.provenance import SourceRef
-from terezy.core.primitives.rates import RealRate, RealTermsUnavailable
-from terezy.core.results import canonical, project
+from terezy.core.primitives.rates import NominalRate, RealBasis, RealRate, RealTermsUnavailable
+from terezy.core.results import canonical, hurdle, project
 from terezy.core.results.project import Projection
 from terezy.core.routes import capacity
 from terezy.data import manifest
@@ -111,16 +112,77 @@ def test_every_amount_is_rendered_as_an_exact_hexadecimal_float() -> None:
     assert isinstance(figures[0], str)
 
 
+def _real(value: float, *, basis: RealBasis = "realized_cpi", series_id: str = "s") -> RealRate:
+    """A real figure with the fields feature 007 gave it, so the digest can be compared."""
+    return RealRate(
+        value=value,
+        basis=basis,
+        series_id=series_id,
+        window=Window(first="2026-01", last="2026-12"),
+        provenance=prov.EMPTY,
+    )
+
+
 def test_the_real_slot_is_tagged_so_absence_cannot_look_like_zero() -> None:
     """A real rate of zero and "there is no real rate" are opposite claims."""
-    assert canonical.of_real_terms(RealRate(0.0)) == ("real", float.hex(0.0))
-    assert canonical.of_real_terms(RealTermsUnavailable(reason="not modelled")) == (
+    assert canonical.of_real_figure(_real(0.0)) == (
+        "real",
+        float.hex(0.0),
+        "realized_cpi",
+        "s",
+        "2026-01",
+        "2026-12",
+    )
+    assert canonical.of_real_figure(RealTermsUnavailable(reason="no CPI series")) == (
         "unavailable",
-        "not modelled",
+        "no CPI series",
     )
-    assert canonical.of_real_terms(RealRate(0.0)) != canonical.of_real_terms(
-        RealTermsUnavailable(reason="not modelled")
+    assert canonical.of_real_figure(_real(0.0)) != canonical.of_real_figure(
+        RealTermsUnavailable(reason="no CPI series")
     )
+
+
+def test_the_same_number_on_two_different_bases_digests_differently() -> None:
+    """007 FR-010: an observed figure and an assumed one are two claims, never one.
+
+    The values agree; the claims do not. A canonical form that dropped ``basis`` would report
+    "deflated by measured prices" and "deflated by a belief" as the same result -- which is
+    the exact confusion this feature exists to prevent, arriving through the digest.
+    """
+    assert canonical.of_real_figure(_real(0.05, basis="realized_cpi")) != canonical.of_real_figure(
+        _real(0.05, basis="declared_assumption")
+    )
+
+
+def test_the_same_number_against_two_different_series_digests_differently() -> None:
+    """FR-011: a real rate carries what it is real *against*, and the digest carries it too."""
+    assert canonical.of_real_figure(_real(0.05, series_id="ua")) != canonical.of_real_figure(
+        _real(0.05, series_id="us")
+    )
+
+
+def test_the_slot_renders_both_figures_in_a_fixed_order() -> None:
+    """Realized first, assumed second, always -- so the digest depends on which is which."""
+    slot = hurdle.RealTerms(
+        realized=_real(0.05),
+        assumed=_real(0.05, basis="declared_assumption", series_id="belief"),
+    )
+    rendered = canonical.of_real_terms(slot)
+
+    assert rendered == (
+        canonical.of_real_figure(slot.realized),
+        canonical.of_real_figure(slot.assumed),
+    )
+    assert rendered[0] != rendered[1]
+
+
+def test_swapping_the_two_real_figures_changes_the_canonical_form() -> None:
+    """The falsifier for the ordering claim: a set-like rendering would agree here."""
+    realized, assumed = _real(0.05), _real(0.07, basis="declared_assumption", series_id="belief")
+
+    assert canonical.of_real_terms(
+        hurdle.RealTerms(realized=realized, assumed=assumed)
+    ) != canonical.of_real_terms(hurdle.RealTerms(realized=assumed, assumed=realized))
 
 
 def test_both_boundary_sets_are_emitted_in_a_stable_order() -> None:
@@ -178,12 +240,14 @@ def test_every_charge_names_the_class_that_produced_it() -> None:
 # ---------------------------------------------------------------------------
 
 CANONICAL_SHAPE_BY_ENCODING = {
-    "terezy-canonical-v2": (
+    "terezy-canonical-v3": (
         "((i,i,i),s,s,((s,(s,s),(s,s),(s,s))),"
         "((s,s,(s,s),(s,s),((s,s,(i,i,i),s,(s,s),(s,s),s)))),"
         "((i,(i,i,i),s,s,(s,s),(s,s),(s,s),(s,s),(s,s),(s,s),(s,s),(s,s),((s,s)),(s,s,s))),"
         "((i,(i,i,i),s,(s,s),s,(s,s,s),(s,s),s,i,s)),"
         "((s,i,i,(s,s))))"
+        "|"
+        "(s,s,((s,s,s,s,s,s),(s,s,s,s,s,s)),(s,s),(s),(s))"
     ),
 }
 """One recorded shape fingerprint per encoding tag, and exactly one entry: the current tag.
@@ -194,6 +258,17 @@ different scheme instead of silently disagreeing*. Feature 002 broke that once -
 canonical tuple gained ``capacity_pool`` and the capacity accumulator while the tag stayed
 ``terezy-canonical-v1``, so pre-002 digests silently disagreed under an unchanged name.
 This pinned pair is what makes the next such change a red test naming the remedy.
+
+⚙ **Two fingerprints, joined by a pipe, since feature 007** -- the ledger's and the figures'.
+The pin used to cover ``ledger.canonical.of_result`` alone, which left the whole of
+``results.canonical`` outside it: 007 changed the real slot from one tagged pair to two and
+the pin would not have noticed, which is exactly the silent disagreement it exists to
+prevent. Anything the projection's canonical form is built from belongs in here.
+
+**v3** (2026-08): feature 007 filled the reserved real-terms slot. Where a v2 projection
+rendered one ``(tag, value)`` pair, a v3 one renders two figures, each carrying its basis,
+its series and its window -- so a v2 digest of the same projection no longer agrees with one
+taken here, and the tag says so rather than letting the two disagree under one name.
 """
 
 
@@ -286,6 +361,27 @@ def _representative_state() -> engine.LedgerState:
     )
 
 
+def _representative_hurdle() -> hurdle.HurdleRate:
+    """One hurdle rate with every optional branch populated, exactly once each.
+
+    Both real figures hold a *rate* rather than an unavailable value, because the populated
+    shape is the larger one and an absent figure would hide it from the fingerprint -- the
+    same reasoning ``_representative_state`` gives for leaving no ``None`` in the ledger.
+    """
+    return hurdle.HurdleRate(
+        nominal_ytm=NominalRate(0.15),
+        nominal_cash_flow_return=NominalRate(0.15),
+        real=hurdle.RealTerms(
+            realized=_real(0.05),
+            assumed=_real(0.05, basis="declared_assumption", series_id="belief"),
+        ),
+        total_tax=Money(0.0, UAH, prov.EMPTY),
+        accounts_for=frozenset({"tax"}),
+        excludes=frozenset({"inflation"}),
+        provenance=prov.EMPTY,
+    )
+
+
 def test_the_encoding_tag_moves_whenever_the_canonical_shape_does() -> None:
     """The reproducibility contract, made mechanical (manifest.py's own promise).
 
@@ -294,8 +390,16 @@ def test_the_encoding_tag_moves_whenever_the_canonical_shape_does() -> None:
     unchanged tag makes old and new digests silently disagree while claiming one scheme --
     which is exactly what a golden digest flipping under an unchanged tag looks like. This
     test fails on either half changing alone, and its message says which line to move.
+
+    ⚙ **Both halves of the projection's form are fingerprinted** (007). Pinning the ledger
+    alone left every figure outside the pin, which is where 007's own change landed.
     """
-    fingerprint = _shape(ledger_canonical.of_result(_representative_state()))
+    fingerprint = "|".join(
+        (
+            _shape(ledger_canonical.of_result(_representative_state())),
+            _shape(canonical.of_hurdle_rate(_representative_hurdle())),
+        )
+    )
     assert manifest.ENCODING in CANONICAL_SHAPE_BY_ENCODING, (
         f"manifest.ENCODING is {manifest.ENCODING!r}, which this test does not know. "
         "Record the tag with its shape fingerprint in CANONICAL_SHAPE_BY_ENCODING -- and "

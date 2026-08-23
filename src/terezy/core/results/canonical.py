@@ -33,7 +33,7 @@ from typing import assert_never
 from terezy.core.ledger import canonical as ledger_canonical
 from terezy.core.ledger.canonical import Canonical
 from terezy.core.primitives.rates import RealRate, RealTermsUnavailable
-from terezy.core.results.hurdle import HurdleRate
+from terezy.core.results.hurdle import HurdleRate, RealTerms
 from terezy.core.results.project import Projection
 from terezy.core.results.schedule import CashFlowRow, CashFlowSchedule, ConventionsApplied
 from terezy.core.tax.interface import TaxCharge
@@ -92,21 +92,47 @@ def of_charge(value: TaxCharge) -> tuple[Canonical, ...]:
     )
 
 
-def of_real_terms(value: RealRate | RealTermsUnavailable) -> tuple[str, str]:
-    """The real-terms slot, tagged so a figure can never be confused with its absence.
+def of_real_figure(value: RealRate | RealTermsUnavailable) -> Canonical:
+    """One real figure, tagged so a number can never be confused with its absence.
 
-    ``("real", <hex>)`` or ``("unavailable", <reason>)``. The tag is what makes the two
-    cases distinguishable in the digest: an untagged rendering could let a real rate of
-    zero and "there is no real rate" produce the same bytes, and those are opposite
-    statements. The reason is included because it is part of what the result *says*.
+    ``("real", <hex>, <basis>, <series id>, <first month>, <last month>)`` or
+    ``("unavailable", <reason>)``. The tag is what makes the two cases distinguishable in the
+    digest: an untagged rendering could let a real rate of zero and "there is no real rate"
+    produce the same bytes, and those are opposite statements. The reason is included because
+    it is part of what the result *says*.
+
+    ⚙ **The basis, the series and the window are in the digest, and they have to be** (007
+    FR-010, FR-011). The same value deflated by observed CPI and by a declared assumption is
+    two different claims, and the same value over two different windows is two different
+    facts; a digest that agreed between them would report two results as one. Provenance stays
+    out, as everywhere else in this module -- filling in a ``verified_on`` must not move a
+    digest.
     """
     match value:
         case RealRate():
-            return ("real", ledger_canonical.of_number(value.value))
+            return (
+                "real",
+                ledger_canonical.of_number(value.value),
+                value.basis,
+                value.series_id,
+                value.window.first,
+                value.window.last,
+            )
         case RealTermsUnavailable():
             return ("unavailable", value.reason)
         case _:  # pragma: no cover -- mypy proves this unreachable
             assert_never(value)
+
+
+def of_real_terms(value: RealTerms) -> Canonical:
+    """The whole real slot: the realized figure and the assumed one, in that order, tagged.
+
+    Two entries, always, even when both are unavailable -- because ``RealTerms`` is never
+    itself unavailable and *which* half is missing is part of what the result says. Rendering
+    them in a fixed order means the digest depends on which figure is which rather than on
+    the order they happened to be built in.
+    """
+    return (of_real_figure(value.realized), of_real_figure(value.assumed))
 
 
 def of_hurdle_rate(value: HurdleRate) -> tuple[Canonical, ...]:

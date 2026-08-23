@@ -276,16 +276,35 @@ def _optional(value: object) -> str:
     return "none" if value is None else str(value)
 
 
+def _real_figure(label: str, figure: RealRate | RealTermsUnavailable) -> Iterable[str]:
+    """One half of the real-terms slot: the number and what it rests on, or the reason not.
+
+    ⚙ **Two entries where feature 001 rendered one** (007 FR-009). The realized figure and
+    the assumed one are two claims and are rendered as two, each labelled, so that a reader
+    of this artefact cannot take either for the other and a diff shows which one moved.
+
+    A figure renders its ``basis``, the series it is real *against* and its window beside its
+    value, because a bare real rate is not checkable: the same nominal figure deflated by
+    observed prices and by a belief, or over two different spans, gives different answers and
+    a single number cannot say which question it answered (FR-010, FR-011).
+    """
+    match figure:
+        case RealRate():
+            yield f"{label:<28} {figure.value!r}"
+            yield f"{label + '_basis':<28} {figure.basis}"
+            yield f"{label + '_against':<28} {figure.series_id}"
+            yield f"{label + '_window':<28} {figure.window.first} .. {figure.window.last}"
+        case RealTermsUnavailable():
+            yield f"{label:<28} unavailable"
+            yield f"{label + '_because':<28} {figure.reason}"
+
+
 def _figures(result: Projection) -> Iterable[str]:
     hurdle = result.hurdle
     yield f"nominal_ytm                  {hurdle.nominal_ytm.value!r}"
     yield f"nominal_cash_flow_return     {hurdle.nominal_cash_flow_return.value!r}"
-    match hurdle.real:
-        case RealRate():  # pragma: no cover -- nothing in feature 001 produces one
-            yield f"real                         {hurdle.real.value!r}"
-        case RealTermsUnavailable():
-            yield "real                         unavailable"
-            yield f"real_unavailable_because     {hurdle.real.reason}"
+    yield from _real_figure("real_realized", hurdle.real.realized)
+    yield from _real_figure("real_assumed", hurdle.real.assumed)
     yield f"total_tax                    {_money(hurdle.total_tax)}"
     for item in sorted(hurdle.accounts_for):
         yield f"accounts_for                 {item}"
