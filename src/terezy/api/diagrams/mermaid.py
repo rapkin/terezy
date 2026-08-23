@@ -43,6 +43,7 @@ forbids.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable, Mapping
 from typing import Final
 
@@ -225,6 +226,24 @@ def edge(source: str, target: str, text: str, *, dotted: bool = False) -> str:
 def class_def(name: str, style: str) -> str:
     """One ``classDef`` line. Styling is added on top of the marks, never instead of them."""
     return f"{INDENT}classDef {name} {style}"
+
+
+_APPLIED: Final = re.compile(r":::(\w+)$")
+
+
+def class_defs(lines: Iterable[str], definitions: Iterable[tuple[str, str]]) -> list[str]:
+    """A ``classDef`` for exactly the classes these lines apply, in the vocabulary's own order.
+
+    **Derived from the output rather than declared beside it**, so the two cannot drift: a class
+    is defined if and only if something in this diagram carries it. An unused ``classDef`` is
+    dead weight in an artifact whose whole value is that a human reads it, and worse, it tells
+    the next contributor that a state is styled when nothing in front of them wears it.
+
+    A diagram carries the states it has. A registry graph never draws a composed chain and a
+    costed path never draws a closed route, so neither should define a class for the other's.
+    """
+    carried = {found.group(1) for line in lines if (found := _APPLIED.search(line))}
+    return [class_def(name, style) for name, style in definitions if name in carried]
 
 
 def document(lines: Iterable[str]) -> str:

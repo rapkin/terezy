@@ -41,6 +41,7 @@ from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance, SourceRef
 from terezy.core.primitives.staleness import ObservationKind, StalenessVerdict
+from terezy.core.results.coverage import SpendableEndpoint
 from terezy.core.results.ramp import (
     ExitCostUnknown,
     NothingComparable,
@@ -50,10 +51,22 @@ from terezy.core.results.ramp import (
 from terezy.core.routes import cost
 from terezy.core.routes.channels import ChannelSide, FxChannel
 from terezy.core.routes.legs import FX, TRANSFER, Leg, Route, RouteDirection, RouteStatus
-from terezy.core.routes.path import FundingPath
+from terezy.core.routes.path import (
+    EXIT_BY_IDENTITY,
+    FROM_THE_DECLARATION,
+    Candidate,
+    ComposedExit,
+    ComposedPath,
+    ExitChoice,
+    FundingPath,
+)
 from terezy.core.routes.venues import Venue
 from terezy.core.scenarios.regimes import Regime
+from terezy.core.streams.streams import IncomeStream, Indexation
 from terezy.data.declarations import loader, resolver
+
+OWNER_ID: Final = "owner-001"
+"""The one owner (Principle VII), carried while there is exactly one."""
 
 REPO_ROOT: Final = Path(__file__).resolve().parents[1]
 DATA_ROOT: Final = REPO_ROOT / "data"
@@ -673,6 +686,19 @@ def one_unverified_graph(mode: Mode = Mode.DECLARED_FIGURES) -> Diagram:
     return graph_of(one_unverified_registry(), mode)
 
 
+def shipped_spendable() -> frozenset[SpendableEndpoint]:
+    """The owner's declared spendable endpoints, read from ``data/`` like every other input.
+
+    Costing consults it since feature 004: a destination that is itself somewhere the owner
+    spends satisfies its own exit requirement (003 FR-002), which is the ``EXIT_BY_IDENTITY``
+    case. Loaded rather than restated, so a hand-written copy here cannot disagree with the file
+    while a diagram built on it still looks authoritative.
+    """
+    owner_id, endpoints = loader.spendable_from_file(DATA_ROOT / "spendable" / "owner-001.toml")
+    assert owner_id == OWNER_ID, owner_id
+    return frozenset(endpoints)
+
+
 def shipped_declarations() -> resolver.RampDeclarations:
     """Everything under ``data/``, resolved -- the registry the owner actually declares."""
     return resolver.ramp_from_data_root(DATA_ROOT, base_currency=UAH)
@@ -789,6 +815,7 @@ def costed(
         kinds=declared.kinds,
         on_date=AS_OF,
         as_of=AS_OF,
+        spendable=shipped_spendable(),
     )
 
 
@@ -850,6 +877,7 @@ def stale_premium_cost() -> RampCost:
         kinds=declared.kinds,
         on_date=AS_OF,
         as_of=STALE_PREMIUM_AS_OF,
+        spendable=shipped_spendable(),
     )
     assert isinstance(result, RampCost), result
     return result
@@ -898,5 +926,182 @@ def path_of(result: CostedOutcome, *, regime_id: str = "wartime") -> Diagram | N
 def drawn_path(result: CostedOutcome, *, regime_id: str = "wartime") -> Diagram:
     """The same, narrowed -- a refusal here is the test's finding, not its input."""
     rendered = path_of(result, regime_id=regime_id)
+    assert isinstance(rendered, Diagram), rendered
+    return rendered
+
+
+# --- composed candidates (feature 004) --------------------------------------------------
+
+HOP_ONE: Final = "r_hop_one"
+HOP_TWO: Final = "r_hop_two"
+BACK_ONE: Final = "r_back_one"
+BACK_TWO: Final = "r_back_two"
+CHAIN_STREAM: Final = "wages"
+
+CHAIN_IN: Final = ComposedPath(
+    destination_id="gamma", stream_id=CHAIN_STREAM, segments=(HOP_ONE, HOP_TWO)
+)
+"""Two declared routes, joined at a venue where the currency also matches.
+
+**Hand-built rather than enumerated**, and the reason is worth recording: the shipped registry
+composes **nothing** under either declared regime -- every corridor in ``data/routes/`` either
+starts at the salary rail or ends at it, so no chain of two connects anything a single route
+does not. Searching for one and rendering what came back would have produced no test at all.
+``ComposedPath`` is an ordinary input to ``cost_one``, the search that finds them is feature
+004's and is tested there, and what this feature has to prove is that a chain *draws* honestly.
+"""
+
+CHAIN_OUT: Final = ComposedExit(segments=(BACK_ONE, BACK_TWO))
+"""And a chain of declared **exit** routes back to somewhere the owner spends (004 FR-012)."""
+
+
+def _chain_registry() -> tuple[
+    Mapping[str, Venue], Mapping[str, Route], Mapping[str, IncomeStream]
+]:
+    """Three venues and four declared routes: two hops out, two hops back.
+
+    ``alpha`` holds hryvnia and is where the wages land; ``gamma`` holds dollars and is the
+    destination nobody declared a direct corridor to. The hop that converts carries a fee as
+    well as a premium, so the by-segment attribution has something to distinguish -- a chain
+    whose every segment charged zero would make "which hop dominates" unanswerable and the
+    second axis of attribution pointless to render.
+    """
+    venues = {v.id: v for v in (venue("alpha", UAH), venue("beta", UAH, USD), venue("gamma", USD))}
+    cited = source("s_chain", verified=True, fresh=True, synthetic=True)
+    routes = {
+        r.id: r
+        for r in (
+            route(
+                HOP_ONE,
+                origin="alpha",
+                destination="beta",
+                provenance=cited,
+                kind_of_observation=SLOW_KIND,
+                from_ccy=UAH,
+                fee_pct=0.01,
+                fee_fixed=5.0,
+                # So the fixture can also produce 002's original way out -- one declared
+                # partner -- and all three ``ExitChain`` members are reachable from one
+                # registry. Never consulted by the composed cases, which name their exit.
+                partner_route=BACK_TWO,
+            ),
+            route(
+                HOP_TWO,
+                origin="beta",
+                destination="gamma",
+                provenance=cited,
+                kind_of_observation=SLOW_KIND,
+                from_ccy=UAH,
+                to_ccy=USD,
+            ),
+            route(
+                BACK_ONE,
+                origin="gamma",
+                destination="beta",
+                provenance=cited,
+                kind_of_observation=SLOW_KIND,
+                direction="exit",
+                from_ccy=USD,
+                to_ccy=UAH,
+            ),
+            route(
+                BACK_TWO,
+                origin="beta",
+                destination="alpha",
+                provenance=cited,
+                kind_of_observation=SLOW_KIND,
+                direction="exit",
+                from_ccy=UAH,
+            ),
+        )
+    }
+    streams = {
+        CHAIN_STREAM: IncomeStream(
+            id=CHAIN_STREAM,
+            owner_id=OWNER_ID,
+            amount=Money(0.0, UAH, prov.EMPTY),
+            cadence="monthly",
+            arrives_at="alpha",
+            indexation=Indexation(policy="none", rate=None),
+            income_tax_rate=None,
+        )
+    }
+    return venues, routes, streams
+
+
+def chain_regime() -> Regime:
+    """A regime that includes every segment of both halves. See ``path._in_force``."""
+    _, routes, _ = _chain_registry()
+    return Regime(id=REGIME_ID, route_ids=frozenset(routes))
+
+
+def chain_routes() -> Mapping[str, Route]:
+    _, routes, _ = _chain_registry()
+    return routes
+
+
+def _chain_cost(
+    *, exit_path: ExitChoice, spendable: frozenset[SpendableEndpoint], path: Candidate = CHAIN_IN
+) -> RampCost:
+    venues, routes, streams = _chain_registry()
+    assert venues
+    result = cost.cost_one(
+        path,
+        Money(AMOUNT, UAH, prov.EMPTY),
+        routes=routes,
+        channels=fixture_channels(),
+        streams=streams,
+        kinds=declared_kinds(),
+        on_date=AS_OF,
+        as_of=AS_OF,
+        spendable=spendable,
+        exit_path=exit_path,
+    )
+    assert isinstance(result, RampCost), result
+    return result
+
+
+def composed_cost() -> RampCost:
+    """A composed way in and a composed way out, costed by the one costing function."""
+    return _chain_cost(
+        exit_path=CHAIN_OUT,
+        spendable=frozenset({SpendableEndpoint(venue_id="alpha", currency=UAH)}),
+    )
+
+
+def identity_exit_cost() -> RampCost:
+    """A composed way in to a destination that **is** a declared spendable endpoint.
+
+    ``EXIT_BY_IDENTITY``: the money is already where it needed to come back out to, so the exit
+    chain has no segments and the round-trip figure equals the one-way figure. Not a way out
+    that happened to be free -- there is no way out to cost.
+    """
+    return _chain_cost(
+        exit_path=EXIT_BY_IDENTITY,
+        spendable=frozenset({SpendableEndpoint(venue_id="gamma", currency=USD)}),
+    )
+
+
+def declared_exit_chain_cost() -> RampCost:
+    """One declared route in, one declared route out -- 004's ``DeclaredExit``, on the fixture.
+
+    Here so the three ``ExitChain`` members are all reachable from one registry, and so the
+    composed cases can be compared against a declared one that shares their venues.
+    """
+    return _chain_cost(
+        path=FundingPath(destination_id="beta", stream_id=CHAIN_STREAM, route_id=HOP_ONE),
+        exit_path=FROM_THE_DECLARATION,
+        spendable=frozenset({SpendableEndpoint(venue_id="alpha", currency=UAH)}),
+    )
+
+
+def chain_path_of(result: CostedOutcome) -> Diagram:
+    """Render a fixture journey under the regime that includes every one of its segments."""
+    rendered = render_path(
+        result,
+        routes=chain_routes(),
+        channels=fixture_channels(),
+        regime=chain_regime(),
+    )
     assert isinstance(rendered, Diagram), rendered
     return rendered

@@ -50,10 +50,11 @@ from terezy.api.diagrams import (  # noqa: E402
 from terezy.core.primitives import provenance as prov  # noqa: E402
 from terezy.core.primitives.currency import Currency  # noqa: E402
 from terezy.core.primitives.money import Money  # noqa: E402
+from terezy.core.results.coverage import SpendableEndpoint  # noqa: E402
 from terezy.core.routes import cost  # noqa: E402
 from terezy.core.routes.path import FundingPath  # noqa: E402
 from terezy.core.scenarios.regimes import Regime  # noqa: E402
-from terezy.data.declarations import resolver  # noqa: E402
+from terezy.data.declarations import loader, resolver  # noqa: E402
 
 DATA_ROOT = REPO_ROOT / "data"
 
@@ -120,6 +121,17 @@ def _graph(args: argparse.Namespace) -> Diagram | NothingToDraw:
     )
 
 
+def _spendable(root: Path) -> frozenset[SpendableEndpoint]:
+    """The owner's declared spendable endpoints, read from the same data root.
+
+    Costing consults it since feature 004: a destination that is itself somewhere the owner
+    spends satisfies its own exit requirement, which is the ``EXIT_BY_IDENTITY`` case a diagram
+    has to draw differently from a way out that happened to be free.
+    """
+    _, endpoints = loader.spendable_from_file(root / "spendable" / "owner-001.toml")
+    return frozenset(endpoints)
+
+
 def _path(args: argparse.Namespace) -> Diagram | NothingToDraw:
     declared = _declarations(args.data_root)
     result = cost.cost_one(
@@ -131,6 +143,7 @@ def _path(args: argparse.Namespace) -> Diagram | NothingToDraw:
         kinds=declared.kinds,
         on_date=args.on_date or args.as_of,
         as_of=args.as_of,
+        spendable=_spendable(args.data_root),
     )
     return render_path(
         result,

@@ -38,7 +38,14 @@ from terezy.core.primitives.provenance import Provenance
 
 
 class Mark(Enum):
-    """The states a diagram element can carry. A **closed** set of six.
+    """The states a diagram element can carry. A **closed** set of eight.
+
+    ⚙ **Six when this feature was specified, eight since feature 004 landed.** ``COMPOSED`` and
+    ``EXIT_BY_IDENTITY`` are states that did not exist when data-model.md enumerated the
+    vocabulary; each is recorded on its member below. Growing a closed set is a code change
+    reviewed against the claim the set exists to support -- that every state is pairwise
+    distinguishable -- which is what ``tests/contract/test_diagram_marks.py`` asserts, over
+    whatever the set currently is.
 
     Closed for the reason every enumeration in this project is closed: a free-form mark
     vocabulary would let one call site invent a token, and "every state is pairwise
@@ -65,6 +72,17 @@ class Mark(Enum):
     """Built on a declared test fixture, so a picture of invented data can never pass as a
     picture of the owner's actual options (FR-014)."""
 
+    COMPOSED = "composed"
+    """⚙ The way in is a **chain of declared routes**, not one declared route (004 FR-013).
+
+    Added when feature 004 landed, and it is a mark rather than a caption word because this
+    feature's own specification says so: *"composed paths are visibly distinct candidates, so
+    when such results exist, their composed nature is one more mark the diagram must carry"*
+    (spec.md, Assumptions). The chain exists only at query time -- nobody declared it end to end
+    -- and a reader who cannot tell it from a declared corridor would go looking for a file that
+    does not exist.
+    """
+
     CLOSED = "closed"
     """The route is declared closed. Present and marked, never omitted -- closed and
     nonexistent are different facts and must look different (FR-004)."""
@@ -72,6 +90,15 @@ class Mark(Enum):
     NO_EXIT_DECLARED = "no-exit"
     """Nothing is declared leaving this destination, so it is not comparison-ready (FR-005).
     Feature 002's FR-030 made visual: an explicitly absent edge, never an omission."""
+
+    EXIT_BY_IDENTITY = "exit-identity"
+    """⚙ The destination **is** a declared spendable endpoint, so there is no way out to cost.
+
+    Added with feature 004, which introduced the state (its ``path.EXIT_BY_IDENTITY``). Not the
+    same claim as an exit that happened to be free: the money is already where it needed to come
+    back out to, so there are no exit legs at all -- which is why it renders on the *venue* and
+    never as an edge. See :mod:`terezy.api.diagrams.path`.
+    """
 
     EXIT_COST_UNKNOWN = "exit-unknown"
     """A costed result whose round-trip slot is ``ExitCostUnknown``. Rendered in the place the
@@ -83,7 +110,9 @@ _TOKEN: Final[Mapping[Mark, str]] = {
     Mark.STALE: "STALE",
     Mark.SYNTHETIC: "SYNTHETIC",
     Mark.CLOSED: "CLOSED",
+    Mark.COMPOSED: "COMPOSED",
     Mark.NO_EXIT_DECLARED: "NO EXIT DECLARED",
+    Mark.EXIT_BY_IDENTITY: "EXIT BY IDENTITY",
     Mark.EXIT_COST_UNKNOWN: "EXIT COST UNKNOWN",
 }
 """What each mark says on the page. Upper case, and no token a substring of another, so
@@ -94,7 +123,9 @@ STYLE_CLASS: Final[Mapping[Mark, str]] = {
     Mark.STALE: "stale",
     Mark.SYNTHETIC: "synthetic",
     Mark.CLOSED: "closedRoute",
+    Mark.COMPOSED: "composed",
     Mark.NO_EXIT_DECLARED: "noExitDeclared",
+    Mark.EXIT_BY_IDENTITY: "exitByIdentity",
     Mark.EXIT_COST_UNKNOWN: "exitCostUnknown",
 }
 """The ``classDef`` name each mark may add. Emphasis only -- see the module docstring."""
@@ -103,25 +134,26 @@ CLASS_DEFS: Final[tuple[tuple[str, str], ...]] = (
     (STYLE_CLASS[Mark.UNVERIFIED], "stroke-dasharray: 4 2"),
     (STYLE_CLASS[Mark.STALE], "stroke-dasharray: 1 3"),
     (STYLE_CLASS[Mark.SYNTHETIC], "stroke-width: 1px"),
+    (STYLE_CLASS[Mark.COMPOSED], "stroke-dasharray: 6 2"),
+    (STYLE_CLASS[Mark.CLOSED], "stroke-dasharray: 8 4"),
     (STYLE_CLASS[Mark.NO_EXIT_DECLARED], "stroke-width: 3px"),
+    (STYLE_CLASS[Mark.EXIT_BY_IDENTITY], "stroke-width: 2px"),
     (STYLE_CLASS[Mark.EXIT_COST_UNKNOWN], "stroke-width: 3px"),
 )
-"""The style declarations, in a fixed order (FR-016), stated as line and stroke rather than
-as colour.
+"""The style declaration each mark *may* get, in a fixed order (FR-016), stated as line and
+stroke rather than as colour.
 
 Deliberately no ``fill`` and no colour: a colour is the one form of emphasis a reader may not
 have -- a monochrome print, a dark theme, a viewer with its own palette -- and choosing one
 would suggest the diagram means something different without it. It does not; the words carry
 the meaning and these only draw the eye.
 
-**``CLOSED`` is in :data:`STYLE_CLASS` and deliberately not here.** Mermaid applies a class to a
-*node*, and ``CLOSED`` only ever lands on an edge, whose emphasis is its line style -- the
-dotted arrow. Emitting a ``classDef`` nothing can carry would be dead weight in an artifact
-whose whole value is that a human reads it, and worse, it would tell the next contributor that
-closed routes are styled when they are not. The explanation belongs here, in the source, and
-not in the output. (Styling an edge means ``linkStyle``, which is addressed by link *index*
-across the whole diagram -- brittle in a way that nothing here can test without a renderer,
-and buying nothing, since the meaning is in the words either way.)
+**A diagram emits only the ones it actually applies.** :func:`mermaid.class_defs` derives that
+from the emitted lines, so a definition appears if and only if something carries it -- a
+registry graph never draws a composed chain, a costed path never draws a closed route, and
+``CLOSED`` is never applied at all, because Mermaid styles a *node* and a closed route is an
+edge whose emphasis is its dotted line. Listing the whole vocabulary here and filtering at the
+end is what keeps that a property of the output rather than eight special cases.
 """
 
 CLEAN: Final = "VERIFIED AND CURRENT"

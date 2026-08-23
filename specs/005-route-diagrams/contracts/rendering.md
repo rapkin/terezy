@@ -25,6 +25,37 @@ def render_path(
 ) -> Diagram | NothingToDraw
 ```
 
+⚙ **What feature 004 changed under this contract, after it landed on `main`.** The signatures
+did not move; the *records* they consume did, and every one of the changes is visible on the
+page:
+
+| 004 record | how it renders |
+|---|---|
+| `RampCost.path` is `FundingPath \| ComposedPath` | the caption says `way in: declared route X` or `way in: composed chain of N declared routes (a+b)`, and the caption carries the `COMPOSED` mark and its style class (004 FR-013) |
+| `ComposedPath.segments` | every edge carries `segment <position> · route <id>`, so a chain's hops are numbered and each names the declaration it **is** — which also disambiguates the `leg 0` that a two-segment chain says twice |
+| `RampCost.exit_path: ExitChain \| None` | four shapes, four captions: `DeclaredExit`, `ComposedExit` (drawn as its own segments, never the way in reversed), `EXIT_BY_IDENTITY`, and `None` |
+| `EXIT_BY_IDENTITY` | **not an edge.** See below |
+| `one_way.by_segment`, `round_trip.by_segment` | one annotation node per half, naming what each segment charged by component (004 FR-020) |
+| `RouteUnusable.binding_segment` | reaches the reader through the refusal's own `reason`, carried verbatim into `NothingToDraw` — G9 unchanged |
+| `RampCost.status` on a chain | labelled `status (way in, tightest segment)`, because 004 states that a constrained *exit* segment does not move it; an unqualified label on a record whose headline number is the round trip would read as covering both halves |
+
+⚙ **`EXIT_BY_IDENTITY` renders on the venue, not as an edge.** The result carries a real
+`RoundTripCost` whose figure equals the one-way figure, and the trap is explaining that
+coincidence. A zero-cost exit edge would assert a journey that costs nothing, which is a
+different claim from there being no journey — the distinction `core.routes.path.ExitByIdentity`
+exists to carry one layer down, where `None` would have said "no exit chain" and an empty chain
+"a chain that charged nothing". So the mark goes on the **destination node**, which is the
+thing that is spendable, and a note states the consequence: the money is already where it
+needed to come back out to, so there are no exit legs and the round-trip figure *is* the
+one-way figure.
+
+⚙ **The regime check widened to every segment of both halves.** A chain is in force only if
+each of its declared routes is; a regime excluding one hop of three would otherwise get a
+picture with two thirds of it looking perfectly ordinary. `EXIT_BY_IDENTITY` contributes no
+segments and is never excluded — it is a fact about the owner's spendable list, which a regime
+has no opinion about.
+
+
 ⚙ **`kinds` and `as_of` were added to `render_graph` during implementation, and the
 signature above as first written could not satisfy G10.** Staleness is
 `as_of - retrieved_on` against a **declared per-kind** threshold (FR-013, feature 002's

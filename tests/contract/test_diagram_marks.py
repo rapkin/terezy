@@ -55,13 +55,21 @@ def unstyled(text: str) -> str:
 class TestTheVocabulary:
     """Six marks, pairwise distinct, and the two states that are the absence of one."""
 
-    def test_the_enum_is_closed_and_is_the_six_the_data_model_names(self) -> None:
+    def test_the_enum_is_closed_and_is_the_states_the_data_model_names(self) -> None:
+        """Six when this feature was specified; eight since feature 004 landed.
+
+        Restated here rather than left to grow silently: ``COMPOSED`` and ``EXIT_BY_IDENTITY``
+        are states that did not exist when data-model.md enumerated the vocabulary, and adding
+        to a closed set is a code change reviewed against the claim the set exists to support.
+        """
         assert {mark.name for mark in Mark} == {
             "UNVERIFIED",
             "STALE",
             "SYNTHETIC",
+            "COMPOSED",
             "CLOSED",
             "NO_EXIT_DECLARED",
+            "EXIT_BY_IDENTITY",
             "EXIT_COST_UNKNOWN",
         }
 
@@ -201,9 +209,13 @@ class TestAllSixStatesInOneDiagram:
 
     def test_every_state_appears_in_the_displayed_text(self) -> None:
         text = self._rendered()
+        # Three are costed-path states a registry graph cannot carry: a chain, a destination
+        # that is already spendable, and a result with no way out. Each is asserted where it
+        # can occur -- ``test_diagram_refusals.py`` and ``test_diagram_path.py``.
+        elsewhere = {Mark.COMPOSED, Mark.EXIT_BY_IDENTITY, Mark.EXIT_COST_UNKNOWN}
         for mark in Mark:
-            if mark is Mark.EXIT_COST_UNKNOWN:
-                continue  # a costed-path mark; asserted in test_diagram_refusals.py
+            if mark in elsewhere:
+                continue
             assert marks.token(mark) in text, f"{mark.name} is not in the displayed text"
         assert marks.CLEAN in text, "the verified, current, open route is not distinguishable"
 

@@ -304,6 +304,20 @@ regenerated diagram contains the added venue and route, correctly connected and 
 - [x] T043 **F5** Correct three references the earlier fixes left behind: a deleted function
   named in a fixture docstring, the path renderer's staleness described per *leg* rather than
   per observation, and a plan that said four modules over a six-module tree
+- [x] T044 Merge `main` (004-composed-paths at `7eba3e4`, plus the suite-wide Hypothesis
+  profile) and adapt `render_path` to what `RampCost` now is: a `Candidate` union, an
+  `ExitChain | None`, `by_segment` on both halves, and a `status` that describes the way in
+- [x] T045 Draw a composed candidate as the chain it is (004 FR-013): the `COMPOSED` mark and
+  style class on the caption, `way in: composed chain of N declared routes`, and a
+  `segment <position> · route <id>` field on every edge so each hop names its declaration
+- [x] T046 Render each `ExitChain` member as itself, and `EXIT_BY_IDENTITY` **not as an edge**
+  — the mark on the destination venue and a note saying the round-trip figure is the one-way
+  figure, because a zero-cost edge would assert a journey that does not happen
+- [x] T047 Put 004's per-segment attribution on its own node per half, with the
+  independent-rounding caveat where a chain has more than one segment
+- [x] T048 Widen the regime check to every segment of both halves, and emit a `classDef` for
+  exactly the classes a diagram applies — derived from the emitted lines, so a registry graph
+  stops defining classes only a costed path can carry
 - [x] T032 Stop emitting the `closedRoute` `classDef`, which nothing can carry — Mermaid
   applies a class to a node and `CLOSED` only ever lands on an edge. The explanation moves into
   `marks.CLASS_DEFS`; the mark itself stays in the vocabulary and in the label text

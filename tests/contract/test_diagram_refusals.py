@@ -36,7 +36,7 @@ from terezy.core.results.ramp import (
     RampCost,
     RouteUnusable,
 )
-from terezy.core.routes.path import FundingPath
+from terezy.core.routes.path import FundingPath, Segment
 from tests import diagram_registries as fixture
 
 pytestmark = pytest.mark.contract
@@ -53,12 +53,13 @@ def a_route_unusable() -> RouteUnusable:
     Built by costing rather than by hand wherever possible; here the shipped registry has no
     leg minimum, so the record is constructed with the fields ``cost_one`` would fill and the
     reason it would write. What matters to this suite is the *shape*: a refusal carrying a
-    binding constraint and a reason.
+    binding constraint, the segment it bound on (004 FR-015), and a reason.
     """
     return RouteUnusable(
         path=FundingPath(
             destination_id="binance", stream_id=fixture.UAH_STREAM, route_id=fixture.P2P_ROUTE
         ),
+        binding_segment=Segment(position=0, route_id=fixture.P2P_ROUTE),
         binding_constraint="leg.minimum",
         required=Money(500.0, Currency.UAH, prov.EMPTY),
         actual=Money(100.0, Currency.UAH, prov.EMPTY),

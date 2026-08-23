@@ -69,7 +69,12 @@ quantity gets a sixth function in this module. It never gets a format at a call 
 ### `Mark`
 
 A closed enum of the states a label can carry: `UNVERIFIED`, `STALE`, `SYNTHETIC`,
-`CLOSED`, `NO_EXIT_DECLARED`, `EXIT_COST_UNKNOWN`.
+`CLOSED`, `NO_EXIT_DECLARED`, `EXIT_COST_UNKNOWN` — and, ⚙ since feature 004 landed,
+`COMPOSED` and `EXIT_BY_IDENTITY`. Those two are states that did not exist when this document
+enumerated the vocabulary: a way in nobody declared end to end (004 FR-013), and a destination
+that is itself a declared spendable endpoint so there is no way out to cost. Growing a closed
+set is a code change reviewed against the claim the set exists to support, and that claim —
+every state pairwise distinguishable — is asserted over whatever the set currently is.
 
 Rendered as **visible tokens inside the label text** (FR-015). Mermaid `classDef` styling
 may add emphasis on top; it may never be the only carrier, because a mark that lives in a
@@ -103,7 +108,14 @@ The renderer consumes what already exists and defines no parallel model (FR-020)
 | `RampCost`, `OneWayCost`, `RoundTripCost` | `core.results.ramp` | The costed path |
 | `ExitCostUnknown`, `RouteUnusable`, `NothingComparable` | `core.results.ramp` | Refusals, drawn as refusals |
 | `Provenance`, `StalenessVerdict` | `core.primitives` | The marks |
+| `ComposedPath`, `ExitChain`, `Segment` | `core.routes.path` | ⚙ A chain drawn as the chain it is |
+| `SegmentAttribution` | `core.results.ramp` | ⚙ What each hop of a chain charged |
 
-**No import of `core.routes.coverage` and none of composition** (research.md D6). The *no
-exit declared* mark is computed here from the declarations — a smaller question than the
-audit, with the same answer, and no dependency on a feature landing in parallel.
+**No import of `core.routes.coverage`, and none of the composition *search*** (research.md
+D6). The *no exit declared* mark is computed here from the declarations — a smaller question
+than the audit, with the same answer.
+
+⚙ Feature 004's records are read; its search is not. `core.routes.compose` never appears here:
+a diagram draws the candidate it was handed, and enumerating one would make the renderer answer
+a question nobody asked it. Feature 003's coverage report is likewise still unread, and its
+"reachable by composition only" annotation is 003's surface to grow.

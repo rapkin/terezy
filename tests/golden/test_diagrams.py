@@ -26,6 +26,15 @@ then read the diff and justify each changed line in the commit message. A **miss
 is a failure, never a silent regeneration: an artifact that reappeared on its own would make a
 deleted one indistinguishable from a passing run.
 
+**No recorded artifact shows a composed candidate, and that is a fact about the registry.**
+The shipped declarations compose *nothing* under either regime: every corridor in
+``data/routes/`` either starts at the salary rail or ends at it, so no chain of two connects
+anywhere a single route does not. Feature 004's rendering is therefore pinned by fixtures in
+``tests/unit/test_diagram_path.py`` rather than by a golden -- stated here rather than left as
+a silence, because a reader looking for a chain in these files should know why there is none
+and what would change it: one declared corridor between two venues that today only the salary
+rail joins.
+
 **And it cannot be green-and-wrong.** An artifact recorded from a broken render agrees with
 itself forever, so the last class below ties the recorded text back to the declarations and to
 the hand-computed figures ``tests/worked_examples/test_ramp_p2p_premium.py`` checks.
@@ -360,6 +369,7 @@ class TestTheArtifactsCannotBeGreenAndWrong:
             "name ",
             "route ",
             "provider ",
+            "segment ",
             "leg ",
             "via channel ",
             "status: ",
@@ -493,20 +503,31 @@ class TestTheArtifactsCannotBeGreenAndWrong:
     def test_no_style_class_is_emitted_that_nothing_can_carry(self) -> None:
         """An unused ``classDef`` is dead weight in an artifact whose value is being read.
 
-        Worse, it tells the next contributor that closed routes are styled when they are not:
-        Mermaid applies a class to a node, and ``CLOSED`` only ever lands on an edge, whose
-        emphasis is its dotted line. The mark itself is still in the vocabulary and still in
-        the label text -- only the unusable style declaration is gone.
+        Worse, it tells the next contributor that a state is styled when nothing in front of
+        them wears it. Asserted as an **equality** per artifact rather than as an absence, so
+        it holds in both directions and needs no list of exceptions: a diagram carries the
+        states it has, and a registry graph that started defining a class for composed chains
+        would fail here even though the class is perfectly valid on the other diagram kind.
         """
-        emitted = {
+        for artifact in ARTIFACTS:
+            text = _recorded(artifact)
+            emitted = {
+                line.split()[1]
+                for line in text.splitlines()
+                if line.lstrip().startswith("classDef ")
+            }
+            applied = set(re.findall(r":::(\w+)$", text, re.MULTILINE))
+            assert emitted == applied, (
+                f"{artifact.name} defines classes nothing carries, or carries classes nothing "
+                f"defines: {emitted ^ applied}"
+            )
+            assert emitted <= set(diagram_marks.STYLE_CLASS.values())
+        assert diagram_marks.STYLE_CLASS[Mark.CLOSED] not in {
             line.split()[1]
             for artifact in ARTIFACTS
             for line in _recorded(artifact).splitlines()
             if line.lstrip().startswith("classDef ")
-        }
-        assert emitted, "no styling at all was recorded"
-        assert diagram_marks.STYLE_CLASS[Mark.CLOSED] not in emitted
-        assert emitted <= set(diagram_marks.STYLE_CLASS.values())
+        }, "a closed route is an edge, and Mermaid styles a node -- nothing can carry it"
 
     def test_the_recorded_diagrams_say_they_are_built_on_synthetic_data(self) -> None:
         """§11 item 1: none of these figures has been observed, and both pictures say so."""

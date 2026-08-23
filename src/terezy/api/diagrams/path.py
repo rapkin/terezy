@@ -79,9 +79,19 @@ from terezy.core.results.ramp import (
     RampCost,
     RoundTripCost,
     RouteUnusable,
+    SegmentAttribution,
 )
+from terezy.core.routes import path as candidates
 from terezy.core.routes.channels import FxChannel
 from terezy.core.routes.legs import Leg, Route
+from terezy.core.routes.path import (
+    ComposedExit,
+    ComposedPath,
+    DeclaredExit,
+    ExitByIdentity,
+    FundingPath,
+    Segment,
+)
 from terezy.core.scenarios.regimes import Regime
 
 INBOUND: str = "inbound"
@@ -134,17 +144,24 @@ def _is_assessed(provenance: Provenance, verdict: StalenessVerdict) -> bool:
 
 def _leg_fields(
     leg: Leg,
+    segment: Segment,
     route: Route,
+    *,
     direction: str,
     quote: Quote | None,
     verdict: StalenessVerdict,
 ) -> list[str]:
     """One edge's label, field by field. Declared figures only; nothing computed.
 
-    The same fields, in the same order, as the registry graph puts on the same leg
-    (``figures.edge_figures``) -- so a reader holding the two diagrams side by side can
-    compare them line by line, and so neither can quietly start showing a figure the other
-    does not.
+    The same declared figures, in the same order, as the registry graph puts on the same leg
+    (``figures.edge_figures``) -- so a reader holding the two diagrams side by side can compare
+    them line by line, and so neither can quietly start showing a figure the other does not.
+
+    **The segment field is what makes a chain readable.** ``Leg.index`` is declared per route,
+    so a two-segment chain says ``leg 0`` twice; ``segment 0 · leg 0`` and ``segment 1 · leg 0``
+    are the two different movements they are. The segment also names the declared route it is,
+    which is 004's FR-013 on an edge: every hop of a composed candidate is somebody's
+    declaration, and a reader must be able to open it.
     """
     currency = (
         leg.from_ccy.value
@@ -153,6 +170,7 @@ def _leg_fields(
     )
     fields = [
         direction,
+        f"segment {segment.position}",
         f"route {mermaid.escape(route.id)}",
         f"provider {mermaid.escape(route.provider)}",
         f"leg {leg.index} {mermaid.escape(leg.kind)}",
@@ -246,80 +264,138 @@ def _reported_beside_fields(result: RampCost) -> list[str]:
     ]
 
 
-def _exit_route(
-    result: RampCost, routes: Mapping[str, Route]
-) -> tuple[Route, RoundTripCost] | None:
-    """The declared exit route and the figure it earned, or ``None`` for neither.
+def _by_segment_fields(label: str, attributions: tuple[SegmentAttribution, ...]) -> list[str]:
+    """What each segment of a candidate charged, named by the declared route it is.
 
-    Returned together because they are one fact: a ``RoundTripCost`` means an exit route was
-    costed, and the inbound route's ``partner_route`` names which. Returning the pair is what
-    lets the caller draw both without re-narrowing the union -- a second ``isinstance`` at the
-    call site would be a second place the two could be read apart.
+    004's second axis of attribution (its FR-020). ``components`` says which *term* charged --
+    spread, percentage, flat -- and this says which *hop* did, which is the question a reader of
+    a chain actually has: **which declaration dominates, and where do I open it?**
 
-    Keyed off the *result*, never a search for something that leaves the destination: that
-    search is composition, a different feature's question with a different answer.
+    On its own node rather than on the edges. A segment is a declared route and an edge is a
+    leg, so a segment's charge belongs to neither one of its legs nor to all of them; repeating
+    it on each would read as each leg charging it. A declared route has exactly one of these and
+    that is not a special case -- the figures restate the component totals, which is the correct
+    reading and exactly what stops being true the day a chain is costed.
     """
-    if not isinstance(result.round_trip, RoundTripCost):
-        return None
-    inbound = routes[result.path.route_id]
-    if inbound.partner_route is None:
-        raise ValueError(
-            f"route {inbound.id!r} carries a round-trip cost but declares no partner_route. A "
-            "round trip is drawn from the declared exit route's own legs (FR-010); there is no "
-            "reversal of the inbound chain to fall back on"
+    fields = [f"{label} cost by segment"]
+    if len(attributions) > 1:
+        # Each figure goes through the one rule and is rounded on its own, so two segments
+        # rounding up can display a total a hundredth above the rounded sum above -- 666.67 and
+        # 555.56 against 1222.22 on the §4.3.1 round trip. The underlying figures add exactly;
+        # what does not add is the *rendering*, which is the rounding this diagram admits to
+        # (METHODOLOGY, the number rule). Said here rather than left for a reader to find,
+        # because a reader who adds them and comes up short will suspect the arithmetic.
+        fields.append(
+            "each figure rounded on its own, so the segments need not add to the total above"
         )
-    return routes[inbound.partner_route], result.round_trip
+    fields.extend(
+        f"segment {entry.position} route {mermaid.escape(entry.route_id)}: "
+        + ", ".join(
+            f"{component.value} {numbers.amount(entry.components[component])}"
+            for component in sorted(CostComponent, key=lambda item: item.value)
+        )
+        for entry in attributions
+    )
+    return fields
 
 
-def _drawn(
-    result: RampCost,
+def _way_in_field(candidate: candidates.Candidate) -> str:
+    """How the money got in, said in the caption: one declaration, or a chain of them.
+
+    004's FR-013 -- *a composed candidate is visibly distinct from a declared route in every
+    report* -- and a diagram is a report. A chain exists only at query time, so a reader who
+    could not tell it from a declared corridor would go looking for a file nobody wrote.
+    """
+    match candidate:
+        case FundingPath():
+            return f"way in: declared route {mermaid.escape(candidate.route_id)}"
+        case ComposedPath():
+            joined = mermaid.escape(candidates.candidate_id(candidate))
+            return (
+                f"way in: composed chain of {len(candidate.segments)} declared routes "
+                f"({joined}) -- nobody declared this corridor end to end"
+            )
+        case _:  # pragma: no cover -- mypy proves this unreachable
+            assert_never(candidate)
+
+
+def _way_out_field(result: RampCost) -> str:
+    """How the money gets back out, in the four shapes the result can carry.
+
+    Three members of ``ExitChain`` plus ``None``, each a different claim the owner acts on
+    differently: one declared partner, a chain of declared exit routes, a destination that is
+    already spendable, and nobody having costed a way out at all.
+    """
+    match result.exit_path:
+        case None:
+            return "way out: NONE COSTED -- see the exit-cost-unknown note"
+        case DeclaredExit():
+            return f"way out: declared route {mermaid.escape(result.exit_path.route_id)}"
+        case ComposedExit():
+            joined = mermaid.escape("+".join(result.exit_path.segments))
+            return (
+                f"way out: composed chain of {len(result.exit_path.segments)} declared exit "
+                f"routes ({joined})"
+            )
+        case ExitByIdentity():
+            return "way out: none needed -- the destination is itself a declared spendable endpoint"
+        case _:  # pragma: no cover -- mypy proves this unreachable
+            assert_never(result.exit_path)
+
+
+def _identity_fields(result: RampCost) -> list[str]:
+    """The ``EXIT_BY_IDENTITY`` note: why this diagram has a round trip and no exit legs.
+
+    **It is not an edge, and drawing one would say something false.** An edge is a movement of
+    money; here no money moves, because the destination *is* somewhere the owner spends. A
+    zero-cost edge would assert a journey that costs nothing, which is a different claim from
+    there being no journey -- the same distinction ``core.routes.path.ExitByIdentity`` exists to
+    carry, where ``None`` would have said "no exit chain" and an empty chain "a chain that
+    charged nothing".
+
+    So the claim goes where it is true: on the **venue**, which is the thing that is spendable,
+    and in this note. The consequence a reader needs is stated too -- the round-trip figure
+    equals the one-way figure, and that is arithmetic rather than a coincidence.
+    """
+    return [
+        marks.segment((Mark.EXIT_BY_IDENTITY,)),
+        f"{mermaid.escape(result.path.destination_id)} is itself a declared spendable endpoint",
+        "the money is already where it needed to come back out to, so there are no exit legs",
+        "and the round-trip figure is the one-way figure -- not a way out that happened to cost "
+        "nothing",
+    ]
+
+
+def _walked(
+    segment_ids: tuple[str, ...],
     routes: Mapping[str, Route],
-    channels: Mapping[str, FxChannel],
-    regime_id: str,
-) -> Diagram:
-    """The path itself, once the input has been established to be a costed result."""
-    inbound = routes[result.path.route_id]
-    way_out = _exit_route(result, routes)
+    direction: str,
+    verdict: StalenessVerdict,
+) -> list[tuple[str, Segment, Route, StalenessVerdict]]:
+    """One half of a journey, as the declared routes it is made of, numbered in chain order.
 
-    chains: list[tuple[str, Route, StalenessVerdict]] = [
-        (INBOUND, inbound, result.one_way.staleness)
-    ]
-    if way_out is not None:
-        # The exit legs' observations are in the *round-trip* verdict: it is the merged
-        # verdict over both routes, and the one-way verdict never aged them. Using the
-        # one-way verdict here would report every exit leg as unassessed -- honest, but a
-        # verdict that does cover them exists and this is a picture of that result.
-        exit_route, round_trip = way_out
-        chains.append((EXIT, exit_route, round_trip.staleness))
-
-    venue_ids = sorted(
-        {
-            venue
-            for _, route, _ in chains
-            for leg in route.legs
-            for venue in (leg.from_venue, leg.to_venue)
-        }
-    )
-    node_of = {venue_id: mermaid.node_id(index) for index, venue_id in enumerate(venue_ids)}
-
-    caption_marks = marks.epistemic(
-        result.one_way.provenance, stale=bool(result.one_way.staleness.stale)
-    )
-    lines = [
-        mermaid.node(
-            mermaid.CAPTION_ID,
-            mermaid.label(
-                "costed path",
-                f"regime: {mermaid.escape(regime_id)}",
-                f"destination: {mermaid.escape(result.path.destination_id)}",
-                f"stream: {mermaid.escape(result.path.stream_id)}",
-                f"route: {mermaid.escape(result.path.route_id)}",
-                f"status: {inbound.status}",
-                marks.segment(caption_marks),
-            ),
-        )
+    A declared route is a chain of one and is not a special case here, which is the reading
+    ``core.routes.path.segments_of`` establishes and this follows: one code path draws both, so
+    a composed candidate cannot acquire a rendering of its own.
+    """
+    return [
+        (direction, Segment(position=position, route_id=route_id), routes[route_id], verdict)
+        for position, route_id in enumerate(segment_ids)
     ]
 
+
+def _annotations(result: RampCost) -> tuple[list[tuple[list[str], str | None]], str | None]:
+    """Every free-standing note beside the path, in a fixed order, and the exit-unknown node.
+
+    Separated from :func:`_drawn` because it is where all the branching lives: four exit shapes,
+    two optional spread notes, one optional identity note. A function whose job is "which notes
+    does this result earn" is readable; the same branches inlined among node and edge emission
+    were not.
+
+    The order is fixed and therefore so are the ``x<k>`` ids (FR-016). The exit-unknown node's
+    id is returned because an edge points at it, and finding it again by matching on its text
+    would make the diagram's structure depend on its prose.
+    """
     annotations: list[tuple[list[str], str | None]] = [
         (
             _cost_fields(ONE_WAY, result.one_way),
@@ -352,23 +428,98 @@ def _drawn(
         case _:  # pragma: no cover -- mypy proves this unreachable
             assert_never(result.round_trip)
 
+    if isinstance(result.exit_path, ExitByIdentity):
+        annotations.append((_identity_fields(result), marks.STYLE_CLASS[Mark.EXIT_BY_IDENTITY]))
+    annotations.append((_by_segment_fields(ONE_WAY, result.one_way.by_segment), None))
+    if isinstance(result.round_trip, RoundTripCost):
+        annotations.append((_by_segment_fields(ROUND_TRIP, result.round_trip.by_segment), None))
     if result.one_way.spreads_over_reference:
         annotations.append((_spread_fields(ONE_WAY, result.one_way), None))
     if isinstance(result.round_trip, RoundTripCost) and result.round_trip.spreads_over_reference:
         annotations.append((_spread_fields(ROUND_TRIP, result.round_trip), None))
     annotations.append((_reported_beside_fields(result), None))
+    return annotations, exit_unknown_node
+
+
+def _drawn(
+    result: RampCost,
+    routes: Mapping[str, Route],
+    channels: Mapping[str, FxChannel],
+    regime_id: str,
+) -> Diagram:
+    """The path itself, once the input has been established to be a costed result."""
+    chains = _walked(candidates.segments_of(result.path), routes, INBOUND, result.one_way.staleness)
+    if isinstance(result.round_trip, RoundTripCost) and result.exit_path is not None:
+        # The exit segments' observations are in the *round-trip* verdict: it is the merged
+        # verdict over every route the journey touched, and the one-way verdict never aged
+        # them. Empty for EXIT_BY_IDENTITY, which is a way out with no legs.
+        chains.extend(
+            _walked(
+                candidates.exit_segments_of(result.exit_path),
+                routes,
+                EXIT,
+                result.round_trip.staleness,
+            )
+        )
+
+    venue_ids = sorted(
+        {
+            venue
+            for _, _, route, _ in chains
+            for leg in route.legs
+            for venue in (leg.from_venue, leg.to_venue)
+        }
+    )
+    node_of = {venue_id: mermaid.node_id(index) for index, venue_id in enumerate(venue_ids)}
+
+    composed = isinstance(result.path, ComposedPath)
+    by_identity = isinstance(result.exit_path, ExitByIdentity)
+    caption_marks = list(
+        marks.epistemic(result.one_way.provenance, stale=bool(result.one_way.staleness.stale))
+    )
+    if composed:
+        caption_marks.append(Mark.COMPOSED)
+    if by_identity:
+        caption_marks.append(Mark.EXIT_BY_IDENTITY)
+
+    lines = [
+        mermaid.node(
+            mermaid.CAPTION_ID,
+            mermaid.label(
+                "costed path",
+                f"regime: {mermaid.escape(regime_id)}",
+                f"destination: {mermaid.escape(result.path.destination_id)}",
+                f"stream: {mermaid.escape(result.path.stream_id)}",
+                _way_in_field(result.path),
+                _way_out_field(result),
+                # Named as the way in's, because that is what it describes: on a chain it is the
+                # tightest *inbound* segment's status, and a constrained exit segment does not
+                # move it (004, a stated gap). An unqualified "status" on a record whose headline
+                # number is the round trip would read as covering both halves.
+                f"status (way in, tightest segment): {result.status}",
+                marks.segment(tuple(caption_marks)),
+            ),
+            style_class=marks.STYLE_CLASS[Mark.COMPOSED] if composed else None,
+        )
+    ]
+
+    annotations, exit_unknown_node = _annotations(result)
 
     lines.extend(
         mermaid.node(mermaid.annotation_id(index), mermaid.label(*fields), style_class=style)
         for index, (fields, style) in enumerate(annotations)
     )
 
-    lines.extend(
-        mermaid.node(node_of[venue_id], mermaid.label(f"venue {mermaid.escape(venue_id)}"))
-        for venue_id in venue_ids
-    )
+    for venue_id in venue_ids:
+        fields = [f"venue {mermaid.escape(venue_id)}"]
+        style: str | None = None
+        if by_identity and venue_id == result.path.destination_id:
+            fields.append(marks.segment((Mark.EXIT_BY_IDENTITY,)))
+            fields.append("a declared spendable endpoint, so nothing has to leave it")
+            style = marks.STYLE_CLASS[Mark.EXIT_BY_IDENTITY]
+        lines.append(mermaid.node(node_of[venue_id], mermaid.label(*fields), style_class=style))
 
-    for direction, route, verdict in chains:
+    for direction, segment, route, verdict in chains:
         for leg in sorted(route.legs, key=lambda item: item.index):
             lines.append(
                 mermaid.edge(
@@ -376,7 +527,12 @@ def _drawn(
                     node_of[leg.to_venue],
                     mermaid.label(
                         *_leg_fields(
-                            leg, route, direction, figures.quote_for(leg, channels), verdict
+                            leg,
+                            segment,
+                            route,
+                            direction=direction,
+                            quote=figures.quote_for(leg, channels),
+                            verdict=verdict,
                         )
                     ),
                 )
@@ -385,7 +541,7 @@ def _drawn(
     if exit_unknown_node is not None:
         lines.append(
             mermaid.edge(
-                node_of[inbound.destination],
+                node_of[result.path.destination_id],
                 exit_unknown_node,
                 mermaid.label(
                     marks.segment((Mark.EXIT_COST_UNKNOWN,)),
@@ -395,7 +551,7 @@ def _drawn(
             )
         )
 
-    lines.extend(mermaid.class_def(name, style) for name, style in marks.CLASS_DEFS)
+    lines.extend(mermaid.class_defs(lines, marks.CLASS_DEFS))
 
     return Diagram(
         text=mermaid.document(lines),
@@ -403,6 +559,30 @@ def _drawn(
         regime_id=regime_id,
         mode=None,
     )
+
+
+def _in_force(result: RampCost, regime: Regime) -> None:
+    """Refuse to draw a journey the regime does not include, naming every segment it excludes.
+
+    **Every** segment, both halves. A chain is in force only if each of its declared routes is,
+    and a regime that excluded one hop of a three-hop candidate would otherwise get a picture of
+    a corridor its own belief says is not there -- with two thirds of it looking perfectly
+    ordinary. Checking the way out too is the same reading ``regimes.routes_in_force`` takes when
+    it refuses a regime that includes an inbound route while excluding its declared partner.
+
+    ``EXIT_BY_IDENTITY`` contributes no segments and so is never excluded: it is a fact about the
+    owner's spendable list, which a regime has no opinion about.
+    """
+    walked = candidates.segments_of(result.path)
+    if result.exit_path is not None:
+        walked += candidates.exit_segments_of(result.exit_path)
+    missing = sorted(set(walked) - regime.route_ids)
+    if missing:
+        raise ValueError(
+            f"regime {regime.id!r} does not include route(s) {missing}, so this journey does "
+            "not exist under it. A diagram shows one regime (FR-019), and drawing a corridor "
+            "the regime excludes would picture something the scenario says is not there"
+        )
 
 
 def render_path(
@@ -425,13 +605,7 @@ def render_path(
     """
     match result:
         case RampCost():
-            if result.path.route_id not in regime.route_ids:
-                raise ValueError(
-                    f"regime {regime.id!r} does not include route {result.path.route_id!r}, so "
-                    "this path does not exist under it. A diagram shows one regime (FR-019), "
-                    "and drawing a corridor the regime excludes would picture something the "
-                    "scenario says is not there"
-                )
+            _in_force(result, regime)
             return _drawn(result, routes, channels, regime.id)
         case RouteUnusable() | ExitCostUnknown() | NothingComparable():
             return NothingToDraw(reason=result.reason, kind="costed_path")

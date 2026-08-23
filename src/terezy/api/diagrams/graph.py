@@ -391,7 +391,7 @@ def render_graph(
             )
         )
 
-    lines.extend(mermaid.class_def(name, style) for name, style in marks.CLASS_DEFS)
+    lines.extend(mermaid.class_defs(lines, marks.CLASS_DEFS))
 
     return Diagram(
         text=mermaid.document(lines),

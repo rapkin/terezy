@@ -1,18 +1,16 @@
 flowchart LR
-    meta["costed path · regime: wartime · destination: binance · stream: salary_uah · route: monobank_to_binance_p2p · status: open · marks: UNVERIFIED + SYNTHETIC"]
+    meta["costed path · regime: wartime · destination: binance · stream: salary_uah · way in: declared route monobank_to_binance_p2p · way out: declared route binance_p2p_to_monobank · status (way in, tightest segment): open · marks: UNVERIFIED + SYNTHETIC"]
     x0["one-way cost 6.67% of 10000.00 UAH sent · arrived 222.22 USD · conversion_spread 666.67 UAH · fixed_fee 0.00 UAH · percentage_fee 0.00 UAH · marks: UNVERIFIED + SYNTHETIC"]:::unverified
     x1["round-trip cost 12.22% of 10000.00 UAH sent · arrived 8777.78 UAH · conversion_spread 1222.22 UAH · fixed_fee 0.00 UAH · percentage_fee 0.00 UAH · marks: UNVERIFIED + SYNTHETIC"]:::unverified
-    x2["spread over reference (one-way): 7.14% via p2p · this is NOT the cost -- the cost is the one-way cost figure above"]
-    x3["spread over reference (round-trip): 7.14% via p2p, 5.95% via p2p · this is NOT the cost -- the cost is the round-trip cost figure above"]
-    x4["reported beside the cost, never folded into it · latency 0 days · tightest declared monthly ceiling: 100000.00 UAH · disruption probability (largest single leg, so a lower bound): 5.00%"]
+    x2["one-way cost by segment · segment 0 route monobank_to_binance_p2p: conversion_spread 666.67 UAH, fixed_fee 0.00 UAH, percentage_fee 0.00 UAH"]
+    x3["round-trip cost by segment · each figure rounded on its own, so the segments need not add to the total above · segment 0 route monobank_to_binance_p2p: conversion_spread 666.67 UAH, fixed_fee 0.00 UAH, percentage_fee 0.00 UAH · segment 1 route binance_p2p_to_monobank: conversion_spread 555.56 UAH, fixed_fee 0.00 UAH, percentage_fee 0.00 UAH"]
+    x4["spread over reference (one-way): 7.14% via p2p · this is NOT the cost -- the cost is the one-way cost figure above"]
+    x5["spread over reference (round-trip): 7.14% via p2p, 5.95% via p2p · this is NOT the cost -- the cost is the round-trip cost figure above"]
+    x6["reported beside the cost, never folded into it · latency 0 days · tightest declared monthly ceiling: 100000.00 UAH · disruption probability (largest single leg, so a lower bound): 5.00%"]
     n0["venue binance"]
     n1["venue monobank_uah"]
-    n1 -->|"inbound · route monobank_to_binance_p2p · provider Binance P2P · leg 0 fx · UAH to USD · via channel p2p · declared fee 0.00% + 0.00 UAH · declared premium (buy side) +3.00 UAH per USD, applied above the reference 42.00 UAH per USD · status: open · marks: UNVERIFIED + SYNTHETIC"| n1
-    n1 -->|"inbound · route monobank_to_binance_p2p · provider Binance P2P · leg 1 transfer · USD · declared fee 0.00% + 0.00 USD · status: open · marks: UNVERIFIED + SYNTHETIC"| n0
-    n0 -->|"exit · route binance_p2p_to_monobank · provider Binance P2P · leg 0 fx · USD to UAH · via channel p2p · declared fee 0.00% + 0.00 USD · declared premium (sell side) -2.50 UAH per USD, applied below the reference 42.00 UAH per USD · status: open · marks: UNVERIFIED + SYNTHETIC"| n0
-    n0 -->|"exit · route binance_p2p_to_monobank · provider Binance P2P · leg 1 transfer · UAH · declared fee 0.00% + 0.00 UAH · status: open · marks: UNVERIFIED + SYNTHETIC"| n1
+    n1 -->|"inbound · segment 0 · route monobank_to_binance_p2p · provider Binance P2P · leg 0 fx · UAH to USD · via channel p2p · declared fee 0.00% + 0.00 UAH · declared premium (buy side) +3.00 UAH per USD, applied above the reference 42.00 UAH per USD · status: open · marks: UNVERIFIED + SYNTHETIC"| n1
+    n1 -->|"inbound · segment 0 · route monobank_to_binance_p2p · provider Binance P2P · leg 1 transfer · USD · declared fee 0.00% + 0.00 USD · status: open · marks: UNVERIFIED + SYNTHETIC"| n0
+    n0 -->|"exit · segment 0 · route binance_p2p_to_monobank · provider Binance P2P · leg 0 fx · USD to UAH · via channel p2p · declared fee 0.00% + 0.00 USD · declared premium (sell side) -2.50 UAH per USD, applied below the reference 42.00 UAH per USD · status: open · marks: UNVERIFIED + SYNTHETIC"| n0
+    n0 -->|"exit · segment 0 · route binance_p2p_to_monobank · provider Binance P2P · leg 1 transfer · UAH · declared fee 0.00% + 0.00 UAH · status: open · marks: UNVERIFIED + SYNTHETIC"| n1
     classDef unverified stroke-dasharray: 4 2
-    classDef stale stroke-dasharray: 1 3
-    classDef synthetic stroke-width: 1px
-    classDef noExitDeclared stroke-width: 3px
-    classDef exitCostUnknown stroke-width: 3px
