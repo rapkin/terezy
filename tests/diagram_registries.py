@@ -74,6 +74,19 @@ FRESH: Final = date(2026, 8, 20)
 LONG_AGO: Final = date(2020, 1, 1)
 """Years before :data:`AS_OF`: stale under every declared threshold."""
 
+EIGHTY_TWO_DAYS_AGO: Final = date(2026, 5, 31)
+"""The **discriminating** age: 82 days before :data:`AS_OF`.
+
+Stale under ``p2p_premium``'s 7 days and current under ``bank_fee_schedule``'s 365. That gap is
+the whole content of FR-028 -- and the number is not chosen at random. ``cost._channel_verdicts``
+records the defect it was written to fix in exactly these terms: a P2P premium aged under the
+reference's schedule threshold was "reported fresh at 82 days".
+
+:data:`LONG_AGO` cannot discriminate. It is stale under *both* thresholds, so a renderer that
+collapsed the three declared kinds into one would reach the same verdict and every assertion
+built on it would still pass. Any test of per-kind ageing has to use this date.
+"""
+
 FAST_KIND: Final = "p2p_premium"
 """The fastest-ageing declared kind (7 days). The stale routes below age under it."""
 
@@ -125,16 +138,29 @@ def declared_kinds() -> Mapping[str, ObservationKind]:
     }
 
 
-def source(source_id: str, *, verified: bool, fresh: bool, synthetic: bool) -> Provenance:
-    """One cited origin in one of the four states the marks distinguish."""
+def source(
+    source_id: str,
+    *,
+    verified: bool,
+    fresh: bool,
+    synthetic: bool,
+    retrieved_on: date | None = None,
+) -> Provenance:
+    """One cited origin in one of the states the marks distinguish.
+
+    ``retrieved_on`` overrides the coarse ``fresh`` switch when a test needs a *specific* age --
+    :data:`EIGHTY_TWO_DAYS_AGO` is the one that discriminates between two declared thresholds,
+    which ``fresh=False`` cannot do because it is stale under both.
+    """
+    seen = retrieved_on if retrieved_on is not None else (FRESH if fresh else LONG_AGO)
     return Provenance(
         frozenset(
             {
                 SourceRef(
                     id=source_id,
                     citation=SYNTHETIC_CITATION if synthetic else CITED_CITATION,
-                    retrieved_on=FRESH if fresh else LONG_AGO,
-                    verified_on=(FRESH if fresh else LONG_AGO) if verified else None,
+                    retrieved_on=seen,
+                    verified_on=seen if verified else None,
                 )
             }
         )
@@ -149,6 +175,7 @@ def side(
     kind: str = FAST_KIND,
     verified: bool = True,
     fresh: bool = True,
+    retrieved_on: date | None = None,
 ) -> ChannelSide:
     """One side of a quote, in exactly one of the two declared forms.
 
@@ -156,7 +183,9 @@ def side(
     ``_side_figure`` renders: a side with both, or neither, is a file that cannot exist.
     """
     assert (premium is None) != (bps is None), "declare exactly one form"
-    sources = source(source_id, verified=verified, fresh=fresh, synthetic=True)
+    sources = source(
+        source_id, verified=verified, fresh=fresh, synthetic=True, retrieved_on=retrieved_on
+    )
     return ChannelSide(
         markup_bps=bps,
         premium_per_unit=None if premium is None else Money(premium, UAH, sources),
@@ -239,6 +268,7 @@ def leg(
     kind_of_observation: str,
     fee_pct: float = 0.0,
     fee_fixed: float = 0.0,
+    channel_id: str = "p2p",
 ) -> Leg:
     """One movement. ``fx`` exactly when the currencies differ, and a channel only there.
 
@@ -253,7 +283,7 @@ def leg(
         to_venue=to_venue,
         from_ccy=from_ccy,
         to_ccy=to_ccy,
-        channel="p2p" if converts else None,
+        channel=channel_id if converts else None,
         fee_pct=fee_pct,
         fee_fixed=Money(fee_fixed, from_ccy, provenance),
         minimum=None,
@@ -283,6 +313,7 @@ def route(
     to_ccy: Currency | None = None,
     fee_pct: float = 0.0,
     fee_fixed: float = 0.0,
+    channel_id: str = "p2p",
 ) -> Route:
     """One declared corridor as a single leg, on ``coverage_registries.route``'s pattern.
 
@@ -310,6 +341,7 @@ def route(
                 kind_of_observation=kind_of_observation,
                 fee_pct=fee_pct,
                 fee_fixed=fee_fixed,
+                channel_id=channel_id,
             ),
         ),
     )
@@ -467,13 +499,21 @@ def stale_premium_registry() -> Registry:
     marked the leg's fee schedule fresh and said nothing about a premium last seen years ago
     would render the most decision-relevant stale figure in the registry as current.
 
-    The premium ages under ``p2p_premium`` (7 days) and the fee under ``bank_fee_schedule``
-    (365) -- two thresholds, two tables, which is exactly why FR-028 declares them per kind.
+    The premium ages under ``p2p_premium`` (7 days) and the fee and the reference rate under
+    ``bank_fee_schedule`` (365) -- three thresholds across three tables, which is exactly why
+    FR-028 declares them per kind.
+
+    **The premium is :data:`EIGHTY_TWO_DAYS_AGO` old, and that number is the point.** At 82 days
+    it is stale under the side's own 7-day threshold and *current* under the 365-day one the
+    channel declares for its reference rate. A renderer that aged the channel's whole provenance
+    under the channel's kind -- the collapse ``cost._channel_verdicts`` exists to prevent --
+    renders this edge clean. An older premium would be stale under both thresholds and would let
+    that collapse pass unnoticed, which is what happened to the first version of this fixture.
     """
     quote = channel(
         "p2p",
-        buy=side(premium=3.0, source_id="p2p:buy:stale", fresh=False),
-        sell=side(premium=-2.5, source_id="p2p:sell:stale", fresh=False),
+        buy=side(premium=3.0, source_id="p2p:buy:stale", retrieved_on=EIGHTY_TWO_DAYS_AGO),
+        sell=side(premium=-2.5, source_id="p2p:sell:stale", retrieved_on=EIGHTY_TWO_DAYS_AGO),
     )
     venues = {v.id: v for v in (venue("alpha", UAH, USD), venue("beta", UAH, USD))}
     routes = {
@@ -491,6 +531,65 @@ def stale_premium_registry() -> Registry:
         venues=venues,
         routes=routes,
         channels={"p2p": quote},
+        regime=Regime(id=REGIME_ID, route_ids=frozenset(routes)),
+        kinds=declared_kinds(),
+    )
+
+
+CARD_IN_ROUTE: Final = "r_card_buy"
+CARD_OUT_ROUTE: Final = "r_card_sell"
+
+
+def card_registry() -> Registry:
+    """Both sides of a **basis-point** channel, in one registry.
+
+    The form that carries no direction of its own. ``markup_bps`` is a *cost magnitude*: the
+    engine adds it on the buy side and subtracts it on the sell side, so the identical declared
+    ``150.0`` describes an edge that charges +1.5% and an edge that charges -1.5%. Rendering the
+    number alone draws the two identically and draws the sell side backwards.
+
+    Two routes, one each way, so a test can compare the two labels. The shipped registry cannot
+    do this: it declares exactly one leg through the ``card`` channel and it is buy-side, so no
+    golden would ever show the case.
+    """
+    quote = channel(
+        "card",
+        buy=side(bps=150.0, source_id="card:buy", kind=SLOW_KIND),
+        sell=side(bps=150.0, source_id="card:sell", kind=SLOW_KIND),
+    )
+    venues = {v.id: v for v in (venue("alpha", UAH, USD), venue("beta", UAH, USD))}
+    cited = source("s_card", verified=True, fresh=True, synthetic=False)
+    routes = {
+        r.id: r
+        for r in (
+            route(
+                CARD_IN_ROUTE,
+                origin="alpha",
+                destination="beta",
+                provenance=cited,
+                kind_of_observation=SLOW_KIND,
+                from_ccy=UAH,
+                to_ccy=USD,
+                partner_route=CARD_OUT_ROUTE,
+                channel_id="card",
+            ),
+            route(
+                CARD_OUT_ROUTE,
+                origin="beta",
+                destination="alpha",
+                provenance=cited,
+                kind_of_observation=SLOW_KIND,
+                direction="exit",
+                from_ccy=USD,
+                to_ccy=UAH,
+                channel_id="card",
+            ),
+        )
+    }
+    return Registry(
+        venues=venues,
+        routes=routes,
+        channels={"card": quote},
         regime=Regime(id=REGIME_ID, route_ids=frozenset(routes)),
         kinds=declared_kinds(),
     )
@@ -644,12 +743,45 @@ CostedOutcome = RampCost | RouteUnusable | ExitCostUnknown | NothingComparable
 """Everything ``render_path`` accepts: one costed result, or one of the three refusals."""
 
 
+STALE_PREMIUM_AS_OF: Final = date(2026, 11, 12)
+"""82 days after the shipped declarations were retrieved (2026-08-22).
+
+Chosen so exactly one kind of observation on the §4.3.1 corridor has gone stale: the ``p2p``
+premium, whose threshold is 7 days. The route's own legs age under ``regulatory_limit`` (180)
+and ``bank_fee_schedule`` (365) and are still current. So a costed path at this date has a
+**stale premium on fresh legs** -- the case where matching a verdict against the leg's own
+sources alone leaves the stale figure invisible on the edge that charges it.
+"""
+
+
+def stale_premium_cost() -> RampCost:
+    """The §4.3.1 corridor costed late enough that only its premium has aged.
+
+    Costed through ``cost_one`` like every other fixture here, so the verdict the diagram reads
+    is the verdict feature 002 produced -- not one this module invented to suit an assertion.
+    """
+    declared = shipped_declarations()
+    result = cost.cost_one(
+        FundingPath(destination_id="binance", stream_id=UAH_STREAM, route_id=P2P_ROUTE),
+        Money(AMOUNT, UAH, prov.EMPTY),
+        routes=declared.routes,
+        channels=declared.channels,
+        streams=declared.streams,
+        kinds=declared.kinds,
+        on_date=AS_OF,
+        as_of=STALE_PREMIUM_AS_OF,
+    )
+    assert isinstance(result, RampCost), result
+    return result
+
+
 def path_of(result: CostedOutcome, *, regime_id: str = "wartime") -> Diagram | NothingToDraw:
     """Render a costed result under one declared regime."""
     declared = shipped_declarations()
     return render_path(
         result,
         routes=declared.routes,
+        channels=declared.channels,
         regime=shipped_regime(declared, "war_end", regime_id),
     )
 

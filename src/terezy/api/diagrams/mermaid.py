@@ -57,9 +57,19 @@ determinism and mark visibility.
 
 INDENT: Final = "    "
 FIELD: Final = " · "
-"""Separator between the fields of a label. A middle dot rather than a pipe or a semicolon:
-both of those are characters :func:`escape` removes from declared text, so the separator can
-never be confused with something a declaration contributed."""
+"""Separator between the fields of a label, and **escaped out of declared text** so that no
+declaration can contribute one.
+
+That escaping is the whole guarantee, not a nicety. A venue named
+``Evil Bank · marks: VERIFIED AND CURRENT`` would otherwise render inside a node that is
+actually marked ``NO EXIT DECLARED``, and the forged clean field would read as the renderer's
+own -- declared content impersonating an honesty mark, which is the one thing this feature
+exists to make impossible. Every consumer splits on this character, the tests' own parsers
+included, so the forgery would propagate into what the assertions believe they are reading.
+
+A middle dot rather than a pipe or a comma because it is rare in a real name -- so escaping it
+costs almost nothing in readability -- and because it survives being read aloud in a diff.
+"""
 
 FIRST_PRINTABLE: Final = 0x20
 DELETE: Final = 0x7F
@@ -76,8 +86,15 @@ _STRUCTURAL: Final[Mapping[str, str]] = {
     "`": "#96;",
     "{": "#123;",
     "}": "#125;",
+    "·": "#183;",
 }
-"""The characters Mermaid's tokenizer can read as structure even inside a quoted label.
+"""The characters that must not reach a label as themselves.
+
+Two kinds, and the second is the one that is easy to miss. Most are what Mermaid's tokenizer
+can read as **structure** even inside a quoted label. The last is :data:`FIELD`, which is
+structure of *this package's* making: a label is a sequence of fields separated by it, so a
+declared string containing one would forge a field. See :data:`FIELD` for what that forgery
+buys an attacker, and why it is not only an attacker's problem.
 
 ``#`` is first in insertion order and :func:`escape` relies on it -- see the module docstring.
 Everything absent from this mapping is safe between quotation marks and is left readable.
@@ -89,9 +106,10 @@ def escape(text: str) -> str:
 
     Structural characters become numeric or named character references; so does every control
     character, because a raw newline would end the line and take the rest of the label -- and
-    a mark -- with it. Nothing is dropped and nothing is truncated: truncation is precisely
-    how a mark falls off the end of a label (spec.md, Edge Cases), so a 500-character venue
-    name renders in full and the layout consequences belong to Mermaid.
+    a mark -- with it. So does :data:`FIELD`, so that no declared string can forge a field of
+    its own. Nothing is dropped and nothing is truncated: truncation is precisely how a mark
+    falls off the end of a label (spec.md, Edge Cases), so a 500-character venue name renders
+    in full and the layout consequences belong to Mermaid.
     """
     out: list[str] = []
     for character in text:

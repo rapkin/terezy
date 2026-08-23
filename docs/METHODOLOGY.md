@@ -1630,6 +1630,17 @@ Every figure on every diagram is rendered by
 | a premium per unit | fixed two decimals, **always signed** | `+3.00 UAH per USD`, `-2.50 UAH per USD` |
 | a markup in basis points | fixed two decimals, in the unit declared | `150.0` → `150.00 bps` |
 
+A rendered premium always names **which side** the leg takes and **which way** the quote is
+applied: `(buy side) 150.00 bps, applied above the reference 42.00 UAH per USD`. That is not
+decoration. The two declared forms have different sign conventions — `premium_per_unit` is a
+signed offset that both sides add, while `markup_bps` is a *cost magnitude* the engine adds on
+the buy side and subtracts on the sell side (§16.1). So the identical declared `150.0`
+describes an edge charging +1.5% and an edge charging −1.5%, and the number alone renders the
+two the same way and the sell side backwards. The direction phrase is taken from
+`channels.effective_rate` itself, so the picture and the arithmetic cannot disagree; the
+effective rate is *not* rendered, because it is computed rather than declared and FR-008
+allows the diagram no figure its input does not carry.
+
 Two decimals, **one** private helper, and all five public functions go through it. This is the
 single-tolerance discipline of §11 applied to formatting: defined in one place, imported
 everywhere, and a second rule for the same kind of quantity is a **defect** rather than a
@@ -1698,14 +1709,25 @@ does not name; a number there would be keyed by nothing. The two modes —
 nothing else, and each names itself on the face of the diagram so a numberless picture is never
 read as "zero fees".
 
-**What `with-declared-figures` shows is the leg's fees *and the premium of the channel it
-applies*.** The prohibition above does not reach a premium: it is a declared observation with
-its own source, verification date and `kind`, exactly like a leg fee. Showing only the fees was
-the first implementation and it was wrong in the way this whole document is about — every fee on
-the §4.3.1 corridor is declared zero, so the graph drew the most expensive corridor in the
-registry as free while the 6.67% lived entirely in a premium it never mentioned. The applied
-side carries its own marks and ages under its own threshold, so a stale premium on a fresh-fee
-leg does not render clean (§18, and `cost._channel_verdicts` one layer down).
+**Both diagram kinds show the leg's fees *and the premium of the channel it applies*.** The
+prohibition above does not reach a premium: it is a declared observation with its own source,
+verification date and `kind`, exactly like a leg fee. Showing only the fees was the first
+implementation and it was wrong in the way this whole document is about — every fee on the
+§4.3.1 corridor is declared zero, so the diagram drew the most expensive corridor in the
+registry as free while the 6.67% lived entirely in a premium it never mentioned. A caption or a
+totals node does not repair that: a disclaimer at the top does not survive someone looking at
+one edge, which is why the costed path carries the premium on its edges too.
+
+The applied side carries its own marks and ages under **its own** threshold, so a stale premium
+on a fresh-fee leg does not render clean (§18, and `cost._channel_verdicts` one layer down). A
+channel file declares a kind three times — reference rate, buy side, sell side — and collapsing
+them reports a 7-day premium fresh at 82 days.
+
+**A declared name can never forge a label field.** A label is a sequence of fields separated
+by ` · `, so that separator is escaped out of declared text along with Mermaid's own
+metacharacters. Without it a venue named `Evil Bank · marks: VERIFIED AND CURRENT` renders a
+clean marks field, in the renderer's own voice, inside a node that is actually marked
+`NO EXIT DECLARED` — declared content impersonating an honesty mark.
 
 **A refusal is never drawn as a path.** `RouteUnusable`, `ExitCostUnknown` and
 `NothingComparable` each produce a typed `NothingToDraw` carrying the refusal's own reason

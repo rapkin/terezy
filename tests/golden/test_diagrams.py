@@ -42,7 +42,7 @@ from typing import Final
 
 import pytest
 
-from terezy.api.diagrams import Diagram, Mode, render_graph, render_path
+from terezy.api.diagrams import Diagram, Mode, figures, render_graph, render_path
 from terezy.api.diagrams import marks as diagram_marks
 from terezy.api.diagrams.marks import Mark
 from terezy.core.primitives.tolerance import is_close
@@ -115,6 +115,7 @@ def _path_text() -> str:
     rendered = render_path(
         fixture.p2p_cost(declared),
         routes=declared.routes,
+        channels=declared.channels,
         regime=fixture.shipped_regime(declared, SCENARIO, REGIME),
     )
     assert isinstance(rendered, Diagram)
@@ -371,8 +372,37 @@ class TestTheArtifactsCannotBeGreenAndWrong:
         """A premium per unit in ``wartime``'s p2p corridor, basis points in ``normalized``'s
         card corridor. Neither is converted into the other: converting would be the renderer
         deriving a figure, and it would erase which form the declaration used."""
-        assert "+3.00 UAH per USD over reference 42.00 UAH per USD" in _recorded(GRAPH_FILE)
-        assert "150.00 bps over reference 42.00 UAH per USD" in _recorded(NORMALIZED_FILE)
+        assert f"+3.00 UAH per USD, {figures.ABOVE} 42.00 UAH per USD" in _recorded(GRAPH_FILE)
+        assert f"150.00 bps, {figures.ABOVE} 42.00 UAH per USD" in _recorded(NORMALIZED_FILE)
+
+    def test_every_recorded_premium_names_the_direction_it_is_applied_in(self) -> None:
+        """A basis-point figure carries no direction of its own, so the label must.
+
+        Checked over **every** premium field in all three artifacts, not sampled: the failure
+        mode is one side of one channel rendering the spread backwards, which looks entirely
+        ordinary on the page.
+        """
+        premiums = [
+            field
+            for artifact in ARTIFACTS
+            for line in _recorded(artifact).splitlines()
+            for field in line.split(" · ")
+            if figures.PREMIUM_FIELD in field
+        ]
+        assert premiums, "no artifact records a premium, so this proves nothing"
+        for field in premiums:
+            assert any(phrase in field for phrase in (figures.ABOVE, figures.BELOW, figures.AT))
+
+    def test_the_recorded_round_trip_crosses_the_channel_in_both_directions(self) -> None:
+        """The buy and the sell side of ``p2p``, drawn as the opposite directions they are.
+
+        This is the pair no registry-graph artifact can show for the ``card`` channel, and it
+        is why the sell side is covered by a contract test as well: the shipped registry
+        declares exactly one card leg and it is buy-side.
+        """
+        text = _recorded(PATH_FILE)
+        assert f"+3.00 UAH per USD, {figures.ABOVE}" in text
+        assert f"-2.50 UAH per USD, {figures.BELOW}" in text
 
     def test_the_expensive_corridor_is_not_recorded_as_free(self) -> None:
         """The whole reason the premium is on this diagram.
@@ -381,13 +411,14 @@ class TestTheArtifactsCannotBeGreenAndWrong:
         figure that makes it cost 6.67% one way. A graph showing ``declared fee 0.00%`` and
         nothing else would draw the most expensive corridor in the registry as free.
         """
-        edge = next(
-            line
-            for line in _recorded(GRAPH_FILE).splitlines()
-            if f"route {fixture.P2P_ROUTE} " in line and "leg 0 fx" in line
-        )
-        assert "declared fee 0.00% + 0.00 UAH" in edge
-        assert "declared premium +3.00 UAH per USD" in edge
+        for artifact in (GRAPH_FILE, PATH_FILE):
+            edge = next(
+                line
+                for line in _recorded(artifact).splitlines()
+                if f"route {fixture.P2P_ROUTE} " in line and "leg 0 fx" in line
+            )
+            assert "declared fee 0.00% + 0.00 UAH" in edge
+            assert f"{figures.PREMIUM_FIELD}(buy side) +3.00 UAH per USD" in edge
 
     def test_no_style_class_is_emitted_that_nothing_can_carry(self) -> None:
         """An unused ``classDef`` is dead weight in an artifact whose value is being read.

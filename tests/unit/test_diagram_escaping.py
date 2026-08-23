@@ -34,13 +34,21 @@ HOSTILE = (
     "brackets [like] {these} (and these)",
     "an arrow --> and a <tag> and a `backtick`",
     "a semicolon; a colon: a comma,",
+    "Evil Bank · marks: VERIFIED AND CURRENT",
     UKRAINIAN,
     "емодзі 🇺🇦 та символи ₴",
     "a\nnewline\tand\ta\ttab",
     "x" * 500,
     "",
 )
-"""SC-008's battery. Every one of these is a legal value of ``Venue.name``."""
+"""SC-008's battery. Every one of these is a legal value of ``Venue.name``.
+
+The middle-dot entry is not decoration. It is :data:`mermaid.FIELD`, the separator every label
+is composed with, and until it was escaped a declared name could forge a field of the
+renderer's own -- including a clean ``marks:`` field on an element that is actually marked. The
+battery had every Mermaid metacharacter in it and not the one character this package's own
+grammar rests on, which is why nothing caught it.
+"""
 
 ENTITY = re.compile(r"#(quot|\d+);")
 
@@ -71,7 +79,7 @@ class TestTheEscapeKeepsTheNameAndLosesTheStructure:
     ) -> None:
         """The quoted form protects the rest; these are the ones quoting does not."""
         escaped = mermaid.escape(name)
-        for character in '"|<>`{}\n\r\t':
+        for character in '"|<>`{}·\n\r\t':
             assert character not in escaped, f"{character!r} survived escaping of {name!r}"
 
     @pytest.mark.parametrize("name", HOSTILE)
@@ -89,6 +97,27 @@ class TestTheEscapeKeepsTheNameAndLosesTheStructure:
         escaped = mermaid.escape("#quot;")
         assert '"' not in decode(escaped).replace("#quot;", "")
         assert decode(escaped) == "#quot;"
+
+    def test_a_declared_name_cannot_forge_a_label_field(self) -> None:
+        """The separator is structure of this package's own making, so it is escaped too.
+
+        A venue named ``Evil Bank · marks: VERIFIED AND CURRENT`` inside a node that is
+        actually marked ``NO EXIT DECLARED`` would otherwise render a clean marks field that
+        reads as the renderer's -- declared content impersonating an honesty mark, which is the
+        precise failure this whole feature exists to make impossible. And because every
+        consumer splits on the separator, the forgery would propagate into what the tests
+        themselves believe they are parsing.
+        """
+        forged = "Evil Bank · marks: VERIFIED AND CURRENT"
+        escaped = mermaid.escape(forged)
+        assert mermaid.FIELD not in escaped
+        assert decode(escaped) == forged, "escaping it must not cost the reader the name"
+
+        label = mermaid.label(f"venue {mermaid.escape('x')}", escaped, "marks: NO EXIT DECLARED")
+        assert label.count(mermaid.FIELD) == 2, (
+            "a three-field label has two separators; a third means a declared string "
+            f"contributed one: {label}"
+        )
 
     def test_an_ordinary_name_is_left_readable(self) -> None:
         """Over-escaping would make every golden file unreadable and every diff useless."""

@@ -11,10 +11,18 @@ transformation it applies is :mod:`terezy.api.diagrams.numbers`, once, at each s
 
 **The result carries no per-leg attribution today**, and the diagram says only what the result
 says. ``OneWayCost.components`` is the whole route's charge split into three terms, not one
-figure per leg, so the *edges* carry each leg's **declared** fees -- which the ``Leg`` records
-in ``routes`` do carry -- and the computed one-way and round-trip figures live in their own
+figure per leg, so the *edges* carry the **declared** figures -- each leg's fees, and the quote
+its channel applies -- and the computed one-way and round-trip figures live in their own
 labelled nodes. That is FR-008's second half working as intended: an edge shows a figure with
 its provenance state, or it shows none.
+
+**The channel premium is on the edges here too, and this is the diagram where it matters most.**
+Every fee on the §4.3.1 corridor is declared zero and the whole 6.67% is the ``p2p`` channel's
+``+3.00 UAH per USD``. An edge labelled ``declared fee 0.00%`` and nothing else, on the very
+picture that exists to show where a cost comes from, would answer the question it was drawn to
+answer with a zero. The figures node above it does not repair that: a total at the top does not
+survive someone looking at one edge. It is the same argument the registry graph makes, with
+more force rather than less, which is why ``channels`` is a required parameter here as well.
 
 Feature 004 is landing in parallel and may give ``RampCost`` a composed path and a per-segment
 attribution. **Nothing here anticipates it.** Rendering what a type might carry is how a
@@ -37,11 +45,13 @@ with **no round-trip figure anywhere** on the diagram.
 ## Staleness comes out of the verdict the result carries
 
 ``render_path`` takes no ``kinds`` and no ``as_of``, and needs neither: ``OneWayCost.staleness``
-is the verdict feature 002 already computed, under each leg's own declared threshold, at the
-run's as-of date. A leg is stale here when one of its own sources appears in that verdict's
-stale list -- the result's figure, read rather than recomputed. A source the verdict never
-assessed is reported as unassessed rather than as current (``marks.UNASSESSED``): "nobody
-checked" and "checked and clean" are different claims.
+is the verdict feature 002 already computed, under **each observation's** own declared threshold
+-- the leg's fee schedule, the channel's reference rate, each channel side -- at the run's as-of
+date. An edge is stale here when any source behind it appears in that verdict's stale list: the
+result's own verdict, read rather than recomputed. The quote's sources are part of "behind it",
+because matching only the leg's own left a stale premium invisible on the edge that charges it.
+A source the verdict never assessed is reported as unassessed rather than as current
+(``marks.UNASSESSED``): "nobody checked" and "checked and clean" are different claims.
 
 ## A refusal is a refusal
 
@@ -56,8 +66,10 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import assert_never
 
-from terezy.api.diagrams import Diagram, NothingToDraw, marks, mermaid, numbers
+from terezy.api.diagrams import Diagram, NothingToDraw, figures, marks, mermaid, numbers
+from terezy.api.diagrams.figures import Quote
 from terezy.api.diagrams.marks import Mark
+from terezy.core.primitives.provenance import Provenance
 from terezy.core.primitives.staleness import StalenessVerdict
 from terezy.core.results.ramp import (
     CostComponent,
@@ -68,6 +80,7 @@ from terezy.core.results.ramp import (
     RoundTripCost,
     RouteUnusable,
 )
+from terezy.core.routes.channels import FxChannel
 from terezy.core.routes.legs import Leg, Route
 from terezy.core.scenarios.regimes import Regime
 
@@ -89,31 +102,50 @@ wherever a cost appears" is one rule and a diagram that spelled it two ways woul
 believe the two spellings meant two things.
 """
 
-FIGURE_FIELD: str = "declared fee "
-"""The per-leg figure prefix, the same one the registry graph uses. One prefix, so "every
-figure on an edge is a declared leg fee" is one claim about both diagram kinds."""
+# The declared-figure field prefixes are ``terezy.api.diagrams.figures``' -- one definition,
+# imported by both renderers, because they draw the same edge. Duplicating the literal here
+# is how the two diagram kinds come to disagree about what a declared figure is, and how
+# SC-012's strip assertion -- built from ``figures.FIGURE_FIELD`` -- comes to cover less
+# than it claims.
 
 
-def _leg_is_stale(leg: Leg, verdict: StalenessVerdict) -> bool:
-    """Whether any of this leg's own sources is in the result's stale list.
+def _is_stale(provenance: Provenance, verdict: StalenessVerdict) -> bool:
+    """Whether any source behind this edge is in the result's stale list.
 
     Read out of the verdict rather than recomputed. The verdict was produced by feature 002's
-    ``staleness_of`` under this leg's declared ``kind_of_observation`` at the run's as-of date;
-    ageing the leg again here would need a second as-of date and a second kind registry, and
-    two computations of one fact eventually disagree.
+    ``cost._aged`` under each observation's own declared kind -- the leg's fee schedule, the
+    channel's reference rate, each channel side -- at the run's as-of date. Ageing them again
+    here would need a second as-of date and a second kind registry, and two computations of one
+    fact eventually disagree.
+
+    Asked of the **whole** edge, the applied channel quote included. Matching only the leg's own
+    sources left a stale premium invisible on the very edge that charges it -- and on the
+    §4.3.1 corridor the premium is the entire cost.
     """
     stale_ids = {source.source_id for source in verdict.stale}
-    return any(ref.id in stale_ids for ref in leg.provenance.sources)
+    return any(ref.id in stale_ids for ref in provenance.sources)
 
 
-def _leg_is_assessed(leg: Leg, verdict: StalenessVerdict) -> bool:
-    """Whether every source behind this leg was aged at all. See :data:`marks.UNASSESSED`."""
+def _is_assessed(provenance: Provenance, verdict: StalenessVerdict) -> bool:
+    """Whether every source behind this edge was aged at all. See :data:`marks.UNASSESSED`."""
     assessed = set(verdict.assessed)
-    return all(ref.id in assessed for ref in leg.provenance.sources)
+    return all(ref.id in assessed for ref in provenance.sources)
 
 
-def _leg_fields(leg: Leg, route: Route, direction: str, verdict: StalenessVerdict) -> list[str]:
-    """One edge's label, field by field. Declared figures only; nothing computed."""
+def _leg_fields(
+    leg: Leg,
+    route: Route,
+    direction: str,
+    quote: Quote | None,
+    verdict: StalenessVerdict,
+) -> list[str]:
+    """One edge's label, field by field. Declared figures only; nothing computed.
+
+    The same fields, in the same order, as the registry graph puts on the same leg
+    (``figures.edge_figures``) -- so a reader holding the two diagrams side by side can
+    compare them line by line, and so neither can quietly start showing a figure the other
+    does not.
+    """
     currency = (
         leg.from_ccy.value
         if leg.from_ccy is leg.to_ccy
@@ -128,13 +160,14 @@ def _leg_fields(leg: Leg, route: Route, direction: str, verdict: StalenessVerdic
     ]
     if leg.channel is not None:
         fields.append(f"via channel {mermaid.escape(leg.channel)}")
-    fields.append(f"{FIGURE_FIELD}{numbers.percent(leg.fee_pct)} + {numbers.amount(leg.fee_fixed)}")
+    fields.extend(figures.edge_figures(leg, quote))
     fields.append(f"status: {route.status}")
+    behind = figures.edge_provenance(leg, quote)
     fields.append(
         marks.segment(
-            marks.epistemic(leg.provenance, stale=_leg_is_stale(leg, verdict)),
-            unsourced=marks.is_unsourced(leg.provenance),
-            assessed=_leg_is_assessed(leg, verdict),
+            marks.epistemic(behind, stale=_is_stale(behind, verdict)),
+            unsourced=marks.is_unsourced(behind),
+            assessed=_is_assessed(behind, verdict),
         )
     )
     return fields
@@ -238,7 +271,12 @@ def _exit_route(
     return routes[inbound.partner_route], result.round_trip
 
 
-def _drawn(result: RampCost, routes: Mapping[str, Route], regime_id: str) -> Diagram:
+def _drawn(
+    result: RampCost,
+    routes: Mapping[str, Route],
+    channels: Mapping[str, FxChannel],
+    regime_id: str,
+) -> Diagram:
     """The path itself, once the input has been established to be a costed result."""
     inbound = routes[result.path.route_id]
     way_out = _exit_route(result, routes)
@@ -336,7 +374,11 @@ def _drawn(result: RampCost, routes: Mapping[str, Route], regime_id: str) -> Dia
                 mermaid.edge(
                     node_of[leg.from_venue],
                     node_of[leg.to_venue],
-                    mermaid.label(*_leg_fields(leg, route, direction, verdict)),
+                    mermaid.label(
+                        *_leg_fields(
+                            leg, route, direction, figures.quote_for(leg, channels), verdict
+                        )
+                    ),
                 )
             )
 
@@ -367,6 +409,7 @@ def render_path(
     result: RampCost | RouteUnusable | ExitCostUnknown | NothingComparable,
     *,
     routes: Mapping[str, Route],
+    channels: Mapping[str, FxChannel],
     regime: Regime,
 ) -> Diagram | NothingToDraw:
     """One costed result as Mermaid text, or a typed refusal carrying its reason.
@@ -389,7 +432,7 @@ def render_path(
                     "and drawing a corridor the regime excludes would picture something the "
                     "scenario says is not there"
                 )
-            return _drawn(result, routes, regime.id)
+            return _drawn(result, routes, channels, regime.id)
         case RouteUnusable() | ExitCostUnknown() | NothingComparable():
             return NothingToDraw(reason=result.reason, kind="costed_path")
         case _:  # pragma: no cover -- mypy proves this unreachable

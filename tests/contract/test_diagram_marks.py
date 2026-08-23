@@ -25,7 +25,7 @@ from datetime import date
 
 import pytest
 
-from terezy.api.diagrams import Diagram, Mode, marks, render_graph
+from terezy.api.diagrams import Diagram, Mode, figures, marks, render_graph
 from terezy.api.diagrams.marks import Mark
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives import staleness
@@ -298,20 +298,65 @@ class TestTheChannelPremiumCarriesItsOwnMarks:
         assert not staleness.any_stale(verdict)
         assert not prov.is_unverified(leg.provenance)
 
-    def test_each_observation_ages_under_the_kind_its_own_table_declared(self) -> None:
-        """FR-028: the premium's 7 days and the fee schedule's 365 are two thresholds.
+    def test_the_rendered_edge_is_stale_under_the_sides_kind_and_not_the_channels(self) -> None:
+        """**M2.** The three-table ageing, pinned on the *rendered text*.
 
-        Aging the premium under the fee schedule's threshold reports it fresh for a year --
-        the silent permissive default FR-028 exists to close, and the defect
-        ``cost._channel_verdicts`` was written to fix one layer down.
+        The premium is :data:`EIGHTY_TWO_DAYS_AGO` old: stale under ``p2p_premium``'s 7 days,
+        current under ``bank_fee_schedule``'s 365. So this edge renders ``STALE`` only if the
+        renderer ages the side under **the side's own** declared kind. Collapse the three
+        declared kinds into one -- ``staleness_of(channel.provenance, kind=channel.kind)``,
+        which is exactly the defect ``cost._channel_verdicts`` was written to fix -- and the
+        premium ages under 365 days, comes back current, and this edge renders clean.
+
+        The earlier version of this test asserted only fixture properties (``staleness_days``,
+        ``side.kind``) and never looked at a diagram, so the collapse passed it. This one reads
+        the label.
+        """
+        label = fixture.labels_by_route(
+            unstyled(fixture.graph_of(fixture.stale_premium_registry()).text)
+        )[fixture.STALE_PREMIUM_ROUTE]
+        assert marks.token(Mark.STALE) in label
+        assert marks.CLEAN not in label
+
+    def test_the_discriminating_age_really_discriminates(self) -> None:
+        """Otherwise the test above passes under the collapsed implementation too.
+
+        82 days has to fall **between** the two declared thresholds. If someone retunes
+        ``p2p_premium`` past 82 days, or ``bank_fee_schedule`` below it, the test above stops
+        distinguishing the two implementations and this one says so.
         """
         registry = fixture.stale_premium_registry()
-        assert registry.kinds[fixture.FAST_KIND].staleness_days == 7
-        assert registry.kinds[fixture.SLOW_KIND].staleness_days == 365
-        assert registry.channels["p2p"].buy_side.kind == fixture.FAST_KIND
+        age = (fixture.AS_OF - fixture.EIGHTY_TWO_DAYS_AGO).days
+        assert age == 82
+        assert registry.kinds[fixture.FAST_KIND].staleness_days < age
+        assert age < registry.kinds[fixture.SLOW_KIND].staleness_days
+
+    def test_the_side_and_the_channel_declare_different_kinds_in_the_fixture(self) -> None:
+        """And the two kinds have to differ, or there is nothing to collapse."""
+        registry = fixture.stale_premium_registry()
+        quote = registry.channels["p2p"]
+        assert quote.buy_side.kind == fixture.FAST_KIND
+        assert quote.kind == fixture.SLOW_KIND
         assert registry.routes[fixture.STALE_PREMIUM_ROUTE].legs[0].kind_of_observation == (
             fixture.SLOW_KIND
         )
+
+    def test_the_reference_rates_own_sources_are_what_remain_of_the_union(self) -> None:
+        """``_reference_sources`` is a set difference, and returning the union instead passes
+        every other test in this file.
+
+        A channel's ``provenance`` is the reference's sources **and** both sides'. Ageing that
+        whole union under the channel's kind is the same collapse by another route, so the
+        split is asserted directly: the reference's own sources are the ones no side cites.
+        """
+        quote = fixture.stale_premium_registry().channels["p2p"]
+        reference = figures._reference_sources(quote)
+        side_ids = {ref.id for ref in quote.buy_side.provenance.sources} | {
+            ref.id for ref in quote.sell_side.provenance.sources
+        }
+        assert {ref.id for ref in reference.sources} == {"p2p:reference"}
+        assert not {ref.id for ref in reference.sources} & side_ids
+        assert reference.sources < quote.provenance.sources
 
     def test_a_leg_naming_an_undeclared_channel_fails_loudly(self) -> None:
         """There is no default channel, and a diagram may not invent one.

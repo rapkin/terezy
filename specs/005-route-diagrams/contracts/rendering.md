@@ -20,6 +20,7 @@ def render_path(
     result: RampCost | RouteUnusable | ExitCostUnknown | NothingComparable,
     *,
     routes: Mapping[str, Route],
+    channels: Mapping[str, FxChannel],      # ⚙ added at implementation — see below
     regime: Regime,
 ) -> Diagram | NothingToDraw
 ```
@@ -66,6 +67,21 @@ Both declared side forms render, each in the unit its declaration used and neith
 into the other (converting would be the renderer deriving a figure, and would erase which form
 the file actually used). The two rules for them live in `numbers.py` with the other three —
 see `data-model.md`.
+
+⚙ **And `render_path` takes `channels` for the same reason, added on review.** The first
+implementation applied the ruling to the registry graph only, leaving the costed path — the
+diagram where the cost actually lives — drawing the §4.3.1 fx leg as `declared fee 0.00%` with
+no premium at all. The argument above applies here with more force, not less: a totals node at
+the top does not survive someone looking at one edge. Both renderers now compose an edge's
+declared figures through the same function, so neither can gain or lose one alone.
+
+⚙ **A rendered premium names the side taken and the direction applied.** The two declared forms
+have different sign conventions: `premium_per_unit` is a signed offset both sides add, while
+`markup_bps` is a cost magnitude the engine adds on the buy side and subtracts on the sell one.
+Without the direction, `150.00 bps over reference 42.00 UAH per USD` is one label for an edge
+charging +1.5% and an edge charging −1.5%, with the sell side drawn backwards. The phrase comes
+from `channels.effective_rate`, so the picture and the arithmetic cannot disagree; the effective
+rate itself is not rendered, because it is computed rather than declared (G6).
 
 `regime` is required on both and has no default, sentinel or overload: FR-019 says a merged
 graph existing under no regime must not be **producible**, and the strongest reading of that

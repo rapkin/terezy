@@ -268,6 +268,28 @@ regenerated diagram contains the added venue and route, correctly connected and 
   source, kind and staleness, so a stale premium on a fresh-fee leg does not render clean.
   Three rules join `numbers.py`, one per new unit, all through the one decimal format (FR-006,
   FR-012, FR-013, FR-022)
+- [x] T033 **M1** Name the side taken and the direction applied on every rendered premium. A
+  `markup_bps` side carries no direction of its own -- the engine adds it buying and subtracts
+  it selling -- so the declared number alone rendered two opposite corridors identically and the
+  sell side backwards. The phrase comes from `channels.effective_rate`; the effective rate
+  itself is not rendered, because it is computed rather than declared (FR-008)
+- [x] T034 **M2** Pin the three-table staleness on **rendered text**, with a premium aged 82
+  days -- stale under `p2p_premium`'s 7 and current under `bank_fee_schedule`'s 365. The
+  previous fixture aged it years, which is stale under both thresholds, so collapsing the three
+  declared kinds into one passed every test
+- [x] T035 **M3** Escape the label field separator out of declared text, and add it to SC-008's
+  hostile battery. A venue name containing one could forge a field -- including a clean `marks:`
+  field on an element that is actually marked
+- [x] T036 **M4** Draw the declared premium on the **costed path**'s edges too, and match the
+  result's stale list against the whole edge rather than the leg's own sources. `render_path`
+  gains `channels` for the same reason `render_graph` did
+- [x] T037 **L5** One definition of the declared-figure field prefixes, in
+  `api/diagrams/figures.py`, imported by both renderers, with an AST scan for a reinstated
+  literal
+- [x] T038 **L6** Assert the basis-point rendering against a rendered diagram rather than
+  against `numbers.basis_points`, and delete the assertion made dead by the line above it
+- [x] T039 **L7** `channels` joins `_distinct_ids`: an edge labels `via channel` from the
+  mapping key while its premium comes from the record, and nothing checked the two agree
 - [x] T032 Stop emitting the `closedRoute` `classDef`, which nothing can carry — Mermaid
   applies a class to a node and `CLOSED` only ever lands on an edge. The explanation moves into
   `marks.CLASS_DEFS`; the mark itself stays in the vocabulary and in the label text

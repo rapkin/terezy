@@ -216,6 +216,44 @@ class TestTheLoudFailures:
         with pytest.raises(ValueError, match="mistyped"):
             fixture.graph_of(broken)
 
+    def test_two_channels_declaring_one_id_fail_loudly_naming_both_keys(self) -> None:
+        """**L7.** Channels are a rendered input now, and they carry the biggest figure.
+
+        An edge labels ``via channel {leg.channel}`` from the *mapping key* while its premium
+        comes from ``channels[leg.channel]``, whose ``.id`` nothing checked. Two channels
+        declaring one id, or one filed under a key it does not declare, is the diagram naming
+        one quote and drawing another -- which is exactly what the second branch of this check
+        exists to refuse for venues and routes.
+        """
+        registry = fixture.card_registry()
+        colliding = {
+            **registry.channels,
+            "second_key": replace(registry.channels["card"], reference_rate=99.0),
+        }
+        broken = fixture.Registry(
+            venues=registry.venues,
+            routes=registry.routes,
+            channels=colliding,
+            regime=registry.regime,
+            kinds=registry.kinds,
+        )
+        with pytest.raises(ValueError, match="card") as raised:
+            fixture.graph_of(broken)
+        assert "second_key" in str(raised.value)
+
+    def test_a_channel_keyed_under_an_id_it_does_not_declare_fails(self) -> None:
+        registry = fixture.card_registry()
+        misfiled = {"mistyped": registry.channels["card"]}
+        broken = fixture.Registry(
+            venues=registry.venues,
+            routes=registry.routes,
+            channels=misfiled,
+            regime=registry.regime,
+            kinds=registry.kinds,
+        )
+        with pytest.raises(ValueError, match="mistyped"):
+            fixture.graph_of(broken)
+
     def test_a_leg_declaring_an_unknown_observation_kind_fails_rather_than_ages_freely(
         self,
     ) -> None:

@@ -24,13 +24,17 @@ actually make.
 
 from __future__ import annotations
 
+import ast
 import inspect
 import re
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
-from terezy.api.diagrams import Diagram, Mode, graph, numbers, render_graph
+from terezy.api.diagrams import Diagram, Mode, figures, render_graph
+from terezy.core.routes import channels
+from terezy.core.routes.channels import Side
 from tests import diagram_registries as fixture
 from tests import source_scan
 
@@ -44,7 +48,7 @@ FIGURE = re.compile(r"\d+\.\d\d")
 """What the one number rule produces, and the only shape a figure can have (FR-022)."""
 
 FIGURE_FIELD = re.compile(
-    re.escape(SEPARATOR + graph.FIGURE_FIELD) + r'[^·"]*?(?=' + re.escape(SEPARATOR) + r'|")'
+    re.escape(SEPARATOR + figures.FIGURE_FIELD) + r'[^·"]*?(?=' + re.escape(SEPARATOR) + r'|")'
 )
 """One declared-figure field, its separator included, as it appears inside a label."""
 
@@ -69,6 +73,13 @@ def edge_labels(text: str) -> list[str]:
 
 def node_labels(text: str) -> list[str]:
     return [found.group(1) for found in re.finditer(r'^\s*\w+\["(.*?)"\]', text, re.MULTILINE)]
+
+
+def premium_of(label: str) -> str:
+    """The one declared-premium field of a label, or a loud failure if there is none."""
+    found = [field for field in label.split(SEPARATOR) if field.startswith(figures.PREMIUM_FIELD)]
+    assert len(found) == 1, (label, found)
+    return found[0]
 
 
 def figure_bearing_fields(text: str) -> list[str]:
@@ -111,12 +122,59 @@ class TestTheTwoModesDifferByFiguresAndNothingElse:
         found = figure_bearing_fields(fixture.six_state_graph(Mode.TOPOLOGY).text)
         assert not found, f"a topology diagram carries figures: {found}"
 
+    def test_no_renderer_composes_a_declared_figure_field_from_its_own_literal(self) -> None:
+        """**L5.** SC-012's strip assertion is built from one constant, so there must be one.
+
+        Both renderers draw the same edge, and each once carried its own ``"declared fee "``
+        literal. Nothing bound them, so changing one silently diverged them -- and the strip
+        above, which knows only ``figures.FIGURE_FIELD``, would have quietly stopped covering
+        whatever the other renderer emitted.
+
+        Looks for the shape of the defect rather than the word: an f-string whose leading
+        literal *is* the prefix, which is how a field gets composed. A module explaining the
+        prefix in prose, or naming it in a caption, is neither -- and the mode note on every
+        registry graph legitimately contains the word.
+        """
+        home = REPO_ROOT / "src" / "terezy" / "api" / "diagrams" / "figures.py"
+        offenders: dict[str, list[str]] = {}
+        for path in sorted(home.parent.rglob("*.py")):
+            if path == home:
+                continue
+            tree = ast.parse(source_scan.executable_source(path))
+            found = [
+                node.values[0].value
+                for node in ast.walk(tree)
+                if isinstance(node, ast.JoinedStr)
+                and node.values
+                and isinstance(node.values[0], ast.Constant)
+                and isinstance(node.values[0].value, str)
+                and node.values[0].value.startswith(figures.FIGURE_FIELD)
+            ]
+            if found:
+                offenders[path.name] = found
+        assert not offenders, (
+            f"a renderer composes a declared-figure field from its own literal: {offenders}. "
+            "The prefixes are defined once in figures.py and imported, because the two diagram "
+            "kinds draw the same edge and must not disagree about what a declared figure is"
+        )
+
+    def test_that_scan_would_catch_a_reinstated_literal(self) -> None:
+        """A scan that cannot fail protects nothing."""
+        planted = f'def f(x: float) -> str:\n    return f"{figures.FEE_FIELD}{{x}}"\n'
+        tree = ast.parse(source_scan.strip_prose(planted))
+        assert any(
+            isinstance(node, ast.JoinedStr)
+            and isinstance(node.values[0], ast.Constant)
+            and str(node.values[0].value).startswith(figures.FIGURE_FIELD)
+            for node in ast.walk(tree)
+        )
+
     def test_the_with_figures_diagram_carries_declared_fees_with_their_provenance_state(
         self,
     ) -> None:
         labels = fixture.labels_by_route(fixture.six_state_graph(Mode.DECLARED_FIGURES).text)
         priced = labels[fixture.VERIFIED_ROUTE]
-        assert f"{graph.FEE_FIELD}1.50% + 12.50 UAH" in priced
+        assert f"{figures.FEE_FIELD}1.50% + 12.50 UAH" in priced
         assert "marks: " in priced, "a figure without its provenance state is half a figure"
 
     def test_the_with_figures_diagram_carries_the_channel_premium_on_every_fx_leg(self) -> None:
@@ -124,25 +182,139 @@ class TestTheTwoModesDifferByFiguresAndNothingElse:
 
         Every fee on the fixture's converting leg is zero and the premium is the whole cost, so
         a with-figures graph that showed only fees would draw that corridor as free -- the
-        mislabelled figure in picture form. Both declared forms are asserted, each in the unit
-        its side was declared in and neither converted into the other.
+        mislabelled figure in picture form.
         """
         converting = fixture.labels_by_route(fixture.six_state_graph(Mode.DECLARED_FIGURES).text)[
             fixture.UNVERIFIED_ROUTE
         ]
         assert (
-            f"{graph.PREMIUM_FIELD}+3.00 UAH per USD over reference 42.00 UAH per USD" in converting
+            f"{figures.PREMIUM_FIELD}(buy side) +3.00 UAH per USD, "
+            f"{figures.ABOVE} 42.00 UAH per USD" in converting
         )
-        assert graph.PREMIUM_FIELD in converting
-        # And the basis-point form renders as basis points, unconverted.
-        assert numbers.basis_points(150.0) == "150.00 bps"
+
+    def test_the_basis_point_form_renders_as_basis_points_in_the_diagram(self) -> None:
+        """Asserted against the **rendered graph**, never against the formatting function.
+
+        Calling ``numbers.basis_points`` and checking its return value says nothing about what a
+        diagram contains -- the renderer could stop calling it altogether and such a test would
+        stay green. The rule itself is pinned in ``test_diagram_one_number_rule.py``; what is at
+        stake here is whether the diagram uses it.
+        """
+        labels = fixture.labels_by_route(fixture.graph_of(fixture.card_registry()).text)
+        assert f"{figures.PREMIUM_FIELD}(buy side) 150.00 bps, " in labels[fixture.CARD_IN_ROUTE]
+        assert "1.50%" not in labels[fixture.CARD_IN_ROUTE], (
+            "basis points render in the unit declared; converting them would be the renderer "
+            "deriving a figure, and it would erase which form the file actually used"
+        )
 
     def test_a_leg_that_converts_nothing_carries_no_premium(self) -> None:
         """A transfer has no channel and therefore no quote; inventing one would be a rate."""
         transfers = fixture.labels_by_route(fixture.six_state_graph(Mode.DECLARED_FIGURES).text)[
             fixture.VERIFIED_ROUTE
         ]
-        assert graph.PREMIUM_FIELD not in transfers
+        assert figures.PREMIUM_FIELD not in transfers
+
+
+class TestTheDeclaredPremiumSaysWhichWayItIsApplied:
+    """**M1.** A quote without its direction is one label for two opposite corridors.
+
+    ``core.routes.channels`` declares two forms with **different sign conventions**:
+
+    * ``premium_per_unit`` is a *signed offset* -- both sides are ``reference + premium``, so
+      the sign carries the direction;
+    * ``markup_bps`` is a *cost magnitude* -- the engine adds it on the buy side and subtracts
+      it on the sell side, so the number carries no direction at all.
+
+    A label reading ``150.00 bps over reference 42.00 UAH per USD`` therefore described an edge
+    charging +1.5% and an edge charging -1.5% **identically**, and drew the sell side in the
+    opposite direction from what the engine charges. The direction phrase is the carrier: a
+    reader must be able to tell those two apart without knowing which side a leg takes, and
+    without holding two sign conventions in their head.
+    """
+
+    @staticmethod
+    def _card_labels() -> dict[str, str]:
+        return fixture.labels_by_route(fixture.graph_of(fixture.card_registry()).text)
+
+    def test_the_two_sides_of_one_basis_point_channel_do_not_render_identically(self) -> None:
+        """The regression, stated as the inequality it is."""
+        labels = self._card_labels()
+        buying = premium_of(labels[fixture.CARD_IN_ROUTE])
+        selling = premium_of(labels[fixture.CARD_OUT_ROUTE])
+        assert buying != selling, (
+            "both sides declare 150.0 bps and the engine applies them in opposite directions; "
+            "rendering the declared number alone draws two opposite corridors the same way"
+        )
+
+    def test_each_side_names_the_direction_the_engine_actually_applies(self) -> None:
+        """Buy adds the markup, sell subtracts it -- ``channels.effective_rate``'s own rule."""
+        labels = self._card_labels()
+        assert figures.ABOVE in labels[fixture.CARD_IN_ROUTE]
+        assert figures.BELOW in labels[fixture.CARD_OUT_ROUTE]
+        assert figures.BELOW not in labels[fixture.CARD_IN_ROUTE]
+        assert figures.ABOVE not in labels[fixture.CARD_OUT_ROUTE]
+
+    def test_the_direction_agrees_with_the_engines_effective_rate(self) -> None:
+        """Not asserted against a remembered convention: asserted against the core.
+
+        Getting the side backwards is the classic FX bug -- every number stays plausible while
+        every spread is inverted -- so the diagram's word and the engine's arithmetic are
+        compared here rather than both trusted.
+        """
+        quote = fixture.card_registry().channels["card"]
+        labels = self._card_labels()
+        for route_id, side, role in (
+            (fixture.CARD_IN_ROUTE, quote.buy_side, Side.BUY),
+            (fixture.CARD_OUT_ROUTE, quote.sell_side, Side.SELL),
+        ):
+            effective = channels.effective_rate(side, quote.reference_rate, role=role)
+            expected = figures.ABOVE if effective > quote.reference_rate else figures.BELOW
+            assert expected in labels[route_id], (route_id, effective)
+
+    def test_the_signed_premium_form_names_its_direction_too(self) -> None:
+        """The safe form is labelled the same way, so a reader learns one convention."""
+        labels = fixture.labels_by_route(fixture.six_state_graph(Mode.DECLARED_FIGURES).text)
+        assert figures.ABOVE in labels[fixture.UNVERIFIED_ROUTE]
+        assert "+3.00 UAH per USD" in labels[fixture.UNVERIFIED_ROUTE]
+
+    def test_the_side_taken_is_named_as_well_as_the_direction(self) -> None:
+        labels = self._card_labels()
+        assert "(buy side)" in labels[fixture.CARD_IN_ROUTE]
+        assert "(sell side)" in labels[fixture.CARD_OUT_ROUTE]
+
+    def test_a_channel_at_its_reference_says_so_rather_than_claiming_a_direction(self) -> None:
+        """A zero premium is a legal declaration meaning the channel trades at its reference.
+
+        Reporting it as "above" would invent a cost out of a number that declares there is
+        none; reporting it as "below" would invent a discount. There is a third phrase for the
+        third case, and it is the honest one.
+        """
+        registry = fixture.card_registry()
+        at_reference = replace(
+            registry.channels["card"],
+            buy_side=fixture.side(premium=0.0, source_id="card:buy:flat", kind=fixture.SLOW_KIND),
+            sell_side=fixture.side(premium=0.0, source_id="card:sell:flat", kind=fixture.SLOW_KIND),
+        )
+        flat = fixture.Registry(
+            venues=registry.venues,
+            routes=registry.routes,
+            channels={"card": at_reference},
+            regime=registry.regime,
+            kinds=registry.kinds,
+        )
+        labels = fixture.labels_by_route(fixture.graph_of(flat).text)
+        for route_id in (fixture.CARD_IN_ROUTE, fixture.CARD_OUT_ROUTE):
+            assert figures.AT in labels[route_id]
+            assert "+0.00 UAH per USD" in labels[route_id]
+            assert figures.ABOVE not in labels[route_id]
+            assert figures.BELOW not in labels[route_id]
+
+    def test_the_three_direction_phrases_are_pairwise_distinct(self) -> None:
+        """``AT`` is a real case: a zero premium means the channel trades at its reference."""
+        phrases = (figures.ABOVE, figures.BELOW, figures.AT)
+        assert len(set(phrases)) == 3
+        for phrase in phrases:
+            assert not any(phrase in other for other in phrases if other != phrase)
 
 
 class TestNoComputedRampCostReachesARegistryGraph:
@@ -157,7 +329,7 @@ class TestNoComputedRampCostReachesARegistryGraph:
         """
         for mode in Mode:
             for field in figure_bearing_fields(fixture.six_state_graph(mode).text):
-                assert field.startswith(graph.FIGURE_FIELD), (
+                assert field.startswith(figures.FIGURE_FIELD), (
                     f"{mode.value} carries a figure that is not a declared leg fee: {field!r}"
                 )
 

@@ -25,7 +25,9 @@ from dataclasses import replace
 
 import pytest
 
-from terezy.api.diagrams import Diagram, numbers, render_path
+from terezy.api.diagrams import Diagram, figures, numbers, render_path
+from terezy.api.diagrams import marks as diagram_marks
+from terezy.api.diagrams.marks import Mark
 from terezy.core.results.ramp import CostComponent, RoundTripCost
 from tests import diagram_registries as fixture
 
@@ -176,6 +178,16 @@ class TestEveryFigureIsTheResultsFigureThroughTheOneRule:
                 for route_id in (fixture.P2P_ROUTE, cost.path.route_id)
                 for leg in fixture.shipped_declarations().routes[route_id].legs
             ),
+            # Declared, not computed: the quote each converting leg applies, rendered by the
+            # same one rule and taken from the same channel records the costing used.
+            *(
+                field
+                for route in fixture.shipped_declarations().routes.values()
+                for leg in route.legs
+                for quote in [figures.quote_for(leg, fixture.shipped_declarations().channels)]
+                if quote is not None
+                for field in [quote.figure]
+            ),
         }
         if cost.ceiling is not None:
             permitted.add(numbers.amount(cost.ceiling))
@@ -184,6 +196,111 @@ class TestEveryFigureIsTheResultsFigureThroughTheOneRule:
             value for value in rendered if not any(value in allowed for allowed in permitted)
         }
         assert not unexplained, f"the diagram carries figures the result does not: {unexplained}"
+
+    def test_the_converting_leg_carries_the_channel_premium_that_is_its_whole_cost(
+        self,
+    ) -> None:
+        """**M4.** The edge where the §4.3.1 cost actually lives must say where it comes from.
+
+        Every declared fee on this corridor is zero and the whole 6.67% is the ``p2p``
+        channel's ``+3.00 UAH per USD`` against a 42.00 reference. An edge labelled
+        ``declared fee 0.00%`` and nothing else, on the very picture drawn to show where a cost
+        comes from, answers that question with a zero -- and the figures node above it does not
+        repair it, because a total at the top does not survive someone looking at one edge.
+        """
+        declared = fixture.shipped_declarations()
+        text = fixture.drawn_path(fixture.p2p_cost(declared)).text
+        converting = [label for _, label, _ in EDGE.findall(text) if " fx · " in f" {label} "]
+        assert converting, "the fixture route no longer converts, so this proves nothing"
+        for label in converting:
+            assert figures.PREMIUM_FIELD in label
+            assert figures.ABOVE in label or figures.BELOW in label
+        inbound = next(label for label in converting if label.startswith("inbound"))
+        assert "+3.00 UAH per USD" in inbound
+        assert "declared fee 0.00% + 0.00 UAH" in inbound, (
+            "if the fee stopped being zero, this corridor would no longer be the case where "
+            "the premium is the entire cost"
+        )
+
+    def test_the_inbound_and_exit_legs_take_opposite_sides_of_the_same_channel(self) -> None:
+        """Both cross ``p2p``; the way in buys dollars and the way out sells them.
+
+        Drawn as the same channel with opposite directions, which is what makes the round trip
+        cost 12.22% rather than twice nothing -- and what a reader checking FR-010 looks for.
+        """
+        text = fixture.drawn_path(fixture.p2p_cost()).text
+        inbound = next(
+            label
+            for _, label, _ in EDGE.findall(text)
+            if "inbound · " in label and " fx · " in label
+        )
+        outbound = next(
+            label for _, label, _ in EDGE.findall(text) if "exit · " in label and " fx · " in label
+        )
+        assert "(buy side)" in inbound
+        assert "(sell side)" in outbound
+        assert "+3.00 UAH per USD" in inbound
+        assert "-2.50 UAH per USD" in outbound
+
+    def test_the_same_leg_carries_the_same_figures_on_both_diagram_kinds(self) -> None:
+        """The costed path and the registry graph draw the same leg, so they say the same thing.
+
+        Compared field by field rather than by eye: a reader holding the two diagrams together
+        is entitled to line them up, and either renderer quietly gaining or losing a figure is
+        exactly what this catches.
+        """
+        declared = fixture.shipped_declarations()
+        leg = declared.routes[fixture.P2P_ROUTE].legs[0]
+        quote = figures.quote_for(leg, declared.channels)
+        expected = figures.edge_figures(leg, quote)
+        path_text = fixture.drawn_path(fixture.p2p_cost(declared)).text
+        label = next(
+            label
+            for _, label, _ in EDGE.findall(path_text)
+            if f"route {fixture.P2P_ROUTE}" in label and "leg 0 " in label
+        )
+        assert [
+            field for field in label.split(SEPARATOR) if field.startswith(figures.FIGURE_FIELD)
+        ] == expected
+
+    def test_a_stale_premium_marks_the_edge_that_charges_it(self) -> None:
+        """**M4.** The verdict is matched against the whole edge, the quote included.
+
+        Costed at :data:`fixture.STALE_PREMIUM_AS_OF`, where exactly one observation on this
+        corridor has aged: the ``p2p`` premium, at 7 days. The route's own legs age under
+        ``regulatory_limit`` (180) and ``bank_fee_schedule`` (365) and are current.
+
+        So matching the result's stale list against the leg's own sources alone leaves the fx
+        edge -- the one that charges the entire 6.67% -- rendering clean while the figure it
+        shows is years-stale in premium terms. The transfer leg beside it stays unmarked, which
+        is what makes the mark mean something rather than appear everywhere.
+        """
+        text = fixture.drawn_path(fixture.stale_premium_cost()).text
+        converting = next(
+            label for _, label, _ in EDGE.findall(text) if "inbound" in label and " fx · " in label
+        )
+        transferring = next(
+            label
+            for _, label, _ in EDGE.findall(text)
+            if "inbound" in label and " transfer · " in label
+        )
+        assert diagram_marks.token(Mark.STALE) in converting
+        assert diagram_marks.token(Mark.STALE) not in transferring
+
+    def test_that_result_really_has_a_stale_premium_and_fresh_legs(self) -> None:
+        """Otherwise the contrast above holds for a reason that is not about the premium."""
+        declared = fixture.shipped_declarations()
+        cost = fixture.stale_premium_cost()
+        stale_ids = {source.source_id for source in cost.one_way.staleness.stale}
+        assert stale_ids, "nothing is stale at this as-of date, so the test above is vacuous"
+        for leg in declared.routes[fixture.P2P_ROUTE].legs:
+            assert not {ref.id for ref in leg.provenance.sources} & stale_ids, (
+                "a leg's own observation has gone stale too, so the edge would be marked "
+                "whether or not the quote were consulted"
+            )
+        quote = figures.quote_for(declared.routes[fixture.P2P_ROUTE].legs[0], declared.channels)
+        assert quote is not None
+        assert {ref.id for ref in figures.sources(quote).sources} & stale_ids
 
     def test_a_leg_with_no_figure_to_show_shows_no_number(self) -> None:
         """FR-008's second half: an edge shows a figure with its provenance state, or none.
@@ -199,10 +316,10 @@ class TestEveryFigureIsTheResultsFigureThroughTheOneRule:
             fields = label.split(SEPARATOR)
             if len(fields) < 2 or not fields[1].startswith("route "):
                 continue
-            figures = [field for field in fields if FIGURE.search(field)]
-            assert all(field.startswith("declared fee ") for field in figures), (
+            found = [field for field in fields if FIGURE.search(field)]
+            assert all(field.startswith(figures.FIGURE_FIELD) for field in found), (
                 f"an edge from {source} to {target} carries a figure that is not a declared "
-                f"leg fee: {figures}"
+                f"one: {found}"
             )
 
 
@@ -292,5 +409,6 @@ class TestTheRoundTripCannotBeDrawnWithoutADeclaredExit:
             render_path(
                 cost,
                 routes=routes,
+                channels=declared.channels,
                 regime=fixture.shipped_regime(declared, "war_end", "wartime"),
             )

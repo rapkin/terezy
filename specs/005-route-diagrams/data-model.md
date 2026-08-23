@@ -98,7 +98,7 @@ The renderer consumes what already exists and defines no parallel model (FR-020)
 | Input | From | Used for |
 |---|---|---|
 | `Venue`, `Route`, `Leg`, `Regime` | `core.routes`, `core.scenarios` | The registry graph |
-| `FxChannel`, `ChannelSide` | `core.routes.channels` | ⚙ The declared premium on an `fx` edge |
+| `FxChannel`, `ChannelSide` | `core.routes.channels` | ⚙ The declared premium on an `fx` edge, **on both diagram kinds** |
 | `ObservationKind` | `core.primitives.staleness` | ⚙ The per-kind staleness thresholds |
 | `RampCost`, `OneWayCost`, `RoundTripCost` | `core.results.ramp` | The costed path |
 | `ExitCostUnknown`, `RouteUnusable`, `NothingComparable` | `core.results.ramp` | Refusals, drawn as refusals |
