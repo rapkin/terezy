@@ -71,6 +71,7 @@ from terezy.core.results.ramp import (
 )
 from terezy.core.routes import channels, cost, ranking
 from terezy.core.routes.channels import Side
+from terezy.core.routes.path import candidate_id
 from tests.invariants import route_graphs
 
 pytestmark = pytest.mark.worked_example
@@ -111,6 +112,7 @@ def _cost(graph: route_graphs.Graph, *, amount: float = SENT) -> RampCost:
         kinds=route_graphs.KINDS,
         on_date=route_graphs.ON_DATE,
         as_of=route_graphs.AS_OF,
+        spendable=graph.spendable,
     )
     assert isinstance(costed, RampCost), costed
     return costed
@@ -305,6 +307,7 @@ class TestTheFindingTheFeatureExistsFor:
             kinds=route_graphs.KINDS,
             on_date=route_graphs.ON_DATE,
             as_of=route_graphs.AS_OF,
+            spendable=domestic.spendable | offshore.spendable,
         )
         assert not isinstance(ranked, NothingComparable), ranked
         return ranked
@@ -320,7 +323,7 @@ class TestTheFindingTheFeatureExistsFor:
     ) -> None:
         # The comparison, stated as the two numbers it is made of.
         ranked = self._ranked()
-        by_route = {entry.path.route_id: entry for entry in ranked.costed}
+        by_route = {candidate_id(entry.path): entry for entry in ranked.costed}
         domestic = by_route["inzhur_direct"]
         offshore = by_route["monobank_to_binance_p2p"]
         assert isinstance(domestic.round_trip, RoundTripCost)
@@ -333,9 +336,9 @@ class TestTheFindingTheFeatureExistsFor:
         # the P2P route is the *faster* one (one leg against two). Cost leads; latency is
         # the third key and only speaks when the first two are equal.
         ranked = self._ranked()
-        assert recommended_cost(ranked).path.route_id == "inzhur_direct"
-        assert ranked.costed[0].path.route_id == "inzhur_direct"
-        assert ranked.costed[1].path.route_id == "monobank_to_binance_p2p"
+        assert candidate_id(recommended_cost(ranked).path) == "inzhur_direct"
+        assert candidate_id(ranked.costed[0].path) == "inzhur_direct"
+        assert candidate_id(ranked.costed[1].path) == "monobank_to_binance_p2p"
         assert ranked.ties == ()
 
     def test_the_gap_is_the_whole_p2p_round_trip_and_nothing_else(self) -> None:
@@ -345,7 +348,9 @@ class TestTheFindingTheFeatureExistsFor:
         # while a number of hryvnia is not.
         ranked = self._ranked()
         offshore = next(
-            entry for entry in ranked.costed if entry.path.route_id == "monobank_to_binance_p2p"
+            entry
+            for entry in ranked.costed
+            if candidate_id(entry.path) == "monobank_to_binance_p2p"
         )
         assert isinstance(offshore.round_trip, RoundTripCost)
         spread = offshore.round_trip.components[CostComponent.CONVERSION_SPREAD]

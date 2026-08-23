@@ -21,6 +21,17 @@ this test, on the line that names the file. The last time the OVDP artefact move
 was exactly three input digests and an unchanged result digest -- which is how the file
 distinguishes "the inputs changed" from "the answer changed".
 
+**The two fields feature 004 added are rendered**: ``exit_path`` -- which way out this figure is
+keyed by -- and ``by_segment``, the attribution's second axis, on both halves of the round trip.
+Both are user-visible, and a recorded result that omitted them would let either move without the
+artefact noticing.
+
+⚙ **The digest covers ``exit_path`` and the *one-way* segment axis, not the round-trip one**, and
+that is the older design rather than an oversight: ``manifest_shape`` has never covered the
+round-trip fraction or its channels either, because the digest is the one-way figure's bit-identity
+check and the round trip is caught by the rendering beside it. Both halves are diffed; one half is
+hashed. Say which, rather than claiming both.
+
 **Deliberately excluded**: provenance. Filling in a ``verified_on`` must not move the digest,
 or the test would fail on a documentation edit; that exclusion is asserted below, and the mark
 itself is checked separately.
@@ -55,24 +66,33 @@ from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.tolerance import is_close
+from terezy.core.results.coverage import SpendableEndpoint
 from terezy.core.results.ramp import (
     ExitCostUnknown,
     NothingComparable,
     RampCost,
     Ranking,
     RoundTripCost,
+    SegmentAttribution,
     recommended_cost,
 )
 from terezy.core.routes import ranking
-from terezy.core.routes.path import FundingPath
+from terezy.core.routes.path import (
+    ExitByIdentity,
+    ExitChain,
+    FundingPath,
+    candidate_id,
+    exit_segments_of,
+)
 from terezy.data import manifest
-from terezy.data.declarations import resolver
+from terezy.data.declarations import loader, resolver
 
 pytestmark = pytest.mark.golden
 
 REPO_ROOT: Final = Path(__file__).resolve().parents[2]
 DATA_ROOT: Final = REPO_ROOT / "data"
 GOLDEN_FILE: Final = Path(__file__).with_name("ramp_comparison.golden.txt")
+SPENDABLE_FILE: Final = DATA_ROOT / "spendable" / "owner-001.toml"
 
 UPDATE_VARIABLE: Final = "TEREZY_UPDATE_GOLDEN"
 """Set it to rewrite the artefact. See the module docstring for the procedure."""
@@ -107,6 +127,20 @@ def _declarations() -> resolver.RampDeclarations:
     return resolver.ramp_from_data_root(DATA_ROOT, base_currency=UAH)
 
 
+def _spendable() -> frozenset[SpendableEndpoint]:
+    """The shipped spendable list, read from ``data/`` like every other input to this run.
+
+    Loaded rather than restated, because ranking now consults it: a destination that is itself
+    somewhere the owner spends satisfies its own exit requirement (003 FR-002), and a hand-written
+    copy here could disagree with the file while the artefact still looked authoritative. The
+    file's digest is recorded with the other inputs below, so editing it fails this test on its
+    own line -- which is the point of recording inputs at all.
+    """
+    owner_id, endpoints = loader.spendable_from_file(SPENDABLE_FILE)
+    assert owner_id == "owner-001", owner_id
+    return frozenset(endpoints)
+
+
 def _paths(declared: resolver.RampDeclarations) -> tuple[FundingPath, ...]:
     """Every inbound route that ends at the destination, in a stable order.
 
@@ -130,6 +164,7 @@ def _rank(declared: resolver.RampDeclarations) -> Ranking | NothingComparable:
         kinds=declared.kinds,
         on_date=ON_DATE,
         as_of=AS_OF,
+        spendable=_spendable(),
     )
 
 
@@ -146,8 +181,43 @@ def _money(value: Money) -> str:
     return f"{value.amount!r} {value.currency.value}"
 
 
+def _segments(label: str, attributions: tuple[SegmentAttribution, ...]) -> Iterable[str]:
+    """One line per segment per component, so a change to either axis shows up as a line.
+
+    Rendered in full rather than summarised: ``by_segment`` is a *user-visible attribution*, and
+    the value of recording it here is that a diff says which hop moved, not that a hash changed.
+    A declared route has exactly one segment, so on today's registry these lines restate the
+    component totals -- which is the correct reading, and is what would stop being true the day
+    a composed candidate entered this comparison.
+    """
+    for entry in attributions:
+        for component, amount in sorted(entry.components.items(), key=lambda kv: kv[0].value):
+            yield (
+                f"      {label} seg[{entry.position}] {entry.route_id:<26} "
+                f"{component.value:<18} {_money(amount)}"
+            )
+
+
+def _exit(chain: ExitChain | None) -> str:
+    """The way out this figure is keyed by, in the output's own words.
+
+    ``none`` is not decoration: it means there is no round-trip figure at all, and the
+    correspondence is exact (FR-012). The identity case renders as itself rather than as an
+    empty chain, because a round trip that costs nothing *because there is nothing to do* is a
+    different claim from one whose fees cancelled.
+    """
+    match chain:
+        case None:
+            return "none"
+        case ExitByIdentity():
+            return "by-identity"
+        case _:
+            return "+".join(exit_segments_of(chain))
+
+
 def _cost(index: int, cost: RampCost) -> Iterable[str]:
-    yield f"[{index}] {cost.path.route_id}"
+    yield f"[{index}] {candidate_id(cost.path)}"
+    yield f"      exit_path         {_exit(cost.exit_path)}"
     yield f"      stream            {cost.path.stream_id}"
     yield f"      destination       {cost.path.destination_id}"
     yield f"      status            {cost.status}"
@@ -161,10 +231,12 @@ def _cost(index: int, cost: RampCost) -> Iterable[str]:
     yield f"      one_way  spread/r {cost.one_way.spreads_over_reference}"
     for component, amount in sorted(cost.one_way.components.items(), key=lambda kv: kv[0].value):
         yield f"      one_way  {component.value:<16} {_money(amount)}"
+    yield from _segments("one_way ", cost.one_way.by_segment)
     match cost.round_trip:
         case RoundTripCost() as round_trip:
             yield f"      round    fraction {round_trip.fraction!r}"
             yield f"      round    channels {round_trip.channels_applied}"
+            yield from _segments("round   ", round_trip.by_segment)
         case ExitCostUnknown() as unknown:
             yield f"      round    UNKNOWN  {unknown.reason}"
         case _:  # pragma: no cover -- mypy proves this unreachable
@@ -189,7 +261,13 @@ def _render(result: Ranking, declared: resolver.RampDeclarations) -> str:
     for name in sorted(declared.routes):
         digest = manifest.file_version(DATA_ROOT / "routes" / f"{name}.toml")
         lines.append(f"route      {name:<34} {digest}")
-    for stem in ("channels/uah_usd", "streams/owner-001", "observation_kinds", "venues"):
+    for stem in (
+        "channels/uah_usd",
+        "streams/owner-001",
+        "spendable/owner-001",
+        "observation_kinds",
+        "venues",
+    ):
         candidate = DATA_ROOT / f"{stem}.toml"
         if candidate.is_file():
             lines.append(f"file       {stem:<34} {manifest.file_version(candidate)}")
@@ -198,14 +276,16 @@ def _render(result: Ranking, declared: resolver.RampDeclarations) -> str:
     for index, cost in enumerate(result.costed):
         lines.extend(_cost(index, cost))
         lines.append("")
-    lines.append(f"recommended   {result.recommended} ({recommended_cost(result).path.route_id})")
+    lines.append(
+        f"recommended   {result.recommended} ({candidate_id(recommended_cost(result).path)})"
+    )
     lines.append(f"ties          {result.ties}")
     lines.append(f"excluded      {len(result.excluded)}")
     for unusable in result.excluded:
-        lines.append(f"      {unusable.path.route_id}: {unusable.binding_constraint}")
+        lines.append(f"      {candidate_id(unusable.path)}: {unusable.binding_constraint}")
     lines.append(f"not_comparable {len(result.not_comparable)}")
     for cost in result.not_comparable:
-        lines.append(f"      {cost.path.route_id}")
+        lines.append(f"      {candidate_id(cost.path)}")
 
     lines += ["", "## digest over core.routes.ranking output", digest_of(result), ""]
     return "\n".join(lines)
@@ -220,7 +300,7 @@ def digest_of(result: Ranking) -> str:
 def manifest_shape(cost: RampCost) -> tuple[str | tuple[str, ...], ...]:
     """The parts of a cost the digest covers. Provenance is excluded, deliberately."""
     return (
-        cost.path.route_id,
+        candidate_id(cost.path),
         cost.path.stream_id,
         cost.path.destination_id,
         cost.one_way.sent.amount.hex(),
@@ -230,6 +310,12 @@ def manifest_shape(cost: RampCost) -> tuple[str | tuple[str, ...], ...]:
         tuple(value.hex() for value in cost.one_way.spreads_over_reference),
         str(cost.latency_days),
         cost.status,
+        _exit(cost.exit_path),
+        tuple(
+            f"{entry.position}:{entry.route_id}:{component.value}:{amount.amount.hex()}"
+            for entry in cost.one_way.by_segment
+            for component, amount in sorted(entry.components.items(), key=lambda kv: kv[0].value)
+        ),
     )
 
 
@@ -287,20 +373,20 @@ class TestTheArtefactCannotBeGreenAndWrong:
         The zero-cost claim itself is checked where it belongs, in
         ``tests/unit/test_zero_cost_domestic_route.py``.
         """
-        route_ids = {cost.path.route_id for cost in _ranking().costed}
+        route_ids = {candidate_id(cost.path) for cost in _ranking().costed}
         assert route_ids, "the ranking is empty, so nothing below proves anything"
         assert "inzhur_direct" not in route_ids
         assert all(cost.path.destination_id == DESTINATION for cost in _ranking().costed)
 
     def test_the_p2p_route_reproduces_the_hand_computed_cost(self) -> None:
-        p2p = next(c for c in _ranking().costed if c.path.route_id == P2P_ROUTE)
+        p2p = next(c for c in _ranking().costed if candidate_id(c.path) == P2P_ROUTE)
         assert is_close(p2p.one_way.fraction, P2P_ONE_WAY)
         assert isinstance(p2p.round_trip, RoundTripCost), p2p.round_trip
         assert is_close(p2p.round_trip.fraction, P2P_ROUND_TRIP)
 
     def test_the_rate_space_spread_is_reported_beside_the_cost_not_as_it(self) -> None:
         """METHODOLOGY §16.2: `p/r` is §4.3.1's figure and is not the cost."""
-        p2p = next(c for c in _ranking().costed if c.path.route_id == P2P_ROUTE)
+        p2p = next(c for c in _ranking().costed if candidate_id(c.path) == P2P_ROUTE)
         assert p2p.one_way.spreads_over_reference == (P2P_SPREAD_OVER_REFERENCE,)
         assert not is_close(p2p.one_way.fraction, P2P_SPREAD_OVER_REFERENCE)
 
@@ -313,4 +399,4 @@ class TestTheArtefactCannotBeGreenAndWrong:
         """None of §11 item 1's numbers has been observed, and the output says so."""
         for cost in _ranking().costed:
             if cost.one_way.provenance.sources:
-                assert prov.is_unverified(cost.one_way.provenance), cost.path.route_id
+                assert prov.is_unverified(cost.one_way.provenance), candidate_id(cost.path)

@@ -94,15 +94,19 @@ from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.tolerance import is_close
+from terezy.core.results.coverage import SpendableEndpoint
 from terezy.core.results.ramp import NothingComparable, RampCost, RoundTripCost, recommended_cost
 from terezy.core.routes import cost, ranking
 from terezy.core.routes.channels import FxChannel
 from terezy.core.routes.legs import Route
-from terezy.core.routes.path import FundingPath
+from terezy.core.routes.path import FundingPath, candidate_id
 from terezy.core.scenarios import regimes
 from tests.invariants import route_graphs
 
 pytestmark = pytest.mark.worked_example
+
+SPENDABLE = frozenset({SpendableEndpoint(venue_id="venue_2", currency=Currency.UAH)})
+"""Where both corridors' declared exits land -- hryvnia back at the home rail."""
 
 SENT = 10_000.0
 """What departs, in hryvnia. Round, so the divisions above stay readable."""
@@ -220,6 +224,7 @@ def _costed(route_id: str, on_date: date) -> RampCost:
         kinds=route_graphs.KINDS,
         on_date=on_date,
         as_of=AS_OF,
+        spendable=SPENDABLE,
     )
     assert isinstance(costed, RampCost), costed
     return costed
@@ -401,12 +406,13 @@ class TestARankingSeesOnlyTheCorridorsInForce:
             kinds=route_graphs.KINDS,
             on_date=on_date,
             as_of=AS_OF,
+            spendable=SPENDABLE,
         )
         assert not isinstance(ranked, NothingComparable), ranked
         assert ranked.excluded == (), ranked.excluded
         recommended = recommended_cost(ranked)
         assert isinstance(recommended.round_trip, RoundTripCost)
-        return recommended.path.route_id, recommended.round_trip.fraction
+        return candidate_id(recommended.path), recommended.round_trip.fraction
 
     def test_the_same_contribution_is_ranked_through_a_different_corridor_on_each_side(
         self,

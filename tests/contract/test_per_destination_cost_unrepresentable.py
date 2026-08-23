@@ -170,10 +170,20 @@ def _takes_the_triple(target: Any) -> bool:
     heuristic and the type is the guarantee: a parameter called ``path`` carrying a bare venue
     id would satisfy a name check while reintroducing precisely the blended figure FR-008
     exists to forbid.
+
+    ⚙ **``Candidate`` and ``Journey`` count too**, since feature 004. ``Candidate`` is
+    ``FundingPath | ComposedPath`` and both members carry the destination **and** the stream --
+    a ``ComposedPath`` names its whole chain of segments where a ``FundingPath`` names one
+    route, which is more of the key rather than less. A ``Journey`` pairs a candidate with its
+    way out, so it is the key plus the exit chain (FR-012). What the widening does *not* admit
+    is a bare venue id: a ``str`` still fails, which is the property this function exists for.
     """
     signature = inspect.signature(target)
     return any(
-        "FundingPath" in str(signature.parameters[name].annotation)
+        any(
+            key in str(signature.parameters[name].annotation)
+            for key in ("FundingPath", "Candidate", "Journey")
+        )
         for name in frozenset(signature.parameters) & PATH_NAMES
     )
 
@@ -223,14 +233,26 @@ def _records_nested_in_keyed_records() -> frozenset[str]:
     written down, so a new nested cost record inherits it automatically and a cost record that
     is *not* nested inside anything keyed does not.
     """
+    records = {
+        target.__name__: target
+        for _, target in _public_callables()
+        if inspect.isclass(target) and dataclasses.is_dataclass(target)
+    }
+
+    def held_by(record: Any) -> set[str]:
+        names: set[str] = set()
+        for field in dataclasses.fields(record):
+            names.update(re.findall(r"[A-Z]\w+", str(field.type)))
+        return names
+
     nested: set[str] = set()
-    for _, target in _public_callables():
-        if not (inspect.isclass(target) and dataclasses.is_dataclass(target)):
-            continue
-        if not _is_keyed(target):
-            continue
-        for field in dataclasses.fields(target):
-            nested.update(re.findall(r"[A-Z]\w+", str(field.type)))
+    frontier = [target for target in records.values() if _is_keyed(target)]
+    while frontier:
+        held = held_by(frontier.pop())
+        for name in held - nested:
+            nested.add(name)
+            if name in records:
+                frontier.append(records[name])
     return frozenset(nested)
 
 
@@ -415,6 +437,37 @@ class TestTheScanWouldActuallyCatchAViolation:
         assert not _accepts_a_bare_destination(cost_one)
         assert _takes_the_triple(cost_one)
 
+    def test_the_transitive_closure_walks_out_from_keyed_records_and_not_over_everything(
+        self,
+    ) -> None:
+        """The boundary of the widened exemption, asserted where it can actually fail.
+
+        ⚙ **The obvious decoy here is vacuous, and saying so is the point.** A throwaway record
+        declared inside a test body can never enter the closure, because ``held_by`` collects
+        names by reading the *annotations of reachable records* -- a name no annotation mentions
+        is unreachable under any closure, one level or twenty. An assertion that cannot fail is
+        worse than none: it reads as coverage.
+
+        What *is* falsifiable is the closure's **root set**. It walks out from the keyed records
+        only, so a declaration record like ``Route`` or ``Leg`` -- carrying no cost figure, and
+        held by no result record -- must stay outside it. A closure that walked every dataclass
+        instead of following the field graph from the keys would sweep both in, and every
+        unkeyed cost record with them.
+        """
+        nested = _records_nested_in_keyed_records()
+        assert "Route" not in nested
+        assert "Leg" not in nested
+
+    def test_the_transitive_exemption_does_reach_the_record_it_was_widened_for(self) -> None:
+        """The other half: ``SegmentAttribution`` is two hops from the key and **is** exempt.
+
+        Without this the decoy above would pass against a closure that had been reverted to one
+        level, and the widening would look untested in the direction it actually changed.
+        """
+        nested = _records_nested_in_keyed_records()
+        assert "OneWayCost" in nested, "the direct hop is missing; this test is stale"
+        assert "SegmentAttribution" in nested
+
     def test_a_sequence_of_triples_is_the_triple_too(self) -> None:
         # ``rank``'s shape. Many whole keys is not a partial key, and refusing the plural
         # would push a ranking function into taking three parallel lists -- which is the
@@ -471,6 +524,7 @@ class TestTheTripleMustBeCoherentAndNotMerelyPresent:
             kinds=route_graphs.KINDS,
             on_date=route_graphs.ON_DATE,
             as_of=route_graphs.AS_OF,
+            spendable=frozenset(),
         )
 
     def test_a_path_naming_an_undeclared_route_fails_naming_the_known_ones(self) -> None:

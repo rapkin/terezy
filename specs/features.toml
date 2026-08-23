@@ -28,13 +28,13 @@ needs  = ["002-ramp-cost"]
 
 [[feature]]
 id     = "004-composed-paths"
-status = "spec"
+status = "done"
 needs  = ["002-ramp-cost", "003-route-coverage"]
 why    = "the spendable-endpoint list is declared by 003 (its FR-004); 004's composed exit chains end there (its FR-022)"
 
 [[feature]]
 id     = "005-route-diagrams"
-status = "spec"
+status = "done"
 needs  = ["002-ramp-cost"]
 
 [[feature]]
@@ -83,11 +83,6 @@ note  = "advisory -> binding: ranking excludes non-spendable exits; 003 FR-019 d
 id    = "superseded-exit-visibility"
 after = ["003-route-coverage"]
 note  = "a spendable destination satisfies its own exit by identity (003 FR-002, owner decision 2026-08-23), and the sentinel supersedes any exit routes actually declared from it -- so those declarations appear nowhere in the report: not relied on, not orphaned, not a deficit. Unreachable in the shipped registry, where nothing exits a spendable venue, and stated at three sites rather than hidden. Making them visible costs the mirror with satisfied-by-arrival, which is why it is the owner's call and not the implementer's"
-
-[[future]]
-id    = "identity-exit-vs-partner-requirement"
-after = ["003-route-coverage"]
-note  = "FR-002's owner decision (2026-08-23) and 002's FR-030 can disagree: an inbound route landing on a spendable endpoint with no declared partner_route gives coverage Ready by identity and costing ExitCostUnknown -- a genuine FR-018 violation, which FR-018 says must not exist. Unreached today: the SC-009 generator is partner-closed by its own scoping rule, and every declared route into monobank_uah is an exit. Composition (004) or one new corridor makes it real, and then it needs a decision rather than a scope note"
 
 [[future]]
 id    = "instrument-access-nodes"

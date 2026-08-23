@@ -1,0 +1,40 @@
+# How many declared routes may be chained into one candidate.
+#
+# **Owner policy, not an observation** — the same class as `data/objectives/` and
+# `data/strategies/`, and the reason there are no citation keys here. How far this person is
+# willing to let a search run is a fact about him, not about the corridors. Every *number* that
+# describes the world lives on a leg, in `data/routes/`, cited.
+#
+# **Per-owner, beside `data/streams/` and `data/spendable/`**, not at the root beside curated
+# `venues.toml`. A corridor is a public fact shared across owners; a reach policy is one
+# person's, and putting both at one filesystem level would make the boundary a matter of reading
+# field names.
+#
+# **No default, deliberately.** A registry with no declared bound fails at load naming this file
+# and this field, by the rule that refuses a default staleness threshold (002 FR-028): a
+# forgotten line must never read as a chosen policy. A permissive default would make the engine
+# quietly stop looking one segment out, and the corridor it stopped finding would be
+# indistinguishable from one nobody declared.
+#
+# `max_segments = 1` means composition is **OFF** — only declared routes are candidates. That is
+# a legal choice and the explicit way to disable it; it is not the same as leaving the field out,
+# and it is not the same as `0`, which admits nothing at all and is refused as a broken registry.
+#
+# `scripts/check_provenance.py` therefore does not scan this directory — but **not** because it
+# is absent from `SOURCED_DIRS`. That gate is fail-closed over the whole data tree: a directory
+# in neither list is an error, never a blind spot. `composition` is named in `EXEMPT_DIRS` **with
+# this reason recorded beside it**, which is the only way a directory is permitted to go
+# unscanned. If a number that describes the world ever has to live here, it moves to a sourced
+# directory instead of the exemption widening to cover it.
+#
+# **Why three.** The owner's venue list reaches every declared destination in at most three
+# hops — salary venue → exchange → broker is two, and one more leaves room for a corridor that
+# has to pass through a second rail. It is a stated preference and nothing computes it; raising
+# it costs enumeration time and lowers nothing, lowering it hides corridors and the results say
+# so, because the bound in force travels with them.
+
+[owner]
+id = "owner-001"
+
+[composition]
+max_segments = 3

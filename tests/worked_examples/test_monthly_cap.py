@@ -129,6 +129,7 @@ def _cost(path: FundingPath, routes: Mapping[str, Route], amount: Money) -> Ramp
         kinds=route_graphs.KINDS,
         on_date=AUGUST,
         as_of=route_graphs.AS_OF,
+        spendable=route_graphs.capped_graph().spendable,
     )
     assert isinstance(costed, RampCost), costed
     return costed

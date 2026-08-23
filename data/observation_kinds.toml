@@ -61,3 +61,8 @@ note           = "A rate the fund states about itself â€” a target, or a range â
 id             = "fund_liquidity"
 staleness_days = 30
 note           = "A buyback the manager performs by current practice rather than by obligation can be withdrawn the day it becomes expensive. Thirty days is the shortest prompt in this file after a peer-to-peer premium, because what ages here is not a price but a permission."
+
+[[kind]]
+id             = "cpi_index"
+staleness_days = 45
+note           = "A published price index for a month that has ended is a historical fact and does not decay -- what ages here is the RETRIEVAL, because the publisher adds a month roughly every month and a series fetched long ago is a series missing its recent end. Forty-five days is the re-fetch prompt, not a claim that an old month's value went wrong. Whether a series is complete up to a given date is a different question entirely, answered from its coverage window rather than from this threshold, and the deflation feature owns it."

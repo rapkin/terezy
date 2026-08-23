@@ -39,7 +39,7 @@ from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance, SourceRef
 from terezy.core.primitives.staleness import ObservationKind
-from terezy.core.results.coverage import SpendableEndpoint
+from terezy.core.results.coverage import Destination, SpendableEndpoint
 from terezy.core.routes.channels import ChannelSide, FxChannel
 from terezy.core.routes.legs import FX, TRANSFER, Leg, Route, RouteStatus
 from terezy.core.routes.path import FundingPath
@@ -159,6 +159,15 @@ class Graph:
     routes: Mapping[str, Route]
     channels: Mapping[str, FxChannel]
     reference_rate: float
+    spendable: frozenset[SpendableEndpoint]
+    """Where money counts as having come back out, for this graph.
+
+    Derived from the graph's **own** declared exit route -- the venue and currency it ends at --
+    rather than fixed, because each builder below lands its exit somewhere different and a
+    shared constant would make half of them refuse a way out they had just declared. Empty where
+    the graph declares no exit at all, which is the honest state of a route nobody has costed
+    the way back from: there is nowhere for a chain to end because there is no chain.
+    """
 
 
 def _channel(
@@ -248,6 +257,15 @@ def _leg(
             else (P2P_PREMIUM.id if kind == FX else BANK_FEE_SCHEDULE.id)
         ),
         provenance=FEE_SOURCES,
+    )
+
+
+def _spendable_at(route: Route | None) -> frozenset[SpendableEndpoint]:
+    """The endpoint a declared exit route lands on, as the spendable set for its graph."""
+    if route is None:
+        return frozenset()
+    return frozenset(
+        {SpendableEndpoint(venue_id=route.destination, currency=route.legs[-1].to_ccy)}
     )
 
 
@@ -398,6 +416,7 @@ def route_graphs(
         routes=routes,
         channels={CHANNEL_ID: channel},
         reference_rate=reference,
+        spendable=_spendable_at(routes.get("exit_route")),
     )
 
 
@@ -493,6 +512,7 @@ def zero_cost_graph(*, fixed_fee: float = 0.0, with_exit: bool = False) -> Graph
         routes=routes,
         channels={CHANNEL_ID: _channel(42.0, 0.0, 0.0)},
         reference_rate=42.0,
+        spendable=_spendable_at(routes.get(partner_id) if partner_id else None),
     )
 
 
@@ -559,6 +579,7 @@ def p2p_graph(
         routes={inbound.id: inbound, exit_route.id: exit_route},
         channels={CHANNEL_ID: _channel(reference, buy_premium, sell_premium)},
         reference_rate=reference,
+        spendable=_spendable_at(exit_route),
     )
 
 
@@ -657,6 +678,7 @@ def bank_corridor_graph(
             )
         },
         reference_rate=reference,
+        spendable=_spendable_at(exit_route),
     )
 
 
@@ -711,6 +733,7 @@ def usd_direct_graph() -> Graph:
         routes={route.id: route},
         channels={CHANNEL_ID: _channel(42.0, 3.0, -3.0)},
         reference_rate=42.0,
+        spendable=_spendable_at(None),
     )
 
 
@@ -775,6 +798,7 @@ def capped_graph(
         routes={route.id: route},
         channels={CHANNEL_ID: _channel(42.0, 0.0, 0.0)},
         reference_rate=42.0,
+        spendable=_spendable_at(None),
     )
 
 
@@ -1049,6 +1073,16 @@ def coverage_registries(draw: st.DrawFn) -> CoverageRegistry:
         #
         # Drawn after the repair above so a registry that would otherwise have no route still
         # takes the orphan-exit repair, and the shapes those examples exercise are unchanged.
+        #
+        # ⚙ **This one pair is drawn partner-open as well as partner-closed** (added with
+        # feature 004). Scoping decision 4 exists because coverage finds an exit by direction
+        # while 002's costing followed the partner link, so a registry where the two could
+        # disagree would not be testing what the property claims. At a **spendable**
+        # destination neither mechanism is consulted: coverage satisfies the exit half by
+        # identity, and costing now derives the same sentinel from the same declared list. So
+        # this is the one place a partner-less inbound is in scope, and it is the shape that
+        # carried the recorded ``identity-exit-vs-partner-requirement`` disagreement.
+        declares_partner = draw(st.booleans())
         routes[SPENDABLE_INBOUND] = _corridor(
             SPENDABLE_INBOUND,
             origin=CONTRACT_VENUE,
@@ -1056,20 +1090,209 @@ def coverage_registries(draw: st.DrawFn) -> CoverageRegistry:
             direction="inbound",
             from_ccy=Currency.USD,
             to_ccy=BASE_CURRENCY,
-            partner_route=SPENDABLE_EXIT,
+            partner_route=SPENDABLE_EXIT if declares_partner else None,
         )
-        routes[SPENDABLE_EXIT] = _corridor(
-            SPENDABLE_EXIT,
-            origin=HOME_VENUE,
-            destination=CONTRACT_VENUE,
-            direction="exit",
-            from_ccy=BASE_CURRENCY,
-            to_ccy=Currency.USD,
-        )
+        if declares_partner:
+            routes[SPENDABLE_EXIT] = _corridor(
+                SPENDABLE_EXIT,
+                origin=HOME_VENUE,
+                destination=CONTRACT_VENUE,
+                direction="exit",
+                from_ccy=BASE_CURRENCY,
+                to_ccy=Currency.USD,
+            )
     return CoverageRegistry(
         venues=venues,
         streams=COVERAGE_STREAMS,
         routes=routes,
         channels={CHANNEL_ID: _channel(42.0, 3.0, -3.0)},
         spendable=frozenset({SpendableEndpoint(venue_id=HOME_VENUE, currency=BASE_CURRENCY)}),
+    )
+
+
+# ---------------------------------------------------------------------------
+# 004-composed-paths: registries whose route graph is worth searching
+# ---------------------------------------------------------------------------
+#
+# The strategies above generate **one route at a time**, because the properties they serve are
+# about arithmetic. The composition properties are about a *graph*: what chains, what loops,
+# what runs longer than the bound, and what would connect only by mixing directions. So they
+# need a generator that produces a whole registry, and one whose graph is dense enough that a
+# cycle and an over-long corridor are the ordinary case rather than a lucky draw.
+#
+# ⚙ **Every ordered pair of venues is a coin flip, in each direction.** Four venues give twelve
+# ordered pairs and twenty-four possible corridors, so a drawn registry routinely contains a
+# two-cycle (`a -> b` and `b -> a` both inbound), a corridor needing more hops than any
+# plausible bound, and a pair whose only completion runs through a route declared `exit`. Those
+# three are exactly SC-004, SC-005 and SC-016, and a sparser generator would pass all three by
+# never producing the shape.
+#
+# What it does **not** produce is a junction that fails on *currency*: each venue holds one drawn
+# currency, so connectivity here is topological and any two corridors meeting at a venue agree
+# about the currency there. That rule is exercised by hand elsewhere -- see
+# `composition_registries` below, where the claim was measured rather than assumed.
+#
+# **Nothing here is drawn that composition reads for a *number*.** Every leg is zero-fee, has no
+# minimum, no maximum, no cap and no window -- because the search consults none of those and a
+# generator that varied them would be varying the wrong thing. Feasibility on a date is
+# `cost_one`'s answer and is exercised by the unit suite, which can declare a closed segment on
+# purpose.
+
+COMPOSE_VENUES: tuple[str, ...] = ("v_a", "v_b", "v_c", "v_d")
+"""Four venues, so a chain can be three segments long without repeating one."""
+
+COMPOSE_ORIGIN = COMPOSE_VENUES[0]
+"""Where the drawn stream's money arrives, and where every inbound chain starts."""
+
+COMPOSE_TARGET = COMPOSE_VENUES[-1]
+"""The destination asked about, and the one declared spendable endpoint -- so the inbound and
+exit questions are asked about the same graph from opposite ends."""
+
+
+@dataclass(frozen=True, slots=True)
+class CompositionRegistry:
+    """One generated route graph, and everything a search over it needs."""
+
+    routes: Mapping[str, Route]
+    currencies: Mapping[str, Currency]
+    stream: IncomeStream
+    destination: Destination
+    """The venue and currency an inbound chain must reach, and an exit chain must leave.
+
+    A field rather than something derived on access: records here carry data and nothing else
+    (owner decision D-E), and a hand-built registry has to be able to name a destination that
+    is not the generated one.
+    """
+
+    spendable: frozenset[SpendableEndpoint]
+
+
+def _searchable_leg(*, from_venue: str, to_venue: str, currencies: Mapping[str, Currency]) -> Leg:
+    """One movement with nothing on it that binds: the search reads endpoints, not limits."""
+    from_ccy = currencies[from_venue]
+    to_ccy = currencies[to_venue]
+    converts = from_ccy is not to_ccy
+    return Leg(
+        index=0,
+        kind=FX if converts else TRANSFER,
+        from_venue=from_venue,
+        to_venue=to_venue,
+        from_ccy=from_ccy,
+        to_ccy=to_ccy,
+        channel=CHANNEL_ID if converts else None,
+        fee_pct=0.0,
+        fee_fixed=Money(0.0, from_ccy, FEE_SOURCES),
+        minimum=None,
+        maximum=None,
+        monthly_cap=None,
+        capacity_pool=None,
+        latency_days=0,
+        available_from=None,
+        available_until=None,
+        disruption_probability=0.0,
+        kind_of_observation=P2P_PREMIUM.id if converts else BANK_FEE_SCHEDULE.id,
+        provenance=FEE_SOURCES,
+    )
+
+
+@st.composite
+def composition_registries(draw: st.DrawFn) -> CompositionRegistry:
+    """A route graph with a drawn set of corridors, in both directions, over four venues.
+
+    Each venue holds **one** drawn currency, which is what makes the graph's connectivity purely
+    topological: a corridor's currencies are read off its two venues, so any two corridors that
+    meet at a venue also agree about the currency there.
+
+    ⚙ **So a non-joining junction is *not* something this generator produces**, and the docstring
+    said it was until it was measured: 5062 adjacent same-direction pairs over 300 draws, zero of
+    them disagreeing by currency. The rule is real and is covered by hand -- in
+    ``tests/contract/test_composed_same_costing.py`` and
+    ``tests/contract/test_composed_data_only.py``, where a venue can be given two currencies on
+    purpose. What this generator is for is the *topology*: cycles, chains longer than any bound,
+    and corridors declared in both directions.
+
+    The stream is built here rather than taken from the module constants above because its
+    arrival currency has to be the drawn currency of the origin venue: a stream delivering
+    dollars where the first corridor moves hryvnia is a *funding mismatch*, which is costing's
+    refusal and not the search's business.
+    """
+    currencies = {venue: draw(st.sampled_from(Currency)) for venue in COMPOSE_VENUES}
+    routes: dict[str, Route] = {}
+    for origin in COMPOSE_VENUES:
+        for destination in COMPOSE_VENUES:
+            if origin == destination:
+                continue
+            for direction in ("inbound", "exit"):
+                if not draw(st.booleans()):
+                    continue
+                route_id = f"{direction}_{origin}_{destination}"
+                routes[route_id] = Route(
+                    id=route_id,
+                    provider=f"Synthetic {route_id}",
+                    origin=origin,
+                    destination=destination,
+                    direction="inbound" if direction == "inbound" else "exit",
+                    partner_route=None,
+                    status="open",
+                    legs=(
+                        _searchable_leg(
+                            from_venue=origin, to_venue=destination, currencies=currencies
+                        ),
+                    ),
+                )
+    return CompositionRegistry(
+        routes=routes,
+        currencies=currencies,
+        destination=Destination(venue_id=COMPOSE_TARGET, currency=currencies[COMPOSE_TARGET]),
+        stream=IncomeStream(
+            id="salary_generated",
+            owner_id=OWNER_ID,
+            amount=Money(0.0, currencies[COMPOSE_ORIGIN], prov.EMPTY),
+            cadence="monthly",
+            arrives_at=COMPOSE_ORIGIN,
+            indexation=Indexation(policy="none", rate=None),
+            income_tax_rate=None,
+        ),
+        spendable=frozenset(
+            {SpendableEndpoint(venue_id=COMPOSE_TARGET, currency=currencies[COMPOSE_TARGET])}
+        ),
+    )
+
+
+AGREEMENT_CHANNELS: Mapping[str, FxChannel] = {CHANNEL_ID: _channel(42.0, 3.0, -3.0)}
+"""The one quote the coverage registries convert against. Named so a hand-built registry beside
+the generated ones cannot quietly use a different reference rate."""
+
+
+def venues_for_agreement() -> tuple[Venue, Venue]:
+    """The home rail and the contract rail, as the generated registries declare them."""
+    return (
+        Venue(
+            id=HOME_VENUE,
+            name="Home rail (SYNTHETIC FIXTURE)",
+            currencies=frozenset({Currency.UAH}),
+        ),
+        Venue(
+            id=CONTRACT_VENUE,
+            name="Contract rail (SYNTHETIC FIXTURE)",
+            currencies=frozenset({Currency.USD}),
+        ),
+    )
+
+
+def spendable_inbound(*, partner: str | None) -> Route:
+    """The way in that lands on the spendable endpoint, with or without a declared partner.
+
+    ``partner=None`` is the shape 002's costing refused and 003's coverage called ready -- the
+    recorded ``identity-exit-vs-partner-requirement`` disagreement, which feature 004 closes by
+    deriving the identity sentinel from the same spendable list coverage reads.
+    """
+    return _corridor(
+        SPENDABLE_INBOUND,
+        origin=CONTRACT_VENUE,
+        destination=HOME_VENUE,
+        direction="inbound",
+        from_ccy=Currency.USD,
+        to_ccy=BASE_CURRENCY,
+        partner_route=partner,
     )

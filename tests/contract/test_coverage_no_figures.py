@@ -296,6 +296,7 @@ def test_producing_the_report_changes_no_ranking() -> None:
             kinds=route_graphs.KINDS,
             on_date=date(2026, 8, 21),
             as_of=date(2026, 8, 21),
+            spendable=graph.spendable,
         )
 
     before = ranked()

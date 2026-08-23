@@ -463,7 +463,7 @@ No tax rate exists anywhere in the source code. Every rate arrives in a declared
 loaded from `data/tax/` as a **dated schedule**, each entry carrying its own citation,
 retrieval date and verification date — and that holds for a rate of **zero** exactly as it
 does for a non-zero one. How the entry in force is chosen, and what happens to an event the
-schedule does not reach, is §22.
+schedule does not reach, is §23.
 
 The one rule implemented is a flat rate on a stated base:
 
@@ -517,7 +517,7 @@ refund. The loss itself is not swallowed — `ExitLine.realised_loss` carries it
 figure with `carryforward_note` beside it saying that loss offset and carryforward are not
 modelled here — and the zero base keeps the gain's provenance, so it still cites what it
 was computed from. The flat-rate rule is unchanged; what changed is what the fund
-projection hands it, and it hands it a figure with a named line beside it. See §23.
+projection hands it, and it hands it a figure with a named line beside it. See §24.
 
 ---
 
@@ -1621,7 +1621,384 @@ reader of the artifact sees it. The owner's rule remains the destination: making
 ranking excluding a destination with no spendable way out — is a recorded deferral to a later
 feature, not a softer reading of the rule.
 
-## 22. Dated rate schedules: which rate applied, and when a run stops
+## 21. Composed paths: reaching a place nobody declared end to end
+
+### 21.1 What a composed candidate is
+
+A **composed candidate** is an ordered chain of declared routes whose venues, currencies,
+directions and regime membership connect end to end, from a stream's arrival venue to a
+destination. It exists only at query time: nothing is written back to the registry, nothing
+persists between runs, and the registry stays the sole record of what has been observed.
+
+The gap it closes grows with the registry. UAH salary → Binance is declared; Binance → IBKR is
+declared; UAH salary → IBKR **via** Binance did not exist until somebody sat down and hand-wrote
+the concatenation, and every new venue multiplies the concatenations nobody will write.
+
+**A composed candidate is its own kind of candidate**, not a route with a joined id. Where a
+declared route is a `FundingPath`, a chain is a `ComposedPath` carrying its segments in order, and
+every ranking, report and recommendation shows it segment by segment with each segment naming the
+declared route it *is*. So which comparisons rest on composition, and on which declarations, is
+visible wherever a composed candidate appears.
+
+### 21.2 Why every candidate is costed in full
+
+There is **one** costing function, and a chain is not costed *like* a declared route — it is
+costed by the same call. `legs_of` turns either kind of candidate into one sequence of legs,
+renumbered once across the concatenation, and the existing fold walks that sequence unchanged. A
+declared route is a chain of one, and that is not a special case anywhere in the code.
+
+The rejected alternative is the obvious one: cost each segment and add the results. It is a second
+arithmetic, and it is wrong in a way no reviewer would see — **the rounding of a sum of sums is
+not the rounding of a single fold**, so the cost-attribution invariant would begin failing for
+composed candidates only. Slow and honest beats fast and approximate: if enumeration within the
+bound is slow, the honest levers are the bound and the registry, both data and both owner-visible.
+
+Composition therefore adds **reach**, never new arithmetic. Provenance, staleness, capacity pools,
+latency, status and per-leg disruption all behave exactly as they would on a declared route with
+the same concatenated legs, because the fold never knew what a route was.
+
+### 21.3 What a junction does not do
+
+Two segments join only where the destination venue **and** the arriving currency of one equal the
+origin venue **and** the departing currency of the next. A junction **converts nothing, charges
+nothing and waits for nothing**.
+
+Where the venue matches and the currency does not — one segment arrives in USDT, the next departs
+in USD — the chain simply does not exist. It is never bridged by an implicit conversion, because
+an implicit conversion is an invented leg at an invented rate. The corridor's absence is a fact
+for the coverage report (§20), not something for this feature to paper over.
+
+### 21.4 How the bound bounds reach, and why it is visible
+
+The maximum number of segments in a candidate is **declared as data**, per owner, in
+`data/composition/`. There is no default: a registry with no declared bound fails at load naming
+the file and the field, by the rule that refuses a default staleness threshold (§18) — a forgotten
+line must never read as a chosen policy. `max_segments = 1` means composition is **off**, only
+declared routes are candidates, and that is a legal choice; `0` admits nothing at all and is
+refused as a broken registry.
+
+Within the bound, enumeration is **exhaustive**: every chain of connectable declared routes up to
+that length is a candidate, and nothing is dropped, truncated or deferred without a recorded
+reason. Nothing is pruned by cost — no shortest path, no admissible heuristic, no cache of partial
+costs, because a partial cost is valid for **one amount only** (minimums, caps and fixed fees are
+not linear) and a cache keyed by less than the whole amount would be an invented number the first
+time it hit. There is no field anywhere in the feature for a path score, which is required test
+**B12** made structural.
+
+**The bound in force travels with the results.** Without it, a corridor needing four hops under a
+bound of three is indistinguishable from a corridor nobody declared — and the owner's remedy for
+those two is opposite: raise the bound, or write a declaration.
+
+Two rules keep the search finite and honest beside the bound. **No candidate visits a venue
+twice**, because venues are the nodes — even in a different currency; a genuinely useful
+out-and-back corridor can still be hand-declared as one route, where its terms are observations
+rather than search artefacts. And **directions never mix**: the adjacency index is built per
+direction, so an inbound enumeration cannot see an exit route. What was observed one way says
+nothing about the other way, and treating it as if it did would invent a corridor nobody observed.
+
+**Enumeration order influences nothing.** Each adjacency bucket is sorted by route id and the
+emitted candidates are sorted by `(segment count, route ids)`, so the order is a function of the
+declarations rather than of dictionary iteration or file load order. Two candidates costing the
+same within the project tolerance are a **tie** (§19), never resolved in favour of whichever the
+search found first.
+
+### 21.5 Attribution gains a segment axis
+
+Cost is attributed twice over the same total: by **component** — conversion spread, percentage
+fee, fixed fee — and by **segment**, one entry per declared route in the chain. Both mappings sum
+to the same total within the project tolerance, so a leg cannot hide in either, and a reader can
+say both *which term* dominates and *which hop* did.
+
+The two axes are accumulated side by side from the same per-leg figures, never one from the
+other. The whole-candidate totals keep the exact addition order feature 002 established, because
+reconstructing a total from segment subtotals is the sum of sums §21.2 refuses.
+
+### 21.6 There is no path-level disruption probability
+
+Each leg reports its own declared probability, exactly as it does on a declared route, and the
+candidate reports the **largest single leg's** figure — a lower bound, read as *at least this
+likely*.
+
+Nothing combines them, and there is **no field** for a combined figure. Compounding
+`1 - Π(1 - pᵢ)` would require assuming the legs fail independently, and nobody has declared that.
+The structural refusal is worth more than a comment here, because the comment is what gets deleted
+by the next contributor who "just needs a single number for the ranking".
+
+### 21.7 What a chain's status reports
+
+A composed candidate's `status` is the **most constrained** status any of its segments declares:
+`constrained` if any one is, `open` only if all of them are. A chain is no more usable than its
+tightest link, and taking the first segment's status or the last would let a constrained corridor
+hide behind an open one — in the field a reader scans to decide whether to trust the figure
+beside it. It is the shape the other whole-chain figures already take: the `ceiling` is the
+tightest declared cap and the disruption probability the largest single leg.
+
+A `closed` segment never reaches the figure at all: the candidate is excluded with the binding
+**segment** named, so a reader of a three-hop chain knows which declaration to open.
+
+**It describes the way in only, and that is a stated gap.** A constrained *exit* segment leaves
+the status `open` on a record whose headline number is the round trip. Widening it would change
+what the field means for every declared route that already carries one, so the honest fix is a
+second field for the way out rather than a quiet redefinition of this one. A **closed** exit
+segment is unaffected either way — it produces *exit cost unknown* naming the route, so the
+round-trip slot says so in words.
+
+### 21.8 The seam between the way in and the way out
+
+A round trip is **one** journey, so the exit chain is anchored at both ends: it departs from the
+venue the inbound chain arrived at, in the currency it arrived in, and it ends at a declared
+spendable endpoint.
+
+Neither anchor is decoration. Without the first, an exit chain belonging to one destination can
+be paired with a way in to another and walked as though the two met — the money crosses a
+junction nobody declared, for free, and what comes out is a coherent-looking round trip over two
+unrelated journeys. Without the second, a round trip can "complete" while the money is still
+sitting in dollars at an exchange, and the record then carries an arriving amount in one currency
+beside a cost fraction computed in another: two figures describing different things.
+
+Feature 002 enforced both at load for a declared `partner_route`. They are enforced again here
+because a chain assembled at query time never met the loader, and because the search that would
+only ever emit a well-anchored chain is not the only way one arrives.
+
+### 21.9 The way out, in three shapes
+
+A round trip exists when there is a way out, and there are exactly three ways there can be one:
+
+* **a declared exit route** — feature 002's single `partner_route`, unchanged;
+* **a chain of declared exit routes** — the owner's decision of 2026-08-22: a chain *satisfies*
+  the "separately declared exit route" requirement, because every link of it **is** an
+  observation. In 002 the danger was a round-trip figure resting on an exit nobody had looked at,
+  namely the inbound route reversed; composing declared exit segments invents nothing, and it is
+  the mechanism that makes *"a way out, at least through one other venue"* real;
+* **exit by identity** — the destination **is** a declared spendable endpoint, so the money is
+  already where it needed to come back out to.
+
+The exit chain is **part of the candidate's identity**. A round-trip figure is keyed per
+`(destination × stream × inbound path × exit chain)`, so two exit chains from one destination are
+two figures in one ranking, each reported, never blended — and when they agree within the
+tolerance they tie, under the same rule as everything else. The alternative shape, one record
+holding several round-trip figures, has no defined position in an ordering by round-trip cost, and
+picking one to order by is the blend arrived at by accident.
+
+**Exit by identity is a distinct value, never a zero-length chain, and never a promoted one-way
+figure.** A round trip that costs nothing *because there is nothing to do* is a different claim
+from one whose fees happened to cancel, and only a named value carries the difference. The
+round-trip figure equals the one-way figure there — not because a way out was assumed free, but
+because there is no way out left to travel.
+
+⚙ **This closes a recorded disagreement.** Feature 003's coverage audit calls a spendable
+destination ready by identity, while 002's costing required a declared partner and refused it —
+the disagreement 003's own FR-018 says must not exist, recorded in `specs/features.toml` as
+`identity-exit-vs-partner-requirement` and naming composition as the thing that would make it
+real. The sentinel is that resolution, and the entry comes off the future list with this feature.
+
+**The identity case is derived, not opted into.** Costing reads the same declared spendable
+list the coverage report reads, and where the destination is on it the sentinel is the way out —
+without a caller passing anything. That is what closes the disagreement rather than merely making
+it closable: a reconciliation only a caller can opt into leaves the recorded violation exactly
+where it was, because no caller opts in. Identity also **supersedes** a declared partner, which is
+the reading feature 003 already took: where the money is already spendable, a further declared hop
+is a journey the owner has no reason to make.
+
+**Where nothing chains, the gap stands.** A destination from which no declared exit segments reach
+a spendable endpoint still reports *exit cost unknown*, stays out of the round-trip ranking, and
+has its one-way figure reported in a field named one way. "Most of the cost" is not the cost.
+## 22. Diagrams: the one number rule, and what a mark on a picture claims
+
+Feature 005 renders two things as Mermaid text: the declared route graph for one named regime,
+and the path of one costed result. Both are derived — nothing in either is hand-maintained —
+and both must be **as honest as the numbers**, because the picture travels further than the
+tables. It gets pasted into reports and read by people who never open the TOML.
+
+### 22.1 The number-rendering rule — there is exactly one
+
+Every figure on every diagram is rendered by
+`terezy.api.diagrams.numbers`, and by nothing else:
+
+| what | how it renders | example |
+| --- | --- | --- |
+| a fraction, as a percentage | fixed **two** decimals, then `%` | `0.0666…` → `6.67%` |
+| an amount of money | fixed **two** decimals, then the currency **code** | `1234.5678 UAH` → `1234.57 UAH` |
+| a quoted rate | fixed two decimals, both currencies named | `42.0` → `42.00 UAH per USD` |
+| a premium per unit | fixed two decimals, **always signed** | `+3.00 UAH per USD`, `-2.50 UAH per USD` |
+| a markup in basis points | fixed two decimals, in the unit declared | `150.0` → `150.00 bps` |
+
+A rendered premium always names **which side** the leg takes and **which way** the quote is
+applied: `(buy side) 150.00 bps, applied above the reference 42.00 UAH per USD`. That is not
+decoration. The two declared forms have different sign conventions — `premium_per_unit` is a
+signed offset that both sides add, while `markup_bps` is a *cost magnitude* the engine adds on
+the buy side and subtracts on the sell side (§16.1). So the identical declared `150.0`
+describes an edge charging +1.5% and an edge charging −1.5%, and the number alone renders the
+two the same way and the sell side backwards. The direction phrase is taken from
+`channels.effective_rate` itself, so the picture and the arithmetic cannot disagree; the
+effective rate is *not* rendered, because it is computed rather than declared and FR-008
+allows the diagram no figure its input does not carry.
+
+Two decimals, **one** private helper, and all five public functions go through it. This is the
+single-tolerance discipline of §11 applied to formatting: defined in one place, imported
+everywhere, and a second rule for the same kind of quantity is a **defect** rather than a
+preference. `tests/contract/test_diagram_one_number_rule.py` greps the whole `api.diagrams`
+package for a second one — `:.2f`, `round(`, `format(`, `%.2f`, `Decimal` — and proves the grep
+can fail.
+
+**One rule per kind of quantity, not one function.** A signed offset per unit of another
+currency is not an amount of money — it carries a second currency and a mandatory sign — and
+basis points are not a percentage. Each gets its own rule in the one module rather than a `+`
+prepended or a `/10000` performed at a call site. The sign on a premium is the whole content:
+`+3` on the buy side and `-2.5` on the sell side are what make the P2P round trip cost 12.22%,
+and two unsigned figures read as two costs of the same shape. `+0.00` means *at the reference*,
+which is a declaration the schema accepts and the rendering must not hide.
+
+**Why the rule had to exist at all.** Results carry `float`, and this project's canonical float
+form is hexadecimal (§12.2), chosen because determinism means bit-identity. So "the diagram
+shows the result's figure" was undefined until a human-readable decimal form was named. That
+gap was found on external review and closed by naming this rule rather than by softening the
+criterion.
+
+**The rule rounds, and the diagram is therefore not the audit trail.** This is the *one*
+transformation a renderer may apply; it may not compute, derive, aggregate or round again. If a
+decision turns on the third decimal, the diagram is the wrong instrument — the figure itself is
+in the result record, in the golden artifact, and in `float.hex()` where bit-identity is what is
+being asserted. Rounding is half-to-even on the double, so `0.125` renders `0.12` and `0.135`
+(really `0.13500000000000001`) renders `0.14`. A rounded-away negative keeps its sign: `-0.00`
+rather than `0.00`, because a negative arriving amount is a fact this project reports and never
+clamps.
+
+### 22.2 The mark vocabulary, and what each token claims
+
+Marks live in the **label text**. Mermaid `classDef` styling may add emphasis on top; it may
+never be the only carrier, because a mark carried by a colour is lost the moment the text is
+diffed, re-themed, or read as source in a golden file — and golden files are one of exactly two
+places this output lands. Every mark assertion strips all styling first.
+
+Every mark-bearing label ends in a `marks: …` field. Six marks, plus three named ways of saying
+that none applies:
+
+| token | what it claims |
+| --- | --- |
+| `UNVERIFIED` | some source behind this figure has no verification date (§10.2) |
+| `STALE` | some source aged past **its kind's** declared threshold (§18) |
+| `SYNTHETIC` | some source's citation says `SYNTHETIC FIXTURE`, so this is invented data |
+| `CLOSED` | the route is declared closed — present and marked, never omitted |
+| `NO EXIT DECLARED` | nothing this regime includes leaves this destination, so it is not comparison-ready (§17, §20.1) |
+| `EXIT COST UNKNOWN` | a costed result whose round-trip slot is `ExitCostUnknown` — drawn where the exit would be, with no round-trip figure anywhere |
+| `VERIFIED AND CURRENT` | cited, checked, and inside its kind's threshold — no mark applies |
+| `NO SOURCE CITED` | the figure rests on `provenance.EMPTY`: not unverified, and not verified either |
+| `AGE NOT ASSESSED` | nobody aged the sources against a threshold — distinct from having aged them and found nothing |
+
+The last three exist for the same reason `StalenessVerdict.assessed` does: an empty marks field
+is indistinguishable from a renderer that forgot, and "nobody checked" must never wear "checked
+and clean"'s tick. `STALE` and `UNVERIFIED` are independent claims and a figure can carry both;
+neither swallows the other. No token is a substring of another, so `token in label` is a safe
+question to ask of a diagram's text — an earlier `STALENESS NOT ASSESSED` contained `STALE` and
+was renamed for exactly that reason.
+
+### 22.3 Two things a diagram may never do
+
+**A computed ramp cost never appears on a registry graph**, in either mode. Such a figure exists
+only per `(destination × stream × route)` (§16, and feature 002's FR-008), which a registry graph
+does not name; a number there would be keyed by nothing. The two modes —
+`topology-only` and `with-declared-figures` — differ by the fields prefixed `declared ` and
+nothing else, and each names itself on the face of the diagram so a numberless picture is never
+read as "zero fees".
+
+**Both diagram kinds show the leg's fees *and the premium of the channel it applies*.** The
+prohibition above does not reach a premium: it is a declared observation with its own source,
+verification date and `kind`, exactly like a leg fee. Showing only the fees was the first
+implementation and it was wrong in the way this whole document is about — every fee on the
+§4.3.1 corridor is declared zero, so the diagram drew the most expensive corridor in the
+registry as free while the 6.67% lived entirely in a premium it never mentioned. A caption or a
+totals node does not repair that: a disclaimer at the top does not survive someone looking at
+one edge, which is why the costed path carries the premium on its edges too.
+
+The applied side carries its own marks and ages under **its own** threshold, so a stale premium
+on a fresh-fee leg does not render clean (§18, and `cost._channel_verdicts` one layer down). A
+channel file declares a kind three times — reference rate, buy side, sell side — and collapsing
+them reports a 7-day premium fresh at 82 days.
+
+**A declared name can never forge a label field.** A label is a sequence of fields separated by
+` · `, and a mark is a field, so a declaration forges a mark if it can *add* a field or *be*
+one. Both are closed, by different mechanisms:
+
+- the separator and the token that opens the marks field are escaped out of declared text, so
+  nothing a declaration contributes can add a field or open that one;
+- every field carrying declared text begins with a renderer-owned word (`name …`, `provider …`),
+  so nothing a declaration contributes can *be* a field.
+
+Escaping the separator alone was not enough, and the gap is worth recording: a venue's name and
+a route's provider were emitted as bare unprefixed text, so a route declaring its provider as
+`marks: VERIFIED AND CURRENT` needed no separator at all — those characters landed in a label
+whose real marks field said `UNVERIFIED + CLOSED`.
+
+The consequence is what makes the marks readable at all: **exactly one field per label opens
+with `marks: `**, so a diagram is asked what it is marked by reading that field, never by
+searching the label for a word. The test suite reads it that way.
+
+**A refusal is never drawn as a path.** `RouteUnusable`, `ExitCostUnknown` and
+`NothingComparable` each produce a typed `NothingToDraw` carrying the refusal's own reason
+verbatim — never a partial path and never an empty diagram, because an empty picture is
+indistinguishable from a graph that genuinely has nothing in it.
+
+### 22.4 A composed path draws as the chain it is
+
+Feature 004 made a candidate either a declared route or a chain of them, and its FR-013 says a
+composed candidate is visibly distinct from a declared route **in every report**. A diagram is
+a report, and three things carry the distinction:
+
+- the caption reads `way in: composed chain of N declared routes (a+b)` — *nobody declared this
+  corridor end to end* — where a declared route reads `way in: declared route X`;
+- the caption carries the `COMPOSED` mark, and its style class;
+- every edge carries `segment <position> · route <id>`, so each hop names the declaration it
+  **is** and a reader can open it. That also disambiguates the `leg 0` a two-segment chain says
+  twice: `Leg.index` is declared per route, and `segment 0 · leg 0` and `segment 1 · leg 0` are
+  the two different movements they are.
+
+**Which hop charged what** is 004's second axis of attribution, and it goes on its own node —
+one per half — rather than on the edges. A segment is a declared route and an edge is a leg, so
+a segment's charge belongs to neither one of its legs nor to all of them, and repeating it on
+each would read as each leg charging it. Where a chain has more than one segment the node adds
+a caveat, because it is true and a reader would otherwise suspect the arithmetic: each figure
+goes through the one rule on its own, so two segments rounding up can display a hundredth above
+the rounded total — `666.67` and `555.56` against `1222.22` on the §4.3.1 round trip. The
+underlying figures add exactly; the *renderings* need not.
+
+### 22.5 The four ways out, and the one that is not an edge
+
+`RampCost.exit_path` has four states and the caption names each as itself: one declared partner
+route, a chain of declared exit routes drawn as its **own** segments (never the way in
+reversed), a destination that is already spendable, and nobody having costed a way out at all.
+
+`EXIT_BY_IDENTITY` is the one that needs care. The result carries a real round-trip figure and
+it **equals the one-way figure**, and the trap is explaining that coincidence. A zero-cost exit
+edge would assert a journey that costs nothing, which is a different claim from there being no
+journey — the distinction `core.routes.path.ExitByIdentity` exists to carry one layer down,
+where `None` would have said "no exit chain" and an empty chain "a chain that charged nothing".
+
+So it is not an edge. The mark goes on the **destination node**, which is the thing that is
+spendable, and a note states the consequence in words: *the money is already where it needed to
+come back out to, so there are no exit legs, and the round-trip figure is the one-way figure —
+not a way out that happened to cost nothing.*
+
+One consequence in the other direction: **the status field says which half it describes.** On a
+chain `RampCost.status` is the tightest *inbound* segment's, and 004 records that a constrained
+exit segment deliberately does not move it. An unqualified `status:` on a record whose headline
+number is the round trip would read as covering both halves, so the diagram writes
+`status (way in, tightest segment)`. Each edge still carries its own segment's declared status,
+which is where a constrained exit is visible.
+
+### 22.6 Node identity is positional
+
+A node's Mermaid id is `n0`, `n1`, … — its index in a **sorted** list of the entities drawn. The
+declared id and name live in the quoted, escaped label and nowhere else.
+
+Deriving the id from the declared id would mean sanitising, and sanitising is a non-injective
+map: `binance-p2p` and `binance_p2p` both become `binance_p2p`, two venues collapse into one
+node, and nothing in the output says so. Positional ids are injective by construction, which
+turns every hostile character — quotes, pipes, arrows, Cyrillic, emoji — into a *labelling*
+problem that the escaping solves, and never an identity problem. The cost, accepted: the raw
+text is less readable to a human reading the source. The diagram is meant to be rendered.
+
+## 23. Dated rate schedules: which rate applied, and when a run stops
 
 A tax rate is not a constant, it is a schedule. Ukrainian law moved the military levy from
 1.5% to 5% in December 2024, and several published sources still show the old figure — so
@@ -1679,7 +2056,7 @@ one. A `TaxCharge` therefore carries the citation of the **entry** that produced
 
 ---
 
-## 23. Collective-investment funds: what is declared, and what is refused
+## 24. Collective-investment funds: what is declared, and what is refused
 
 A bond's schedule comes from a contract that says what it will pay. A fund's comes from
 **what the fund says about itself**, and every part of the model below is shaped by that.
@@ -1828,7 +2205,7 @@ refuses by naming the task.
 
 ---
 
-## 21. Where to look next
+## 25. Where to look next
 
 | question | file |
 | --- | --- |
@@ -1851,6 +2228,18 @@ refuses by naming the task.
 | Which observation should I make next? | `tests/unit/test_coverage_deficits.py` |
 | Does the audit agree with what costing actually does? | `tests/invariants/test_coverage_costing_agreement.py` |
 | Can a cost figure leak into the coverage report? | `tests/contract/test_coverage_no_figures.py` |
+| What does a chain nobody declared end to end cost? | `tests/worked_examples/test_composed_arithmetic.py` |
+| Does a composed round trip need a declared way out? | `tests/worked_examples/test_composed_exit_chain.py` |
+| Do two hops over one card share its limit? | `tests/worked_examples/test_composed_pool.py` |
+| Is the search a search rather than a router? | `tests/invariants/test_composition_search.py` |
+| Could enumeration order reach the output? | `tests/invariants/test_composition_order.py` |
+| Is a chain costed by the same function as a route? | `tests/contract/test_composed_same_costing.py` |
+| Is the declared graph what I think it is? | `tests/golden/route_graph_wartime.mmd` |
+| What does a destination with no way out look like? | `tests/golden/route_graph_normalized.mmd` |
+| What does one costed route look like? | `tests/golden/costed_path_p2p.mmd` |
+| Is there a second number-rendering rule? | `tests/contract/test_diagram_one_number_rule.py` |
+| Do the marks survive the picture? | `tests/contract/test_diagram_marks.py` |
+| Can a hostile venue name break a diagram? | `tests/unit/test_diagram_escaping.py` |
 | Which rate applied, and when does a run stop? | `tests/worked_examples/test_rate_schedule_straddle.py` |
 | Can two tax classes on one instrument collide? | `tests/worked_examples/test_two_tax_classes.py` |
 | What does relying on the legal floor cost? | `tests/worked_examples/test_fund_liquidity.py` |

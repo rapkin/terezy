@@ -52,6 +52,7 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.primitives.currency import Currency
     from terezy.core.primitives.money import Money
     from terezy.core.primitives.staleness import ObservationKind
+    from terezy.core.results.composed import SegmentBound
     from terezy.core.results.coverage import SpendableEndpoint
     from terezy.core.routes.channels import FxChannel
     from terezy.core.routes.legs import Leg, Route
@@ -1533,3 +1534,149 @@ def _check_fund_references(
                 f"add {kind.value!r} to that class's applies_to if the rule covers it, or "
                 "reference the class that does",
             )
+# 004-composed-paths: the segment bound's cross-file pass
+# ---------------------------------------------------------------------------
+#
+# One new declaration and one relation the file cannot check about itself: **the owner owns the
+# streams the bound is resolved with**. How far a search may run is a fact about *this* person
+# (Principle VII), and one owner's policy deciding another's reach would put two people's facts
+# in one comparison -- feature 003's argument about the spendable list, applied to the one knob
+# feature 004 adds.
+
+COMPOSITION_DIR = "composition"
+"""Where the per-owner segment bound lives under a data root.
+
+**Per-owner, beside `streams/` and `spendable/`, not at the root beside curated `venues.toml`**
+-- the same Principle VII boundary, made structural (004 research.md D8).
+"""
+
+
+@dataclass(frozen=True, slots=True)
+class CompositionDeclarations:
+    """Every declaration composed candidates need: the coverage set, plus the segment bound.
+
+    ⚙ **A record beside :class:`CoverageDeclarations` rather than more fields on it**, on the
+    precedent that record itself sets against :class:`RampDeclarations`. The three describe
+    different runs: a data root with no composition file must still be able to cost a ramp and
+    audit a registry, and folding the bound into either would make every existing caller require
+    a file this feature invented.
+
+    **It builds on the coverage set rather than on the ramp set, and that is a dependency on
+    declarations rather than on a report** (004 research.md D13). Composition needs the
+    *spendable list*, because a composed exit chain has to end somewhere the owner calls
+    spendable (FR-022), and it needs the regimes, because every segment of a candidate belongs to
+    one regime's route set (FR-017). Both are already resolved and checked by
+    :func:`resolve_coverage`. What composition does **not** consult is the coverage *report*:
+    using the declarations is not using the audit, and a ranking that depended on a report would
+    invert the direction feature 003's FR-019 fixed.
+    """
+
+    coverage: CoverageDeclarations
+    """The venues, streams, routes, channels, kinds, scenarios, regimes and spendable endpoints
+    -- one owner's registry, already checked against itself."""
+
+    bound: SegmentBound
+    """The declared maximum number of segments in a candidate (FR-006). Recorded with every
+    enumeration it bounds, so a corridor's absence is attributable to the bound rather than
+    mistaken for a gap in the registry."""
+
+    composition_file: Path
+    """Which file declared the bound. Not decoration: it is what lets a later failure still name
+    the file after the TOML has been discarded."""
+
+
+def _check_composition_owner(
+    owner_id: str,
+    streams: Mapping[str, IncomeStream],
+    *,
+    path: Path,
+) -> None:
+    """The bound must belong to the owner whose streams it is resolved with (Principle VII).
+
+    A composed candidate is keyed by its stream, so a bound resolved beside somebody else's
+    streams would decide how far *his* money is allowed to travel -- one person's stated
+    preference silently applied to another person's registry.
+
+    ⚙ **Only one half of :func:`_check_spendable_owner`'s check is here, and the other half is
+    not missing.** That function also refuses a run holding a *second* owner's streams beside the
+    first's, and :func:`resolve_composition` takes an already-resolved
+    :class:`CoverageDeclarations` -- which has been through exactly that refusal. Repeating it
+    here was unreachable code: no input can arrive with a foreign stream still in it. A guard
+    that cannot fire is worse than no guard, because it reads as protection.
+    """
+    owners = sorted({stream.owner_id for stream in streams.values()})
+    if owner_id not in owners:
+        raise DeclarationError(
+            path,
+            f"{loader.OWNER_TABLE}.id",
+            f"declares owner {owner_id!r}, but the income streams this bound is resolved with "
+            f"belong to {owners}. How far a search may run is one person's stated policy, so a "
+            "bound belonging to somebody else would decide this owner's reach -- and which "
+            "corridors he is shown at all.",
+            f"name one of {owners}, or resolve this bound against that owner's streams",
+        )
+
+
+def resolve_composition(
+    *, coverage: CoverageDeclarations, composition_file: Path
+) -> CompositionDeclarations:
+    """The coverage declarations plus a resolved segment bound, checked against their owner.
+
+    Takes the resolved :class:`CoverageDeclarations` rather than the paths that produced them,
+    on :func:`resolve_coverage`'s own reasoning: the bound is checked against the *streams*,
+    which are already resolved by then, and re-resolving them here would give a data root two
+    chances to disagree with itself.
+    """
+    owner_id, bound = loader.composition_from_file(composition_file)
+    _check_composition_owner(owner_id, coverage.ramp.streams, path=composition_file)
+    return CompositionDeclarations(
+        coverage=coverage, bound=bound, composition_file=composition_file
+    )
+
+
+def composition_from_data_root(
+    root: Path, *, base_currency: Currency, scenario_id: str | None
+) -> CompositionDeclarations:
+    """Every declaration composed candidates need, under one data root.
+
+    :func:`coverage_from_data_root`'s families, plus ``composition/*.toml``.
+
+    **An empty directory is an error, not a policy of "do not compose".** FR-006 refuses a
+    permissive default, and the absence of the file is the absence of the policy: a mistyped
+    path and an unstated bound are indistinguishable downstream, and reading the absence as a
+    bound of 1 would silently turn the feature off in a run that asked for it.
+
+    ⚙ **Exactly one file, and a second is refused by name**, on feature 003's precedent for the
+    spendable list. Two owners' policies cannot both be in force, and merging them silently --
+    by taking either one, or the smaller, or the larger -- would let one person decide the
+    other's reach. Multi-owner resolution is a later feature, not a defect here.
+    """
+    declared = sorted((root / COMPOSITION_DIR).glob("*.toml"))
+    if not declared:
+        raise DeclarationError(
+            root / COMPOSITION_DIR,
+            "",
+            f"contains no *.toml declarations. An empty {COMPOSITION_DIR} directory is reported "
+            "rather than read as a bound of 1: FR-006 refuses a permissive default, and the "
+            "absence of the file is the absence of the policy. A run that quietly considered "
+            "only declared routes would hide every composable corridor while the real fault was "
+            "a mistyped path.",
+            "check the data root, or declare how many segments a candidate may chain",
+        )
+    if len(declared) > 1:
+        raise DeclarationError(
+            root / COMPOSITION_DIR,
+            "",
+            f"holds {len(declared)} composition declarations "
+            f"({', '.join(path.name for path in declared)}), and this engine resolves one. "
+            "There is exactly one owner today (spec Assumptions), and two owners' policies "
+            "cannot both be in force: merging them would let one person decide the other's "
+            "reach, which is what a per-owner file exists to prevent.",
+            "keep one file per data root until multi-owner support lands",
+        )
+    return resolve_composition(
+        coverage=coverage_from_data_root(
+            root, base_currency=base_currency, scenario_id=scenario_id
+        ),
+        composition_file=declared[0],
+    )

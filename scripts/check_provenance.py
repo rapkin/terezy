@@ -37,7 +37,7 @@ DATA_ROOT = REPO_ROOT / "data"
 # `channels` joined in feature 002: a two-sided rate is the most decision-relevant
 # observation in the ramp model, and an uncited premium is exactly the figure that gets
 # believed without checking.
-SOURCED_DIRS = ("tax", "instruments", "routes", "channels")
+SOURCED_DIRS = ("tax", "instruments", "routes", "channels", "cpi")
 
 # The directories exempt from the citation requirement, each BY NAME and WITH ITS REASON.
 # Together with SOURCED_DIRS this list is exhaustive: a directory under data/ that appears
@@ -64,6 +64,13 @@ EXEMPT_DIRS: dict[str, str] = {
         "and the field exists only so the deployable figure is not overstated. A rate the "
         "engine applies to a taxable event needs a source; a rate the owner states about "
         "his own payslip does not (contracts/declaration-schema.md, data/README.md)"
+    ),
+    "composition": (
+        "the owner's own policy on how far a search may run -- how many declared routes may "
+        "be chained into one candidate. Nothing here describes the world, so there is nothing "
+        "for a source to vouch for: it is the same exemption `objectives` and `strategies` "
+        "carry, and for the same reason. Every *number* that describes a corridor lives on a "
+        "leg, in data/routes/, cited (004 research.md D8)"
     ),
     "spendable": (
         "the owner's own statement of where he spends -- a venue id and a currency code, "

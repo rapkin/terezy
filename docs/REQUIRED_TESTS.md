@@ -103,7 +103,7 @@ xfailed, or deleted without an amendment.
 | E8 | The same scenario under jurisdiction A vs B differs only in the tax terms; the gross market outcome is bit-identical. | `[ ]` |
 | E9 | A residency change mid-simulation is applied by date, including positions held across the change. | `[ ]` |
 | E11 | A **zero** tax figure distinguishes *exempted* from *not applicable* when rendered. The engine already separates them — a taxable event's zero cites its tax class, a non-taxable row's zero cites nothing because there is nothing to cite — but a reader looking at a schedule table sees `0.00` on every row either way. A presentation requirement for the waterfall (spec §5.3), recorded here so the distinction the engine preserves is not thrown away at the last step. | `[ ]` |
-| E10 | A rate declared as a **dated schedule** changes on its effective date, so a legislated change is modelled rather than requiring a rebuild. **Closed by feature 006:** the scalar rate was removed, not deprecated, and `data/README.md` rule 3 and `SIMULATOR_SPEC.md` §4.5.1 are now satisfied. An event before a schedule's earliest cited entry is a typed refusal rather than a defaulted rate — see `docs/METHODOLOGY.md` §22.2 on why that refusal is what makes an honest schedule writable. | `[x]` `tests/worked_examples/test_rate_schedule_straddle.py`, with the boundary in `tests/unit/test_rate_lookup_boundary.py` and the refusals in `tests/unit/test_schedule_refusals.py` |
+| E10 | A rate declared as a **dated schedule** changes on its effective date, so a legislated change is modelled rather than requiring a rebuild. **Closed by feature 006:** the scalar rate was removed, not deprecated, and `data/README.md` rule 3 and `SIMULATOR_SPEC.md` §4.5.1 are now satisfied. An event before a schedule's earliest cited entry is a typed refusal rather than a defaulted rate — see `docs/METHODOLOGY.md` §23.2 on why that refusal is what makes an honest schedule writable. | `[x]` `tests/worked_examples/test_rate_schedule_straddle.py`, with the boundary in `tests/unit/test_rate_lookup_boundary.py` and the refusals in `tests/unit/test_schedule_refusals.py` |
 
 ## F. FX, display currency, and asymmetry
 
@@ -196,6 +196,30 @@ reinforces without closing:
 | **J4** | Half-covered and marked `[~]` above. A fund whose only guaranteed exit is its termination now says so on the result, and a redemption the terms do not owe is refused with the holding left open. What the row asks for and does not exist is a declared **lock-up** term compared against a horizon: these funds declare no lock-up, they declare an absence of obligation, which is a different fact reached by a different route. |
 | **E11** | Reinforced: every fund charge is recorded including a zero, and a disposal at a loss carries a `taxable_base` of zero *with the loss beside it on its own line*. The row is a **presentation** requirement for the waterfall — that a reader looking at `0.00` can tell exempted from not-applicable — and there is still no presentation surface. |
 | **B5** | Approached from one side: tax is assessed per disposal against per-lot basis consumed, and `charged_for_year` records the year it accrues to. The row also wants it **paid from cash on the due date**, with loss offset and carryforward, and this feature explicitly does not model any of the three (FR-008 says so in the output). Feature 009's. |
+**004-composed-paths** closes **no** row either, and says so rather than stretching one: no
+lettered behaviour above names composing declared routes into a candidate. Three rows it presses
+on directly, and one it reinforces along the way:
+
+| Row | How, and why the box does not move |
+|---|---|
+| **B12** | The row's hardest case, because a routing search is exactly where a composite score sneaks into a user-visible ordering. Composed candidates enter 002's lexicographic ranking with no bonus, no penalty and no separate league; nothing is pruned by cost, no partial cost is cached, and **no record in the feature has a field a score could live in** — asserted as an absence in `tests/unit/test_composed_path_types.py`, and as order-independence in `tests/invariants/test_composition_order.py`, which runs a registry in both declaration orders and compares every figure, position, recommendation and tie. Still a whole-engine row: this is one more ordering that does not use a score, not the last one. |
+| **G6** | Pressed on from the other side. A composed round trip exists **only** through a chain of declared exit routes (FR-012, owner decision 2026-08-22) or where the destination is itself spendable; where nothing chains, *exit cost unknown* stands, the candidate stays out of the round-trip ranking, and its one-way figure is not promoted — both directions verified in `tests/worked_examples/test_composed_exit_chain.py`. `tests/contract/test_composed_distinct.py` pins the correspondence: `RampCost.exit_path` is `None` exactly when the round trip is unknown. |
+| **H1** | The row's claim applied to composition, and the closest any feature has come to it: `tests/contract/test_composed_data_only.py` adds **one** `Route` declaration, gets a three-segment candidate that is fully costed and ranked, and asserts that no module under `core/` mentions the new venue or route at all. The box stays open because H1 asks for an instrument, a route, a tax class and a jurisdiction through the **full pipeline**, which is feature 010's scope. |
+| **B10** | Exercised again: `CompositionRefused` is a typed statement that a question could not be asked — a bound admitting nothing, an exit chain with nowhere declared to end — and it is a *different type* from an empty enumeration, which is the legitimate answer "nothing connects". `tests/invariants/test_composition_search.py` asserts both, because a caller who counts rows cannot tell them apart. |
+
+**005-route-diagrams** closes **no** row either. No lettered behaviour above names a diagram,
+and the feature's spec states that plainly rather than stretching one. It extends two standing
+obligations into a new surface, and its tests assert the extension:
+
+| Row | How, and why the box does not move |
+|---|---|
+| **E5** | The mark propagates into the *picture*, not only into tables. One unverified route input marks 100% of the diagram elements depicting figures derived from it, and the assertion strips every style declaration first so a mark carried by a colour fails. `tests/contract/test_diagram_marks.py`. The row is about every figure in the engine, so one more surface carrying the mark does not close it — it is the row still holding. |
+| **B10** | Exercised again in its visual form: a refusal renders as a typed `NothingToDraw` carrying the refusal's own reason verbatim, never an empty diagram — because an empty picture is indistinguishable from a graph with nothing in it. `tests/contract/test_diagram_refusals.py`. Same reading as 003: a whole-engine row, and one more typed outcome does not close it. |
+
+Feature 002's **SC-014** — no exit route means no round-trip figure, and the destination is
+excluded from comparison — is likewise extended rather than restated: the exclusion becomes
+*visible*, as an explicitly absent edge and a `NO EXIT DECLARED` mark on the destination,
+never an omission. `tests/contract/test_diagram_refusals.py`.
 
 ---
 

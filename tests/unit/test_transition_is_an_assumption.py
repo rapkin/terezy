@@ -51,7 +51,7 @@ from terezy.core.primitives.money import Money
 from terezy.core.results.ramp import RampCost, RouteUnusable
 from terezy.core.routes import cost
 from terezy.core.routes.legs import Leg, Route
-from terezy.core.routes.path import FundingPath
+from terezy.core.routes.path import FundingPath, candidate_id
 from terezy.core.scenarios import regimes
 from tests.invariants import route_graphs
 
@@ -285,6 +285,7 @@ class TestARegimeCannotBeExpressedAsALegWindow:
             kinds=route_graphs.KINDS,
             on_date=AFTER,
             as_of=route_graphs.AS_OF,
+            spendable=route_graphs.p2p_graph().spendable,
         )
         assert isinstance(observed, RouteUnusable), observed
         assert observed.binding_constraint == "leg.available_until"
@@ -317,6 +318,7 @@ class TestARegimeCannotBeExpressedAsALegWindow:
                 kinds=route_graphs.KINDS,
                 on_date=AFTER,
                 as_of=route_graphs.AS_OF,
+                spendable=route_graphs.p2p_graph().spendable,
             ),
             RampCost,
         )
@@ -543,10 +545,10 @@ class TestACandidateSetIsNarrowedRatherThanRefused:
             REGIMES, _world(), transitions=(TRANSITION,), on_date=BEFORE
         )
         after = regimes.routes_in_force(REGIMES, _world(), transitions=(TRANSITION,), on_date=AFTER)
-        assert [p.route_id for p in regimes.paths_in_force(self._paths(), before)] == [
+        assert [candidate_id(p) for p in regimes.paths_in_force(self._paths(), before)] == [
             "monobank_to_binance_p2p"
         ]
-        assert [p.route_id for p in regimes.paths_in_force(self._paths(), after)] == [
+        assert [candidate_id(p) for p in regimes.paths_in_force(self._paths(), after)] == [
             "bank_uah_to_broker"
         ]
 
@@ -554,8 +556,8 @@ class TestACandidateSetIsNarrowedRatherThanRefused:
         # The filtering is not silent, and this is where that claim is cashed: every path
         # dropped names a route the selection already reported as excluded.
         after = regimes.routes_in_force(REGIMES, _world(), transitions=(TRANSITION,), on_date=AFTER)
-        kept = {p.route_id for p in regimes.paths_in_force(self._paths(), after)}
-        dropped = {p.route_id for p in self._paths()} - kept
+        kept = {candidate_id(p) for p in regimes.paths_in_force(self._paths(), after)}
+        dropped = {candidate_id(p) for p in self._paths()} - kept
         assert dropped <= set(after.excluded)
 
     def test_the_order_the_caller_gave_is_preserved(self) -> None:

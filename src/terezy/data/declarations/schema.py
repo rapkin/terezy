@@ -1206,3 +1206,53 @@ class FundFile(BaseModel):
     model_config = STRICT
 
     instrument: FundTable
+
+
+# ---------------------------------------------------------------------------
+# 004-composed-paths: the segment bound
+# ---------------------------------------------------------------------------
+#
+# One new declaration, and the smallest one in the project: an owner and an integer. Same three
+# settings as every model above, and the same standing rule: **zero field defaults**. FR-006
+# rests entirely on that rule -- a `max_segments` with a default would make a forgotten line
+# read as a chosen policy, which is the substitution `extra="forbid"` and the absent defaults
+# exist together to prevent.
+#
+# ⚙ **No citation keys, and their absence is the design.** How far the owner is willing to let
+# a search run is a statement about him, not an observation of the world, so there is nothing
+# for a source to vouch for. The same reading `data/objectives/`, `data/strategies/` and
+# `data/spendable/` already carry. Every *number* that describes a corridor lives on a leg, in
+# `data/routes/`, cited.
+#
+# `[owner]` is the shared `OwnerTable` above rather than a copy: it is the same claim -- whose
+# file this is -- and two models for it would eventually disagree about whether the id may be
+# blank.
+
+
+class CompositionTable(BaseModel):
+    """``[composition]`` -- the owner's policy on how far a chain may run."""
+
+    model_config = STRICT
+
+    max_segments: int
+    """At least one, checked by the loader, which can name the file and the field.
+
+    Typed ``int`` under ``strict=True``, so ``2.5`` and ``"3"`` are both refused at the shape
+    stage: half a segment is not a chain, and a quoted number is a file whose type and the
+    engine's type disagree while the answer still looks right.
+    """
+
+
+class CompositionFile(BaseModel):
+    """A whole ``data/composition/<owner_id>.toml``: one owner's reach policy.
+
+    Per-owner, beside ``data/streams/`` and ``data/spendable/`` and **not** at the root beside
+    curated ``venues.toml`` (research.md D8, on feature 003's precedent). A corridor is a public
+    fact about the world; how far this person will let a search run is a fact about him.
+    """
+
+    model_config = STRICT
+
+    owner: OwnerTable
+
+    composition: CompositionTable
