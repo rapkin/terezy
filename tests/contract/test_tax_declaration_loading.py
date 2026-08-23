@@ -474,6 +474,24 @@ class TestTheShippedFilesLoad:
         for standing in rules["ua"].methods.values():
             assert prov.is_unverified(standing.provenance)
 
+    def test_every_shipped_category_declares_the_unresearched_convention_and_flags_it(
+        self,
+    ) -> None:
+        """The one value in the file with no source, pinned rather than described.
+
+        ``none`` leaves a deadline where the cited date put it; ``following`` would assert
+        that the law grants an extension, which is a second legal fact nobody has attested.
+        The gap is flagged in each category's **note**, because the note is the half that
+        becomes ``TimingRule.note`` and reaches a reader beside the figure -- a header comment
+        reaches only whoever opens the file.
+        """
+        declared = loader.timing_from_file(SHIPPED_TIMING)
+
+        assert len(declared.timing) == 3
+        for rule in declared.timing:
+            assert rule.non_business_day_rule == "none", rule.category_id
+            assert "NON_BUSINESS_DAY_RULE IS NOT RESEARCHED" in rule.note, rule.category_id
+
     def test_the_shipped_positions_are_labelled_assumptions_with_a_resolution_path(self) -> None:
         found = resolver.tax_positions_from_data_root(DATA_ROOT)
 

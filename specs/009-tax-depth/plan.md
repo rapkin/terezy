@@ -88,18 +88,27 @@ substitute one for the other at `legs.py::channel_for`.
 
 ## Project Structure
 
+As built. Two placements were decided against the draft and both are argued in
+[research.md](./research.md) D10: `AnnualStatement` sits beside the assessment because
+`core.results.*` already imports `core.tax.year`, and the four basis methods stayed in
+`core/ledger/lots.py` beside the two that were already there.
+
 ```text
 src/terezy/core/
+├── ledger/
+│   └── lots.py                 TOUCHED — all four selection methods, one mapping of functions
 ├── tax/
-│   ├── year.py                 NEW — assessment to a year, netting, carryforward
-│   ├── lots.py                 NEW — the four selection methods as a mapping of functions
-│   └── registry.py             TOUCHED
+│   └── year.py                 NEW — assessment to a year, netting, carryforward,
+│                                     AnnualStatement and the assessment refusals
 └── results/
-    └── tax_year.py             NEW — AnnualStatement, the payment record, typed refusals
+    ├── tax_year.py             NEW — settle, the payment record, the settlement refusals
+    ├── project.py              TOUCHED — the charge memo moves no cash
+    ├── fund.py                 TOUCHED — likewise
+    └── schedule.py             TOUCHED — a row's tax comes from the charge, not the memo
 
 data/
-├── tax/                        due-date rules, with provenance
-└── scenarios/                  the UNSETTLED switches, labelled as beliefs
+├── tax/timing/                 categories, deadlines and method standings, with provenance
+└── scenarios/tax/              the UNSETTLED switches, labelled as beliefs
 ```
 
 ```text
@@ -112,8 +121,8 @@ tests/invariants/
 └── test_ledger_conservation.py TOUCHED — SC-006, now over ledgers containing payments
 
 tests/unit/
-├── test_annual_statement.py    FR-001, FR-002, FR-006
-└── test_insufficient_cash.py   SC-004 — typed, naming the shortfall
+├── test_insufficient_cash.py       SC-004 — typed, naming the shortfall
+└── test_settlement_references.py   FR-002 across the seam a payment cuts in the stream
 
 tests/contract/
 ├── test_tax_declaration_loading.py  SC-007 — the whole misdeclaration battery
@@ -121,7 +130,9 @@ tests/contract/
 └── test_unsettled_is_labelled.py    SC-012
 
 tests/golden/
-└── test_end_to_end_ovdp.py     UNCHANGED FILE — SC-009, bit-identical
+└── test_end_to_end_ovdp.py     SC-009 — the recorded figures bit-identical. The module gained
+                                assertions against the shipped rules; the artefact moved once,
+                                for the OVDP citation upgrade, and no figure in it moved
 ```
 
 ## Complexity Tracking

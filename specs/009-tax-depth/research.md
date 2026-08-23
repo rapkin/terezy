@@ -10,7 +10,7 @@ rests on, and D5 is the one the whole feature turns on.
 
 ## D1 — A tax year is a record, not an accumulator someone remembers to reset
 
-**Decision.** `AnnualStatement` in `core/results/tax_year.py`: a frozen record per
+**Decision.** `AnnualStatement` in `core/tax/year.py` (see D10): a frozen record per
 `(tax year × income category)` holding the charges that compose it, the netted result, and
 the liability. Produced by a fold over the ledger's charges, never mutated.
 
@@ -103,9 +103,14 @@ levy larger than the PIT's own base, which no reader would catch from the total 
 
 ## D9 — Feature 001's golden is bit-identical, and that is the regression
 
-**Decision.** `tests/golden/ovdp_synthetic_a.golden.txt` unchanged. Per-event zero charges
-continue to be recorded, and a year of exclusively exempt income produces **no payment
-event**.
+**Decision.** Every *result* in `tests/golden/ovdp_synthetic_a.golden.txt` unchanged.
+Per-event zero charges continue to be recorded, and a year of exclusively exempt income
+produces **no payment event**.
+
+⚙ The artefact itself moved once, deliberately and for a reason outside the engine: upgrading
+the OVDP citation to the primary text (spec.md, Assumptions) changes the `== inputs ==`
+sha256 of `data/tax/ua.toml`. `canonical.py` excludes provenance from the digest by design, so
+the `== digest ==` line and every figure are untouched.
 
 **Rationale.** FR-026, SC-009. A year with a zero liability still produces a statement
 (FR-006) — an annual statement saying zero is a different claim from no statement at all —
@@ -116,11 +121,20 @@ path grew a behaviour it should not have.
 
 ## D10 — Where the code lives
 
-- `core/tax/year.py` — assessment to a year, netting, carryforward.
-- `core/tax/lots.py` — the four selection methods, as a mapping of functions (D-E).
-- `core/results/tax_year.py` — `AnnualStatement`, the payment record, the typed refusals.
-- `data/tax/` — due-date rules; `data/scenarios/` — the unsettled switches.
+Two of the four placements below were decided against the draft, and both are recorded rather
+than quietly taken.
 
-`core/ledger/lots.py` already holds FIFO and LIFO; the two new methods join them there or in
-`core/tax/lots.py` — decide by where the existing two live and keep all four together. Four
-methods split across two modules is how a fifth ends up in a third.
+- `core/tax/year.py` — assessment to a year, netting, carryforward, **and
+  `AnnualStatement`**. The draft put the statement under `core/results/`, which is an import
+  cycle and not a preference: `core.results.fund` and `core.results.project` both import
+  `core.tax.year` for the charge memo, so the module that produces statements cannot import
+  them back out of `results/`. Nothing would have caught it mechanically —
+  `.importlinter` declares no layer contract *inside* `terezy.core`, so the reverse direction
+  is only forbidden by the cycle itself.
+- `core/results/tax_year.py` — `settle`, the payment record, and the settlement refusals: the
+  half that spends money, which is a result of a run rather than a reading of the law.
+- **No `core/tax/lots.py`.** `core/ledger/lots.py` already held FIFO and LIFO, so all four
+  methods joined them there. The draft's rule decided it: keep all four together, because
+  four methods split across two modules is how a fifth ends up in a third.
+- `data/tax/timing/` — categories, deadlines and method standings; `data/scenarios/tax/` —
+  the unsettled switches.

@@ -116,6 +116,12 @@ def timing(
     The **shape** of the researched Ukrainian rule, with fixture provenance. The real dates,
     with their citations, are in ``data/tax/timing/ua.toml``; a test that needs to prove the
     dates are data changes them there and watches the payment move.
+
+    ``following`` is a **fixture choice and not the shipped one**, deliberately: it is the
+    convention that actually moves a date, so a worked example can put a deadline on a Sunday
+    and watch it land on the Monday. What ships declares ``none``, which is a claim about the
+    law rather than about a calendar, and is pinned against the file itself in
+    ``tests/contract/test_tax_declaration_loading.py``.
     """
     return tax_year.TimingRule(
         category_id=category_id,

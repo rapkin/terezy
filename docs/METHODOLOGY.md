@@ -2688,11 +2688,11 @@ today the nominal side of that merge is `UNASSESSED` and only the CPI side is ge
 assessed. The merge point exists so that when those records gain their kind, one caller
 changes and every real figure inherits the verdict.
 
-## 29. The tax year: assessed to a year, paid from cash, and never labelled
+## 28. The tax year: assessed to a year, paid from cash, and never labelled
 
 Feature 001 charged tax per event and left the timing open. This section is what closed it.
 
-### 29.1 A charge assesses; a payment settles
+### 28.1 A charge assesses; a payment settles
 
 The predecessor deducted tax from the portfolio at the moment of the trade
 (`REWRITE_BRIEF` §4.3, defect B5), and this engine did the same in miniature: the
@@ -2716,7 +2716,7 @@ Accrual rather than payment is a claim about the *paper*: what the holding earns
 tax on it costs. *When* the money leaves is a fact about the owner's tax year, and that is
 `core.results.tax_year.settle`.
 
-### 29.2 The order the law puts the arithmetic in
+### 28.2 The order the law puts the arithmetic in
 
 Per `(tax year x declared income category)`, for a category whose declared treatment is
 `nets`:
@@ -2739,14 +2739,14 @@ is also what keeps a class whose rate changes mid-year computable. A category de
 `outside` (exempt securities) nets with nothing on **either** side: no tax on an exempt gain,
 and **no shield from an exempt loss**.
 
-### 29.3 A year with a mid-year rate change refuses
+### 28.3 A year with a mid-year rate change refuses
 
 A netting category charges one annual result, so it needs one pair of rates. Where a year's
 items fall under two dated entries the assessment **refuses** rather than splitting the base,
 because no source says how an annual base is split across a change. The evidence that this is
 genuinely open: the 2024 levy rise needed its own law to answer exactly that question.
 
-### 29.4 Filing is an input, and not filing has a price
+### 28.4 Filing is an input, and not filing has a price
 
 Whether the owner filed is declared per year with no default. `"The tool assumed you filed"`
 and `"the tool assumed you did not"` are different wrong answers and each silently changes the
@@ -2762,7 +2762,7 @@ filed. Cumulative rather than per-year, because a single year cannot answer the 
 under the chain-restorable reading below, an unfiled year pays early and the year that absorbs
 the loss pays less, and only the running total says whether anything was actually lost.
 
-### 29.5 Four methods, four figures, and none of them is the liability
+### 28.5 Four methods, four figures, and none of them is the liability
 
 The Tax Code prescribes **no** basis method — settled by absence. Tax-service guidance
 recognises costs proportionally, which is average cost over the packet, for a self-declaring
@@ -2790,7 +2790,7 @@ consumes exactly the lot the disposal names and refuses — naming the lot and t
 when it cannot; naming a lot under any other method is a conflict rather than a hint, because
 ignoring it would tax a basis the owner did not choose.
 
-### 29.6 Two questions the law does not answer, and how they are carried
+### 28.6 Two questions the law does not answer, and how they are carried
 
 Each is a declared switch under `data/scenarios/tax/`, with no default, labelled on every
 figure whose arithmetic **actually** rests on it — a label on everything is a label a reader
@@ -2800,12 +2800,12 @@ learns to ignore.
 the immediately previous year's declaration, and no ruling was found on restoring a broken
 chain. Both branches are modelled and they give different tax.
 
-*Which source-backed method governs a self-declarant?* See §29.5.
+*Which source-backed method governs a self-declarant?* See §28.5.
 
 Each records an individual tax consultation (art. 52 PKU) as the citation that would retire
 the label.
 
-### 29.7 When the cash is not there
+### 28.7 When the cash is not there
 
 The liability is paid from the tax-currency balance on the declared due date. If the balance
 is smaller, the run stops with a typed report naming the liability, the cash available, the
@@ -2818,7 +2818,7 @@ A liability assessed inside the horizon but due after it is reported as an open 
 rather than dropped: a closing balance that quietly absorbed next August's tax bill would
 overstate the outcome by exactly the tax.
 
-### 29.8 What is declared, and the one value that is not researched
+### 28.8 What is declared, and the one value that is not researched
 
 `data/tax/timing/<jurisdiction>.toml` declares the categories with their netting treatment and
 carryforward rule, the deadlines and settlement behaviour, and what the sources say about each
@@ -2832,7 +2832,7 @@ attested. When it is found, one field changes and no source does.
 
 ---
 
-## 28. Where to look next
+## 29. Where to look next
 
 | question | file |
 | --- | --- |

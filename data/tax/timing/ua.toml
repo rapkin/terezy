@@ -23,6 +23,11 @@
 # and adds no claim of its own. `following` would assert that the law grants an extension,
 # which is a second legal fact nobody has attested. When the rule is found, changing this one
 # field moves every payment event and no source changes.
+#
+# It is unresearched for ALL THREE categories, and each one's `note` says so, because the note
+# is the half that travels: it becomes `TimingRule.note` and reaches a reader beside the
+# figure, while this header stays in the file. A gap flagged only where the file is opened is
+# a gap nobody downstream is told about.
 
 [timing]
 jurisdiction = "ua"
@@ -58,7 +63,7 @@ declare_by_day        = 1
 pay_by_month          = 8
 pay_by_day            = 1
 non_business_day_rule = "none"
-note                  = "Distributions from a collective-investment institution are a separate kind of passive income (пп. 167.5.4 ПКУ), outside the investment-profit calculation entirely: nothing nets, and an investment loss never reduces them. Each payout is charged on its own, at the rate in force on its own date — which is also what keeps a class whose rate changes mid-year computable, where a netting category would have to refuse."
+note                  = "Distributions from a collective-investment institution are a separate kind of passive income (пп. 167.5.4 ПКУ), outside the investment-profit calculation entirely: nothing nets, and an investment loss never reduces them. Each payout is charged on its own, at the rate in force on its own date — which is also what keeps a class whose rate changes mid-year computable, where a netting category would have to refuse. NON_BUSINESS_DAY_RULE IS NOT RESEARCHED — see the header."
 kind                  = "tax_rule"
 source                = "https://zakon.rada.gov.ua/laws/show/2755-17 — Податковий кодекс України, пп. 167.5.4 (9% on dividends from collective-investment institutions and non-payers of CIT); accessed 2026-08-22. Deadlines as for investment_profit above."
 retrieved_on          = "2026-08-23"
@@ -74,7 +79,7 @@ declare_by_day        = 1
 pay_by_month          = 8
 pay_by_day            = 1
 non_business_day_rule = "none"
-note                  = "Operations in securities whose income is exempt (OVDP, пп. 165.1.52 ПКУ) stand outside the investment-profit calculation on BOTH sides: the income is excluded and so are the costs (пп. 170.2.8 останній абзац, пп. 164.2.9). The consequence that must be modelled is the unwelcome half — an exempt loss buys no tax shield. Zero is charged per event and cited there; the deadlines are declared because a category with no timing rule cannot be assessed at all, and they never produce a payment because nothing is ever owed."
+note                  = "Operations in securities whose income is exempt (OVDP, пп. 165.1.52 ПКУ) stand outside the investment-profit calculation on BOTH sides: the income is excluded and so are the costs (пп. 170.2.8 останній абзац, пп. 164.2.9). The consequence that must be modelled is the unwelcome half — an exempt loss buys no tax shield. Zero is charged per event and cited there; the deadlines are declared because a category with no timing rule cannot be assessed at all, and they never produce a payment because nothing is ever owed. NON_BUSINESS_DAY_RULE IS NOT RESEARCHED — see the header."
 kind                  = "tax_rule"
 source                = "https://zakon.rada.gov.ua/laws/show/2755-17 — Податковий кодекс України, пп. 165.1.52 (the exemption), пп. 170.2.8 останній абзац and пп. 164.2.9 (operations excluded from the investment-profit calculation); accessed 2026-08-22."
 retrieved_on          = "2026-08-23"

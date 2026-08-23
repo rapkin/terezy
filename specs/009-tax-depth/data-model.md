@@ -11,18 +11,32 @@ that produced it** (FR-024, research.md D5).
 
 ## The tax year
 
-### `AnnualStatement` — `core/results/tax_year.py`
+### `AnnualStatement` — `core/tax/year.py`
+
+⚙ **Built in `core/tax/year.py`, not in `core/results/`.** Putting it under `results/` would
+be an import cycle rather than a preference: `core.results.fund` and `core.results.project`
+both import `core.tax.year` for the charge memo, so the module that *produces* statements
+cannot also import them from `results/`. Nothing mechanical would have caught it —
+`.importlinter` declares no layer contract inside `terezy.core` — which is why it is recorded
+here. `core/results/tax_year.py` keeps the half that spends money: `settle`, the payment
+record, and the settlement refusals.
 
 | Field | Type | Meaning |
 |---|---|---|
 | `tax_year` | `int` | |
 | `category` | `str` | Declared income category; one statement per category per year (FR-001) |
+| `treatment` | `Treatment` | How the year was assembled — nets, per event, or outside |
 | `charges` | `tuple[ChargeRef, ...]` | Each traceable to its event and its rule (FR-002) |
 | `netted_base` | `Money` | Gains less losses within the year (FR-013) |
-| `carried_in` | `Money` | Loss brought forward, zero in the unfiled branch |
+| `carryforward` | `CarryforwardState \| None` | `None` for a category that carries no losses |
 | `liability` | `AssessedLiability` | Never a bare `Money` — see below |
-| `method` | `LotMethod` | Which selection method produced the basis |
+| `zero_because` | `ZeroReason \| None` | Exemption, netting, or nothing happened (FR-006) |
+| `settlement`, `due_on` | | The declared behaviour and the date it is payable |
 | `unsettled` | `tuple[UnsettledSwitch, ...]` | Every declared switch this figure rests on |
+
+**No `method` field on the statement.** The method is reachable only through `liability`,
+which also carries the standing behind it — so there is no field a reader can take the method
+from while leaving the citation behind, and no second copy to drift from the first.
 
 ### `AssessedLiability`
 
@@ -30,8 +44,10 @@ that produced it** (FR-024, research.md D5).
 |---|---|---|
 | `pit` | `Money` | |
 | `levy` | `Money` | Assessed on the **same netted base** as the PIT (FR-017) |
-| `method` | `LotMethod` | Repeated here deliberately: a liability lifted out of its statement still says what produced it |
-| `rests_on` | `Provenance` | The rate entries, the due-date rule, the carryforward rule |
+| `base` | `Money` | The netted, carryforward-reduced figure both rates were applied to |
+| `method` | `LotMethod` | The method the ledger's disposals were consumed by, checked against `LedgerState.consumption_method` rather than stamped |
+| `standing` | `MethodStanding` | What the law is found to say about that method |
+| `rests_on` | `Provenance` | The rate entries, the timing rule, the category, the standing |
 
 **There is no field named `total` alone** and no constructor that produces a liability
 without a method. FR-024's "no figure may be labelled the tax you would owe" is enforced by
@@ -81,11 +97,16 @@ invariant.**
 
 ## Refusals
 
+Named as designed; the implementation's own names are in the two `year.py` modules, and
+where they differ they are wider rather than different (`TimingRuleUndeclared` covers the
+whole timing rule, not only the due date).
+
 | Record | When |
 |---|---|
 | `DueDateRuleUndeclared` | A taxable event with no declared rule (FR-005) |
 | `FilingStatusUndeclared` | The loss-year branch not stated (FR-014) |
 | `MethodUndeclared` | A disposal with no method named (FR-024) |
+| `MethodDisagreesWithLedger` | The method a year is assessed under is not the one its disposals were consumed by (FR-024) |
 | `LotNotNamed` | Specific-lot without a named lot (FR-021) |
 | `LotNamedUnderWrongMethod` | A lot named under any other method (FR-022) |
 | `InsufficientCashForTax` | Shortfall, date and statement named; nothing sold (FR-009, D7) |
