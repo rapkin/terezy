@@ -85,6 +85,11 @@ after = ["003-route-coverage"]
 note  = "a spendable destination satisfies its own exit by identity (003 FR-002, owner decision 2026-08-23), and the sentinel supersedes any exit routes actually declared from it -- so those declarations appear nowhere in the report: not relied on, not orphaned, not a deficit. Unreachable in the shipped registry, where nothing exits a spendable venue, and stated at three sites rather than hidden. Making them visible costs the mirror with satisfied-by-arrival, which is why it is the owner's call and not the implementer's"
 
 [[future]]
+id    = "identity-exit-vs-partner-requirement"
+after = ["003-route-coverage"]
+note  = "FR-002's owner decision (2026-08-23) and 002's FR-030 can disagree: an inbound route landing on a spendable endpoint with no declared partner_route gives coverage Ready by identity and costing ExitCostUnknown -- a genuine FR-018 violation, which FR-018 says must not exist. Unreached today: the SC-009 generator is partner-closed by its own scoping rule, and every declared route into monobank_uah is an exit. Composition (004) or one new corridor makes it real, and then it needs a decision rather than a scope note"
+
+[[future]]
 id    = "instrument-access-nodes"
 after = ["004-composed-paths"]
 note  = "instruments as terminal nodes; 004 FR-014 deferral, owner-confirmed future need"
