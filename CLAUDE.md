@@ -45,6 +45,19 @@ concise body, no `Co-Authored-By` or other attribution trailers).
 exactly that. The commit grant is about not making the user click a button, not about
 rewriting history.
 
+**`/condense` runs after the work is green and before the review.** It reads the branch diff
+and cuts what does not earn its place, in prose **and** in code, on one rule: **one fact, one
+place**. A comment claiming what another module does, a helper restating a computation, two
+fields holding one truth — all the same shape, and in this repository the duplicate is where
+the drift happened every time. It keeps what prevents a named defect and what makes a wrong
+state unrepresentable; collapsing a tagged union into a flag is not simplification, it is
+moving the complexity into the reader's head.
+
+**Before the review, not after**, for two reasons: the review then reads what will land, and
+its own check on unverifiable claims applies to the condensed version rather than to prose
+about to be deleted. It is also the one pass that re-reads every comment on the branch, which
+is where a stale claim otherwise survives.
+
 **A code review is a blocking gate before anything lands on `main`.** Not a courtesy pass
 and not something to note as skipped: run `/code-review` over the diff and iterate until it
 comes back clean. It is the only gate that catches what the machine cannot — a guard whose
@@ -154,6 +167,33 @@ the test path. That file is how we know what is actually covered.
 An undocumented formula is an incomplete feature. Every metric carries a plain-language
 definition; every tax figure links to its rule, source and verification date;
 `docs/METHODOLOGY.md` is updated in the same change as the formula it describes.
+
+**A comment describes its own subject and nothing else.** This is the rule that keeps the
+rest honest, and it is not a style preference — it is what stops prose going stale. A
+docstring explaining why *this* function does what it does can only become false when the
+function changes. A docstring claiming what the registry contains, what another module does,
+or how many cases exist elsewhere becomes false the moment anything else moves, and nothing
+checks it. **A claim about behaviour outside the thing you are annotating is a test, or it is
+not written.**
+
+On 2026-08-23 one day's reviews found seven pieces of prose that had become false: a count
+that said three where its own list said four, "a fund implements `Instrument`" over a dead
+method, "a declared name can never forge a label field" over an open hole, a docstring
+teaching a rule the code never had, and a section of `METHODOLOGY.md` silently reverted by a
+merge. Every one was caught by expensive review. Half of `core/` is prose; that is where the
+staleness lives.
+
+**Prose earns its place by preventing a named defect.** A decision taken against an obvious
+alternative, a trap with a name, a gap stated with its date. Restating what the code says
+earns nothing, and restating the constitution earns less — it is already written down, and
+the copy is what drifts.
+
+**Prefer the mechanical form.** Where a claim is worth making, it is usually worth asserting:
+`scripts/check_methodology_refs.py`, a scan that pins how many places construct a record, an
+`emitted == applied` equality. A check cannot go stale silently; a sentence can.
+
+Reviews treat prose that makes an unverifiable claim about elsewhere as a finding, at the
+same weight as a guard whose message is false — because it is the same defect.
 
 ## Privacy
 
