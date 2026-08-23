@@ -61,6 +61,7 @@ EXEMPT_CLASS = "ua_government_bond"
 DISTRIBUTION_CLASS = "ua_ci_fund_distribution"
 DISPOSAL_CLASS = "ua_investment_profit"
 REIT = "inzhur_reit"
+MILTECH = "inzhur_miltech"
 FUND_C = "synthetic_fund_c"
 FIXTURE_PAYOUT_CLASS = "synthetic_fund_payout"
 FIXTURE_DISPOSAL_CLASS = "synthetic_fund_disposal"
@@ -184,6 +185,7 @@ class TestEveryDeclarationAndVersionThatFedTheRun:
             ("instrument", ISSUE_A),
             ("instrument", ISSUE_B),
             ("fund", REIT),
+            ("fund", MILTECH),
             ("fund", FUND_C),
             ("tax_class", EXEMPT_CLASS),
             ("tax_class", DISTRIBUTION_CLASS),
@@ -219,6 +221,7 @@ class TestEveryDeclarationAndVersionThatFedTheRun:
             ISSUE_A: f"instruments/{ISSUE_A}.toml",
             ISSUE_B: f"instruments/{ISSUE_B}.toml",
             REIT: f"instruments/{REIT}.toml",
+            MILTECH: f"instruments/{MILTECH}.toml",
             FUND_C: f"instruments/{FUND_C}.toml",
             EXEMPT_CLASS: "tax/ua.toml",
             DISTRIBUTION_CLASS: "tax/ua.toml",
@@ -240,6 +243,7 @@ class TestEveryDeclarationAndVersionThatFedTheRun:
             ISSUE_A: DATA_ROOT / "instruments" / f"{ISSUE_A}.toml",
             ISSUE_B: DATA_ROOT / "instruments" / f"{ISSUE_B}.toml",
             REIT: DATA_ROOT / "instruments" / f"{REIT}.toml",
+            MILTECH: DATA_ROOT / "instruments" / f"{MILTECH}.toml",
             FUND_C: DATA_ROOT / "instruments" / f"{FUND_C}.toml",
             EXEMPT_CLASS: DATA_ROOT / "tax" / "ua.toml",
             DISTRIBUTION_CLASS: DATA_ROOT / "tax" / "ua.toml",

@@ -262,19 +262,19 @@ hurdle rate.
 the declared rate, and check the pro-rata accrual, the spread, the disposal tax and the
 net outcome by hand.
 
-- [ ] T039 [US4] Declare `data/instruments/inzhur_miltech.toml` — minimum ticket, term to
+- [x] T039 [US4] Declare `data/instruments/inzhur_miltech.toml` — minimum ticket, term to
       2029-11-06, subscription cutoff 2026-12-31, the 25–29% fund-stated range, the fee
       facts as recorded context and the commission as a verification task — with
       citations and empty verification dates (FR-026, FR-028)
-- [ ] T040 [US4] Write the failing worked example for the accumulation projection: no
+- [x] T040 [US4] Write the failing worked example for the accumulation projection: no
       invented distribution events, pro-rata accrual over the declared yield, the exit
       taxed under the disposal class, and the round-trip spread erosion reconciling
       exactly with the named lines, in `tests/worked_examples/test_declared_yield.py`
       (SC-012, FR-023, FR-024)
-- [ ] T041 [US4] Implement the range discipline in `src/terezy/core/results/fund.py`: a
+- [x] T041 [US4] Implement the range discipline in `src/terezy/core/results/fund.py`: a
       range projects to a range, an explicitly declared `ChosenPoint` is labelled the
       owner's assumption, and **there is no midpoint helper** (research.md D11, SC-013)
-- [ ] T042 [US4] Report the after-spread, after-tax outcome beside 001's hurdle rate with
+- [x] T042 [US4] Report the after-spread, after-tax outcome beside 001's hurdle rate with
       the route-costs-excluded statement on its face, in
       `src/terezy/core/results/fund.py`, asserted in
       `tests/worked_examples/test_declared_yield.py` (FR-025, SC-013)

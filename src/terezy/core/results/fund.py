@@ -55,11 +55,12 @@ from terezy.core.instruments.fund import (
 from terezy.core.ledger import engine
 from terezy.core.ledger.engine import LedgerState
 from terezy.core.ledger.events import CausationKind, CausationRef, Event, EventKind
-from terezy.core.primitives import money
+from terezy.core.primitives import conventions, money
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance
+from terezy.core.results.hurdle import HurdleRate
 from terezy.core.tax import registry as tax_registry
 from terezy.core.tax.interface import TaxableEventKind, TaxCharge, TaxClass, TaxContext
 from terezy.core.tax.schedule import RateEntry, RateUndeclaredBefore, rate_on
@@ -555,6 +556,22 @@ def _refuse(
                 f"before this purchase settles {holding.purchased_on.isoformat()}. There "
                 "is no holding period to project, and a zero-length one would report a "
                 "fund that paid nothing rather than one that could not be bought."
+            ),
+        )
+
+    chosen = assumptions.yield_point
+    declared = declaration.declared_yield
+    if chosen is not None and not declared.low <= chosen.rate <= declared.high:
+        return InconsistentTerms(
+            first_term="assumptions.yield_point.rate",
+            second_term="fund.declared_yield",
+            reason=(
+                f"the chosen rate {chosen.rate!r} lies outside the range "
+                f"{declared.low!r} to {declared.high!r} that {declaration.id!r} states. A "
+                "point outside the fund's own range is not a choice within it: it is a "
+                "different claim about the fund, and it would be reported under the "
+                "fund's citation. Refused rather than clamped to the nearer end, which "
+                "would silently change the owner's stated assumption."
             ),
         )
 
@@ -1355,3 +1372,106 @@ def _rests_on(
         for fee in declaration.fee_context
     )
     return tuple(stated)
+
+
+# ---------------------------------------------------------------------------
+# Beside the hurdle rate
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class BesideTheHurdle:
+    """A fund's after-spread, after-tax outcome next to feature 001's tax-free benchmark.
+
+    FR-025. The comparison exists because a fund-stated 25-29% next to a 15.5% exempt
+    government bond is the exact place false precision does its damage, and the honest
+    answer is arithmetic rather than a verdict: here is what survives the spread and the
+    tax, here is what the benchmark pays, and here is everything the comparison leaves out.
+
+    **The excluded terms are on the record's face, not in a footnote** (Principle VI). This
+    compares an instrument against an instrument. The funding route in and the exit route
+    out are the largest missing numbers, and naming them is what stops this being read as
+    a decision.
+    """
+
+    instrument_id: str
+    fund_net_simple_annual: float
+    """Net profit over what was invested, over the holding's years. Simple, not
+    compounded, because the fund states a simple rate and compounding one would report a
+    figure it never claimed."""
+
+    hurdle_nominal_ytm: float
+    """Feature 001's benchmark: the tax-free yield every other option has to beat."""
+
+    difference: float
+    """``fund - hurdle``. Negative means the benchmark wins, which is a real outcome and
+    is reported as plainly as the other one."""
+
+    years: float
+    """The holding period the fund figure is annualised over, by the fund's own day count."""
+
+    excludes: tuple[str, ...]
+    rests_on: tuple[str, ...]
+    provenance: Provenance
+    """The union of both sides' marks: an unverified fund term marks the comparison."""
+
+
+def beside_hurdle(
+    declaration: FundDeclaration,
+    holding: Holding,
+    projection: FundProjection,
+    hurdle: HurdleRate,
+) -> BesideTheHurdle | InconsistentTerms:
+    """Put one fund projection beside one hurdle rate, with what it excludes attached.
+
+    The fund figure is ``net profit / invested / years``: everything the holding returned
+    after the spread and after tax, as a simple annual rate over the period actually held.
+    Read off the projection's own ledger totals rather than recomputed, so it cannot
+    disagree with the lines above it.
+
+    Refuses where the holding has no measurable length -- a projection whose events all
+    fall on one day annualises to a division by zero, and a large number produced that way
+    would be the most confident figure in the output and the least meaningful.
+    """
+    invested = -_purchase_amount(projection)
+    ends_on = _ends_on(projection)
+    years = conventions.day_count(declaration.day_count)(holding.purchased_on, ends_on)
+    if years <= 0.0 or invested <= 0.0:
+        return InconsistentTerms(
+            first_term="holding.purchased_on",
+            second_term="the projection's last event",
+            reason=(
+                f"{declaration.id!r} was held from {holding.purchased_on.isoformat()} to "
+                f"{ends_on.isoformat()} for {invested!r} — a period or an amount of zero. "
+                "There is no annual rate for a holding of no length or no size, and "
+                "producing one by dividing would put the most confident figure in the "
+                "output where the least meaningful one belongs."
+            ),
+        )
+    net = projection.net_proceeds.amount / invested / years
+    return BesideTheHurdle(
+        instrument_id=declaration.id,
+        fund_net_simple_annual=net,
+        hurdle_nominal_ytm=hurdle.nominal_ytm.value,
+        difference=net - hurdle.nominal_ytm.value,
+        years=years,
+        excludes=projection.excludes,
+        rests_on=projection.rests_on,
+        provenance=prov.merge(projection.provenance, hurdle.provenance),
+    )
+
+
+def _purchase_amount(projection: FundProjection) -> float:
+    """What the purchase cost, signed as the ledger holds it: negative, money going out."""
+    for event in projection.ledger.applied:
+        if event.kind is EventKind.PURCHASE:
+            return event.amount.amount
+    raise LedgerInvariantError(  # pragma: no cover -- every fund run opens with a purchase
+        "a fund projection has no purchase event, so there is nothing it was measured "
+        "against. Every run opens with one."
+    )
+
+
+def _ends_on(projection: FundProjection) -> date:
+    """The date the last thing happened: the exit's settlement, or the last payout."""
+    return max(event.occurred_on for event in projection.ledger.applied)

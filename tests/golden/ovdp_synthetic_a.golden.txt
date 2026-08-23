@@ -30,6 +30,7 @@ canonical_encoding terezy-canonical-v2
 
 == inputs ==
 
+fund       inzhur_miltech       instruments/inzhur_miltech.toml          sha256:ca7d6102b87f7d5f672c6d8084e332ffc892b800f8a332505d716ca76fab4ec7
 fund       inzhur_reit          instruments/inzhur_reit.toml             sha256:78acd50bbf250fc53692bfb863b698536c2ff653672ab9176877dc1a4113165e
 fund       synthetic_fund_c     instruments/synthetic_fund_c.toml        sha256:39ed338a5a88918dfd813a2b0401e6fca6172ad9c10eebf21c32d77c361a232a
 instrument ovdp_synthetic_a     instruments/ovdp_synthetic_a.toml        sha256:6d6fcafc9e3da360c2f2c523704b488065f253c2db5fce362b3ad72cd6b5e49e

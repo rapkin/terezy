@@ -1,0 +1,135 @@
+# Inzhur MilTech — a real, buyable fund, researched from its own primary documents.
+#
+# **RESEARCHED IS NOT VERIFIED.** Every value below was read on 2026-08-22 from the fund's
+# регламент (ред. 15.07.2026), its проспект (15.07.2026), its fund page and Inzhur's launch
+# news of 12.08.2026. Every `verified_on` is EMPTY until the owner checks it against his
+# investor cabinet, and the mark propagates to every figure derived from these terms.
+#
+# **THIS IS AN ASSUMPTION-DRIVEN INSTRUMENT**, and it is the one where honesty is hardest:
+# a fund-stated 25–29% sitting next to a 15.5% tax-exempt government bond invites exactly
+# the false precision this project exists to refuse. No volatility, no Sharpe, no
+# statistical metric may ever be emitted for it. The tool's job is the erosion arithmetic —
+# how much of the stated rate survives the entry/exit spread and the 23% disposal tax —
+# reported beside the hurdle rate, on a rate clearly labelled as the fund's own statement.
+#
+# **THE RATE IS A RANGE AND STAYS A RANGE.** 25–29% is two numbers the fund published, not
+# a figure with error bars. A projection reports both ends, or a point the owner chose and
+# labelled his own. There is no midpoint anywhere in this project, and that absence is the
+# requirement: the midpoint of a fund-stated range is the most seductive invented number in
+# the whole feature, because it looks like arithmetic.
+#
+# **AN ACCUMULATION FUND: no `[instrument.distribution]` table at all.** MilTech owes no
+# dividend. That is a declared fact rather than a missing section, and it is why nothing
+# invents a payout for it: the whole declared rate accretes to NAV and comes out at the
+# exit, taxed once as investment profit rather than monthly as a distribution.
+#
+# **RECORDED CONTEXT, NOT MODELLED FLOWS** (owner decision B). The underlying bonds pay
+# 35-day coupons which reinvest into net asset value, and they mature in July 2029, four
+# months before the fund's own end. Neither is modelled as a term: they are the mechanism
+# behind the declared rate, and modelling them would mean inventing the fund's book from
+# outside. The fee clauses are recorded the same way, as `[[instrument.fee_fact]]`.
+#
+# **MilTech's outcome distribution is out of scope**, explicitly: the probability of total
+# loss, of return of capital, of the target and of the upside are the owner's assumptions
+# and belong to the decision layer (`SIMULATOR_SPEC.md` §11 item 6). Nothing here weights
+# anything by a probability.
+
+[instrument]
+id                   = "inzhur_miltech"
+name                 = "Inzhur MilTech — closed-end non-diversified venture fund (ЗНПІФ), accumulation"
+class                = "collective_investment_fund"
+unit_currency        = "UAH"
+is_assumption_driven = true
+day_count            = "act/365"
+terminates_on        = "2029-11-06"
+subscription_cutoff  = "2026-12-31"
+
+  [instrument.nav]
+  per_unit     = 1006.97
+  kind         = "fund_terms"
+  source       = "https://www.inzhur.reit/offer/inzhur-miltech — the live entry price per certificate, accessed 2026-08-22, against a nominal of 1 000.00 грн. Read as the net asset value because the entry price sits only 0.7% above nominal on a fund registered 06.05.2026 and launched 12.08.2026, which is consistent with NAV having accreted and NO markup being charged rather than with a markup on nominal. Verification task 1 exists to settle exactly that."
+  retrieved_on = "2026-08-22"
+  verified_on  = ""
+
+  [instrument.declared_yield]
+  low_pct      = 25.0
+  high_pct     = 29.0
+  basis        = "simple_annual"
+  kind         = "fund_stated_yield"
+  source       = "https://www.inzhur.reit/offer/inzhur-miltech — the fund's stated 25–29% simple annual in hryvnia, accessed 2026-08-22. A RANGE THE FUND STATES ABOUT ITSELF. Not a promise, not a measurement, and not to be collapsed to a point: reported at both ends, or at a point the owner chooses and labels his own."
+  retrieved_on = "2026-08-22"
+  verified_on  = ""
+
+  # No [instrument.distribution] table: MilTech owes no dividend. See the header.
+
+  [instrument.spread]
+  entry_markup_max_pct   = 1.0
+  exit_discount_max_pct  = 1.0
+  live_entry_markup_pct  = 0.0
+  live_exit_discount_pct = 0.0
+  kind                   = "fund_terms"
+  source                 = "Регламент ЗНПІФ «Inzhur MilTech» (ред. 15.07.2026) for the maxima — an entry markup of up to 1% of NAV and an exit discount of up to 1%. The LIVE settings are unverified inferences and recorded as such: the entry price of ≈ 1 006.97 against a nominal of 1 000.00 is consistent with no markup being charged, and Inzhur's zero-buyback-commission practice is assumed to extend to this fund. Verification tasks 1 and 3 exist to settle both, and until they are closed the live figures are the optimistic reading."
+  retrieved_on           = "2026-08-22"
+  verified_on            = ""
+
+  [instrument.liquidity.legal]
+  buyback_before_termination = "discretionary"
+  settlement_business_days   = 15
+  note                       = "The регламент owes NO buyback before the fund's termination on 2029-11-06. An earlier exit is at the manager's discretion, at a discretionary discount of up to the declared maximum, settled within 15 business days. For a fund whose underlying bonds mature in July 2029 this is close to a lock-up in practice: the guaranteed exit is the termination payout and nothing else."
+  kind                       = "fund_liquidity"
+  source                     = "Регламент ЗНПІФ «Inzhur MilTech» (ред. 15.07.2026), read in full 2026-08-22 — no redemption windows exist and no buyback obligation arises before termination."
+  retrieved_on               = "2026-08-22"
+  verified_on                = ""
+
+  [instrument.liquidity.practice]
+  settlement_business_days = 0
+  is_revocable             = true
+  note                     = "Inzhur's observed practice of buying certificates back at NAV, same day, at zero commission, ASSUMED TO EXTEND TO THIS FUND. No post-launch statement confirming that has been found — verification task 3 — so this mode is doubly unverified here: a revocable practice, and one nobody has confirmed applies."
+  kind                     = "fund_liquidity"
+  source                   = "Inzhur news of 07.04.2025 announcing the cancelled buyback commission, and the launch news of 12.08.2026, accessed 2026-08-22."
+  retrieved_on             = "2026-08-22"
+  verified_on              = ""
+
+  [instrument.constraints]
+  minimum_units = 1.0
+  kind          = "venue_terms"
+  source        = "https://www.inzhur.reit/offer/inzhur-miltech — the minimum purchase is one certificate of 1 000.00 грн nominal, accessed 2026-08-22."
+  retrieved_on  = "2026-08-22"
+  verified_on   = ""
+
+  [instrument.tax_classes]
+  disposal_gain = "ua_investment_profit"
+
+  [[instrument.fee_fact]]
+  what         = "Management fee of up to 2% a year of average net asset value, accrued at one twelfth monthly and pro-rata reduced in a month the fund underperforms a 28% benchmark."
+  kind         = "fund_terms"
+  source       = "Регламент ЗНПІФ «Inzhur MilTech» (ред. 15.07.2026), read 2026-08-22. Recorded as context for the declared net yield; nothing accrues from it (owner decision B)."
+  retrieved_on = "2026-08-22"
+  verified_on  = ""
+
+  [[instrument.fee_fact]]
+  what         = "NO performance-fee clause. A deliberate absence in the регламент, recorded because an absence a reader has to infer is one they will assume the other way round."
+  kind         = "fund_terms"
+  source       = "Регламент ЗНПІФ «Inzhur MilTech» (ред. 15.07.2026), read in full 2026-08-22 — no performance fee is provided for, unlike the REIT's регламент."
+  retrieved_on = "2026-08-22"
+  verified_on  = ""
+
+  [[instrument.verification_task]]
+  question    = "Whether the 1% entry markup and the 1% exit discount are currently charged on MilTech: the entry price of ≈ 1 006.97 against a nominal of 1 000.00 suggests no markup, but that reading assumes NAV has accreted rather than a markup being applied. Verify the live buy and sell prices in the investor cabinet."
+  searched    = "The fund page and Регламент ЗНПІФ «Inzhur MilTech» (ред. 15.07.2026)"
+  searched_on = "2026-08-22"
+
+  [[instrument.verification_task]]
+  question    = "The ІНЖУР КЕПІТАЛ investment-firm commission amount, if any."
+  searched    = "Регламент ЗНПІФ «Inzhur MilTech» (ред. 15.07.2026), Проспект (15.07.2026) and the fund page"
+  searched_on = "2026-08-22"
+
+  [[instrument.verification_task]]
+  question    = "A post-launch statement that the zero-buyback-commission practice covers MilTech and not only the REIT."
+  searched    = "Inzhur news of 07.04.2025 and the launch news of 12.08.2026"
+  searched_on = "2026-08-22"
+
+  [[instrument.verification_task]]
+  question    = "Whether any organized secondary market exists for MilTech certificates."
+  searched    = "Регламент ЗНПІФ «Inzhur MilTech» (ред. 15.07.2026) and the fund page"
+  searched_on = "2026-08-22"
