@@ -124,6 +124,7 @@ class NothingToDraw:
 
 
 from terezy.api.diagrams.graph import render_graph  # noqa: E402
+from terezy.api.diagrams.path import render_path  # noqa: E402
 
 __all__ = [
     "Diagram",
@@ -131,4 +132,5 @@ __all__ = [
     "Mode",
     "NothingToDraw",
     "render_graph",
+    "render_path",
 ]

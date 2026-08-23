@@ -134,6 +134,20 @@ had would be exactly the laundering ``core.primitives.provenance`` was built to 
 it*, and here there is no source to check.
 """
 
+UNASSESSED: Final = "AGE NOT ASSESSED"
+"""What a figure says when nothing aged its sources against a threshold.
+
+The third state that is the absence of a mark, and it exists for exactly the reason
+``core.primitives.staleness.UNASSESSED`` does: "everything was checked and nothing is stale"
+and "nobody checked" must not be the same value, or the second one wears the first one's green
+tick. A costed path reads staleness out of the verdict its result carries, and a source that
+verdict never assessed cannot be called current.
+
+The wording avoids the word *stale* on purpose: ``"STALENESS NOT ASSESSED"`` contains the
+``STALE`` token as a substring, so ``token(Mark.STALE) in label`` -- the question every mark
+assertion asks of a diagram -- would answer yes for a label saying the opposite.
+"""
+
 PREFIX: Final = "marks: "
 """How a marks segment begins, so a reader and a test can find it in a label."""
 
@@ -155,15 +169,23 @@ def token(mark: Mark) -> str:
     return _TOKEN[mark]
 
 
-def segment(applicable: Iterable[Mark], *, unsourced: bool = False) -> str:
+def segment(applicable: Iterable[Mark], *, unsourced: bool = False, assessed: bool = True) -> str:
     """The marks field of a label: every mark that applies, or the named absence of one.
 
     The order is the enum's, never the caller's and never a ``set``'s, because byte-identity
-    for identical input (FR-016) reaches all the way down to this. ``unsourced`` comes first
-    when it applies, since "there is no source" frames everything after it.
+    for identical input (FR-016) reaches all the way down to this. The two "no mark applies"
+    states come first when they apply, since each frames everything after it: "there is no
+    source" and "nobody aged the sources there are".
+
+    ``assessed=False`` is what stops :data:`CLEAN` being a claim nobody made. A label may only
+    say ``VERIFIED AND CURRENT`` when something actually aged its sources against a declared
+    threshold. It is suppressed under ``unsourced``, where there was nothing to age: two
+    tokens saying the same absence twice would read as two separate problems.
     """
     named = set(applicable)
     tokens = [UNSOURCED] if unsourced else []
+    if not assessed and not unsourced:
+        tokens.append(UNASSESSED)
     tokens.extend(_TOKEN[mark] for mark in Mark if mark in named)
     return PREFIX + JOIN.join(tokens or [CLEAN])
 

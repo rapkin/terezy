@@ -146,14 +146,14 @@ every label against the result's own figures — same figures, same labels, noth
 
 ### Tests first
 
-- [ ] T014 [P] [US2] Write `tests/contract/test_diagram_refusals.py`: `RouteUnusable`,
+- [x] T014 [P] [US2] Write `tests/contract/test_diagram_refusals.py`: `RouteUnusable`,
   `ExitCostUnknown` and `NothingComparable` each yield a typed `NothingToDraw` carrying the
   refusal's own reason verbatim — never an empty diagram, never a partial path; and a `RampCost`
   whose `round_trip` is `ExitCostUnknown` renders the inbound path with the *exit cost unknown*
   mark where the exit would be and **no round-trip figure anywhere** in the text; plus the
   registry-graph *no exit declared* mark for a destination nothing exits (SC-010, SC-007,
   FR-005, FR-010, FR-011, research.md D6, D7)
-- [ ] T015 [P] [US2] Write `tests/unit/test_diagram_path.py`: the drawn legs are exactly the
+- [x] T015 [P] [US2] Write `tests/unit/test_diagram_path.py`: the drawn legs are exactly the
   legs the result costed, in order; the exit route is drawn as **its own** legs and venues, never
   the inbound reversed; every cost label is explicitly one-way or round-trip; cost and
   spread-over-reference are labelled as themselves and never conflated; a leg with no figure to
@@ -162,12 +162,12 @@ every label against the result's own figures — same figures, same labels, noth
 
 ### Implementation
 
-- [ ] T016 [US2] `src/terezy/api/diagrams/path.py` — `render_path`: match on the input union;
+- [x] T016 [US2] `src/terezy/api/diagrams/path.py` — `render_path`: match on the input union;
   the inbound chain from the route's legs, the declared exit route drawn as itself, the
   route-level figures node with one-way and round-trip named separately, and `NothingToDraw` for
   every refusal. Renders what the type carries **today** — no anticipation of feature 004's
   composed paths (plan.md, "A note on the parallel lane")
-- [ ] T017 [US2] Export `render_path` from `src/terezy/api/diagrams/__init__.py`
+- [x] T017 [US2] Export `render_path` from `src/terezy/api/diagrams/__init__.py`
 
 **Checkpoint**: US1 and US2 both work independently.
 
@@ -183,7 +183,7 @@ every state visibly distinct in the text **with all styling stripped first**.
 
 ### Tests first
 
-- [ ] T018 [US3] Extend `tests/contract/test_diagram_marks.py` with the end-to-end half:
+- [x] T018 [US3] Extend `tests/contract/test_diagram_marks.py` with the end-to-end half:
   a single fixture carrying all six states renders them pairwise-distinguishable **after every
   `classDef` line and every `:::class` suffix is removed** — a mark carried only by a colour
   fails here; a closed route is present, marked, and distinct from an open one and from one that
@@ -193,7 +193,7 @@ every state visibly distinct in the text **with all styling stripped first**.
 
 ### Implementation
 
-- [ ] T019 [US3] Wire the marks through `graph.py` and `path.py`: unverified from `Provenance`,
+- [x] T019 [US3] Wire the marks through `graph.py` and `path.py`: unverified from `Provenance`,
   stale through the core's own `staleness_of` under each leg's declared kind, synthetic from the
   citation token, closed from the declared status, *no exit declared* computed here from the
   declarations, *exit cost unknown* from the result. Add the `classDef` block as emphasis only

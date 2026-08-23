@@ -35,12 +35,21 @@ from datetime import date
 from pathlib import Path
 from typing import Final
 
-from terezy.api.diagrams import Diagram, Mode, render_graph
+from terezy.api.diagrams import Diagram, Mode, NothingToDraw, render_graph, render_path
+from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance, SourceRef
 from terezy.core.primitives.staleness import ObservationKind
+from terezy.core.results.ramp import (
+    ExitCostUnknown,
+    NothingComparable,
+    RampCost,
+    RouteUnusable,
+)
+from terezy.core.routes import cost
 from terezy.core.routes.legs import FX, TRANSFER, Leg, Route, RouteDirection, RouteStatus
+from terezy.core.routes.path import FundingPath
 from terezy.core.routes.venues import Venue
 from terezy.core.scenarios.regimes import Regime
 from terezy.data.declarations import loader, resolver
@@ -434,3 +443,96 @@ def labels_by_route(text: str) -> dict[str, str]:
             continue
         grouped.setdefault(named.group(1), []).append(found.group(1))
     return {route_id: "\n".join(labels) for route_id, labels in grouped.items()}
+
+
+P2P_ROUTE: Final = "monobank_to_binance_p2p"
+"""§4.3.1's corridor, and the one the costed-path golden depicts. Round trip through its
+declared partner ``binance_p2p_to_monobank`` -- an exit route with its own legs, never the
+inbound chain reversed (feature 002's FR-027)."""
+
+UAH_STREAM: Final = "salary_uah"
+USD_STREAM: Final = "contract_usd"
+
+NO_PARTNER_ROUTE: Final = "coinbase_to_ibkr"
+"""The one shipped route declaring no ``partner_route``, so costing it yields
+``ExitCostUnknown`` -- the state FR-010 and SC-007 are about. It exists only under the
+``normalized`` regime."""
+
+AMOUNT: Final = 10_000.0
+"""What the golden path sends. Shared with ``tests/golden/test_ramp_comparison.py`` so the two
+artifacts describe the same journey."""
+
+
+def costed(
+    declared: resolver.RampDeclarations,
+    *,
+    route_id: str,
+    stream_id: str,
+    destination_id: str,
+    amount: float,
+    currency: Currency = UAH,
+) -> RampCost | RouteUnusable:
+    """One route costed through feature 002's one costing function.
+
+    Through ``cost_one`` rather than by hand: a costed-path diagram must show *the result's*
+    figures, so a fixture that built a ``RampCost`` itself would be testing the renderer
+    against numbers nobody computed.
+    """
+    return cost.cost_one(
+        FundingPath(destination_id=destination_id, stream_id=stream_id, route_id=route_id),
+        Money(amount, currency, prov.EMPTY),
+        routes=declared.routes,
+        channels=declared.channels,
+        streams=declared.streams,
+        kinds=declared.kinds,
+        on_date=AS_OF,
+        as_of=AS_OF,
+    )
+
+
+def p2p_cost(declared: resolver.RampDeclarations | None = None) -> RampCost:
+    """The §4.3.1 round trip, costed. A ``RouteUnusable`` here is a fixture failure."""
+    result = costed(
+        declared if declared is not None else shipped_declarations(),
+        route_id=P2P_ROUTE,
+        stream_id=UAH_STREAM,
+        destination_id="binance",
+        amount=AMOUNT,
+    )
+    assert isinstance(result, RampCost), result
+    return result
+
+
+def exit_unknown_cost(declared: resolver.RampDeclarations | None = None) -> RampCost:
+    """A costed route whose exit nobody has declared: one way real, round trip absent."""
+    result = costed(
+        declared if declared is not None else shipped_declarations(),
+        route_id=NO_PARTNER_ROUTE,
+        stream_id=USD_STREAM,
+        destination_id="ibkr_usd",
+        amount=1_000.0,
+        currency=USD,
+    )
+    assert isinstance(result, RampCost), result
+    return result
+
+
+CostedOutcome = RampCost | RouteUnusable | ExitCostUnknown | NothingComparable
+"""Everything ``render_path`` accepts: one costed result, or one of the three refusals."""
+
+
+def path_of(result: CostedOutcome, *, regime_id: str = "wartime") -> Diagram | NothingToDraw:
+    """Render a costed result under one declared regime."""
+    declared = shipped_declarations()
+    return render_path(
+        result,
+        routes=declared.routes,
+        regime=shipped_regime(declared, "war_end", regime_id),
+    )
+
+
+def drawn_path(result: CostedOutcome, *, regime_id: str = "wartime") -> Diagram:
+    """The same, narrowed -- a refusal here is the test's finding, not its input."""
+    rendered = path_of(result, regime_id=regime_id)
+    assert isinstance(rendered, Diagram), rendered
+    return rendered

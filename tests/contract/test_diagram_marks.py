@@ -68,10 +68,21 @@ class TestTheVocabulary:
         assert len(set(tokens)) == len(tokens)
 
     def test_no_token_is_a_substring_of_another(self) -> None:
-        """Substring collision would make ``"STALE" in text`` a lie for some other mark."""
-        tokens = [marks.token(mark) for mark in Mark]
-        for token in tokens:
-            others = [other for other in tokens if other != token]
+        """Substring collision would make ``"STALE" in text`` a lie for some other label.
+
+        Over the **whole** vocabulary, marks and the three named absences together -- which is
+        where the collision actually happened: an earlier ``"STALENESS NOT ASSESSED"``
+        contained ``STALE``, so a label saying nobody had aged the sources answered yes to
+        "is this stale?".
+        """
+        vocabulary = [marks.token(mark) for mark in Mark] + [
+            marks.CLEAN,
+            marks.UNSOURCED,
+            marks.UNASSESSED,
+        ]
+        assert len(set(vocabulary)) == len(vocabulary)
+        for token in vocabulary:
+            others = [other for other in vocabulary if other != token]
             assert not any(token in other for other in others), token
 
     def test_an_empty_mark_set_is_named_rather_than_left_as_an_empty_space(self) -> None:
@@ -101,6 +112,33 @@ class TestTheVocabulary:
         assert marks.segment((Mark.STALE, Mark.UNVERIFIED)) == marks.segment(
             (Mark.UNVERIFIED, Mark.STALE)
         )
+
+    def test_a_source_nobody_aged_is_not_reported_as_current(self) -> None:
+        """``STALENESS NOT ASSESSED`` is the third absence, and it is not :data:`CLEAN`.
+
+        The same ambiguity ``core.primitives.staleness.UNASSESSED`` exists to remove: a
+        verdict that assessed nothing must not wear a clean verdict's tick. A costed path
+        reads staleness out of the verdict its result carries, so a source that verdict never
+        looked at reaches this branch.
+        """
+        assert marks.segment((), assessed=False) == f"marks: {marks.UNASSESSED}"
+        assert marks.segment((), assessed=False) != marks.segment(())
+        assert marks.token(Mark.STALE) not in marks.segment((), assessed=False), (
+            "'nobody checked' and 'checked and found stale' are different claims, and a "
+            "label that contains the STALE token answers the wrong one"
+        )
+
+    def test_an_unsourced_figure_does_not_also_say_its_absent_sources_were_not_aged(
+        self,
+    ) -> None:
+        """Two tokens for one absence would read as two separate problems."""
+        both = marks.segment((), unsourced=True, assessed=False)
+        assert both == f"marks: {marks.UNSOURCED}"
+
+    def test_no_applicable_mark_means_no_style_class_to_apply(self) -> None:
+        """A clean element is not emphasised, because there is nothing to draw the eye to."""
+        assert marks.style_class_for(()) is None
+        assert marks.style_class_for((Mark.STALE,)) == marks.STYLE_CLASS[Mark.STALE]
 
     def test_every_mark_has_a_style_class_and_the_classes_are_distinct(self) -> None:
         """Styling is emphasis, and emphasis still has to be unambiguous."""
