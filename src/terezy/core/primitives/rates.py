@@ -61,6 +61,7 @@ from typing import Literal
 
 from terezy.core.primitives.periods import Window
 from terezy.core.primitives.provenance import Provenance
+from terezy.core.primitives.staleness import StalenessVerdict
 
 type RealBasis = Literal["realized_cpi", "declared_assumption"]
 """What a real figure rests on: measured price changes, or a declared belief.
@@ -131,9 +132,15 @@ class RealRate:
     """What this figure is real *against* (FR-011).
 
     For ``realized_cpi``, the id of the CPI series whose observations deflated it. For
-    ``declared_assumption``, the id of the declared assumption -- the same question answered
-    by the only thing there is to answer it with, so that "real against what?" always has an
+    ``declared_assumption``, the id of the declared assumption -- the same question answered by
+    the only thing there is to answer it with, so that "real against what?" always has an
     answer and never an empty string.
+
+    **Read it with :attr:`basis`, never alone.** The two id spaces are checked for uniqueness
+    separately -- one across ``data/cpi/``, one across ``data/scenarios/inflation/`` -- so a
+    belief could in principle be named after a series. The pair is what identifies the
+    deflator, and it is the pair that goes into the canonical form; a reader or a renderer
+    that showed this field without the basis beside it would be showing half an answer.
     """
 
     window: Window
@@ -151,6 +158,24 @@ class RealRate:
     this figure. Deflating a marked figure never launders the mark, and deflating by an
     unverified observation always adds one. Empty only for a figure resting on a bare owner
     belief and a nominal figure that itself rests on nothing.
+    """
+
+    staleness: StalenessVerdict
+    """Whether anything this figure rests on has aged past its kind's threshold (FR-005).
+
+    The other half of FR-013, on ``RampCost.staleness``'s precedent: an unverified mark and a
+    staleness report are different claims about an input and both must reach the figure. A
+    real figure over a long window rests on hundreds of observations, and one of them past its
+    threshold makes the figure stale -- naming that observation, its kind and the number of
+    days it is overdue.
+
+    **Merged, not chosen.** The verdict covers the CPI side and the nominal side together, so
+    a caller cannot read one and think it read both.
+
+    :data:`~terezy.core.primitives.staleness.UNASSESSED` means *nobody aged anything*, which
+    is deliberately distinguishable from a verdict that aged sources and found none stale. It
+    is what a figure carries when the run supplied no ``as_of`` -- ageing needs a date the
+    question is asked at, and this project has no clock to invent one from.
     """
 
 

@@ -59,6 +59,14 @@ ISSUE_A = "ovdp_synthetic_a"
 ISSUE_B = "ovdp_synthetic_b"
 EXEMPT_CLASS = "ua_government_bond"
 
+CPI_SERIES = "ua_cpi_monthly"
+"""The declared price series this data root holds (007)."""
+
+INFLATION_BELIEF = "owner_placeholder_inflation"
+"""The declared future-inflation belief this data root holds (007). A placeholder, and the
+manifest records it by id and by file version so a run made before the owner replaces it is
+distinguishable from one made after."""
+
 HORIZON_END = date(2028, 1, 31)
 
 
@@ -95,6 +103,7 @@ def _manifest(root: Path = DATA_ROOT) -> manifest.RunManifest:
         horizon=DateRange(start=holding.purchased_on, end=HORIZON_END),
         assumptions=synthetic.assumptions(),
         seed=None,
+        inflation=resolver.inflation_from_data_root(root),
     )
 
 
@@ -168,6 +177,11 @@ class TestEveryDeclarationAndVersionThatFedTheRun:
     def test_every_declaration_in_the_set_is_named(self) -> None:
         record = _manifest()
         assert {(ref.kind, ref.id) for ref in record.inputs} == {
+            # ⚙ The last two joined in 007. FR-015 requires the record to say which price
+            # series and which declared belief were in force, because two runs differing only
+            # in the belief are two results and nothing else in the manifest tells them apart.
+            ("cpi_series", CPI_SERIES),
+            ("inflation_assumption", INFLATION_BELIEF),
             ("instrument", ISSUE_A),
             ("instrument", ISSUE_B),
             ("tax_class", EXEMPT_CLASS),
@@ -197,6 +211,8 @@ class TestEveryDeclarationAndVersionThatFedTheRun:
         """
         files = {ref.id: ref.file for ref in _manifest().inputs}
         assert files == {
+            CPI_SERIES: "cpi/ua.toml",
+            INFLATION_BELIEF: "inflation/owner-001.toml",
             ISSUE_A: f"instruments/{ISSUE_A}.toml",
             ISSUE_B: f"instruments/{ISSUE_B}.toml",
             EXEMPT_CLASS: "tax/ua.toml",
@@ -212,11 +228,18 @@ class TestEveryDeclarationAndVersionThatFedTheRun:
         of exactly the bytes on disk.
         """
         expected = {
+            CPI_SERIES: DATA_ROOT / "cpi" / "ua.toml",
+            INFLATION_BELIEF: DATA_ROOT / "scenarios" / "inflation" / "owner-001.toml",
             ISSUE_A: DATA_ROOT / "instruments" / f"{ISSUE_A}.toml",
             ISSUE_B: DATA_ROOT / "instruments" / f"{ISSUE_B}.toml",
             EXEMPT_CLASS: DATA_ROOT / "tax" / "ua.toml",
         }
-        for ref in _manifest().inputs:
+        recorded = _manifest().inputs
+        assert {ref.id for ref in recorded} == set(expected), (
+            "every input must be checked here; an id this map does not know would otherwise "
+            "skip the loop's assertion entirely"
+        )
+        for ref in recorded:
             digest = hashlib.sha256(expected[ref.id].read_bytes()).hexdigest()
             assert ref.version == f"{manifest.ALGORITHM}:{digest}"
 
@@ -262,18 +285,40 @@ class TestEveryDeclarationAndVersionThatFedTheRun:
 class TestTheManifestCarriesTheProvenanceOfWhatFedIt:
     """Principle III asks for *"the version and provenance of every input"* -- both."""
 
-    def test_every_declaration_reports_which_of_its_sources_are_unverified(self) -> None:
-        """Every ``verified_on`` in ``data/`` is empty, so every input is marked.
+    def test_every_sourced_declaration_reports_which_of_its_sources_are_unverified(self) -> None:
+        """Every ``verified_on`` in ``data/`` is empty, so every *cited* input is marked.
 
         Per input rather than only in the roll-up, so a reader can see *which file* is the
         one still to check against a primary source.
+
+        ⚙ **The declared inflation belief is excluded, and its empty list is the honest one**
+        (007). It carries no citation at all -- a belief about next year's prices has no
+        publisher -- so there is nothing that *could* be verified and nothing to mark. That is
+        a different claim from "checked and clean", and what distinguishes the two here is the
+        input's ``kind``, not an empty tuple.
         """
         for ref in _manifest().inputs:
+            if ref.kind == "inflation_assumption":
+                assert ref.unverified_sources == (), (
+                    f"{ref.id} is a belief and cites nothing; a source here would be invented"
+                )
+                continue
             assert ref.unverified_sources, f"{ref.id} claims to be fully verified"
             assert all(name.startswith(f"{ref.file}#") for name in ref.unverified_sources), (
                 f"{ref.id} reports sources that do not belong to {ref.file}: "
                 f"{ref.unverified_sources}"
             )
+
+    def test_the_cpi_series_reports_all_four_hundred_and_eleven_unverified_months(self) -> None:
+        """The count, because a per-file mark that collapsed to one would look identical.
+
+        One ``SourceRef`` per observation is what makes a real figure able to name every month
+        it chained (007 research.md D6); a shared ref would report a single unverified value
+        here and the number would look reassuring.
+        """
+        series = next(ref for ref in _manifest().inputs if ref.kind == "cpi_series")
+
+        assert len(series.unverified_sources) == 411
 
     def test_an_instrument_reports_the_sources_of_its_terms_and_its_constraints(self) -> None:
         """Two tables, two observations, two sources -- and both are recorded.

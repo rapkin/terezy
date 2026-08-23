@@ -211,4 +211,11 @@ def test_coverage_is_total_and_a_covered_window_holds_one_observation_per_month(
         case cpi.Covered():
             assert tuple(item.period for item in result.observations) == periods.months_in(window)
         case cpi.NotCovered():
+            # Both halves, because "not covered" with nothing missing is only honest for a
+            # window that spans nothing. Without the second assertion a `NotCovered(missing=())`
+            # returned for a window the series fully covers would satisfy this property, and
+            # the refusal would name no month while claiming one was absent.
             assert set(result.missing) <= set(periods.months_in(window))
+            assert result.missing or not periods.months_in(window)
+        case _:  # pragma: no cover -- mypy proves this unreachable
+            pytest.fail(f"coverage returned neither union member: {result!r}")

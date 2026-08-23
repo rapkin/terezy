@@ -70,6 +70,7 @@ from terezy.core.primitives import conventions, money, periods
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.periods import Window
+from terezy.core.primitives.staleness import Ageing
 from terezy.core.results import hurdle as hurdle_figures
 from terezy.core.results import schedule as schedule_rows
 from terezy.core.results.hurdle import CashFlow, HurdleRate
@@ -119,6 +120,7 @@ def project(
     tax_classes: Mapping[str, TaxClass],
     cpi_series: CpiSeries | None = None,
     inflation_assumption: InflationAssumption | None = None,
+    ageing: Ageing | None = None,
 ) -> ProjectionOutcome:
     """Project one holding to maturity and report what it pays and what it returns.
 
@@ -136,6 +138,14 @@ def project(
     projection identical to one that ran under feature 001* to run here unchanged and produce
     a shape-identical result; a required argument would have made every one of those call
     sites a lie about what changed.
+
+    ``ageing`` carries the declared staleness thresholds and the ``as_of`` date the question is
+    asked at (FR-005). It is one record rather than two arguments so it cannot be half-supplied
+    -- thresholds without a date age nothing and would say nothing about not having done so --
+    and ``None`` means this run did not ask, which the figures report as
+    :data:`~terezy.core.primitives.staleness.UNASSESSED` rather than as freshness. There is no
+    clock: ``as_of`` is an input, recorded in the manifest, so the same run gives the same
+    verdict for ever.
     """
     ops = instrument_registry.ops_for(declaration.instrument_class)
     produced = ops.events(declaration, holding, horizon, assumptions)
@@ -202,6 +212,7 @@ def project(
                 window=_deflation_window(holding, contractual_events),
                 series=cpi_series,
                 assumption=inflation_assumption,
+                ageing=ageing,
             ),
         ),
     )

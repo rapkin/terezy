@@ -965,12 +965,26 @@ scheme written by hand:
 | string | `s<byte length>:<utf-8 bytes>;` |
 | tuple | `t<element count>:<encoded elements>;` |
 
-prefixed with the scheme's name, `terezy-canonical-v2`, and a NUL byte. The version in the
-name moves whenever the canonical structure of §12.1 changes shape — v2 is v1 plus the
-event's `capacity_pool` and the ledger's capacity accumulator — so a digest recorded under
+prefixed with the scheme's name, `terezy-canonical-v3`, and a NUL byte. The version in the
+name moves whenever the canonical structure of §12.1 changes shape, so a digest recorded under
 one shape can never silently disagree with one taken under another: they visibly belong to
-different schemes. A pinned shape fingerprint in `tests/unit/test_results_canonical.py`
-fails the build if the shape moves while the name does not.
+different schemes.
+
+| version | what changed |
+| --- | --- |
+| v1 | the original structure |
+| v2 | the event gained `capacity_pool`; the ledger gained the capacity accumulator |
+| v3 | the real-terms slot became **two** tagged figures, each carrying its basis, the series it is real against and its window ([§23.5](#235-two-figures-never-mixed)) |
+
+A pinned shape fingerprint in `tests/unit/test_results_canonical.py` fails the build if the
+shape moves while the name does not. That pin covers **every** component `of_projection` is
+built from — the ledger, a schedule row, a charge, and the figures with the real slot both
+populated and absent — because a pin over one component leaves the rest free to move under an
+unchanged name, which is the v1→v2 failure it exists to prevent.
+
+Bumping the name moves **every** digest taken under it, including `tests/golden/ramp_comparison.golden.txt`,
+whose ranking did not change. That is the cost of one scheme name for the whole project and it
+is the intended behaviour: the alternative is a digest that silently means something else.
 
 **Why it is injective.** Every string carries its byte length and every tuple its element
 count, so no two different structures can produce the same bytes:
@@ -2172,6 +2186,20 @@ fact and does not decay, but the *retrieval* ages, because the publisher adds a 
 every month. *"Does the series reach the end of my window?"* is coverage. Both can fire on one
 run, they point at different fixes — re-fetch, or declare the missing months — and reporting
 either as the other sends the owner to the wrong one.
+
+Every `RealRate` therefore carries a `staleness` verdict beside its provenance, on
+`RampCost.staleness`'s precedent, merged over **both** sides: the CPI observations that
+deflated it, and whatever the caller knows about the ageing of the nominal figure. Ageing needs
+two things — the declared thresholds and an `as_of` date the question is asked at — and a run
+supplies them together or not at all. A run that supplies neither gets `UNASSESSED`, which
+says *nobody aged anything* and is deliberately not the same value as *aged, and nothing was
+stale*. There is no clock: `as_of` is an input and is recorded in the manifest.
+
+One honest gap, stated rather than papered over: feature 001's `BondTerms`,
+`InstrumentConstraints` and `TaxClass` do not carry the observation kind they age under, so
+today the nominal side of that merge is `UNASSESSED` and only the CPI side is genuinely
+assessed. The merge point exists so that when those records gain their kind, one caller
+changes and every real figure inherits the verdict.
 
 ## 24. Where to look next
 

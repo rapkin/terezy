@@ -37,6 +37,7 @@ from pathlib import Path
 import pytest
 
 from terezy.core.primitives import provenance as prov
+from terezy.core.primitives import staleness
 from terezy.core.primitives.rates import NominalRate, RealRate
 from terezy.core.results import canonical, hurdle
 from terezy.data import manifest
@@ -53,13 +54,16 @@ SERIES = cpi_fixtures.series(cpi_fixtures.run_of("2026-01", 12, 101.0))
 WINDOW = cpi_fixtures.window("2026-01", "2026-12")
 
 
-def _both(assumption: object) -> hurdle.RealTerms:
+def _both(assumption: object, *, series: object = SERIES) -> hurdle.RealTerms:
     return hurdle.real_terms(
         nominal=NOMINAL,
         nominal_provenance=prov.EMPTY,
-        series=SERIES,
-        window=WINDOW,
-        assumption=assumption,  # type: ignore[arg-type]
+        nominal_staleness=staleness.UNASSESSED,
+        deflation=cpi_fixtures.deflation(
+            window=WINDOW,
+            series=series,  # type: ignore[arg-type]
+            assumption=assumption,  # type: ignore[arg-type]
+        ),
     )
 
 
@@ -101,13 +105,7 @@ def test_the_two_figures_are_computed_independently_of_one_another() -> None:
 def test_removing_the_observations_leaves_the_assumed_figure_untouched() -> None:
     """The other direction of independence: the deflators do not borrow from one another."""
     with_series = _both(cpi_fixtures.owner_assumption(0.10))
-    without = hurdle.real_terms(
-        nominal=NOMINAL,
-        nominal_provenance=prov.EMPTY,
-        series=None,
-        window=WINDOW,
-        assumption=cpi_fixtures.owner_assumption(0.10),
-    )
+    without = _both(cpi_fixtures.owner_assumption(0.10), series=None)
 
     assert with_series.assumed == without.assumed
 
@@ -253,13 +251,7 @@ def test_two_runs_differing_only_in_the_assumption_are_two_results() -> None:
 
 def test_there_is_no_default_rate_anywhere_to_fall_back_on() -> None:
     """FR-015. A default would be a belief about the future the owner never stated."""
-    without = hurdle.real_terms(
-        nominal=NOMINAL,
-        nominal_provenance=prov.EMPTY,
-        series=SERIES,
-        window=WINDOW,
-        assumption=None,
-    )
+    without = _both(None)
 
     assert not isinstance(without.assumed, RealRate)
     assert isinstance(without.realized, RealRate)
@@ -340,17 +332,43 @@ def test_a_run_given_no_inflation_declarations_records_none_rather_than_a_defaul
 # subtraction approximation.
 
 
+def _called_name(node: ast.Call) -> str | None:
+    """The bare name a call invokes, however it is spelled at the call site.
+
+    ⚙ **Three spellings, not one.** A first cut of this scan matched ``ast.Name`` only, which
+    made ``rates.RealRate(...)`` -- the module-qualified style used throughout this codebase --
+    invisible to it, and ``dataclasses.replace(figure, basis=...)`` invisible twice over. A
+    scan that counts construction sites has to see every way one can be written, or the count
+    it reports is a count of the spellings it happens to know.
+
+    ``replace`` is folded in as a construction of whatever it copies, because that is what it
+    is: ``dataclasses.replace(a_real_rate, basis="declared_assumption")`` builds a second real
+    figure with a different epistemic claim and never goes near ``RealRate(``.
+    """
+    match node.func:
+        case ast.Name(id=name):
+            return name
+        case ast.Attribute(attr=name):
+            return name
+        case _:
+            return None
+
+
 def _construction_sites(name: str) -> dict[str, int]:
-    """Where in ``src/`` something of this name is called, and how often, prose excluded."""
+    """Where in ``src/`` something of this name is called, and how often, prose excluded.
+
+    Matches the bare name, so ``RealRate(...)``, ``rates.RealRate(...)`` and
+    ``terezy.core.primitives.rates.RealRate(...)`` all count. That over-counts in principle --
+    an unrelated ``something.deflate()`` would be caught -- and over-counting is the safe
+    direction: it makes a reviewer look, where under-counting makes a site vanish.
+    """
     found: dict[str, int] = {}
     for path in sorted((REPO_ROOT / "src" / "terezy").rglob("*.py")):
         tree = ast.parse(source_scan.executable_source(path))
         calls = sum(
             1
             for node in ast.walk(tree)
-            if isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Name)
-            and node.func.id == name
+            if isinstance(node, ast.Call) and _called_name(node) == name
         )
         if calls:
             found[str(path.relative_to(REPO_ROOT))] = calls
@@ -372,12 +390,107 @@ def test_the_fisher_relation_is_called_in_exactly_two_places() -> None:
     assert _construction_sites("deflate") == {"src/terezy/core/results/hurdle.py": 2}
 
 
-def test_the_slot_is_built_in_exactly_two_places() -> None:
-    """``real_terms`` and the ``NOT_DEFLATED`` constant, and nothing else assembles the pair."""
-    assert _construction_sites("RealTerms") == {"src/terezy/core/results/hurdle.py": 2}
+def test_the_slot_is_built_only_in_the_module_that_defines_it() -> None:
+    """Four sites, all in ``real_terms`` and its constant: the two shared refusals, the pair.
+
+    A count rather than a location alone, so that a fifth -- somewhere assembling a
+    ``RealTerms`` from parts it chose -- has to be looked at.
+    """
+    assert _construction_sites("RealTerms") == {"src/terezy/core/results/hurdle.py": 4}
+
+
+def _modules_mentioning(name: str) -> set[str]:
+    """Every module in ``src/`` whose *executable* code names this identifier, prose excluded.
+
+    Any spelling: a call, an annotation, a ``match`` pattern, an argument to
+    ``dataclasses.replace``. Annotations survive the strip because ``from __future__ import
+    annotations`` makes them text that ``ast.unparse`` writes back out, so a function that
+    takes or returns a real figure names it here whatever it does with it.
+    """
+    found: set[str] = set()
+    for path in sorted((REPO_ROOT / "src" / "terezy").rglob("*.py")):
+        tree = ast.parse(source_scan.executable_source(path))
+        mentioned = any(
+            (isinstance(node, ast.Name) and node.id == name)
+            or (isinstance(node, ast.Attribute) and node.attr == name)
+            for node in ast.walk(tree)
+        )
+        if mentioned:
+            found.add(str(path.relative_to(REPO_ROOT)))
+    return found
+
+
+MODULES_ALLOWED_TO_TOUCH = {
+    "RealRate": {
+        "src/terezy/core/results/hurdle.py",
+        "src/terezy/core/results/canonical.py",
+        # ⚙ Joined in 007's review round, and the reason is FR-013's roll-up: the manifest
+        # matches on the union to collect a real figure's sources, because the nominal
+        # figure's provenance deliberately excludes the CPI observations. It reads a figure
+        # and never builds one -- `_construction_sites` above holds that line separately.
+        "src/terezy/data/manifest.py",
+    },
+    "RealTerms": {
+        "src/terezy/core/results/hurdle.py",
+        "src/terezy/core/results/canonical.py",
+    },
+}
+"""Which modules may name a real figure in executable code, and nothing else may.
+
+An allowlist with a reason per entry, on ``check_provenance.EXEMPT_DIRS``' precedent: the way
+a rule like this rots is by someone widening it in passing, and a set literal with a comment
+beside each addition is where that has to be argued.
+"""
+
+
+@pytest.mark.parametrize("name", ["RealRate", "RealTerms"])
+def test_only_the_named_modules_touch_a_real_figure_at_all(name: str) -> None:
+    """Containment rather than a call count, because a copy is not spelled like a construction.
+
+    ``dataclasses.replace(figure, basis="declared_assumption")`` builds a second real figure
+    carrying a different epistemic claim and never goes near ``RealRate(``. This test file does
+    exactly that to make a twin -- legitimate in a test, and not in the engine, where it would
+    relabel a figure that ``real_terms`` had already computed and labelled with every guard
+    bypassed.
+
+    Counting call shapes cannot see that. Naming the modules can, and the allowlist above is
+    where a new one has to be argued for -- it caught ``manifest.py`` joining the set during
+    this feature's own review round, which is the behaviour that makes it worth having.
+
+    The defining modules are absent from the expected set and that is not an omission: a
+    ``class RealRate:`` is a ``ClassDef``, which this scan does not count as a *mention*. It
+    looks for code that reaches for the type, not for the line that declares it.
+    """
+    assert _modules_mentioning(name) == MODULES_ALLOWED_TO_TOUCH[name]
 
 
 def test_the_scan_is_falsifiable() -> None:
-    """It must be able to see a construction, or the three tests above are green by accident."""
+    """It must be able to see a construction, or the tests above are green by accident."""
     assert _construction_sites("NominalRate")
     assert _construction_sites("nothing_is_called_this") == {}
+
+
+def test_the_scan_sees_a_module_qualified_call() -> None:
+    """The blind spot the first cut of this scan had, asserted directly.
+
+    ``ast.parse`` on a snippet rather than a file, so the case is stated rather than relied on
+    happening to exist somewhere in ``src/``.
+    """
+    qualified = ast.parse("rates.RealRate(value=1.0)").body[0]
+    bare = ast.parse("RealRate(value=1.0)").body[0]
+    assert isinstance(qualified, ast.Expr)
+    assert isinstance(qualified.value, ast.Call)
+    assert isinstance(bare, ast.Expr)
+    assert isinstance(bare.value, ast.Call)
+
+    assert _called_name(qualified.value) == "RealRate"
+    assert _called_name(bare.value) == "RealRate"
+
+
+def test_the_scan_ignores_a_call_it_cannot_name() -> None:
+    """A call on a subscript or a lambda has no name to match; it must not crash the walk."""
+    node = ast.parse("handlers[0]()").body[0]
+    assert isinstance(node, ast.Expr)
+    assert isinstance(node.value, ast.Call)
+
+    assert _called_name(node.value) is None

@@ -68,13 +68,14 @@ from typing import Final, assert_never
 
 from terezy.core.inflation import series as cpi
 from terezy.core.inflation.deflate import deflate
-from terezy.core.inflation.series import CpiSeries, InflationAssumption
-from terezy.core.primitives import periods
+from terezy.core.inflation.series import CpiObservation, CpiSeries, InflationAssumption
+from terezy.core.primitives import periods, staleness
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.periods import Window
 from terezy.core.primitives.provenance import Provenance
 from terezy.core.primitives.rates import NominalRate, RealRate, RealTermsUnavailable
+from terezy.core.primitives.staleness import Ageing, StalenessVerdict
 
 type CashFlow = tuple[float, float]
 """One dated amount, as ``(years from the purchase, signed amount)``.
@@ -167,10 +168,16 @@ class RealTerms:
 
 
 def no_series_declared() -> RealTermsUnavailable:
-    """FR-012: no CPI series was declared for this run."""
+    """FR-012: this run was given no CPI series.
+
+    The wording says *given* rather than *declared* on purpose. A series can be absent because
+    nobody declared one or because a caller forgot to pass the one that exists, and from inside
+    the core those are the same fact -- so the reason states what it can see rather than
+    guessing at a cause and sending the reader to the wrong file.
+    """
     return RealTermsUnavailable(
         reason=(
-            "no CPI series was declared for this run, so there is nothing to deflate by. "
+            "this run was given no CPI series, so there is nothing to deflate by. "
             "None is assumed: a real rate derived from an undeclared inflation rate would be "
             "a fabricated number wearing the same label as a measured one."
         )
@@ -201,7 +208,7 @@ def no_assumption_declared() -> RealTermsUnavailable:
     """
     return RealTermsUnavailable(
         reason=(
-            "no future-inflation assumption was declared for this run, so the projected "
+            "this run was given no future-inflation assumption, so the projected "
             "portion of the horizon has no inflation rate to deflate by. There is no default "
             "rate: one would be a belief about the future that the owner never stated, "
             "presented as though he had."
@@ -265,6 +272,16 @@ class Deflation:
     assumption: InflationAssumption | None
     """The declared future-inflation assumption, or ``None`` when the run was given none."""
 
+    ageing: Ageing | None
+    """The declared staleness thresholds and the date the question is asked at, or ``None``.
+
+    ``None`` means *this run did not ask* -- ageing needs an ``as_of`` and there is no clock to
+    invent one from -- and the figures then carry
+    :data:`~terezy.core.primitives.staleness.UNASSESSED`, which says nothing was checked rather
+    than claiming everything is fresh. One optional record rather than two optional fields, so
+    a caller cannot supply the thresholds, forget the date, and get silence (FR-005).
+    """
+
 
 NOT_DEFLATED: Final[RealTerms] = RealTerms(
     realized=no_series_declared(),
@@ -283,66 +300,80 @@ def real_terms(
     *,
     nominal: NominalRate | None,
     nominal_provenance: Provenance,
-    series: CpiSeries | None,
-    window: Window,
-    assumption: InflationAssumption | None,
+    nominal_staleness: StalenessVerdict,
+    deflation: Deflation,
 ) -> RealTerms:
     """Both real figures for one nominal rate over one window. The only place a slot is filled.
 
-    Pure: no clock, no I/O. ``series`` and ``assumption`` are ``None``-able because their
-    absence is a *reported reason* rather than an error -- the whole point of FR-012 -- and
-    ``nominal`` is ``None``-able for the same reason, so that "there is nothing to deflate" is
-    a named answer instead of an unrepresentable state.
+    Pure: no clock, no I/O. Everything nullable inside :class:`Deflation` is nullable because
+    its absence is a *reported reason* rather than an error -- the whole point of FR-012 -- and
+    ``nominal`` is nullable for the same reason, so that "there is nothing to deflate" is a
+    named answer instead of an unrepresentable state.
 
-    ``nominal_provenance`` is required and separate from ``nominal`` because a
-    :class:`~terezy.core.primitives.rates.NominalRate` carries no sources of its own: the
-    union FR-013 requires is over the *holding's* provenance and every observation used, and
-    only the caller holds the first half.
+    ``nominal_provenance`` and ``nominal_staleness`` are separate from ``nominal`` because a
+    :class:`~terezy.core.primitives.rates.NominalRate` carries neither: the union FR-013
+    requires is over the *holding's* inputs and every observation used, and only the caller
+    holds the first half.
 
-    The two figures are computed independently and neither is derived from the other. That is
-    not an implementation detail: FR-010 forbids a single reported number blending observed
-    and assumed inflation, and computing one from the other is how a blend gets in.
+    The window comes from :attr:`Deflation.window` and is **not** a second parameter. It was
+    one briefly, and two places holding one span is two places that can disagree about what a
+    figure covers -- with FR-011 requiring the figure to name it.
+
+    **The two refusals that apply to both figures are decided here, once.** There is no figure
+    to deflate, and the window spans no elapsed month: neither is a fact about a *deflator*, so
+    neither belongs in a per-figure branch where one half could grow a guard the other lacks.
+    That is not hypothetical -- it is the divergence a reviewer found in the first cut of this
+    function, where ``_realized`` refused a reversed window by name while ``_assumed`` returned
+    a rate whose ``window`` named a span containing no months, in breach of FR-011.
+
+    Below that line the two figures are computed independently and neither is derived from the
+    other. FR-010 forbids a single reported number blending observed and assumed inflation, and
+    computing one from the other is how a blend gets in.
     """
+    if nominal is None:
+        return RealTerms(realized=no_nominal_figure(), assumed=no_nominal_figure())
+    if not periods.months_in(deflation.window):
+        return RealTerms(
+            realized=window_has_no_elapsed_month(deflation.window),
+            assumed=window_has_no_elapsed_month(deflation.window),
+        )
     return RealTerms(
         realized=_realized(
             nominal=nominal,
             nominal_provenance=nominal_provenance,
-            series=series,
-            window=window,
+            nominal_staleness=nominal_staleness,
+            deflation=deflation,
         ),
         assumed=_assumed(
             nominal=nominal,
             nominal_provenance=nominal_provenance,
-            window=window,
-            assumption=assumption,
+            nominal_staleness=nominal_staleness,
+            deflation=deflation,
         ),
     )
 
 
 def _realized(
     *,
-    nominal: NominalRate | None,
+    nominal: NominalRate,
     nominal_provenance: Provenance,
-    series: CpiSeries | None,
-    window: Window,
+    nominal_staleness: StalenessVerdict,
+    deflation: Deflation,
 ) -> RealRate | RealTermsUnavailable:
     """The figure deflated by declared observations, or the specific reason there is none.
 
-    **Coverage is checked before any arithmetic**, and the order of the guards below is the
-    order of the questions: is there a figure, is there a series, does the window span
-    anything, does the series cover it. Each one that fails names itself and stops.
+    **Coverage is checked before any arithmetic.** The two guards that could equally apply to
+    the assumed figure were hoisted into :func:`real_terms`, so this function refuses only what
+    is genuinely its own: no series, and a series that does not cover the window.
     """
-    if nominal is None:
-        return no_nominal_figure()
+    series = deflation.series
     if series is None:
         return no_series_declared()
-    if not periods.months_in(window):
-        return window_has_no_elapsed_month(window)
 
-    covered = cpi.coverage(series, window)
+    covered = cpi.coverage(series, deflation.window)
     match covered:
         case cpi.NotCovered():
-            return window_not_covered(series.id, window, covered.missing)
+            return window_not_covered(series.id, deflation.window, covered.missing)
         case cpi.Covered():
             cumulative = cpi.cumulative_inflation(covered.observations)
             annual = cpi.annualised(
@@ -354,8 +385,12 @@ def _realized(
                 value=deflate(nominal=nominal.value, inflation=annual),
                 basis="realized_cpi",
                 series_id=series.id,
-                window=window,
+                window=deflation.window,
                 provenance=prov.merge(nominal_provenance, cpi.provenance_of(covered.observations)),
+                staleness=staleness.merge(
+                    nominal_staleness,
+                    _aged_observations(covered.observations, deflation.ageing),
+                ),
             )
         case _:  # pragma: no cover -- mypy proves this unreachable
             assert_never(covered)
@@ -363,10 +398,10 @@ def _realized(
 
 def _assumed(
     *,
-    nominal: NominalRate | None,
+    nominal: NominalRate,
     nominal_provenance: Provenance,
-    window: Window,
-    assumption: InflationAssumption | None,
+    nominal_staleness: StalenessVerdict,
+    deflation: Deflation,
 ) -> RealRate | RealTermsUnavailable:
     """The figure deflated by the declared assumption, or the specific reason there is none.
 
@@ -375,25 +410,48 @@ def _assumed(
     observation. What the figure carries instead is ``basis="declared_assumption"`` on its
     face, everywhere it appears.
 
-    A cited external forecast contributes its citation to the provenance and is **still**
-    labelled an assumption (FR-010). The citation says where the belief was read; it does not
-    make next year's prices observed.
+    A cited external forecast contributes its citation to the provenance, ages under its own
+    declared kind, and is **still** labelled an assumption (FR-010). The citation says where
+    the belief was read; it does not make next year's prices observed.
     """
-    if nominal is None:
-        return no_nominal_figure()
+    assumption = deflation.assumption
     if assumption is None:
         return no_assumption_declared()
     return RealRate(
         value=deflate(nominal=nominal.value, inflation=assumption.annual_rate),
         basis="declared_assumption",
         series_id=assumption.id,
-        window=window,
+        window=deflation.window,
         provenance=(
             nominal_provenance
             if assumption.provenance is None
             else prov.merge(nominal_provenance, assumption.provenance)
         ),
+        staleness=staleness.merge(
+            nominal_staleness, _aged_assumption(assumption, deflation.ageing)
+        ),
     )
+
+
+def _aged_observations(
+    observations: Sequence[CpiObservation], ageing: Ageing | None
+) -> StalenessVerdict:
+    """The CPI side's verdict, or ``UNASSESSED`` when this run did not ask for one."""
+    if ageing is None:
+        return staleness.UNASSESSED
+    return cpi.staleness_of_observations(observations, ageing.kinds, as_of=ageing.as_of)
+
+
+def _aged_assumption(assumption: InflationAssumption, ageing: Ageing | None) -> StalenessVerdict:
+    """The belief's verdict: ``UNASSESSED`` unless it is a retrieved forecast and a date was given.
+
+    An owner's own belief returns ``UNASSESSED`` even when a date *was* given, and that is the
+    honest answer rather than a shortcut: a belief has no retrieval date to age from, and it is
+    superseded when the owner changes his mind rather than by a threshold expiring.
+    """
+    if ageing is None:
+        return staleness.UNASSESSED
+    return cpi.staleness_of_assumption(assumption, ageing.kinds, as_of=ageing.as_of)
 
 
 _LOWEST_RATE: Final = -0.999999
@@ -529,6 +587,7 @@ def of_flows(
     received: Sequence[CashFlow],
     total_tax: Money,
     provenance: Provenance,
+    nominal_staleness: StalenessVerdict = staleness.UNASSESSED,
     deflate_with: Deflation | None = None,
 ) -> HurdleRate:
     """Assemble the result from the two series, the tax total and the merged sources.
@@ -546,6 +605,15 @@ def of_flows(
     two roots of the same equation with two chances to disagree. The caller supplies the
     window and the deflators; the rate comes from here.
 
+    ⚙ **``nominal_staleness`` is what the caller knows about the ageing of the figure being
+    deflated** (FR-013: a staleness report on *any input of the nominal figure* must reach the
+    real figure). It defaults to :data:`~terezy.core.primitives.staleness.UNASSESSED` --
+    *nobody aged anything* -- which is the honest verdict for a feature-001 hurdle rate and not
+    a claim of freshness: 001's ``BondTerms``, ``InstrumentConstraints`` and ``TaxClass`` do not
+    carry the observation kind they age under (see ``loader._source_ref``), so there is nothing
+    here to age them against yet. The merge point exists so that the day those records carry
+    their kind, one caller changes and every real figure inherits the verdict.
+
     ``deflate_with`` defaults to ``None``, and the default is **not** a permissive one: the
     slot then holds :data:`NOT_DEFLATED`, two of FR-012's named refusals saying that no series
     and no assumption were supplied -- which is exactly what happened. FR-006 and US1's fifth
@@ -562,9 +630,8 @@ def of_flows(
             else real_terms(
                 nominal=nominal_ytm,
                 nominal_provenance=provenance,
-                series=deflate_with.series,
-                window=deflate_with.window,
-                assumption=deflate_with.assumption,
+                nominal_staleness=nominal_staleness,
+                deflation=deflate_with,
             )
         ),
         total_tax=total_tax,

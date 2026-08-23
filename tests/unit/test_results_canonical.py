@@ -20,6 +20,7 @@ structural form the digest will be taken over.
 
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import replace
 from datetime import date
 
@@ -29,6 +30,7 @@ from terezy.core.ledger.accounts import CashBalance
 from terezy.core.ledger.events import CausationKind, CausationRef, Event, EventKind, LotRef
 from terezy.core.ledger.lots import Disposal, Lot, Position
 from terezy.core.primitives import provenance as prov
+from terezy.core.primitives import staleness
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.periods import Window
@@ -120,6 +122,7 @@ def _real(value: float, *, basis: RealBasis = "realized_cpi", series_id: str = "
         series_id=series_id,
         window=Window(first="2026-01", last="2026-12"),
         provenance=prov.EMPTY,
+        staleness=staleness.UNASSESSED,
     )
 
 
@@ -241,13 +244,11 @@ def test_every_charge_names_the_class_that_produced_it() -> None:
 
 CANONICAL_SHAPE_BY_ENCODING = {
     "terezy-canonical-v3": (
-        "((i,i,i),s,s,((s,(s,s),(s,s),(s,s))),"
-        "((s,s,(s,s),(s,s),((s,s,(i,i,i),s,(s,s),(s,s),s)))),"
-        "((i,(i,i,i),s,s,(s,s),(s,s),(s,s),(s,s),(s,s),(s,s),(s,s),(s,s),((s,s)),(s,s,s))),"
-        "((i,(i,i,i),s,(s,s),s,(s,s,s),(s,s),s,i,s)),"
-        "((s,i,i,(s,s))))"
-        "|"
-        "(s,s,((s,s,s,s,s,s),(s,s,s,s,s,s)),(s,s),(s),(s))"
+        "((i,i,i),s,s,((s,(s,s),(s,s),(s,s))),((s,s,(s,s),(s,s),((s,s,(i,i,i),s,(s,s),(s,s),s)))),((i,(i,i,i),s,s,(s,s),(s,s),(s,s),(s,s),(s,s),(s,s),(s,s),(s,s),((s,s)),(s,s,s))),((i,(i,i,i),s,(s,s),s,(s,s,s),(s,s),s,i,s)),((s,i,i,(s,s))))"
+        "|(s,((i,(i,i,i),s,s,(s,s),(s,s),(s,s),(s,s,s),(s,s,s)),(i,(i,i,i),s,0,(s,s),(s,s),(s,s),(s,s,s),(s,s,s))))"
+        "|(i,(s,s),(s,s),(s,s),(s,s),s,i)"
+        "|(s,s,((s,s,s,s,s,s),(s,s,s,s,s,s)),(s,s),(s),(s))"
+        "|(s,s,((s,s),(s,s)),(s,s),(s),(s))"
     ),
 }
 """One recorded shape fingerprint per encoding tag, and exactly one entry: the current tag.
@@ -259,11 +260,13 @@ canonical tuple gained ``capacity_pool`` and the capacity accumulator while the 
 ``terezy-canonical-v1``, so pre-002 digests silently disagreed under an unchanged name.
 This pinned pair is what makes the next such change a red test naming the remedy.
 
-⚙ **Two fingerprints, joined by a pipe, since feature 007** -- the ledger's and the figures'.
-The pin used to cover ``ledger.canonical.of_result`` alone, which left the whole of
-``results.canonical`` outside it: 007 changed the real slot from one tagged pair to two and
-the pin would not have noticed, which is exactly the silent disagreement it exists to
-prevent. Anything the projection's canonical form is built from belongs in here.
+⚙ **One fingerprint per component of ``of_projection``, joined by pipes, since feature 007.**
+The pin used to cover ``ledger.canonical.of_result`` alone, which left the schedule, the
+charges and the figures outside it -- three quarters of what a digest is taken over, including
+the part 007 changed. A shape change in a schedule row would have moved every recorded digest
+under an unchanged tag, which is the feature-002 failure this test exists to prevent. The
+figures appear twice: with both real figures populated, and with both unavailable, because the
+two branches have different shapes and pinning one leaves the other free to move.
 
 **v3** (2026-08): feature 007 filled the reserved real-terms slot. Where a v2 projection
 rendered one ``(tag, value)`` pair, a v3 one renders two figures, each carrying its basis,
@@ -361,6 +364,47 @@ def _representative_state() -> engine.LedgerState:
     )
 
 
+def _projection_fingerprint() -> str:
+    """The shape of **every** component of ``of_projection``, joined, plus the absent branch.
+
+    ⚙ **Widened after review.** The first version fingerprinted the ledger alone, which left
+    the schedule, the charges and the figures outside the pin -- three quarters of what a
+    digest is taken over, including the part feature 007 changed. A shape change in a schedule
+    row would then have moved every recorded digest under an unchanged encoding tag, which is
+    precisely the feature-002 failure this test was written to prevent.
+
+    ``of_projection`` is not called directly because building a representative ``Projection``
+    means running a projection, and a fixture's coupon count would then leak into the
+    fingerprint. Each component is fingerprinted from a hand-built representative instead --
+    one of everything, no ``None`` where a value could sit -- and the join is the same
+    structure ``of_projection`` assembles.
+
+    The real slot appears **twice**: once with both figures populated and once with both
+    unavailable. The two branches have different shapes -- six elements against two -- and
+    pinning only the populated one would leave a change to the refusal's rendering invisible.
+    """
+    result = _projection(verified=False)
+    # Two schedule rows and one charge, never the whole run: the fixture pays four coupons and
+    # a count of rows is a property of the *fixture*, not of the encoding. Two rows rather than
+    # one because the purchase carries a quantity and a coupon does not, so both the populated
+    # and the absent shape of that field are pinned.
+    two_rows = replace(result.schedule, rows=result.schedule.rows[:2])
+    return "|".join(
+        (
+            _shape(ledger_canonical.of_result(_representative_state())),
+            _shape(canonical.of_schedule(two_rows)),
+            _shape(canonical.of_charge(result.charges[0])),
+            _shape(canonical.of_hurdle_rate(_representative_hurdle())),
+            _shape(canonical.of_hurdle_rate(_unavailable_hurdle())),
+        )
+    )
+
+
+def _unavailable_hurdle() -> hurdle.HurdleRate:
+    """The same record with both real figures absent, so the refusal's shape is pinned too."""
+    return dataclasses.replace(_representative_hurdle(), real=hurdle.NOT_DEFLATED)
+
+
 def _representative_hurdle() -> hurdle.HurdleRate:
     """One hurdle rate with every optional branch populated, exactly once each.
 
@@ -394,12 +438,7 @@ def test_the_encoding_tag_moves_whenever_the_canonical_shape_does() -> None:
     ⚙ **Both halves of the projection's form are fingerprinted** (007). Pinning the ledger
     alone left every figure outside the pin, which is where 007's own change landed.
     """
-    fingerprint = "|".join(
-        (
-            _shape(ledger_canonical.of_result(_representative_state())),
-            _shape(canonical.of_hurdle_rate(_representative_hurdle())),
-        )
-    )
+    fingerprint = _projection_fingerprint()
     assert manifest.ENCODING in CANONICAL_SHAPE_BY_ENCODING, (
         f"manifest.ENCODING is {manifest.ENCODING!r}, which this test does not know. "
         "Record the tag with its shape fingerprint in CANONICAL_SHAPE_BY_ENCODING -- and "

@@ -294,3 +294,28 @@ def any_stale(verdict: StalenessVerdict) -> bool:
     situation exactly, since it is the fastest-ageing number in the system.
     """
     return bool(verdict.stale)
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Ageing:
+    """The two things ageing an observation needs, kept together so neither can go missing.
+
+    ⚙ **Added by feature 007**, and a record rather than two parameters for one reason:
+    where ageing is *optional*, two separate optional parameters can be half-supplied.
+    Passing ``kinds`` and forgetting ``as_of`` would age nothing and say nothing about not
+    having done so -- a silent :data:`UNASSESSED` wearing a caller's intention to check. One
+    optional record cannot be half-passed.
+
+    Functions where ageing is *required* -- ``routes.cost.cost_one`` and everything under it
+    -- keep taking the two separately, because there the type checker already forbids omitting
+    either and a wrapper would be ceremony.
+
+    ``as_of`` is an input to the run and is recorded in the manifest. There is no clock here
+    and there may never be one: the same inputs must give the same verdict for ever.
+    """
+
+    kinds: Mapping[str, ObservationKind]
+    """The declared registry from ``data/observation_kinds.toml``, keyed by kind id."""
+
+    as_of: date
+    """The date the question is asked -- never ``on_date``, which is when money moves."""

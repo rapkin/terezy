@@ -27,6 +27,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from terezy.core.primitives import provenance as prov
+from terezy.core.primitives import staleness
 from terezy.core.primitives.rates import NominalRate, RealRate, RealTermsUnavailable
 from terezy.core.results import hurdle
 from tests import cpi_fixtures
@@ -49,9 +50,12 @@ def _real_terms(
     return hurdle.real_terms(
         nominal=nominal,
         nominal_provenance=prov.EMPTY,
-        series=series,  # type: ignore[arg-type]
-        window=window,  # type: ignore[arg-type]
-        assumption=assumption,  # type: ignore[arg-type]
+        nominal_staleness=staleness.UNASSESSED,
+        deflation=cpi_fixtures.deflation(
+            window=window,  # type: ignore[arg-type]
+            series=series,  # type: ignore[arg-type]
+            assumption=assumption,  # type: ignore[arg-type]
+        ),
     )
 
 

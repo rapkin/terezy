@@ -91,6 +91,7 @@ from terezy.core.instruments.interface import (
 from terezy.core.ledger.canonical import Canonical
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.provenance import Provenance
+from terezy.core.primitives.rates import RealRate
 from terezy.core.results import canonical
 from terezy.core.results.project import Projection
 from terezy.data.declarations.errors import DeclarationError
@@ -300,11 +301,19 @@ class RunManifest:
     """``"sha256:<hex>"`` over the canonical form of the projection (:func:`digest`)."""
 
     unverified_sources: tuple[str, ...]
-    """Ids of every source behind the headline figure with no verification date, sorted.
+    """Ids of every source behind the reported figures with no verification date, sorted.
 
-    The roll-up of what :attr:`inputs` records per file, taken from the figure's own
+    The roll-up of what :attr:`inputs` records per file, taken from the figures' own
     provenance so it describes what the *result* rests on rather than what happened to be
     loaded. Non-empty is the expected state for feature 001 (FR-014, FR-015).
+
+    ⚙ **The real figures are included, and they had to be** (007 FR-013). The nominal figure's
+    provenance deliberately excludes the CPI observations -- putting them there would make the
+    *nominal* rate appear to rest on a price index it does not -- so a roll-up taken from
+    ``hurdle.provenance`` alone would omit every observation behind a real figure. With the
+    shipped Ukrainian series that is 411 unverified values behind a reported number, absent
+    from the field whose whole job is to name them. A long window therefore makes this list
+    long, which is the honest answer rather than a reason to trim it (research.md D6).
     """
 
 
@@ -450,5 +459,20 @@ def of_run(
         ),
         seed=seed,
         result_digest=digest_of_projection(result),
-        unverified_sources=_unverified_ids(result.hurdle.provenance),
+        unverified_sources=_unverified_ids(_reported_provenance(result)),
     )
+
+
+def _reported_provenance(result: Projection) -> Provenance:
+    """Every source behind a figure this result reports: the nominal one, and each real one.
+
+    Two sides, unioned, because they are genuinely different source sets and the manifest is
+    the one place that answers *"what did this whole result rest on?"*. An unavailable real
+    figure contributes nothing -- there is no figure -- which is why the match is over the
+    union type rather than an attribute read.
+    """
+    sources = [result.hurdle.provenance]
+    for figure in (result.hurdle.real.realized, result.hurdle.real.assumed):
+        if isinstance(figure, RealRate):
+            sources.append(figure.provenance)
+    return prov.merge_all(sources)

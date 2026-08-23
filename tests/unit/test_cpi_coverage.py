@@ -18,7 +18,10 @@ no field an implementation could reach into for a partial answer.
 
 from __future__ import annotations
 
+import pytest
+
 from terezy.core.inflation import series as cpi
+from terezy.core.inflation.deflate import deflate
 from terezy.core.inflation.series import Covered, NotCovered
 from tests import cpi_fixtures
 
@@ -145,3 +148,49 @@ def test_a_window_with_no_elapsed_month_is_not_reported_as_covered() -> None:
     result = cpi.coverage(declared, cpi_fixtures.window("2026-05", "2026-04"))
     assert isinstance(result, NotCovered)
     assert result.missing == ()
+
+
+# --- the programmer-error guards -------------------------------------------------------
+#
+# Three refusals in this feature's core are raises rather than typed values, because reaching
+# them means a data-layer check was bypassed rather than that something is wrong with the
+# money. They are still tested, for the reason ``primitives/periods.py::_parts`` is: an
+# untested guard is a guard whose message can be false and nobody notices, and its message is
+# the only thing a reader of the traceback gets.
+
+
+def test_a_series_declaring_one_period_twice_is_refused_rather_than_read() -> None:
+    """The loader refuses a duplicate period and can name the file; reaching here is a bypass.
+
+    Silently keeping either copy would make the chained product depend on which row was read
+    second -- a figure that changes when a file is reordered, with nothing saying so.
+    """
+    doubled = cpi_fixtures.series([("2026-01", 101.0), ("2026-01", 109.0)])
+
+    with pytest.raises(KeyError, match="2026-01"):
+        cpi.coverage(doubled, cpi_fixtures.window("2026-01", "2026-01"))
+
+
+def test_annualising_over_no_periods_is_refused_rather_than_answered() -> None:
+    """A window with no elapsed period is reported by name before the arithmetic runs.
+
+    There is no rate per annum for a span of no time, and returning one -- or dividing by zero
+    and letting the traceback explain -- would be worse than saying so.
+    """
+    with pytest.raises(ValueError, match="0 periods"):
+        cpi.annualised(0.05, periods=0, per_year=12)
+
+    with pytest.raises(ValueError, match="-1 periods"):
+        cpi.annualised(0.05, periods=-1, per_year=12)
+
+
+def test_deflating_by_total_collapse_is_refused_rather_than_dividing_by_zero() -> None:
+    """Inflation of exactly -1 is prices having fallen to nothing; every real rate is infinite.
+
+    Declared index values are strictly positive and declared assumed rates strictly above -1,
+    both checked at the data boundary, so this is unreachable from declared data. The message
+    is what a reader gets if it ever is reached, and ``ZeroDivisionError`` says nothing about
+    money.
+    """
+    with pytest.raises(ValueError, match="fallen to nothing"):
+        deflate(nominal=0.155, inflation=-1.0)

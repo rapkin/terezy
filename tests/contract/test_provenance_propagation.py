@@ -568,9 +568,11 @@ def _deflated(
     figure = hurdle.real_terms(
         nominal=NominalRate(0.155),
         nominal_provenance=prov.of([nominal_source]),
-        series=series,
-        window=Window(first="2026-01", last=series.observations[-1].period),
-        assumption=None,
+        nominal_staleness=staleness.UNASSESSED,
+        deflation=cpi_fixtures.deflation(
+            window=Window(first="2026-01", last=series.observations[-1].period),
+            series=series,
+        ),
     ).realized
     assert isinstance(figure, RealRate), figure
     return figure
@@ -652,9 +654,11 @@ def test_the_assumed_figure_carries_the_forecasts_citation_and_the_nominal_side(
     figure = hurdle.real_terms(
         nominal=NominalRate(0.155),
         nominal_provenance=prov.of([nominal_source]),
-        series=None,
-        window=Window(first="2026-01", last="2026-12"),
-        assumption=cpi_fixtures.forecast_assumption(0.12),
+        nominal_staleness=staleness.UNASSESSED,
+        deflation=cpi_fixtures.deflation(
+            window=Window(first="2026-01", last="2026-12"),
+            assumption=cpi_fixtures.forecast_assumption(0.12),
+        ),
     ).assumed
     assert isinstance(figure, RealRate)
 

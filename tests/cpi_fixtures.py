@@ -18,7 +18,7 @@ assertion pass for the wrong reason.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import date
 
 from terezy.core.inflation.series import CpiObservation, CpiSeries, InflationAssumption
@@ -26,6 +26,8 @@ from terezy.core.primitives import periods
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.periods import Window
 from terezy.core.primitives.provenance import Provenance, SourceRef
+from terezy.core.primitives.staleness import Ageing, ObservationKind
+from terezy.core.results.hurdle import Deflation
 
 CPI_KIND = "cpi_index"
 """The declared kind every CPI observation ages under (``data/observation_kinds.toml``)."""
@@ -170,3 +172,25 @@ def forecast_assumption(
         ),
         kind=CPI_KIND,
     )
+
+
+def deflation(
+    *,
+    window: Window,
+    series: CpiSeries | None = None,
+    assumption: InflationAssumption | None = None,
+    ageing: Ageing | None = None,
+) -> Deflation:
+    """The deflation inputs one run brings, with everything absent by default.
+
+    Written out here rather than inline in each test so that the *shape* lives in one place: a
+    field added to :class:`~terezy.core.results.hurdle.Deflation` breaks this once and the
+    tests keep saying what they mean. The defaults are all-absent because that is the state
+    every refusal test is a departure from.
+    """
+    return Deflation(window=window, series=series, assumption=assumption, ageing=ageing)
+
+
+def ageing_at(as_of: date, kinds: Mapping[str, ObservationKind]) -> Ageing:
+    """The declared thresholds and the date the question is asked at. Never a clock."""
+    return Ageing(kinds=kinds, as_of=as_of)
