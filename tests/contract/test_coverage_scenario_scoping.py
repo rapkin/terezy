@@ -176,7 +176,10 @@ def test_a_missing_declaration_is_counted_per_regime_and_never_pooled() -> None:
     }
     for entry in report.to_observe:
         # Each count is that regime's own tally, computed here from that regime's own block --
-        # so a pooled total, or one regime's number reported against both, fails.
+        # so a pooled total fails. Note what this cannot currently catch: every shipped entry
+        # is symmetric across the two regimes, so reporting one regime's number against both
+        # would pass. The asymmetric case the shipped registry used to carry is gone with the
+        # Deel correction, and pinning it again needs a synthetic root.
         assert entry.blocked_by_regime == tuple(
             (regime_id, blocking[regime_id][entry.missing]) for regime_id in sorted(blocking)
         ), entry.missing

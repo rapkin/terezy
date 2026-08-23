@@ -117,9 +117,11 @@ direction     = "{direction}"
         )
 
     # Named into the *first* declared regime, by opening its list rather than by matching
-    # whatever route happens to close it. Anchoring on the last entry made this silently do
-    # nothing the day a route was appended to the shipped file -- and a scratch root that was
-    # never edited turns every assertion below into a test of the shipped diagram.
+    # whatever route happens to close it. The previous anchor was the route that closed the
+    # wartime list, which worked until this change appended three more -- and an anchor that
+    # stops matching leaves the scratch root unedited, so two of the assertions below would
+    # have gone vacuously true while the rest failed. Anchoring on the regime's own name and
+    # asserting the substitution happened makes both outcomes impossible.
     scenario = root / "scenarios" / "war_end.toml"
     anchor = '  id        = "wartime"\n  route_ids = [\n'
     before = scenario.read_text(encoding="utf-8")
