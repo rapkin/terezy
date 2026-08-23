@@ -23,7 +23,7 @@ needs  = ["001-ovdp-hurdle-rate"]
 
 [[feature]]
 id     = "003-route-coverage"
-status = "in-progress"
+status = "done"
 needs  = ["002-ramp-cost"]
 
 [[feature]]
@@ -78,6 +78,11 @@ note  = "OVDP 40% haircut + 2y delay, hand-computed (D3); proposed 2026-08-22, n
 id    = "coverage-enforcement"
 after = ["003-route-coverage"]
 note  = "advisory -> binding: ranking excludes non-spendable exits; 003 FR-019 deferral"
+
+[[future]]
+id    = "superseded-exit-visibility"
+after = ["003-route-coverage"]
+note  = "a spendable destination satisfies its own exit by identity (003 FR-002, owner decision 2026-08-23), and the sentinel supersedes any exit routes actually declared from it -- so those declarations appear nowhere in the report: not relied on, not orphaned, not a deficit. Unreachable in the shipped registry, where nothing exits a spendable venue, and stated at three sites rather than hidden. Making them visible costs the mirror with satisfied-by-arrival, which is why it is the owner's call and not the implementer's"
 
 [[future]]
 id    = "instrument-access-nodes"

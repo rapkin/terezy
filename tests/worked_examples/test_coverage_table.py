@@ -288,7 +288,7 @@ def _block() -> RegimeCoverage:
 
 
 def test_every_pair_in_the_declared_universe_appears_exactly_once() -> None:
-    """SC-001, FR-001, G1. Four venues x one currency each x two streams = eight verdicts.
+    """SC-001, FR-001, G1. Seven venues x one currency each x two streams = fourteen verdicts.
 
     Counted rather than sampled: a pair silently absent from the report is the failure mode
     the whole feature exists to prevent, and it is invisible to any assertion that only checks
