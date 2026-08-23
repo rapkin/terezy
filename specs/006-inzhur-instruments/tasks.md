@@ -225,25 +225,25 @@ received. Closes required test **J3**.
 and under the legal terms, and check the executed amounts, the refusal case and the tax
 on the discounted case by hand.
 
-- [ ] T034 [US3] Write the failing hand-computed worked example for the three liquidity
+- [x] T034 [US3] Write the failing hand-computed worked example for the three liquidity
       cases — practice at NAV same-day labelled revocable and unverified; legal terms at
       the declared maximum discount with the declared settlement delay, the discount its
       own line and the disposal tax on the post-discount proceeds; and the refusal naming
       that no buyback obligation exists before the termination date with the holding left
       open — plus the assertion that the two modes differ by exactly the declared spread,
       discount and delay, in `tests/worked_examples/test_fund_liquidity.py` (SC-007)
-- [ ] T035 [US3] Implement the required, keyword-only `liquidity_mode` parameter with **no
+- [x] T035 [US3] Implement the required, keyword-only `liquidity_mode` parameter with **no
       default** and the mode's execution rules in `src/terezy/core/results/fund.py`
       (research.md D5, FR-015–FR-018)
-- [ ] T036 [US3] Implement `RedemptionRefused` so the lot stays open and the termination
+- [x] T036 [US3] Implement `RedemptionRefused` so the lot stays open and the termination
       date is named as the next guaranteed exit, in `src/terezy/core/results/fund.py`
       (research.md D6, FR-017)
-- [ ] T037 [US3] Implement the cutoff and termination rules — a purchase after the
+- [x] T037 [US3] Implement the cutoff and termination rules — a purchase after the
       declared subscription cutoff refused naming the cutoff, and a horizon reaching the
       termination date producing a dated termination payout taxed as a disposal — in
       `src/terezy/core/instruments/fund.py` and `src/terezy/core/results/fund.py`
       (FR-019, SC-014)
-- [ ] T038 [US3] Assert the cutoff refusal, the termination payout and the
+- [x] T038 [US3] Assert the cutoff refusal, the termination payout and the
       guaranteed-exit feasibility finding in
       `tests/contract/test_fund_declaration_loading.py` and
       `tests/worked_examples/test_fund_liquidity.py` (SC-014)

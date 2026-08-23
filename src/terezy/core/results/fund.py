@@ -1327,6 +1327,20 @@ def _rests_on(
             )
         case _:  # pragma: no cover -- mypy proves this unreachable
             assert_never(basis)
+    if plan.liquidity_mode == "legal" and plan.exit is not None and plan.exit.cause == "requested":
+        # FR-019's feasibility finding. Under the legal terms an early exit is the
+        # manager's discretion and nothing else, so a plan that *needs* one to happen is
+        # resting on someone else's decision. Executing it and saying nothing would be the
+        # silent simulation the requirement forbids -- and the statement is here rather
+        # than in a refusal because the exit is possible, just not owed.
+        stated.append(
+            f"the exit on {plan.exit.executed_on.isoformat()} is "
+            f"{declaration.liquidity.legal.buyback_before_termination} under the legal "
+            f"terms and is NOT guaranteed: it happens only if the manager chooses to buy "
+            f"back, and this run assumed he does. The next exit the fund actually owes is "
+            f"the termination payout on {declaration.terminates_on.isoformat()}. A plan "
+            "that requires money out before then is resting on a discretion, not on a term"
+        )
     if plan.exchange_rate is not None:
         stated.append(
             f"the exchange rate {plan.exchange_rate.uah_per_unit!r} is the owner's stated "
