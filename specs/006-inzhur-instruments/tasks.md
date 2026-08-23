@@ -463,14 +463,57 @@ than a report on the arithmetic. D13 is rewritten to say what is true: the golde
 evidence that a schema change moved no arithmetic, and it is evidence only if the dates were
 settled on their own citations first.
 
+### Review round — the interface question, ruled on 2026-08-23
+
+**Is a collective-investment fund a fifth plugin interface? No. No amendment was made.**
+Owner's ruling, recorded here, in `plan.md` (*The interface question, and the ruling on
+it*), in `research.md` D12 and in `core/instruments/registry.py`'s section comment.
+
+Three statements, because the wrong one of them was in `plan.md` and the code contradicted
+it:
+
+1. **Not a fifth plugin interface.** No `FundOps`, no second mapping of functions, no new
+   dispatch mechanism, and adding a third fund is data-only (SC-010; a fourth is added in a
+   scratch directory by `tests/contract/test_fund_data_only.py`).
+2. **Not "a fund implements `Instrument`"** either — that sentence was false. A fund is a
+   second declaration *kind* under the same concept, projected by its own function because
+   its result shape differs. The dead `fund.tax_classes()` the false claim had left behind
+   is deleted, and the resolver's `if` is now a lookup in `LOADERS_BY_KIND` over the
+   vocabulary `core.instruments.registry.DECLARATION_KINDS` declares.
+3. **`InstrumentOps` / `REGISTRY` are the dispatch for kinds whose projection is an event
+   stream**, and `REGISTRY` is *not* exhaustive of instruments. Their docstrings said
+   otherwise and now say so, because reading `REGISTRY` as the list of every instrument is
+   exactly the mistake that produced the false claim.
+
+The decisive mismatch is the output: `EventsFn` returns one stream, and a fund stating
+25–29% with no chosen point produces **two** projections. Forcing that through the
+signature means either picking a point (FR-023 forbids it by name) or widening the return
+type for bonds too (every existing caller then handles a case that cannot arise for a bond).
+
+**The recorded seam for 010:** the unification is at the *result* layer, and
+`core.results.fund.BesideTheHurdle` is the first of it.
+
+### Review round — sibling paths, enumerated rather than the one that was demonstrated
+
+The review's standing point: a demonstration is an existence proof, not a specification.
+What else could reach each finding, and what was done about it.
+
+| Finding | Every path that reaches it | Disposition |
+|---|---|---|
+| A date from a vague citation stated no criterion (`ua.toml`) | all three `ua.toml` entries; both `inzhur_reit.toml` cap entries; `inzhur_miltech.toml`'s NAV reading | Two rules (A, and B split into B1/B2) written into `ua.toml`'s header; **every** entry now names the rule that dated it, and the cap entries name B1 by name so the repo has one vocabulary. MilTech's NAV is the same class of judgement — a reading chosen between two — and now states its arithmetic **and** that it is the *less* conservative reading taken because the evidence decides, B1 being only a tiebreaker |
+| A false interface claim in `plan.md` | `plan.md` ×3, `research.md` D12, `registry.py` ×3 docstrings, `instruments/__init__.py`, `instruments/interface.py` | All corrected; the `[[future]]` entry that deferred the question is deleted, since it is answered |
+| A stale digest transcribed into prose | the whole disclosure table in these notes | Re-derived from the files on disk by script, never edited by hand; a check re-runs it against `tests/golden/ovdp_synthetic_a.golden.txt` |
+| A fixture hard-coding a date that is not its subject | five fund test modules | All repointed at `tests/synthetic.SCHEDULE_START` |
+| A run depending on the 15-day margin to the exemption's start | four modules projecting issue A | One assertion pins the relationship and names all four; each of the four carries a comment pointing at it |
+
 ### T053 — the gates on the last commit, and the delta from T001
 
 | Gate | Baseline (T001) | Now | Delta |
 |---|---|---|---|
-| `pytest --cov` | 1198 passed | **1893 passed** | +695 (includes 004, 005 and the CPI series, merged in) |
+| `pytest --cov` | 1198 passed | **1895 passed** | +697 (includes 004, 005, the CPI series and the Deel/ФОП flow, merged in) |
 | coverage (floor 90%) | 99.77% | **99.57%** | −0.20 pt |
-| `pytest -m "contract or invariant"` | — | **864 passed**, 1029 deselected | — |
-| `check_provenance.py` | 0 errors, 24 unverified, 12 files | **0 errors, 463 unverified, 17 files** | the jump is the merged-in CPI series, which is one cited observation per month |
+| `pytest -m "contract or invariant"` | — | **866 passed**, 1029 deselected | — |
+| `check_provenance.py` | 0 errors, 24 unverified, 12 files | **0 errors, 470 unverified, 20 files** | the jump is the merged-in CPI series, one cited observation per month, plus the Deel/ФОП routes |
 | `ruff check` / `ruff format --check` | clean | clean | — |
 | `mypy` (strict) | clean, 144 files | clean, **189 files** | +45 |
 | `lint-imports` | 4 contracts kept | 4 kept, 0 broken | — |

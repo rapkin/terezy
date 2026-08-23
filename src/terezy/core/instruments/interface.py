@@ -6,6 +6,14 @@ to inherit, no protocol to implement, and nothing to construct. An instrument ki
 frozen record of three functions, and dispatch is a mapping
 (``terezy.core.instruments.registry``).
 
+⚙ **What this interface covers is a projection that produces a stream of ledger events.**
+That is not every declared instrument: a collective-investment fund
+(``terezy.core.instruments.fund``) is a declared kind whose projection returns a result
+record instead -- and, for a fund stating a range, two of them. It is therefore not in
+``registry.REGISTRY`` and does not implement :class:`InstrumentOps`. See that module's
+section comment for the three mismatches and for why widening this signature to cover both
+was rejected.
+
 This module also defines the records those functions take and return, because they are
 the vocabulary of the interface and splitting them into a fourth module would only add a
 file to import. They divide into two kinds, and the division is Principle VII's:

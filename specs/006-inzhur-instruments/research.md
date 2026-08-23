@@ -169,8 +169,14 @@ it looks like arithmetic.
 - `core/tax/schedule.py` — `RateEntry`, `rate_on`, `RateUndeclaredBefore`.
 - `core/tax/flat_rate.py` — migrated to read the schedule; the `TaxRule` interface is
   unchanged, so no fifth plugin interface and no amendment.
-- `core/instruments/fund.py` — the collective-investment fund beside `fixed_income.py`,
-  implementing the existing `Instrument` interface.
+- `core/instruments/fund.py` — the collective-investment fund beside `fixed_income.py`.
+  ⚙ **Corrected during implementation:** this line originally read "implementing the
+  existing `Instrument` interface", and that is false. A fund needs inputs a bond has no use
+  for, refuses in ways a bond cannot, and answers a stated range with *two* projections
+  where `EventsFn` returns one stream. It is a second declaration **kind** under the same
+  concept, not an implementation of the interface — which is still not a fifth plugin
+  interface, and the owner ruled on 2026-08-23 that no amendment is required. The argument
+  is in `plan.md`, *The interface question, and the ruling on it*.
 - `core/results/fund.py` — the projection result, per-class subtotals, the peg statement,
   the spread lines, and the typed refusals.
 - `data/instruments/inzhur_reit.toml`, `inzhur_miltech.toml`, and a third **synthetic** fund

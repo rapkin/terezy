@@ -47,7 +47,7 @@ subscription_cutoff  = "2026-12-31"
   [instrument.nav]
   per_unit     = 1006.97
   kind         = "fund_terms"
-  source       = "https://www.inzhur.reit/offer/inzhur-miltech — the live entry price per certificate, accessed 2026-08-22, against a nominal of 1 000.00 грн. Read as the net asset value because the entry price sits only 0.7% above nominal on a fund registered 06.05.2026 and launched 12.08.2026, which is consistent with NAV having accreted and NO markup being charged rather than with a markup on nominal. Verification task 1 exists to settle exactly that."
+  source       = "https://www.inzhur.reit/offer/inzhur-miltech — the live entry price per certificate, accessed 2026-08-22, against a nominal of 1 000.00 грн. Read as the net asset value rather than as nominal-plus-markup, and the reasoning is stated because it is a judgement between two readings of one observation. The fund launched 12.08.2026 and this price was read 2026-08-22; ten days of the fund's own stated 25-29% on a nominal of 1 000.00 is about 6.8-7.9 грн, and the observed premium is 6.97 — so 'NAV has accreted and no markup is charged' fits the arithmetic, while 'nominal plus a 0.697% markup' fits nothing in particular. ⚙ NOTE THAT THIS IS THE LESS CONSERVATIVE READING and it is taken anyway, which is the opposite of what data/tax/ua.toml's rule B1 would do. B1 is a TIEBREAKER for when the evidence does not decide; here it does. The consequence of being wrong is visible: a NAV declared 0.697% high makes every exit 0.697% richer, because the exit prices off accreted NAV while the purchase cost is identical under either reading. Verification task 1 exists to settle it against the live buy and sell prices."
   retrieved_on = "2026-08-22"
   verified_on  = ""
 
