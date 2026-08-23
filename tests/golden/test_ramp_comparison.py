@@ -21,10 +21,16 @@ this test, on the line that names the file. The last time the OVDP artefact move
 was exactly three input digests and an unchanged result digest -- which is how the file
 distinguishes "the inputs changed" from "the answer changed".
 
-**The two fields feature 004 added are rendered and digested**: ``exit_path`` -- which way out
-this figure is keyed by -- and ``by_segment``, the attribution's second axis. Both are
-user-visible, and a recorded result that omitted them would let either move without the artefact
-noticing, which is the one thing a golden file exists to prevent.
+**The two fields feature 004 added are rendered**: ``exit_path`` -- which way out this figure is
+keyed by -- and ``by_segment``, the attribution's second axis, on both halves of the round trip.
+Both are user-visible, and a recorded result that omitted them would let either move without the
+artefact noticing.
+
+⚙ **The digest covers ``exit_path`` and the *one-way* segment axis, not the round-trip one**, and
+that is the older design rather than an oversight: ``manifest_shape`` has never covered the
+round-trip fraction or its channels either, because the digest is the one-way figure's bit-identity
+check and the round trip is caught by the rendering beside it. Both halves are diffed; one half is
+hashed. Say which, rather than claiming both.
 
 **Deliberately excluded**: provenance. Filling in a ``verified_on`` must not move the digest,
 or the test would fail on a documentation edit; that exclusion is asserted below, and the mark

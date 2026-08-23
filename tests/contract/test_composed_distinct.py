@@ -41,6 +41,7 @@ from terezy.core.results.ramp import (
 from terezy.core.routes import cost, ranking
 from terezy.core.routes.legs import Route
 from terezy.core.routes.path import (
+    EXIT_BY_IDENTITY,
     ComposedExit,
     ComposedPath,
     DeclaredExit,
@@ -361,6 +362,58 @@ class TestTheSeamBetweenTheWayInAndTheWayOut:
                 as_of=fixtures.AS_OF,
                 spendable=world.spendable,
             )
+
+    def test_a_supplied_identity_sentinel_is_anchored_too(self) -> None:
+        """The twin, and the hole the first pass left.
+
+        ``EXIT_BY_IDENTITY`` skipped ``_supplied_exit`` entirely because it matched its own
+        ``case`` arm before the catch-all -- so the one shape whose **whole content** is a claim
+        about the far end was the one shape nothing checked. Passed against a candidate arriving
+        at the broker it produced a ``RoundTripCost`` reporting 2199.00 **USD** arrived beside a
+        fraction computed from hryvnia components: two figures on one record describing different
+        things, which is verbatim the failure ``METHODOLOGY`` §21.8 cites to justify the anchor.
+
+        Reachable through this feature's own surface -- ``rank`` takes a ``Journey`` from any
+        caller, and ``Journey(path, exit_path=EXIT_BY_IDENTITY)`` is one line.
+        """
+        world = fixtures.tied()
+        with pytest.raises(ValueError, match="not a declared spendable endpoint"):
+            cost.cost_one(
+                CHAIN,
+                AMOUNT,
+                exit_path=EXIT_BY_IDENTITY,
+                routes=_world(),
+                channels=world.channels,
+                streams=world.streams,
+                kinds=world.kinds,
+                on_date=fixtures.ON_DATE,
+                as_of=fixtures.AS_OF,
+                spendable=world.spendable,
+            )
+
+    def test_the_sentinel_still_costs_where_the_destination_really_is_spendable(self) -> None:
+        """The anchor refuses a false claim, not the sentinel. Without this the test above would
+        pass against a branch that raised unconditionally."""
+        world = fixtures.spendable_destination()
+        costed = cost.cost_one(
+            FundingPath(
+                destination_id=fixtures.HOME,
+                stream_id=fixtures.SALARY.id,
+                route_id="in_salary_to_home",
+            ),
+            AMOUNT,
+            exit_path=EXIT_BY_IDENTITY,
+            routes=world.routes,
+            channels=world.channels,
+            streams=world.streams,
+            kinds=world.kinds,
+            on_date=fixtures.ON_DATE,
+            as_of=fixtures.AS_OF,
+            spendable=world.spendable,
+        )
+        assert isinstance(costed, RampCost), costed
+        assert isinstance(costed.round_trip, RoundTripCost)
+        assert costed.exit_path is EXIT_BY_IDENTITY
 
     def test_a_correctly_anchored_chain_still_costs(self) -> None:
         """The anchors refuse mispairings, not exit chains. Without this the two above would

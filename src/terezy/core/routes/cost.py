@@ -849,6 +849,28 @@ def _spendable_junctions(spendable: frozenset[SpendableEndpoint]) -> frozenset[_
     return frozenset((endpoint.venue_id, endpoint.currency.value) for endpoint in spendable)
 
 
+def _reaches_spendable(
+    junction: _Junction, spendable: frozenset[SpendableEndpoint], *, claim: str
+) -> None:
+    """The far end of a way out is somewhere the owner actually spends, or a raise saying so.
+
+    FR-022: an exit chain runs from the destination back to a **declared spendable endpoint**.
+    One function, because there are two ways a caller can claim to have got the money out -- by
+    naming a chain, or by asserting the destination needs no chain -- and the second is *only*
+    that claim, so it is the one place the check must not be skipped.
+    """
+    reachable = _spendable_junctions(spendable)
+    if junction in reachable:
+        return
+    raise ValueError(
+        f"{claim} ends as {junction[1]} at {junction[0]!r}, which is not a declared spendable "
+        f"endpoint. Known endpoints: {sorted(reachable)}. A way out runs from the destination "
+        "back to somewhere the owner actually spends (FR-022); one that stops short has not got "
+        "the money out, and a round-trip figure over it would report a journey ending in "
+        "something the owner cannot spend as though it had come back."
+    )
+
+
 def _exit_chain_of(
     path: Candidate,
     exit_path: ExitChoice,
@@ -890,6 +912,21 @@ def _exit_chain_of(
             partner = routes[segments_of(path)[-1]].partner_route
             return None if partner is None else DeclaredExit(route_id=partner)
         case ExitByIdentity():
+            # **A caller-supplied sentinel is checked, not taken on trust.** Derived above it is
+            # safe by construction -- the branch only reaches it when the arrival *is* spendable
+            # -- but passed in it is the bare assertion "this destination needs no way out", and
+            # its whole content is a claim about the far end. Unchecked, it produced a confident
+            # round trip for money still sitting in dollars at an exchange: an arriving amount in
+            # one currency beside a cost fraction computed in another, which is exactly the
+            # failure the anchor below exists to refuse.
+            _reaches_spendable(
+                arrival,
+                spendable,
+                claim=(
+                    "EXIT_BY_IDENTITY says there is nothing to do because the way in already "
+                    "ends somewhere the owner spends -- but it"
+                ),
+            )
             return exit_path
         case _:
             _supplied_exit(exit_path, routes, arrival=arrival, spendable=spendable)
@@ -919,19 +956,20 @@ def _supplied_exit(
     is feature 003's ``coverage-enforcement`` -- a recorded deferral, and not this feature's to
     take. What is in scope is FR-022's definition of a **composed** way out, and a caller who
     names a chain is asserting it is one.
+
+    **The consequence is an asymmetry worth stating plainly:** naming the very exit the
+    declaration would have derived raises here, where leaving it to be derived returns a figure.
+    That is not "stricter versus looser" but an exception versus a number, and it is the price of
+    keeping the deferral honest -- 002's rule governs what the loader vouched for, and FR-022
+    governs what a caller asserts. If the two should converge, the change is to lift
+    ``coverage-enforcement``, which is the owner's call and not a widening to make here.
     """
     resolved = _exit_routes(chain, routes, arrival=arrival)
-    reachable = _spendable_junctions(spendable)
-    if _arrives_at(resolved[-1]) not in reachable:
-        raise ValueError(
-            f"exit chain {'+'.join(exit_segments_of(chain))!r} ends as "
-            f"{resolved[-1].legs[-1].to_ccy.value} at {resolved[-1].destination!r}, which is "
-            f"not a declared spendable endpoint. Known endpoints: {sorted(reachable)}. An exit "
-            "chain runs from the destination back to somewhere the owner actually spends "
-            "(FR-022); one that stops short has not got the money out, and a round-trip figure "
-            "over it would report a journey ending in something the owner cannot spend as "
-            "though it had come back."
-        )
+    _reaches_spendable(
+        _arrives_at(resolved[-1]),
+        spendable,
+        claim=f"exit chain {'+'.join(exit_segments_of(chain))!r}",
+    )
 
 
 def _exit_routes(

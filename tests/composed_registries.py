@@ -653,3 +653,66 @@ def stranded() -> Registry:
 def spendable_destination() -> Registry:
     """A way in that lands where the owner spends, with nothing declared to come back out."""
     return registry(SALARY_TO_HOME)
+
+
+HOME_TO_WALLET = corridor(
+    "out_home_to_wallet",
+    direction="exit",
+    legs=(
+        leg(
+            index=0,
+            from_venue=HOME,
+            to_venue=WALLET,
+            from_ccy=UAH,
+            to_ccy=UAH,
+            fee_pct=0.05,
+        ),
+    ),
+)
+"""A declared way out **of** the spendable endpoint, charging ten times the way in.
+
+The fee is deliberately large: it exists so that "identity supersedes a declared partner" is a
+claim with a visible consequence rather than a preference between two figures that agree. Where
+the two rules disagree they disagree by a factor of ten, so a test can tell which one ran.
+"""
+
+SALARY_TO_HOME_PARTNERED = corridor(
+    "in_salary_to_home_partnered",
+    direction="inbound",
+    legs=(
+        leg(
+            index=0,
+            from_venue=SALARY_VENUE,
+            to_venue=HOME,
+            from_ccy=UAH,
+            to_ccy=UAH,
+            fee_pct=0.005,
+        ),
+    ),
+    partner_route=HOME_TO_WALLET.id,
+)
+"""A way in that lands on the spendable endpoint **and** names a declared way out of it.
+
+The one registry where 003's identity rule and 002's partner rule both apply and disagree. It is
+the shape ``superseded-exit-visibility`` is about, and until it existed the branch order in
+``_exit_chain_of`` could be swapped without any test noticing.
+"""
+
+
+def spendable_destination_with_partner() -> Registry:
+    """A spendable destination that also declares an exit, and a second spendable rail.
+
+    Two endpoints, because the partner has to *land* somewhere spendable for the comparison to
+    be between two figures rather than between a figure and a refusal: it leaves the home rail
+    and reaches the wallet, and the owner spends from both.
+    """
+    return registry(
+        SALARY_TO_HOME_PARTNERED,
+        HOME_TO_WALLET,
+        spendable=frozenset(
+            {
+                SpendableEndpoint(venue_id=HOME, currency=UAH),
+                SpendableEndpoint(venue_id=WALLET, currency=UAH),
+            }
+        ),
+    )

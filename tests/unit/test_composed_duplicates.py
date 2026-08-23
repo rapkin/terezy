@@ -184,13 +184,29 @@ ONE_TERM_APART: dict[str, dict[str, object]] = {
     "capacity_pool": {"pool": "another_rail"},
     "fee_pct": {"fee_pct": 0.02},
     "fee_fixed": {"fee_fixed": 7.0},
+    "kind_of_observation": {"observation": fixtures.P2P_PREMIUM.id},
 }
 """Exactly one declared term each, against :data:`BASE_TERMS`.
 
-Every one of them is part of what a journey costs or what it will carry, so two corridors
-differing in one are two things the owner may choose between -- and dropping any of them from
-the comparison deletes a real alternative from the ranking **with no trace**, since there is no
-``excluded`` entry for a candidate the search never emitted.
+Every one of them is part of what a journey costs, what it will carry, or how its numbers age,
+so two corridors differing in one are two things the owner may choose between -- and dropping
+any of them from the comparison deletes a real alternative from the ranking **with no trace**,
+since there is no ``excluded`` entry for a candidate the search never emitted.
+
+⚙ **The comparison holds nineteen elements and this covers fifteen of them**; the remainder are
+named rather than left for a reader to count. ``position`` is the renumbered index and is pinned
+by SC-013 next door. ``from_venue``, ``to_venue``, ``from_ccy`` and ``to_ccy`` are covered by the
+mirror-venue case above. The three that are **not** exercised here -- ``kind``, ``channel`` and
+``fee_fixed``'s currency -- cannot vary independently in this builder: ``leg`` derives all three
+from the two venue currencies, so a variant differing in one of them differs in a currency too
+and would be testing the currency. Exercising them needs a builder that can declare an
+inconsistent leg, which is a leg the resolver refuses, so what would be under test is a file
+that cannot exist.
+
+``kind_of_observation`` *can* vary on its own -- ``leg`` takes ``observation=`` -- and it was
+the one genuine gap: two corridors whose numbers age on different schedules are two corridors,
+and collapsing them would report one staleness verdict for two different claims about how fresh
+the figures are.
 """
 
 

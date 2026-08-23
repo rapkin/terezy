@@ -468,3 +468,77 @@ class TestADestinationThatIsItselfSpendable:
         assert not isinstance(outcome, NothingComparable), outcome
         assert len(outcome.costed) == 1
         assert outcome.not_comparable == ()
+
+
+class TestIdentitySupersedesADeclaredPartner:
+    """The branch order in ``_exit_chain_of``, turned from a comment into a decision.
+
+    Feature 003's ``superseded-exit-visibility`` note records the reading: where the destination
+    **is** a declared spendable endpoint, the identity sentinel supersedes any exit route
+    actually declared from it. Costing has to take the same reading or one pair would be priced
+    two ways -- coverage's verdict resting on identity, costing's figure resting on a hop.
+
+    Until this registry existed the rule was stated in three places and asserted nowhere: every
+    other identity fixture declares ``partner_route = None``, where both orders agree. Swapping
+    the two branches passed the whole suite.
+
+    ## The arithmetic, so the two readings are visibly different
+
+    ```
+    in_salary_to_home_partnered   0.5% of 10 000               =    50.00 UAH
+        by identity   the money has arrived somewhere spendable; nothing more to do
+                      round trip = way in                      =    50.00 UAH  (0.5%)
+
+    out_home_to_wallet            5% of the 9 950 that arrived =   497.50 UAH
+        by the partner            50.00 + 497.50               =   547.50 UAH  (5.475%)
+    ```
+
+    A factor of ten in the headline figure, decided entirely by which rule runs first.
+    """
+
+    PATH = FundingPath(
+        destination_id=fixtures.HOME,
+        stream_id=fixtures.SALARY.id,
+        route_id="in_salary_to_home_partnered",
+    )
+
+    IDENTITY_FRACTION = 0.005
+    PARTNER_FRACTION = (50.0 + 0.05 * (SENT - 50.0)) / SENT
+    """0.05475 -- 547.50 UAH on 10 000."""
+
+    def test_the_registry_really_declares_both_a_spendable_landing_and_a_partner(self) -> None:
+        """The precondition. Without it the test could pass on a registry where only one rule
+        applies, and the branch order would still be unpinned."""
+        world = fixtures.spendable_destination_with_partner()
+        route = world.routes["in_salary_to_home_partnered"]
+        assert route.partner_route == "out_home_to_wallet"
+        assert any(
+            endpoint.venue_id == fixtures.HOME and endpoint.currency is Currency.UAH
+            for endpoint in world.spendable
+        )
+
+    def test_the_declaration_resolves_to_identity_and_not_to_the_partner(self) -> None:
+        world = fixtures.spendable_destination_with_partner()
+        costed = _costed(world, path=self.PATH, exit_path=FROM_THE_DECLARATION)
+        assert costed.exit_path is EXIT_BY_IDENTITY
+        assert isinstance(costed.round_trip, RoundTripCost)
+        assert is_close(costed.round_trip.fraction, self.IDENTITY_FRACTION)
+        assert [entry.route_id for entry in costed.round_trip.by_segment] == [
+            "in_salary_to_home_partnered"
+        ]
+
+    def test_the_partner_is_a_genuinely_different_figure_when_named(self) -> None:
+        """So the assertion above is about *which rule ran*, not about two figures that agree.
+
+        A caller may still name the declared exit explicitly and be charged for it -- the
+        supersession is what the *declaration* resolves to, not a refusal to walk a hop the
+        caller asked for.
+        """
+        world = fixtures.spendable_destination_with_partner()
+        costed = _costed(
+            world, path=self.PATH, exit_path=DeclaredExit(route_id="out_home_to_wallet")
+        )
+        assert costed.exit_path == DeclaredExit(route_id="out_home_to_wallet")
+        assert isinstance(costed.round_trip, RoundTripCost)
+        assert is_close(costed.round_trip.fraction, self.PARTNER_FRACTION)
+        assert not is_close(self.PARTNER_FRACTION, self.IDENTITY_FRACTION)

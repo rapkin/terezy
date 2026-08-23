@@ -437,30 +437,26 @@ class TestTheScanWouldActuallyCatchAViolation:
         assert not _accepts_a_bare_destination(cost_one)
         assert _takes_the_triple(cost_one)
 
-    def test_the_transitive_nesting_exemption_still_refuses_an_unreachable_record(self) -> None:
-        """The decoy the widened exemption needed, and did not have.
+    def test_the_transitive_closure_walks_out_from_keyed_records_and_not_over_everything(
+        self,
+    ) -> None:
+        """The boundary of the widened exemption, asserted where it can actually fail.
 
-        Making the nesting closure transitive was necessary -- ``SegmentAttribution`` is keyed by
-        its **grandparent** ``RampCost`` -- but it widened the exempt set from the eight types
-        directly held by a keyed record to everything reachable from one. An exemption that grew
-        without a decoy is an exemption nobody has seen fail.
+        ⚙ **The obvious decoy here is vacuous, and saying so is the point.** A throwaway record
+        declared inside a test body can never enter the closure, because ``held_by`` collects
+        names by reading the *annotations of reachable records* -- a name no annotation mentions
+        is unreachable under any closure, one level or twenty. An assertion that cannot fail is
+        worse than none: it reads as coverage.
 
-        So: a record carrying a cost figure that **nothing keyed reaches** must still be caught.
-        The closure walks out from the keyed records only, so a type held by no result record at
-        all is outside it however transitive the walk becomes.
+        What *is* falsifiable is the closure's **root set**. It walks out from the keyed records
+        only, so a declaration record like ``Route`` or ``Leg`` -- carrying no cost figure, and
+        held by no result record -- must stay outside it. A closure that walked every dataclass
+        instead of following the field graph from the keys would sweep both in, and every
+        unkeyed cost record with them.
         """
         nested = _records_nested_in_keyed_records()
-
-        @dataclasses.dataclass(frozen=True)
-        class OrphanedAttribution:
-            """A cost figure hanging off nothing -- exempt only if the closure over-reaches."""
-
-            fraction: float
-
-        assert OrphanedAttribution.__name__ not in nested
-        fields = {field.name for field in dataclasses.fields(OrphanedAttribution)}
-        assert fields & COST_FIGURE_NAMES
-        assert not _is_keyed(OrphanedAttribution)
+        assert "Route" not in nested
+        assert "Leg" not in nested
 
     def test_the_transitive_exemption_does_reach_the_record_it_was_widened_for(self) -> None:
         """The other half: ``SegmentAttribution`` is two hops from the key and **is** exempt.

@@ -342,6 +342,33 @@ with the test that pins it and a revert check proving that test fails without th
 
 ---
 
+## Phase 10: Delta re-review (2026-08-23)
+
+Nine of eleven fixes verified sound. One blocker, one missing assertion, three documentation
+gaps.
+
+- [X] R13 **Blocker** — a caller-supplied `EXIT_BY_IDENTITY` matched its own `case` arm and so
+      skipped `_supplied_exit` entirely, leaving the one shape whose whole content is a claim
+      about the far end unchecked. `_reaches_spendable` is now shared by both claims. Twin test
+      in `tests/contract/test_composed_distinct.py::…::test_a_supplied_identity_sentinel_is_anchored_too`,
+      with a positive control beside it.
+- [X] R14 — identity superseding a declared partner was documented three times and pinned by
+      nothing. `tests/composed_registries.py::spendable_destination_with_partner` is the registry
+      where the two rules disagree by a factor of ten, and
+      `test_composed_exit_chain.py::TestIdentitySupersedesADeclaredPartner` decides it.
+- [X] R15 — the derived/supplied asymmetry now says out loud that the same chain, named
+      explicitly, raises where the derived path returns a figure.
+- [X] R16 **F5 doc** — `kind_of_observation` was a genuine gap and is now a case rather than a
+      note; `kind`, `channel` and `fee_fixed.currency` are named as non-independent in this
+      builder, with the reason.
+- [X] R17 **F10 doc** — the claim is halved: both fields are rendered, `exit_path` and the
+      one-way segment axis are digested, and the round-trip axis is not — which is the older
+      design, stated rather than overclaimed.
+- [X] R18 **F8 doc** — the over-reach decoy was vacuous and is replaced by a falsifiable one:
+      the closure's **root set**, which a walk over every record would breach.
+
+---
+
 ## Dependencies & execution order
 
 ### Phase dependencies
