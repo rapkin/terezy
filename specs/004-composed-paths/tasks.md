@@ -282,19 +282,19 @@ candidates appear, fully costed and ranked, with no source-code change.
 
 ## Phase 8: Polish & cross-cutting
 
-- [ ] T035 [P] Update `docs/METHODOLOGY.md` in the same change as the behaviour: what a composed
+- [X] T035 [P] Update `docs/METHODOLOGY.md` in the same change as the behaviour: what a composed
       candidate is, why every one is costed in full, what a junction does **not** do, how the
       segment bound bounds reach, why there is no path-level disruption probability, and what
       `EXIT_BY_IDENTITY` claims.
-- [ ] T036 [P] Update `docs/REQUIRED_TESTS.md`: this feature closes **no** row; record the
+- [X] T036 [P] Update `docs/REQUIRED_TESTS.md`: this feature closes **no** row; record the
       pressure it puts on **B12**, **G6** and **H1** in *Rows a feature reinforced without
       closing*, with the test paths that hold them.
-- [ ] T037 [P] Add the `data/composition/` section to `data/README.md`, in the voice its
+- [X] T037 [P] Add the `data/composition/` section to `data/README.md`, in the voice its
       neighbours use.
-- [ ] T038 Record in `specs/features.toml` that `identity-exit-vs-partner-requirement` is closed
+- [X] T038 Record in `specs/features.toml` that `identity-exit-vs-partner-requirement` is closed
       by this feature — the `[[future]]` entry comes off the list rather than being left as a
       solved problem, with the removal justified in the commit message.
-- [ ] T039 Run the quickstart end to end
+- [X] T039 Run the quickstart end to end
       ([quickstart.md](./quickstart.md)) and every gate:
       `uv run ruff check . && uv run ruff format --check .`, `uv run mypy`,
       `uv run lint-imports`, `uv run python scripts/check_provenance.py`, `uv run pytest --cov`,

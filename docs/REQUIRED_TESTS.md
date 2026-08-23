@@ -188,6 +188,17 @@ it reinforces:
 | **H2** | Relied on and extended, not re-derived: the one new declaration (`data/spendable/`) fails at load naming file and field for every refusal in its contract, on the existing loader path. `tests/contract/test_spendable_declaration_loading.py`. The row's own test stays `tests/contract/test_declaration_loading.py`. |
 | **G6** | Extended in visibility: feature 002's per-route *exit cost unknown* refusal becomes an audit of the whole registry, and `tests/invariants/test_coverage_costing_agreement.py` pins the two views together — a pair the audit marks ready is one costing produces a round-trip figure for, within this feature's single-route scope. |
 
+**004-composed-paths** closes **no** row either, and says so rather than stretching one: no
+lettered behaviour above names composing declared routes into a candidate. Three rows it presses
+on directly, and one it reinforces along the way:
+
+| Row | How, and why the box does not move |
+|---|---|
+| **B12** | The row's hardest case, because a routing search is exactly where a composite score sneaks into a user-visible ordering. Composed candidates enter 002's lexicographic ranking with no bonus, no penalty and no separate league; nothing is pruned by cost, no partial cost is cached, and **no record in the feature has a field a score could live in** — asserted as an absence in `tests/unit/test_composed_path_types.py`, and as order-independence in `tests/invariants/test_composition_order.py`, which runs a registry in both declaration orders and compares every figure, position, recommendation and tie. Still a whole-engine row: this is one more ordering that does not use a score, not the last one. |
+| **G6** | Pressed on from the other side. A composed round trip exists **only** through a chain of declared exit routes (FR-012, owner decision 2026-08-22) or where the destination is itself spendable; where nothing chains, *exit cost unknown* stands, the candidate stays out of the round-trip ranking, and its one-way figure is not promoted — both directions verified in `tests/worked_examples/test_composed_exit_chain.py`. `tests/contract/test_composed_distinct.py` pins the correspondence: `RampCost.exit_path` is `None` exactly when the round trip is unknown. |
+| **H1** | The row's claim applied to composition, and the closest any feature has come to it: `tests/contract/test_composed_data_only.py` adds **one** `Route` declaration, gets a three-segment candidate that is fully costed and ranked, and asserts that no module under `core/` mentions the new venue or route at all. The box stays open because H1 asks for an instrument, a route, a tax class and a jurisdiction through the **full pipeline**, which is feature 010's scope. |
+| **B10** | Exercised again: `CompositionRefused` is a typed statement that a question could not be asked — a bound admitting nothing, an exit chain with nowhere declared to end — and it is a *different type* from an empty enumeration, which is the legitimate answer "nothing connects". `tests/invariants/test_composition_search.py` asserts both, because a caller who counts rows cannot tell them apart. |
+
 ---
 
 ## On tolerance

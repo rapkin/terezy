@@ -15,6 +15,7 @@ Everything here is versioned, sourced, dated, and reviewed in git like code
 | `channels/` | Two-sided FX quotes per named channel — official, interbank, bank non-cash, cash desk, card, peer-to-peer (spec §4.3.1, FR-010). |
 | `streams/` | **Per-owner** income streams: currency, amount, cadence, arrival venue, indexation (spec §4.2). |
 | `spendable/` | **Per-owner** endpoints where money counts as having come back out: base currency only, at the venues the owner actually spends from (003 FR-004). |
+| `composition/` | **Per-owner** reach policy: how many declared routes may be chained into one candidate. No default — a missing bound fails at load (004 FR-006). |
 | `tax/` | Jurisdiction rule packs with dated rate schedules (spec §4.5). |
 | `scenarios/` | FX paths, discrete events, regime transitions, risk assumptions (spec §4.3.4, §4.6). |
 | `strategies/` | Named allocations, per income stream (spec §5.1). |
@@ -81,6 +82,16 @@ number in the file for a source to vouch for. It is listed in `EXEMPT_DIRS` by n
 that reason, which is the only way a directory is allowed to go unscanned; if a *number*
 ever appears there — a spending limit, a fee — the value moves to a sourced directory
 rather than the exemption widening to cover it.
+
+`composition/` carries the **exemption `objectives/` and `strategies/` carry**, and for the same
+reason: it is a *policy*, not a belief and not an observation. How many declared routes the owner
+is willing to let a search chain into one candidate is a statement about how far he wants to
+look, and nothing in the file describes the world — every *number* that describes a corridor
+lives on a leg, in `routes/`, cited. It has **no default**: a registry with no declared bound
+fails at load naming the file and the field, by the rule that refuses a default staleness
+threshold, because a forgotten line must never read as a chosen policy. `max_segments = 1` is the
+explicit way to switch composition off and is a legal choice; `0` admits nothing at all and is
+refused as a broken registry.
 
 The two lists are **exhaustive, and the gate is fail-closed**: every directory under
 `data/` is either scanned or exempted *by name with its reason* in the script, files at
