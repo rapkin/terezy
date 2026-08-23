@@ -296,6 +296,33 @@ feasibility union and the refusals) still lands with the solver in Phase 6.
 
 ---
 
+## Phase 10: Review follow-up (2026-08-23)
+
+Two blockers, three fold-ins and one owner decision from the independent review.
+
+- [x] T042 **Blocker.** A crossing before the target date is no longer reported as an arrival:
+      `_missed_or_unreachable` in `src/terezy/core/goals/solve.py` refuses a crossing that is
+      not strictly later than the horizon, and the verdict is unreachable carrying the
+      shortfall and the falling-through month. Pinned both directions in
+      `tests/unit/test_goal_feasibility.py` and as a property with the regression as a
+      Hypothesis `@example` in `tests/invariants/test_goal_mode_consistency.py`
+- [x] T043 **Blocker.** `seeds.seed_cost` joins the estimated-basis mark to the declared cost
+      inside `src/terezy/core/ledger/seeds.py`, so a lot assembled without the loader cannot
+      fold into an unmarked gain; the propagation fixtures now build unmarked costs on purpose
+- [x] T044 `_unreachable_reason` gains the third shape it was folding into the second — pure
+      decay with no contribution — each branch testing the expression the solver gave up on
+- [x] T045 The closed forms compute `(1+i)^t - 1` with `expm1` and invert with `log1p`, and the
+      consistency property's target floor of 10 000 is gone
+- [x] T046 `data/README.md` rule 5 rewritten to the owner's own rule (public facts and labelled
+      synthetic fixtures only), enumeration made total, and reconciled with Principle VII;
+      `.claude/skills/commit/SKILL.md` amended to match
+- [x] T047 `data-model.md`, `contracts/goal-solver.md` and `research.md` D7 reconciled with the
+      code they describe
+- [x] T048 `is_synthetic` added to the seed and goal declarations as a required field, so rule
+      5's claim is machine-readable
+
+---
+
 ## Notes
 
 - Every commit goes through the `/commit` skill, which runs the gates.
