@@ -375,10 +375,57 @@ def test_the_provenance_gate_does_not_scan_the_spendable_directory() -> None:
     There is no observed value in the spendable file for a source to vouch for. If this half
     ever has to change, a number leaked into the declaration -- so the check is on the tuple
     itself rather than on the gate's exit status, which would go green either way.
+
+    ⚙ **The claim is about ``spendable``, not about the whole tuple** (correction,
+    2026-08-23). This asserted ``SOURCED_DIRS == ("tax", "instruments", "routes", "channels")``,
+    which fails the day a *genuinely sourced* directory is added -- ``data/prices/``, say -- and
+    fails under a test name and a docstring that send the reader to ``data/spendable/``, which
+    is not what changed. Adding a sourced directory is ordinary growth and no business of this
+    test; a spendable directory that started being scanned is the finding it exists to make
+    loud.
     """
     module: Any = _provenance_module()
     assert "spendable" not in module.SOURCED_DIRS
-    assert module.SOURCED_DIRS == ("tax", "instruments", "routes", "channels")
+
+
+LOADER_SOURCE = REPO_ROOT / "src" / "terezy" / "data" / "declarations" / "loader.py"
+SPENDABLE_SECTION_BANNER = "# 003-route-coverage: the spendable-endpoint list"
+
+
+def _loader_spendable_section() -> str:
+    """The loader's header for this feature: its banner down to the first declaration."""
+    source = LOADER_SOURCE.read_text(encoding="utf-8")
+    _, banner, rest = source.partition(SPENDABLE_SECTION_BANNER)
+    assert banner, f"{LOADER_SOURCE.name} no longer carries the section this test reads"
+    section, marker, _ = rest.partition("SPENDABLE_TABLE")
+    assert marker, "the section no longer ends at SPENDABLE_TABLE; this test is stale"
+    return section
+
+
+def test_the_loader_header_teaches_the_fail_closed_exemption_not_the_superseded_rule() -> None:
+    """Four places state why the spendable file carries no citation. They must state one rule.
+
+    Absence from ``SOURCED_DIRS`` used to be how a directory was out of scope. Since the gate
+    became fail-closed it is an *error*, and ``spendable`` is unscanned only because it is named
+    in ``EXEMPT_DIRS`` with its reason recorded. ``research.md`` D4, the schema contract,
+    ``data/README.md``, the shipped TOML header and these tests were all restated to say so --
+    and the loader's own header was missed, leaving the one place still teaching the old rule to
+    the reader most likely to act on it.
+
+    A textual assertion, with the limits every scan in this suite states: it pins the vocabulary
+    rather than the argument. What it catches is the sentence going stale again while four
+    others move on, which is exactly what happened.
+    """
+    section = _loader_spendable_section()
+    assert "EXEMPT_DIRS" in section, (
+        "the loader header explains why no citation is read here, and the reason is now the "
+        "named exemption -- a header that does not mention EXEMPT_DIRS is teaching the "
+        "superseded 'absent from SOURCED_DIRS is enough' rule"
+    )
+    assert "is not extended" not in section, (
+        "'SOURCED_DIRS is not extended' is the superseded mechanism: under a fail-closed gate "
+        "not being extended is an error, not an exemption"
+    )
 
 
 def test_the_spendable_exemption_is_argued_in_the_gate_by_name() -> None:

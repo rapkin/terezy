@@ -1975,9 +1975,15 @@ def _fallback(
 # Same four responsibilities -- read, shape, meaning, construct -- and the one difference worth
 # stating: **no citation is read and none is expected.** An owner's statement about where he
 # spends is not an observation of the world; it is a fact about his own life, the same exemption
-# `data/streams/` and `data/scenarios/` already have. `scripts/check_provenance.py` therefore
-# does not scan `data/spendable/` and its `SOURCED_DIRS` is not extended (research.md D4) -- a
-# contract test asserts that rather than assuming it.
+# `data/streams/` and `data/scenarios/` already have.
+#
+# `scripts/check_provenance.py` therefore does not scan `data/spendable/` -- but **not** because
+# the directory is absent from `SOURCED_DIRS` (research.md D4, amended 2026-08-23). That gate is
+# fail-closed over the whole data tree: a directory in neither list is an *error*, never a blind
+# spot. `spendable` goes unscanned only because it is named in `EXEMPT_DIRS` **with its reason
+# recorded beside it**, which is the one way a directory is permitted to be out of scope. If a
+# number ever has to live here it moves to a sourced directory, rather than the exemption
+# widening to cover it. Contract tests assert both halves rather than assuming either.
 #
 # What is *not* here, because it needs a second file: whether the venue exists, whether it can
 # hold the currency, whether the currency is the run's base currency, and whether the owner owns

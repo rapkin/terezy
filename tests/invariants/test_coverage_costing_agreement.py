@@ -27,15 +27,24 @@ wrong instruction. So the generator holds amount, dates and statuses where feasi
 bite, and every one of those scoping decisions is written out at
 ``route_graphs.coverage_registries``.
 
-**Nor does it cover a pair costing has no ``FundingPath`` for at all** -- and that exclusion
-grew on 2026-08-23. A ``FundingPath`` is a ``(destination, stream, route)`` triple, so a pair
-whose inbound half is satisfied by *arrival* and/or whose exit half is satisfied by *identity*
-has no route to name and costing produces neither a figure nor a refusal for it. It is outside
-the agreement's **domain**, not in disagreement with it: the two views are answering the same
-question about corridors, and this pair needs no corridor. The hole already existed for arrival
-(FR-005); the owner's FR-002 decision widened it to the exit side. Such pairs are partitioned
-out below **and asserted on**, rather than skipped, so the exclusion cannot quietly swallow a
-real disagreement.
+**Nor does it cover a pair costing has no ``FundingPath`` for at all.** A ``FundingPath`` is a
+``(destination, stream, route)`` triple, and the *route* in it is the way **in**: so a pair
+whose inbound half is satisfied by *arrival* names no route, costing is never asked about it,
+and it produces neither a figure nor a refusal. That pair is outside the agreement's **domain**
+rather than in disagreement with it -- the two views answer the same question about corridors,
+and this one needs no corridor on the way in. Such pairs are partitioned out below **and
+asserted on**, rather than skipped, so the exclusion cannot quietly swallow a real
+disagreement.
+
+⚙ **The exit half is not part of that exclusion, and saying it was is a correction of
+2026-08-23.** This note first read "arrival *and/or* identity", which is false for identity: a
+pair whose exit half is satisfied because the destination *is* the spendable endpoint (FR-002)
+still has a declared route on the way in, so a ``FundingPath`` exists, and where that inbound
+names a partner exit ``cost_one`` returns a ``RoundTripCost``. Coverage says ready, costing
+produces a figure, **the two agree** -- and the widened partition excluded the pair and then
+asserted no figure existed for it, a tripwire that fires on agreement. It was latent only
+because the generator never routed an inbound into ``HOME_VENUE``. It does now, drawn, so the
+corrected partition is exercised rather than argued (``route_graphs.SPENDABLE_INBOUND``).
 
 **If this test fails with a ``RouteUnusable``, the generator has drifted into feasibility
 territory. Fix the generator's amounts, dates and limits -- never the coverage rule.** The
@@ -130,15 +139,19 @@ def _assert_in_scope(outcomes: list[RampCost | RouteUnusable]) -> None:
             )
 
 
-def _rests_on_a_route(verdict: Ready) -> bool:
-    """Whether both halves of this ready verdict are carried by declared routes.
+def _is_costable(verdict: Ready) -> bool:
+    """Whether costing has a ``FundingPath`` for this ready pair at all.
 
-    A verdict resting on a sentinel -- arrival on the way in, identity on the way out -- names
-    no route, so there is no ``FundingPath`` for costing to have an opinion about. Partitioning
-    on this is what keeps the agreement a claim about corridors rather than a claim costing was
-    never asked.
+    **The inbound half alone decides it**, and that is the correction of 2026-08-23. A
+    ``FundingPath`` is ``(destination, stream, route)`` where the route is the way *in*: a pair
+    reached by *arrival* names none, so costing is never asked and has no opinion to agree or
+    disagree with. The exit half is a different matter -- a verdict whose exit is satisfied by
+    *identity* still names an inbound route, so costing has a path, walks it, and (where that
+    inbound declares its partner) produces the round-trip figure. Excluding it would put a pair
+    the two views **agree** about outside the domain, and then assert there was no figure for
+    it.
     """
-    return isinstance(verdict.inbound, tuple) and isinstance(verdict.exits, tuple)
+    return isinstance(verdict.inbound, tuple)
 
 
 @given(registry=coverage_registries())
@@ -162,16 +175,18 @@ def test_a_ready_pair_is_one_costing_produces_a_round_trip_for(
             continue
         outcomes = _costed(registry, verdict.destination.venue_id, verdict.stream_id)
         _assert_in_scope(outcomes)
-        if not _rests_on_a_route(verdict):
-            _SENTINEL_BACKED.add((verdict.destination.venue_id, verdict.stream_id))
+        if not _is_costable(verdict):
+            _ARRIVAL_BACKED.add((verdict.destination.venue_id, verdict.stream_id))
             # Outside the domain, and asserted to be outside it rather than merely skipped:
-            # costing has no path to this pair, so it produces no figure. If a future
-            # generator ever makes one costable, this fails and sends the reader to the scope
-            # note above instead of letting the partition hide a real disagreement.
+            # the money is born at this destination, so no ``FundingPath`` names it and costing
+            # produces no figure. If a future generator ever makes one costable, this fails and
+            # sends the reader to the scope note above instead of letting the partition hide a
+            # real disagreement.
             assert not _round_trips(outcomes), (
-                f"{verdict.destination.venue_id}/{verdict.stream_id} is ready on a sentinel "
-                "and costing produced a figure for it, so it is *inside* the agreement's "
-                "domain after all and the partition above is wrong."
+                f"{verdict.destination.venue_id}/{verdict.stream_id} is ready by arrival -- no "
+                "declared route carries this stream in -- and costing produced a round-trip "
+                "figure for it anyway, so it is *inside* the agreement's domain after all and "
+                "the partition above is wrong."
             )
             continue
         assert _round_trips(outcomes), (
@@ -180,13 +195,22 @@ def test_a_ready_pair_is_one_costing_produces_a_round_trip_for(
             "views of one registry must not disagree about what is comparable (FR-018)."
         )
         _ROUTE_BACKED.add((verdict.destination.venue_id, verdict.stream_id))
+        if not isinstance(verdict.exits, tuple):
+            _IDENTITY_BACKED.add((verdict.destination.venue_id, verdict.stream_id))
 
 
 _ROUTE_BACKED: set[tuple[str, str]] = set()
 """Ready pairs the agreement actually constrained, accumulated across examples."""
 
-_SENTINEL_BACKED: set[tuple[str, str]] = set()
-"""Ready pairs excluded from the domain because they name no route."""
+_ARRIVAL_BACKED: set[tuple[str, str]] = set()
+"""Ready pairs excluded from the domain because no declared route carries the money in."""
+
+_IDENTITY_BACKED: set[tuple[str, str]] = set()
+"""Constrained pairs whose *exit* half was a sentinel: ready on a route in and identity out.
+
+The shape the old partition wrongly excluded. Tallied separately so the corrected partition is
+provably exercised rather than merely believed.
+"""
 
 
 @given(registry=coverage_registries())
@@ -262,9 +286,18 @@ def test_the_agreement_constrained_real_pairs_and_the_exclusion_is_not_everythin
 
     A property that excluded every ready pair would pass for the worst possible reason. Runs
     after the two properties, which pytest orders within a file.
+
+    The third assertion is the one the 2026-08-23 correction owes: the corrected partition
+    keeps *exit-by-identity* pairs inside the domain, and a partition nothing ever falls on the
+    inside of is a partition nobody has tested.
     """
     assert _ROUTE_BACKED, "the agreement never constrained a single route-backed ready pair"
-    assert _SENTINEL_BACKED, "the sentinel exclusion never fired; the note above is untested"
+    assert _ARRIVAL_BACKED, "the arrival exclusion never fired; the note above is untested"
+    assert _IDENTITY_BACKED, (
+        "no ready pair was constrained whose exit half is the identity sentinel, so the "
+        "corrected partition is argued and not exercised. The generator's drawn way in to the "
+        "spendable endpoint (route_graphs.SPENDABLE_INBOUND) is what produces it."
+    )
 
 
 def test_the_battery_produced_both_ready_and_not_ready_verdicts() -> None:

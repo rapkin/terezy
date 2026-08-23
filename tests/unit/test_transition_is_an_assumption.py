@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import dataclasses
 import inspect
+import re
 from datetime import date
 from pathlib import Path
 from typing import get_args, get_type_hints
@@ -95,6 +96,39 @@ above exists to close. The test immediately after the scan holds it to exactly t
 stricter bar than the import ban it is exempt from. **Nothing else goes in this set** without
 the same argument written out beside it.
 """
+
+_IMPORTS_REGIME = re.compile(r"^\s*(?:from\s+[\w.]+\s+)?import\s+.*\bRegime\b")
+"""An import statement that binds the name ``Regime`` in the importing module."""
+
+_EXPORTS_REGIME = re.compile(r"""^\s*(?:__all__\b.*["']Regime["']|["']Regime["']\s*,?\s*$)""")
+"""An ``__all__`` entry re-exporting ``Regime``, on its own line or in a one-line list."""
+
+
+def _regime_side_doors(source: str) -> list[tuple[int, str]]:
+    """Every line of a module that would let *another* module reach ``Regime`` through it.
+
+    Two shapes, and deliberately only two: an **import** that binds the name, and an
+    ``__all__`` entry that re-exports it. Those are the ways a costing module could get hold of
+    the record; nothing else in a file makes it reachable.
+
+    ⚙ **Shapes, not the bare word** (correction, 2026-08-23). This scan read raw text for
+    ``Regime`` anywhere, comments included -- so ``cost.py`` explaining that *a regime is not a
+    leg window*, which is the subject of the enclosing test class and the most natural sentence
+    to write there, would have failed it, with a message about a re-export that does not exist.
+    The sibling scan above already strips comments and states the docstring trade-off out loud;
+    this one did neither. It now matches the two shapes that actually open the door, so prose --
+    in a comment or a docstring -- is free to name the record it is warning about.
+
+    The limits are ``test_money_construction_guard``'s, unchanged: an alias
+    (``import Regime as R``, or a ``getattr``) is not caught. What is caught is the obvious
+    version, which is the one that gets written.
+    """
+    return [
+        (number, line.strip())
+        for number, line in enumerate(source.splitlines(), 1)
+        if not line.lstrip().startswith("#")
+        and (_IMPORTS_REGIME.match(line) or _EXPORTS_REGIME.match(line))
+    ]
 
 
 def _world() -> dict[str, Route]:
@@ -356,17 +390,30 @@ class TestARegimeCannotBeExpressedAsALegWindow:
             "it introduces does not exist at run time for another module to reach through"
         )
         assert "from terezy.core.scenarios" not in before
-        assert '"Regime"' not in source, "Regime must not be re-exported from this package"
+        exported = [
+            (number, line)
+            for number, line in _regime_side_doors(source)
+            if not line.startswith(("import ", "from "))
+        ]
+        assert exported == [], (
+            f"coverage.py re-exports Regime at {exported}. Its own import is permitted -- the "
+            "audit needs the record -- but naming it in __all__ turns this module into the "
+            "package's front door to it."
+        )
 
         offenders = [
-            path.name
+            (path.name, number, line)
             for path in sorted(ROUTES_ROOT.glob("*.py"))
-            if path.name != "coverage.py" and "Regime" in path.read_text(encoding="utf-8")
+            if path.name != "coverage.py"
+            for number, line in _regime_side_doors(path.read_text(encoding="utf-8"))
         ]
         assert offenders == [], (
-            f"{offenders} name Regime. The import scan above only looks for the word "
-            "'scenarios', so a module reaching the record through coverage.py's re-export "
-            "would pass it -- this is the assertion that closes that door."
+            f"these lines bind or re-export Regime outside coverage.py: {offenders}. The import "
+            "scan above only looks for the word 'scenarios', so a module reaching the record "
+            "through coverage.py -- `from terezy.core.routes.coverage import Regime` -- would "
+            "pass it. This is the assertion that closes that door. **Prose is not a side "
+            "door**: a comment or a docstring naming the record is not matched, so say what "
+            "you need to say about regimes here."
         )
 
     def test_the_dependency_points_one_way_and_the_selection_needs_no_as_of(self) -> None:
@@ -376,6 +423,46 @@ class TestARegimeCannotBeExpressedAsALegWindow:
         parameters = inspect.signature(regimes.routes_in_force).parameters
         assert "on_date" in parameters
         assert "as_of" not in parameters
+
+
+class TestTheSideDoorScanMatchesShapesRatherThanProse:
+    """What the scan above is allowed to fail on -- pinned, because it fired on prose once.
+
+    The scan guards a real boundary and its failure message accuses a module of re-exporting a
+    record. Both are worth keeping, and both are worthless if the scan cannot tell an import
+    from a sentence: the first false positive it can produce is a module explaining the very
+    hazard this file is about, and the fix a reader would reach for is deleting the sentence.
+    """
+
+    def test_a_docstring_naming_the_record_is_not_a_side_door(self) -> None:
+        # The exact sentence the old scan would have failed on, in the module whose subject it
+        # is. Nothing here binds the name; a reader of ``cost.py`` cannot reach ``Regime``
+        # through a docstring.
+        source = '''"""Costing. A ``Regime`` is not a leg window -- see scenarios/regimes.py."""'''
+        assert _regime_side_doors(source) == []
+
+    def test_a_comment_naming_the_record_is_not_a_side_door(self) -> None:
+        assert _regime_side_doors("# never turn a Regime into a leg's available_until\n") == []
+
+    def test_an_import_binding_the_name_is_a_side_door(self) -> None:
+        source = "from terezy.core.routes.coverage import Regime\n"
+        assert _regime_side_doors(source) == [(1, "from terezy.core.routes.coverage import Regime")]
+
+    def test_an_all_entry_re_exporting_the_name_is_a_side_door(self) -> None:
+        # Both spellings a re-export is written in: the one-line list, and the entry on its own
+        # line in a multi-line one.
+        assert _regime_side_doors('__all__ = ["Regime", "cost_one"]\n') == [
+            (1, '__all__ = ["Regime", "cost_one"]')
+        ]
+        assert _regime_side_doors('__all__ = [\n    "Regime",\n]\n') == [(2, '"Regime",')]
+
+    def test_the_scan_reports_where_it_found_what_it_found(self) -> None:
+        # The failure message quotes these pairs, so a reader is sent to a line rather than to
+        # a claim about a re-export that may not be what happened.
+        source = "import os\nfrom terezy.core.scenarios.regimes import Regime\n"
+        assert _regime_side_doors(source) == [
+            (2, "from terezy.core.scenarios.regimes import Regime")
+        ]
 
 
 class TestTheSelectionRefusesAScenarioThatStatesNoBelief:

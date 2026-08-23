@@ -823,6 +823,22 @@ HOME_VENUE = "home_uah"
 CONTRACT_VENUE = "coin_usd"
 """Where the dollar contract income lands. Holds dollars only."""
 
+SPENDABLE_INBOUND = "in_home_contract"
+"""The drawn way in to the spendable endpoint itself: contract dollars into home hryvnia.
+
+Its destination is ``HOME_VENUE``, so coverage satisfies the pair's exit half by *identity*
+while its inbound half is a declared route -- the one shape a registry without it cannot
+produce, and the one the costing agreement's partition is about.
+"""
+
+SPENDABLE_EXIT = "out_home_contract"
+"""The partner of :data:`SPENDABLE_INBOUND`: back out of home hryvnia into contract dollars.
+
+Declared only alongside it, and only so costing has a way out to charge. It lands somewhere
+**not** spendable, which changes no verdict: the destination it leaves is the spendable
+endpoint, whose exit half needs no route at all.
+"""
+
 COVERAGE_SALARY = IncomeStream(
     id="salary_uah",
     owner_id=OWNER_ID,
@@ -940,10 +956,20 @@ def coverage_registries(draw: st.DrawFn) -> CoverageRegistry:
     most, a destination reachable from both streams with no exit, and one reachable from
     neither with an exit nobody can use.
 
-    The exit always ends in hryvnia at :data:`HOME_VENUE`, which is the single declared
-    spendable endpoint. So "an exit exists" and "an exit reaches somewhere spendable" coincide
-    here by construction; deficit 3, where they come apart, is exercised by the unit and
-    contract suites, which can declare a non-spendable landing place on purpose.
+    A destination's exit always ends in hryvnia at :data:`HOME_VENUE`, which is the single
+    declared spendable endpoint. So "an exit exists" and "an exit reaches somewhere spendable"
+    coincide here by construction; deficit 3, where they come apart, is exercised by the unit
+    and contract suites, which can declare a non-spendable landing place on purpose.
+
+    ⚙ **One further drawn pair: a way in to the spendable endpoint itself** (added 2026-08-23
+    with the costing-agreement partition fix). Nothing here used to route an inbound *into*
+    ``HOME_VENUE``, so the one shape where coverage's exit-by-identity meets a declared inbound
+    route -- ready on a corridor plus a sentinel, and costable -- was unreachable, and the
+    agreement property's partition excluded it while arguing about it. It is drawn rather than
+    always present so the registries without it stay exactly as they were, and it is
+    **partner-closed** like every other inbound here (scoping decision 4): the exit out of
+    ``HOME_VENUE`` exists precisely because the inbound names it, which is what keeps costing
+    able to produce the round-trip figure coverage's verdict implies.
     """
     venues: dict[str, Venue] = {
         HOME_VENUE: Venue(
@@ -1010,6 +1036,35 @@ def coverage_registries(draw: st.DrawFn) -> CoverageRegistry:
             direction="exit",
             from_ccy=currency,
             to_ccy=BASE_CURRENCY,
+        )
+    if draw(st.booleans()):
+        # A way in to the **spendable endpoint itself**, with the way back out it names.
+        #
+        # Coverage marks the resulting pair ready on a declared inbound plus the exit-identity
+        # sentinel (FR-002): the money has landed where it can be spent, so nothing is owed on
+        # the way out. Costing has a ``FundingPath`` for it -- the inbound is a declared route
+        # -- and produces the round-trip figure through the partner. Both views therefore say
+        # the pair is comparable, which is what makes it belong *inside* the agreement's domain
+        # rather than in the sentinel exclusion beside a pair that names no route at all.
+        #
+        # Drawn after the repair above so a registry that would otherwise have no route still
+        # takes the orphan-exit repair, and the shapes those examples exercise are unchanged.
+        routes[SPENDABLE_INBOUND] = _corridor(
+            SPENDABLE_INBOUND,
+            origin=CONTRACT_VENUE,
+            destination=HOME_VENUE,
+            direction="inbound",
+            from_ccy=Currency.USD,
+            to_ccy=BASE_CURRENCY,
+            partner_route=SPENDABLE_EXIT,
+        )
+        routes[SPENDABLE_EXIT] = _corridor(
+            SPENDABLE_EXIT,
+            origin=HOME_VENUE,
+            destination=CONTRACT_VENUE,
+            direction="exit",
+            from_ccy=BASE_CURRENCY,
+            to_ccy=Currency.USD,
         )
     return CoverageRegistry(
         venues=venues,
