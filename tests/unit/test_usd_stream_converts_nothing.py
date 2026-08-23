@@ -57,6 +57,7 @@ def _costed(amount: float) -> RampCost:
         kinds=route_graphs.KINDS,
         on_date=route_graphs.ON_DATE,
         as_of=route_graphs.AS_OF,
+        spendable=graph.spendable,
     )
     assert isinstance(outcome, RampCost), outcome
     return outcome
@@ -169,6 +170,7 @@ class TestTheContrastWithTheHryvniaPathIsTheWholeFinding:
             kinds=route_graphs.KINDS,
             on_date=route_graphs.ON_DATE,
             as_of=route_graphs.AS_OF,
+            spendable=graph.spendable,
         )
         assert isinstance(outcome, RampCost)
         assert outcome.one_way.components[CONVERSION].amount > 0.0

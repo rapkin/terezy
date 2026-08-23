@@ -48,6 +48,7 @@ from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.results import ramp
+from terezy.core.results.coverage import SpendableEndpoint
 from terezy.core.results.ramp import (
     NothingComparable,
     RampCost,
@@ -61,6 +62,17 @@ from terezy.core.routes.path import FundingPath
 from tests.invariants import route_graphs
 
 pytestmark = pytest.mark.contract
+
+SPENDABLE: frozenset[SpendableEndpoint] = frozenset()
+"""**Nowhere is declared spendable here, and that is deliberate.**
+
+These fixtures predate the spendable list and their subject is 002's partner rule: a route
+with a declared way out, and one without. A destination that happened to appear in this set
+would satisfy its own exit requirement by identity (003 FR-002) and quietly acquire a
+round-trip figure, turning "nobody costed the way out" into "there was nothing to do" --
+which is a different claim and is exercised where it belongs, in the composed suites and in
+``tests/invariants/test_coverage_costing_agreement.py``.
+"""
 
 AMOUNT = Money(10_000.0, Currency.UAH, prov.EMPTY)
 """One amount for every candidate, which is what makes a comparison a comparison."""
@@ -99,6 +111,7 @@ def _ranked() -> Ranking:
         kinds=route_graphs.KINDS,
         on_date=route_graphs.ON_DATE,
         as_of=route_graphs.AS_OF,
+        spendable=SPENDABLE,
     )
     assert isinstance(ranked, Ranking), ranked
     return ranked
@@ -156,6 +169,7 @@ class TestEveryCandidateWasCostedByTheOneCostingFunction:
                 kinds=route_graphs.KINDS,
                 on_date=route_graphs.ON_DATE,
                 as_of=route_graphs.AS_OF,
+                spendable=SPENDABLE,
             )
 
     def test_every_candidate_appears_exactly_once_somewhere(self) -> None:
@@ -335,6 +349,7 @@ class TestNothingComparableIsNotARankingWithAnEmptySlot:
             kinds=route_graphs.KINDS,
             on_date=route_graphs.ON_DATE,
             as_of=route_graphs.AS_OF,
+            spendable=SPENDABLE,
         )
         assert isinstance(outcome, NothingComparable)
         assert len(outcome.excluded) == 1
@@ -355,6 +370,7 @@ class TestNothingComparableIsNotARankingWithAnEmptySlot:
             kinds=route_graphs.KINDS,
             on_date=route_graphs.ON_DATE,
             as_of=route_graphs.AS_OF,
+            spendable=SPENDABLE,
         )
         assert isinstance(outcome, NothingComparable)
         assert len(outcome.not_comparable) == 1
@@ -383,6 +399,7 @@ class TestNothingComparableIsNotARankingWithAnEmptySlot:
             kinds=route_graphs.KINDS,
             on_date=route_graphs.ON_DATE,
             as_of=route_graphs.AS_OF,
+            spendable=SPENDABLE,
         )
         assert isinstance(outcome, NothingComparable)
         assert len(outcome.excluded) == 1
@@ -400,6 +417,7 @@ class TestNothingComparableIsNotARankingWithAnEmptySlot:
             kinds=route_graphs.KINDS,
             on_date=route_graphs.ON_DATE,
             as_of=route_graphs.AS_OF,
+            spendable=SPENDABLE,
         )
         assert isinstance(outcome, NothingComparable)
         assert outcome.excluded == ()

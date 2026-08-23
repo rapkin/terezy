@@ -43,6 +43,7 @@ from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.staleness import ObservationKind
 from terezy.core.primitives.tolerance import is_close
+from terezy.core.results.coverage import SpendableEndpoint
 from terezy.core.results.ramp import (
     CostComponent,
     RampCost,
@@ -53,11 +54,19 @@ from terezy.core.results.ramp import (
 from terezy.core.routes import legs, ranking
 from terezy.core.routes.channels import ChannelSide, FxChannel
 from terezy.core.routes.legs import Leg, Route
-from terezy.core.routes.path import FundingPath
+from terezy.core.routes.path import FundingPath, candidate_id
 from terezy.core.streams.streams import IncomeStream, Indexation
 from terezy.data.declarations import resolver
 
 pytestmark = pytest.mark.contract
+
+SPENDABLE = frozenset({SpendableEndpoint(venue_id="monobank_uah", currency=Currency.UAH)})
+"""Where the shipped registry says money counts as having come back out.
+
+Restated here rather than loaded from ``data/spendable/`` so this battery keeps testing the
+*routes*: a change to the spendable list should not turn a route test red, and a change to
+this line should be a deliberate statement about what these rankings assume.
+"""
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DATA_ROOT = REPO_ROOT / "data"
@@ -132,6 +141,7 @@ def _rank(
         kinds=declarations.kinds,
         on_date=ON_DATE,
         as_of=AS_OF,
+        spendable=SPENDABLE,
     )
     assert isinstance(outcome, Ranking), f"nothing was comparable: {outcome}"
     return outcome
@@ -139,7 +149,7 @@ def _rank(
 
 def _costed(ranked: Ranking, route_id: str) -> RampCost:
     """One route's cost out of a ranking, by id."""
-    found = [cost for cost in ranked.costed if cost.path.route_id == route_id]
+    found = [cost for cost in ranked.costed if candidate_id(cost.path) == route_id]
     assert len(found) == 1, f"{route_id} appears {len(found)} times in the ranking"
     return found[0]
 
@@ -156,7 +166,7 @@ def _round_trip(cost: RampCost) -> RoundTripCost:
 
 
 def _order(ranked: Ranking) -> list[str]:
-    return [cost.path.route_id for cost in ranked.costed]
+    return [candidate_id(cost.path) for cost in ranked.costed]
 
 
 class TestTheShippedCorridorsRankAsHandComputed:
@@ -219,12 +229,13 @@ class TestTheShippedCorridorsRankAsHandComputed:
             kinds=declarations.kinds,
             on_date=ON_DATE,
             as_of=AS_OF,
+            spendable=SPENDABLE,
         )
         assert not isinstance(ranked, Ranking), (
             "the only candidate has no declared exit, so there is nothing comparable to rank "
             "-- and the type says so rather than an index standing in for it"
         )
-        assert [cost.path.route_id for cost in ranked.not_comparable] == ["coinbase_to_ibkr"]
+        assert [candidate_id(cost.path) for cost in ranked.not_comparable] == ["coinbase_to_ibkr"]
         assert "exit" in ranked.reason
         one_way = ranked.not_comparable[0].one_way
         # 1 000 USD, 0.5% plus a flat 25: 5.00 + 25.00 = 30.00, and nothing converted.
@@ -601,7 +612,7 @@ def _numbers(cost: RampCost) -> tuple[str, ...]:
     not differ is a single amount.
     """
     rendered: list[str] = [
-        cost.path.route_id,
+        candidate_id(cost.path),
         cost.status,
         str(cost.latency_days),
         cost.disruption_probability.hex(),
@@ -935,6 +946,7 @@ def _hand_built_cost(*, buy_premium: float = 3.0) -> RampCost:
         },
         on_date=ON_DATE,
         as_of=AS_OF,
+        spendable=SPENDABLE,
     )
     assert isinstance(outcome, Ranking)
     return recommended_cost(outcome)

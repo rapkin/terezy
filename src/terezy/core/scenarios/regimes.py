@@ -71,7 +71,7 @@ from itertools import pairwise
 from typing import Literal
 
 from terezy.core.routes.legs import Route
-from terezy.core.routes.path import FundingPath
+from terezy.core.routes.path import Candidate, segments_of
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -326,9 +326,7 @@ def routes_in_force(
     )
 
 
-def paths_in_force(
-    paths: Sequence[FundingPath], in_force: RoutesInForce
-) -> tuple[FundingPath, ...]:
+def paths_in_force(paths: Sequence[Candidate], in_force: RoutesInForce) -> tuple[Candidate, ...]:
     """The candidate funding paths whose route the regime includes, in the order given.
 
     Needed because ``rank`` and ``cost_one`` take a ``routes`` mapping and *raise* on a path
@@ -341,5 +339,13 @@ def paths_in_force(
     the regime *outside* ``rank`` is deliberate -- an assumed exclusion arriving in
     ``Ranking.excluded``, whose records name a declared field as the binding constraint, would
     be indistinguishable from an observed one (research.md D8).
+
+    **Every segment of a composed candidate must be in force, not merely the first** (004
+    FR-017). A chain that connected by mixing a wartime corridor with a post-war one would be a
+    journey nobody believes in under either regime, and it is the ``all`` below rather than a
+    comment that stops it. A declared route is a chain of one, so nothing about 002's behaviour
+    changes here.
     """
-    return tuple(path for path in paths if path.route_id in in_force.routes)
+    return tuple(
+        path for path in paths if all(route_id in in_force.routes for route_id in segments_of(path))
+    )

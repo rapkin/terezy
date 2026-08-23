@@ -46,6 +46,7 @@ from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.tolerance import is_close
+from terezy.core.results.coverage import SpendableEndpoint
 from terezy.core.results.ramp import (
     ExitCostUnknown,
     NothingComparable,
@@ -55,7 +56,7 @@ from terezy.core.results.ramp import (
 )
 from terezy.core.routes import ranking
 from terezy.core.routes.legs import Route, RouteStatus
-from terezy.core.routes.path import FundingPath
+from terezy.core.routes.path import FundingPath, candidate_id
 from tests.invariants import route_graphs
 
 AMOUNT = 10_000.0
@@ -69,6 +70,18 @@ _EXIT_TEMPLATE = _TEMPLATE.routes["inzhur_exit"]
 
 Candidate = tuple[FundingPath, Mapping[str, Route]]
 """One path and the route declarations it needs -- the inbound route and, usually, its exit."""
+
+
+SPENDABLE: frozenset[SpendableEndpoint] = frozenset()
+"""**Nowhere is declared spendable here, and that is deliberate.**
+
+These fixtures predate the spendable list and their subject is 002's partner rule: a route
+with a declared way out, and one without. A destination that happened to appear in this set
+would satisfy its own exit requirement by identity (003 FR-002) and quietly acquire a
+round-trip figure, turning "nobody costed the way out" into "there was nothing to do" --
+which is a different claim and is exercised where it belongs, in the composed suites and in
+``tests/invariants/test_coverage_costing_agreement.py``.
+"""
 
 
 def _uah(amount: float) -> Money:
@@ -134,6 +147,7 @@ def _rank(*candidates: Candidate) -> Ranking | NothingComparable:
         kinds=route_graphs.KINDS,
         on_date=route_graphs.ON_DATE,
         as_of=route_graphs.AS_OF,
+        spendable=SPENDABLE,
     )
 
 
@@ -150,7 +164,7 @@ def _fraction(ranked: Ranking, index: int) -> float:
 
 
 def _ids(ranked: Ranking) -> list[str]:
-    return [entry.path.route_id for entry in ranked.costed]
+    return [candidate_id(entry.path) for entry in ranked.costed]
 
 
 class TestATieIsReportedAsATie:
@@ -241,7 +255,7 @@ class TestTheOrderIsLexicographicOnTheThreeKeys:
             _candidate("free"),
         )
         assert _ids(ranked) == ["free", "cheap", "dear"]
-        assert recommended_cost(ranked).path.route_id == "free"
+        assert candidate_id(recommended_cost(ranked).path) == "free"
 
     def test_among_equal_costs_the_larger_ceiling_comes_first(self) -> None:
         # The second key, and only ever the second: it speaks when the first is level.
@@ -280,7 +294,7 @@ class TestTheOrderIsLexicographicOnTheThreeKeys:
             _candidate("dear_but_roomy", fee_pct=0.02, cap=None, latency=0),
         )
         assert _ids(ranked) == ["cheap_but_capped", "dear_but_roomy"]
-        assert recommended_cost(ranked).path.route_id == "cheap_but_capped"
+        assert candidate_id(recommended_cost(ranked).path) == "cheap_but_capped"
         assert ranked.ties == ()
 
     def test_the_ordering_is_the_round_trip_cost_and_not_the_one_way_one(self) -> None:
@@ -302,7 +316,7 @@ class TestAnExcludedRouteCarriesItsReason:
         assert _ids(ranked) == ["open_one"]
         assert len(ranked.excluded) == 1
         refused = ranked.excluded[0]
-        assert refused.path.route_id == "shut"
+        assert candidate_id(refused.path) == "shut"
         assert refused.binding_constraint == "route.status"
         assert "closed" in refused.reason
 
@@ -330,8 +344,8 @@ class TestAnExcludedRouteCarriesItsReason:
             _candidate("dear_but_open", fee_pct=0.05),
             _candidate("free_but_shut", fee_pct=0.0, status="closed"),
         )
-        assert recommended_cost(ranked).path.route_id == "dear_but_open"
-        assert [item.path.route_id for item in ranked.excluded] == ["free_but_shut"]
+        assert candidate_id(recommended_cost(ranked).path) == "dear_but_open"
+        assert [candidate_id(item.path) for item in ranked.excluded] == ["free_but_shut"]
 
     def test_every_refusal_appears_and_none_is_collapsed_into_a_count(self) -> None:
         ranked = _ranking(
@@ -339,7 +353,7 @@ class TestAnExcludedRouteCarriesItsReason:
             _candidate("shut", status="closed"),
             _candidate("too_small_for_us", minimum=50_000.0),
         )
-        assert sorted(item.path.route_id for item in ranked.excluded) == [
+        assert sorted(candidate_id(item.path) for item in ranked.excluded) == [
             "shut",
             "too_small_for_us",
         ]
@@ -355,7 +369,7 @@ class TestARouteWithNoDeclaredExitIsCostedButNotRanked:
             _candidate("no_way_back", fee_pct=0.0, with_exit=False),
         )
         assert _ids(ranked) == ["round_trip_known"]
-        assert [entry.path.route_id for entry in ranked.not_comparable] == ["no_way_back"]
+        assert [candidate_id(entry.path) for entry in ranked.not_comparable] == ["no_way_back"]
 
     def test_the_cheapest_route_going_in_is_not_recommended_when_nobody_costed_the_exit(
         self,
@@ -367,7 +381,7 @@ class TestARouteWithNoDeclaredExitIsCostedButNotRanked:
             _candidate("round_trip_known", fee_pct=0.02),
             _candidate("no_way_back", fee_pct=0.0, with_exit=False),
         )
-        assert recommended_cost(ranked).path.route_id == "round_trip_known"
+        assert candidate_id(recommended_cost(ranked).path) == "round_trip_known"
         orphan = ranked.not_comparable[0]
         assert orphan.one_way.fraction == 0.0
         assert isinstance(orphan.round_trip, ExitCostUnknown)
@@ -417,9 +431,9 @@ class TestAClosedExitPartnerKeepsTheRouteOutOfTheRanking:
             self._with_closed_exit("way_out_shut", fee_pct=0.0),
         )
         assert _ids(ranked) == ["healthy"]
-        assert recommended_cost(ranked).path.route_id == "healthy"
+        assert candidate_id(recommended_cost(ranked).path) == "healthy"
         (orphan,) = ranked.not_comparable
-        assert orphan.path.route_id == "way_out_shut"
+        assert candidate_id(orphan.path) == "way_out_shut"
         assert isinstance(orphan.round_trip, ExitCostUnknown)
         assert "way_out_shut__exit" in orphan.round_trip.reason
         assert "closed" in orphan.round_trip.reason
@@ -458,9 +472,9 @@ class TestNothingIsSilentlyDropped:
         built = [_candidate(name, **kwargs) for name, kwargs in candidates]  # type: ignore[arg-type]
         ranked = _ranking(*built)
         reported = [
-            *(entry.path.route_id for entry in ranked.costed),
-            *(entry.path.route_id for entry in ranked.not_comparable),
-            *(item.path.route_id for item in ranked.excluded),
+            *(candidate_id(entry.path) for entry in ranked.costed),
+            *(candidate_id(entry.path) for entry in ranked.not_comparable),
+            *(candidate_id(item.path) for item in ranked.excluded),
         ]
         assert sorted(reported) == sorted(name for name, _ in candidates)
         assert len(reported) == len(set(reported))

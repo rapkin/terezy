@@ -102,6 +102,8 @@ import math
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from datetime import date
+from itertools import pairwise
+from typing import Final
 
 from terezy.core.primitives import money
 from terezy.core.primitives import provenance as prov
@@ -110,6 +112,7 @@ from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance
 from terezy.core.primitives.staleness import ObservationKind, StalenessVerdict
+from terezy.core.results.coverage import SpendableEndpoint
 from terezy.core.results.ramp import (
     CostComponent,
     ExitCostUnknown,
@@ -117,13 +120,36 @@ from terezy.core.results.ramp import (
     RampCost,
     RoundTripCost,
     RouteUnusable,
+    SegmentAttribution,
 )
 from terezy.core.routes import channels as fx
 from terezy.core.routes import legs as leg_module
 from terezy.core.routes.channels import FxChannel, Side
-from terezy.core.routes.legs import FX, Leg, LegOutcome, Route
-from terezy.core.routes.path import FundingPath
+from terezy.core.routes.legs import FX, Leg, LegOutcome, Route, RouteStatus
+from terezy.core.routes.path import (
+    EXIT_BY_IDENTITY,
+    FROM_THE_DECLARATION,
+    Candidate,
+    ComposedExit,
+    ComposedPath,
+    DeclaredExit,
+    ExitByIdentity,
+    ExitChain,
+    ExitChoice,
+    FromTheDeclaration,
+    FundingPath,
+    Segment,
+    exit_segments_of,
+    segments_of,
+)
 from terezy.core.streams.streams import IncomeStream
+
+_COMPOSED_MINIMUM: Final = 2
+"""How many segments a composition has at the least.
+
+Named rather than written inline because it is a *definition* -- a chain of one is a declared
+route, and a chain of none is not a journey -- and the two places that enforce it, the inbound
+candidate and the exit chain, must enforce the same one."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -179,33 +205,153 @@ class _Walk:
     staleness: StalenessVerdict
     """Merged verdict over every declaration consulted so far."""
 
+    segments: tuple[SegmentAttribution, ...]
+    """The same charges, split by **segment** rather than by term (FR-020, research.md D7).
 
-def _route_for(routes: Mapping[str, Route], path: FundingPath) -> Route:
-    """The declared route a path names, or a raise naming what is known.
+    Accumulated **beside** the three fields above and never summed into them. That is the trap
+    this feature was warned about: the whole-candidate totals keep the exact addition order
+    feature 002 established, because the rounding of a sum of sums is not the rounding of one
+    fold, and reconstructing a total from segment subtotals would move numbers 002 recorded in
+    a golden file. Each per-leg charge is translated **once** and added into both, so the two
+    axes see the same figures in the same currency and differ only in association.
 
-    The path is built *from* declared routes, so a name that does not resolve means the
-    caller assembled a path for a route that was never declared -- a programmer error rather
-    than a fact about the money, and therefore a raise rather than a typed failure. The same
-    reasoning as ``conventions._resolve``.
+    One entry per segment, in chain order, growing as the fold crosses into a new segment. A
+    declared route therefore ends with exactly one, which is not a special case anywhere.
     """
-    if path.route_id not in routes:
+
+
+_Junction = tuple[str, str]
+"""A venue id and a currency code: where value arrives, and in what.
+
+The same key :mod:`terezy.core.routes.compose` searches over, restated here because costing has
+to check the joins the search asserted -- an inbound chain assembled by hand never went through
+the search at all.
+"""
+
+
+def _arrives_at(route: Route) -> _Junction:
+    """Where a route's money ends up, and in what currency."""
+    return (route.destination, route.legs[-1].to_ccy.value)
+
+
+def _departs_from(route: Route) -> _Junction:
+    """Where a route's money must already be, and in what, for the route to carry it."""
+    return (route.origin, route.legs[0].from_ccy.value)
+
+
+def _checked_joins(resolved: tuple[Route, ...], *, what: str) -> None:
+    """Every adjacent pair meets at a venue **and** in a currency, or a raise naming the pair.
+
+    **One junction rule, used by both chain validators** -- the inbound candidate's and the exit
+    chain's. The two carried this loop verbatim once and diverged: the inbound one anchored its
+    far end and the exit one anchored neither, which is how a chain could depart from a venue the
+    money had never reached. Duplication is where that divergence hid, so there is one copy.
+
+    A junction **converts nothing, charges nothing and waits for nothing** (FR-002). Where the
+    venue matches and the currency does not, the chain does not exist: bridging it would be an
+    invented leg at an invented rate, and it is the single most tempting fabrication in the
+    feature because the two declarations sit at the same venue and look adjacent.
+    """
+    for position, (before, after) in enumerate(pairwise(resolved)):
+        if _arrives_at(before) != _departs_from(after):
+            raise ValueError(
+                f"{what} segments {position} and {position + 1} do not join: route "
+                f"{before.id!r} arrives as {before.legs[-1].to_ccy.value} at "
+                f"{before.destination!r} and route {after.id!r} departs as "
+                f"{after.legs[0].from_ccy.value} from {after.origin!r}. A junction converts "
+                "nothing and charges nothing, so a chain whose venue or currency disagrees does "
+                "not exist -- and bridging it would be an invented leg at an invented rate "
+                "(FR-002)."
+            )
+
+
+def _routes_for(routes: Mapping[str, Route], candidate: Candidate) -> tuple[Route, ...]:
+    """The declared routes a candidate names, in chain order, or a raise naming what is wrong.
+
+    A candidate is built **from** declared routes -- by hand for a :class:`FundingPath`, by
+    :func:`terezy.core.routes.compose.compose` for a chain -- so a name that does not resolve,
+    a chain of one, a junction that does not join, or a destination that is not where the last
+    segment ends all mean the caller assembled something incoherent. Those are programmer
+    errors rather than facts about the money, so they raise, on ``conventions._resolve``'s
+    reasoning: reporting them as a cost failure would invite callers to keep building
+    mismatched candidates and read the answer as a cost.
+
+    ⚙ **A composed chain is re-validated here, and a declared route is not.** Venue and
+    currency continuity *within* a declared route is a structural property of the declaration
+    and is checked at load, where the error can name the file and the leg index (002
+    research.md D6). A chain between routes has no file: it is assembled at query time, so this
+    is the only place its junctions can be checked at all -- and an unchecked junction is
+    exactly where an implicit conversion would appear, which FR-002 forbids outright.
+    """
+    chain = segments_of(candidate)
+    if isinstance(candidate, ComposedPath) and len(chain) < _COMPOSED_MINIMUM:
+        raise ValueError(
+            f"a composed path names {len(chain)} segment(s), and a composition has at least two. "
+            "A chain of one *is* a declared route and belongs in a FundingPath: costing it "
+            "under the composed type would put one journey in a ranking under two shapes, and "
+            "every report would then have to guess which it was looking at (FR-013)."
+        )
+    missing = [route_id for route_id in chain if route_id not in routes]
+    if missing:
         raise KeyError(
-            f"unknown route {path.route_id!r}: a funding path names a declared route. "
+            f"unknown route(s) {missing}: a candidate names declared routes. "
             f"Known routes: {sorted(routes)}"
         )
-    route = routes[path.route_id]
-    if route.destination != path.destination_id:
+    resolved = tuple(routes[route_id] for route_id in chain)
+    _checked_joins(resolved, what="inbound")
+    if resolved[-1].destination != candidate.destination_id:
         raise ValueError(
-            f"route {route.id!r} ends at {route.destination!r}, but the funding path names "
-            f"{path.destination_id!r} as its destination. The triple has to be coherent: a "
-            "path is built from a route, so a disagreement is a construction error, and "
-            "reporting it as a fact about the money would invite callers to build "
-            "mismatched paths and read the answer as a cost (FR-008)."
+            f"the candidate ends at route {resolved[-1].id!r}, which arrives at "
+            f"{resolved[-1].destination!r}, but names {candidate.destination_id!r} as its "
+            "destination. The key has to be coherent: a candidate is built from routes, so a "
+            "disagreement is a construction error, and reporting it as a fact about the money "
+            "would invite callers to build mismatched candidates and read the answer as a cost "
+            "(FR-008)."
         )
-    return route
+    return resolved
 
 
-def _stream_for(streams: Mapping[str, IncomeStream], path: FundingPath) -> IncomeStream:
+def _chain(candidate: Candidate, routes: Mapping[str, Route]) -> tuple[tuple[Leg, Segment], ...]:
+    """Every leg of every segment, in order, each paired with the segment it belongs to.
+
+    **The whole of "composition adds no arithmetic"** (research.md D1). What comes back is one
+    flat sequence, and :func:`_walk` folds over it exactly as it folded over a single route's
+    legs in feature 002. There is no second costing path to keep in step, which is what makes
+    SC-002's "asserted by construction" a fact about the code rather than a comparison of two
+    numbers that happen to agree.
+
+    ``Leg.index`` is **renumbered across the concatenation**. Per-route indices repeat -- a
+    two-leg route followed by a one-leg route gives ``0, 1, 0`` -- and a refusal saying "leg 0"
+    twice in one chain is a message that cannot be acted on. For a declared route the
+    renumbering is the identity, because the loader already numbers legs from zero.
+
+    The :class:`~terezy.core.routes.path.Segment` travelling beside each leg is what lets a
+    refusal name the **binding segment** (FR-015) and the attribution name the **charging
+    segment** (FR-020) without either of them recomputing which route a leg came from.
+    """
+    paired: list[tuple[Leg, Segment]] = []
+    for position, route in enumerate(_routes_for(routes, candidate)):
+        segment = Segment(position=position, route_id=route.id)
+        for leg in route.legs:
+            paired.append((replace(leg, index=len(paired)), segment))
+    return tuple(paired)
+
+
+def legs_of(candidate: Candidate, routes: Mapping[str, Route]) -> tuple[Leg, ...]:
+    """One candidate as one sequence of legs -- the only way a journey is assembled.
+
+    A declared route's own legs, or the concatenation of a chain's, renumbered once across the
+    whole. :func:`cost_one` walks what this returns and nothing else, so a composed candidate
+    is not *costed like* a declared route: it is costed **by the same call**, over a longer
+    tuple.
+
+    Public because SC-002 is a claim about there being one producer of leg sequences, and a
+    claim about a private helper is a claim a test cannot make.
+    """
+    return tuple(leg for leg, _ in _chain(candidate, routes))
+
+
+def _stream_for(streams: Mapping[str, IncomeStream], path: Candidate) -> IncomeStream:
     """The declared income stream a path names, or a raise naming what is known.
 
     A raise rather than a typed failure, on exactly the reasoning of :func:`_route_for`: a
@@ -239,26 +385,35 @@ def _initial(amount: Money) -> _Walk:
         ceiling=None,
         disruption=0.0,
         staleness=stale.UNASSESSED,
+        segments=(),
     )
 
 
 def _unusable(
-    path: FundingPath,
+    path: Candidate,
     constraint: str,
     reason: str,
     *,
+    segment: Segment | None,
     required: Money | None = None,
     actual: Money | None = None,
 ) -> RouteUnusable:
-    """A refusal, with its constraint named and its gap computed once.
+    """A refusal, with its constraint named, its segment named and its gap computed once.
 
     ``shortfall`` is ``required - actual`` in every case, which reads as a shortfall against
     a minimum and as a (negative) excess against a maximum. One subtraction, one direction,
     so the figure the owner sees does not depend on which constraint bound.
+
+    **The segment is dropped for a declared route** (data-model.md). A ``FundingPath`` names
+    exactly one route and ``path`` already carries it, so a ``Segment(position=0, ...)`` beside
+    it would be the same fact twice and would read as though something had been selected out of
+    several. On a chain it is the whole point: ``leg.minimum`` on a three-segment candidate is
+    not actionable until a reader knows which declaration to open.
     """
     shortfall = None if required is None or actual is None else money.sub(required, actual)
     return RouteUnusable(
         path=path,
+        binding_segment=None if isinstance(path, FundingPath) else segment,
         binding_constraint=constraint,
         required=required,
         actual=actual,
@@ -268,7 +423,7 @@ def _unusable(
 
 
 def _funding_mismatch(
-    stream: IncomeStream, route: Route, path: FundingPath
+    stream: IncomeStream, route: Route, path: Candidate, segment: Segment
 ) -> RouteUnusable | None:
     """Whether this stream's money can start down this route at all.
 
@@ -303,6 +458,7 @@ def _funding_mismatch(
             "route begins, so the route cannot carry it: the mismatch is reported rather "
             "than assumed away, because assuming it away would price a journey that skips "
             "the part nobody has costed.",
+            segment=segment,
         )
     if route.legs and stream.amount.currency is not route.legs[0].from_ccy:
         return _unusable(
@@ -313,11 +469,14 @@ def _funding_mismatch(
             f"moves {route.legs[0].from_ccy.value} out of it. Arriving at the right venue in "
             "the wrong currency is still a mismatch, and no conversion is invented to bridge "
             "it -- a conversion is a declared leg with a declared channel (FR-010).",
+            segment=segment,
         )
     return None
 
 
-def _availability(leg: Leg, path: FundingPath, on_date: date) -> RouteUnusable | None:
+def _availability(
+    leg: Leg, path: Candidate, segment: Segment, on_date: date
+) -> RouteUnusable | None:
     """Whether this leg works on the date the money moves.
 
     A leg's window is **a fact** about the corridor, with a source -- "this closed in March
@@ -331,6 +490,7 @@ def _availability(leg: Leg, path: FundingPath, on_date: date) -> RouteUnusable |
             "leg.available_from",
             f"leg {leg.index} does not open until {leg.available_from.isoformat()}, and the "
             f"movement is dated {on_date.isoformat()}",
+            segment=segment,
         )
     if leg.available_until is not None and on_date > leg.available_until:
         return _unusable(
@@ -338,11 +498,12 @@ def _availability(leg: Leg, path: FundingPath, on_date: date) -> RouteUnusable |
             "leg.available_until",
             f"leg {leg.index} closed on {leg.available_until.isoformat()}, and the movement "
             f"is dated {on_date.isoformat()}",
+            segment=segment,
         )
     return None
 
 
-def _limits(leg: Leg, amount: Money, path: FundingPath) -> RouteUnusable | None:
+def _limits(leg: Leg, amount: Money, path: Candidate, segment: Segment) -> RouteUnusable | None:
     """Whether this leg will carry this amount, with the gap named if it will not.
 
     Never silently adjusted (FR-014). Rounding up to a minimum would move money the owner
@@ -355,6 +516,7 @@ def _limits(leg: Leg, amount: Money, path: FundingPath) -> RouteUnusable | None:
             "leg.minimum",
             f"leg {leg.index} carries no less than {leg.minimum.amount!r} "
             f"{leg.minimum.currency.value}, and {amount.amount!r} reaches it",
+            segment=segment,
             required=leg.minimum,
             actual=amount,
         )
@@ -364,6 +526,7 @@ def _limits(leg: Leg, amount: Money, path: FundingPath) -> RouteUnusable | None:
             "leg.maximum",
             f"leg {leg.index} carries no more than {leg.maximum.amount!r} "
             f"{leg.maximum.currency.value}, and {amount.amount!r} reaches it",
+            segment=segment,
             required=leg.maximum,
             actual=amount,
         )
@@ -462,21 +625,78 @@ def _ceiling_after(walk: _Walk, leg: Leg, sending: Currency) -> Money | None:
     return walk.ceiling
 
 
+def _attributed(
+    walk: _Walk,
+    segment: Segment,
+    *,
+    spread: Money,
+    percentage: Money,
+    fixed: Money,
+) -> tuple[SegmentAttribution, ...]:
+    """One leg's charges folded into its segment's running attribution (FR-020).
+
+    The charges arrive **already translated into the sending currency** by :func:`_applied`,
+    which is what keeps the two axes honest: the same three figures are added into the
+    whole-candidate totals and into this segment's subtotal, so neither axis can see a number
+    the other did not.
+
+    A leg whose segment is the one already at the end of the tuple extends it; a leg that has
+    crossed into the next segment starts a new entry. The fold visits segments in order and
+    never returns to one, so a single tail check is the whole of the grouping -- and a chain
+    that could revisit a segment would be a chain that revisited a venue, which the search
+    refuses (FR-005).
+    """
+    charges = {
+        CostComponent.CONVERSION_SPREAD: spread,
+        CostComponent.PERCENTAGE_FEE: percentage,
+        CostComponent.FIXED_FEE: fixed,
+    }
+    if walk.segments and walk.segments[-1].position == segment.position:
+        running = walk.segments[-1]
+        return (
+            *walk.segments[:-1],
+            replace(
+                running,
+                components={
+                    component: money.add(running.components[component], charge)
+                    for component, charge in charges.items()
+                },
+            ),
+        )
+    return (
+        *walk.segments,
+        SegmentAttribution(
+            position=segment.position, route_id=segment.route_id, components=charges
+        ),
+    )
+
+
 def _applied(
     walk: _Walk,
     leg: Leg,
     outcome: LegOutcome,
+    *,
     sending: Currency,
     staleness: StalenessVerdict,
+    segment: Segment,
 ) -> _Walk:
-    """Fold one leg's outcome into the walk, with every charge valued where it started."""
+    """Fold one leg's outcome into the walk, with every charge valued where it started.
+
+    Each charge is translated **once** and then added into both axes: the three running totals
+    feature 002 established, in their original order, and this segment's own subtotal. Deriving
+    either axis from the other would be the sum-of-sums the whole design refuses.
+    """
+    spread = _translated(walk, outcome.conversion_spread, sending)
+    percentage = _translated(walk, outcome.percentage_fee, sending)
+    fixed = _translated(walk, outcome.fixed_fee, sending)
     return replace(
         walk,
         amount=outcome.outgoing,
         staleness=staleness,
-        spread=money.add(walk.spread, _translated(walk, outcome.conversion_spread, sending)),
-        percentage=money.add(walk.percentage, _translated(walk, outcome.percentage_fee, sending)),
-        fixed=money.add(walk.fixed, _translated(walk, outcome.fixed_fee, sending)),
+        spread=money.add(walk.spread, spread),
+        percentage=money.add(walk.percentage, percentage),
+        fixed=money.add(walk.fixed, fixed),
+        segments=_attributed(walk, segment, spread=spread, percentage=percentage, fixed=fixed),
         channels=(
             walk.channels
             if outcome.channel_applied is None
@@ -496,8 +716,9 @@ def _applied(
 def _step(
     walk: _Walk,
     leg: Leg,
+    segment: Segment,
     *,
-    path: FundingPath,
+    path: Candidate,
     sending: Currency,
     channels: Mapping[str, FxChannel],
     kinds: Mapping[str, ObservationKind],
@@ -505,12 +726,19 @@ def _step(
     as_of: date,
 ) -> _Walk | RouteUnusable:
     """Apply one leg: check what it will carry, then charge what it charges."""
-    blocked = _availability(leg, path, on_date) or _limits(leg, walk.amount, path)
+    blocked = _availability(leg, path, segment, on_date) or _limits(leg, walk.amount, path, segment)
     if blocked is not None:
         return blocked
     channel = leg_module.channel_for(channels, leg)
     outcome = leg_module.cost_fn_for(leg.kind)(leg, walk.amount, channel)
-    stepped = _applied(walk, leg, outcome, sending, _aged(walk, leg, channel, kinds, as_of))
+    stepped = _applied(
+        walk,
+        leg,
+        outcome,
+        sending=sending,
+        staleness=_aged(walk, leg, channel, kinds, as_of),
+        segment=segment,
+    )
     if leg.kind == FX and channel is not None:
         factor, sources = _factor_after(walk, leg, channel)
         stepped = replace(stepped, factor=factor, factor_sources=sources)
@@ -518,21 +746,27 @@ def _step(
 
 
 def _walk(
-    legs: tuple[Leg, ...],
+    chain: tuple[tuple[Leg, Segment], ...],
     walk: _Walk,
     *,
-    path: FundingPath,
+    path: Candidate,
     sending: Currency,
     channels: Mapping[str, FxChannel],
     kinds: Mapping[str, ObservationKind],
     on_date: date,
     as_of: date,
 ) -> _Walk | RouteUnusable:
-    """Fold every leg in declared order, stopping at the first that will not carry it."""
-    for leg in legs:
+    """Fold every leg in chain order, stopping at the first that will not carry it.
+
+    One fold over one sequence, whether that sequence came from one declared route or from five
+    chained ones. That is the whole of FR-003: there is no per-segment costing step to sum, so
+    a composed candidate cannot be priced by a different arithmetic than a declared one.
+    """
+    for leg, segment in chain:
         stepped = _step(
             walk,
             leg,
+            segment,
             path=path,
             sending=sending,
             channels=channels,
@@ -606,15 +840,231 @@ def _one_way(sent: Money, walk: _Walk) -> OneWayCost:
         channels_applied=walk.channels,
         provenance=provenance,
         staleness=walk.staleness,
+        by_segment=walk.segments,
     )
+
+
+def _spendable_junctions(spendable: frozenset[SpendableEndpoint]) -> frozenset[_Junction]:
+    """The owner's declared spendable endpoints, as junctions the chain rules can compare."""
+    return frozenset((endpoint.venue_id, endpoint.currency.value) for endpoint in spendable)
+
+
+def _reaches_spendable(
+    junction: _Junction, spendable: frozenset[SpendableEndpoint], *, claim: str
+) -> None:
+    """The far end of a way out is somewhere the owner actually spends, or a raise saying so.
+
+    FR-022: an exit chain runs from the destination back to a **declared spendable endpoint**.
+    One function, because there are two ways a caller can claim to have got the money out -- by
+    naming a chain, or by asserting the destination needs no chain -- and the second is *only*
+    that claim, so it is the one place the check must not be skipped.
+    """
+    reachable = _spendable_junctions(spendable)
+    if junction in reachable:
+        return
+    raise ValueError(
+        f"{claim} ends as {junction[1]} at {junction[0]!r}, which is not a declared spendable "
+        f"endpoint. Known endpoints: {sorted(reachable)}. A way out runs from the destination "
+        "back to somewhere the owner actually spends (FR-022); one that stops short has not got "
+        "the money out, and a round-trip figure over it would report a journey ending in "
+        "something the owner cannot spend as though it had come back."
+    )
+
+
+def _exit_chain_of(
+    path: Candidate,
+    exit_path: ExitChoice,
+    *,
+    routes: Mapping[str, Route],
+    arrival: _Junction,
+    spendable: frozenset[SpendableEndpoint],
+) -> ExitChain | None:
+    """The way out this candidate is keyed by, or ``None`` when nobody has declared one.
+
+    :data:`~terezy.core.routes.path.FROM_THE_DECLARATION` reads the declarations, in the order
+    the owner's own rules put them:
+
+    * **The destination is itself a declared spendable endpoint** -- the money has arrived where
+      it needed to come back out to, so there is nothing to do and
+      :data:`~terezy.core.routes.path.EXIT_BY_IDENTITY` is the way out (003 FR-002, owner
+      decision 2026-08-23). It is derived here rather than left for a caller to pass, because a
+      reconciliation only a caller can opt into is not one: the disagreement ``features.toml``
+      recorded as ``identity-exit-vs-partner-requirement`` was that coverage called such a pair
+      ready while costing refused it, and it stands until costing reaches that verdict itself.
+    * **Otherwise the arriving route's ``partner_route``** -- 002's FR-027 rule unchanged, taken
+      from the last segment, because that is the route whose declaration was written about
+      getting money out of the destination it lands at. No partner still yields ``None``, and
+      ``None`` still means ``ExitCostUnknown`` with no one-way figure promoted (FR-030).
+
+    **Identity supersedes a declared partner**, which is the reading feature 003 already took:
+    its ``superseded-exit-visibility`` note records that the sentinel supersedes exit routes
+    actually declared from a spendable destination. Costing has to agree, or one pair would be
+    priced two ways. Where the money is already spendable, a further declared hop is a journey
+    the owner has no reason to make.
+
+    Anything else is the caller's own statement about the way out, and is **checked** rather
+    than trusted -- see :func:`_supplied_exit`.
+    """
+    match exit_path:
+        case FromTheDeclaration():
+            if arrival in _spendable_junctions(spendable):
+                return EXIT_BY_IDENTITY
+            partner = routes[segments_of(path)[-1]].partner_route
+            return None if partner is None else DeclaredExit(route_id=partner)
+        case ExitByIdentity():
+            # **A caller-supplied sentinel is checked, not taken on trust.** Derived above it is
+            # safe by construction -- the branch only reaches it when the arrival *is* spendable
+            # -- but passed in it is the bare assertion "this destination needs no way out", and
+            # its whole content is a claim about the far end. Unchecked, it produced a confident
+            # round trip for money still sitting in dollars at an exchange: an arriving amount in
+            # one currency beside a cost fraction computed in another, which is exactly the
+            # failure the anchor below exists to refuse.
+            _reaches_spendable(
+                arrival,
+                spendable,
+                claim=(
+                    "EXIT_BY_IDENTITY says there is nothing to do because the way in already "
+                    "ends somewhere the owner spends -- but it"
+                ),
+            )
+            return exit_path
+        case _:
+            _supplied_exit(exit_path, routes, arrival=arrival, spendable=spendable)
+            return exit_path
+
+
+def _supplied_exit(
+    chain: ExitChain,
+    routes: Mapping[str, Route],
+    *,
+    arrival: _Junction,
+    spendable: frozenset[SpendableEndpoint],
+) -> None:
+    """A caller-supplied way out, held to what :func:`compose` would only ever have emitted.
+
+    :func:`terezy.core.routes.compose.compose` enumerates exit chains that start at the
+    destination and end at a declared spendable endpoint, and emits no others. A chain arriving
+    here by any other route -- assembled by hand, or paired with the wrong inbound candidate in
+    a loop -- has been through none of that, so this is where the same two anchors are applied.
+    Both raise: a way out that does not leave from where the money is, or does not get it
+    anywhere the owner spends, is a construction error rather than a fact about the money, and
+    pricing it would produce a confident round-trip figure for a journey nobody can walk.
+
+    ⚙ **The spendable anchor is checked here and not for a derived partner**, and the line is
+    deliberate. 002's loader already validates a ``partner_route`` on five counts including
+    ending in base currency, and tightening *that* path to require a declared spendable endpoint
+    is feature 003's ``coverage-enforcement`` -- a recorded deferral, and not this feature's to
+    take. What is in scope is FR-022's definition of a **composed** way out, and a caller who
+    names a chain is asserting it is one.
+
+    **The consequence is an asymmetry worth stating plainly:** naming the very exit the
+    declaration would have derived raises here, where leaving it to be derived returns a figure.
+    That is not "stricter versus looser" but an exception versus a number, and it is the price of
+    keeping the deferral honest -- 002's rule governs what the loader vouched for, and FR-022
+    governs what a caller asserts. If the two should converge, the change is to lift
+    ``coverage-enforcement``, which is the owner's call and not a widening to make here.
+    """
+    resolved = _exit_routes(chain, routes, arrival=arrival)
+    _reaches_spendable(
+        _arrives_at(resolved[-1]),
+        spendable,
+        claim=f"exit chain {'+'.join(exit_segments_of(chain))!r}",
+    )
+
+
+def _exit_routes(
+    chain: ExitChain, routes: Mapping[str, Route], *, arrival: _Junction
+) -> tuple[Route, ...]:
+    """The declared routes an exit chain names, in order, or a raise naming what is wrong.
+
+    Four checks, and they are 002's ``_check_partner`` rules applied where a chain can reach
+    costing without having passed the loader: the ids resolve, **every segment is declared
+    ``exit``** (FR-022), the chain **departs from where the money actually is**, and its
+    internal junctions join.
+
+    ⚙ **The head anchor is the one this function was missing**, and it is the sharpest of the
+    four -- ``_check_partner``'s own docstring says so of its equivalent. Without it a chain
+    leaving from a venue the inbound journey never reached is walked as though it had: the money
+    teleports across a junction nobody declared, for free, and what comes out is a coherent
+    looking round trip over two unrelated journeys. ``_routes_for`` anchors the inbound chain at
+    its tail against the destination it claims; this is the same check at the other end of the
+    same seam.
+
+    Resolution comes **before** the closed-status check its caller makes, and the order is
+    load-bearing: a ``partner_route`` naming a route nobody declared has to raise saying so
+    (002's rule), and a status lookup on an unresolved id would raise a bare ``KeyError`` naming
+    only the id -- true, and about the wrong thing.
+    """
+    ids = exit_segments_of(chain)
+    if isinstance(chain, ComposedExit) and len(ids) < _COMPOSED_MINIMUM:
+        raise ValueError(
+            f"a composed exit names {len(ids)} segment(s), and a composition has at least two. "
+            "One declared exit route is a DeclaredExit, and a chain of none is not a way out at "
+            "all -- that is ExitCostUnknown, which is a different claim."
+        )
+    missing = [route_id for route_id in ids if route_id not in routes]
+    if missing:
+        raise KeyError(
+            f"exit chain names route(s) {missing}, which are not declared. A dangling partner "
+            f"is refused at load (FR-027) precisely so it cannot become a missing round trip "
+            f"here -- ``null`` is the way to say nobody has costed the exit. Known routes: "
+            f"{sorted(routes)}"
+        )
+    resolved = tuple(routes[route_id] for route_id in ids)
+    inbound = [route.id for route in resolved if route.direction != "exit"]
+    if inbound:
+        raise ValueError(
+            f"exit chain names route(s) {inbound} declared inbound. Directions never mix "
+            "(FR-022): what was observed one way says nothing about the other way, so using an "
+            "inbound route as a way out would invent a corridor nobody observed."
+        )
+    if _departs_from(resolved[0]) != arrival:
+        raise ValueError(
+            f"exit route {resolved[0].id!r} departs as {resolved[0].legs[0].from_ccy.value} "
+            f"from {resolved[0].origin!r}, but the way in arrived as {arrival[1]} at "
+            f"{arrival[0]!r}. The two do not meet, so the round trip would be two unrelated "
+            "journeys reported as one figure -- and walking it anyway would move the money "
+            "across a junction nobody declared, for free, which is exactly the implicit "
+            "conversion FR-002 forbids."
+        )
+    _checked_joins(resolved, what="exit")
+    return resolved
+
+
+def _exit_chain(
+    resolved: tuple[Route, ...], *, position_from: int, index_from: int
+) -> tuple[tuple[Leg, Segment], ...]:
+    """An exit chain's legs, paired with segments numbered on from the inbound chain's.
+
+    Continuous numbering because the round trip is **one** journey: the amount that leaves the
+    inbound chain is the amount that enters the exit chain, with nothing re-derived in between,
+    and two independent numberings would make "position 0" ambiguous in a report.
+    """
+    paired: list[tuple[Leg, Segment]] = []
+    for offset, route in enumerate(resolved):
+        segment = Segment(position=position_from + offset, route_id=route.id)
+        for leg in route.legs:
+            paired.append((replace(leg, index=index_from + len(paired)), segment))
+    return tuple(paired)
+
+
+def _closed_exit(resolved: tuple[Route, ...]) -> Route | None:
+    """The first segment of an already-resolved exit chain that is declared closed, if any.
+
+    Takes the resolved routes rather than the ids so it cannot be reached before
+    :func:`_exit_routes` has said whether they exist -- a lookup that raised here would report a
+    dangling partner as a missing key rather than as the declaration error it is.
+    """
+    return next((route for route in resolved if route.status == "closed"), None)
 
 
 def _round_trip(
     sent: Money,
     walk: _Walk,
-    route: Route,
     *,
-    path: FundingPath,
+    path: Candidate,
+    exit_chain: ExitChain | None,
+    arrival: _Junction,
     routes: Mapping[str, Route],
     channels: Mapping[str, FxChannel],
     kinds: Mapping[str, ObservationKind],
@@ -623,56 +1073,83 @@ def _round_trip(
 ) -> RoundTripCost | ExitCostUnknown:
     """The cost in and back out again, or a typed statement of why there is none.
 
-    Computed by continuing the *same* walk through the declared exit route, so the exit's
-    charges land in the same three components, valued in the same sending currency, as the
-    inbound ones. Continuing the walk rather than starting a new one is what makes the
-    round-trip attribution close: the amount that leaves the inbound route is the amount that
-    enters the exit route, with nothing re-derived in between.
+    Computed by continuing the *same* walk through the exit chain, so the exit's charges land in
+    the same three components, valued in the same sending currency, as the inbound ones.
+    Continuing the walk rather than starting a new one is what makes the round-trip attribution
+    close: the amount that leaves the inbound chain is the amount that enters the exit chain,
+    with nothing re-derived in between.
 
-    A route with no declared partner yields :class:`ExitCostUnknown` (FR-030). So does a
-    partner that is **declared closed** -- a way out that carries nothing on the date is not
-    a usable way out, and a confident round-trip figure through it would price a journey
-    that cannot be walked -- and so does a partner that will not carry what arrived. The
-    reason says which, because "nobody declared the way out", "the way out is closed" and
-    "the way out will not take this much" are different facts and the owner acts on them
-    differently. In no case is the one-way figure promoted.
+    **Three ways there is a round trip, and they are three different claims.**
+    :class:`~terezy.core.routes.path.DeclaredExit` is 002's single declared partner;
+    :class:`~terezy.core.routes.path.ComposedExit` is FR-012's chain of declared exit segments,
+    which the owner decided satisfies FR-027 because every link of it **is** an observation; and
+    :data:`~terezy.core.routes.path.EXIT_BY_IDENTITY` is the destination already being a declared
+    spendable endpoint, so there is nothing to do and nothing to charge.
+
+    **The identity case is not a promoted one-way figure**, and the distinction is the reason the
+    sentinel exists rather than a zero-length chain. The money has arrived somewhere the owner
+    spends from: the round trip is complete at the moment the inbound chain ends, so the
+    round-trip figure *is* the inbound figure -- not because a way out was assumed free, but
+    because there is no way out left to travel. A ``RoundTripCost`` here says "this is the whole
+    cost of getting in and being able to spend it"; ``ExitCostUnknown`` would say the opposite,
+    and a one-way figure quietly copied into the round-trip slot would say it while looking like
+    the first.
+
+    A candidate with no exit chain at all yields :class:`ExitCostUnknown` (FR-030). So does an
+    exit segment **declared closed** -- a way out that carries nothing on the date is not a
+    usable way out -- and so does an exit chain that will not carry what arrived. The reason says
+    which, because "nobody declared the way out", "the way out is closed" and "the way out will
+    not take this much" are different facts and the owner acts on them differently. In no case is
+    the one-way figure promoted.
     """
-    if route.partner_route is None:
+    arriving = routes[segments_of(path)[-1]]
+    if exit_chain is None:
         return ExitCostUnknown(
             reason=(
-                f"route {route.id!r} declares no partner_route, so nobody has costed the way "
-                "out. Round-trip cost is computed from a separately declared exit route and "
+                f"route {arriving.id!r} declares no partner_route, so nobody has costed the way "
+                "out. Round-trip cost is computed from separately declared exit routes and "
                 "never by reversing the way in (FR-027), and the one-way figure is not "
                 "promoted into its place (FR-030): a destination whose exit nobody has "
                 "costed is not comparison-ready."
             ),
-            missing_partner_for=route.id,
+            missing_partner_for=arriving.id,
         )
-    if route.partner_route not in routes:
-        raise KeyError(
-            f"route {route.id!r} names partner route {route.partner_route!r}, which is not "
-            f"declared. A dangling partner is refused at load (FR-027) precisely so it "
-            f"cannot become a missing round trip here -- ``null`` is the way to say nobody "
-            f"has costed the exit. Known routes: {sorted(routes)}"
+    if isinstance(exit_chain, ExitByIdentity):
+        # No legs, and therefore no charges: the destination is itself a declared spendable
+        # endpoint, so the money is already where it needed to come back out to (003 FR-002).
+        # The figure below is the inbound walk's, because the inbound walk is the whole journey
+        # -- see this function's docstring for why that is not FR-030's forbidden promotion.
+        components, fraction, provenance = _figure(sent, walk)
+        return RoundTripCost(
+            sent=sent,
+            arrived=walk.amount,
+            components=components,
+            fraction=fraction,
+            spreads_over_reference=walk.spreads,
+            channels_applied=walk.channels,
+            provenance=provenance,
+            staleness=walk.staleness,
+            by_segment=walk.segments,
         )
-    partner = routes[route.partner_route]
-    if partner.status == "closed":
-        # The same respect ``cost_one`` pays the inbound status, at the seam where it was
-        # missing: a closed exit is a declared fact that the way out carries nothing on this
-        # date. Distinct from "not declared" -- the reason names the partner and its status,
-        # so a corridor that shut is never reported as a declaration nobody wrote (FR-014).
+    resolved_exit = _exit_routes(exit_chain, routes, arrival=arrival)
+    closed = _closed_exit(resolved_exit)
+    if closed is not None:
         return ExitCostUnknown(
             reason=(
-                f"exit route {partner.id!r} is declared closed, so it carries nothing on "
+                f"exit route {closed.id!r} is declared closed, so it carries nothing on "
                 f"{on_date.isoformat()}: the way out is declared and is not usable. There "
                 "is therefore no round-trip figure for this path, and the one-way figure "
                 "is not promoted into its place (FR-030); the exclusion is recorded rather "
                 "than silent (FR-014)."
             ),
-            missing_partner_for=route.id,
+            missing_partner_for=arriving.id,
         )
     exited = _walk(
-        partner.legs,
+        _exit_chain(
+            resolved_exit,
+            position_from=len(segments_of(path)),
+            index_from=sum(len(routes[route_id].legs) for route_id in segments_of(path)),
+        ),
         walk,
         path=path,
         sending=sent.currency,
@@ -684,11 +1161,11 @@ def _round_trip(
     if isinstance(exited, RouteUnusable):
         return ExitCostUnknown(
             reason=(
-                f"exit route {partner.id!r} will not carry what arrives: "
-                f"{exited.reason}. There is therefore no round-trip figure for this path, "
-                "and the one-way figure is not promoted into its place (FR-030)."
+                f"exit chain {'+'.join(exit_segments_of(exit_chain))!r} will not carry what "
+                f"arrives: {exited.reason}. There is therefore no round-trip figure for this "
+                "path, and the one-way figure is not promoted into its place (FR-030)."
             ),
-            missing_partner_for=route.id,
+            missing_partner_for=arriving.id,
         )
     components, fraction, provenance = _figure(sent, exited)
     return RoundTripCost(
@@ -700,11 +1177,26 @@ def _round_trip(
         channels_applied=exited.channels,
         provenance=provenance,
         staleness=exited.staleness,
+        by_segment=exited.segments,
     )
 
 
+def _status_of(resolved: tuple[Route, ...]) -> RouteStatus:
+    """The status a whole candidate reports: the most constrained any segment declares.
+
+    A chain is no more usable than its tightest link, so a candidate one of whose segments is
+    ``constrained`` is reported constrained even where the others are open. Taking the first
+    segment's status, or the last, would let a constrained corridor hide behind an open one --
+    and the status is what a reader scans to decide whether to trust the figure beside it.
+
+    ``closed`` never reaches here: :func:`cost_one` excludes such a candidate with the binding
+    segment recorded, before anything is costed (FR-014, FR-015).
+    """
+    return "constrained" if any(route.status == "constrained" for route in resolved) else "open"
+
+
 def cost_one(
-    path: FundingPath,
+    path: Candidate,
     amount: Money,
     *,
     routes: Mapping[str, Route],
@@ -713,39 +1205,51 @@ def cost_one(
     kinds: Mapping[str, ObservationKind],
     on_date: date,
     as_of: date,
+    spendable: frozenset[SpendableEndpoint],
+    exit_path: ExitChoice = FROM_THE_DECLARATION,
 ) -> RampCost | RouteUnusable:
-    """Cost one amount along one funding path. The only costing function in the project.
+    """Cost one amount along one candidate. The only costing function in the project.
 
     Pure: no clock, no I/O, no state. Called twice with equal arguments it returns equal
     results, which is what makes C4 determinism reachable and what lets a ranking cost every
     candidate through this same function without any of them influencing another.
 
-    Returns a :class:`RampCost` -- one way, round trip, latency, ceiling, status and
-    disruption probability, attributed by component and carrying merged provenance and a
-    staleness verdict -- or a :class:`RouteUnusable` naming the constraint that bound. Never
-    an exception for a fact about the money, and never a zero cost standing in for a refusal.
+    ``path`` is a :class:`~terezy.core.routes.path.Candidate`: one declared route, or a chain of
+    them composed at query time. **There is no separate function for the second kind**
+    (FR-003). :func:`legs_of` turns either into one leg sequence and the fold below walks it
+    unchanged, so a composed candidate is not costed *like* a declared route -- it is costed by
+    the same call, over a longer tuple. That is why SC-002 can be asserted by construction
+    rather than by comparing two figures that happen to agree.
+
+    Returns a :class:`RampCost` -- one way, round trip, latency, ceiling, status and disruption
+    probability, attributed by **component and by segment** and carrying merged provenance and a
+    staleness verdict -- or a :class:`RouteUnusable` naming the constraint that bound and the
+    segment it bound on. Never an exception for a fact about the money, and never a zero cost
+    standing in for a refusal.
 
     A negative amount raises. It is not a movement of money in the other direction -- that is
     a different route, declared separately (FR-027) -- so it can only be a caller's arithmetic
     error, and costing it would produce a negative cost that looks like a gain.
 
-    **The order the refusals are checked in is deliberate**, because two of them can be true
-    at once and the one reported should be the one the owner acts on first. They run from the
-    least dependent on circumstance to the most: the path's own coherence (a raise -- three ids
-    that do not describe one journey are not a question about money), then the stream against
-    the route (true on every date and at every amount), then the route's status (true on this
-    date), then each leg's window and limits (true of this amount on this date). A funding path
-    whose stream does not reach its route is reported as such even if the route also happens to
-    be closed, because declaring a route from where the money actually lands is the owner's
-    next move either way.
+    **``exit_path`` names the way out, and its default is the declaration rather than a
+    guess.** :data:`~terezy.core.routes.path.FROM_THE_DECLARATION` applies 002's FR-027 rule
+    unchanged -- the arriving route's ``partner_route``, or ``ExitCostUnknown`` where it names
+    none -- so every caller written before this feature keeps the behaviour it had, and says so
+    by name in the signature rather than inheriting it silently. It substitutes nothing for
+    missing data: a route with no declared partner still has no round trip. A caller who has
+    *found* a way out -- an enumerated chain of declared exit segments (FR-012), or a
+    destination that is itself spendable (003 FR-002) -- passes it, because those rest on
+    declarations this function is not the owner of.
 
-    **``streams`` landed here with User Story 2, and it landed in ``rank`` in the same
-    change.** ``contracts/route-costing.md`` requires the two together: had ranking costed its
-    candidates through a signature that did not know about streams while this one did, the
-    winner and the alternatives would have been priced by two different functions -- the second
-    code path FR-029 exists to forbid. ``capacity_used`` is still to come, with the monthly-cap
-    accumulator of User Story 3 (T029), and will be added to both signatures together for the
-    same reason.
+    **The order the refusals are checked in is deliberate**, because two of them can be true at
+    once and the one reported should be the one the owner acts on first. They run from the least
+    dependent on circumstance to the most: the candidate's own coherence (a raise -- a chain
+    whose junctions do not join is not a question about money), then the stream against the way
+    in (true on every date and at every amount), then each segment's status (true on this date),
+    then each leg's window and limits (true of this amount on this date). A candidate whose
+    stream does not reach its first segment is reported as such even if a later segment also
+    happens to be closed, because declaring a route from where the money actually lands is the
+    owner's next move either way.
 
     ``amount`` and ``streams`` are separate arguments and the amount must be in the named
     stream's currency; a disagreement raises. The amount is deliberately not read off the
@@ -762,7 +1266,7 @@ def cost_one(
             "own declaration (FR-027) -- so a negative amount here is an arithmetic error in "
             "the caller, and costing it would report a negative cost that reads as a gain"
         )
-    route = _route_for(routes, path)
+    resolved = _routes_for(routes, path)
     stream = _stream_for(streams, path)
     if amount.currency is not stream.amount.currency:
         raise ValueError(
@@ -773,18 +1277,28 @@ def cost_one(
             "mismatch in ``money``, this is a caller's error rather than a fact about the "
             "money, so it raises rather than returning a cost or a refusal."
         )
-    mismatched = _funding_mismatch(stream, route, path)
+    mismatched = _funding_mismatch(
+        stream, resolved[0], path, Segment(position=0, route_id=resolved[0].id)
+    )
     if mismatched is not None:
         return mismatched
-    if route.status == "closed":
-        return _unusable(
-            path,
-            "route.status",
-            f"route {route.id!r} is declared closed, so it carries nothing on "
-            f"{on_date.isoformat()}. Its exclusion is recorded rather than silent (FR-014).",
-        )
+    for position, route in enumerate(resolved):
+        if route.status == "closed":
+            return _unusable(
+                path,
+                "route.status",
+                f"route {route.id!r} is declared closed, so it carries nothing on "
+                f"{on_date.isoformat()}. Its exclusion is recorded rather than silent "
+                "(FR-014), and the segment it bound on is named so a chain's reader knows "
+                "which declaration to open (FR-015).",
+                segment=Segment(position=position, route_id=route.id),
+            )
     walked = _walk(
-        route.legs,
+        # Inlined rather than bound to a name, so that "the fold is only ever handed a chain
+        # this module built" is visible at the call site and checkable by a scan over the
+        # syntax. A local variable would put one indirection between the two, which is exactly
+        # where a second way of assembling a journey would appear.
+        _chain(path, routes),
         _initial(amount),
         path=path,
         sending=amount.currency,
@@ -795,22 +1309,35 @@ def cost_one(
     )
     if isinstance(walked, RouteUnusable):
         return walked
+    arrival = _arrives_at(resolved[-1])
+    exit_chain = _exit_chain_of(
+        path, exit_path, routes=routes, arrival=arrival, spendable=spendable
+    )
+    round_trip = _round_trip(
+        amount,
+        walked,
+        path=path,
+        exit_chain=exit_chain,
+        arrival=arrival,
+        routes=routes,
+        channels=channels,
+        kinds=kinds,
+        on_date=on_date,
+        as_of=as_of,
+    )
     return RampCost(
         path=path,
+        # The key is derived from the **outcome**, so "``exit_path`` is ``None`` exactly when
+        # there is no round-trip figure" is true by construction rather than by two places
+        # agreeing. A way out that turned out to be closed, or that would not carry what
+        # arrived, is not a way out this figure is keyed by -- and a consumer reading
+        # ``exit_path is not None`` as "there is a round trip" is then correct, which is the
+        # natural reading and the one that has to hold.
+        exit_path=None if isinstance(round_trip, ExitCostUnknown) else exit_chain,
         one_way=_one_way(amount, walked),
-        round_trip=_round_trip(
-            amount,
-            walked,
-            route,
-            path=path,
-            routes=routes,
-            channels=channels,
-            kinds=kinds,
-            on_date=on_date,
-            as_of=as_of,
-        ),
+        round_trip=round_trip,
         latency_days=walked.latency_days,
         ceiling=walked.ceiling,
-        status=route.status,
+        status=_status_of(resolved),
         disruption_probability=walked.disruption,
     )

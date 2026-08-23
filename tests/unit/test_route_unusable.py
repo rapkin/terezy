@@ -46,7 +46,7 @@ from terezy.core.primitives.tolerance import assert_money_close
 from terezy.core.results.ramp import NothingComparable, RampCost, Ranking, RouteUnusable
 from terezy.core.routes import cost, ranking
 from terezy.core.routes.legs import Leg, Route
-from terezy.core.routes.path import FundingPath
+from terezy.core.routes.path import FundingPath, candidate_id
 from tests.invariants import route_graphs
 
 AMOUNT = 10_000.0
@@ -95,6 +95,7 @@ def _refused(
         kinds=route_graphs.KINDS,
         on_date=on_date,
         as_of=route_graphs.AS_OF,
+        spendable=TEMPLATE.spendable,
     )
     assert isinstance(outcome, RouteUnusable), outcome
     return outcome
@@ -110,6 +111,7 @@ def _rank(routes: Mapping[str, Route], *paths: FundingPath) -> Ranking | Nothing
         kinds=route_graphs.KINDS,
         on_date=route_graphs.ON_DATE,
         as_of=route_graphs.AS_OF,
+        spendable=TEMPLATE.spendable,
     )
 
 
@@ -156,6 +158,7 @@ class TestBelowADeclaredMinimum:
             kinds=route_graphs.KINDS,
             on_date=route_graphs.ON_DATE,
             as_of=route_graphs.AS_OF,
+            spendable=TEMPLATE.spendable,
         )
         assert isinstance(outcome, RampCost)
         assert_money_close(outcome.one_way.arrived, _uah(25_000.0))
@@ -191,6 +194,7 @@ class TestOverADeclaredMaximum:
             kinds=route_graphs.KINDS,
             on_date=route_graphs.ON_DATE,
             as_of=route_graphs.AS_OF,
+            spendable=TEMPLATE.spendable,
         )
         assert isinstance(outcome, RampCost)
 
@@ -239,6 +243,7 @@ class TestClosedOnTheDate:
             kinds=route_graphs.KINDS,
             on_date=date(2027, 6, 1),
             as_of=route_graphs.AS_OF,
+            spendable=TEMPLATE.spendable,
         )
         assert isinstance(outcome, RampCost)
 
@@ -282,7 +287,10 @@ class TestARefusedRouteIsExcludedWithItsReasonAndNotDropped:
             + [entry.path for entry in ranked.excluded]
             + [entry.path for entry in ranked.not_comparable]
         )
-        assert sorted(entry.route_id for entry in accounted) == ["alternative", "inzhur_direct"]
+        assert sorted(candidate_id(entry) for entry in accounted) == [
+            "alternative",
+            "inzhur_direct",
+        ]
 
     def test_when_every_candidate_refuses_the_answer_is_not_a_ranking(self) -> None:
         # There is no honest index into an empty tuple, so the type says so rather than a
@@ -311,6 +319,7 @@ class TestACapIsNotARefusal:
             kinds=route_graphs.KINDS,
             on_date=route_graphs.ON_DATE,
             as_of=route_graphs.AS_OF,
+            spendable=TEMPLATE.spendable,
         )
         assert isinstance(outcome, RampCost)
         assert outcome.ceiling is not None
@@ -347,6 +356,7 @@ class TestARefusalIsAValueAndAProgrammerErrorIsARaise:
                 kinds=route_graphs.KINDS,
                 on_date=route_graphs.ON_DATE,
                 as_of=route_graphs.AS_OF,
+                spendable=TEMPLATE.spendable,
             )
 
     def test_a_negative_amount_raises_rather_than_refusing(self) -> None:
@@ -363,6 +373,7 @@ class TestARefusalIsAValueAndAProgrammerErrorIsARaise:
                 kinds=route_graphs.KINDS,
                 on_date=route_graphs.ON_DATE,
                 as_of=route_graphs.AS_OF,
+                spendable=TEMPLATE.spendable,
             )
 
     def test_a_refusal_is_not_a_cost_of_zero(self) -> None:
