@@ -199,6 +199,20 @@ on directly, and one it reinforces along the way:
 | **H1** | The row's claim applied to composition, and the closest any feature has come to it: `tests/contract/test_composed_data_only.py` adds **one** `Route` declaration, gets a three-segment candidate that is fully costed and ranked, and asserts that no module under `core/` mentions the new venue or route at all. The box stays open because H1 asks for an instrument, a route, a tax class and a jurisdiction through the **full pipeline**, which is feature 010's scope. |
 | **B10** | Exercised again: `CompositionRefused` is a typed statement that a question could not be asked — a bound admitting nothing, an exit chain with nowhere declared to end — and it is a *different type* from an empty enumeration, which is the legitimate answer "nothing connects". `tests/invariants/test_composition_search.py` asserts both, because a caller who counts rows cannot tell them apart. |
 
+**005-route-diagrams** closes **no** row either. No lettered behaviour above names a diagram,
+and the feature's spec states that plainly rather than stretching one. It extends two standing
+obligations into a new surface, and its tests assert the extension:
+
+| Row | How, and why the box does not move |
+|---|---|
+| **E5** | The mark propagates into the *picture*, not only into tables. One unverified route input marks 100% of the diagram elements depicting figures derived from it, and the assertion strips every style declaration first so a mark carried by a colour fails. `tests/contract/test_diagram_marks.py`. The row is about every figure in the engine, so one more surface carrying the mark does not close it — it is the row still holding. |
+| **B10** | Exercised again in its visual form: a refusal renders as a typed `NothingToDraw` carrying the refusal's own reason verbatim, never an empty diagram — because an empty picture is indistinguishable from a graph with nothing in it. `tests/contract/test_diagram_refusals.py`. Same reading as 003: a whole-engine row, and one more typed outcome does not close it. |
+
+Feature 002's **SC-014** — no exit route means no round-trip figure, and the destination is
+excluded from comparison — is likewise extended rather than restated: the exclusion becomes
+*visible*, as an explicitly absent edge and a `NO EXIT DECLARED` mark on the destination,
+never an omission. `tests/contract/test_diagram_refusals.py`.
+
 ---
 
 ## On tolerance
