@@ -67,6 +67,13 @@ status = "spec"
 needs  = ["002-ramp-cost", "006-inzhur-instruments"]
 why    = "connect ramp to instrument purchases: net-of-access-cost comparison (§8 q1) and the H1 data-only full-pipeline test"
 
+[[feature]]
+id     = "011-official-rate"
+status = "spec"
+needs  = ["002-ramp-cost"]
+why    = "the tax-currency role (Principle VI) has never had machinery: 011's per-kind staleness threshold follows 002's FR-028 and lands in the same `data/observation_kinds.toml`, and 011's central prohibition — the official rate never prices a leg, a channel rate never strikes a tax base — is the rule 002 already wrote at `core/routes/legs.py::channel_for` and `data/declarations/resolver.py::_check_channel`, which 011 must leave standing"
+note   = "one open [NEEDS CLARIFICATION] (FR-011): the citable primary text of the NBU rule for a date no rate is published for. Not a blocker — the specified default in its absence is a refusal — but it must reach /speckit-clarify before planning"
+
 # Named future work — seams already recorded inside landed specs, not yet features.
 
 [[future]]
