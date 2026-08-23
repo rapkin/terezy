@@ -9,6 +9,7 @@ def render_graph(
     *,
     venues: Mapping[str, Venue],
     routes: Mapping[str, Route],
+    channels: Mapping[str, FxChannel],      # ⚙ added at implementation — see below
     regime: Regime,
     mode: Mode,
     kinds: Mapping[str, ObservationKind],   # ⚙ added at implementation — see below
@@ -43,12 +44,28 @@ feature 002 already computed under each leg's own declared threshold, so the pat
 **reads** the result's verdict instead of recomputing it. Two computations of one fact
 eventually disagree.
 
-⚙ **A channel's premium is not on the registry graph.** FR-006's with-figures mode names
-"fees, premiums"; a premium is declared on an `FxChannel`, and `render_graph`'s declared inputs
-are venues and routes. Rather than widen the signature a third time, the renderer shows the
-per-leg figures the `Leg` record carries — `fee_pct` and `fee_fixed` — and the premium surfaces
-where a *result* carries it: on the costed path, as the spread over reference, labelled as
-itself and never as the cost (G7). Stated as a limit rather than left to be discovered.
+⚙ **`channels` was added on the owner's ruling of 2026-08-23, and the reason is the strongest
+in the feature.** FR-006's with-figures mode names "fees, premiums", and a premium is declared
+on an `FxChannel`. Without it, every `fx` leg of the §4.3.1 corridor rendered
+`declared fee 0.00% + 0.00 UAH` — in the mode whose whole purpose is to show declared figures —
+while the real declared figure, `+3.00 UAH per USD` against a `42.00` reference, is the entire
+6.67% one-way cost the costed-path diagram then reports. **The registry graph drew the most
+expensive corridor in the registry as free.** That is not a gap in coverage; it is the
+mislabelled figure in picture form, which is the founding constraint of this whole
+specification. The caption's disclaimer does not repair it: a disclaimer at the top does not
+survive someone looking at one edge.
+
+The prohibition in FR-006 does not reach it. What that requirement forbids on a registry graph
+is a **computed ramp cost**, which exists only per `(destination × stream × route)` — a triple
+this diagram does not name. A channel premium is a *declared observation* with its own source,
+its own verification date and its own `kind`, exactly like a leg fee, and it carries its own
+marks and its own staleness accordingly: a stale premium on a fresh-fee leg never renders
+clean.
+
+Both declared side forms render, each in the unit its declaration used and neither converted
+into the other (converting would be the renderer deriving a figure, and would erase which form
+the file actually used). The two rules for them live in `numbers.py` with the other three —
+see `data-model.md`.
 
 `regime` is required on both and has no default, sentinel or overload: FR-019 says a merged
 graph existing under no regime must not be **producible**, and the strongest reading of that

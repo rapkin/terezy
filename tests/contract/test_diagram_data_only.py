@@ -139,6 +139,7 @@ class TestACorridorAddedAsDataAppearsInThePicture:
         rendered = render_graph(
             venues=declared.venues,
             routes=declared.routes,
+            channels=declared.channels,
             regime=fixture.shipped_regime(declared, "war_end", "wartime"),
             mode=Mode.DECLARED_FIGURES,
             kinds=declared.kinds,
@@ -195,6 +196,7 @@ def _shipped_graph_text() -> str:
     rendered = render_graph(
         venues=declared.venues,
         routes=declared.routes,
+        channels=declared.channels,
         regime=fixture.shipped_regime(declared, "war_end", "wartime"),
         mode=Mode.DECLARED_FIGURES,
         kinds=declared.kinds,

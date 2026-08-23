@@ -43,6 +43,8 @@ from typing import Final
 import pytest
 
 from terezy.api.diagrams import Diagram, Mode, render_graph, render_path
+from terezy.api.diagrams import marks as diagram_marks
+from terezy.api.diagrams.marks import Mark
 from terezy.core.primitives.tolerance import is_close
 from terezy.core.results.ramp import RoundTripCost
 from tests import diagram_registries as fixture
@@ -54,10 +56,23 @@ SCRIPT: Final = REPO_ROOT / "scripts" / "render_diagram.py"
 UPDATE_VARIABLE: Final = "TEREZY_UPDATE_GOLDEN"
 
 GRAPH_FILE: Final = Path(__file__).with_name("route_graph_wartime.mmd")
+NORMALIZED_FILE: Final = Path(__file__).with_name("route_graph_normalized.mmd")
 PATH_FILE: Final = Path(__file__).with_name("costed_path_p2p.mmd")
+
+ARTIFACTS: Final = (GRAPH_FILE, NORMALIZED_FILE, PATH_FILE)
+"""Every checked-in diagram. The properties below hold of all three or of none."""
 
 SCENARIO: Final = "war_end"
 REGIME: Final = "wartime"
+NORMALIZED: Final = "normalized"
+"""The second declared regime, recorded because it carries two things ``wartime`` does not.
+
+``ibkr_usd`` receives an inbound route and the regime declares nothing leaving it, so the
+graph carries the **NO EXIT DECLARED** mark -- the one a reader most needs to recognise on
+sight, and the one no other artifact would show. And ``monobank_to_binance_card`` applies the
+``card`` channel, whose sides are declared in basis points rather than as a premium per unit,
+so both declared quote forms appear across the two recorded graphs.
+"""
 GRAPH_MODE: Final = Mode.DECLARED_FIGURES
 
 P2P_ONE_WAY: Final = 3.0 / 45.0
@@ -67,7 +82,12 @@ P2P_ROUND_TRIP: Final = 5.5 / 45.0
 """And the round trip through the declared exit route: 5.5/45 = 12.2222%."""
 
 
-def _graph_text(*, venues_reversed: bool = False, rename: tuple[str, str] | None = None) -> str:
+def _graph_text(
+    *,
+    regime_id: str = REGIME,
+    venues_reversed: bool = False,
+    rename: tuple[str, str] | None = None,
+) -> str:
     declared = fixture.shipped_declarations()
     venues = dict(declared.venues)
     if rename is not None:
@@ -80,7 +100,8 @@ def _graph_text(*, venues_reversed: bool = False, rename: tuple[str, str] | None
         routes=dict(reversed(list(declared.routes.items())))
         if venues_reversed
         else declared.routes,
-        regime=fixture.shipped_regime(declared, SCENARIO, REGIME),
+        channels=declared.channels,
+        regime=fixture.shipped_regime(declared, SCENARIO, regime_id),
         mode=GRAPH_MODE,
         kinds=declared.kinds,
         as_of=fixture.AS_OF,
@@ -134,6 +155,20 @@ def _script(*arguments: str) -> str:
     return completed.stdout
 
 
+def _graph_arguments(regime_id: str) -> tuple[str, ...]:
+    return (
+        "graph",
+        "--regime",
+        regime_id,
+        "--scenario",
+        SCENARIO,
+        "--mode",
+        "declared-figures",
+        "--as-of",
+        fixture.AS_OF.isoformat(),
+    )
+
+
 GRAPH_ARGUMENTS: Final = (
     "graph",
     "--regime",
@@ -171,19 +206,24 @@ class TestTheRecordedDiagramsAreStillTheDiagrams:
     def test_the_route_graph_matches_the_checked_in_artifact(self) -> None:
         assert _today(GRAPH_FILE, _graph_text()) == _recorded(GRAPH_FILE)
 
+    def test_the_normalized_route_graph_matches_the_checked_in_artifact(self) -> None:
+        assert _today(NORMALIZED_FILE, _graph_text(regime_id=NORMALIZED)) == _recorded(
+            NORMALIZED_FILE
+        )
+
     def test_the_costed_path_matches_the_checked_in_artifact(self) -> None:
         assert _today(PATH_FILE, _path_text()) == _recorded(PATH_FILE)
 
     def test_neither_artifact_carries_a_line_ending_in_whitespace(self) -> None:
         """An editor stripping trailing space must not produce a failure about a route."""
-        for artifact in (GRAPH_FILE, PATH_FILE):
+        for artifact in ARTIFACTS:
             text = _recorded(artifact)
             assert all(line == line.rstrip() for line in text.splitlines())
             assert text.endswith("\n")
 
     def test_both_artifacts_are_mermaid_flowcharts_and_nothing_else(self) -> None:
         """Every line is one of the four shapes this package emits (research.md D10)."""
-        for artifact in (GRAPH_FILE, PATH_FILE):
+        for artifact in ARTIFACTS:
             lines = _recorded(artifact).splitlines()
             assert lines[0] == "flowchart LR"
             for line in lines[1:]:
@@ -196,6 +236,9 @@ class TestTheScriptPrintsWhatTheSuiteRegenerates:
 
     def test_the_script_reproduces_the_route_graph_artifact_byte_for_byte(self) -> None:
         assert _script(*GRAPH_ARGUMENTS) == _recorded(GRAPH_FILE)
+
+    def test_the_script_reproduces_the_normalized_graph_artifact_byte_for_byte(self) -> None:
+        assert _script(*_graph_arguments(NORMALIZED)) == _recorded(NORMALIZED_FILE)
 
     def test_the_script_reproduces_the_costed_path_artifact_byte_for_byte(self) -> None:
         assert _script(*PATH_ARGUMENTS) == _recorded(PATH_FILE)
@@ -303,9 +346,70 @@ class TestTheArtifactsCannotBeGreenAndWrong:
         assert "this is NOT the cost" in text
         assert "one-way cost 7.14%" not in text
 
+    def test_the_normalized_graph_records_the_mark_a_reader_most_needs_to_recognise(
+        self,
+    ) -> None:
+        """FR-005 in a shipped artifact, not only in a fixture.
+
+        ``normalized`` declares an inbound route to ``ibkr_usd`` and nothing leaving it, so the
+        destination renders **not comparison-ready** with an explicitly absent edge. ``wartime``
+        is partner-closed and produces no such mark, which is why this regime is recorded too:
+        the goldens are a delivery target, and this is the mark that most needs to be
+        recognisable on sight.
+        """
+        text = _recorded(NORMALIZED_FILE)
+        assert diagram_marks.token(Mark.NO_EXIT_DECLARED) in text
+        node = next(line for line in text.splitlines() if '["venue ibkr_usd' in line)
+        assert diagram_marks.token(Mark.NO_EXIT_DECLARED) in node
+        assert "not comparison-ready" in node
+        assert diagram_marks.token(Mark.NO_EXIT_DECLARED) not in _recorded(GRAPH_FILE), (
+            "wartime is partner-closed; if it stopped being so, this pair of artifacts no "
+            "longer contrasts a comparison-ready registry with one that is not"
+        )
+
+    def test_both_declared_quote_forms_are_recorded_each_in_its_own_unit(self) -> None:
+        """A premium per unit in ``wartime``'s p2p corridor, basis points in ``normalized``'s
+        card corridor. Neither is converted into the other: converting would be the renderer
+        deriving a figure, and it would erase which form the declaration used."""
+        assert "+3.00 UAH per USD over reference 42.00 UAH per USD" in _recorded(GRAPH_FILE)
+        assert "150.00 bps over reference 42.00 UAH per USD" in _recorded(NORMALIZED_FILE)
+
+    def test_the_expensive_corridor_is_not_recorded_as_free(self) -> None:
+        """The whole reason the premium is on this diagram.
+
+        Every declared fee on the §4.3.1 corridor is zero, and its edge must still carry the
+        figure that makes it cost 6.67% one way. A graph showing ``declared fee 0.00%`` and
+        nothing else would draw the most expensive corridor in the registry as free.
+        """
+        edge = next(
+            line
+            for line in _recorded(GRAPH_FILE).splitlines()
+            if f"route {fixture.P2P_ROUTE} " in line and "leg 0 fx" in line
+        )
+        assert "declared fee 0.00% + 0.00 UAH" in edge
+        assert "declared premium +3.00 UAH per USD" in edge
+
+    def test_no_style_class_is_emitted_that_nothing_can_carry(self) -> None:
+        """An unused ``classDef`` is dead weight in an artifact whose value is being read.
+
+        Worse, it tells the next contributor that closed routes are styled when they are not:
+        Mermaid applies a class to a node, and ``CLOSED`` only ever lands on an edge, whose
+        emphasis is its dotted line. The mark itself is still in the vocabulary and still in
+        the label text -- only the unusable style declaration is gone.
+        """
+        emitted = {
+            line.split()[1]
+            for artifact in ARTIFACTS
+            for line in _recorded(artifact).splitlines()
+            if line.lstrip().startswith("classDef ")
+        }
+        assert emitted, "no styling at all was recorded"
+        assert diagram_marks.STYLE_CLASS[Mark.CLOSED] not in emitted
+        assert emitted <= set(diagram_marks.STYLE_CLASS.values())
+
     def test_the_recorded_diagrams_say_they_are_built_on_synthetic_data(self) -> None:
         """§11 item 1: none of these figures has been observed, and both pictures say so."""
-        for artifact in (GRAPH_FILE, PATH_FILE):
+        for artifact in ARTIFACTS:
             assert "SYNTHETIC" in _recorded(artifact).splitlines()[1]
 
     def test_the_recorded_graph_names_its_regime_and_its_mode(self) -> None:

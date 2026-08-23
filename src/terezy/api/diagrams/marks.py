@@ -102,7 +102,6 @@ CLASS_DEFS: Final[tuple[tuple[str, str], ...]] = (
     (STYLE_CLASS[Mark.UNVERIFIED], "stroke-dasharray: 4 2"),
     (STYLE_CLASS[Mark.STALE], "stroke-dasharray: 1 3"),
     (STYLE_CLASS[Mark.SYNTHETIC], "stroke-width: 1px"),
-    (STYLE_CLASS[Mark.CLOSED], "stroke-dasharray: 8 4"),
     (STYLE_CLASS[Mark.NO_EXIT_DECLARED], "stroke-width: 3px"),
     (STYLE_CLASS[Mark.EXIT_COST_UNKNOWN], "stroke-width: 3px"),
 )
@@ -114,12 +113,14 @@ have -- a monochrome print, a dark theme, a viewer with its own palette -- and c
 would suggest the diagram means something different without it. It does not; the words carry
 the meaning and these only draw the eye.
 
-**All six are declared on every diagram, and a given diagram will not carry all six.** Mermaid
-applies a class to a *node*; an edge's emphasis is its line style, so a mark that only ever
-lands on an edge -- ``CLOSED`` -- gets its emphasis from the dotted arrow instead and its
-``classDef`` goes unused. Emitting the whole vocabulary anyway keeps it one thing rather than
-two, costs a reader nothing, and makes the point D4 is about: the styling is never where the
-meaning is, so which classes happen to be in play cannot change what a diagram says.
+**``CLOSED`` is in :data:`STYLE_CLASS` and deliberately not here.** Mermaid applies a class to a
+*node*, and ``CLOSED`` only ever lands on an edge, whose emphasis is its line style -- the
+dotted arrow. Emitting a ``classDef`` nothing can carry would be dead weight in an artifact
+whose whole value is that a human reads it, and worse, it would tell the next contributor that
+closed routes are styled when they are not. The explanation belongs here, in the source, and
+not in the output. (Styling an edge means ``linkStyle``, which is addressed by link *index*
+across the whole diagram -- brittle in a way that nothing here can test without a renderer,
+and buying nothing, since the meaning is in the words either way.)
 """
 
 CLEAN: Final = "VERIFIED AND CURRENT"

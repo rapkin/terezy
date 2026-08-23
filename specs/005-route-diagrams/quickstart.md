@@ -36,7 +36,9 @@ fastest review is your own eyes on the picture before any assertion runs.
 
 What to look for: every declared venue present; two routes between the same pair drawn as
 two edges; a closed route marked and still there; a destination with no exit carrying its
-*no exit declared* mark; and the mode named on the diagram itself.
+*no exit declared* mark (try `--regime normalized`, where `ibkr_usd` has one); the **channel
+premium** on every `fx` edge in `declared-figures` mode, since that is where the §4.3.1 cost
+actually lives; and the mode named on the diagram itself.
 
 ## 2. The honesty of the picture
 
@@ -70,7 +72,10 @@ uv run pytest -k hostile -v
 - **SC-008** — quotes, brackets, pipes, arrows and Cyrillic in declared names give valid
   Mermaid, and two venues whose ids differ only by a character that sanitising would
   flatten stay two nodes. That is the whole reason node ids are positional (research.md D3).
-- **SC-011** — at least one route graph and one costed path are checked in as goldens.
+- **SC-011** — three artifacts are checked in: the `wartime` and `normalized` route graphs
+  and one costed path. `normalized` is recorded because it is the shipped regime that
+  produces a *no exit declared* mark, and because its card corridor declares its premium in
+  basis points where the p2p corridor declares one per unit.
 
 A golden diff here is a real diff. Read it before regenerating it.
 

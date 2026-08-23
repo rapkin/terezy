@@ -116,6 +116,7 @@ class TestTheCasesThatLookRightWhileBeingWrong:
         extended = fixture.Registry(
             venues=registry.venues,
             routes=routes,
+            channels=registry.channels,
             regime=Regime(id=fixture.REGIME_ID, route_ids=frozenset(routes)),
             kinds=registry.kinds,
         )
@@ -126,6 +127,7 @@ class TestTheCasesThatLookRightWhileBeingWrong:
         rendered = render_graph(
             venues={},
             routes={},
+            channels={},
             regime=Regime(id="deserted", route_ids=frozenset()),
             mode=Mode.TOPOLOGY,
             kinds=fixture.declared_kinds(),
@@ -141,6 +143,7 @@ class TestTheCasesThatLookRightWhileBeingWrong:
         empty_regime = fixture.Registry(
             venues=registry.venues,
             routes=registry.routes,
+            channels=registry.channels,
             regime=Regime(id="believes_nothing", route_ids=frozenset()),
             kinds=registry.kinds,
         )
@@ -158,6 +161,7 @@ class TestTheLoudFailures:
         broken = fixture.Registry(
             venues=registry.venues,
             routes=registry.routes,
+            channels=registry.channels,
             regime=Regime(id=fixture.REGIME_ID, route_ids=frozenset({"no_such_route"})),
             kinds=registry.kinds,
         )
@@ -171,6 +175,7 @@ class TestTheLoudFailures:
         broken = fixture.Registry(
             venues=without_gamma,
             routes=registry.routes,
+            channels=registry.channels,
             regime=registry.regime,
             kinds=registry.kinds,
         )
@@ -189,6 +194,7 @@ class TestTheLoudFailures:
         broken = fixture.Registry(
             venues=colliding,
             routes=registry.routes,
+            channels=registry.channels,
             regime=registry.regime,
             kinds=registry.kinds,
         )
@@ -203,6 +209,7 @@ class TestTheLoudFailures:
         broken = fixture.Registry(
             venues=misfiled,
             routes=registry.routes,
+            channels=registry.channels,
             regime=registry.regime,
             kinds=registry.kinds,
         )
@@ -220,6 +227,7 @@ class TestTheLoudFailures:
         broken = fixture.Registry(
             venues=registry.venues,
             routes=routes,
+            channels=registry.channels,
             regime=registry.regime,
             kinds=registry.kinds,
         )
@@ -237,6 +245,7 @@ class TestTheShippedRegistryDrawsWithoutBeingTouched:
         rendered = render_graph(
             venues=declared.venues,
             routes=declared.routes,
+            channels=declared.channels,
             regime=regime,
             mode=Mode.DECLARED_FIGURES,
             kinds=declared.kinds,
@@ -254,6 +263,7 @@ class TestTheShippedRegistryDrawsWithoutBeingTouched:
             render_graph(
                 venues=declared.venues,
                 routes=declared.routes,
+                channels=declared.channels,
                 regime=fixture.shipped_regime(declared, "war_end", regime_id),
                 mode=Mode.DECLARED_FIGURES,
                 kinds=declared.kinds,

@@ -48,6 +48,7 @@ from terezy.core.results.ramp import (
     RouteUnusable,
 )
 from terezy.core.routes import cost
+from terezy.core.routes.channels import ChannelSide, FxChannel
 from terezy.core.routes.legs import FX, TRANSFER, Leg, Route, RouteDirection, RouteStatus
 from terezy.core.routes.path import FundingPath
 from terezy.core.routes.venues import Venue
@@ -106,6 +107,7 @@ class Registry:
 
     venues: Mapping[str, Venue]
     routes: Mapping[str, Route]
+    channels: Mapping[str, FxChannel]
     regime: Regime
     kinds: Mapping[str, ObservationKind]
 
@@ -137,6 +139,84 @@ def source(source_id: str, *, verified: bool, fresh: bool, synthetic: bool) -> P
             }
         )
     )
+
+
+def side(
+    *,
+    premium: float | None = None,
+    bps: float | None = None,
+    source_id: str,
+    kind: str = FAST_KIND,
+    verified: bool = True,
+    fresh: bool = True,
+) -> ChannelSide:
+    """One side of a quote, in exactly one of the two declared forms.
+
+    Exactly one of ``premium`` and ``bps``, because that is what the loader enforces and what
+    ``_side_figure`` renders: a side with both, or neither, is a file that cannot exist.
+    """
+    assert (premium is None) != (bps is None), "declare exactly one form"
+    sources = source(source_id, verified=verified, fresh=fresh, synthetic=True)
+    return ChannelSide(
+        markup_bps=bps,
+        premium_per_unit=None if premium is None else Money(premium, UAH, sources),
+        kind=kind,
+        provenance=sources,
+    )
+
+
+def channel(
+    channel_id: str,
+    *,
+    buy: ChannelSide,
+    sell: ChannelSide,
+    reference: float = 42.0,
+    kind: str = SLOW_KIND,
+    reference_source: str | None = None,
+) -> FxChannel:
+    """One two-sided quote for ``(UAH, USD)``, with the reference cited separately.
+
+    ``provenance`` is the union of the reference's sources and both sides', which is how the
+    declaration loader builds it -- and what lets a renderer recover the reference's own
+    sources by taking the sides' out (``graph._reference_sources``). A fixture that put the
+    sides' sources only on the sides would model a file that cannot be produced.
+    """
+    reference_sources = source(
+        reference_source or f"{channel_id}:reference", verified=True, fresh=True, synthetic=True
+    )
+    return FxChannel(
+        id=channel_id,
+        pair=(UAH, USD),
+        reference_rate=reference,
+        buy_side=buy,
+        sell_side=sell,
+        observed_on=FRESH,
+        kind=kind,
+        provenance=Provenance(
+            reference_sources.sources | buy.provenance.sources | sell.provenance.sources
+        ),
+    )
+
+
+def fixture_channels() -> Mapping[str, FxChannel]:
+    """Both declared forms, so a fixture graph exercises the same two the shipped data does.
+
+    ``p2p`` quotes a signed premium per unit -- the form the owner actually reads off a screen
+    -- and ``card`` quotes a markup in basis points. The renderer must show each in its own
+    unit and convert neither into the other.
+    """
+    return {
+        "p2p": channel(
+            "p2p",
+            buy=side(premium=3.0, source_id="p2p:buy"),
+            sell=side(premium=-2.5, source_id="p2p:sell"),
+        ),
+        "card": channel(
+            "card",
+            buy=side(bps=150.0, source_id="card:buy", kind=SLOW_KIND),
+            sell=side(bps=150.0, source_id="card:sell", kind=SLOW_KIND),
+        ),
+    }
 
 
 def venue(venue_id: str, *currencies: Currency) -> Venue:
@@ -325,6 +405,7 @@ def six_state_registry() -> Registry:
     return Registry(
         venues=venues,
         routes=routes,
+        channels=fixture_channels(),
         regime=Regime(id=REGIME_ID, route_ids=frozenset(routes)),
         kinds=declared_kinds(),
     )
@@ -369,6 +450,47 @@ def one_unverified_registry() -> Registry:
     return Registry(
         venues=venues,
         routes=routes,
+        channels=fixture_channels(),
+        regime=Regime(id=REGIME_ID, route_ids=frozenset(routes)),
+        kinds=declared_kinds(),
+    )
+
+
+STALE_PREMIUM_ROUTE: Final = "r_fresh_fee_stale_premium"
+
+
+def stale_premium_registry() -> Registry:
+    """One ``fx`` leg whose own fee schedule is fresh and whose **premium** is stale.
+
+    The case the marks would miss if an edge were marked from its leg alone. On the §4.3.1
+    corridor every declared fee is zero and the premium is the whole cost, so a diagram that
+    marked the leg's fee schedule fresh and said nothing about a premium last seen years ago
+    would render the most decision-relevant stale figure in the registry as current.
+
+    The premium ages under ``p2p_premium`` (7 days) and the fee under ``bank_fee_schedule``
+    (365) -- two thresholds, two tables, which is exactly why FR-028 declares them per kind.
+    """
+    quote = channel(
+        "p2p",
+        buy=side(premium=3.0, source_id="p2p:buy:stale", fresh=False),
+        sell=side(premium=-2.5, source_id="p2p:sell:stale", fresh=False),
+    )
+    venues = {v.id: v for v in (venue("alpha", UAH, USD), venue("beta", UAH, USD))}
+    routes = {
+        STALE_PREMIUM_ROUTE: route(
+            STALE_PREMIUM_ROUTE,
+            origin="alpha",
+            destination="beta",
+            provenance=source("s_fresh_fee", verified=True, fresh=True, synthetic=False),
+            kind_of_observation=SLOW_KIND,
+            from_ccy=UAH,
+            to_ccy=USD,
+        )
+    }
+    return Registry(
+        venues=venues,
+        routes=routes,
+        channels={"p2p": quote},
         regime=Regime(id=REGIME_ID, route_ids=frozenset(routes)),
         kinds=declared_kinds(),
     )
@@ -384,6 +506,7 @@ def graph_of(registry: Registry, mode: Mode = Mode.DECLARED_FIGURES) -> Diagram:
     rendered = render_graph(
         venues=registry.venues,
         routes=registry.routes,
+        channels=registry.channels,
         regime=registry.regime,
         mode=mode,
         kinds=registry.kinds,

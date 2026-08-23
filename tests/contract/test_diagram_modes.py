@@ -30,7 +30,7 @@ from pathlib import Path
 
 import pytest
 
-from terezy.api.diagrams import Diagram, Mode, graph, render_graph
+from terezy.api.diagrams import Diagram, Mode, graph, numbers, render_graph
 from tests import diagram_registries as fixture
 from tests import source_scan
 
@@ -116,8 +116,33 @@ class TestTheTwoModesDifferByFiguresAndNothingElse:
     ) -> None:
         labels = fixture.labels_by_route(fixture.six_state_graph(Mode.DECLARED_FIGURES).text)
         priced = labels[fixture.VERIFIED_ROUTE]
-        assert f"{graph.FIGURE_FIELD}1.50% + 12.50 UAH" in priced
+        assert f"{graph.FEE_FIELD}1.50% + 12.50 UAH" in priced
         assert "marks: " in priced, "a figure without its provenance state is half a figure"
+
+    def test_the_with_figures_diagram_carries_the_channel_premium_on_every_fx_leg(self) -> None:
+        """The figure that matters most, in the mode whose purpose is to show it.
+
+        Every fee on the fixture's converting leg is zero and the premium is the whole cost, so
+        a with-figures graph that showed only fees would draw that corridor as free -- the
+        mislabelled figure in picture form. Both declared forms are asserted, each in the unit
+        its side was declared in and neither converted into the other.
+        """
+        converting = fixture.labels_by_route(fixture.six_state_graph(Mode.DECLARED_FIGURES).text)[
+            fixture.UNVERIFIED_ROUTE
+        ]
+        assert (
+            f"{graph.PREMIUM_FIELD}+3.00 UAH per USD over reference 42.00 UAH per USD" in converting
+        )
+        assert graph.PREMIUM_FIELD in converting
+        # And the basis-point form renders as basis points, unconverted.
+        assert numbers.basis_points(150.0) == "150.00 bps"
+
+    def test_a_leg_that_converts_nothing_carries_no_premium(self) -> None:
+        """A transfer has no channel and therefore no quote; inventing one would be a rate."""
+        transfers = fixture.labels_by_route(fixture.six_state_graph(Mode.DECLARED_FIGURES).text)[
+            fixture.VERIFIED_ROUTE
+        ]
+        assert graph.PREMIUM_FIELD not in transfers
 
 
 class TestNoComputedRampCostReachesARegistryGraph:
@@ -197,6 +222,7 @@ class TestEveryDiagramNamesExactlyOneRegime:
         narrowed = fixture.Registry(
             venues=registry.venues,
             routes=registry.routes,
+            channels=registry.channels,
             regime=type(registry.regime)(
                 id="narrow", route_ids=frozenset({fixture.VERIFIED_ROUTE})
             ),

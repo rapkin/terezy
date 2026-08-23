@@ -1626,12 +1626,24 @@ Every figure on every diagram is rendered by
 | --- | --- | --- |
 | a fraction, as a percentage | fixed **two** decimals, then `%` | `0.0666…` → `6.67%` |
 | an amount of money | fixed **two** decimals, then the currency **code** | `1234.5678 UAH` → `1234.57 UAH` |
+| a quoted rate | fixed two decimals, both currencies named | `42.0` → `42.00 UAH per USD` |
+| a premium per unit | fixed two decimals, **always signed** | `+3.00 UAH per USD`, `-2.50 UAH per USD` |
+| a markup in basis points | fixed two decimals, in the unit declared | `150.0` → `150.00 bps` |
 
-Two decimals, one private helper, and both public functions go through it. This is the
+Two decimals, **one** private helper, and all five public functions go through it. This is the
 single-tolerance discipline of §11 applied to formatting: defined in one place, imported
-everywhere, and a second rule anywhere is a **defect** rather than a preference.
-`tests/contract/test_diagram_one_number_rule.py` greps the whole `api.diagrams` package for a
-second one — `:.2f`, `round(`, `format(`, `%.2f`, `Decimal` — and proves the grep can fail.
+everywhere, and a second rule for the same kind of quantity is a **defect** rather than a
+preference. `tests/contract/test_diagram_one_number_rule.py` greps the whole `api.diagrams`
+package for a second one — `:.2f`, `round(`, `format(`, `%.2f`, `Decimal` — and proves the grep
+can fail.
+
+**One rule per kind of quantity, not one function.** A signed offset per unit of another
+currency is not an amount of money — it carries a second currency and a mandatory sign — and
+basis points are not a percentage. Each gets its own rule in the one module rather than a `+`
+prepended or a `/10000` performed at a call site. The sign on a premium is the whole content:
+`+3` on the buy side and `-2.5` on the sell side are what make the P2P round trip cost 12.22%,
+and two unsigned figures read as two costs of the same shape. `+0.00` means *at the reference*,
+which is a declaration the schema accepts and the rendering must not hide.
 
 **Why the rule had to exist at all.** Results carry `float`, and this project's canonical float
 form is hexadecimal (§12.2), chosen because determinism means bit-identity. So "the diagram
@@ -1682,9 +1694,18 @@ was renamed for exactly that reason.
 **A computed ramp cost never appears on a registry graph**, in either mode. Such a figure exists
 only per `(destination × stream × route)` (§16, and feature 002's FR-008), which a registry graph
 does not name; a number there would be keyed by nothing. The two modes —
-`topology-only` and `with-declared-figures` — differ by the **declared per-leg fee** field and
+`topology-only` and `with-declared-figures` — differ by the fields prefixed `declared ` and
 nothing else, and each names itself on the face of the diagram so a numberless picture is never
 read as "zero fees".
+
+**What `with-declared-figures` shows is the leg's fees *and the premium of the channel it
+applies*.** The prohibition above does not reach a premium: it is a declared observation with
+its own source, verification date and `kind`, exactly like a leg fee. Showing only the fees was
+the first implementation and it was wrong in the way this whole document is about — every fee on
+the §4.3.1 corridor is declared zero, so the graph drew the most expensive corridor in the
+registry as free while the 6.67% lived entirely in a premium it never mentioned. The applied
+side carries its own marks and ages under its own threshold, so a stale premium on a fresh-fee
+leg does not render clean (§18, and `cost._channel_verdicts` one layer down).
 
 **A refusal is never drawn as a path.** `RouteUnusable`, `ExitCostUnknown` and
 `NothingComparable` each produce a typed `NothingToDraw` carrying the refusal's own reason
@@ -1727,6 +1748,7 @@ text is less readable to a human reading the source. The diagram is meant to be 
 | Does the audit agree with what costing actually does? | `tests/invariants/test_coverage_costing_agreement.py` |
 | Can a cost figure leak into the coverage report? | `tests/contract/test_coverage_no_figures.py` |
 | Is the declared graph what I think it is? | `tests/golden/route_graph_wartime.mmd` |
+| What does a destination with no way out look like? | `tests/golden/route_graph_normalized.mmd` |
 | What does one costed route look like? | `tests/golden/costed_path_p2p.mmd` |
 | Is there a second number-rendering rule? | `tests/contract/test_diagram_one_number_rule.py` |
 | Do the marks survive the picture? | `tests/contract/test_diagram_marks.py` |

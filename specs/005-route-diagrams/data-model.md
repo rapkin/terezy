@@ -46,11 +46,23 @@ diagram, so a numberless picture is never read as "zero fees".
 |---|---|
 | `percent(value: float) -> str` | Fixed two decimals with `%` |
 | `amount(value: Money) -> str` | Fixed two decimals with the currency code |
+| `rate(value: float, *, price, unit) -> str` | ⚙ `42.00 UAH per USD` — a quoted reference |
+| `premium_per_unit(value: Money, *, unit) -> str` | ⚙ `+3.00 UAH per USD` — a **signed** offset |
+| `basis_points(value: float) -> str` | ⚙ `150.00 bps` — the other declared side form |
 
-The project's only diagram-label number rule (FR-022), on the model of the single project
-tolerance. It **rounds**, and that is the one transformation FR-008 permits — the diagram is
-a picture, not the audit trail. A second rule anywhere, or an inline format at a call site,
-is a defect, and a contract test greps for one.
+The project's only diagram-label number rules (FR-022), on the model of the single project
+tolerance. All five go through one private helper, so there is exactly **one** decimal format
+in the project; what each adds is the *unit the declaration was written in*. It **rounds**, and
+that is the one transformation FR-008 permits — the diagram is a picture, not the audit trail.
+A second rule for the same kind of quantity, or an inline format at a call site, is a defect,
+and a contract test greps for one.
+
+⚙ **The last three were added when the premium landed on the registry graph** (owner ruling,
+2026-08-23). FR-022 requires that the rendering of a *kind of quantity* be defined once and
+imported — not that there be exactly two functions. A signed offset per unit of another
+currency is not an amount of money, and basis points are not a percentage; each gets its own
+rule here rather than a `+` prepended or a `/10000` performed at a call site. A sixth kind of
+quantity gets a sixth function in this module. It never gets a format at a call site.
 
 ## Marks
 
@@ -86,6 +98,8 @@ The renderer consumes what already exists and defines no parallel model (FR-020)
 | Input | From | Used for |
 |---|---|---|
 | `Venue`, `Route`, `Leg`, `Regime` | `core.routes`, `core.scenarios` | The registry graph |
+| `FxChannel`, `ChannelSide` | `core.routes.channels` | ⚙ The declared premium on an `fx` edge |
+| `ObservationKind` | `core.primitives.staleness` | ⚙ The per-kind staleness thresholds |
 | `RampCost`, `OneWayCost`, `RoundTripCost` | `core.results.ramp` | The costed path |
 | `ExitCostUnknown`, `RouteUnusable`, `NothingComparable` | `core.results.ramp` | Refusals, drawn as refusals |
 | `Provenance`, `StalenessVerdict` | `core.primitives` | The marks |

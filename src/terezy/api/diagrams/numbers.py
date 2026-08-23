@@ -27,12 +27,20 @@ no amount of precision here would make it the right one.
 singularity and its documentation are what FR-022 requires, and both are enforced:
 ``tests/contract/test_diagram_one_number_rule.py`` greps the whole package for a second rule
 and proves the grep can fail.
+
+**One rule per kind of quantity, not one function.** FR-022 requires that the rendering of a
+figure be defined once and imported, and this module holds five such rules -- a percentage, an
+amount, a quoted rate, a signed premium per unit, and a markup in basis points. All five go
+through the same private helper, so there is still exactly one decimal format in the project;
+what each adds is the *unit* the declaration was written in. A sixth kind of quantity gets a
+sixth function here. It never gets a format at a call site.
 """
 
 from __future__ import annotations
 
 from typing import Final
 
+from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 
 DECIMAL_PLACES: Final = 2
@@ -84,3 +92,49 @@ def amount(value: Money) -> str:
     what a diagram says a leg charged.
     """
     return f"{_fixed(value.amount)} {value.currency.value}"
+
+
+def rate(value: float, *, price: Currency, unit: Currency) -> str:
+    """A quoted rate, with both currencies named: ``42.00 UAH per USD``.
+
+    The reference a premium is quoted *against*. It is rendered beside every premium and
+    never alone, because a premium without its reference is an unanchored figure: ``+3.00 UAH
+    per USD`` is 7.14% of a 42 reference and 6.00% of a 50 one, and a reader cannot tell which
+    corridor is expensive without both.
+
+    Both currencies are named rather than implied by the channel's declared order. The pair is
+    ordered ``(price, unit)`` and reversing it inverts every spread in the system while leaving
+    every number plausible (``core.routes.channels.side_for``); a label that spells the order
+    out cannot be read the wrong way round.
+    """
+    return f"{_fixed(value)} {price.value} per {unit.value}"
+
+
+def premium_per_unit(value: Money, *, unit: Currency) -> str:
+    """A **signed** offset from a reference rate: ``+3.00 UAH per USD``, ``-2.50 UAH per USD``.
+
+    The sign is always written, including on a positive value, because the sign is the whole
+    content: ``+3`` on the buy side and ``-2.5`` on the sell side are what make the P2P round
+    trip cost 12.22% rather than nothing, and an unsigned ``3.00`` beside an unsigned ``2.50``
+    reads as two costs of the same shape. Zero renders ``+0.00`` and means *at the reference*,
+    which is a declaration the schema accepts and this rendering must not hide.
+
+    Distinct from :func:`amount` deliberately, and this is what FR-022 actually asks for: one
+    rule per kind of quantity, each defined once and imported. An offset per unit of another
+    currency is not an amount of money -- it has a second currency in it and a mandatory sign
+    -- so it gets its own rule here rather than an ad-hoc ``+`` prepended at a call site.
+    """
+    sign = "-" if value.amount < 0.0 else "+"
+    return f"{sign}{_fixed(abs(value.amount))} {value.currency.value} per {unit.value}"
+
+
+def basis_points(value: float) -> str:
+    """A markup in basis points, as declared: ``150.00 bps``.
+
+    The second form a channel side may take (``core.routes.channels.ChannelSide``), and it is
+    rendered **in the unit it was declared in**. Converting 150 bps to ``1.50%`` here would be
+    the renderer deriving a figure -- arithmetic FR-008 forbids it, however trivial -- and it
+    would also erase which of the two forms the declaration actually used, which is the thing a
+    reader checking the file needs to know.
+    """
+    return f"{_fixed(value)} bps"

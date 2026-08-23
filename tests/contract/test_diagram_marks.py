@@ -20,6 +20,7 @@ still there" a single testable claim rather than six similar ones.
 from __future__ import annotations
 
 import re
+from dataclasses import replace
 from datetime import date
 
 import pytest
@@ -27,9 +28,11 @@ import pytest
 from terezy.api.diagrams import Diagram, Mode, marks, render_graph
 from terezy.api.diagrams.marks import Mark
 from terezy.core.primitives import provenance as prov
+from terezy.core.primitives import staleness
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.provenance import Provenance, SourceRef
 from terezy.core.primitives.staleness import ObservationKind
+from terezy.core.routes.channels import ChannelSide
 from terezy.core.scenarios.regimes import Regime
 from tests import diagram_registries as fixture
 
@@ -267,6 +270,96 @@ class TestTheUnverifiedMarkPropagatesToEveryElement:
         assert marks.token(Mark.UNVERIFIED) not in labels[fixture.VERIFIED_ROUTE]
 
 
+class TestTheChannelPremiumCarriesItsOwnMarks:
+    """FR-012, FR-013 through the quote, not only through the leg.
+
+    A channel side is **its own observation**: its own source, its own verification date, its
+    own ``kind`` and therefore its own staleness threshold. On the §4.3.1 corridor every
+    declared fee is zero and the premium is the whole cost, so an edge marked from its leg
+    alone would report the most decision-relevant stale figure in the registry as current.
+    """
+
+    def test_a_stale_premium_on_a_fresh_fee_leg_does_not_render_clean(self) -> None:
+        text = unstyled(fixture.graph_of(fixture.stale_premium_registry()).text)
+        label = fixture.labels_by_route(text)[fixture.STALE_PREMIUM_ROUTE]
+        assert marks.token(Mark.STALE) in label, (
+            "the leg's own fee schedule is fresh and verified; the premium it applies was "
+            "last seen years ago, and the edge showing that premium must say so"
+        )
+        assert marks.CLEAN not in label
+
+    def test_the_fee_schedule_behind_that_leg_really_is_fresh_and_verified(self) -> None:
+        """Otherwise the test above would pass for the wrong reason."""
+        registry = fixture.stale_premium_registry()
+        leg = registry.routes[fixture.STALE_PREMIUM_ROUTE].legs[0]
+        verdict = staleness.staleness_of(
+            leg.provenance, registry.kinds, kind=leg.kind_of_observation, as_of=fixture.AS_OF
+        )
+        assert not staleness.any_stale(verdict)
+        assert not prov.is_unverified(leg.provenance)
+
+    def test_each_observation_ages_under_the_kind_its_own_table_declared(self) -> None:
+        """FR-028: the premium's 7 days and the fee schedule's 365 are two thresholds.
+
+        Aging the premium under the fee schedule's threshold reports it fresh for a year --
+        the silent permissive default FR-028 exists to close, and the defect
+        ``cost._channel_verdicts`` was written to fix one layer down.
+        """
+        registry = fixture.stale_premium_registry()
+        assert registry.kinds[fixture.FAST_KIND].staleness_days == 7
+        assert registry.kinds[fixture.SLOW_KIND].staleness_days == 365
+        assert registry.channels["p2p"].buy_side.kind == fixture.FAST_KIND
+        assert registry.routes[fixture.STALE_PREMIUM_ROUTE].legs[0].kind_of_observation == (
+            fixture.SLOW_KIND
+        )
+
+    def test_a_leg_naming_an_undeclared_channel_fails_loudly(self) -> None:
+        """There is no default channel, and a diagram may not invent one.
+
+        Substituting "the official rate" for a misspelt id would reprice a P2P leg at the
+        reference and delete the entire spread this project exists to measure -- and here it
+        would do it in a picture, where nothing else would contradict it.
+        """
+        registry = fixture.stale_premium_registry()
+        with pytest.raises(KeyError, match="p2p"):
+            render_graph(
+                venues=registry.venues,
+                routes=registry.routes,
+                channels={},
+                regime=registry.regime,
+                mode=Mode.DECLARED_FIGURES,
+                kinds=registry.kinds,
+                as_of=fixture.AS_OF,
+            )
+
+    def test_a_side_declaring_neither_form_is_refused_rather_than_drawn_as_free(self) -> None:
+        """FR-010 has no third form, and "no premium" is not one of the two.
+
+        "At the reference" is declarable as a zero premium, so an absence can only be an
+        unfinished declaration — and rendering it as nothing would draw the corridor at the
+        reference, the cheapest it could possibly be. The loader refuses such a file; reaching
+        the renderer with one means that check was bypassed, so it raises naming the channel.
+        """
+        registry = fixture.stale_premium_registry()
+        quote = registry.channels["p2p"]
+        empty = ChannelSide(
+            markup_bps=None,
+            premium_per_unit=None,
+            kind=fixture.FAST_KIND,
+            provenance=quote.buy_side.provenance,
+        )
+        with pytest.raises(ValueError, match="p2p"):
+            render_graph(
+                venues=registry.venues,
+                routes=registry.routes,
+                channels={"p2p": replace(quote, buy_side=empty)},
+                regime=registry.regime,
+                mode=Mode.DECLARED_FIGURES,
+                kinds=registry.kinds,
+                as_of=fixture.AS_OF,
+            )
+
+
 class TestEveryShippedRouteRendersSynthetic:
     """The shipped registry is invented, and the picture of it says so.
 
@@ -282,6 +375,7 @@ class TestEveryShippedRouteRendersSynthetic:
         rendered = render_graph(
             venues=declared.venues,
             routes=declared.routes,
+            channels=declared.channels,
             regime=regime,
             mode=Mode.TOPOLOGY,
             kinds=declared.kinds,

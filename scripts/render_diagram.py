@@ -112,6 +112,7 @@ def _graph(args: argparse.Namespace) -> Diagram | NothingToDraw:
     return render_graph(
         venues=declared.venues,
         routes=declared.routes,
+        channels=declared.channels,
         regime=_regime(declared, args.scenario, args.regime),
         mode=MODES[args.mode],
         kinds=declared.kinds,
