@@ -292,28 +292,28 @@ under a declared exchange-rate assumption.
 **Independent Test**: inspect every output produced for the two funds and confirm no
 statistical metric appears; request one explicitly and confirm a typed refusal.
 
-- [ ] T043 [P] [US5] Write the failing contract test for the metric refusal — a request
+- [x] T043 [P] [US5] Write the failing contract test for the metric refusal — a request
       for volatility, Sharpe or Sortino on an assumption-driven instrument returns
       `MetricRefused` carrying the reason, and `FundProjection` has **no field** such a
       number could sit in — in `tests/contract/test_assumption_driven_refusal.py`
       (SC-009, FR-005)
-- [ ] T044 [P] [US5] Write the failing worked example for the peg — a payment sized under
+- [x] T044 [P] [US5] Write the failing worked example for the peg — a payment sized under
       a declared exchange-rate assumption checked by hand, an assumed rate above the
       declared cap sized **at the cap** with the output saying the cap bound, a pegged
       flow with no declared assumption returning `PegUnsizable` naming the missing input,
       and no combination of amounts in different currencies ever succeeding — in
       `tests/worked_examples/test_pegged_distribution.py` (SC-011, FR-020–FR-022)
-- [ ] T045 [US5] Implement `ExchangeRateAssumption`, the cap-bound sizing and
+- [x] T045 [US5] Implement `ExchangeRateAssumption`, the cap-bound sizing and
       `PegUnsizable` in `src/terezy/core/instruments/fund.py` and
       `src/terezy/core/results/fund.py`, keeping a USD-equivalent term from ever being a
       `Money` (research.md D7)
-- [ ] T046 [US5] Implement `AwaitingVerification` so a projection needing a value recorded
+- [x] T046 [US5] Implement `AwaitingVerification` so a projection needing a value recorded
       only as a `VerificationTask` refuses by naming the task, in
       `src/terezy/core/results/fund.py` (research.md D8)
-- [ ] T047 [US5] Extend `tests/contract/test_provenance_propagation.py` so every fund
+- [x] T047 [US5] Extend `tests/contract/test_provenance_propagation.py` so every fund
       term joins the walk: with any term left unverified, 100% of figures derived from it
       carry the mark and no derived figure appears unmarked (SC-008, FR-002)
-- [ ] T048 [US5] Declare `data/instruments/synthetic_fund_c.toml` — a third fund with
+- [x] T048 [US5] Declare `data/instruments/synthetic_fund_c.toml` — a third fund with
       different liquidity terms, spread, peg and tax classes — and assert it projects
       completely with zero source lines changed, in
       `tests/contract/test_fund_data_only.py` (SC-010, FR-001)
