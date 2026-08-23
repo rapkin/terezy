@@ -37,6 +37,7 @@ id = "owner-001"
 # actually reached, because those are two different facts.
 [[goal]]
 id                   = "flat_deposit"
+is_synthetic         = true
 currency             = "UAH"
 monthly_contribution = 20_000.0
 target_sum           = 1_200_000.0

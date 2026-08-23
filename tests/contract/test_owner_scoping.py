@@ -29,6 +29,7 @@ import pytest
 from terezy.core.ledger import seeds
 from terezy.core.primitives.currency import Currency
 from terezy.data.declarations import loader, resolver
+from terezy.data.declarations.errors import DeclarationError
 
 pytestmark = pytest.mark.contract
 
@@ -126,3 +127,50 @@ def test_deleting_the_per_owner_files_removes_every_record_and_no_curated_one(
     assert resolved.goals == ()
     assert resolved.owner_id is None
     assert _curated_digest(root) == before
+
+
+# ---------------------------------------------------------------------------
+# The synthetic label, machine-readable rather than a comment
+# ---------------------------------------------------------------------------
+
+
+def test_every_shipped_per_owner_record_is_labelled_synthetic() -> None:
+    """FR-025, and `data/README.md` rule 5 -- the owner's own rule -- made checkable.
+
+    What may be committed here is a public fact or a fixture that says it is one. The header
+    comment says so to a human; ``is_synthetic`` says so to the tool, which is what makes "the
+    day a file stops being synthetic it stops being committable" a sentence something other
+    than a reviewer can enforce.
+
+    The assertion is on the **loaded records**, not on the file text: a label that survives
+    only as a comment is lost the moment the TOML is discarded, and every downstream figure is
+    computed from the records.
+    """
+    _, declared_seeds = loader.seeds_from_file(SEEDS, base_currency=Currency.UAH)
+    _, declared_goals = loader.goals_from_file(GOALS)
+    assert declared_seeds
+    assert declared_goals
+    assert all(lot.is_synthetic for lot in declared_seeds)
+    assert all(goal.is_synthetic for goal in declared_goals)
+
+
+def test_the_label_is_required_rather_than_defaulted(tmp_path: Path) -> None:
+    """Omission must fail, and it must fail in the safe direction.
+
+    Defaulting to ``false`` would let a fixture be mistaken for the owner's real position
+    through a forgotten line; defaulting to ``true`` would let his real holdings be committed
+    while claiming to be invented. Both are worse than a load error, which is the same argument
+    ``InstrumentTable.is_synthetic`` already carries.
+    """
+    target = tmp_path / "unlabelled.toml"
+    target.write_text(
+        "\n".join(
+            line
+            for line in SEEDS.read_text(encoding="utf-8").splitlines()
+            if not line.startswith("is_synthetic")
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(DeclarationError) as caught:
+        loader.seeds_from_file(target, base_currency=Currency.UAH)
+    assert "is_synthetic" in caught.value.field_path

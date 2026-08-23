@@ -66,6 +66,7 @@ def _solved(target: float) -> GoalOutcome:
     outcome = solve.solve(
         Goal(
             owner_id="owner-001",
+            is_synthetic=True,
             id="two_answers",
             currency=UAH,
             monthly_contribution=Money(CONTRIBUTION, UAH, prov.EMPTY),
@@ -159,6 +160,7 @@ def test_a_target_already_met_at_the_evaluation_date_has_no_date_to_report() -> 
     outcome = solve.solve(
         Goal(
             owner_id="owner-001",
+            is_synthetic=True,
             id="two_answers",
             currency=UAH,
             monthly_contribution=Money(CONTRIBUTION, UAH, prov.EMPTY),

@@ -120,6 +120,7 @@ def seeded_event_streams(draw: st.DrawFn, currency: Currency = Currency.UAH) -> 
         lots.append(
             SeedLot(
                 owner_id=OWNER,
+                is_synthetic=True,
                 lot_id=f"seed-{index}",
                 declared_at=f"tests/seeded_streams#seed[{index}]",
                 instrument_id=INSTRUMENT,

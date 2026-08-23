@@ -20,6 +20,7 @@ transforms that already exist and cannot be dropped by one that forgot about it.
 |---|---|---|
 | `owner_id` | `str` | FR-022, FR-007 of the constitution's Principle VII |
 | `instrument_id` | `str` | Must name a curated declaration; unknown fails at load (FR-005) |
+| `is_synthetic` | `bool` | Whether the holding is invented (FR-025) — required, never defaulted, and machine-readable because `data/README.md` rule 5 rests on it |
 | `quantity` | `float` | |
 | `acquired_on` | `date` | |
 | `lot_id` | `str` | Identity, from the entry's position in the file — two purchases of one instrument on one date are two lots |
@@ -53,6 +54,7 @@ honest shape.
 | Field | Type | Meaning |
 |---|---|---|
 | `owner_id` | `str` | |
+| `is_synthetic` | `bool` | Whether the target is invented (FR-025) |
 | `monthly_contribution` | `Money \| None` | Any **two** of these three are declared (FR-011) |
 | `target_sum` | `Money \| None` | |
 | `target_date` | `date \| None` | |

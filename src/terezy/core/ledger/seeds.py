@@ -148,6 +148,15 @@ class SeedLot:
     instrument_id: str
     """Must name a curated declaration; an unknown one is refused (FR-005)."""
 
+    is_synthetic: bool
+    """Whether this holding is invented (FR-025).
+
+    Carried on the record and not only in a file comment, because `data/README.md` rule 5 makes
+    the claim load-bearing: what may be committed is a public fact or a *labelled* fixture, and
+    a label only a human can read cannot be checked by anything. It is a property of the
+    declaration rather than of the arithmetic -- nothing in the ledger branches on it.
+    """
+
     quantity: float
     """Units held. Strictly positive -- the loader refuses zero and below."""
 

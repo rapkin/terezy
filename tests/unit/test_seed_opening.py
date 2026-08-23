@@ -53,6 +53,7 @@ def _lot(**overrides: Any) -> SeedLot:
     """
     base = SeedLot(
         owner_id=OWNER,
+        is_synthetic=True,
         lot_id="seed-0",
         declared_at="tests/test_seed_opening#seed[0]",
         instrument_id=INSTRUMENT,

@@ -44,6 +44,10 @@ class Goal:
     """Unique within the declaration. A duplicate is refused at load: two goals with one id
     cannot be told apart, so neither could be reported against."""
 
+    is_synthetic: bool
+    """Whether this target is invented (FR-025). See ``SeedLot.is_synthetic`` for why it is a
+    field rather than a comment."""
+
     currency: Currency
     """The denomination of the target, **stated rather than assumed** (FR-016).
 

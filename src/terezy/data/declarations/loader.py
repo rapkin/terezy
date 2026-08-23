@@ -2283,6 +2283,7 @@ def seeds_from_file(path: Path, *, base_currency: Currency) -> tuple[str, tuple[
                 owner_id=owner_id,
                 lot_id=f"{SEED_TABLE}-{position}",
                 declared_at=declared_at,
+                is_synthetic=entry.is_synthetic,
                 instrument_id=_require_text(
                     path,
                     f"{field_prefix}.instrument_id",
@@ -2369,6 +2370,7 @@ def goals_from_file(path: Path) -> tuple[str, tuple[Goal, ...]]:
             Goal(
                 owner_id=owner_id,
                 id=goal_id,
+                is_synthetic=entry.is_synthetic,
                 currency=currency,
                 monthly_contribution=None
                 if entry.monthly_contribution is None

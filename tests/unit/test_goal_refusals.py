@@ -63,6 +63,7 @@ def _goal(
 ) -> Goal:
     return Goal(
         owner_id="owner-001",
+        is_synthetic=True,
         id="refusals",
         currency=currency,
         monthly_contribution=(

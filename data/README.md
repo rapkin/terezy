@@ -65,7 +65,7 @@ the whole repository refers to:
    | Kind | Directories | Rule |
    |---|---|---|
    | Public facts about the world | `instruments/`, `routes/`, `channels/`, `tax/`, `venues.toml`, `observation_kinds.toml` | Cited: `source`, `retrieved_on`, `verified_on` (rules 2 and 4 above). |
-   | The owner's own statements, shipped **synthetic** | `seeds/`, `goals/`, `streams/`, `spendable/`, `composition/`, `scenarios/`, `strategies/`, `objectives/` | Nothing to cite — see the next section for each one's argument. Labelled synthetic while the real figures are unstated (`SIMULATOR_SPEC.md` §11 item 3). |
+   | The owner's own statements, shipped **synthetic** | `seeds/`, `goals/`, `streams/`, `spendable/`, `composition/`, `scenarios/`, `strategies/`, `objectives/` | Nothing to cite — see the next section for each one's argument. Labelled synthetic while the real figures are unstated (`SIMULATOR_SPEC.md` §11 item 3) — `seeds/` and `goals/` carry `is_synthetic` as a **required field**, so the label is readable by the tool and not only by a reader. |
    | What a run *produces* | `data/user/`, `cache/`, `runs/` | Gitignored. Never curated, never committed, outside every gate. |
 
    The second row is committed **because what ships in it is synthetic**, not because

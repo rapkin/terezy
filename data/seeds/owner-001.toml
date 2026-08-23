@@ -16,6 +16,11 @@
 # reason written out. If a *market value* ever has to live here it moves to a sourced
 # directory rather than the exemption widening to cover it.
 #
+# **`is_synthetic = true` is a claim the tool can read**, not decoration beside this header.
+# `data/README.md` rule 5 permits this file in the repository because what is in it is
+# invented; the day a lot here describes something the owner actually holds, the flag says so
+# and the file stops being committable.
+#
 # **A seed is a cost, never a current value** (§4.8). "I hold 100 units worth X today" cannot
 # produce a disposal gain at all: the tax engine needs lots, and a lot is units acquired on a
 # date at a price. Where the price is genuinely forgotten, `basis = "estimated"` says so and
@@ -32,6 +37,7 @@ id = "owner-001"
 
 # A lot whose cost the owner knows: he has the confirmation from the purchase.
 [[seed]]
+is_synthetic  = true
 instrument_id = "ovdp_synthetic_a"
 quantity      = 10.0
 acquired_on   = "2026-03-14"
@@ -43,6 +49,7 @@ basis         = "known"
 # `reason` is required here and forbidden above — a reason on a known basis means one of the
 # two fields is wrong, and guessing which would be the loader inventing a declaration.
 [[seed]]
+is_synthetic  = true
 instrument_id = "ovdp_synthetic_b"
 quantity      = 5.0
 acquired_on   = "2026-04-02"

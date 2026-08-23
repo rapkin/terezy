@@ -51,6 +51,7 @@ DECLARED: dict[str, InstrumentDeclaration] = {
 
 LOT_A = SeedLot(
     owner_id=OWNER,
+    is_synthetic=True,
     lot_id="seed-0",
     declared_at="tests/test_seeded_disposal#seed[0]",
     instrument_id=INSTRUMENT,
@@ -62,6 +63,7 @@ LOT_A = SeedLot(
 
 LOT_B = SeedLot(
     owner_id=OWNER,
+    is_synthetic=True,
     lot_id="seed-1",
     declared_at="tests/test_seeded_disposal#seed[1]",
     instrument_id=INSTRUMENT,

@@ -1807,8 +1807,10 @@ as "100 units worth 120 000 today" cannot produce a disposal gain at all — a g
 minus the basis consumed, and a current value is not a basis. Declaring one and then taxing
 against it would report the whole proceeds as gain.
 
-So a seed states four things: the instrument, the quantity, the acquisition date, and what was
-paid. The cost is in the base currency, always: there is deliberately no `currency` key,
+So a seed states five things: the instrument, the quantity, the acquisition date, what was
+paid, and whether the holding is invented — `is_synthetic` is a required field rather than a
+comment, because `data/README.md` rule 5 permits these files in the repository only while what
+is in them is a labelled fixture. The cost is in the base currency, always: there is deliberately no `currency` key,
 because converting a foreign-currency basis needs a rate on the acquisition date and an
 assumed rate underneath a tax figure is exactly the confident wrongness this project exists to
 remove.

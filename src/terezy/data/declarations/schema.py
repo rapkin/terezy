@@ -1017,6 +1017,18 @@ class SeedTable(BaseModel):
     would make every later disposal compute the wrong gain (FR-006).
     """
 
+    is_synthetic: bool
+    """``true`` for a fixture whose holding is invented. Required; there is no default.
+
+    The same field and the same argument ``InstrumentTable`` carries, and here it is doing more
+    work than a label. `data/README.md` rule 5 -- the owner's own rule -- permits this file in
+    the repository *because* what ships in it is synthetic, so the claim has to be readable by
+    something other than a human reading a comment. Defaulting it to ``false`` would let a
+    fixture be mistaken for the owner's real position through omission, and the omission runs
+    the wrong way round; defaulting it to ``true`` would let his real holdings be committed
+    while claiming to be invented, which is worse.
+    """
+
     basis: str
     """``known`` or ``estimated``, and there is no third value and no default (FR-006).
 
@@ -1059,6 +1071,9 @@ class GoalTable(BaseModel):
 
     id: str
     """Unique within the file. A duplicate is refused at load."""
+
+    is_synthetic: bool
+    """``true`` for a fixture whose target is invented. Required; see :class:`SeedTable`."""
 
     currency: str
     """The target's denomination, resolved against the closed ``Currency`` enum. Must be the

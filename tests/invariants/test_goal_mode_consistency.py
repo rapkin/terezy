@@ -106,6 +106,7 @@ def _goal(
 ) -> Goal:
     return Goal(
         owner_id=OWNER,
+        is_synthetic=True,
         id="generated",
         currency=UAH,
         monthly_contribution=None if contribution is None else Money(contribution, UAH, prov.EMPTY),

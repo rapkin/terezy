@@ -156,7 +156,9 @@ def test_a_goal_declaring_none_of_the_three_is_refused(tmp_path: Path) -> None:
     """The degenerate case of the same rule: an id and a currency are not a goal."""
     path = tmp_path / "bare.toml"
     path.write_text(
-        '[owner]\nid = "owner-001"\n\n[[goal]]\nid = "bare"\ncurrency = "UAH"\n', encoding="utf-8"
+        '[owner]\nid = "owner-001"\n\n[[goal]]\nid = "bare"\nis_synthetic = true\n'
+        'currency = "UAH"\n',
+        encoding="utf-8",
     )
     with pytest.raises(DeclarationError) as caught:
         loader.goals_from_file(path)
@@ -182,10 +184,10 @@ def test_a_duplicate_goal_id_is_refused(tmp_path: Path) -> None:
     path = tmp_path / "twice.toml"
     path.write_text(
         '[owner]\nid = "owner-001"\n\n'
-        '[[goal]]\nid = "flat"\ncurrency = "UAH"\nmonthly_contribution = 1.0\n'
-        "target_sum = 2.0\n\n"
-        '[[goal]]\nid = "flat"\ncurrency = "UAH"\nmonthly_contribution = 3.0\n'
-        "target_sum = 4.0\n",
+        '[[goal]]\nid = "flat"\nis_synthetic = true\ncurrency = "UAH"\n'
+        "monthly_contribution = 1.0\ntarget_sum = 2.0\n\n"
+        '[[goal]]\nid = "flat"\nis_synthetic = true\ncurrency = "UAH"\n'
+        "monthly_contribution = 3.0\ntarget_sum = 4.0\n",
         encoding="utf-8",
     )
     with pytest.raises(DeclarationError) as caught:

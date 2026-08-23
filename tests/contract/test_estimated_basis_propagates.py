@@ -96,6 +96,7 @@ def _seed(*, estimated: bool) -> SeedLot:
         basis = seeds.KNOWN
     return SeedLot(
         owner_id=OWNER,
+        is_synthetic=True,
         lot_id="seed-0",
         declared_at="tests/test_estimated_basis_propagates#seed[0]",
         instrument_id=INSTRUMENT,
