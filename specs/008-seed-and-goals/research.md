@@ -112,6 +112,16 @@ shows up as a drift that only a range of magnitudes reveals.
 starting amount; a missing growth assumption; a non-base target currency; an unreachable
 target; and a solved contribution at or below zero.
 
+⚙ **Amended 2026-08-23, during implementation: eight, and one of them lives elsewhere.**
+`TargetDateNotInFuture` was added because the spec's edge-case list requires a target date in
+the past to be reported and it cannot be caught at load -- "past" is relative to the evaluation
+date, which no declaration file carries. `Unreachable` also became a *return* of `solve` and not
+only a feasibility member, because in the date mode it is the whole answer. And
+`SeedInstrumentUndeclared` sits in `core/errors.py` beside the other domain failures rather than
+in `core/results/goal.py`: it is returned by `core.ledger.seeds`, and a results module would
+have made `core.ledger` import `core.results`, which is backwards. The decision's substance --
+every refusal typed, none an exception, each naming what is missing -- is unchanged.
+
 **Rationale.** FR-011, FR-012, FR-016, FR-019 and FR-020. Two of them deserve their shape
 recorded:
 

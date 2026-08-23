@@ -52,13 +52,39 @@ the whole repository refers to:
    would be worse than either.
 4. **No legal value from memory.** Tax and legal values come from a cited public
    source, entered as data. Not from an implementer, and not from an agent.
-5. **Curated vs per-owner.** Most of this directory is curated and shared — instruments,
-   routes, channels, tax packs, venues: public facts about the world. The per-owner
-   directories (`streams/`, `spendable/`, `composition/`, `seeds/`, `goals/`) hold one
-   person's declarations and are committed on the same footing, because the boundary
-   Principle VII draws is *curated versus per-owner*, not *committed versus not*. What stays
-   outside and gitignored is what a **run produces** rather than what a person declares:
-   results, caches and anything under `data/user/`.
+5. **No real personal data, ever — public facts and labelled synthetic fixtures only.**
+   This is the owner's own rule (2026-08-23) and it is the axis that matters. What may be
+   committed here is a **general fact about the world** — a fee, a tax rate, a published
+   inflation figure, a corridor, a venue — or a **synthetic fixture that says on its face
+   that it is one**, so that logic and arithmetic can be checked quickly. A fixture shaped
+   like the owner's real situation is fine on the same terms. What may **never** be committed
+   is a figure that describes his actual position.
+
+   That splits the tree in two, and the split is *not* the same as curated-versus-per-owner:
+
+   | Kind | Directories | Rule |
+   |---|---|---|
+   | Public facts about the world | `instruments/`, `routes/`, `channels/`, `tax/`, `venues.toml`, `observation_kinds.toml` | Cited: `source`, `retrieved_on`, `verified_on` (rules 2 and 4 above). |
+   | The owner's own statements, shipped **synthetic** | `seeds/`, `goals/`, `streams/`, `spendable/`, `composition/`, `scenarios/`, `strategies/`, `objectives/` | Nothing to cite — see the next section for each one's argument. Labelled synthetic while the real figures are unstated (`SIMULATOR_SPEC.md` §11 item 3). |
+   | What a run *produces* | `data/user/`, `cache/`, `runs/` | Gitignored. Never curated, never committed, outside every gate. |
+
+   The second row is committed **because what ships in it is synthetic**, not because
+   per-owner data is committable in general. The day a file there stops being synthetic it
+   stops being committable — that is the same sentence, not a new rule.
+
+   **This is narrower than Principle VII, and deliberately.** The constitution requires
+   per-user data to be *separate from* curated data — a structural boundary, which the
+   directory split satisfies — and says nothing about whether it may be committed. An earlier
+   version of this file was stricter than the constitution, asserting that holdings and goals
+   stay outside `data/` and gitignored; feature 008 put labelled synthetic ones inside it, and
+   this rule is what the owner actually asked for. Where the two documents differ, this one is
+   the tighter of the two on content and the looser on location.
+
+   **The other half of his rule — "the data stays isolated from the core" — is currently true
+   and not yet guaranteed.** No module under `src/terezy/core/` names any declared id in code;
+   the only occurrences are in docstring prose. A contract test under `tests/contract/` will
+   turn that from an observation into a guarantee, and it lands with the review follow-up to
+   this feature. Until it does, treat the claim as reviewed rather than enforced.
 
 ## Assumptions are not observations
 
@@ -116,15 +142,9 @@ the data root (`venues.toml`) are scanned too, and a directory the script does n
 is an error — never a blind spot. A gate that passes over what it never looked at would
 be fail-open in the one script whose job is the opposite.
 
-Per-owner data being *inside* `data/` is a narrower claim than it looks, and feature 008
-widened it deliberately. `streams/` holds one committed, reviewed declaration of where money
-lands and in what currency, with its amounts at `0.0` because the real figures have not been
-stated (§11 item 3) — and `seeds/` and `goals/` now hold the owner's holdings and targets on
-the same footing, as labelled synthetic fixtures until his real figures arrive. The boundary
-that matters is **curated versus per-owner**, not committed versus not: a salary is at least as
-private as a holding and has been committed since feature 002, and this repository is designed
-to hold one person's complete financial picture under version control (008 research.md D2).
-
-`user/` stays gitignored and outside every gate: computed results, caches, and anything a run
-writes rather than a person declares. That is the part rule 5 above is about — what the owner
-*declares* is reviewed in git like code, and what the tool *produces* is not.
+Per-owner data being *inside* `data/` is a narrower claim than it looks. `streams/` holds one
+committed, reviewed declaration of where money lands and in what currency, with its amounts at
+`0.0` because the real figures have not been stated (§11 item 3); `seeds/` and `goals/` hold
+holdings and targets on the same footing, as labelled synthetic fixtures until real ones
+arrive. Every one of them is committed **because what ships in it is synthetic** — rule 5
+above, and the owner's own rule. None of them is a licence to commit his actual position.

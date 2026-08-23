@@ -22,7 +22,9 @@ transforms that already exist and cannot be dropped by one that forgot about it.
 | `instrument_id` | `str` | Must name a curated declaration; unknown fails at load (FR-005) |
 | `quantity` | `float` | |
 | `acquired_on` | `date` | |
-| `cost` | `Money` | In the **base currency** (FR-010) |
+| `lot_id` | `str` | Identity, from the entry's position in the file — two purchases of one instrument on one date are two lots |
+| `declared_at` | `str` | Where it was declared (`seeds/owner-001.toml#seed[0]`), for the `SEED_DECLARATION` cause and the estimate's mark |
+| `cost` | `Money` | The declared amount, in the **base currency** (FR-010), *as written* — read `seeds.seed_cost`, which joins it to the basis mark |
 | `basis` | `BasisKnown \| BasisEstimated` | Explicit — never inferred (FR-006) |
 
 `basis` is a two-member union rather than a `is_estimated: bool`, because the estimated case
@@ -63,8 +65,21 @@ solve — it is the feasibility question of FR-018.
 
 | Field | Type | Meaning |
 |---|---|---|
-| `starting_amount` | `Money` | Explicit; **no assumed opening balance** (FR-012) |
-| `growth` | `GrowthAssumption` | Explicit; **no default rate** |
+| `as_of` | `date` | The date the starting amount is measured at and the schedule begins from |
+| `base_currency` | `Currency` | The run's base currency, stated rather than read off the amount |
+| `starting_amount` | `Money \| None` | Explicit; **no assumed opening balance** (FR-012) |
+| `growth` | `GrowthAssumption \| None` | Explicit; **no default rate** |
+
+⚙ **Amended during implementation (2026-08-23).** Three changes, each forced by the
+requirements rather than chosen:
+
+- `as_of` exists because the core has no clock and every mode needs an origin for the monthly
+  schedule; without it a solved date could not be reproduced a year later.
+- `base_currency` is stated rather than inferred from `starting_amount.currency`, because
+  Principle VI calls conflating two currency roles a defect: inferring would mean a goal in the
+  wrong currency checked against an amount in the wrong currency, and both passing.
+- The last two are `| None`. Non-optional, FR-012's `StartingAmountMissing` and
+  `GrowthAssumptionMissing` could never fire, and a guard that cannot fire is worse than none.
 
 ### `GrowthAssumption`
 
@@ -79,6 +94,14 @@ solve — it is the feasibility question of FR-018.
 |---|---|---|
 | `contribution_timing` | `Literal["end_of_period"]` | When in the period a contribution lands |
 | `compounding` | `Literal["monthly"]` | How growth compounds between contributions |
+| `monthly_rate` | `Literal["twelfth_root_of_annual"]` | `i = (1+g)^(1/12) - 1`, the effective reading |
+| `month_count` | `Literal["anniversary_actual_days"]` | Monthly anniversaries plus the elapsed fraction of the month in progress |
+
+⚙ **The last two were added during implementation (2026-08-23)**, and they are not decoration:
+each changes the answer materially. A nominal annual rate over twelve gives 12.68% where the
+effective reading gives 12%, and a fixed 30.44-day month puts a target date on a fractional
+month it does not fall on. FR-014 requires the conventions the arithmetic depends on to be
+stated, and these two are among them.
 
 **Carried in the result, not implicit in the code** (FR-014). This is what lets a hand
 computation and the engine check the same model instead of two models that agree to three
@@ -90,13 +113,13 @@ decimals.
 
 | Field | Type | Meaning |
 |---|---|---|
-| `solved_for` | `Literal["contribution", "sum", "date"]` | Which of the three was unknown |
+| `solved_for` | `Literal["contribution", "sum", "date", "feasibility"]` | Which of the three was unknown, or `"feasibility"` when all three were declared |
 | `contribution`, `sum`, `date` | the three, all populated after solving | |
 | `exact_date` | `SolvedDate \| None` | Date mode only — see below |
 | `conventions` | `Conventions` | |
 | `feasibility` | `Met \| Missed \| Unreachable` | FR-018, FR-019 |
 | `terms` | `Literal["nominal"]` | Labelled on its face (FR-017) |
-| `real` | `None` | The reserved slot, in the shape 001's `HurdleRate.real` set (research.md D8) |
+| `real` | `RealTargetSum \| RealTermsUnavailable` | The reserved slot, in the shape 001's `HurdleRate.real` set (research.md D8) — a **typed** empty occupant carrying its reason, not a bare `None`, so a nominal `Money` cannot be assigned into it |
 | `determinism_note` | `str` | States the verdict is one path under a stated assumption, **not** a probability (FR-021, research.md D10) |
 | `provenance` | `Provenance` | The growth assumption's marks, propagated |
 
@@ -119,14 +142,21 @@ decimals.
 
 ### Typed refusals
 
-| Record | When |
-|---|---|
-| `GoalUnderdetermined` | Fewer than two variables — names which (FR-011) |
-| `StartingAmountMissing` | No opening balance declared; none is assumed (FR-012) |
-| `GrowthAssumptionMissing` | No rate declared; none is defaulted (FR-012) |
-| `CurrencyNotYetModelled` | A non-base target — the reason names the **missing FX modelling**, never the currency as invalid (FR-016) |
-| `NoContributionNeeded` | The solved contribution is at or below zero — carries the margin, not a negative instruction (FR-020) |
-| `SeedInstrumentUndeclared` | A seed naming an instrument no curated declaration defines (FR-005) |
+⚙ **Eight, not six, and one of them is not in this module** (amended 2026-08-23). The two
+additions each close a case the spec's own edge-case list names and the contract's signature
+did not enumerate; `SeedInstrumentUndeclared` moved because a seed refusal in a results module
+would make `core.ledger` import `core.results`, which is backwards.
+
+| Record | Where | When |
+|---|---|---|
+| `GoalUnderdetermined` | `core/results/goal.py` | Fewer than two variables — names which (FR-011) |
+| `StartingAmountMissing` | `core/results/goal.py` | No opening balance declared; none is assumed (FR-012) |
+| `GrowthAssumptionMissing` | `core/results/goal.py` | No rate declared; none is defaulted (FR-012) |
+| `CurrencyNotYetModelled` | `core/results/goal.py` | A non-base target — the reason names the **missing FX modelling**, never the currency as invalid (FR-016) |
+| `NoContributionNeeded` | `core/results/goal.py` | The solved contribution is at or below zero, **or** the date mode is asked about a target already met — carries the margin, not a negative instruction (FR-020) |
+| `TargetDateNotInFuture` | `core/results/goal.py` | A target date on or before the evaluation date — never solved backwards (spec, Edge Cases). Uncatchable at load: "past" is relative to a date no declaration file carries |
+| `Unreachable` | `core/results/goal.py` | Returned by `solve` in the date mode, where there is no other answer to give; the same record the feasibility verdict uses (FR-019) |
+| `SeedInstrumentUndeclared` | `core/errors.py` | A seed naming an instrument no curated declaration defines (FR-005) |
 
 None is an exception. `raise` stays for programmer errors.
 

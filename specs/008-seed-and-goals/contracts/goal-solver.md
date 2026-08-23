@@ -59,8 +59,18 @@ assumption; no field for a likelihood exists. (FR-021)
 ## Contract for seeds
 
 ```python
-def opening_events(seeds: Sequence[SeedLot], instruments: Mapping[str, InstrumentDeclaration]) -> tuple[Event, ...] | SeedInstrumentUndeclared
+def opening_events(
+    seeds: Sequence[SeedLot],
+    instruments: Mapping[str, InstrumentDeclaration],
+    *,
+    opens_on: date,
+) -> tuple[Event, ...] | SeedInstrumentUndeclared | InconsistentTerms
 ```
+
+⚙ **Amended during implementation (2026-08-23).** `opens_on` is the date the projection's
+ledger opens, and it is an argument because the core has no clock; `InconsistentTerms` is the
+spec's two date edge cases -- a lot acquired before its instrument existed, or after the ledger
+opens -- reported rather than silently re-dated.
 
 **G13 — A seed is an ordinary ledger citizen.** It opens the ledger through the same path a
 purchase takes, and every existing conservation invariant counts it with no knowledge that it
