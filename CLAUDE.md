@@ -51,11 +51,12 @@ place**. A comment claiming what another module does, a helper restating a compu
 fields holding one truth — all the same shape, and in this repository the duplicate is where
 the drift happened every time. It keeps what prevents a named defect and what makes a wrong
 state unrepresentable; collapsing a tagged union into a flag is not simplification, it is
-moving the complexity into the reader's head. In that order for two
-reasons: the review then reads the text that will land, and the review's own check on
-unverifiable claims applies to the condensed version rather than to prose about to be
-deleted. It is also the one pass that re-reads every comment on the branch, which is where a
-stale claim otherwise survives.
+moving the complexity into the reader's head.
+
+**Before the review, not after**, for two reasons: the review then reads what will land, and
+its own check on unverifiable claims applies to the condensed version rather than to prose
+about to be deleted. It is also the one pass that re-reads every comment on the branch, which
+is where a stale claim otherwise survives.
 
 **A code review is a blocking gate before anything lands on `main`.** Not a courtesy pass
 and not something to note as skipped: run `/code-review` over the diff and iterate until it
