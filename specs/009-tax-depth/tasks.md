@@ -61,8 +61,8 @@ golden**.
 
 ### The records
 
-- [ ] T013 [P] Create `src/terezy/core/tax/year.py` with the frozen records: `IncomeCategory`, `Treatment`, `CarryforwardRule`, `TimingRule`, `Settlement behaviour`, `LotMethod`, `MethodStanding`, `UnsettledSwitch`, `FilingDecisions`, `AssessmentRules`, `ChargeRef`, `CarryforwardState`, `AssessedLiability`, `AnnualStatement`, and the `TaxYearRefusal` union — **no constructor produces a liability without its method** (data-model.md)
-- [ ] T014 [P] Create `src/terezy/core/results/tax_year.py` with the settlement-side records: `TaxPayment`, `OpenObligation`, `Settlement`, `InsufficientCashForTax`, `WithholdingNotModelled`
+- [X] T013 [P] Create `src/terezy/core/tax/year.py` with the frozen records: `IncomeCategory`, `Treatment`, `CarryforwardRule`, `TimingRule`, `Settlement behaviour`, `LotMethod`, `MethodStanding`, `UnsettledSwitch`, `FilingDecisions`, `AssessmentRules`, `ChargeRef`, `CarryforwardState`, `AssessedLiability`, `AnnualStatement`, and the `TaxYearRefusal` union — **no constructor produces a liability without its method** (data-model.md)
+- [X] T014 [P] Create `src/terezy/core/results/tax_year.py` with the settlement-side records: `TaxPayment`, `OpenObligation`, `Settlement`, `InsufficientCashForTax`, `WithholdingNotModelled`
 - [ ] T015 (test) Assert `AssessedLiability` cannot be constructed without a `LotMethod` and that no field on any record in either module is a bare unlabelled liability, in `tests/contract/test_method_is_never_implicit.py`
 
 ### The declarations
@@ -88,11 +88,11 @@ payment that debits cash in the following year.
 the liability equals the hand-computed charge for the gain's year, and exactly one cash
 outflow settles it on the declared due date of the following year.
 
-- [ ] T022 (test) [US1] Hand-compute a one-gain scenario end to end in `tests/worked_examples/test_tax_payment.py`: gross in the ledger at trade time, the year's liability, the payment on the declared due date, arithmetic checked in beside the assertion (SC-003)
-- [ ] T023 (test) [P] [US1] Assert the annual statement's shape in `tests/unit/test_annual_statement.py` — charges enumerated and traceable to event and rule (FR-002), one statement per year × category, zero years present with their reason (FR-006)
-- [ ] T024 (test) [P] [US1] Assert an assessed-but-not-yet-due liability at the horizon is reported as an open obligation in `tests/unit/test_annual_statement.py` (FR-007)
-- [ ] T025 [US1] Implement `statements(...)` in `src/terezy/core/tax/year.py`: the fold from charges to statements, per year and declared category, with the netted base, the zero reason, and the method on every figure
-- [ ] T026 [US1] Implement `settle(...)` in `src/terezy/core/results/tax_year.py`: due date from the declared rule, the payment woven into the stream and renumbered, the statement named on the event, open obligations reported rather than dropped
+- [X] T022 (test) [US1] Hand-compute a one-gain scenario end to end in `tests/worked_examples/test_tax_payment.py`: gross in the ledger at trade time, the year's liability, the payment on the declared due date, arithmetic checked in beside the assertion (SC-003)
+- [X] T023 (test) [P] [US1] Assert the annual statement's shape in `tests/unit/test_annual_statement.py` — charges enumerated and traceable to event and rule (FR-002), one statement per year × category, zero years present with their reason (FR-006)
+- [X] T024 (test) [P] [US1] Assert an assessed-but-not-yet-due liability at the horizon is reported as an open obligation in `tests/unit/test_annual_statement.py` (FR-007)
+- [X] T025 [US1] Implement `statements(...)` in `src/terezy/core/tax/year.py`: the fold from charges to statements, per year and declared category, with the netted base, the zero reason, and the method on every figure
+- [X] T026 [US1] Implement `settle(...)` in `src/terezy/core/results/tax_year.py`: due date from the declared rule, the payment woven into the stream and renumbered, the statement named on the event, open obligations reported rather than dropped
 - [ ] T027 (test) [US1] Assert a withheld-at-source class refuses rather than being silently self-assessed, in `tests/unit/test_annual_statement.py` (FR-003)
 
 **Checkpoint**: US1 is testable on its own; every later story extends this fold.

@@ -45,6 +45,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, replace
 from datetime import date
+from enum import Enum
 from typing import Final
 
 from terezy.core.errors import CurrencyMismatchError, LedgerInvariantError
@@ -226,11 +227,73 @@ def _newest_first(items: tuple[Lot, ...]) -> tuple[Lot, ...]:
     return tuple(sorted(items, key=lambda lot: (lot.acquired_on, lot.lot_id), reverse=True))
 
 
-FIFO: Final = "fifo"
+class LotMethod(Enum):
+    """The four basis methods, as a closed set. **No default anywhere** (FR-020, D5).
+
+    ⚙ **Added by feature 009**, together with the two implementations 001 deliberately left
+    out. All four live here rather than in a tax module, because two of them already did and
+    four methods split across two modules is how a fifth ends up in a third (009 research.md
+    D10).
+
+    The value strings are the data contract: they are what a scenario declares, what
+    ``CONSUMPTION_FNS`` is keyed by, and what a result renders. The enum exists beside those
+    strings so that a **figure** cannot carry an unchecked method name: everything feature 009
+    emits carries a ``LotMethod``, and the one place a name becomes one is :func:`method_named`,
+    which refuses anything else by name.
+
+    **What the law says about each of them is not here.** It is declared data -- the Tax Code
+    prescribes no method at all, DPS/ZIR guidance points at a proportional reading for a
+    self-declarant, and Metodyka MFU No. 1484 prescribes FIFO where a tax agent computes -- and
+    it reaches a figure as ``terezy.core.tax.year.MethodStanding``. A verdict about the law
+    hard-coded next to an implementation would be exactly the domain knowledge Principle II
+    keeps out of the engine.
+    """
+
+    FIFO = "fifo"
+    """First in, first out."""
+
+    LIFO = "lifo"
+    """Last in, first out."""
+
+    AVERAGE_COST = "average_cost"
+    """Every lot contributes basis in proportion to the units it holds, over the whole packet
+    the asset is (пп. 170.2.7). The reading DPS/ZIR guidance recognises for a self-declarant."""
+
+    SPECIFIC_LOT = "specific_lot"
+    """Exactly the lot the disposal names, and no other. The disposal 001 refused loudly."""
+
+
+FIFO: Final = LotMethod.FIFO.value
 """First in, first out."""
 
-LIFO: Final = "lifo"
+LIFO: Final = LotMethod.LIFO.value
 """Last in, first out."""
+
+AVERAGE_COST: Final = LotMethod.AVERAGE_COST.value
+"""Pro rata over the packet. ⚙ Feature 009."""
+
+SPECIFIC_LOT: Final = LotMethod.SPECIFIC_LOT.value
+"""The named lot, and a refusal where it cannot be honoured exactly. ⚙ Feature 009."""
+
+
+def method_named(name: str) -> LotMethod:
+    """The declared name as a checked method, or a raise naming the four that exist.
+
+    The one place a string becomes a :class:`LotMethod`, so that every figure downstream
+    carries a member of a closed set rather than whatever the caller typed. A raise rather
+    than a typed refusal for the same reason :func:`consumption_order` raises: by the time a
+    fold is running, the name has already passed the data boundary, and an unknown one here
+    is a bug in the code that assembled the run.
+    """
+    for method in LotMethod:
+        if method.value == name:
+            return method
+    raise LedgerInvariantError(
+        f"unknown lot consumption method {name!r}. There is no default method: the choice "
+        f"changes the basis consumed and therefore the tax. Known methods: "
+        f"{sorted(member.value for member in LotMethod)}"
+    )
+
 
 CONSUMPTION_ORDER_FNS: Final[Mapping[str, ConsumptionOrderFn]] = {
     FIFO: _oldest_first,
