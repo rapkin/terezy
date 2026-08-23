@@ -60,6 +60,7 @@ from terezy.core.inflation.series import (
     Periodicity,
 )
 from terezy.core.instruments import registry as instrument_registry
+from terezy.core.instruments.access import InstrumentAccess
 from terezy.core.instruments.fund import (
     CapEntry,
     DeclaredYield,
@@ -3353,5 +3354,134 @@ def inflation_assumption_from_file(path: Path) -> tuple[str, InflationAssumption
             ),
             provenance=provenance,
             kind=kind,
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# 010-full-tuple: how an instrument is reached
+# ---------------------------------------------------------------------------
+#
+# Same four responsibilities in the same order -- read, shape, meaning, construct -- and the
+# same rule that no pydantic type crosses this line.
+#
+# What is checked here is everything true of one file read in isolation: the list is
+# non-empty, ids and labels are not blank, a duplicate ``instrument_id`` within the file is
+# refused, the price is positive and its currency is one this engine models, and the citation
+# is complete.
+#
+# What is **not** here, because each needs a second file: whether the instrument exists,
+# whether the venues exist and can hold its currency, whether the quote's currency is the
+# instrument's own, and whether this kind of instrument is entitled to declare a price at all.
+# Four relations, and all four live in the resolver where the whole set is in hand and both
+# files can be named.
+
+ACCESS_TABLE: Final = "access"
+"""Root array of an access file, and the prefix of every field path in one."""
+
+
+def access_from_file(path: Path) -> tuple[InstrumentAccess, ...]:
+    """One ``data/access/<name>.toml`` as the access declarations it makes.
+
+    A tuple rather than a mapping: the resolver keys them, because a duplicate *across* files
+    is its question and reporting it needs both file names.
+    """
+    file = _validate(schema.AccessFile, read_document(path), path)
+    if not file.access:
+        raise DeclarationError(
+            path,
+            ACCESS_TABLE,
+            "declares no access entries. An empty list is reported rather than read as 'no "
+            "instrument can be reached': every tuple naming an instrument would refuse for a "
+            "missing declaration, and a comparison emptied by a forgotten line looks exactly "
+            "like one emptied by a genuine gap in the registry.",
+            "declare at least one [[access]] entry, or delete the file",
+        )
+    declared: list[InstrumentAccess] = []
+    seen: dict[str, int] = {}
+    for position, entry in enumerate(file.access):
+        prefix = f"{ACCESS_TABLE}[{position}]"
+        instrument_id = _require_text(
+            path,
+            f"{prefix}.instrument_id",
+            entry.instrument_id,
+            "an access declaration says how one named instrument is reached, and it is "
+            "resolved against the declared instruments",
+        )
+        if instrument_id in seen:
+            raise DeclarationError(
+                path,
+                f"{prefix}.instrument_id",
+                f"declares how {instrument_id!r} is reached for the second time; entry "
+                f"{seen[instrument_id]} of this file already does. The two are not merged and "
+                "neither wins: an instrument reached two ways is two declarations only once "
+                "there is a term to tell them apart, and until then a repeated id is a file "
+                "that was edited twice.",
+                "delete the duplicate entry",
+            )
+        seen[instrument_id] = position
+        declared.append(
+            InstrumentAccess(
+                instrument_id=instrument_id,
+                bought_at=_require_text(
+                    path,
+                    f"{prefix}.bought_at",
+                    entry.bought_at,
+                    "the purchase happens at a named venue, and that venue is the far end the "
+                    "funding route has to reach (FR-004)",
+                ),
+                proceeds_to=_require_text(
+                    path,
+                    f"{prefix}.proceeds_to",
+                    entry.proceeds_to,
+                    "the instrument's proceeds land at a named venue, and that venue is where "
+                    "the exit route has to depart from (FR-004)",
+                ),
+                price_per_unit=_access_price(path, prefix, entry.price),
+                risk_class=_require_text(
+                    path,
+                    f"{prefix}.risk_class",
+                    entry.risk_class,
+                    "the risk class is the fifth term of the unit of analysis and is carried "
+                    "into every outcome; it is declared and never scored",
+                ),
+            )
+        )
+    return tuple(declared)
+
+
+def _access_price(
+    path: Path, prefix: str, declared: schema.AccessPriceTable | None
+) -> Money | None:
+    """The declared unit quote, or ``None`` where the table is absent.
+
+    ``None`` is the *statement* that this instrument prices itself, and it is returned here
+    without judgement: whether this kind of instrument is entitled to make that statement is a
+    relation between two files and belongs to the resolver.
+    """
+    if declared is None:
+        return None
+    field = f"{prefix}.price"
+    return Money(
+        _positive(
+            path,
+            f"{field}.per_unit",
+            declared.per_unit,
+            "a unit costs something. A price of zero or below would make a purchase acquire "
+            "unlimited units from any amount, and every figure downstream of it meaningless "
+            "rather than merely large",
+        ),
+        _currency(path, f"{field}.currency", declared.currency),
+        prov.of(
+            [
+                _source_ref(
+                    path,
+                    field,
+                    source=declared.source,
+                    retrieved_on=declared.retrieved_on,
+                    verified_on=declared.verified_on,
+                    kind=declared.kind,
+                )
+            ]
         ),
     )

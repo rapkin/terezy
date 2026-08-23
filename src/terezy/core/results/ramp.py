@@ -553,3 +553,97 @@ def recommended_cost(ranking: Ranking) -> RampCost:
     :attr:`Ranking.costed`, because that case is :class:`NothingComparable`.
     """
     return ranking.costed[ranking.recommended]
+
+
+# ---------------------------------------------------------------------------
+# 010-full-tuple: the way out, costed from what the instrument actually released
+# ---------------------------------------------------------------------------
+#
+# :class:`RoundTripCost` costs the way out **from what the inbound chain delivered**, because
+# in feature 002 nothing was ever bought: the money arrived at a venue and the same money came
+# back. Once something *is* bought, the amount travelling the way out is whatever the holding
+# released -- a coupon, a distribution, a redemption -- on the date it released it, and that is
+# neither the arriving amount nor a fraction of it. A fixed fee does not scale, so applying
+# 002's round-trip *fraction* to a different amount would be a fabricated figure that looks
+# exactly like a real one.
+#
+# So there is a third cost record, and it is **unrelated to the other two** for the reason the
+# module docstring gives about the first two: the three are field-for-field similar, which is
+# precisely why nothing weaker than distinct types would stop one standing in for another.
+
+
+@dataclass(frozen=True, slots=True)
+class WayOutCost:
+    """What it costs to get one dated amount **out**: from where it was released to a spendable
+    endpoint.
+
+    Unrelated to :class:`OneWayCost` and :class:`RoundTripCost` by design. See the section
+    comment above.
+    """
+
+    path: Candidate
+    """The way out as a journey: which spendable endpoint, funded from which stream, by which
+    declared exit routes.
+
+    **Keyed by the whole triple, exactly as every other cost in this module is** (FR-008). It
+    is the same rule from the other end of the round trip: the way out of an instrument bought
+    from the dollar contract income and the way out of one bought from the hryvnia salary are
+    two figures, because the stream is part of what a cost *is*. A way-out cost keyed by the
+    destination alone would blend them, and the blend would look entirely reasonable.
+
+    Never a way *in*, despite the type: a :class:`~terezy.core.routes.path.Candidate` is how
+    this project spells "a destination, a stream and one or more declared routes", and the
+    routes named here are the exit chain's. Which direction they run is a property of the
+    declarations, which the loader refuses to mix (FR-022).
+    """
+
+    sent: Money
+    """What left the venue the instrument released it at, in that venue's currency."""
+
+    arrived: Money
+    """What reached the spendable endpoint, in the endpoint's currency.
+
+    **May be zero or negative** where the fees exceed the amount, and is reported that way:
+    a small distribution can genuinely cost more than itself to repatriate, and that is a
+    finding rather than an error state.
+    """
+
+    components: Mapping[CostComponent, Money]
+    """The charge, split by term, in :attr:`sent`'s currency. Every member present, zero where
+    it does not apply, for :attr:`OneWayCost.components`' reason."""
+
+    fraction: float
+    """Cost as a fraction of :attr:`sent`. **Not capped**, in either direction."""
+
+    spreads_over_reference: tuple[float, ...]
+    """One rate-space spread per converting leg, parallel to :attr:`channels_applied`. Not the
+    cost -- see :attr:`OneWayCost.spreads_over_reference`."""
+
+    channels_applied: tuple[str, ...]
+    """Which channel each ``fx`` leg used, in leg order. Empty for a chain that converts
+    nothing, and empty for an exit by identity, which has no legs at all."""
+
+    provenance: Provenance
+    """The union of every declared value behind this figure."""
+
+    staleness: StalenessVerdict
+    """Which of those observations have aged past their kind's threshold."""
+
+    by_segment: tuple[SegmentAttribution, ...]
+    """The same charge, split by segment, numbered from zero within this way out.
+
+    From zero rather than continuing an inbound chain's numbering, because this is its own
+    journey: it starts where the instrument released the money and on the date it released it,
+    which may be years after and somewhere other than where the way in ended.
+    """
+
+    latency_days: int
+    """Summed over the chain's legs, and **inside the span the comparable rate is measured
+    over** (010 FR-015).
+
+    Carried on the cost rather than reported beside it, unlike
+    :attr:`RampCost.latency_days`, and the difference is the owner's decision of 2026-08-22:
+    waiting is a cost. A figure that reaches a spendable endpoint three days later is worth
+    less than the same figure today, and the only way for a money-weighted return to say so is
+    for the arrival date to move.
+    """

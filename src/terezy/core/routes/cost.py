@@ -121,6 +121,7 @@ from terezy.core.results.ramp import (
     RoundTripCost,
     RouteUnusable,
     SegmentAttribution,
+    WayOutCost,
 )
 from terezy.core.routes import channels as fx
 from terezy.core.routes import legs as leg_module
@@ -1341,3 +1342,200 @@ def cost_one(
         status=_status_of(resolved),
         disruption_probability=walked.disruption,
     )
+
+
+# ---------------------------------------------------------------------------
+# 010-full-tuple: costing a way out from an amount that is not the inbound arrival
+# ---------------------------------------------------------------------------
+#
+# `cost_one` costs a round trip by **continuing the inbound walk**, which is exactly right
+# while nothing is bought: the amount leaving the inbound chain is the amount entering the
+# exit chain. Once an instrument is bought the two part company. What travels the way out is
+# what the holding released -- a coupon, a distribution, a redemption -- on the date it
+# released it, and that amount is neither the arriving amount nor a fraction of it.
+#
+# **Applying the round-trip fraction to a different amount would be a fabrication**, and a
+# convincing one: a fixed fee does not scale, so a fraction measured on 10 000 UAH is simply
+# the wrong number for a 768 UAH coupon, while the arithmetic that produced it looks sound.
+# FR-029 says every candidate is costed in full through the same path, and this is that path
+# entered at a different point rather than a second one.
+#
+# So: one more entry point, no new arithmetic. It resolves the chain with `_exit_routes` --
+# the same four checks, including the head anchor that feature 004 was missing -- and folds
+# `_walk` over `_exit_chain`, which is what `_round_trip` already does. Nothing here computes
+# a fee, a rate or a conversion of its own.
+
+
+_IDENTITY_ROUTE: Final = "(exit by identity)"
+"""The route id a way out by identity is keyed by: a named absence, not a declared route.
+
+:data:`~terezy.core.routes.path.EXIT_BY_IDENTITY` walks no legs, so there is no declaration to
+name -- and a cost still has to be keyed by all three terms (FR-008), because the stream that
+funded a holding released at a spendable venue is as much part of that figure as of any other.
+Spelt with brackets and spaces so it cannot collide with a declared route id, on the precedent
+of ``results.coverage.IMPLICIT_REGIME_ID``.
+"""
+
+
+Junction = _Junction
+"""Where value sits: a venue id and a currency code.
+
+Public under this feature's name because the join has two seams to anchor and both are
+stated in exactly these terms -- *the way in ends here, the purchase begins there*. It is
+the same alias the search and the costing already share; naming it once is what stops a
+third spelling of "a venue and a currency" appearing in the layer above.
+"""
+
+
+def junctions_of(route: Route) -> tuple[Junction, Junction]:
+    """Where a declared route departs from and where it arrives, as junctions.
+
+    Both at once, from the one pair of functions the chain checks already use, so a caller
+    anchoring a seam cannot read the departure from one definition and the arrival from
+    another.
+    """
+    return _departs_from(route), _arrives_at(route)
+
+
+def spendable_junctions(spendable: frozenset[SpendableEndpoint]) -> frozenset[Junction]:
+    """The owner's declared spendable endpoints, as junctions a seam check can compare."""
+    return _spendable_junctions(spendable)
+
+
+def _way_out_key(resolved: tuple[Route, ...], *, stream_id: str) -> Candidate:
+    """The way out as a candidate, so a refusal can name the journey that refused.
+
+    Not a funding path and never returned as one: it exists because
+    :class:`~terezy.core.results.ramp.RouteUnusable` is keyed by a candidate, and a refusal on
+    the way out that named the way *in* would send a reader to the wrong declaration. The
+    stream is the funding stream, because a cost is keyed per ``(instrument x stream x route)``
+    on the way out exactly as on the way in (Principle VI).
+
+    A single declared exit route becomes a :class:`FundingPath`, several a
+    :class:`ComposedPath`, which is what makes ``RouteUnusable.binding_segment`` behave the way
+    it does everywhere else: dropped where there is one declaration to open, present where
+    there are several.
+    """
+    ids = tuple(route.id for route in resolved)
+    destination = resolved[-1].destination
+    if len(ids) == 1:
+        return FundingPath(destination_id=destination, stream_id=stream_id, route_id=ids[0])
+    return ComposedPath(destination_id=destination, stream_id=stream_id, segments=ids)
+
+
+def _way_out(path: Candidate, sent: Money, walk: _Walk) -> WayOutCost:
+    """The figure, from the same three parts a one-way and a round-trip figure come from."""
+    components, fraction, provenance = _figure(sent, walk)
+    return WayOutCost(
+        path=path,
+        sent=sent,
+        arrived=walk.amount,
+        components=components,
+        fraction=fraction,
+        spreads_over_reference=walk.spreads,
+        channels_applied=walk.channels,
+        provenance=provenance,
+        staleness=walk.staleness,
+        by_segment=walk.segments,
+        latency_days=walk.latency_days,
+    )
+
+
+def cost_exit(
+    chain: ExitChain,
+    amount: Money,
+    *,
+    stream_id: str,
+    departing_from: tuple[str, str],
+    routes: Mapping[str, Route],
+    channels: Mapping[str, FxChannel],
+    kinds: Mapping[str, ObservationKind],
+    on_date: date,
+    as_of: date,
+    spendable: frozenset[SpendableEndpoint],
+) -> WayOutCost | RouteUnusable:
+    """Cost one dated amount out along one declared way out, from where it actually is.
+
+    Pure, like :func:`cost_one`, and with the same two dates meaning the same two things:
+    ``on_date`` is when this amount moves -- which for a way out is the date the instrument
+    released it, not the date the tuple started -- and ``as_of`` is when the question is asked.
+
+    ``departing_from`` is the ``(venue, currency)`` the money is actually at, and it is
+    **checked** rather than trusted: :func:`_exit_routes` refuses a chain whose first segment
+    departs from anywhere else, naming both sides. That check is the head anchor feature 004
+    shipped without, and it raises here rather than returning a refusal because by this point
+    the caller has already been given the chance to report the mismatch as the *data* problem
+    it is -- a chain reaching this function from somewhere the money is not is a construction
+    error, on ``_routes_for``'s reasoning.
+
+    :data:`~terezy.core.routes.path.EXIT_BY_IDENTITY` costs nothing and takes no time, because
+    there is nothing to do: the instrument released the money somewhere the owner already
+    spends from. It is checked against the declared endpoints all the same -- a bare assertion
+    about the far end is the one claim that must not be taken on trust.
+
+    Returns a :class:`~terezy.core.results.ramp.WayOutCost`, or a
+    :class:`~terezy.core.results.ramp.RouteUnusable` naming the constraint that bound: a
+    segment declared closed on the date, or a leg that will not carry this much. Never an
+    exception for a fact about the money, and never a zero cost standing in for a refusal.
+    """
+    if amount.amount < 0.0:
+        raise ValueError(
+            f"an amount of {amount.amount!r} {amount.currency.value} cannot be moved out "
+            "along an exit chain: a negative movement is not this chain in reverse -- the way "
+            "in is its own declaration (FR-027) -- so a negative amount here is an arithmetic "
+            "error in the caller, and costing it would report a negative cost as a gain"
+        )
+    if isinstance(chain, ExitByIdentity):
+        _reaches_spendable(
+            departing_from,
+            spendable,
+            claim=(
+                "EXIT_BY_IDENTITY says there is nothing to do because the instrument already "
+                "releases its proceeds somewhere the owner spends -- but it"
+            ),
+        )
+        return _way_out(
+            FundingPath(
+                destination_id=departing_from[0],
+                stream_id=stream_id,
+                route_id=_IDENTITY_ROUTE,
+            ),
+            amount,
+            _initial(amount),
+        )
+    resolved = _exit_routes(chain, routes, arrival=departing_from)
+    _reaches_spendable(
+        _arrives_at(resolved[-1]),
+        spendable,
+        claim=f"exit chain {'+'.join(exit_segments_of(chain))!r}",
+    )
+    keyed_by = _way_out_key(resolved, stream_id=stream_id)
+    closed = _closed_exit(resolved)
+    if closed is not None:
+        return _unusable(
+            keyed_by,
+            "route.status",
+            f"exit route {closed.id!r} is declared closed, so it carries nothing on "
+            f"{on_date.isoformat()}. The way out is declared and is not usable, which is a "
+            "different fact from nobody having declared one, and the exclusion is recorded "
+            "rather than silent (FR-014).",
+            segment=Segment(
+                position=next(
+                    position for position, route in enumerate(resolved) if route.id == closed.id
+                ),
+                route_id=closed.id,
+            ),
+        )
+    walked = _walk(
+        _exit_chain(resolved, position_from=0, index_from=0),
+        _initial(amount),
+        path=keyed_by,
+        sending=amount.currency,
+        channels=channels,
+        kinds=kinds,
+        on_date=on_date,
+        as_of=as_of,
+    )
+    if isinstance(walked, RouteUnusable):
+        return walked
+    return _way_out(keyed_by, amount, walked)
