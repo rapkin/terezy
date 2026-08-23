@@ -107,17 +107,17 @@ estimated one's gain, tax and every derived figure are marked and the known one'
 
 ### Tests for User Story 2 (write first)
 
-- [ ] T011 [P] [US2] SC-003 / FR-007: `tests/contract/test_estimated_basis_propagates.py` — 100% of
+- [x] T011 [P] [US2] SC-003 / FR-007: `tests/contract/test_estimated_basis_propagates.py` — 100% of
       the tax figures downstream of an estimated-basis lot carry the mark (`pit`, `levy`, `total`,
       `taxable_base`, the charge's provenance), the known-basis twin carries none of it, and a lot
       resting on both an estimated basis and an unverified observation shows both
-- [ ] T012 [P] [US2] FR-008: the mark states its reason and is distinguishable from an
+- [x] T012 [P] [US2] FR-008: the mark states its reason and is distinguishable from an
       unverified-observation mark — `is_basis_estimated` / `basis_estimated_sources` over a
       provenance carrying one of each, in `tests/unit/test_basis_mark.py`
 
 ### Implementation for User Story 2
 
-- [ ] T013 [US2] `basis_estimated`, `BASIS_ESTIMATED_PREFIX`, `is_basis_estimated` and
+- [x] T013 [US2] `basis_estimated`, `BASIS_ESTIMATED_PREFIX`, `is_basis_estimated` and
       `basis_estimated_sources` in `src/terezy/core/ledger/seeds.py`: one `SourceRef` with
       `verified_on=None`, the owner's reason as its citation, and an id namespaced so the mark is
       distinguishable on inspection while propagating by the existing rule
