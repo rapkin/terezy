@@ -52,7 +52,8 @@ CLASSIFIED: Final[frozenset[str]] = frozenset(
         "horizon",
         # The attribution: what each term took, with the call that produced it named.
         "parts",
-        # Money that made the trip and bought nothing. Reported, and outside the rate.
+        # Money that made the trip and bought nothing. Reported, and netted off the outlay
+        # the rate is measured against rather than discounted as a loss.
         "undeployed",
         # The scope statements this module is about.
         "accounts_for",

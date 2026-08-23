@@ -1,8 +1,9 @@
 """How an instrument is reached: the terms a tuple needs that the instrument does not state.
 
-Feature 010 joins a costed route to an instrument purchase, and the join has two seams --
-*the route in ends where the purchase begins* and *the instrument's exit produces a balance
-where the route out starts* (FR-004). Anchoring either one needs a **venue**, and nothing in
+Feature 010 joins a costed route to an instrument purchase, and two of the join's seams are
+*positional* -- *the route in ends where the purchase begins* and *the instrument's exit
+produces a balance where the route out starts* (FR-004). Anchoring either needs a **venue**,
+and nothing in
 ``data/instruments/`` declares one: an ``InstrumentDeclaration`` and a ``FundDeclaration``
 both carry a currency and stop there.
 ``IncomeStream.arrives_at`` is the only non-route declaration in the project that names a

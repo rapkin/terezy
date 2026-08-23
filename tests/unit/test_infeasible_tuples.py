@@ -1,6 +1,7 @@
 """SC-010: below the minimum, fees over the amount, and a remainder -- each reported honestly.
 
-Three shapes of "this does not work", and the failure mode they share is the flattering one:
+Four shapes of "this does not work" -- SC-010's three, and the increment that binds where the
+ticket does not -- and the failure mode they share is the flattering one:
 rounding the amount up to the minimum spends money the owner did not agree to spend, rounding
 it down reports a return on a holding that was never bought, and clamping a negative arriving
 amount to zero makes money vanish with no diagnostic -- which is the predecessor's B13 defect

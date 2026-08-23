@@ -29,8 +29,16 @@ typed refusal naming both sides.
 
 **Rationale.** FR-004. Feature 004 learned this the expensive way: its exit chain was
 anchored at neither end, and money teleported between venues for free with the record still
-reading as a coherent journey. The same failure is available here at two more seams. **Anchor
-both, name both sides in the refusal, and test each seam with a deliberate mismatch.**
+reading as a coherent journey. The same failure is available here at two more *positional*
+seams. **Anchor both, name both sides in the refusal, and test each seam with a deliberate
+mismatch.**
+
+⚙ **Amended 2026-08-24: there is a third seam and it has no venue in it.** A `Candidate`
+carries its own `stream_id` and the way in is costed from that one, while `Tuple.stream_id`
+resolves the stream, keys the way out and appears in every report. Two fields, one fact, and
+nothing compared them until a review found it: a tuple funded on paper from the dollar
+contract income and costed over the free domestic hryvnia route produced complete figures and
+no refusal. Same rule, same remedy -- `FundedFromAnotherStream`, naming both ids.
 
 ## D3 — The hurdle is produced by the same code path as every tuple
 

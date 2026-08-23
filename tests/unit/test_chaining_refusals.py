@@ -1,4 +1,4 @@
-"""FR-004: both seams are anchored, and a mismatch names both sides.
+"""FR-004 and FR-010: every seam is anchored, and a mismatch names both sides.
 
 **This is the part of the join that can be silently wrong**, which is why it is the first
 thing built and the first thing tested (plan.md, Phase 2 note). Everything else in the feature

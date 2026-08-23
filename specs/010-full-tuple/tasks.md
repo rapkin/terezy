@@ -13,7 +13,8 @@ Two findings from Phase 0 reading are recorded here because they change the task
   `FundDeclaration` carry a currency and no venue; `IncomeStream.arrives_at` is the only
   non-route declaration in the repository that names one. So FR-004's seam has no venue to
   anchor against, and the join would be able to check only the currency — which is feature
-  004's unanchored-chain defect, at two more seams. Closing it is a new declaration
+  004's unanchored-chain defect, at two more positional seams (and a third, the funding
+  stream, found by review and closed the same way). Closing it is a new declaration
   (Phase 1), not a new branch in the join.
 - **F2 — a bond declares no purchase price.** `BondTerms` gives a face value; `Holding.cost`
   is *stated* by the caller. A join buying with an arriving amount needs a price per unit,

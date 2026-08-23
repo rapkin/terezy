@@ -2709,23 +2709,30 @@ than a rule to remember.
 The risk class is **declared and never scored**. Scoring it needs a model nobody has declared,
 and an unscored label is honest where a computed number would not be.
 
-### 28.2 The two seams, and what a mismatch refuses
+### 28.2 The three seams, and what a mismatch refuses
 
 ```
+the tuple's stream  ==  the stream the way in is costed from
 stream --[ way in ]--> (venue, currency)  ==  where the purchase happens
 where the proceeds land  ==  (venue, currency) --[ way out ]--> a spendable endpoint
 ```
 
-Both are checked on **venue and currency**, and a mismatch is a typed refusal naming both
-sides. The venue half is the one nothing else guards: two hryvnia venues are identical to a
-currency check, and a way in landing at the wrong one funds a purchase with money that never
+The last two are checked on **venue and currency**, and a mismatch is a typed refusal naming
+both sides. The venue half is the one nothing else guards: two hryvnia venues are identical to
+a currency check, and a way in landing at the wrong one funds a purchase with money that never
 got there.
+
+The first has no venue in it and is the easiest to miss for exactly that reason. A funding
+candidate carries its own stream and the way in is costed from *that* one; the tuple's own is
+what resolves the stream, keys the way out and appears in every report. Two fields, one fact.
+A tuple funded on paper from the dollar contract income and costed over the free domestic
+hryvnia route produced complete, plausible figures and no refusal at all.
 
 Feature 004 shipped an exit chain anchored at neither end. Money moved between venues for
 free and the record still read as a coherent three-hop journey — an arriving amount in one
-currency beside a cost fraction computed in another. Bridging either seam here would be an
+currency beside a cost fraction computed in another. Bridging any of these seams would be an
 invented leg at an invented rate, and it is the most tempting fabrication in the feature
-because the two declarations look adjacent.
+because the declarations look adjacent.
 
 ### 28.3 The purchase is made with what arrived
 
@@ -2935,7 +2942,7 @@ the ramp.
 | Can an assumption be mistaken for an observation? | `tests/contract/test_two_figures_never_blend.py` |
 | Does a stale price index reach the real figure? | `tests/unit/test_cpi_staleness.py` |
 | What does a whole tuple cost, end to end? | `tests/worked_examples/test_full_round_trip.py` |
-| Are both seams really anchored? | `tests/unit/test_chaining_refusals.py` |
+| Are all three seams really anchored? | `tests/unit/test_chaining_refusals.py` |
 | Is the benchmark the same figure it ranks? | `tests/contract/test_the_hurdle_is_a_tuple.py` |
 | Is a new instrument, route, tax class and jurisdiction data-only? | `tests/contract/test_h1_data_only.py` |
 | Does the ramp difference reach the holding? | `tests/unit/test_two_streams_two_outcomes.py` |

@@ -1,8 +1,9 @@
 # How each declared instrument is reached: the terms a tuple needs that the instrument's own
 # declaration does not state.
 #
-# **Why this file exists.** Feature 010 joins a costed route to a purchase, and the join has
-# two seams: the way in must end **where and in the currency** the purchase happens, and the
+# **Why this file exists.** Feature 010 joins a costed route to a purchase, and two of the
+# join's seams are positional: the way in must end **where and in the currency** the purchase
+# happens, and the
 # instrument's proceeds must land **where and in the currency** the way out departs from. An
 # instrument declaration carries a currency and no venue, so without this file both seams
 # could be checked on currency alone — and a way in that ends in the right currency at the

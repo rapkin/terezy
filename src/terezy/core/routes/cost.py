@@ -1380,8 +1380,8 @@ of ``results.coverage.IMPLICIT_REGIME_ID``.
 Junction = _Junction
 """Where value sits: a venue id and a currency code.
 
-Public under this feature's name because the join has two seams to anchor and both are
-stated in exactly these terms -- *the way in ends here, the purchase begins there*. It is
+Public under this feature's name because the join has two *positional* seams to anchor and
+both are stated in exactly these terms -- *the way in ends here, the purchase begins there*. It is
 the same alias the search and the costing already share; naming it once is what stops a
 third spelling of "a venue and a currency" appearing in the layer above.
 """

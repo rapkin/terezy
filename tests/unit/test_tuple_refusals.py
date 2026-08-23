@@ -66,7 +66,8 @@ class TestOneMissingDeclarationPerPart:
         assert "nothing_declares_this" in refusal.what
 
     def test_an_instrument_with_no_access_declaration(self) -> None:
-        # The part this feature added, and the one that makes both seams anchorable. Without
+        # The part this feature added, and the one that makes both venue seams anchorable.
+        # Without
         # it the join could check only the currency -- which is feature 004's defect exactly.
         refusal = _evaluated(fixtures.without_access(fixtures.shipped(), fixtures.OVDP))
         assert isinstance(refusal, DeclarationMissing), refusal

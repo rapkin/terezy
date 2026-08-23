@@ -250,10 +250,10 @@ def evaluate(
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class _Routed:
-    """The way in, costed, with both seams checked and the way out resolved.
+    """The way in, costed, with both venue seams checked and the way out resolved.
 
-    A private carrier for the same reason :class:`_Prepared` is one: it makes "both seams were
-    anchored before anything was bought" a fact about the control flow rather than a rule
+    A private carrier for the same reason :class:`_Prepared` is one: it makes "both venue seams
+    were anchored before anything was bought" a fact about the control flow rather than a rule
     spread over one long function.
     """
 
@@ -272,7 +272,7 @@ def _route_in(
     as_of: date,
     registries: Registries,
 ) -> _Routed | TupleRefused:
-    """Cost the way in, check both seams, and resolve the way out. Nothing is bought yet.
+    """Cost the way in, check both venue seams, and resolve the way out. Nothing is bought yet.
 
     The order matters and is the plan's: the chaining rule first, because it is the part that
     can be silently wrong, and everything after it is a sum of calls that already work.
@@ -574,7 +574,7 @@ def _plan_for(
 
 
 # ---------------------------------------------------------------------------
-# The two seams
+# The two positional seams (the third, the funding stream, is anchored in `_prepare`)
 # ---------------------------------------------------------------------------
 
 
@@ -822,9 +822,10 @@ def _acquire(prepared: _Prepared, path: Candidate, arrived: Money) -> _Acquisiti
                     f"{prepared.declared.id!r} is bought in increments of {increment!r} "
                     f"unit(s) at {price.amount!r} {price.currency.value} each, so "
                     f"{remainder.amount!r} of what arrived bought nothing. It is money that "
-                    "made the trip and is sitting where the purchase was made; it is not in "
-                    "the amount that reaches a spendable endpoint and not in the rate, "
-                    "because bringing it home would need a date nobody declared."
+                    "made the trip and is sitting where the purchase was made: it is not in "
+                    "the amount that reaches a spendable endpoint, because bringing it home "
+                    "would need a date nobody declared, and the rate is measured on what was "
+                    "actually invested rather than charging it as a loss."
                 ),
             )
         ),

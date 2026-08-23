@@ -391,6 +391,10 @@ class RateNotComparable:
     an outlay against a return is a reference, and substituting one for the other would put a
     transaction price where a valuation belongs and quietly change every ranking it touched.
 
+    A remainder the purchase could not deploy joins that first case when it is in a third
+    currency, because it is netted off the outlay: three amounts, and a rate is a rate only
+    over one currency.
+
     The other case is a series with no rate to find: a round trip that returned nothing, or
     whose repatriation charges exceeded what was released. Reported rather than approximated,
     because a rate extrapolated past the bracket would be invented.
