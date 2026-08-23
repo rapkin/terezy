@@ -123,14 +123,24 @@ def _sell(sequence: int, on: date, *, instrument: str, proceeds: float, units: f
     )
 
 
-def _events(*, with_exempt_loss: bool = False) -> tuple[Event, ...]:
-    """The fixture above, optionally with an exempt-security loss beside the 2026 gain."""
+def _events(*, with_exempt_loss: bool = False, with_gain: bool = True) -> tuple[Event, ...]:
+    """The fixture above, with two optional variants each isolating one claim.
+
+    ``with_exempt_loss`` adds an exempt-security loss beside the 2026 gain (SC-005).
+    ``with_gain`` drops the gain year, leaving the carryforward unabsorbed at the horizon so
+    that FR-019's reporting has something to report; a 2026 cash event keeps the ledger's span
+    two years either way, so the quiet-year statement is the same one in both.
+    """
     base = [
         _cash(1, date(2025, 1, 5), 40_000.00),
         _buy(2, date(2025, 1, 5), instrument=TAXABLE, lot="lot-a", cost=10_000.00, units=100.0),
         _buy(3, date(2025, 1, 6), instrument=TAXABLE, lot="lot-b", cost=10_000.00, units=100.0),
         _sell(4, date(2025, 6, 10), instrument=TAXABLE, proceeds=7_000.00, units=100.0),
-        _sell(5, date(2026, 9, 15), instrument=TAXABLE, proceeds=18_000.00, units=100.0),
+        (
+            _sell(5, date(2026, 9, 15), instrument=TAXABLE, proceeds=18_000.00, units=100.0)
+            if with_gain
+            else _cash(5, date(2026, 9, 15), 1.00)
+        ),
     ]
     if with_exempt_loss:
         # 5 000.00 of an exempt security bought in 2025 and sold for 3 000.00 in 2026: a
@@ -189,9 +199,9 @@ def _charges(state: engine.LedgerState, events: tuple[Event, ...]) -> tuple[TaxC
 
 
 def _statements(
-    *, filed_2025: bool, with_exempt_loss: bool = False
+    *, filed_2025: bool, with_exempt_loss: bool = False, with_gain: bool = True
 ) -> tuple[tax_year.AnnualStatement, ...]:
-    events = _renumbered(_events(with_exempt_loss=with_exempt_loss))
+    events = _renumbered(_events(with_exempt_loss=with_exempt_loss, with_gain=with_gain))
     state = _ledger(events)
     built = tax_year.statements(
         state,
@@ -425,3 +435,31 @@ class TestThePaymentMovesToTheNextBusinessDay:
         assert isinstance(outcome, settlement.Settlement), outcome
 
         assert [payment.tax_year for payment in outcome.payments] == [2026]
+
+
+class TestACarryforwardStillOpenAtTheHorizonIsReported:
+    """FR-019. A loss nobody absorbed is a balance, not a rounding error to drop."""
+
+    def test_the_open_balance_is_reported_with_its_origin_year(self) -> None:
+        statements = _statements(filed_2025=True, with_gain=False)
+
+        open_balances = settlement.open_carryforward(statements)
+
+        assert len(open_balances) == 1
+        assert open_balances[0].category == tax_years.INVESTMENT
+        assert_money_close(open_balances[0].open_balance, _uah(LOSS))
+        assert [year for year, _ in open_balances[0].origins] == [2025]
+
+    def test_the_quiet_year_after_it_still_carries_the_balance(self) -> None:
+        """A statement in a year with no operations says the balance passed through it."""
+        quiet = _investment(_statements(filed_2025=True, with_gain=False), 2026)
+
+        assert quiet.charges == ()
+        assert quiet.carryforward is not None
+        assert_money_close(quiet.carryforward.brought_in, _uah(LOSS))
+        assert_money_close(quiet.carryforward.open_balance, _uah(LOSS))
+        assert quiet.carryforward.filed is None
+
+    def test_an_absorbed_carryforward_is_reported_as_nothing_open(self) -> None:
+        """The other half: a balance of zero is not listed, because nothing is open."""
+        assert settlement.open_carryforward(_statements(filed_2025=True)) == ()

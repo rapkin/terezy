@@ -1616,3 +1616,183 @@ class InflationAssumptionFile(BaseModel):
     model_config = STRICT
 
     inflation_assumption: InflationAssumptionTable
+
+
+# ---------------------------------------------------------------------------
+# 009-tax-depth: how a tax year is assembled, and the owner's positions on it
+# ---------------------------------------------------------------------------
+#
+# Two declarations of opposite epistemic kinds again, and split the same way 007's were.
+#
+# `data/tax/timing/<jurisdiction>.toml` is **cited law**: which category a class belongs to,
+# whether that category nets, what a loss in it does, when the money is due, and what each
+# basis method stands on. It sits under `data/tax/`, so `scripts/check_provenance.py` requires
+# a citation on every table carrying a number -- which is why the deadlines are declared as
+# month and day integers rather than as an `"08-01"` string. The gate counts numeric leaves,
+# and a legal value that reaches the engine as text would sit outside it.
+#
+# `data/scenarios/tax/<owner>.toml` is the **owner's own**: whether he filed, and which branch
+# of an unanswered legal question this run takes. It carries `is_assumption = true` where an
+# observation carries a source, on `TransitionTable`'s precedent.
+#
+# Same three settings as every model above, and the same standing rule: **zero field
+# defaults**. A missing filing decision must fail rather than read as `false`.
+
+
+class TimingCategoryTable(BaseModel):
+    """``[[timing.category]]`` -- how one income category's year is put together."""
+
+    model_config = STRICT
+
+    id: str
+    treatment: str
+    """``nets``, ``per_event`` or ``outside``. Resolved by the loader against the core's closed
+    set, so an unrecognised value names the file and lists what would have worked."""
+
+    carryforward: str
+    """``unlimited`` or ``none``. What a negative annual result does."""
+
+    settlement: str
+    """``self_assessed`` or ``withheld_at_source``. FR-003 asks for the timing behaviour of a
+    tax class as declared data, and this is it: a class names its category, the category names
+    its settlement, so a withheld-at-source class is a data-only addition."""
+
+    declare_by_month: int
+    declare_by_day: int
+    pay_by_month: int
+    pay_by_day: int
+    """The deadlines, in the year **after** the tax year. Four integers rather than one
+    ``"05-01"`` string: a recurring deadline has no year of its own, and the provenance gate
+    sees numbers rather than text."""
+
+    non_business_day_rule: str
+    """The declared convention when a deadline falls on a non-business day (FR-008). Resolved
+    against ``core.primitives.conventions``, so an unrecognised name fails at load."""
+
+    note: str
+    kind: str
+    source: str
+    retrieved_on: str
+    verified_on: str
+
+
+class TimingClassTable(BaseModel):
+    """``[[timing.class]]`` -- which category one declared tax class belongs to.
+
+    A reference rather than an observation, so no citation: the rates are cited where they are
+    declared. Whether the class **resolves** is the resolver's job, since it needs every rate
+    pack parsed first.
+    """
+
+    model_config = STRICT
+
+    tax_class: str
+    category: str
+    note: str
+
+
+class LotMethodTable(BaseModel):
+    """``[[timing.lot_method]]`` -- what the sources say about one basis method.
+
+    Cited even where the finding is that nothing prescribes the method: "no source prescribes
+    this" is a claim about the law, and an uncited one is indistinguishable from nobody having
+    looked.
+    """
+
+    model_config = STRICT
+
+    method: str
+    verdict: str
+    what_the_law_says: str
+    kind: str
+    source: str
+    retrieved_on: str
+    verified_on: str
+
+
+class TimingTable(BaseModel):
+    """``[timing]`` -- the root table of one jurisdiction's assessment rules."""
+
+    model_config = STRICT
+
+    jurisdiction: str
+    tax_currency: str
+    category: list[TimingCategoryTable]
+    lot_method: list[LotMethodTable]
+    class_: list[TimingClassTable] = Field(alias="class")
+    """``class`` is a Python keyword, so the field is aliased. ``populate_by_name`` is off, so
+    the file must spell it ``[[timing.class]]`` and nothing else."""
+
+
+class TimingFile(BaseModel):
+    """A whole ``data/tax/timing/<jurisdiction>.toml``."""
+
+    model_config = STRICT
+
+    timing: TimingTable
+
+
+class FilingTable(BaseModel):
+    """``[[tax_positions.filing]]`` -- was one year's declaration filed?
+
+    No default anywhere, which is the whole content of FR-014: a year with investment
+    operations and no entry stops the run naming the year.
+    """
+
+    model_config = STRICT
+
+    year: int
+    filed: bool
+    note: str
+
+
+class CarryforwardChainTable(BaseModel):
+    """``[tax_positions.carryforward_chain]`` -- the position on an unanswered question."""
+
+    model_config = STRICT
+
+    position: str
+    """``chain_broken_forfeits`` or ``chain_restorable``. Neither is a default."""
+
+    question: str
+    rationale: str
+    resolution_path: str
+    """What would retire the label. An individual tax consultation, and nothing less."""
+
+    is_assumption: bool
+
+
+class SelfDeclarantMethodTable(BaseModel):
+    """``[tax_positions.self_declarant_method]`` -- which source-backed method this run reads
+    as governing a self-declaring individual."""
+
+    model_config = STRICT
+
+    method: str
+    question: str
+    rationale: str
+    resolution_path: str
+    is_assumption: bool
+
+
+class TaxPositionsTable(BaseModel):
+    """``[tax_positions]`` -- the owner's own tax statements for one run."""
+
+    model_config = STRICT
+
+    owner_id: str
+    is_synthetic: bool
+    """Required, on ``seeds`` and ``goals``' precedent: a label only a human can read cannot be
+    checked by anything (`data/README.md` rule 5)."""
+
+    filing: list[FilingTable]
+    carryforward_chain: CarryforwardChainTable
+    self_declarant_method: SelfDeclarantMethodTable
+
+
+class TaxPositionsFile(BaseModel):
+    """A whole ``data/scenarios/tax/<owner>.toml``."""
+
+    model_config = STRICT
+
+    tax_positions: TaxPositionsTable

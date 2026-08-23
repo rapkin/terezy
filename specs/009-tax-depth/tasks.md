@@ -67,12 +67,12 @@ golden**.
 
 ### The declarations
 
-- [ ] T016 [P] Append the `009-tax-depth` banner and the timing/category/method schema models to `src/terezy/data/declarations/schema.py` (`extra="forbid"`, `strict=True`, no defaults)
-- [ ] T017 [P] Append the `009-tax-depth` banner and the tax-scenario schema models (filing decisions, unsettled positions) to `src/terezy/data/declarations/schema.py`
-- [ ] T018 Append `timing_from_file` and `tax_positions_from_file` to `src/terezy/data/declarations/loader.py` under a `009-tax-depth` banner, every failure naming the file and the field
-- [ ] T019 Append `tax_rules_from_data_root` and `tax_positions_from_data_root` to `src/terezy/data/declarations/resolver.py` under a `009-tax-depth` banner, resolving class → category references across files
-- [ ] T020 [P] Write `data/tax/timing/ua.toml`: the declaration and payment deadlines, the non-business-day convention, the income categories with their netting treatment and carryforward rule, the settlement behaviour per class, and the four lot methods' legal standing — every table cited, `verified_on` empty
-- [ ] T021 [P] Write `data/scenarios/tax/owner-001.toml`: the owner's per-year filing decisions and the two unsettled positions, labelled as beliefs with the ІПК (ст. 52 ПКУ) recorded as the resolution path
+- [X] T016 [P] Append the `009-tax-depth` banner and the timing/category/method schema models to `src/terezy/data/declarations/schema.py` (`extra="forbid"`, `strict=True`, no defaults)
+- [X] T017 [P] Append the `009-tax-depth` banner and the tax-scenario schema models (filing decisions, unsettled positions) to `src/terezy/data/declarations/schema.py`
+- [X] T018 Append `timing_from_file` and `tax_positions_from_file` to `src/terezy/data/declarations/loader.py` under a `009-tax-depth` banner, every failure naming the file and the field
+- [X] T019 Append `tax_rules_from_data_root` and `tax_positions_from_data_root` to `src/terezy/data/declarations/resolver.py` under a `009-tax-depth` banner, resolving class → category references across files
+- [X] T020 [P] Write `data/tax/timing/ua.toml`: the declaration and payment deadlines, the non-business-day convention, the income categories with their netting treatment and carryforward rule, the settlement behaviour per class, and the four lot methods' legal standing — every table cited, `verified_on` empty
+- [X] T021 [P] Write `data/scenarios/tax/owner-001.toml`: the owner's per-year filing decisions and the two unsettled positions, labelled as beliefs with the ІПК (ст. 52 ПКУ) recorded as the resolution path
 
 **Checkpoint**: the ledger has a payment kind, a charge moves no cash, 001's golden has not
 moved, and both new declarations load.
@@ -111,7 +111,7 @@ of the carryforward.
 - [X] T028 (test) [US2] Hand-compute the loss-year-then-gain-year fixture in both branches in `tests/worked_examples/test_loss_carryforward.py`, with the arithmetic checked in and the difference asserted against the carryforward's own value (SC-001, SC-010)
 - [X] T029 (test) [P] [US2] Assert PIT and the levy are both computed from the **same netted, carryforward-reduced base** and reported as separate lines, and that a negative year yields two zeros citing the netting, in `tests/worked_examples/test_loss_carryforward.py` (SC-011)
 - [X] T030 (test) [P] [US2] Assert an exempt-security (OVDP) loss beside taxable gains changes neither the taxable result nor the tax, and appears nowhere in the netting, in `tests/worked_examples/test_loss_carryforward.py` (SC-005)
-- [ ] T031 (test) [P] [US2] Assert a scenario reaching a year with investment operations and no declared filing decision refuses, naming the year, in `tests/contract/test_tax_declaration_loading.py` (FR-014)
+- [X] T031 (test) [P] [US2] Assert a scenario reaching a year with investment operations and no declared filing decision refuses, naming the year, in `tests/contract/test_tax_declaration_loading.py` (FR-014)
 - [X] T032 (test) [P] [US2] Assert both chain-continuity branches produce their own hand-computed figure and that each figure carries the unsettled label, in `tests/contract/test_unsettled_is_labelled.py` (FR-015, SC-012)
 - [X] T033 [US2] Implement netting, the carryforward ledger and the forfeiture figure in `src/terezy/core/tax/year.py`, per declared category treatment and declared carryforward rule
 - [X] T034 [US2] Implement the chain-continuity switch's two branches in `src/terezy/core/tax/year.py`, labelling every statement whose figures rest on it
@@ -132,7 +132,7 @@ distinct by construction.
 - [X] T036 (test) [US3] Hand-compute the three-lot partial-sale fixture under FIFO, LIFO, average-cost and specific-lot in `tests/worked_examples/test_four_lot_methods.py`, with each method's arithmetic checked in and the four results asserted pairwise distinct (FR-025, SC-002)
 - [X] T037 (test) [P] [US3] Assert the specific-lot refusals — an unknown lot, an exhausted lot, a lot holding too few units — each naming the lot and the shortfall, and never falling back to another method, in `tests/unit/test_ledger_failures.py` (FR-021)
 - [X] T038 (test) [P] [US3] Assert a disposal naming a lot under any method other than specific-lot is a conflict, never a silently ignored hint, in `tests/unit/test_ledger_failures.py` (FR-022)
-- [ ] T039 (test) [P] [US3] Assert an unknown or absent method fails naming the four known methods, in `tests/contract/test_tax_declaration_loading.py` (FR-020)
+- [X] T039 (test) [P] [US3] Assert an unknown or absent method fails naming the four known methods, in `tests/contract/test_tax_declaration_loading.py` (FR-020)
 - [X] T040 [US3] Implement `basis_consumed` and the four selection functions in `src/terezy/core/ledger/lots.py` — all four together, where the existing two live (research.md D10) — with average cost consuming pro rata over the packet and specific lot consuming exactly the named lot
 - [X] T041 [US3] Widen `_check_closing` in `src/terezy/core/ledger/events.py` so a named lot is a specific-lot request rather than a refusal, and move the method conflict to where the method is known
 - [X] T042 (test) [P] [US3] Draw all four methods into the conservation properties in `tests/invariants/test_ledger_conservation.py` (SC-006, FR-023)
@@ -166,10 +166,10 @@ deferral.
 **Independent Test**: change a declared due date or carryforward term in data only; payment
 events and netting move with it, with no source change.
 
-- [ ] T047 (test) [P] [US5] Assert a changed due date in a scratch data root moves the payment event with no source change, in `tests/contract/test_tax_declaration_loading.py` (US5 scenario 1)
-- [ ] T048 (test) [P] [US5] Assert the whole misdeclaration battery fails naming file, field or declaration — missing method, unknown method, missing filing decision, missing due-date rule, malformed carryforward declaration, unknown non-business-day convention — in `tests/contract/test_tax_declaration_loading.py` (SC-007, FR-008, FR-018)
-- [ ] T049 (test) [P] [US5] Assert an unverified legal value marks 100% of the figures derived from it — annual liabilities, payment amounts, forfeitures — in `tests/contract/test_provenance_propagation.py` (SC-008, FR-027)
-- [ ] T050 (test) [P] [US5] Assert a foreign-currency taxable event refuses, naming the missing official-rate machinery rather than converting at a channel rate, in `tests/contract/test_tax_declaration_loading.py` (plan.md's boundary)
+- [X] T047 (test) [P] [US5] Assert a changed due date in a scratch data root moves the payment event with no source change, in `tests/contract/test_tax_declaration_loading.py` (US5 scenario 1)
+- [X] T048 (test) [P] [US5] Assert the whole misdeclaration battery fails naming file, field or declaration — missing method, unknown method, missing filing decision, missing due-date rule, malformed carryforward declaration, unknown non-business-day convention — in `tests/contract/test_tax_declaration_loading.py` (SC-007, FR-008, FR-018)
+- [X] T049 (test) [P] [US5] Assert an unverified legal value marks 100% of the figures derived from it — annual liabilities, payment amounts, forfeitures — in `tests/contract/test_provenance_propagation.py` (SC-008, FR-027)
+- [X] T050 (test) [P] [US5] Assert a foreign-currency taxable event refuses, naming the missing official-rate machinery rather than converting at a channel rate, in `tests/contract/test_tax_declaration_loading.py` (plan.md's boundary)
 
 **Checkpoint**: Principle II holds for everything this feature declared.
 
