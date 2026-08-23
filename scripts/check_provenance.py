@@ -80,8 +80,30 @@ EXEMPT_DIRS: dict[str, str] = {
         "attached to a venue lives on a leg, in data/routes/, cited (003 research.md D4)"
     ),
     "user": (
-        "gitignored per-user data -- holdings, goals, results. Never curated, never "
-        "committed, and outside this gate by the Principle VII boundary"
+        "gitignored per-user data -- what a *run produces* rather than what a person declares: "
+        "results, caches, scratch output. Never curated, never committed, and outside this gate "
+        "by the Principle VII boundary. The owner's own declarations are committed and live in "
+        "the per-owner directories above (008 research.md D2)"
+    ),
+    # --- feature 008: the owner's own holdings and targets ---
+    "seeds": (
+        "the owner's own opening lots -- what he already holds, what he paid, and whether he "
+        "knows the price or is stating it from memory. What a person paid for a lot is his own "
+        "record rather than an observation of the world, so there is nothing for a source to "
+        "vouch for: the same exemption `objectives`, `strategies`, `streams` and `spendable` "
+        'carry. A cost he is unsure of is not uncited, it is *marked* -- `basis = "estimated"` '
+        "puts a propagating mark on the gain and on the tax charged on it, which is the honest "
+        "answer where a citation is not available to anybody (008 research.md D2). If a market "
+        "*value* ever has to live here it moves to a sourced directory rather than this "
+        "exemption widening to cover it"
+    ),
+    "goals": (
+        "the owner's own targets -- a sum, a date, a contribution. A target is a decision, not "
+        "an observation, so there is nothing for a source to vouch for: the same exemption "
+        "`objectives` and `strategies` carry, and for the same reason. The growth assumption a "
+        "goal is evaluated against is deliberately *not* declared here (008 FR-012); it is an "
+        "input carrying its own provenance, so no rate this gate would want to check ever "
+        "lands in this directory"
     ),
 }
 

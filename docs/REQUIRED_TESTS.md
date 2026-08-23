@@ -103,7 +103,7 @@ xfailed, or deleted without an amendment.
 | E8 | The same scenario under jurisdiction A vs B differs only in the tax terms; the gross market outcome is bit-identical. | `[ ]` |
 | E9 | A residency change mid-simulation is applied by date, including positions held across the change. | `[ ]` |
 | E11 | A **zero** tax figure distinguishes *exempted* from *not applicable* when rendered. The engine already separates them — a taxable event's zero cites its tax class, a non-taxable row's zero cites nothing because there is nothing to cite — but a reader looking at a schedule table sees `0.00` on every row either way. A presentation requirement for the waterfall (spec §5.3), recorded here so the distinction the engine preserves is not thrown away at the last step. | `[ ]` |
-| E10 | A rate declared as a **dated schedule** changes on its effective date, so a legislated change is modelled rather than requiring a rebuild. **Closed by feature 006:** the scalar rate was removed, not deprecated, and `data/README.md` rule 3 and `SIMULATOR_SPEC.md` §4.5.1 are now satisfied. An event before a schedule's earliest cited entry is a typed refusal rather than a defaulted rate — see `docs/METHODOLOGY.md` §23.2 on why that refusal is what makes an honest schedule writable. | `[x]` `tests/worked_examples/test_rate_schedule_straddle.py`, with the boundary in `tests/unit/test_rate_lookup_boundary.py` and the refusals in `tests/unit/test_schedule_refusals.py` |
+| E10 | A rate declared as a **dated schedule** changes on its effective date, so a legislated change is modelled rather than requiring a rebuild. **Closed by feature 006:** the scalar rate was removed, not deprecated, and `data/README.md` rule 3 and `SIMULATOR_SPEC.md` §4.5.1 are now satisfied. An event before a schedule's earliest cited entry is a typed refusal rather than a defaulted rate — see `docs/METHODOLOGY.md` §25.2 on why that refusal is what makes an honest schedule writable. | `[x]` `tests/worked_examples/test_rate_schedule_straddle.py`, with the boundary in `tests/unit/test_rate_lookup_boundary.py` and the refusals in `tests/unit/test_schedule_refusals.py` |
 
 ## F. FX, display currency, and asymmetry
 
@@ -153,8 +153,8 @@ Compliance tests for Principle II. May not be skipped without an amendment.
 
 | # | Example | Test |
 |---|---|---|
-| J1 | The three goal modes are mutually consistent: solving for date from (contribution, sum) and then for sum from (contribution, that date) returns the original sum. | `[ ]` |
-| J2 | A seed lot with a known basis produces the hand-computed gain on disposal; a basis-estimated seed marks every downstream tax figure. | `[ ]` |
+| J1 | The three goal modes are mutually consistent: solving for date from (contribution, sum) and then for sum from (contribution, that date) returns the original sum. | `[x]` `tests/invariants/test_goal_mode_consistency.py`, `tests/worked_examples/test_goal_arithmetic.py` |
+| J2 | A seed lot with a known basis produces the hand-computed gain on disposal; a basis-estimated seed marks every downstream tax figure. | `[x]` `tests/worked_examples/test_seeded_disposal.py`, `tests/contract/test_estimated_basis_propagates.py` |
 | J3 | Redemption outside an Inzhur window is refused, or executed at the stated haircut when allowed — taxed correctly either way. ⚙ **The wording is annotated rather than reinterpreted.** The funds' primary documents, read in full on 2026-08-22, show that **no redemption windows exist**: legally neither fund owes a buyback before its termination date, an earlier exit is at the manager's discretion, and the same-day buyback at NAV is a revocable company practice (006 spec FR-015). The row's substance is preserved over those declared liquidity terms — refuse, or execute at the declared discount, taxed on the proceeds actually received either way. | `[x]` `tests/worked_examples/test_fund_liquidity.py` |
 | J4 | A lock-up longer than the horizon is a feasibility error, not a silent simulation. | `[~]` `tests/worked_examples/test_fund_liquidity.py::TestAGuaranteedExitBeforeTerminationIsAFeasibilityFinding` and `::TestCaseThreeTheBuybackIsNotOnOffer` — a fund whose only guaranteed exit is its termination surfaces that as a finding on the result, and a redemption the terms do not owe is refused with the holding left open. **Not claimed closed:** a declared `lock_up_months` term and a horizon-versus-lock-up check do not exist, and 006's spec deliberately did not claim this row |
 | J5 | Correlated stress hits OVDP, Inzhur and UAH simultaneously, never as independent draws. | `[ ]` |
@@ -220,6 +220,15 @@ Feature 002's **SC-014** — no exit route means no round-trip figure, and the d
 excluded from comparison — is likewise extended rather than restated: the exclusion becomes
 *visible*, as an explicitly absent edge and a `NO EXIT DECLARED` mark on the destination,
 never an omission. `tests/contract/test_diagram_refusals.py`.
+
+**008-seed-and-goals** closes **J1** and **J2** above. Four rows it reinforces without closing:
+
+| Row | How, and why the box does not move |
+|---|---|
+| **C1–C3** | The conservation properties now draw ledgers that **open from declared seed lots** as well as unseeded ones, and **not one of the properties changed** to accommodate them — which is the executable form of the feature's central claim that a seed is an ordinary ledger citizen. `tests/invariants/seeded_streams.py` builds them through `seeds.opening_events` rather than by hand, so the invariants cover the events the engine actually produces. The rows were already flipped by 001; this widens their inputs. |
+| **E5** | Pressed on from a new direction: the propagating mark now describes the *owner's own memory* rather than only a market observation, and it reaches the tax through the transforms that already existed rather than through a second system. `tests/contract/test_estimated_basis_propagates.py` sweeps every money field of `TaxCharge` from the dataclass, so a field added later is inside the 100% claim. The row's own test stays `tests/contract/test_provenance_propagation.py`. |
+| **B10** | Exercised again, and deliberately in the opposite direction from 003: no seeds and no goals is an **ordinary run**, not a typed empty outcome, because an absent holding cannot be mistaken for a mistyped path. `tests/contract/test_empty_seeds_and_goals.py`. The row is about insufficient data anywhere in the engine, so one feature's rule about emptiness does not close it. |
+| **H2** | Two new declarations fail at load naming file and field for every refusal in their contract, on the existing loader path: `tests/contract/test_seed_declaration_loading.py`, `tests/contract/test_goal_declaration_loading.py`. The row's own test stays `tests/contract/test_declaration_loading.py`. |
 
 ---
 

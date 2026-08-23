@@ -50,11 +50,13 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
 
     from terezy.core.instruments.fund import FundDeclaration
     from terezy.core.instruments.interface import InstrumentDeclaration
+    from terezy.core.ledger.seeds import SeedLot
     from terezy.core.primitives.currency import Currency
     from terezy.core.primitives.money import Money
     from terezy.core.primitives.staleness import ObservationKind
     from terezy.core.results.composed import SegmentBound
     from terezy.core.results.coverage import SpendableEndpoint
+    from terezy.core.results.goal import Goal
     from terezy.core.routes.channels import FxChannel
     from terezy.core.routes.legs import Leg, Route
     from terezy.core.routes.venues import Venue
@@ -1725,3 +1727,239 @@ def _kind_of(path: Path) -> str:
             f"one of: {', '.join(sorted(instrument_registry.DECLARATION_KINDS))}",
         )
     return declared
+
+
+# ---------------------------------------------------------------------------
+# 008-seed-and-goals: the owner's opening lots and targets, resolved as one life
+# ---------------------------------------------------------------------------
+#
+# Two new declarations and three relations no single file can check about itself:
+#
+# * **a seed's instrument must be declared** (FR-005) -- the reference resolves only against
+#   the whole curated set, which is what this module exists to hold;
+# * **a goal's currency must be the run's base currency** (FR-016) -- a base currency is a
+#   property of the run rather than of the file, the same reading `_check_spendable` already
+#   applies to a spendable endpoint;
+# * **the two files must name the same owner** -- one run holds one person's life
+#   (Principle VII), and resolving somebody's holdings beside somebody else's target would
+#   produce a report whose every figure was arithmetically correct and about nobody.
+#
+# ⚙ **An absent or empty directory is *not* an error here**, and this is the only declaration
+# family in the project of which that is true (008 FR-024, research.md D9). `composition`
+# refuses the same shape and the contrast is deliberate: the absence of a segment bound is the
+# absence of a policy a search cannot proceed without, while the absence of a holding is a
+# perfectly ordinary financial position. Refuse emptiness where it cannot be told from an
+# error; accept it where it can.
+#
+# What is deliberately **not** checked here: whether a lot was acquired before its instrument
+# existed. That is a well-formed declaration of an impossible history and it is the engine's
+# typed `InconsistentTerms`, on the precedent of a maturity on or before its issue date --
+# `core.ledger.seeds.opening_events` reports it.
+
+SEEDS_DIR = "seeds"
+"""Where the owner's declared opening lots live under a data root.
+
+**Per-owner, beside `streams/`, `spendable/` and `composition/`**, and not at the root beside
+curated `venues.toml` -- the Principle VII boundary made structural (008 research.md D2).
+"""
+
+GOALS_DIR = "goals"
+"""Where the owner's declared targets live under a data root."""
+
+
+@dataclass(frozen=True, slots=True)
+class SeedAndGoalDeclarations:
+    """One owner's holdings and targets, resolved against the curated declarations.
+
+    A record beside :class:`Declarations` rather than more fields on it, on the precedent
+    :class:`CoverageDeclarations` and :class:`CompositionDeclarations` set: the three describe
+    different runs, and folding seeds into the instrument set would make every existing caller
+    require files this feature invented.
+    """
+
+    owner_id: str | None
+    """Whose declarations these are, or ``None`` when neither file exists.
+
+    ``None`` is a real state and not a missing value: it says *nobody declared anything*, which
+    is what a data root with no per-owner holdings and no per-owner goals means. It is not a
+    default owner and it is not an error (FR-024).
+    """
+
+    seeds: tuple[SeedLot, ...]
+    """The declared opening lots, in file order. Empty is ordinary."""
+
+    goals: tuple[Goal, ...]
+    """The declared targets, in file order. Empty is ordinary."""
+
+    seed_file: Path | None
+    """Which file declared the lots, or ``None`` if none did.
+
+    Not decoration: it is what lets a later failure name the file after the TOML has been
+    discarded -- and what a test asserting the Principle VII boundary points at.
+    """
+
+    goal_file: Path | None
+    """Which file declared the targets, or ``None`` if none did."""
+
+
+def _check_seed_instruments(
+    declared: Sequence[SeedLot],
+    instruments: Mapping[str, InstrumentDeclaration],
+    *,
+    path: Path,
+) -> None:
+    """FR-005: every seed names a curated instrument, or the load fails naming both.
+
+    ``core.ledger.seeds.opening_events`` refuses the same thing as a typed
+    ``SeedInstrumentUndeclared``, for a caller that assembles lots without a file. Both exist
+    on :class:`UnresolvedTaxClass`'s precedent, and for its reason: the core cannot name a file
+    it never saw, and FR-005 asks for the file.
+    """
+    for position, lot in enumerate(declared):
+        if lot.instrument_id in instruments:
+            continue
+        raise DeclarationError(
+            path,
+            f"{loader.SEED_TABLE}[{position}].instrument_id",
+            f"names the instrument {lot.instrument_id!r}, which no curated declaration "
+            f"defines. Declared instruments: {sorted(instruments)}. No placeholder is created "
+            "for it: every figure derived from a holding of an invented instrument would be a "
+            "confident answer about something that does not exist.",
+            "correct the id, or declare the instrument under data/instruments/",
+        )
+
+
+def _check_goal_currencies(
+    declared: Sequence[Goal], *, base_currency: Currency, path: Path
+) -> None:
+    """FR-016: a non-base target is refused as **not yet modelled**, never as invalid.
+
+    The distinction is the requirement rather than a nicety. USD is a currency this engine
+    models perfectly well; what is missing is the dated-rate machinery that would make a dollar
+    target comparable with a hryvnia one, and §4.7 is explicit that under devaluation the two
+    are different goals rather than one goal in two denominations. A reader told "invalid
+    currency" would go and edit a file that is correct.
+    """
+    for position, goal in enumerate(declared):
+        if goal.currency is base_currency:
+            continue
+        raise DeclarationError(
+            path,
+            f"{loader.GOAL_TABLE}[{position}].currency",
+            f"declares the target {goal.id!r} in {goal.currency.value}, which is **not yet "
+            f"modelled**. The base currency of this run is {base_currency.value}, and "
+            f"restating a {goal.currency.value} target in it needs a dated exchange rate this "
+            "feature does not model -- so the goal is refused rather than converted at a rate "
+            "nobody declared. A target in one currency and the same number in another are "
+            "different goals under devaluation, which is why the field exists at all.",
+            f"declare the target in {base_currency.value} until multi-currency goals land "
+            "(specs/features.toml records them as future work)",
+        )
+
+
+def _check_one_owner(
+    seed_owner: str | None,
+    goal_owner: str | None,
+    *,
+    goal_path: Path | None,
+) -> str | None:
+    """One run holds one person's life (Principle VII), or none at all.
+
+    The error is raised against the *goal* file because the seed file is resolved first and is
+    therefore the one already in force; naming the second file is what sends the reader to the
+    line they are most likely to have just written.
+    """
+    if seed_owner is None:
+        return goal_owner
+    if goal_owner is None or goal_owner == seed_owner:
+        return seed_owner
+    if goal_path is None:  # pragma: no cover -- a goal owner implies a goal file
+        raise AssertionError("a goal owner was resolved without a goal file")
+    raise DeclarationError(
+        goal_path,
+        f"{loader.OWNER_TABLE}.id",
+        f"declares owner {goal_owner!r}, but the holdings resolved in this run belong to "
+        f"{seed_owner!r}. Measuring one person's portfolio against another person's target "
+        "would produce a report in which every figure was arithmetically correct and none of "
+        "it was about anybody.",
+        f"name {seed_owner!r}, or resolve this goal against that owner's holdings",
+    )
+
+
+def resolve_seeds_and_goals(
+    *,
+    seed_file: Path | None,
+    goal_file: Path | None,
+    instruments: Mapping[str, InstrumentDeclaration],
+    base_currency: Currency,
+) -> SeedAndGoalDeclarations:
+    """The owner's declared holdings and targets, checked against the curated set and the run.
+
+    Either file may be ``None``, and both may be: that is a person who holds nothing and wants
+    nothing in particular, which is an ordinary state rather than a refusal (FR-024).
+    """
+    seed_owner: str | None = None
+    goal_owner: str | None = None
+    declared_seeds: tuple[SeedLot, ...] = ()
+    declared_goals: tuple[Goal, ...] = ()
+
+    if seed_file is not None:
+        seed_owner, declared_seeds = loader.seeds_from_file(seed_file, base_currency=base_currency)
+        _check_seed_instruments(declared_seeds, instruments, path=seed_file)
+    if goal_file is not None:
+        goal_owner, declared_goals = loader.goals_from_file(goal_file)
+        _check_goal_currencies(declared_goals, base_currency=base_currency, path=goal_file)
+
+    return SeedAndGoalDeclarations(
+        owner_id=_check_one_owner(seed_owner, goal_owner, goal_path=goal_file),
+        seeds=declared_seeds,
+        goals=declared_goals,
+        seed_file=seed_file,
+        goal_file=goal_file,
+    )
+
+
+def _at_most_one(root: Path, directory: str) -> Path | None:
+    """The single declaration in a per-owner directory, or ``None`` if there is none.
+
+    **Zero is ordinary and two is refused**, which is the same split every other per-owner
+    directory makes at the top end and the opposite of what they make at the bottom. Two
+    owners' declarations cannot both be in force -- merging them would put two people's
+    holdings in one ledger -- while nobody's declarations being present is simply a person who
+    has not declared any.
+    """
+    declared = sorted((root / directory).glob("*.toml"))
+    if not declared:
+        return None
+    if len(declared) > 1:
+        raise DeclarationError(
+            root / directory,
+            "",
+            f"holds {len(declared)} declarations "
+            f"({', '.join(path.name for path in declared)}), and this engine resolves one. "
+            "There is exactly one owner today (spec Assumptions), and two owners' holdings or "
+            "targets cannot both be in force: merging them would put two people's money in one "
+            "ledger, and every figure would describe a portfolio nobody has.",
+            "keep one file per data root until multi-owner support lands",
+        )
+    return declared[0]
+
+
+def seeds_and_goals_from_data_root(
+    root: Path, *, base_currency: Currency
+) -> SeedAndGoalDeclarations:
+    """One owner's holdings and targets under a data root, resolved against its instruments.
+
+    The instrument set comes from :func:`from_data_root`, so a seed is checked against exactly
+    the declarations a projection would run with rather than against a set assembled twice.
+
+    **A missing ``seeds/`` or ``goals/`` directory is not an error** (FR-024), unlike every
+    other family. See this section's banner for why the two cases are different rather than
+    inconsistent.
+    """
+    return resolve_seeds_and_goals(
+        seed_file=_at_most_one(root, SEEDS_DIR),
+        goal_file=_at_most_one(root, GOALS_DIR),
+        instruments=from_data_root(root).instruments,
+        base_currency=base_currency,
+    )

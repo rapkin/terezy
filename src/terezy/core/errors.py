@@ -162,6 +162,39 @@ class UnresolvedTaxClass:
     """Plain-language statement, for the output (FR-017)."""
 
 
+@dataclass(frozen=True, slots=True)
+class SeedInstrumentUndeclared:
+    """A declared opening lot names an instrument no curated declaration defines.
+
+    FR-005 of feature 008, and the same refusal shape :class:`UnresolvedTaxClass` has, for
+    the same reason: the alternative is inventing a placeholder instrument, and every figure
+    derived from a holding of a made-up instrument would be a confident answer about
+    something that does not exist.
+
+    ⚙ **Here rather than in ``core.results.goal``**, which plan.md's file map names as the
+    home of this feature's six refusals. The other five are goal outcomes and live there; this
+    one is returned by ``core.ledger.seeds``, and putting it in a results module would make
+    ``core.ledger`` import ``core.results`` -- backwards, since a result is built *from* the
+    ledger. ``core.errors`` is where every other domain failure in the core already lives, and
+    the seed opening also returns :class:`InconsistentTerms` from this module.
+
+    The loader refuses the same thing earlier, naming the file and the field
+    (``data.declarations.resolver``), which is what FR-005's "at load time" asks for. Both
+    exist on :class:`UnresolvedTaxClass`'s precedent: the resolver catches it where the
+    message can name a file, and the core refuses it where a caller might assemble seeds
+    without going through a file at all.
+    """
+
+    instrument_id: str
+    """The instrument the seed named and no declaration defines."""
+
+    lot_id: str
+    """Which declared lot named it, so the reader is sent to one entry rather than a file."""
+
+    reason: str
+    """Plain-language statement, for the output (FR-017)."""
+
+
 InstrumentFailure = InfeasiblePurchase | InconsistentTerms
 """What an instrument operation may fail with.
 
@@ -182,5 +215,14 @@ and from "the wrong class", and it is in the union so every consumer must match 
 exhaustively rather than inherit a default (FR-012, research.md D2).
 """
 
-DomainFailure = InstrumentFailure | TaxFailure
+SeedFailure = SeedInstrumentUndeclared | InconsistentTerms
+"""What opening a ledger from declared seed lots may fail with (feature 008).
+
+``InconsistentTerms`` appears in two unions because it is genuinely the same failure in both:
+two declared facts that cannot both hold. A lot acquired before its instrument was issued,
+or after the projection it opens, is exactly that -- and giving the seed path a private copy
+of the record would mean two types a caller has to learn for one claim.
+"""
+
+DomainFailure = InstrumentFailure | TaxFailure | SeedFailure
 """Every domain failure in the core. Match exhaustively; see the module docstring."""

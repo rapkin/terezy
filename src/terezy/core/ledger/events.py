@@ -163,6 +163,23 @@ class CausationKind(Enum):
     traceable figure pointing at the wrong declaration.
     """
 
+    SEED_DECLARATION = "seed_declaration"
+    """A declared opening lot: what the owner already held when the projection started.
+
+    ⚙ **The fourth member, added with feature 008.** It passes the test the docstring above
+    sets rather than widening it: a seed declaration is *a kind of declaration resolvable
+    back to the file it was read from* -- ``id`` is the declaration reference the loader
+    built from the file and the entry (``seeds/owner-001.toml#seed[0]``), so a reader who
+    asks where an opening lot came from is sent to the line that declares it.
+
+    What it is emphatically not is the catch-all the docstring forbids. It cannot become the
+    place an untracked event ends up, because exactly one function produces it
+    (``core.ledger.seeds.opening_events``) and that function is reached only from a declared
+    seed. The alternative was worse than a fourth member: an opening lot claiming an
+    instrument term as its cause would be a traceable figure pointing at the wrong
+    declaration, sending a reader to a coupon term that has nothing to do with the lot.
+    """
+
 
 @dataclass(frozen=True, slots=True)
 class CausationRef:

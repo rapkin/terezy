@@ -1256,3 +1256,162 @@ class CompositionFile(BaseModel):
     owner: OwnerTable
 
     composition: CompositionTable
+
+
+# ---------------------------------------------------------------------------
+# 008-seed-and-goals: the owner's opening lots, and what the money is for
+# ---------------------------------------------------------------------------
+#
+# Two new declarations, and the first two that live *wholly* on the private side of Principle
+# VII's boundary. Same three settings as every model above, and the same standing rule: **zero
+# field defaults**, with the one qualification the 002 banner already states -- a `X | None =
+# None` is permitted only where the core field it feeds is itself `X | None` and `None` means
+# *the owner declared nothing*. That qualification does real work here: `Goal` declares any
+# *two* of three variables and the third is the question, so all three are nullable in the
+# core record and all three may be omitted in the file. `reason` on a seed is nullable for the
+# same reason -- it is required for an estimated basis and forbidden for a known one, a pairing
+# no pydantic field can express, so the loader owns it and can say which of the two lines is
+# probably wrong.
+#
+# ⚙ **No citation keys, and their absence is the design.** What the owner paid for a lot, and
+# what sum he is aiming at, are his own records rather than observations of the world -- there
+# is nothing for a source to vouch for. It is the same exemption `objectives`, `strategies`,
+# `streams`, `spendable` and `composition` already carry, and `scripts/check_provenance.py`
+# names both directories in `EXEMPT_DIRS` with that reason written out. The gate is fail-closed
+# over the data tree, so absence from `SOURCED_DIRS` is an error rather than an exemption. If a
+# *market value* ever has to live in either file, it moves to a sourced directory instead of
+# the exemption widening.
+#
+# ⚙ **There is deliberately no `currency` key on a seed** (008 FR-010). A cost is in the base
+# currency, full stop: converting a foreign-currency basis needs a rate on the acquisition date
+# and this feature has none, so rather than accept the field and refuse the value, the field
+# does not exist. A file that states one gets the unrecognised-field error, which is a stronger
+# guarantee than a validation rule -- no later change can quietly start converting it.
+#
+# `[owner]` is the shared `OwnerTable` above rather than a copy, as `composition` does: it is
+# the same claim -- whose file this is -- and two models for it would eventually disagree about
+# whether the id may be blank.
+
+
+class SeedTable(BaseModel):
+    """One ``[[seed]]`` entry: a holding the owner already has, as a lot rather than a value.
+
+    §4.8: a seed is *units acquired on a date at a price*, because the tax engine needs lots.
+    "I hold 100 units worth X today" cannot produce a disposal gain at all.
+    """
+
+    model_config = STRICT
+
+    instrument_id: str
+    """Must name a curated instrument declaration. The reference is resolved by the resolver,
+    which holds the whole set; an unknown one fails at load naming the file and the instrument
+    (FR-005), and no placeholder instrument is ever created."""
+
+    quantity: float
+    """Units held. Strictly positive, checked by the loader: a lot may not exist at zero."""
+
+    acquired_on: str
+    """ISO date the units were acquired. What a holding-period rule is measured from, and the
+    date the opening event is recorded on."""
+
+    cost: float
+    """What was paid for these units, in the **base currency** (FR-010). Non-negative.
+
+    Zero is a legitimate declaration -- a gift, a bonus allocation -- and is accepted. What is
+    refused is the field being *absent*, because a zero substituted for a cost nobody stated
+    would make every later disposal compute the wrong gain (FR-006).
+    """
+
+    is_synthetic: bool
+    """``true`` for a fixture whose holding is invented. Required; there is no default.
+
+    The same field and the same argument ``InstrumentTable`` carries, and here it is doing more
+    work than a label. `data/README.md` rule 5 -- the owner's own rule -- permits this file in
+    the repository *because* what ships in it is synthetic, so the claim has to be readable by
+    something other than a human reading a comment. Defaulting it to ``false`` would let a
+    fixture be mistaken for the owner's real position through omission, and the omission runs
+    the wrong way round; defaulting it to ``true`` would let his real holdings be committed
+    while claiming to be invented, which is worse.
+    """
+
+    basis: str
+    """``known`` or ``estimated``, and there is no third value and no default (FR-006).
+
+    Typed ``str`` and resolved by the loader rather than by an enum here, for the reason this
+    module's docstring gives: the loader knows the file and can name the two words that would
+    have worked. Defaulting it to ``known`` would make every forgotten declaration produce a
+    confidently unmarked tax figure, which is the single most expensive omission available in
+    this file.
+    """
+
+    reason: str | None = None
+    """Why the owner does not know the cost. **Required when ``basis = "estimated"`` and
+    forbidden otherwise** -- a pairing the loader checks, because a reason on a known basis
+    means one of the two lines is wrong and guessing which would be inventing a declaration.
+
+    It becomes the citation text of the ``SourceRef`` that marks every figure derived from
+    this lot, including the tax on its disposal, which is why an empty one is refused: a mark
+    that says nothing is a taint flag rather than provenance (FR-008).
+    """
+
+
+class SeedFile(BaseModel):
+    """A whole ``data/seeds/<owner_id>.toml``: one owner's opening lots."""
+
+    model_config = STRICT
+
+    owner: OwnerTable
+
+    seed: list[SeedTable]
+    """May be **empty**, and this is the only declaration list in the project of which that is
+    true (008 FR-024, research.md D9). An empty spendable list makes every exit fail a test it
+    should pass; an empty seed list means the owner holds nothing, which is an ordinary state
+    of affairs and not a mistyped path."""
+
+
+class GoalTable(BaseModel):
+    """One ``[[goal]]`` entry: a target the owner states as any two of three variables."""
+
+    model_config = STRICT
+
+    id: str
+    """Unique within the file. A duplicate is refused at load."""
+
+    is_synthetic: bool
+    """``true`` for a fixture whose target is invented. Required; see :class:`SeedTable`."""
+
+    currency: str
+    """The target's denomination, resolved against the closed ``Currency`` enum. Must be the
+    base currency in this feature; another is refused as *not yet modelled* by the resolver,
+    which is where the run's base currency is known."""
+
+    monthly_contribution: float | None = None
+    """What goes in each month, or omitted when that is the variable to solve for.
+
+    Non-negative: a withdrawal is not a contribution. **Zero is legal** -- a goal reached out
+    of growth on the starting amount alone -- which is why omission and zero mean different
+    things here and the field cannot be defaulted to either.
+    """
+
+    target_sum: float | None = None
+    """How much is wanted, or omitted when that is the question. Strictly positive."""
+
+    target_date: str | None = None
+    """ISO date the target is wanted by, or omitted when that is the question."""
+
+
+class GoalFile(BaseModel):
+    """A whole ``data/goals/<owner_id>.toml``: one owner's targets.
+
+    No growth assumption and no starting amount, deliberately (008 FR-012). Neither is a
+    property of the goal: both are inputs to the evaluation, both carry their own provenance,
+    and a rate written here would silently become "the rate" for every goal in the file.
+    """
+
+    model_config = STRICT
+
+    owner: OwnerTable
+
+    goal: list[GoalTable]
+    """May be empty, for the reason :attr:`SeedFile.seed` may: a person with no stated target
+    is an ordinary person."""
