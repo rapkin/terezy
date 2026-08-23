@@ -23,6 +23,7 @@ from datetime import date
 import pytest
 
 from terezy.core.goals import solve
+from terezy.core.goals.solve import SolveOutcome, projected_value
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
@@ -74,7 +75,7 @@ def _goal(
     )
 
 
-def _outcome(goal: Goal, inputs: GoalInputs | None = None) -> object:
+def _outcome(goal: Goal, inputs: GoalInputs | None = None) -> SolveOutcome:
     return solve.solve(
         goal,
         inputs=inputs if inputs is not None else _inputs(),
@@ -186,12 +187,16 @@ def test_an_unreachable_target_in_the_date_mode_is_the_whole_answer() -> None:
 
 
 def test_a_target_above_the_asymptote_of_a_shrinking_balance_is_unreachable() -> None:
-    """The case a capped horizon would have hidden.
+    """The case a capped horizon would have hidden, and the **rising** shape of decay.
 
     Under a negative growth assumption a fixed contribution settles at a ceiling -- the level
     at which the monthly loss equals the monthly payment -- and a target above it is never
     reached however long the owner waits. A solver that searched forward would return the end
     of its search window and call it a date.
+
+    Here the balance starts at nothing and *rises* towards that ceiling, so "converges towards
+    but never passes" is the true sentence. The neighbouring test covers the other side, where
+    the balance starts above the ceiling and the same sentence would be false.
     """
     outcome = _outcome(
         _goal(contribution=1_000.0, target_sum=5_000_000.0),
@@ -227,6 +232,22 @@ def test_a_target_already_met_needs_no_contribution_and_says_so() -> None:
     assert isinstance(outcome, NoContributionNeeded), outcome
     assert_money_close(outcome.margin, Money(12_682.50301319698, UAH, prov.EMPTY))
     assert outcome.reason.strip()
+
+
+def test_a_target_met_only_after_growth_does_not_credit_the_starting_amount_alone() -> None:
+    """The message names what actually got there, which is the starting amount *and* its growth.
+
+    100 000 does not meet a target of 110 000; 100 000 grown for a year at one percent a month
+    does. Saying "already met by the starting amount alone" is true of the neighbouring case and
+    false of this one -- the same shape of defect as the ceiling sentence above, found by
+    enumerating the paths that make a claim about the balance rather than by hitting it.
+    """
+    outcome = _outcome(_goal(target_sum=110_000.0, target_date=IN_A_YEAR))
+    assert isinstance(outcome, NoContributionNeeded), outcome
+    assert "without paying anything in" in outcome.reason
+    assert "grows to 112682.50301319698" in outcome.reason
+    assert "alone" not in outcome.reason
+    assert_money_close(outcome.margin, Money(2_682.503013196976, UAH, prov.EMPTY))
 
 
 def test_a_target_met_to_the_kopiyka_by_the_starting_amount_alone_needs_no_contribution() -> None:
@@ -295,20 +316,79 @@ def test_a_shrinking_balance_that_starts_above_the_target_reports_no_arrival(
     assert "short by" in outcome.feasibility.reason
 
 
-def test_a_target_the_plan_decays_away_from_says_so_rather_than_naming_a_ceiling() -> None:
-    """The third shape of unreachable, and the one a two-branch message got wrong.
+@pytest.mark.parametrize("contribution", [0.0, 100.0, 5_000.0])
+def test_a_balance_falling_away_from_its_target_never_claims_to_converge_on_it(
+    contribution: float,
+) -> None:
+    """A plan that recedes from its target must not be described as approaching it.
 
-    Nothing goes in and the assumption is negative, so the balance decays towards **nothing**.
-    The message must not describe a contribution "settling at" a level -- with no contribution
-    that level is zero, and a sentence about a zero ceiling is a true number inside a false
-    sentence.
+    **Parametrised because the unparametrised version is what hid the defect.** With no
+    contribution the message was right; with a contribution the *same* branch said the balance
+    "loses each month roughly what a contribution of 100.0 puts in, and settles at 1 781.72" --
+    of a balance that starts at 100 000, loses about 5 600 in its first month, and moves further
+    from a 500 000 target every month after. A true number inside a false sentence, which is the
+    thing this test's own name is about. Its sibling
+    ``test_a_shrinking_balance_that_starts_above_the_target_reports_no_arrival`` was already
+    parametrised over the contribution; this one was not, and the gap survived a review round
+    because of it.
+
+    The three cases are the three ways the falling shape can arise: nothing going in, a
+    contribution far below the loss, and one close enough to it to be worth naming and still
+    below it.
     """
     outcome = _outcome(
-        _goal(contribution=0.0, target_sum=500_000.0),
+        _goal(contribution=contribution, target_sum=500_000.0),
         _inputs(starting=100_000.0, annual=-0.5),
     )
     assert isinstance(outcome, Unreachable), outcome
-    assert "decays" in outcome.reason
-    assert "nothing goes in" in outcome.reason
-    assert "settles at" not in outcome.reason
+
+    # The shape, checked rather than asserted in prose: the target is above where the balance
+    # starts, and the balance is lower after a month than before it.
+    after_a_month = projected_value(
+        _inputs(starting=100_000.0, annual=-0.5),
+        contribution=Money(contribution, UAH, prov.EMPTY),
+        months=1.0,
+    )
+    assert after_a_month.amount < 100_000.0
+
+    assert "converges towards" not in outcome.reason
+    assert "roughly" not in outcome.reason
     assert "never moves" not in outcome.reason
+
+
+def test_each_shape_of_an_unreachable_decay_gets_the_sentence_that_is_true_of_it() -> None:
+    """The four shapes, told apart by the sign of ``S*i + C``, each with its own wording.
+
+    Listed together so that a branch merged into a neighbour shows up as two cases asserting
+    the same sentence rather than as a case nobody wrote.
+    """
+    never_moves = _outcome(
+        _goal(contribution=0.0, target_sum=500_000.0), _inputs(starting=0.0, annual=0.0)
+    )
+    nothing_goes_in = _outcome(
+        _goal(contribution=0.0, target_sum=500_000.0), _inputs(starting=100_000.0, annual=-0.5)
+    )
+    falls_away = _outcome(
+        _goal(contribution=100.0, target_sum=500_000.0), _inputs(starting=100_000.0, annual=-0.5)
+    )
+    rises_to_a_ceiling = _outcome(
+        _goal(contribution=1_000.0, target_sum=5_000_000.0), _inputs(starting=0.0, annual=-0.2)
+    )
+    assert isinstance(never_moves, Unreachable), never_moves
+    assert isinstance(nothing_goes_in, Unreachable), nothing_goes_in
+    assert isinstance(falls_away, Unreachable), falls_away
+    assert isinstance(rises_to_a_ceiling, Unreachable), rises_to_a_ceiling
+
+    assert "never moves off" in never_moves.reason
+
+    assert "nothing goes in" in nothing_goes_in.reason
+    assert "towards nothing" in nothing_goes_in.reason
+    assert "settles at" not in nothing_goes_in.reason
+
+    assert "moves away from rather than towards" in falls_away.reason
+    assert "outweighs" in falls_away.reason
+    assert "1781.7153745105777" in falls_away.reason
+
+    assert "converges towards but never passes" in rises_to_a_ceiling.reason
+    assert "rises from" in rises_to_a_ceiling.reason
+    assert "54278.59101175934" in rises_to_a_ceiling.reason

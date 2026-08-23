@@ -2207,14 +2207,24 @@ it:
 | `Missed` | **both** the amount short on the target date and the first date the target would actually arrive — which is always *later* than the target date |
 | `Unreachable` | the reason. Never a capped horizon, never an arbitrarily distant date |
 
-There are three shapes of unreachable and the reason distinguishes them, each tested against
-the expression that actually produced the failure rather than a restatement of it: a balance
-that does not move at all (no contribution, no growth); a balance decaying towards nothing
-because nothing goes in and the assumption is negative; and a contribution whose ceiling is
-below the target — under a negative assumption a fixed contribution settles where the monthly
-loss eats exactly what goes in, and a target above that level is never reached however long
-anyone waits. A solver that searched forward would have returned the end of its window and
-called it a date.
+Reaching "unreachable" at all implies a negative assumption and a balance that moves: one
+moving at a rate of zero or more passes any target above it eventually. Within that there are
+**four** shapes, and the sign of `S·i + C` tells them apart — the same quantity the constant
+test compares against zero, so the cases partition rather than overlap. Each is tested against
+that expression rather than against a restatement of it:
+
+| `S·i + C` | Shape | What the reason says |
+|---|---|---|
+| `= 0` | The balance never moves | the contribution exactly offsets the loss, or nothing goes in and there is nothing to lose it from |
+| `< 0`, `C = 0` | Nothing goes in | the balance decays towards **nothing**; there is no ceiling worth naming |
+| `> 0` | Rising to a ceiling below the target | what goes in outweighs the loss, the two meet at `−C/i`, and the target is above that |
+| `< 0`, `C > 0` | Falling **away** from the target | the loss outweighs what goes in, so the balance recedes from a target it never approached |
+
+The last two shared one sentence until the review of 2026-08-23 read it against the second: a
+plan losing 5 600 a month while 100 goes in is not "converging on" a ceiling of 1 781, and the
+target is further away every month rather than nearer. A solver that searched forward would
+have returned the end of its window and called it a date; a message that describes the wrong
+one of these four is the same defect one layer up.
 
 **A fourth case reports no date for the opposite reason: the target was met and then lost.**
 Under a shrinking balance that starts above the target, the crossing is real, finite and in the

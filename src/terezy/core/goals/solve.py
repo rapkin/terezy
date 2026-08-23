@@ -407,10 +407,12 @@ def _solve_contribution(
             goal_id=goal.id,
             margin=money.sub(grown, target_sum),
             reason=(
-                f"the goal {goal.id!r} is already met on {target_date.isoformat()} by the "
-                "starting amount alone, so no contribution is required. The arithmetic gives "
-                f"{required.amount!r} a month, and a negative contribution is an instruction "
-                "to withdraw rather than an answer to the question that was asked (FR-020)."
+                f"the goal {goal.id!r} is already met on {target_date.isoformat()} without "
+                f"paying anything in: {starting.amount!r} {target_sum.currency.value} grows to "
+                f"{grown.amount!r} against a target of {target_sum.amount!r}. The arithmetic "
+                f"gives {required.amount!r} a month, and a negative contribution is an "
+                "instruction to withdraw rather than an answer to the question that was asked "
+                "(FR-020)."
             ),
         )
     return _outcome(
@@ -667,6 +669,17 @@ def _first_month_end_at_or_after(as_of: date, crossing: float) -> date | None:
     reached. The crossing itself is kept beside it, in months, because they are different
     facts.
 
+    **The snap cannot collapse a ``Missed`` arrival onto the target date**, which is the one
+    thing it could break: a crossing a fraction of a nanomonth past an integer horizon would
+    round back to that horizon and report an arrival on the date the goal was missed on. It is
+    unreachable rather than merely unlikely. A gap that small in *time* is a gap far inside the
+    same tolerance in *money* -- it would take a monthly rate above roughly 640% for a
+    nanomonth to move the balance by more than the tolerance allows -- so a plan that close to
+    its target on the target date is met, and the ``Met`` branch of the feasibility verdict has
+    already returned by the time this function is called. The bound is stated here rather than
+    guarded against, because a guard for a case that cannot arise reads as protection and is
+    not.
+
     ``None`` is returned where the date would fall outside the representable calendar. The
     caller reports the month count instead, which is the honest answer: rounding it back to
     the last expressible date would be the nearest answer FR-019 forbids, and crashing would
@@ -735,16 +748,27 @@ def _unreachable_reason(
     restatement of it, because a restatement is how a message comes to say something true of the
     case somebody had in mind and false of the case in front of the reader.
 
-    * **The balance never moves** -- the same test :func:`_crossing` gave up on.
-    * **Nothing goes in** and the balance is therefore decaying to nothing. Reachable only under
-      a negative assumption: a balance that moves at a rate of zero or more passes any target
-      above it eventually, so "not constant" and "never reached" together imply the rate is
-      negative, and with no contribution the level it converges to is zero.
-    * **A contribution converges to a ceiling** -- the level at which the monthly loss eats
-      exactly what goes in, which is the only remaining shape.
+    Reaching here at all implies a **negative** assumption and a balance that moves: a balance
+    moving at a rate of zero or more passes any target above it eventually, so "not constant"
+    and "never reached" together leave only decay. Within decay there are four shapes, and the
+    sign of ``S*i + C`` -- the same quantity :func:`_never_moves` tests against zero -- tells
+    them apart, so the three cases partition rather than overlap:
 
-    There is no fourth branch and no fallback. A fallback could only be a sentence about a case
-    that cannot occur, which is the kind of guard that reads as protection and is not.
+    * **The balance never moves** (``S*i + C == 0``): the contribution exactly offsets the loss
+      on the balance it sits on, or nothing goes in and there is nothing to lose it from.
+    * **Nothing goes in** (``C == 0``, so ``S*i < 0``): the balance decays towards nothing, and
+      the level it converges to is zero rather than a ceiling worth naming.
+    * **The balance rises towards a ceiling below the target** (``S*i + C > 0``): what goes in
+      outweighs the loss for now, the two meet at ``-C/i``, and the target is above that.
+    * **The balance falls away from the target** (``S*i + C < 0`` with a target above where it
+      started): the loss outweighs what goes in, so the balance recedes from a target it never
+      approached. The ceiling exists arithmetically and describing the plan as *converging on
+      it* would be a true number inside a false sentence -- 100 UAH a month is not "roughly
+      offsetting" a loss of 5 600, and the target is further away every month, not nearer.
+
+    The last two shared one sentence until the review of 2026-08-23 found the second reading
+    it. There is no fifth branch and no fallback: a fallback could only describe a case that
+    cannot occur, which is the kind of guard that reads as protection and is not.
     """
     rate = monthly_rate(growth)
     if _never_moves(starting=starting.amount, contribution=contribution.amount, rate=rate):
@@ -765,13 +789,26 @@ def _unreachable_reason(
             "would be a nearest answer to a question that has no answer."
         )
     ceiling = -contribution.amount / rate
+    nowhere_to_go = (
+        " No date is reported because there is none -- an arbitrarily distant one would be a "
+        "nearest answer to a question that has no answer."
+    )
+    if starting.amount * rate + contribution.amount > 0.0:
+        return (
+            f"the goal {goal_id!r} targets {target.amount!r} {target.currency.value}, which the "
+            f"stated plan converges towards but never passes. At a growth assumption of "
+            f"{growth.annual_rate!r} the balance rises from {starting.amount!r} towards "
+            f"{ceiling!r} {target.currency.value} -- the level at which the monthly loss eats "
+            f"exactly the {contribution.amount!r} that goes in -- and the target is above it."
+            + nowhere_to_go
+        )
     return (
         f"the goal {goal_id!r} targets {target.amount!r} {target.currency.value}, which the "
-        f"stated plan converges towards but never passes. At a growth assumption of "
-        f"{growth.annual_rate!r} the balance loses each month roughly what a contribution of "
-        f"{contribution.amount!r} puts in, and settles at {ceiling!r} "
-        f"{target.currency.value}. No date is reported because there is none -- an arbitrarily "
-        "distant one would be a nearest answer to a question that has no answer."
+        f"stated plan moves away from rather than towards. At a growth assumption of "
+        f"{growth.annual_rate!r} the monthly loss on {starting.amount!r} outweighs the "
+        f"{contribution.amount!r} that goes in, so the balance falls towards {ceiling!r} "
+        f"{target.currency.value} while the target sits above where it started. Waiting brings "
+        "it no closer." + nowhere_to_go
     )
 
 

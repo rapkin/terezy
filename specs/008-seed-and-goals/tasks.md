@@ -321,6 +321,15 @@ Two blockers, three fold-ins and one owner decision from the independent review.
 - [x] T048 `is_synthetic` added to the seed and goal declarations as a required field, so rule
       5's claim is machine-readable
 
+- [x] T049 The unreachable reason's ceiling branch split in two: a balance *rising* to a
+      ceiling below the target and one *falling away* from a target above it are different
+      shapes and had one sentence. Every path producing a reason enumerated, and the
+      `NoContributionNeeded` message in the contribution mode corrected the same way -- it
+      credited "the starting amount alone" for a target met only after growth on it
+- [x] T050 `_first_month_end_at_or_after`'s month-count snap: the reviewer's optional item,
+      taken as a docstring paragraph stating why it cannot collapse a `Missed` arrival onto
+      the target date
+
 ---
 
 ## Notes
