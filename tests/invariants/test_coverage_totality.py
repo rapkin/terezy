@@ -205,3 +205,27 @@ def test_an_orphan_exit_is_never_a_deficit_and_never_blocks_a_count(
                 continue
             assert isinstance(verdict, NotReady)
             assert "no_inbound" in {deficit.kind for deficit in verdict.deficits}
+
+        # **The converse, which is the half that actually pins the rule.** Checking only that
+        # every *listed* orphan is unreachable is satisfied by listing nothing, and equally by
+        # listing too much -- it says nothing about the exits that were left off the list. So
+        # the orphan set is derived here from the verdicts, independently of how the report
+        # derived it, and the two must agree exactly.
+        #
+        # "Reachable" is the union of both ways money gets to a destination: a declared inbound
+        # route, **and arrival**. Arrival is the term with no route behind it, so it is the one
+        # a reachability test can silently stop counting -- and dropping it turns every exit
+        # from a stream's own arrival venue into a phantom orphan.
+        reached = {
+            verdict.destination
+            for verdict in block.verdicts
+            if isinstance(verdict, Ready) or verdict.inbound != ()
+        }
+        expected = {
+            route_id
+            for route_id in block.route_ids
+            if (declared := registry.routes[route_id]).direction == "exit"
+            and Destination(venue_id=declared.origin, currency=declared.legs[0].from_ccy)
+            not in reached
+        }
+        assert {orphan.route_id for orphan in block.orphan_exits} == expected

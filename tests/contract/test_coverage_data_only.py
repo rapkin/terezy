@@ -32,6 +32,8 @@ from terezy.core.primitives.currency import Currency
 from terezy.core.results.coverage import (
     EXIT_NOT_SPENDABLE,
     NO_INBOUND,
+    SATISFIED_BY_ARRIVAL,
+    SATISFIED_BY_IDENTITY,
     CoverageReport,
     NotReady,
     Ready,
@@ -302,6 +304,137 @@ def test_a_ready_verdict_says_whether_it_rests_on_open_or_closed_declarations(
     into either would state something the declarations do not.
     """
     assert _rests_on(inbound, exit_status) == expected
+
+
+ARRIVAL_VENUES = keyed([venue("mono", UAH), venue("pocket", USD)])
+ARRIVAL_STREAMS = keyed([stream("contract_usd", USD, "pocket")])
+"""``pocket`` is the arrival venue and is **not** spendable, so its exit half is carried by a
+declared route rather than by identity -- which is what makes the arrival branch of
+``rests_on`` reachable at all."""
+
+
+def _rests_on_from_arrival(exit_status: str) -> str:
+    routes = keyed(
+        [
+            route(
+                "out_pocket_mono",
+                origin="pocket",
+                destination="mono",
+                direction="exit",
+                from_ccy=USD,
+                to_ccy=UAH,
+                status=exit_status,  # type: ignore[arg-type]
+            )
+        ]
+    )
+    produced = coverage(
+        venues=ARRIVAL_VENUES,
+        streams=ARRIVAL_STREAMS,
+        routes=routes,
+        regimes={},
+        spendable=SPENDABLE,
+    )
+    assert isinstance(produced, CoverageReport)
+    (block,) = produced.regimes
+    verdict = next(v for v in block.verdicts if v.destination.venue_id == "pocket")
+    assert isinstance(verdict, Ready), verdict
+    assert verdict.inbound is SATISFIED_BY_ARRIVAL
+    return verdict.rests_on
+
+
+@pytest.mark.parametrize(
+    ("exit_status", "expected"),
+    [("open", "open"), ("constrained", "constrained"), ("closed", "closed_only")],
+)
+def test_a_verdict_reached_by_arrival_still_reports_its_exits_status(
+    exit_status: str, expected: str
+) -> None:
+    """**SC-015 where the inbound half is a sentinel** -- and a regression test with a history.
+
+    The first implementation of ``rests_on`` collected the relied routes only when the inbound
+    half was a tuple, so a pair reached by *arrival* contributed an empty relied list and could
+    never be ``closed_only``: an arrival-reached destination whose only way out was declared
+    closed reported ``constrained``, which says some route still works. It was found by
+    reading, fixed, and left unpinned -- every case exercising the arrival branch happened to
+    use an open exit, so reverting the fix left the whole suite green.
+
+    That is what this parametrisation closes. The money being already at the destination says
+    nothing about whether the way out works, and a ready verdict resting on one closed route
+    must say so.
+    """
+    assert _rests_on_from_arrival(exit_status) == expected
+
+
+IDENTITY_VENUES = keyed([venue("mono", UAH), venue("hub", UAH)])
+IDENTITY_STREAMS = keyed([stream("salary_uah", UAH, "hub")])
+"""The mirror: ``mono`` is the spendable endpoint, reached by a declared inbound route from a
+stream that arrives somewhere else. The exit half is the sentinel and the inbound half is not."""
+
+
+@pytest.mark.parametrize(
+    ("inbound_status", "expected"),
+    [("open", "open"), ("constrained", "constrained"), ("closed", "closed_only")],
+)
+def test_a_verdict_whose_exit_is_satisfied_by_identity_still_reports_its_inbounds_status(
+    inbound_status: str, expected: str
+) -> None:
+    """The same claim on the other half, so the two sentinels cannot drift apart.
+
+    Money already at a spendable endpoint has nowhere left to go, and that says nothing about
+    whether the corridor that would get it there works. A ready verdict resting on one closed
+    inbound is ``closed_only`` here exactly as it is when both halves are routes.
+    """
+    routes = keyed(
+        [
+            route(
+                "in_hub_mono",
+                origin="hub",
+                destination="mono",
+                direction="inbound",
+                from_ccy=UAH,
+                status=inbound_status,  # type: ignore[arg-type]
+            )
+        ]
+    )
+    produced = coverage(
+        venues=IDENTITY_VENUES,
+        streams=IDENTITY_STREAMS,
+        routes=routes,
+        regimes={},
+        spendable=SPENDABLE,
+    )
+    assert isinstance(produced, CoverageReport)
+    (block,) = produced.regimes
+    verdict = next(v for v in block.verdicts if v.destination.venue_id == "mono")
+    assert isinstance(verdict, Ready), verdict
+    assert verdict.exits is SATISFIED_BY_IDENTITY
+    assert verdict.rests_on == expected
+
+
+def test_a_verdict_resting_on_no_route_at_all_is_open() -> None:
+    """Both halves sentinels: there is nothing there to be shut.
+
+    ``mono`` is the salary's arrival venue **and** the declared spendable endpoint, so the pair
+    is ready on arrival and identity with no route in the registry touching it. ``open`` is the
+    honest answer -- ``closed_only`` would name a closed declaration that does not exist, and
+    ``constrained`` would imply a limit nobody declared.
+    """
+    produced = coverage(
+        venues=keyed([venue("mono", UAH)]),
+        streams=keyed([stream("salary_uah", UAH, "mono")]),
+        routes=keyed(
+            [route("in_mono_mono", origin="x", destination="y", direction="inbound", from_ccy=UAH)]
+        ),
+        regimes={},
+        spendable=SPENDABLE,
+    )
+    assert isinstance(produced, CoverageReport)
+    (block,) = produced.regimes
+    verdict = next(v for v in block.verdicts if v.destination.venue_id == "mono")
+    assert isinstance(verdict, Ready)
+    assert verdict.inbound is SATISFIED_BY_ARRIVAL
+    assert verdict.exits is SATISFIED_BY_IDENTITY
+    assert verdict.rests_on == "open"
 
 
 def test_a_ready_verdict_resting_on_closed_routes_is_still_distinct_from_a_hole() -> None:
