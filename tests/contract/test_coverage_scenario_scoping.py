@@ -25,6 +25,7 @@ first, because nothing is merged across the two.
 from __future__ import annotations
 
 import shutil
+from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -36,6 +37,8 @@ from terezy.core.results.coverage import (
     CoverageReport,
     NotReady,
     PairVerdict,
+    Ready,
+    SatisfiedByArrival,
 )
 from terezy.core.routes.coverage import coverage
 from terezy.data.declarations import resolver
@@ -46,14 +49,30 @@ pytestmark = pytest.mark.contract
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DATA_ROOT = REPO_ROOT / "data"
 
-IBKR_FROM_CONTRACT = ("ibkr_usd", "USD", "contract_usd")
+BINANCE_FROM_SALARY = ("binance", "USD", "salary_uah")
 """The pair the two shipped regimes disagree about.
 
-``coinbase_to_ibkr`` is named by ``normalized`` and not by ``wartime``, and it is the only way
-the dollar contract income reaches ``ibkr_usd``. So the same pair is missing a way *in* under
-one belief and not under the other — which is FR-013's requirement in the smallest form the
-shipped declarations can state it.
+``monobank_to_binance_card`` is named by ``normalized`` and not by ``wartime``, and it is one of
+the ways the hryvnia salary reaches ``binance``. So the same pair rests on a different set of
+declared corridors under each belief — FR-013's requirement in the smallest form the shipped
+declarations can state it.
+
+**This used to be ``("ibkr_usd", "USD", "contract_usd")``, and why it moved is the finding.**
+``coinbase_to_ibkr`` is still the other route only ``normalized`` names, and it used to be the
+only way the dollar contract income reached the broker — the income arrived at ``coinbase``. It
+does not: the owner's contract income lands at ``deel`` (corrected 2026-08-23), so *no* stream
+starts where that route starts, and the pair is short a way in under both beliefs alike. The
+audit measures declared corridors one hop at a time and does not chain two, so the fact that
+``deel_to_coinbase`` now joins onto it changes no verdict either. That is asserted below rather
+than left as a gap, because a reader comparing the two regimes' route sets against their
+verdicts will otherwise wonder where the second difference went.
 """
+
+CARD_ROUTE = "monobank_to_binance_card"
+"""The normalized-only corridor whose presence the disagreement above is made of."""
+
+IBKR_FROM_CONTRACT = ("ibkr_usd", "USD", "contract_usd")
+"""The pair whose regime disagreement the arrival-venue correction removed. See above."""
 
 
 def _report(root: Path, *, scenario_id: str | None) -> CoverageReport:
@@ -99,12 +118,83 @@ def test_the_shipped_registry_audited_under_war_end_states_both_declared_regimes
 
 
 def test_a_route_one_regime_names_and_the_other_does_not_gives_two_verdicts() -> None:
-    """**FR-013 and FR-014, from declarations rather than from hand-built records.**
+    """**FR-013, from declarations rather than from hand-built records.**
 
-    Under ``wartime`` nothing carries the dollar contract income to ``ibkr_usd``, so the pair
-    is short a way in. Under ``normalized`` the corridor is named, so that deficit is gone —
-    and the missing *exit* remains under both, because no regime declares one. Two verdicts
-    for one pair, no blended third.
+    ``normalized`` names ``monobank_to_binance_card`` and ``wartime`` does not, so the pair it
+    serves rests on three declared corridors under one belief and two under the other. Two
+    verdicts for one pair, no blended third — and the difference is *exactly* the one route,
+    which is what says the block was audited against its own regime's route set rather than
+    against the union.
+    """
+    report = _report(DATA_ROOT, scenario_id="war_end")
+
+    under_wartime = _verdict(report, "wartime", BINANCE_FROM_SALARY)
+    under_normalized = _verdict(report, "normalized", BINANCE_FROM_SALARY)
+    assert under_wartime != under_normalized, "one pair, one verdict, and the regime forgotten"
+
+    relied = {
+        regime_id: _routes_in(verdict)
+        for regime_id, verdict in (
+            ("wartime", under_wartime),
+            ("normalized", under_normalized),
+        )
+    }
+    assert relied["normalized"] - relied["wartime"] == {CARD_ROUTE}
+    assert relied["wartime"] - relied["normalized"] == set()
+
+
+def _routes_in(verdict: PairVerdict) -> set[str]:
+    """The declared corridors one verdict rests on to reach the destination.
+
+    Narrowed loudly rather than defensively: ``inbound`` is also allowed to be
+    ``SatisfiedByArrival`` -- the money is already there and no corridor is relied on -- and a
+    pair that quietly became that shape would make the comparison above trivially true.
+    """
+    assert isinstance(verdict, Ready), verdict
+    assert not isinstance(verdict.inbound, SatisfiedByArrival), verdict
+    return {route.route_id for route in verdict.inbound}
+
+
+def test_a_missing_declaration_is_counted_per_regime_and_never_pooled() -> None:
+    """**FR-014.** One item on the to-observe list, one count beside each regime that it blocks.
+
+    The pooled reading is the dangerous one: a single number would tell the owner this hole
+    blocks four pairs when what it blocks is two pairs under each of two mutually exclusive
+    beliefs, only one of which will turn out to be the world.
+    """
+    report = _report(DATA_ROOT, scenario_id="war_end")
+    assert report.to_observe, "the shipped registry stopped having a hole to count"
+
+    blocking = {
+        block.regime_id: Counter(
+            deficit.missing
+            for verdict in block.verdicts
+            if isinstance(verdict, NotReady)
+            for deficit in verdict.deficits
+        )
+        for block in report.regimes
+    }
+    for entry in report.to_observe:
+        # Each count is that regime's own tally, computed here from that regime's own block --
+        # so a pooled total fails. Note what this cannot currently catch: every shipped entry
+        # is symmetric across the two regimes, so reporting one regime's number against both
+        # would pass. The asymmetric case the shipped registry used to carry is gone with the
+        # Deel correction, and pinning it again needs a synthetic root.
+        assert entry.blocked_by_regime == tuple(
+            (regime_id, blocking[regime_id][entry.missing]) for regime_id in sorted(blocking)
+        ), entry.missing
+        assert sum(count for _, count in entry.blocked_by_regime) > 0
+
+
+def test_the_route_only_normalized_names_that_no_stream_can_reach_changes_no_verdict() -> None:
+    """The other half of the disagreement, and the reason it is not a second one.
+
+    ``coinbase_to_ibkr`` is named by ``normalized`` alone, so a reader would expect it to move a
+    verdict the way ``monobank_to_binance_card`` does. It does not, and the honest reason is
+    recorded here rather than left to be rediscovered: no declared stream arrives at
+    ``coinbase`` — the contract income lands at ``deel`` — and the audit measures one declared
+    hop from where the money *is*, never a chain of two. So the pair is short a way in under
+    both beliefs, identically, even though one of them names the corridor.
     """
     report = _report(DATA_ROOT, scenario_id="war_end")
 
@@ -113,15 +203,15 @@ def test_a_route_one_regime_names_and_the_other_does_not_gives_two_verdicts() ->
     assert isinstance(under_wartime, NotReady)
     assert isinstance(under_normalized, NotReady)
     assert NO_INBOUND in {deficit.kind for deficit in under_wartime.deficits}
-    assert NO_INBOUND not in {deficit.kind for deficit in under_normalized.deficits}
+    assert NO_INBOUND in {deficit.kind for deficit in under_normalized.deficits}
+    assert under_wartime == under_normalized
 
-    # And the same missing declaration is recognizably one item with a count per regime,
-    # never summed: it blocks a pair under wartime and none under normalized.
-    missing_inbound = next(
+    # And the deficit names where the money actually is, so the owner can write the
+    # declaration the report is asking for without guessing the origin.
+    missing = next(
         deficit.missing for deficit in under_wartime.deficits if deficit.kind == NO_INBOUND
     )
-    observation = next(entry for entry in report.to_observe if entry.missing == missing_inbound)
-    assert observation.blocked_by_regime == (("normalized", 0), ("wartime", 1))
+    assert missing.origin_venue == "deel"
 
 
 def test_an_unknown_scenario_is_refused_rather_than_silently_implicit() -> None:

@@ -782,9 +782,29 @@ UAH_STREAM: Final = "salary_uah"
 USD_STREAM: Final = "contract_usd"
 
 NO_PARTNER_ROUTE: Final = "coinbase_to_ibkr"
-"""The one shipped route declaring no ``partner_route``, so costing it yields
-``ExitCostUnknown`` -- the state FR-010 and SC-007 are about. It exists only under the
-``normalized`` regime."""
+"""The shipped **inbound** route declaring no ``partner_route``, so costing anything that ends
+on it yields ``ExitCostUnknown`` -- the state FR-010 and SC-007 are about. It exists only under
+the ``normalized`` regime, which is what makes it the regime-exclusion fixture too.
+
+**Reached as the second segment of a chain, not on its own.** The dollar contract income arrives
+at ``deel`` (the owner's actual flow, corrected 2026-08-23), so no stream starts where this route
+starts and ``cost_one`` refuses it as a single-route path -- correctly, and loudly. The way in is
+``deel_to_coinbase`` first, which is why :data:`NO_PARTNER_CHAIN` and not a bare ``FundingPath``.
+"""
+
+NO_PARTNER_CHAIN: Final = ComposedPath(
+    destination_id="ibkr_usd",
+    stream_id=USD_STREAM,
+    segments=("deel_to_coinbase", NO_PARTNER_ROUTE),
+)
+"""The dollar income's way to the broker: two declared routes, joined at ``coinbase``.
+
+Both halves are shipped declarations and neither declares a partner, so the chain has a real
+one-way figure and no round-trip figure at all -- FR-030 stated by the registry rather than by a
+fixture. ``deel_to_coinbase`` charges nothing and ``coinbase_to_ibkr`` charges 0.5% plus a flat
+25 USD, so the total is genuinely non-zero while the conversion component is exactly zero: the
+chain is dollars end to end.
+"""
 
 AMOUNT: Final = 10_000.0
 """What the golden path sends. Shared with ``tests/golden/test_ramp_comparison.py`` so the two
@@ -794,20 +814,21 @@ artifacts describe the same journey."""
 def costed(
     declared: resolver.RampDeclarations,
     *,
-    route_id: str,
-    stream_id: str,
-    destination_id: str,
+    path: Candidate,
     amount: float,
     currency: Currency = UAH,
 ) -> RampCost | RouteUnusable:
-    """One route costed through feature 002's one costing function.
+    """One candidate costed through feature 002's one costing function.
 
     Through ``cost_one`` rather than by hand: a costed-path diagram must show *the result's*
     figures, so a fixture that built a ``RampCost`` itself would be testing the renderer
     against numbers nobody computed.
+
+    A ``Candidate`` rather than a route id, because the shipped registry now needs both shapes:
+    the §4.3.1 corridor is one declared route and the way to the broker is a chain of two.
     """
     return cost.cost_one(
-        FundingPath(destination_id=destination_id, stream_id=stream_id, route_id=route_id),
+        path,
         Money(amount, currency, prov.EMPTY),
         routes=declared.routes,
         channels=declared.channels,
@@ -823,9 +844,7 @@ def p2p_cost(declared: resolver.RampDeclarations | None = None) -> RampCost:
     """The §4.3.1 round trip, costed. A ``RouteUnusable`` here is a fixture failure."""
     result = costed(
         declared if declared is not None else shipped_declarations(),
-        route_id=P2P_ROUTE,
-        stream_id=UAH_STREAM,
-        destination_id="binance",
+        path=FundingPath(destination_id="binance", stream_id=UAH_STREAM, route_id=P2P_ROUTE),
         amount=AMOUNT,
     )
     assert isinstance(result, RampCost), result
@@ -833,12 +852,10 @@ def p2p_cost(declared: resolver.RampDeclarations | None = None) -> RampCost:
 
 
 def exit_unknown_cost(declared: resolver.RampDeclarations | None = None) -> RampCost:
-    """A costed route whose exit nobody has declared: one way real, round trip absent."""
+    """A costed journey whose exit nobody has declared: one way real, round trip absent."""
     result = costed(
         declared if declared is not None else shipped_declarations(),
-        route_id=NO_PARTNER_ROUTE,
-        stream_id=USD_STREAM,
-        destination_id="ibkr_usd",
+        path=NO_PARTNER_CHAIN,
         amount=1_000.0,
         currency=USD,
     )
@@ -943,12 +960,14 @@ CHAIN_IN: Final = ComposedPath(
 )
 """Two declared routes, joined at a venue where the currency also matches.
 
-**Hand-built rather than enumerated**, and the reason is worth recording: the shipped registry
-composes **nothing** under either declared regime -- every corridor in ``data/routes/`` either
-starts at the salary rail or ends at it, so no chain of two connects anything a single route
-does not. Searching for one and rendering what came back would have produced no test at all.
-``ComposedPath`` is an ordinary input to ``cost_one``, the search that finds them is feature
-004's and is tested there, and what this feature has to prove is that a chain *draws* honestly.
+**Hand-built rather than enumerated.** The shipped registry does compose since 2026-08-23 --
+``deel_to_coinbase`` into ``coinbase_to_ibkr`` is a real chain, and :data:`NO_PARTNER_CHAIN`
+uses it -- but that one chain is a *dollar* journey with no declared exit, so it can state
+neither the composed-exit case nor the exit-by-identity case. This fixture exists to hold the
+shapes the declarations do not: a chain in with a chain back out, over venues invented for the
+purpose. ``ComposedPath`` is an ordinary input to ``cost_one``, the search that finds them is
+feature 004's and is tested there, and what this feature has to prove is that a chain *draws*
+honestly.
 """
 
 CHAIN_OUT: Final = ComposedExit(segments=(BACK_ONE, BACK_TWO))

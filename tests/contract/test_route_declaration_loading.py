@@ -222,8 +222,11 @@ class TestTheShippedFilesLoad:
             "monobank_to_binance_card",
             "binance_p2p_to_monobank",
             "coinbase_to_ibkr",
+            "deel_to_fop",
+            "deel_to_coinbase",
+            "fop_usd_to_monobank_uah",
         }
-        assert set(declarations.channels) == {"p2p", "card"}
+        assert set(declarations.channels) == {"p2p", "card", "bank_fop"}
         assert set(declarations.streams) == {"salary_uah", "contract_usd"}
         assert set(declarations.scenarios) == {"war_end"}
         assert declarations.base_currency is Currency.UAH
@@ -1324,9 +1327,11 @@ class TestStreamArrivalVenue:
 
     def test_a_stream_whose_venue_cannot_hold_its_currency_is_refused(self, tmp_path: Path) -> None:
         root = _root(tmp_path)
+        # The dollar stream, whichever venue it declares today: ``inzhur`` holds hryvnia only,
+        # so pointing a USD stream at it is the mismatch under test.
         _edit(
             root / "streams" / "owner-001.toml",
-            'arrives_at = "coinbase"',
+            'arrives_at = "deel"',
             'arrives_at = "inzhur"',
         )
         with pytest.raises(DeclarationError) as raised:

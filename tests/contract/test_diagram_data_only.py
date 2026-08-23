@@ -50,8 +50,8 @@ NEW_PROVIDER = "A Provider This Repository Has Never Seen"
 
 DECLARED_NAMES = re.compile(
     # venues; channels and providers; streams and scenarios
-    r"monobank|binance|coinbase|ibkr|inzhur|wise"
-    r"|\bp2p\b|nbu|interbank"
+    r"monobank|binance|coinbase|ibkr|inzhur|wise|\bdeel\b|\bfop\b"
+    r"|\bp2p\b|nbu|interbank|bank_fop"
     r"|salary|contract_usd|wartime|normalized|war_end",
     re.IGNORECASE,
 )
@@ -116,13 +116,18 @@ direction     = "{direction}"
             encoding="utf-8",
         )
 
+    # Named into the *first* declared regime, by opening its list rather than by matching
+    # whatever route happens to close it. The previous anchor was the route that closed the
+    # wartime list, which worked until this change appended three more -- and an anchor that
+    # stops matching leaves the scratch root unedited, so two of the assertions below would
+    # have gone vacuously true while the rest failed. Anchoring on the regime's own name and
+    # asserting the substitution happened makes both outcomes impossible.
     scenario = root / "scenarios" / "war_end.toml"
+    anchor = '  id        = "wartime"\n  route_ids = [\n'
+    before = scenario.read_text(encoding="utf-8")
+    assert before.count(anchor) == 1, "the shipped scenario no longer opens the wartime regime"
     scenario.write_text(
-        scenario.read_text(encoding="utf-8").replace(
-            '    "binance_p2p_to_monobank",\n  ]',
-            f'    "binance_p2p_to_monobank",\n    "{NEW_ROUTE}",\n    "{NEW_EXIT}",\n  ]',
-            1,
-        ),
+        before.replace(anchor, f'{anchor}    "{NEW_ROUTE}",\n    "{NEW_EXIT}",\n', 1),
         encoding="utf-8",
     )
     return root

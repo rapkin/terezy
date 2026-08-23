@@ -33,7 +33,7 @@ currencies = ["UAH", "USD"]
 
 [[venue]]
 id         = "coinbase"
-name       = "Coinbase account — where the USD contract income arrives (SYNTHETIC FIXTURE)"
+name       = "Coinbase account — one of the two places Deel can send the contract income (SYNTHETIC FIXTURE)"
 currencies = ["USD"]
 
 [[venue]]
@@ -45,3 +45,23 @@ currencies = ["USD"]
 id         = "inzhur"
 name       = "Inzhur fund platform, hryvnia only (SYNTHETIC FIXTURE)"
 currencies = ["UAH"]
+
+# --- Added 2026-08-23, from the owner's description of his actual flow ---
+
+[[venue]]
+id         = "deel"
+name       = "Deel — where the contract income lands and where the owner first controls it"
+currencies = ["USD"]
+# The first point of control in the whole chain: the Deel cabinet is where the owner
+# chooses what happens next, and that choice is exactly a declared route out of here.
+# Deel is not a place money rests -- it is the fork.
+
+[[venue]]
+id         = "fop"
+name       = "ФОП account — the sole-proprietor account, currency and hryvnia sides"
+currencies = ["USD", "UAH"]
+# Both currencies at one venue on purpose. Dollars arrive here and, under Ukrainian
+# currency rules, must be sold before they can be spent domestically -- so (fop, USD)
+# and (fop, UAH) are two destinations with a declared conversion between them, which is
+# what the mandatory sale actually is. Whether that sale is legally compulsory is not
+# modelled: what is declared is that a corridor exists and what it costs.
