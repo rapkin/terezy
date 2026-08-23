@@ -324,18 +324,18 @@ statistical metric appears; request one explicitly and confirm a typed refusal.
 
 ## Phase 8: Polish & cross-cutting
 
-- [ ] T049 [P] Document in `docs/METHODOLOGY.md`, in the same change as the formulas:
+- [x] T049 [P] Document in `docs/METHODOLOGY.md`, in the same change as the formulas:
       how a rate schedule is read and why an event before the earliest entry refuses;
       what "assumption-driven" forbids; what the declared net yield is and is not; how
       the peg and its cap are stated; and why no fund-internal fee is modelled
-- [ ] T050 [P] Flip **E1**, **E10** and **J3** in `docs/REQUIRED_TESTS.md` with their
+- [x] T050 [P] Flip **E1**, **E10** and **J3** in `docs/REQUIRED_TESTS.md` with their
       test paths recorded, annotating J3's "window" wording per FR-015 ⚙; and flip
       **J4** and **J6** if their test surfaces exist
-- [ ] T051 [P] Update `data/README.md` rule 3 — the dated-schedule requirement is now
+- [x] T051 [P] Update `data/README.md` rule 3 — the dated-schedule requirement is now
       met, and the "Not yet true" note is removed rather than left contradicting the code
 - [x] T052 Flip `006-inzhur-instruments` to `status = "in-progress"` in
       `specs/features.toml` in the first implementation commit
-- [ ] T053 Run every gate from the worktree root and record the numbers and the delta
+- [x] T053 Run every gate from the worktree root and record the numbers and the delta
       from T001's baseline in the implementation notes below
 
 ---
@@ -453,3 +453,19 @@ migration leaking.
 `observation_kinds` digest, after three fund-related kinds were declared (T002). Its own
 comparison digest `sha256:175d37310f623fd11d7913fe88fcf116421c06999486b7a178c1734f431db875`
 is unchanged.
+
+### T053 — the gates on the last commit, and the delta from T001
+
+| Gate | Baseline (T001) | Now | Delta |
+|---|---|---|---|
+| `pytest --cov` | 1198 passed | **1393 passed** | +195 |
+| coverage (floor 90%) | 99.77% | **99.11%** | −0.66 pt |
+| `pytest -m "contract or invariant"` | — | **642 passed**, 751 deselected | — |
+| `check_provenance.py` | 0 errors, 24 unverified, 12 files | **0 errors, 52 unverified, 16 files** | +28 unverified, +4 files |
+| `ruff check` / `ruff format --check` | clean | clean | — |
+| `mypy` (strict) | clean, 144 files | clean, **155 files** | +11 |
+| `lint-imports` | 4 contracts kept | 4 kept, 0 broken | — |
+
+The 28 new unverified values are the expected state, not a regression: every term of both
+real funds and every new tax rate entered with a citation and an **empty** verification date
+(FR-002). The gate reports them; it does not fail on them.

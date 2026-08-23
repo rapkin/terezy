@@ -93,7 +93,7 @@ xfailed, or deleted without an amendment.
 
 | # | Example | Test |
 |---|---|---|
-| E1 | An Inzhur distribution taxed at 9% + 5% and a redemption of the same units taxed at 18% + 5%, both in one run from one instrument — the two classes must not collide. | `[ ]` |
+| E1 | An Inzhur distribution taxed at 9% + 5% and a redemption of the same units taxed at 18% + 5%, both in one run from one instrument — the two classes must not collide. | `[x]` `tests/worked_examples/test_two_tax_classes.py`, with the isolation property in `tests/invariants/test_rate_schedule_isolation.py` |
 | E2 | A loss year followed by a gain year nets correctly; a run that omits the loss-year declaration forfeits the carryforward. **Both branches tested.** | `[ ]` |
 | E3 | Foreign dividend with 15% withholding: PIT credit applied, military levy **not** credited. | `[ ]` |
 | E4 | Crypto scenarios `current_practice`, `draft_18_5`, `draft_transitional_5_5` produce three different hand-checkable results from identical market data. | `[ ]` |
@@ -103,7 +103,7 @@ xfailed, or deleted without an amendment.
 | E8 | The same scenario under jurisdiction A vs B differs only in the tax terms; the gross market outcome is bit-identical. | `[ ]` |
 | E9 | A residency change mid-simulation is applied by date, including positions held across the change. | `[ ]` |
 | E11 | A **zero** tax figure distinguishes *exempted* from *not applicable* when rendered. The engine already separates them — a taxable event's zero cites its tax class, a non-taxable row's zero cites nothing because there is nothing to cite — but a reader looking at a schedule table sees `0.00` on every row either way. A presentation requirement for the waterfall (spec §5.3), recorded here so the distinction the engine preserves is not thrown away at the last step. | `[ ]` |
-| E10 | A rate declared as a **dated schedule** changes on its effective date, so a legislated change is modelled rather than requiring a rebuild. **Known gap:** as of feature 001 the tax schema carries a scalar rate per class, not a schedule, so `data/README.md` rule 3 and `SIMULATOR_SPEC.md` §4.5.1 are not yet satisfied. Closing it is a schema change plus a core change. | `[ ]` |
+| E10 | A rate declared as a **dated schedule** changes on its effective date, so a legislated change is modelled rather than requiring a rebuild. **Closed by feature 006:** the scalar rate was removed, not deprecated, and `data/README.md` rule 3 and `SIMULATOR_SPEC.md` §4.5.1 are now satisfied. An event before a schedule's earliest cited entry is a typed refusal rather than a defaulted rate — see `docs/METHODOLOGY.md` §22.2 on why that refusal is what makes an honest schedule writable. | `[x]` `tests/worked_examples/test_rate_schedule_straddle.py`, with the boundary in `tests/unit/test_rate_lookup_boundary.py` and the refusals in `tests/unit/test_schedule_refusals.py` |
 
 ## F. FX, display currency, and asymmetry
 
@@ -155,10 +155,10 @@ Compliance tests for Principle II. May not be skipped without an amendment.
 |---|---|---|
 | J1 | The three goal modes are mutually consistent: solving for date from (contribution, sum) and then for sum from (contribution, that date) returns the original sum. | `[ ]` |
 | J2 | A seed lot with a known basis produces the hand-computed gain on disposal; a basis-estimated seed marks every downstream tax figure. | `[ ]` |
-| J3 | Redemption outside an Inzhur window is refused, or executed at the stated haircut when allowed — taxed correctly either way. | `[ ]` |
-| J4 | A lock-up longer than the horizon is a feasibility error, not a silent simulation. | `[ ]` |
+| J3 | Redemption outside an Inzhur window is refused, or executed at the stated haircut when allowed — taxed correctly either way. ⚙ **The wording is annotated rather than reinterpreted.** The funds' primary documents, read in full on 2026-08-22, show that **no redemption windows exist**: legally neither fund owes a buyback before its termination date, an earlier exit is at the manager's discretion, and the same-day buyback at NAV is a revocable company practice (006 spec FR-015). The row's substance is preserved over those declared liquidity terms — refuse, or execute at the declared discount, taxed on the proceeds actually received either way. | `[x]` `tests/worked_examples/test_fund_liquidity.py` |
+| J4 | A lock-up longer than the horizon is a feasibility error, not a silent simulation. | `[~]` `tests/worked_examples/test_fund_liquidity.py::TestAGuaranteedExitBeforeTerminationIsAFeasibilityFinding` and `::TestCaseThreeTheBuybackIsNotOnOffer` — a fund whose only guaranteed exit is its termination surfaces that as a finding on the result, and a redemption the terms do not owe is refused with the holding left open. **Not claimed closed:** a declared `lock_up_months` term and a horizon-versus-lock-up check do not exist, and 006's spec deliberately did not claim this row |
 | J5 | Correlated stress hits OVDP, Inzhur and UAH simultaneously, never as independent draws. | `[ ]` |
-| J6 | No Sharpe ratio or volatility figure is emitted for an assumption-driven instrument. | `[ ]` |
+| J6 | No Sharpe ratio or volatility figure is emitted for an assumption-driven instrument. | `[x]` `tests/contract/test_assumption_driven_refusal.py` — the refusal, and a walk over every fund result record proving there is no field one could sit in |
 
 ## K. Equivalence and golden results
 
@@ -187,6 +187,15 @@ it reinforces:
 | **B12** | Honoured by construction: the to-do ordering is a plain blocked-pair count with ties reported as ties, and `TodoEntry.count == len(TodoEntry.blocked)` is asserted. `tests/unit/test_coverage_deficits.py`, `tests/invariants/test_coverage_totality.py`. Again a whole-engine row — this is one more ordering that does not use a composite score, not the last one. |
 | **H2** | Relied on and extended, not re-derived: the one new declaration (`data/spendable/`) fails at load naming file and field for every refusal in its contract, on the existing loader path. `tests/contract/test_spendable_declaration_loading.py`. The row's own test stays `tests/contract/test_declaration_loading.py`. |
 | **G6** | Extended in visibility: feature 002's per-route *exit cost unknown* refusal becomes an audit of the whole registry, and `tests/invariants/test_coverage_costing_agreement.py` pins the two views together — a pair the audit marks ready is one costing produces a round-trip figure for, within this feature's single-route scope. |
+
+**006-inzhur-instruments** closes **E1**, **E10**, **J3** and **J6**. Two rows it
+reinforces without closing:
+
+| Row | How, and why the box does not move |
+|---|---|
+| **J4** | Half-covered and marked `[~]` above. A fund whose only guaranteed exit is its termination now says so on the result, and a redemption the terms do not owe is refused with the holding left open. What the row asks for and does not exist is a declared **lock-up** term compared against a horizon: these funds declare no lock-up, they declare an absence of obligation, which is a different fact reached by a different route. |
+| **E11** | Reinforced: every fund charge is recorded including a zero, and a disposal at a loss carries a `taxable_base` of zero *with the loss beside it on its own line*. The row is a **presentation** requirement for the waterfall — that a reader looking at `0.00` can tell exempted from not-applicable — and there is still no presentation surface. |
+| **B5** | Approached from one side: tax is assessed per disposal against per-lot basis consumed, and `charged_for_year` records the year it accrues to. The row also wants it **paid from cash on the due date**, with loss offset and carryforward, and this feature explicitly does not model any of the three (FR-008 says so in the output). Feature 009's. |
 
 ---
 
