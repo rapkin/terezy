@@ -75,6 +75,10 @@ UAH = Currency.UAH
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DATA_ROOT = REPO_ROOT / "data"
+# ⚙ Issue A's first *taxable* event is its 2026-07-15 coupon, fifteen days after the
+# earliest entry the `ua_government_bond` exemption's citation reaches. The dependency
+# is asserted in tests/contract/test_declaration_loading.py, class
+# TestTheShippedRegistryRefusesAnUncoveredEvent -- not re-derived here.
 ISSUE_A = "ovdp_synthetic_a"
 
 FACE_VALUE = 1000.0

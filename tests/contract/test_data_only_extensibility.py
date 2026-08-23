@@ -62,6 +62,10 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DATA_ROOT = REPO_ROOT / "data"
 SOURCE_ROOT = REPO_ROOT / "src" / "terezy"
 
+# ⚙ Issue A's first *taxable* event is its 2026-07-15 coupon, fifteen days after the
+# earliest entry the `ua_government_bond` exemption's citation reaches. The dependency
+# is asserted in tests/contract/test_declaration_loading.py, class
+# TestTheShippedRegistryRefusesAnUncoveredEvent -- not re-derived here.
 ISSUE_A = "ovdp_synthetic_a"
 ISSUE_B = "ovdp_synthetic_b"
 
@@ -69,11 +73,22 @@ ISSUE_B = "ovdp_synthetic_b"
 # coupon is face x rate x 0.25 x units:
 #     1000.00 x 0.1225 x 0.25 = 30.625 per unit
 #     30.625 x 10 units       = 306.25 per coupon
-# Three years, four coupons a year, so twelve of them:
-#     306.25 x 12 = 3675.00 of interest over the life of the holding.
+# The issue runs three years from 2026-03-02 and pays four coupons a year, so twelve in
+# all -- but this holding is bought on 2026-07-02, four months in, and a coupon paid on or
+# before the purchase belongs to whoever held the units then. The 2026-06-02 coupon is
+# therefore not this holding's, and eleven remain:
+#     306.25 x 11 = 3368.75 of interest over the life of the holding.
+#
+# ⚙ The purchase is dated four months after issue rather than on it because the exemption's
+# citation reaches back only to 2026-06-30 (`data/tax/ua.toml`), so the 2026-06-02 coupon
+# has no rate in force and a holding bought at issue is refused. That refusal is asserted
+# on purpose in `tests/contract/test_declaration_loading.py`; here the subject is a
+# *complete* result from a second declared instrument, so the holding starts inside the
+# window the citation covers. The declaration's own dates were left alone: moving invented
+# terms to dodge a refusal would hide the thing the refusal exists to show.
 B_COUPON = 306.25
-B_COUPON_COUNT = 12
-B_TOTAL_INTEREST = 3675.00
+B_COUPON_COUNT = 11
+B_TOTAL_INTEREST = 3368.75
 
 # Issue A, by hand, for contrast: act/365 over a 181/184-day semiannual period makes
 # every coupon a *different* amount -- which is the visible consequence of the day count

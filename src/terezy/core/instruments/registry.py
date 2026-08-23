@@ -63,3 +63,58 @@ def ops_for(instrument_class: str) -> InstrumentOps:
             f"{sorted(REGISTRY)}"
         )
     return REGISTRY[instrument_class]
+
+
+# ---------------------------------------------------------------------------
+# 006-inzhur-instruments: the declaration kinds, which are not all instruments
+# ---------------------------------------------------------------------------
+#
+# ⚙ **A fund is a declared instrument class, and it is deliberately NOT in `REGISTRY`.**
+# `InstrumentOps` is the `Instrument` plugin interface of Principle II, and a fund does not
+# satisfy it. Three concrete mismatches, none of them cosmetic:
+#
+#   1. **Different inputs.** `EventsFn` takes `Assumptions` -- a consumption method and a
+#      coupon policy. A fund run additionally needs a liquidity mode, whether the
+#      discretionary buyback is on offer, an exit date, a chosen point inside a stated
+#      range and an exchange-rate assumption. None of those has a default anywhere, so a
+#      widened `Assumptions` would force every bond run to state a liquidity mode.
+#   2. **Different failures.** A fund refuses in ways a bond cannot -- after the
+#      subscription cutoff, with no buyback owed, with no rate assumption to size a peg,
+#      with a value recorded only as an unanswered question. `InstrumentFailure` covers
+#      none of them.
+#   3. **A different arity of answer.** A fund stating a range and no chosen point yields
+#      *two* projections. No signature returning one schedule can express that, and
+#      collapsing it is the midpoint this feature exists to refuse.
+#
+# Making `InstrumentOps` generic over both would put `Any` in the registry and force every
+# call site to narrow before it could call -- a registry that type-checks nothing, claiming
+# a uniformity it cannot deliver. That is a worse lie than two records, so the two are kept
+# apart and the difference is written down here.
+#
+# **What this leaves open, for the owner rather than for an implementer.** Principle II
+# permits exactly four plugin interfaces and says a fifth needs an amendment. This feature
+# adds no fifth *registry* -- there is no `FundOps`, no second mapping of functions -- but
+# it does add a second declaration kind dispatched by the same `class` key, which is the
+# substance of the question if not its letter. Whether that requires an amendment is a
+# constitutional call and it is recorded in `specs/006-inzhur-instruments/plan.md` and in
+# `specs/features.toml` rather than settled here.
+#
+# What generic code consumes both today: `data.manifest.input_refs`, per kind, and
+# `data.declarations.resolver.Declarations`, which keys both into one id space. What
+# feature 010 will need in order to rank a bond against a fund is a common *result* --
+# an after-tax, after-cost figure with its provenance and its exclusions -- which
+# `core.results.fund.BesideTheHurdle` begins. That unification belongs at the result layer,
+# and widening the instrument interface would not have moved it forward.
+
+COLLECTIVE_INVESTMENT_FUND: Final = "collective_investment_fund"
+"""A collective-investment fund: `core.instruments.fund`, projected by
+`core.results.fund.project_fund`."""
+
+DECLARATION_KINDS: Final[frozenset[str]] = frozenset({FIXED_INCOME, COLLECTIVE_INVESTMENT_FUND})
+"""Every ``[instrument] class`` a declaration file may name, instrument or otherwise.
+
+The vocabulary lives in `core` because it is domain knowledge; which *loader* parses each
+one is the data layer's business and lives beside the loaders. Reading the set from here
+is what lets `data.declarations.resolver` dispatch on a declared name rather than on an
+``if`` naming one class -- a branch that would have to be edited for a third kind.
+"""

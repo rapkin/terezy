@@ -110,6 +110,7 @@ from terezy.core.results.fund import (
 )
 from terezy.core.tax.interface import TaxableEventKind, TaxClass
 from terezy.core.tax.schedule import RateEntry
+from tests import synthetic
 
 pytestmark = pytest.mark.worked_example
 
@@ -161,7 +162,7 @@ def _tax_pack() -> dict[str, TaxClass]:
             applies_to=frozenset({TaxableEventKind.DISTRIBUTION}),
             rates=(
                 RateEntry(
-                    effective_from=date(2026, 6, 30),
+                    effective_from=synthetic.SCHEDULE_START,
                     pit_rate=0.09,
                     levy_rate=0.05,
                     provenance=_fixture("distribution rate entry"),
@@ -173,7 +174,7 @@ def _tax_pack() -> dict[str, TaxClass]:
             applies_to=frozenset({TaxableEventKind.DISPOSAL_GAIN}),
             rates=(
                 RateEntry(
-                    effective_from=date(2026, 6, 30),
+                    effective_from=synthetic.SCHEDULE_START,
                     pit_rate=0.18,
                     levy_rate=0.05,
                     provenance=_fixture("disposal rate entry"),

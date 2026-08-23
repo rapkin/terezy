@@ -34,11 +34,12 @@ unverifiable.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from terezy.core.instruments import fund as fund_instrument
+from terezy.core.instruments import registry as instrument_registry
 from terezy.core.primitives import money
 from terezy.core.routes.venues import can_hold
 from terezy.data.declarations import loader
@@ -164,9 +165,10 @@ def resolve(
     fund_files_by_id: dict[str, Path] = {}
     files_by_id: dict[str, Path] = {}
     for path in instrument_files:
-        # ⚙ feature 006: one directory, two kinds of declaration, told apart by the one key
-        # they share. See ``loader.declared_class_of``.
-        if loader.declared_class_of(path) == fund_instrument.COLLECTIVE_INVESTMENT_FUND:
+        # ⚙ feature 006: one directory, two kinds of declaration, told apart by the one
+        # key they share and dispatched through a declared mapping rather than a branch
+        # naming a class. See ``loader.declared_class_of`` and ``LOADERS_BY_KIND``.
+        if LOADERS_BY_KIND[_kind_of(path)] is loader.fund_from_file:
             declared_fund = loader.fund_from_file(path)
             if declared_fund.id in files_by_id:
                 raise _refuse_duplicate(
@@ -1534,6 +1536,8 @@ def _check_fund_references(
                 f"add {kind.value!r} to that class's applies_to if the rule covers it, or "
                 "reference the class that does",
             )
+
+
 # 004-composed-paths: the segment bound's cross-file pass
 # ---------------------------------------------------------------------------
 #
@@ -1680,3 +1684,44 @@ def composition_from_data_root(
         ),
         composition_file=declared[0],
     )
+
+
+LOADERS_BY_KIND: Mapping[str, Callable[[Path], object]] = {
+    instrument_registry.FIXED_INCOME: loader.instrument_from_file,
+    instrument_registry.COLLECTIVE_INVESTMENT_FUND: loader.fund_from_file,
+}
+"""Which loader parses each declared ``[instrument] class``.
+
+⚙ **Feature 006.** The *vocabulary* of declaration kinds is domain knowledge and lives in
+``core.instruments.registry``; which function reads each file is the data layer's business
+and lives here, beside the loaders. Keeping them apart is what stops ``core`` needing to
+know that a file exists.
+
+A mapping rather than a branch, on ``core``'s own precedent -- *"registries are mappings of
+functions, not subclass dispatch"* (owner decision D-E). The two return different record
+types, so this is typed at ``object`` and the caller narrows immediately; that is honest
+about what the two loaders have in common, which is a path in and a declaration out and
+nothing else. :func:`_kind_of` refuses a kind the vocabulary does not contain, naming the
+file, so an unrecognised class never reaches a ``KeyError`` here.
+"""
+
+
+def _kind_of(path: Path) -> str:
+    """The declaration kind a file names, checked against the vocabulary ``core`` declares.
+
+    Two failures with different remedies, so they are reported separately: a file with no
+    ``class`` at all is :func:`loader.declared_class_of`'s error, and a file naming a class
+    this engine does not implement is this one -- which lists what would have worked,
+    because an unrecognised kind is almost always a typo.
+    """
+    declared = loader.declared_class_of(path)
+    if declared not in instrument_registry.DECLARATION_KINDS:
+        raise DeclarationError(
+            path,
+            "instrument.class",
+            f"declares {declared!r}, which is not a declaration kind this engine "
+            "implements. There is no fallback: reading an unknown kind as a bond would "
+            "fail later, against a field the author never wrote.",
+            f"one of: {', '.join(sorted(instrument_registry.DECLARATION_KINDS))}",
+        )
+    return declared

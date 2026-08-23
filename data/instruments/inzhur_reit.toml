@@ -74,7 +74,7 @@ terminates_on        = "2045-05-20"
       effective_from = "2023-01-01"
       uah_per_unit   = 37.49
       kind           = "fund_terms"
-      source         = "Pre-2025 secondary evidence for the leases' «граничний курс» ladder, recorded in specs/006-inzhur-instruments/spec.md FR-027 from the 2026-08-22 research pass. THE SOURCE GIVES THE YEAR, NOT THE DAY: the entry is dated from the first day of the attested year, which is the earliest that year can mean and therefore the reading under which the ceiling binds soonest — the conservative direction for a pegged payment. The exact effective date is part of verification task 2."
+      source         = "Pre-2025 secondary evidence for the leases' «граничний курс» ladder, recorded in specs/006-inzhur-instruments/spec.md FR-027 from the 2026-08-22 research pass. THE SOURCE GIVES THE YEAR, NOT THE DAY: the entry is dated from the first day of the attested year, which is the earliest that year can mean and therefore the reading under which the ceiling binds soonest — the conservative direction for a pegged payment. The exact effective date is part of verification task 2. ⚙ UNREACHABLE AS DECLARED, and kept on purpose: the distribution class this fund uses starts 2026-06-30 (data/tax/ua.toml), so no projectable payout can ever select this entry rather than the 2024 one below. It is retained as the evidence for the +10%/yr ladder the 2024 figure rests on — deleting it would leave that claim uncited — and it becomes reachable the day a citation lets the distribution class reach back further."
       retrieved_on   = "2026-08-22"
       verified_on    = ""
 

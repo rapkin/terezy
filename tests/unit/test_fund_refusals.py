@@ -47,6 +47,7 @@ from terezy.core.results.fund import (
 from terezy.core.results.hurdle import HurdleRate
 from terezy.core.tax.interface import TaxableEventKind, TaxClass
 from terezy.core.tax.schedule import RateEntry, RateUndeclaredBefore
+from tests import synthetic
 
 UAH: Final = Currency.UAH
 FUND_ID: Final = "synthetic_fund_guards"
@@ -60,7 +61,7 @@ PURCHASED_ON: Final = date(2027, 1, 10)
 EXIT_ON: Final = date(2027, 7, 10)
 TERMINATES_ON: Final = date(2030, 1, 10)
 HORIZON_END: Final = date(2030, 12, 31)
-SCHEDULE_FROM: Final = date(2026, 6, 30)
+SCHEDULE_FROM: Final = synthetic.SCHEDULE_START
 
 
 def _fixture(what: str) -> Provenance:

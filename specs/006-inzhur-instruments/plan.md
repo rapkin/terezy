@@ -71,9 +71,11 @@ contract tests for data-only extensibility (SC-010) and for the metric refusal (
 **Performance Goals**: none. A monthly schedule over a few years.
 
 **Constraints**: core pure and deterministic; exactly four plugin interfaces and **this
-feature adds none** — a fund implements the existing `Instrument` contract and the schedule
-lives behind the existing `TaxRule`; functional style per D-E; one imported tolerance; money
-is `float64` in a currency-tagged wrapper and a USD-equivalent term is never money.
+feature adds no fifth *registry of functions***; the schedule lives behind the existing
+`TaxRule`; a fund is a second **declaration kind** rather than an implementation of
+`Instrument` (see *The interface question* below); functional style per D-E; one imported
+tolerance; money is `float64` in a currency-tagged wrapper and a USD-equivalent term is
+never money.
 
 **Scale/Scope**: 3 new core modules, 3 touched, 3 touched data-layer modules, 4 declaration
 files (3 new, 1 migrated), ~12 test modules. Closes required tests **E1**, **E10** and
@@ -86,7 +88,7 @@ files (3 new, 1 migrated), ~12 test modules. Closes required tests **E1**, **E10
 | Principle | Gate | Verdict |
 |---|---|---|
 | **I — Honesty over precision** | No figure more confident than its inputs; refusals typed and carrying their reason | **PASS, and this feature is the principle's hardest test so far.** Every number here comes from a fund describing itself. The design answers with four structural refusals rather than four caveats: no statistical metric for an assumption-driven instrument and no field for one; a range that stays a range with no midpoint helper; a `VerificationTask` that carries no value; and a rate schedule that refuses an event before its earliest cited entry. |
-| **II — Framework, not script** | Data-only extensibility; exactly four plugin interfaces | **PASS.** No fifth interface: a fund implements `Instrument`, the schedule sits behind `TaxRule`. SC-010 is the executable claim — a third fund with different liquidity terms, spread, peg and tax classes projects correctly with zero source lines changed. FR-013 is the same claim for tax law: a legislated change is one dated entry. |
+| **II — Framework, not script** | Data-only extensibility; exactly four plugin interfaces | **PASS on data-only extensibility; the interface count is an OPEN QUESTION for the owner — see below.** SC-010 is the executable claim and it holds: a third fund with different liquidity terms, spread, peg and tax classes projects correctly with zero source lines changed, and a fourth added in a scratch directory does too. FR-013 is the same claim for tax law, and the schedule genuinely does sit behind the existing `TaxRule`. What this row may **not** claim is that a fund implements `Instrument`: it does not, and the reasons are structural. |
 | **III — Pure deterministic core** | No I/O, no clock; traceable | **PASS.** `rate_on` takes the date as an argument. The fund documents were read by a human; nothing is fetched. Every projection is a fold over declared terms. |
 | **IV — Reliability through contracts** | Property-based invariants; one tolerance; explicit failure | **PASS.** The tolerance is imported. Failure is a tagged union throughout — six typed refusals, none an exception. The boundary case that matters (in force *from* the effective date, inclusive) is tested at the boundary rather than inferred at each call site. |
 | **V — Test-first** | Worked example, invariant or golden per behaviour; no network | **PASS.** The two-class split, the three liquidity cases and the pegged sizing are hand-computed with their arithmetic checked in. 001's golden is the migration's proof. |
@@ -96,6 +98,56 @@ files (3 new, 1 migrated), ~12 test modules. Closes required tests **E1**, **E10
 
 **No violations requiring justification.** Two items of genuine added complexity are recorded
 in Complexity Tracking.
+
+### The interface question, answered honestly
+
+*Added during implementation, 2026-08-23, replacing a claim this plan made that the code
+does not support.*
+
+**A fund does not implement `Instrument`, and it cannot without making the type system
+lie.** `InstrumentOps` is the `Instrument` interface of Principle II — `events`,
+`tax_classes`, `constraints`, dispatched from `core.instruments.registry.REGISTRY`. A fund
+is not in that registry, and three mismatches are why:
+
+1. **Different inputs.** `EventsFn` takes `Assumptions`: a consumption method and a coupon
+   policy. A fund run also needs a liquidity mode, whether the discretionary buyback is on
+   offer, an exit date, a chosen point inside a stated range, and an exchange-rate
+   assumption. Nothing in this project has a default, so widening `Assumptions` would force
+   every bond run to state a liquidity mode it has no use for.
+2. **Different failures.** `PurchaseAfterCutoff`, `RedemptionRefused`, `PegUnsizable` and
+   `AwaitingVerification` are none of them `InstrumentFailure`, and each is a fact about the
+   money that has to reach the caller.
+3. **A different arity of answer.** A fund stating a range with no chosen point yields
+   **two** projections. No `EventsFn` signature expresses that, and collapsing it to one is
+   precisely the midpoint the feature exists to refuse.
+
+Making `InstrumentOps` generic over both was considered and rejected: it puts `Any` in the
+registry and forces every call site to narrow before it can call, which is a registry that
+type-checks nothing while advertising uniformity it cannot deliver. Two records that are
+honestly different beat one that is uniform in name only.
+
+**What the code therefore does.** `core.instruments.registry` declares the *vocabulary* —
+`DECLARATION_KINDS`, naming both `fixed_income` and `collective_investment_fund` — and
+`data.declarations.resolver.LOADERS_BY_KIND` maps each to its loader, so dispatch is a
+mapping over a declared name rather than an `if` naming one class. `REGISTRY` still holds
+only what genuinely implements `InstrumentOps`. The dead `fund.tax_classes()` this plan's
+original claim had left behind is deleted.
+
+**What is left open, and for whom.** Principle II permits exactly four plugin interfaces and
+says a fifth needs a constitution amendment. This feature adds no fifth registry of
+functions — there is no `FundOps` — but it does add a second declaration kind dispatched by
+the same `class` key, which is arguably the substance of the rule if not its letter.
+**That is a constitutional call and it is the owner's, not an implementer's.** It is
+recorded here and as a `[[future]]` entry in `specs/features.toml` rather than settled by a
+paragraph.
+
+**What decides it, when it is decided.** Not tidiness — what generic code has to consume
+both. Today that is `data.manifest.input_refs`, which already works per kind, and
+`resolver.Declarations`, which keys both into one id space. What feature 010 needs in order
+to rank a bond against a fund in one candidate set is a common **result**: an after-tax,
+after-cost figure carrying its provenance and its exclusions. `core.results.fund.
+BesideTheHurdle` is the first of those. The unification belongs at the result layer, and
+widening the instrument interface would not have advanced it by a line.
 
 ### Post-Phase-1 re-evaluation
 

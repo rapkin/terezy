@@ -181,13 +181,33 @@ it looks like arithmetic.
 feature adds two instruments and one rate shape; if it needed a new layer, the plugin
 boundary 001 drew would have been wrong.
 
-## D13 — Feature 001's golden must not move, and that is the migration's proof
+## D13 — 001's golden is evidence, and only if the dates were chosen first
 
-**Decision.** `tests/golden/ovdp_synthetic_a.golden.txt` is byte-identical after the
-schedule migration. Get it green early and keep it there.
+**Decision (rewritten during implementation, 2026-08-23; the original wording is quoted
+below because the reason for the rewrite is worth more than the rule).**
+`tests/golden/ovdp_synthetic_a.golden.txt` must show **no change to any computed figure**
+after the schedule migration: every figure, every schedule row, every tax charge, the whole
+folded ledger and the projection digest identical. Its `== inputs ==` block **will** change,
+because it records the digest of every declaration file the run was fed and the migration
+edits one of them — that is the artefact working, not the migration leaking.
 
-**Rationale.** FR-014 in executable form. The exempt class charging exactly zero on every
-event, before and after, is the only evidence that a schema migration of the tax engine
-changed no number — and it is cheap evidence, because the file already digests every input.
-See D2 for the one way this can legitimately fail, and why the answer is a citation rather
-than a widened date.
+**And the golden is evidence only in one direction.** It can tell you a schema change moved
+no arithmetic. It cannot tell you a *date* is right, and it must never be consulted while
+choosing one. The order is: settle every `effective_from` on its own citation (D2), then run
+the golden and read what it says.
+
+**The original wording, and why it was wrong.** D13 said *"001's golden must not move, and
+that is the migration's proof."* Read as written that makes a green golden a **constraint on
+the input** rather than a report on the output — and it worked exactly that way. Faced with
+two attested dates for the exempt class, the implementer took the earlier one and recorded
+the tiebreaker as "the later one would break 001's golden". The date happened to be
+defensible; the reasoning was circular, and a rule that can produce a circular justification
+will eventually produce a wrong date with a green suite behind it.
+
+The failure is instructive because nothing caught it: no gate can see a date chosen for the
+wrong reason, which is the same blind spot D2 exists to cover from the other side. The
+protection is procedural — dates first, artefact second — and it is now stated here rather
+than left to whoever reads the golden next.
+
+See D2 for what a legitimate date looks like, and the implementation notes in `tasks.md`
+for the citations actually used.

@@ -130,6 +130,10 @@ INSTRUMENT_ID: Final = "ovdp_synthetic_a"
 OWNER_ID: Final = "owner-1"
 QUANTITY: Final = 10.0
 COST: Final = 10_000.0
+# ⚙ This run projects `ovdp_synthetic_a`, whose first *taxable* event is its 2026-07-15
+# coupon -- fifteen days after the earliest entry the `ua_government_bond` exemption's
+# citation reaches. That dependency is asserted, once, in
+# `tests/contract/test_declaration_loading.py::TestTheShippedRegistryRefusesAnUncoveredEvent`.
 PURCHASED_ON: Final = date(2026, 1, 15)
 HORIZON_END: Final = date(2028, 1, 31)
 

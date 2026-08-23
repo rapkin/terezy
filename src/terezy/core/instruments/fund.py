@@ -58,9 +58,6 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.primitives.provenance import Provenance
     from terezy.core.tax.interface import TaxableEventKind
 
-COLLECTIVE_INVESTMENT_FUND: Final = "collective_investment_fund"
-"""The declared ``class`` of a fund file. The only dispatch key; never the fund's ``id``."""
-
 LiquidityMode = Literal["practice", "legal"]
 """Which set of liquidity terms a projection assumed.
 
@@ -403,11 +400,6 @@ def lot_id_for(holding: Holding) -> str:
     same reason: a counter or a clock would break determinism (C4).
     """
     return f"{holding.instrument_id}@{holding.purchased_on.isoformat()}"
-
-
-def tax_classes(declaration: FundDeclaration) -> Mapping[TaxableEventKind, str]:
-    """Which declared class governs each kind of income this fund produces."""
-    return declaration.tax_classes
 
 
 def entry_markup_for(declaration: FundDeclaration, mode: LiquidityMode) -> float:

@@ -53,7 +53,6 @@ from typing import TYPE_CHECKING, Any, Final, Literal, cast
 
 from pydantic import BaseModel, ValidationError
 
-from terezy.core.instruments import fund as fund_instrument
 from terezy.core.instruments import registry as instrument_registry
 from terezy.core.instruments.fund import (
     CapEntry,
@@ -2469,7 +2468,7 @@ def fund_from_file(path: Path) -> FundDeclaration:
         path,
         f"{prefix}.class",
         table.instrument_class,
-        {fund_instrument.COLLECTIVE_INVESTMENT_FUND: "a collective-investment fund"},
+        {instrument_registry.COLLECTIVE_INVESTMENT_FUND: "a collective-investment fund"},
         "fund instrument class",
     )
     if not table.is_assumption_driven:
@@ -2618,6 +2617,8 @@ def declared_class_of(path: Path) -> str:
             'declare class = "fixed_income" or class = "collective_investment_fund"',
         )
     return declared
+
+
 # 004-composed-paths: the segment bound
 # ---------------------------------------------------------------------------
 #

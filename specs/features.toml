@@ -108,3 +108,14 @@ note  = "owner-requested (2026-08-22): goals in non-base currencies once multi-j
 id    = "forced-sale-policy"
 after = ["009-tax-depth"]
 note  = "owner-deferred (2026-08-22): which positions a forced tax-payment sale draws on and how it is sized; until then insufficient cash is a typed insolvency report — E7 closes only partially in 009"
+
+[[future]]
+id    = "martial-law-ends-one-belief-two-places"
+after = ["006-inzhur-instruments"]
+note  = "The 5% military levy reverts to 1,5% 'з 1 січня року, наступного за роком, у якому буде припинено або скасовано воєнний стан' (Закон № 4015-IX, zakon.rada.gov.ua/laws/show/4015-20). The reversion has NO date -- it is conditioned on an event -- and that same event is already declared as a belief in data/scenarios/war_end.toml, where it switches the route set. So a dated tax schedule and a scenario regime hang off one assumption and nothing in the system knows it: a run can assume the war ends for routing and simultaneously charge 5% for ever. Needs a rate entry whose effective date is a regime transition rather than a date, which is a real modelling question (a schedule keyed by a scenario is no longer a pure fold over dates) and not a tidy-up. Recorded 2026-08-23 during 006; deliberately not built."
+
+[[future]]
+id    = "is-a-fund-a-fifth-plugin-interface"
+after = ["006-inzhur-instruments"]
+note  = "Principle II permits exactly four plugin interfaces and says a fifth needs an amendment. 006 added no fifth registry of functions, but it did add a second declaration kind dispatched by the same `[instrument] class` key, with its own loader, its own assumptions record, its own failures and a projection that can return two results instead of one. A fund does NOT implement `InstrumentOps` and cannot without putting `Any` in the registry -- the reasoning is in specs/006-inzhur-instruments/plan.md, 'The interface question, answered honestly'. Whether that is the substance of a fifth interface is a constitutional call for the owner. What should decide it: what generic code must consume both, which today is only the manifest and the resolver's shared id space, and what 010 needs to rank a bond against a fund -- a common *result* record, not a common instrument interface."
+

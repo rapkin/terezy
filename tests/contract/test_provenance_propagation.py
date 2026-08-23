@@ -144,6 +144,10 @@ def _from_code(*, verified: bool) -> Projection:
     )
 
 
+# ⚙ This run projects `ovdp_synthetic_a`, whose first *taxable* event is its 2026-07-15
+# coupon -- fifteen days after the earliest entry the `ua_government_bond` exemption's
+# citation reaches. That dependency is asserted, once, in
+# `tests/contract/test_declaration_loading.py::TestTheShippedRegistryRefusesAnUncoveredEvent`.
 def _from_data() -> Projection:
     """The same purchase, from the declaration files, through the loader.
 

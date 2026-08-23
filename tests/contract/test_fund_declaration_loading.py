@@ -30,7 +30,7 @@ from pathlib import Path
 
 import pytest
 
-from terezy.core.instruments.fund import COLLECTIVE_INVESTMENT_FUND
+from terezy.core.instruments.registry import COLLECTIVE_INVESTMENT_FUND
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.tax.interface import TaxableEventKind
@@ -166,7 +166,9 @@ class TestTheClassKeyChoosesTheLoader:
 
     def test_a_file_with_no_class_is_refused_rather_than_guessed(self, tmp_path: Path) -> None:
         broken = _written(
-            tmp_path, "unlabelled.toml", _drop_line(REIT.read_text(encoding="utf-8"), "class ")
+            tmp_path,
+            "unlabelled.toml",
+            _drop_line(REIT.read_text(encoding="utf-8"), "class                ="),
         )
         with pytest.raises(DeclarationError) as raised:
             loader.declared_class_of(broken)
@@ -177,6 +179,34 @@ class TestTheClassKeyChoosesTheLoader:
         with pytest.raises(DeclarationError) as raised:
             loader.declared_class_of(broken)
         _assert_names(raised.value, file=broken, field_path="instrument")
+
+    def test_an_unknown_kind_is_refused_by_the_resolver_naming_what_exists(
+        self, tmp_path: Path
+    ) -> None:
+        """The dispatch is a mapping over a declared vocabulary, so it can say what is known.
+
+        A branch naming one class could only say "this is not a fund". This says which
+        kinds exist, which is the difference between an error and a remedy.
+        """
+        (tmp_path / "instruments").mkdir()
+        (tmp_path / "tax").mkdir()
+        (tmp_path / "tax" / "ua.toml").write_text(
+            (DATA_ROOT / "tax" / "ua.toml").read_text(encoding="utf-8"), encoding="utf-8"
+        )
+        (tmp_path / "instruments" / "odd.toml").write_text(
+            _replace(
+                REIT.read_text(encoding="utf-8"),
+                'class                = "collective_investment_fund"',
+                'class                = "structured_note"',
+            ),
+            encoding="utf-8",
+        )
+        with pytest.raises(DeclarationError) as raised:
+            resolver.from_data_root(tmp_path)
+        assert raised.value.field_path == "instrument.class"
+        assert "structured_note" in str(raised.value)
+        assert COLLECTIVE_INVESTMENT_FUND in str(raised.value)
+        assert "fixed_income" in str(raised.value)
 
     def test_a_fund_declaring_a_class_the_fund_loader_does_not_implement_is_refused(
         self, tmp_path: Path

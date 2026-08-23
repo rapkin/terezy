@@ -40,7 +40,9 @@ from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.results import project
+from terezy.core.results.project import Projection
 from terezy.core.tax.interface import TaxableEventKind
+from terezy.core.tax.schedule import RateUndeclaredBefore
 from terezy.data.declarations import loader, resolver
 from terezy.data.declarations.errors import DeclarationError
 
@@ -823,6 +825,15 @@ class TestDatedRateSchedules:
         """
         return loader.tax_classes_from_file(TAX_UA)[-1].id
 
+    def _last_effective_from(self) -> str:
+        """The effective date of that class's last entry, so a duplicate really duplicates.
+
+        Derived for the same reason the id is: the shipped classes are dated by what their
+        citations attest, and those dates move when a better citation is found. A literal
+        here would quietly stop testing duplication the day one did.
+        """
+        return loader.tax_classes_from_file(TAX_UA)[-1].rates[-1].effective_from.isoformat()
+
     def _without_the_schedule(self) -> str:
         """The shipped tax file with its ``[[...rate]]`` block cut off.
 
@@ -867,8 +878,11 @@ class TestDatedRateSchedules:
 
     def test_two_entries_with_the_same_effective_date_are_refused(self, tmp_path: Path) -> None:
         """Two rates in force on one date has no meaning, and neither may win by order."""
-        text = TAX_UA.read_text(encoding="utf-8") + self._schedule_block("2026-06-30")
-        # The block lands under the file's *last* class, whichever that is.
+        # The block lands under the file's *last* class, whichever that is, and repeats
+        # that class's own last effective date.
+        text = TAX_UA.read_text(encoding="utf-8") + self._schedule_block(
+            self._last_effective_from()
+        )
         broken = _write(tmp_path, "duplicate_dates.toml", text)
         with pytest.raises(DeclarationError) as raised:
             loader.tax_classes_from_file(broken)
@@ -971,6 +985,94 @@ class TestDatedRateSchedules:
         assert declared.rates[0].effective_from == date(2099, 1, 1)
 
 
+class TestTheShippedRegistryRefusesAnUncoveredEvent:
+    """FR-012 firing on **shipped** data, through the real registry. Nothing is mutated here.
+
+    Every other refusal in this module is a deliberately broken file written to a scratch
+    directory. This one is the repository as it stands: `ovdp_synthetic_b` pays its first
+    coupon on 2026-06-02, and the citation behind `ua_government_bond` reaches back only to
+    2026-06-30, so a holding bought at issue has an event no declared rate covers.
+
+    **Why that state is kept rather than fixed.** The obvious tidy-up is to move the
+    fixture's invented issue date, and it was tried and reverted: it makes every gate green
+    while removing the only place a reader can watch the refusal happen on real data. The
+    other tidy-up — widening the exemption's effective date — is the invented legal fact D2
+    forbids. So the refusal stays, and this test is what stops it being "fixed" by accident.
+    """
+
+    def _projected(self, purchased_on: date) -> object:
+        declarations = resolver.from_data_root(DATA_ROOT)
+        return project.project(
+            declarations.instruments["ovdp_synthetic_b"],
+            Holding(
+                owner_id="owner-1",
+                instrument_id="ovdp_synthetic_b",
+                quantity=10.0,
+                purchased_on=purchased_on,
+                cost=Money(10_000.0, Currency.UAH, prov.EMPTY),
+            ),
+            DateRange(start=purchased_on, end=date(2029, 3, 31)),
+            Assumptions(consumption_method="fifo", coupon_policy="hold_cash"),
+            tax_classes=declarations.tax_classes,
+        )
+
+    def test_a_holding_bought_at_issue_is_refused_naming_the_class_and_the_date(self) -> None:
+        outcome = self._projected(date(2026, 3, 2))
+        assert isinstance(outcome, RateUndeclaredBefore), outcome
+        assert outcome.tax_class_id == "ua_government_bond"
+        assert outcome.event_date == date(2026, 6, 2)
+        assert outcome.earliest_declared == date(2026, 6, 30)
+
+    def test_the_refusal_says_what_a_reader_would_have_to_go_and_find(self) -> None:
+        outcome = self._projected(date(2026, 3, 2))
+        assert isinstance(outcome, RateUndeclaredBefore)
+        assert "cited legal fact" in outcome.reason
+        assert "dated entry" in outcome.reason
+
+    def test_nothing_is_charged_at_the_earliest_rate_instead(self) -> None:
+        """The failure this forecloses: a zero that looks like the exemption applying."""
+        outcome = self._projected(date(2026, 3, 2))
+        assert not hasattr(outcome, "charges")
+        assert not hasattr(outcome, "hurdle")
+
+    def test_a_holding_bought_inside_the_covered_window_projects_completely(self) -> None:
+        """So the refusal is about the date and not about the declaration being broken."""
+        outcome = self._projected(date(2026, 7, 2))
+        assert isinstance(outcome, Projection), outcome
+        assert outcome.hurdle.total_tax.amount == 0.0
+
+    def test_issue_a_is_covered_by_fifteen_days_and_that_margin_is_deliberate(self) -> None:
+        """Four checked-in runs of issue A depend on this margin. It was luck; make it a claim.
+
+        `ovdp_synthetic_a` is issued 2026-01-15 and pays its first coupon on 2026-07-15,
+        fifteen days after the earliest entry the exemption's citation reaches. A purchase
+        is not a taxable event, so the January date is irrelevant and the July one is not.
+
+        The runs that rest on this, and would otherwise fail somewhere unhelpful if either
+        date moved:
+
+        * `tests/golden/test_end_to_end_ovdp.py`
+        * `tests/contract/test_provenance_propagation.py`
+        * `tests/invariants/test_determinism.py`
+        * `tests/contract/test_data_only_extensibility.py`
+
+        If a better citation moves the exemption **earlier**, this test keeps passing and
+        the margin simply widens. If one moves it **later** than 2026-07-15, this fails
+        first and says which four modules to re-date — which is the whole point of writing
+        the dependency down rather than leaving four suites to discover it separately.
+        """
+        declarations = resolver.from_data_root(DATA_ROOT)
+        exemption = declarations.tax_classes["ua_government_bond"]
+        earliest = min(entry.effective_from for entry in exemption.rates)
+        first_taxable_event = date(2026, 7, 15)
+        assert earliest <= first_taxable_event, (
+            f"the exemption now starts {earliest.isoformat()}, after issue A's first "
+            f"coupon on {first_taxable_event.isoformat()}. The four modules named in this "
+            "test's docstring project issue A and will all fail; re-date their holdings "
+            "rather than widening the exemption's effective date."
+        )
+
+
 class TestTheBatteryCoversTheContract:
     """The battery is only a proof of SC-004 if it covers every row of the table.
 
@@ -998,6 +1100,7 @@ class TestTheBatteryCoversTheContract:
             "TestUnknownConventionName",
             "TestNonPositiveAmounts",
             "TestDatedRateSchedules",
+            "TestTheShippedRegistryRefusesAnUncoveredEvent",
             "TestMalformedFile",
             "TestNoPydanticTypeEscapes",
             "TestAnImpossibleInstrumentIsNotALoadError",

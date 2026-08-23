@@ -120,6 +120,7 @@ from terezy.core.results import fund as fund_results
 from terezy.core.results.fund import FundAssumptions, FundProjection
 from terezy.core.tax.interface import TaxableEventKind, TaxClass
 from terezy.core.tax.schedule import RateEntry
+from tests import synthetic
 
 pytestmark = pytest.mark.worked_example
 
@@ -191,7 +192,7 @@ def _fixture_source(what: str) -> Provenance:
 def _rates(pit: float, levy: float, name: str) -> tuple[RateEntry, ...]:
     return (
         RateEntry(
-            effective_from=date(2026, 6, 30),
+            effective_from=synthetic.SCHEDULE_START,
             pit_rate=pit,
             levy_rate=levy,
             provenance=_fixture_source(f"rate entry for {name}"),
@@ -393,7 +394,7 @@ class TestTheTwoClassesInOneRun:
 
     def test_each_distribution_line_names_the_dated_entry_that_taxed_it(self) -> None:
         for line in _projected("practice").distributions:
-            assert line.rate_effective_from == date(2026, 6, 30)
+            assert line.rate_effective_from == synthetic.SCHEDULE_START
             assert line.tax_class_id == DISTRIBUTION_CLASS
 
 

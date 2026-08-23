@@ -384,88 +384,97 @@ here because they are the three facts a reviewer checks first.*
 
 ### T004 — the effective dates, and the citation that attests each
 
-**Settled, and it is the one judgement call in the feature. The owner should check it.**
+**Revised 2026-08-23 after review.** The first pass reported "no citation in hand reaches
+further back" having queried four of the six §12 sources. It was wrong: the military levy's
+commencement is a matter of published law and it is retrievable.
 
-`SIMULATOR_SPEC.md` §12 lists the sources; none of them dates a rate's commencement. The
-one dated sentence in the whole source list is on the PwC page — *"Bank interest, as well
-as most other passive income, is subject to 18% PIT starting from 1 January 2016"* — and
-it dates the PIT only, not the 5% levy, so it cannot date a PIT-and-levy pair.
+**Rule A — a pair is dated by the later of its halves.** **Rule B — where a citation attests
+a value but not when it commenced**, split into B1 (the choice changes a figure: take the
+reading that claims less) and B2 (it changes no figure: take the earliest date the citation
+itself asserts, recorded as a citation-currency date). Both rules and the reason they differ
+are written into `data/tax/ua.toml`'s header, and **every entry names the rule that dated
+it** — that is the review finding generalised: two entries in this repository take opposite
+readings of a vague citation, and a reader who cannot see which rule applied cannot tell a
+principle from an accident.
 
-The two other §12 sources that carry Ukrainian prose were checked for a dated statement.
-The YANKIV page discusses the levy rising to 5% and the ОВДП exemption **without a date or
-a law number**; the State Tax Service, Oschadbank, Invest-Tandem and KINTO pages could not
-be read (HTTP 403 / redirect loop). Nothing in §12 dates the exemption, the 9% ІСІ rate,
-or the 5% levy.
+| Class | `effective_from` | Rule | What attests it |
+|---|---|---|---|
+| `ua_investment_profit` (18% / 5%) | **2024-12-01** | A, both halves legally dated | Levy: Закон України № 4015-IX від 10.10.2024, published «Голос України» 30.11.2024 № 179, in force the day after publication; the 5% applies *"до доходів, нарахованих … починаючи з 1 грудня 2024 року"*. PIT: PwC, *"18% PIT starting from 1 January 2016"*. Later of the two = 2024-12-01 |
+| `ua_ci_fund_distribution` (9% / 5%) | **2026-06-30** | A over B2 | Levy half legally dated 2024-12-01 as above; **the 9% PIT half has no retrievable commencement**, so B2 dates it at the citation's own "Last reviewed - 30 June 2026". Rule A takes the later. Dating the pair at 2024-12-01 would assert the 9% applied then, which no source says |
+| `ua_government_bond` (0% / 0%) | **2026-06-30** | B2 | PwC lists interest on certain state securities among exempt incomes and states the levy follows PIT; no commencement for either, and the Tax Code's own text is not retrievable. B2 rather than B1 because the class has one entry and both halves are zero: the date changes no figure, only how far back a run is possible |
 
-So, per research.md D2 — *"the schedule simply starts at the attested date"* — every entry
-is dated by **the earliest date its citation attests the rate was in force**, which is the
-cited page's own stated currency: the PwC page carries **"Last reviewed - 30 June 2026"**.
-Each entry is therefore `effective_from = "2026-06-30"`, no earlier entry is invented, and
-every event before that date is refused (FR-012).
+**Sources, and which resolved.** `zakon.rada.gov.ua/laws/show/4015-20` (the law: title,
+number, adoption date, the commencement rule, the 5% and its martial-law reversion) and
+`ibuhgalter.net/news/25264` (publication date, and the accrual rule) both resolve and are
+cited. `tax.gov.ua` returns HTTP 403 and `roedl.ua` presents a bad certificate; `eba.com.ua`
+403s and `business.diia.gov.ua` serves no text to a fetcher. `itandem.com.ua` and
+`kinto.com` 403 as well. The entries record which could not be retrieved, so the next reader
+does not spend the attempts again.
 
-| Class | `effective_from` | What attests it |
-|---|---|---|
-| `ua_government_bond` (0% / 0%) | 2026-06-30 | PwC Ukraine — individual income determination, §12: lists *"Interest from securities issued by certain state bodies of Ukraine"* among exempt incomes, and *"the 5% military tax applies to such income if it was taxed with PIT"*. Page states **"Last reviewed - 30 June 2026"** |
-| `ua_ci_fund_distribution` (9% / 5%) | 2026-06-30 | Same page: *"Dividends paid by non-residents, mutual investment funds, and non-payers of CIT in Ukraine are taxed at 9%"* + the 5% levy sentence. Same review date |
-| `ua_investment_profit` (18% / 5%) | 2026-06-30 | Same page: *"Bank interest, as well as most other passive income, is subject to 18% PIT"* + the 5% levy sentence. Same review date |
+**No earlier entry was written**, and it was tried. A 18% + 1,5% entry needs a commencement
+for the 1,5% levy: Закон № 1621-VII (31.07.2014) is listed on the rada portal but the portal
+serves no article text for it, and the source attesting the rise attests only that 1,5%
+applied *through* November 2024, not from when. So the schedule starts 2024-12-01 and
+earlier events refuse — which is the rule working, not a gap.
 
-**Why not a later date.** `retrieved_on` (2026-08-21) is also attested and would be
-*safer*, but it falls after 001's first taxable event (2026-07-15) and the plan is explicit
-that the answer to that is a citation for an earlier entry, never a widened date. The
-review date **is** that citation, it is printed on the page itself, and it is the earliest
-date the source supports.
+**The reasoning error the first pass made, recorded because the rule that produced it is
+now fixed.** Faced with two attested dates for the exempt class, it chose the earlier and
+justified it as "the later one would break 001's golden". That is circular: 2026-08-21 is
+not a *widened* date, it is a strictly narrower and better-attested one, and the golden had
+no business in the choice. The date it landed on is still 2026-06-30, but now for a stated
+reason (B2) that does not mention the golden. `research.md` D13, which invited the
+circularity, is rewritten.
 
-**Why not an earlier one.** No citation in hand reaches further back. The military levy's
-1.5% → 5% step is recorded in `SIMULATOR_SPEC.md` §4.5.1 as *"December 2024"* — a month is
-not a date, and the entry is deliberately **not** written.
-
-**Consequence, accepted deliberately.** `data/instruments/ovdp_synthetic_b.toml` had its
-first coupon on 2026-06-02 and was correctly refused. Its **invented** issue and maturity
-dates moved four months later (2026-07-02 / 2029-07-02). 30/360 quarters are exactly a
-quarter whatever the calendar says, so not one hand-computed figure changed. An invented
-date moved; the cited one did not.
+**A consequence that is kept rather than fixed.** `data/instruments/ovdp_synthetic_b.toml`
+pays its first coupon on 2026-06-02, before the exemption's earliest entry, so a holding
+bought at its issue date is refused. The first pass moved the fixture's invented dates to
+make that go away; that has been **reverted**, because it removed the only place a reader
+can watch FR-012 fire on shipped data — and the disclosure paragraph justifying the move
+was wrong on its own terms (30/360 is calendar-independent for accrual, not for
+discounting: `modified_following` moves `occurred_on`, the IRR measures to it, and the shift
+moved `nominal_ytm` by 1.4e-5 under an assertion band of ±0.01). The refusal is now asserted
+in `tests/contract/test_declaration_loading.py::TestTheShippedRegistryRefusesAnUncoveredEvent`.
 
 ### T016 — what moved in 001's golden, and why
 
-**No figure moved.** `tests/golden/ovdp_synthetic_a.golden.txt` changed on exactly two
-lines, both in `== inputs ==`, both a file digest:
+**No computed figure moved, and the projection digest is unchanged across the whole
+feature**: `sha256:395d18a4f5d7e1c73cefa5ecf8e197e747ff6ccb84081075e3f212212e98d406`. Total tax is still exactly `0.0 UAH`, and every figure, schedule row,
+tax charge and ledger line in `tests/golden/ovdp_synthetic_a.golden.txt` is byte-identical
+to the pre-branch artefact from `== figures ==` to the end.
+
+What did change is the `== inputs ==` block, which records the digest of every declaration
+file the run was fed — deliberately, because *"a change to a declaration file **should**
+fail this test, loudly, on the line that names the file"* (the module's own docstring).
+Re-derived from the files on disk rather than transcribed:
 
 ```
--tax_class  ua_government_bond   tax/ua.toml   sha256:5806064e…
-+tax_class  ua_government_bond   tax/ua.toml   sha256:b089dcbe…
--instrument ovdp_synthetic_b     …ovdp_synthetic_b.toml   sha256:3293c9bd…
-+instrument ovdp_synthetic_b     …ovdp_synthetic_b.toml   sha256:c906f767…
+tax/ua.toml                       sha256:79af4d487ea3a7cf0366cc1ffbea3b5ff46805bb5c2bc91e18741da16b2ca473
+instruments/ovdp_synthetic_b.toml sha256:d28b43c7a66d320ecb7e6f9e5c3195a68f36fb4eb0ad11cf11b688a9c85df0f5
 ```
 
-Byte-identical everywhere else: every figure, every schedule row with its gross/tax/net,
-every tax charge, the whole folded ledger, and — the assertion that matters — the
-projection digest at the foot, `sha256:395d18a4f5d7e1c73cefa5ecf8e197e747ff6ccb84081075e3f212212e98d406`,
-**unchanged**. Total tax is still exactly `0.0 UAH`.
+plus new `fund` and `tax_class` rows for the declarations this feature adds.
+`tests/golden/ramp_comparison.golden.txt` moved on its `observation_kinds` digest for the
+same reason, three fund kinds having been declared; its own comparison digest is unchanged.
 
-The two digest lines could not have stayed: the golden records the digest of every
-declaration file it was fed, deliberately, *"because a change to a declaration file
-**should** fail this test — loudly, on the line that names the file"* (its own module
-docstring). `data/tax/ua.toml` was migrated to schedule form and `ovdp_synthetic_b.toml`
-had its invented dates moved, so both digests move. That is the artefact working, not the
-migration leaking.
-
-`tests/golden/ramp_comparison.golden.txt` moved on one line for the same reason — the
-`observation_kinds` digest, after three fund-related kinds were declared (T002). Its own
-comparison digest `sha256:175d37310f623fd11d7913fe88fcf116421c06999486b7a178c1734f431db875`
-is unchanged.
+⚙ **`research.md` D13 originally read "001's golden must not move, and that is the
+migration's proof".** Byte-identity was never achievable — the artefact digests its own
+inputs — and, worse, the wording turned the golden into a constraint on the dates rather
+than a report on the arithmetic. D13 is rewritten to say what is true: the golden is
+evidence that a schema change moved no arithmetic, and it is evidence only if the dates were
+settled on their own citations first.
 
 ### T053 — the gates on the last commit, and the delta from T001
 
 | Gate | Baseline (T001) | Now | Delta |
 |---|---|---|---|
-| `pytest --cov` | 1198 passed | **1407 passed** | +209 |
-| coverage (floor 90%) | 99.77% | **99.51%** | −0.26 pt |
-| `pytest -m "contract or invariant"` | — | **642 passed**, 765 deselected | — |
-| `check_provenance.py` | 0 errors, 24 unverified, 12 files | **0 errors, 52 unverified, 16 files** | +28 unverified, +4 files |
+| `pytest --cov` | 1198 passed | **1893 passed** | +695 (includes 004, 005 and the CPI series, merged in) |
+| coverage (floor 90%) | 99.77% | **99.57%** | −0.20 pt |
+| `pytest -m "contract or invariant"` | — | **864 passed**, 1029 deselected | — |
+| `check_provenance.py` | 0 errors, 24 unverified, 12 files | **0 errors, 463 unverified, 17 files** | the jump is the merged-in CPI series, which is one cited observation per month |
 | `ruff check` / `ruff format --check` | clean | clean | — |
-| `mypy` (strict) | clean, 144 files | clean, **156 files** | +12 |
+| `mypy` (strict) | clean, 144 files | clean, **189 files** | +45 |
 | `lint-imports` | 4 contracts kept | 4 kept, 0 broken | — |
 
-The 28 new unverified values are the expected state, not a regression: every term of both
+The new unverified values are the expected state, not a regression: every term of both
 real funds and every new tax rate entered with a citation and an **empty** verification date
 (FR-002). The gate reports them; it does not fail on them.
