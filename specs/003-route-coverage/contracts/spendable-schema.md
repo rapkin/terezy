@@ -80,6 +80,14 @@ a data root with no spendable file must still be able to cost a ramp.
 ## Provenance gate
 
 `scripts/check_provenance.py` scans `SOURCED_DIRS = ("tax", "instruments", "routes",
-"channels")`. `spendable/` is not among them and is not added: there is no observed value in
-the file (research.md D4). A task asserts the gate stays green with the file present rather
-than assuming it.
+"channels")`, and `spendable/` is not added to it: there is no observed value in the file
+(research.md D4).
+
+⚙ **Amended 2026-08-23, after the 002 review made the gate fail-closed.** Not being in
+`SOURCED_DIRS` is no longer sufficient — the gate now errors on any directory under `data/`
+that is in neither `SOURCED_DIRS` nor `EXEMPT_DIRS`, because an allowlist made a new directory
+the one place the gate could not see. So `spendable` is named in **`EXEMPT_DIRS`, with its
+reason recorded beside it**, in the voice of the `streams` entry it mirrors. The intent of D4 is
+unchanged and the mechanism is stricter: the exemption now has to be *argued in the script* to
+exist at all. The tests assert both halves — not in `SOURCED_DIRS`, and in `EXEMPT_DIRS` with a
+non-empty reason — rather than assuming either.

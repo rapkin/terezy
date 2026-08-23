@@ -14,6 +14,7 @@ Everything here is versioned, sourced, dated, and reviewed in git like code
 | `routes/` | Funding and exit routes, **declared in pairs**: legs, caps, rails, one entry per `(provider × currency path × venue)` (spec §4.3). |
 | `channels/` | Two-sided FX quotes per named channel — official, interbank, bank non-cash, cash desk, card, peer-to-peer (spec §4.3.1, FR-010). |
 | `streams/` | **Per-owner** income streams: currency, amount, cadence, arrival venue, indexation (spec §4.2). |
+| `spendable/` | **Per-owner** endpoints where money counts as having come back out: base currency only, at the venues the owner actually spends from (003 FR-004). |
 | `tax/` | Jurisdiction rule packs with dated rate schedules (spec §4.5). |
 | `scenarios/` | FX paths, discrete events, regime transitions, risk assumptions (spec §4.3.4, §4.6). |
 | `strategies/` | Named allocations, per income stream (spec §5.1). |
@@ -68,10 +69,18 @@ outside the simulator entirely: the tool takes net-of-income-tax amounts as inpu
 the field exists only so the deployable figure is not overstated. A rate the engine
 *applies to a taxable event* needs a source; a rate the owner states about his own
 payslip does not. `scripts/check_provenance.py` therefore scans `tax/`, `instruments/`,
-`routes/` and `channels/` — and not `streams/`. `strategies/` carries the assumption
-exemption too: a named allocation is the owner's decision, and a strategy file that ever
-carries a market observation moves that value into a sourced directory instead of
-widening the exemption.
+`routes/` and `channels/`, and names `streams/` in its `EXEMPT_DIRS` with that reason
+attached. `strategies/` carries the assumption exemption too: a named allocation is the
+owner's decision, and a strategy file that ever carries a market observation moves that
+value into a sourced directory instead of widening the exemption.
+
+`spendable/` carries the **same exemption as `streams/`**, and it is the narrowest case of
+all: an owner id, a venue id and a currency code. Where a person's money counts as having
+come back out is a fact about his life, not an observation of the world, and there is no
+number in the file for a source to vouch for. It is listed in `EXEMPT_DIRS` by name with
+that reason, which is the only way a directory is allowed to go unscanned; if a *number*
+ever appears there — a spending limit, a fee — the value moves to a sourced directory
+rather than the exemption widening to cover it.
 
 The two lists are **exhaustive, and the gate is fail-closed**: every directory under
 `data/` is either scanned or exempted *by name with its reason* in the script, files at

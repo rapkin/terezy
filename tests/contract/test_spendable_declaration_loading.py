@@ -15,9 +15,16 @@ rendering does, and it is exactly what the loader adapts ``ValidationError`` to 
 
 **The last two tests are the provenance gate, confirmed rather than assumed** (research.md D4).
 The spendable list carries no observed value -- an id, a currency code, and the owner's statement
-about his own life -- so ``scripts/check_provenance.py`` does not scan ``data/spendable/`` and
-``SOURCED_DIRS`` is not extended. If someone ever had to extend it, a number leaked into the
-file, and that is the finding these two tests exist to make loud.
+about his own life -- so ``scripts/check_provenance.py`` does not scan ``data/spendable/``.
+
+⚙ **It does not scan it for a stricter reason than the one D4 originally gave.** That gate is
+now **fail-closed** over the whole data tree: a directory in neither ``SOURCED_DIRS`` nor
+``EXEMPT_DIRS`` is an *error*, because an allowlist made a new directory the one place the gate
+could not see. So being absent from ``SOURCED_DIRS`` is no longer a way to be out of scope --
+the exemption has to be written into the script by name, with its argument, where a reviewer
+reads it. Both halves are asserted below: **not** in ``SOURCED_DIRS``, and **in**
+``EXEMPT_DIRS`` with a non-empty reason. If someone ever has to move it into ``SOURCED_DIRS``, a
+number leaked into the file, and that is the finding these tests exist to make loud.
 """
 
 from __future__ import annotations
@@ -315,9 +322,9 @@ def _provenance_module() -> ModuleType:
 
 
 def test_the_provenance_gate_does_not_scan_the_spendable_directory() -> None:
-    """``SOURCED_DIRS`` is **not** extended, and that is the assertion.
+    """``SOURCED_DIRS`` is **not** extended, and that is half the assertion.
 
-    There is no observed value in the spendable file for a source to vouch for. If this test
+    There is no observed value in the spendable file for a source to vouch for. If this half
     ever has to change, a number leaked into the declaration -- so the check is on the tuple
     itself rather than on the gate's exit status, which would go green either way.
     """
@@ -326,11 +333,36 @@ def test_the_provenance_gate_does_not_scan_the_spendable_directory() -> None:
     assert module.SOURCED_DIRS == ("tax", "instruments", "routes", "channels")
 
 
+def test_the_spendable_exemption_is_argued_in_the_gate_by_name() -> None:
+    """The other half, and the one the fail-closed gate added.
+
+    Absence from ``SOURCED_DIRS`` used to be enough to be out of scope. It is now an *error*:
+    the gate errors on any directory under ``data/`` it does not know, because an allowlist
+    made a new directory the one place it could not see -- fail-open, in the script whose whole
+    job is the opposite.
+
+    So the exemption has to exist positively, with a reason recorded beside it, and this test
+    is that requirement made executable. The reason is asserted to be substantive rather than
+    merely present: an empty string would satisfy the script and defeat the point of requiring
+    one, which is that a reviewer reads the argument.
+    """
+    module: Any = _provenance_module()
+    assert "spendable" in module.EXEMPT_DIRS
+    reason = module.EXEMPT_DIRS["spendable"]
+    assert reason.strip(), "an exemption with a blank reason is an exemption nobody argued"
+    assert "routes" in reason, "the reason must say where the numbers actually live"
+
+
 def test_the_provenance_gate_stays_green_with_the_new_file_present(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Confirmed rather than assumed, which is the whole content of research.md D4's task."""
+    """Confirmed rather than assumed, which is the whole content of research.md D4's task.
+
+    ``main([])`` and not ``main()``: the gate now reads a data root from ``argv`` so it can be
+    pointed at a scratch tree, and under pytest a bare call would pick up pytest's own
+    arguments and check a directory named ``-q``.
+    """
     module: Any = _provenance_module()
     assert SPENDABLE.is_file(), "the shipped spendable declaration is missing"
-    assert module.main() == 0
+    assert module.main([]) == 0
     capsys.readouterr()

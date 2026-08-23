@@ -15,10 +15,14 @@
 #
 # **NO CITATION KEYS, and that is deliberate.** There is no observed value here for a source to
 # vouch for — an id, a currency code, and the owner's statement about himself. The same reading
-# `data/venues.toml` and `data/streams/owner-001.toml` already carry, and the reason
-# `scripts/check_provenance.py` does not scan this directory: its `SOURCED_DIRS` is
-# `("tax", "instruments", "routes", "channels")` and is **not** extended for this file. If it
-# ever had to be, a number leaked in here. Every *number* attached to a venue lives on a leg, in
+# `data/venues.toml` and `data/streams/owner-001.toml` already carry.
+#
+# `scripts/check_provenance.py` therefore does not scan this directory — but **not** because it
+# is absent from `SOURCED_DIRS`. That gate is fail-closed over the whole data tree: a directory
+# in neither list is an error, never a blind spot. `spendable` is named in `EXEMPT_DIRS` **with
+# this reason recorded beside it**, which is the only way a directory is permitted to go
+# unscanned. If a number ever has to live here, it moves to a sourced directory instead of the
+# exemption widening to cover it. Every *number* attached to a venue lives on a leg, in
 # `data/routes/`, cited.
 
 [owner]

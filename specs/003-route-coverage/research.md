@@ -56,18 +56,33 @@ tidier, loses the owner boundary. A `spendable = true` flag on the venue table: 
 curated and shared; whether the owner spends from it is not a property of the venue, and
 the flag would be per-currency anyway.
 
-## D4 — No citation keys on the spendable file, and no change to the provenance gate
+## D4 — No citation keys on the spendable file, and the exemption argued in the gate
 
-**Decision.** The file carries no `source` / `retrieved_on` / `verified_on`, and
-`scripts/check_provenance.py` is not modified.
+**Decision.** The file carries no `source` / `retrieved_on` / `verified_on`, and it is **not**
+added to `scripts/check_provenance.py`'s `SOURCED_DIRS`. It *is* named in that script's
+`EXEMPT_DIRS`, with the reason recorded beside it.
 
 **Rationale.** FR-023: the report contains no observed values, and neither does this file —
 an id, a currency code, and the owner's statement of where he spends. There is no number
 here for a source to vouch for. This is the same reading `data/venues.toml` already carries
-in its own header, and the gate agrees by construction: its `SOURCED_DIRS` is
-`("tax", "instruments", "routes", "channels")`, so a new per-owner directory is out of
-scope without touching the script. **Confirm this rather than assume it** — a task asserts
-the gate stays green with the new file present.
+in its own header, and the same exemption `data/streams/` already has for the same reason.
+
+⚙ **Amended 2026-08-23. The mechanism sentence was stale before the feature landed, and the
+decision it served was not.** This decision originally read "the gate agrees by construction:
+`SOURCED_DIRS` does not list this directory, so it is out of scope without touching the
+script." Between planning and landing, the 002 code review made the gate **fail-closed** over
+the whole data tree: its directory list had been an *allowlist*, so a new directory — the very
+place a future rate is most likely to land — was exactly the place the gate could not see.
+That is fail-open, which the constitution puts in its top severity class, in the one script
+whose job is to prevent it.
+
+So "not listed" is no longer a way to be out of scope; it is now an error. The exemption has to
+be **written down in the script, by name, with its argument**, which is a stricter regime than
+the one this decision assumed and not a weaker one: what was previously true by omission now
+has to be defended in a sentence a reviewer reads. The decision — *no citation keys on this
+file* — is unchanged. **Confirm both halves rather than assume either**: a task asserts
+`spendable` is absent from `SOURCED_DIRS` **and** present in `EXEMPT_DIRS` with a non-empty
+reason, and that the gate is green with the file present.
 
 ## D5 — Destinations are derived: venue × holdable currency
 
