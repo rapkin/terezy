@@ -280,6 +280,42 @@ series purely as data; both load, the first drives results, and no source file i
 
 ---
 
+## Phase 8: Review round
+
+**Purpose**: the findings of the independent code review, which is a blocking gate before
+anything lands on `main`. One was a blocker; the rest were concrete and confirmed.
+
+- [x] T041 **Blocker.** `core/inflation/series.py`'s two verdict functions had **no production
+      call sites** — `real_terms` took no `as_of`, `RealRate` had no field for a verdict — while
+      US3 scenario 1, `contracts/deflation.md` G10 and `METHODOLOGY` §23.6 all asserted that a
+      real figure reports its staleness. Implemented: `staleness.Ageing`, `RealRate.staleness`,
+      `Deflation.ageing`, `project(ageing=...)`, merged over the CPI side and the nominal side.
+- [x] T042 Hoist the no-elapsed-month guard from `_realized` into `real_terms`, where it covers
+      **both** figures. `_assumed` had none, so a reversed window produced a `RealRate` whose
+      `window` named a span containing no months — a breach of FR-011 the existing test could
+      not see because it checked `.realized` only.
+- [x] T043 `docs/METHODOLOGY.md` §12.2 documented the digest prefix as `terezy-canonical-v2`.
+      It is the only human-readable specification of the digest bytes, so anyone reproducing a
+      digest from it got the wrong answer. Corrected, with a version table and the ramp golden's
+      blast radius stated.
+- [x] T044 `manifest.of_run`'s `inflation` branch had no caller anywhere. Wired through
+      `tests/unit/test_manifest_records_inputs.py`, so FR-015's manifest clause is exercised by
+      the function runs actually use rather than only by calling `inflation_input_refs` directly.
+- [x] T045 Widen the encoding-tag fingerprint from one of `of_projection`'s four components to
+      all four, plus the real slot's **unavailable** branch — whose shape differs from the
+      populated one and was outside the pin.
+- [x] T046 Widen the construction-site scan to module-qualified calls and to
+      `dataclasses.replace`, which the first cut could not see; add a containment property
+      naming every module allowed to touch a real figure at all.
+- [x] T047 `RunManifest.unverified_sources` claimed *every source behind the headline figure*
+      while being built from `hurdle.provenance`, which deliberately excludes CPI. Widened to
+      the real figures too, so 411 unverified observations behind a reported number are named.
+- [x] T048 Test the three programmer-error guards this feature added (`deflate` at −100%
+      inflation, `annualised` over no periods, `coverage` on a duplicated period), and close the
+      `NotCovered(missing=())` hole in the coverage totality invariant.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
