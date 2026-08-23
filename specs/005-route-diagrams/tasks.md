@@ -225,9 +225,11 @@ field and confirm the diff is confined to what that field affects.
   `terezy.api.diagrams`, write to stdout. No file writing, no reports directory, no formatting of
   its own; the only clock in the feature is this script's `--as-of` default, and the resolved
   date is printed on the face of the diagram (FR-021, research.md D11)
-- [x] T022 [US4] Generate the two golden artifacts **last**, deliberately, and read them before
-  committing: `tests/golden/route_graph_wartime.mmd` and `tests/golden/costed_path_p2p.mmd`
-  (SC-011)
+- [x] T022 [US4] Generate the golden artifacts **last**, deliberately, and read them before
+  committing: `tests/golden/route_graph_wartime.mmd`, `tests/golden/costed_path_p2p.mmd`, and
+  — added on the owner's ruling of 2026-08-23 — `tests/golden/route_graph_normalized.mmd`,
+  the shipped regime that produces a *no exit declared* mark and declares a premium in basis
+  points (SC-011)
 
 **Checkpoint**: `uv run pytest -m golden -k diagram` is green and the artifacts are readable by eye.
 
@@ -259,6 +261,16 @@ regenerated diagram contains the added venue and route, correctly connected and 
 ---
 
 ## Phase 8: Polish & cross-cutting
+
+- [x] T031 Draw the declared **channel premium** on every `fx` edge in
+  `Mode.DECLARED_FIGURES` (owner ruling, 2026-08-23). `render_graph` takes `channels`; both
+  declared side forms render in the unit the file used; the applied side carries its own
+  source, kind and staleness, so a stale premium on a fresh-fee leg does not render clean.
+  Three rules join `numbers.py`, one per new unit, all through the one decimal format (FR-006,
+  FR-012, FR-013, FR-022)
+- [x] T032 Stop emitting the `closedRoute` `classDef`, which nothing can carry — Mermaid
+  applies a class to a node and `CLOSED` only ever lands on an edge. The explanation moves into
+  `marks.CLASS_DEFS`; the mark itself stays in the vocabulary and in the label text
 
 - [x] T025 [P] `docs/METHODOLOGY.md` gains a new section: **the** number-rendering rule, stated
   once, with its decimal places and the fact that it **rounds** (and that the diagram is therefore
