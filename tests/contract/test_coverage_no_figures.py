@@ -230,6 +230,19 @@ def test_the_same_declarations_produce_the_identical_report() -> None:
     structural comparison all the way down, tuple order included. Ordering is the part that
     could plausibly drift: every collection in the report is sorted from a mapping, and a
     mapping's iteration order is a property of insertion rather than of the declarations.
+
+    ⚙ **What this test structurally cannot catch, stated so nobody reads it as more than it
+    is.** Both calls happen in **one process**, so both see the same ``PYTHONHASHSEED``. A
+    collection whose order depends on string hashing -- a ``set`` sorted by a key that is not
+    *total*, where two members tie and the sort falls through to iteration order -- is stable
+    within a process and varies between them. This test would pass on every such report and CI
+    would go green until a run happened to hash differently.
+
+    So the defence is in the code rather than here: every sort key in
+    ``core/routes/coverage.py`` is total over the record it orders, and the one place a set was
+    being sorted now builds an insertion-ordered mapping first. See ``_missing_key``. A
+    cross-process check is possible but would mean spawning an interpreter per example; the
+    total key is cheaper and is the actual guarantee.
     """
     assert _report() == _report()
 

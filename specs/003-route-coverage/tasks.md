@@ -268,10 +268,10 @@ functions rather than tasks.
 | SC-009 | `tests/invariants/test_coverage_costing_agreement.py::test_a_ready_pair_is_one_costing_produces_a_round_trip_for`, `::test_a_not_ready_pair_is_one_costing_refuses_over_single_declared_routes` |
 | SC-010 | `tests/unit/test_coverage_deficits.py::test_a_missing_exit_starts_at_the_destination_and_suggests_no_values` |
 | SC-011 | `tests/unit/test_coverage_deficits.py::test_a_two_hop_way_out_is_deficit_three_and_is_never_composed`; `tests/worked_examples/test_coverage_table.py::test_the_two_hop_way_out_is_reported_as_a_hole_and_never_composed` |
-| SC-012 | `tests/worked_examples/test_coverage_table.py::test_a_destination_at_a_streams_arrival_point_is_satisfied_by_arrival` |
+| SC-012 | `tests/worked_examples/test_coverage_table.py::test_a_destination_at_a_streams_arrival_point_is_satisfied_by_arrival`, `::test_an_arrival_point_is_ready_if_and_only_if_its_exit_exists`, `::test_the_spendable_endpoint_itself_is_ready_on_two_sentinels_and_no_route`, `::test_no_missing_exit_is_ever_named_for_a_spendable_destination` |
 | SC-013 | `tests/unit/test_coverage_empty.py::test_each_empty_dimension_is_a_typed_outcome_naming_it`, `::test_every_empty_dimension_is_named_not_only_the_first` |
 | SC-014 | `tests/contract/test_coverage_data_only.py::test_a_new_venue_with_no_routes_appears_as_named_no_inbound_deficits` |
-| SC-015 | `tests/contract/test_coverage_data_only.py::test_a_ready_verdict_says_whether_it_rests_on_open_or_closed_declarations`, `::test_a_ready_verdict_resting_on_closed_routes_is_still_distinct_from_a_hole` |
+| SC-015 | `tests/contract/test_coverage_data_only.py::test_a_ready_verdict_says_whether_it_rests_on_open_or_closed_declarations`, `::test_a_verdict_reached_by_arrival_still_reports_its_exits_status`, `::test_a_verdict_whose_exit_is_satisfied_by_identity_still_reports_its_inbounds_status`, `::test_a_verdict_resting_on_no_route_at_all_is_open`, `::test_a_ready_verdict_resting_on_closed_routes_is_still_distinct_from_a_hole` |
 | SC-016 | `tests/contract/test_coverage_no_figures.py::test_the_same_declarations_produce_the_identical_report`, `::test_the_report_names_the_declaration_set_it_audited` |
 | SC-017 | `tests/unit/test_coverage_deficits.py::test_an_orphan_exit_is_listed_as_unused_and_blocks_no_count`; `tests/invariants/test_coverage_totality.py::test_an_orphan_exit_is_never_a_deficit_and_never_blocks_a_count` |
 | SC-018 | `tests/unit/test_coverage_regimes.py::test_with_no_regime_declared_one_implicit_regime_covers_every_route_and_says_so` |
@@ -279,6 +279,21 @@ functions rather than tasks.
 | SC-020 | `tests/contract/test_coverage_no_figures.py::test_producing_the_report_changes_no_ranking`, `::test_the_report_states_in_its_own_output_that_it_is_advisory` |
 | FR-001 totality | `tests/invariants/test_coverage_totality.py::test_every_declared_pair_appears_exactly_once_in_every_regime` |
 | contracts/spendable-schema.md refusals | `tests/contract/test_spendable_declaration_loading.py` (13 cases, one per row plus the two provenance-gate checks) |
+
+## Round two — review findings, 2026-08-23
+
+Landed after the first pass. Every item is a commit; the tasks above are unchanged and stay
+ticked.
+
+- [X] **R1** Merge `main` (twelve commits, the 002 review) into the branch, not rebase.
+- [X] **R2** `data/spendable/` joins `check_provenance.py`'s `EXEMPT_DIRS` with its reason. The gate is now fail-closed over the whole data tree, so absence from `SOURCED_DIRS` is an error rather than an exemption. Mechanism restated in `research.md` D4, the file header, `contracts/spendable-schema.md` and `data/README.md`; both halves asserted in `tests/contract/test_spendable_declaration_loading.py`.
+- [X] **R3** Owner decision 2026-08-23: a destination that is itself a declared spendable endpoint has its exit half satisfied by identity. `SATISFIED_BY_IDENTITY` mirrors `SATISFIED_BY_ARRIVAL`; `rests_on` re-derived symmetrically; `spec.md` FR-002/FR-005/FR-018 amended with a clarification row; data-model, contract, quickstart and `METHODOLOGY` follow.
+- [X] **R4** FR-018's domain restated: a pair satisfied by arrival or identity names no `FundingPath`, so it is outside the agreement rather than in disagreement with it. Partitioned out explicitly, asserted to be outside, and both sides of the partition asserted non-empty.
+- [X] **R5** Four confirmed test gaps closed, each proved by the mutation that used to pass: `rests_on`'s arrival branch, orphan reachability's converse, one-item-per-missing-exit against a two-endpoint spendable list, and the endpoint rule against multi-leg chains.
+- [X] **R6** `source="implicit" if ... else "declared"` deleted; the generator yields the `Literal` and the coercion is gone.
+- [X] **R7** `_missing_key` made total over every field including the candidate list, and `_observations` builds an insertion-ordered mapping rather than sorting a set. Verified across four `PYTHONHASHSEED` values.
+- [X] **R8** The regime-guard exemption keeps its two open doors shut: the scan's docstring behaviour is stated as intended, and a new test asserts coverage's scenarios import stays under `TYPE_CHECKING`, that `Regime` is not re-exported, and that no other module in `core/routes/` names it.
+- [X] **R9** Four vacuous or misleading assertions replaced; routes sorted once per regime rather than once per pair.
 
 ## Notes
 
