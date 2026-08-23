@@ -38,11 +38,19 @@ and they are printed with the figure.
 - `exit route costs (out)`
 - `inflation (the figure is nominal)`
 
-**Inflation is not modelled.** Both return figures are **nominal**. The result carries a
-real-terms slot which is always occupied by `RealTermsUnavailable` and never by a number:
-a real rate derived from a guessed inflation rate would be a fabricated figure wearing the
-same label as a measured one. A nominal 16% against double-digit inflation is a materially
-different proposition from a real 16%, and nothing here pretends otherwise.
+**Both return figures are still nominal, and beside them the real-terms slot now holds two
+real figures.** A nominal 16% against double-digit inflation is a materially different
+proposition from a real 16%, which is why the slot was reserved in the first place and why
+it stayed empty until CPI arrived as declared, dated, cited data. It is filled now — see
+[§23](#23-real-terms-the-fisher-relation-and-the-chain-behind-it) — by two figures that
+**never mix into one number**: one deflated by declared observations, one by a declared
+belief about future inflation. Where either one's inputs are missing, that figure alone is
+typed-unavailable and its reason names what is missing. A real rate derived from a *guessed*
+inflation rate is still forbidden; a *declared, dated, labelled* belief is a different thing,
+and it says so on the face of every figure it touches.
+
+The `excludes` line above is unchanged and still true: the two **nominal** figures exclude
+inflation. The real figures are reported beside them, never instead of them.
 
 **The OVDP terms currently shipped are synthetic and unverified.** `data/instruments/`
 holds two files, `ovdp_synthetic_a.toml` and `ovdp_synthetic_b.toml`. Every term in them is
@@ -2000,7 +2008,172 @@ turns every hostile character — quotes, pipes, arrows, Cyrillic, emoji — int
 problem that the escaping solves, and never an identity problem. The cost, accepted: the raw
 text is less readable to a human reading the source. The diagram is meant to be rendered.
 
-## 23. Where to look next
+## 23. Real terms: the Fisher relation, and the chain behind it
+
+A nominal return says how much more money there is. A real return says how much more the
+money buys. Between them stands inflation, and how the three are related is the single most
+consequential formula in this document — because the wrong version of it is the one everybody
+knows.
+
+### 23.1 The relation
+
+**Plain language.** Take what a hryvnia buys at the start and at the end. The real return is
+the growth in purchasing power: the growth in money, divided by the growth in prices.
+
+**The formula.**
+
+```
+real = (1 + nominal) / (1 + inflation) − 1
+```
+
+This is the **exact Fisher relation**, and it is the only conversion in this project. The
+familiar approximation `real ≈ nominal − inflation` is **not used anywhere**, and its absence
+is enforced rather than encouraged: `tests/contract/test_no_subtraction_approximation.py`
+parses `core/inflation/`, `core/results/hurdle.py` and `core/primitives/rates.py` and fails on
+any subtraction whose right-hand side is not a plain number.
+
+**Why the approximation is refused rather than merely discouraged.** It is off by
+`nominal × inflation / (1 + inflation)`, which is negligible at 2% inflation and enormous at
+Ukrainian magnitudes. At a nominal 15.5% against 79.6% annual inflation:
+
+| | |
+| --- | --- |
+| exact | `1.155 / 1.7958563260221301 − 1` = **−0.3568527820049191** |
+| approximation | `0.155 − 0.7958563260221301` = **−0.6408563260221301** |
+
+Twenty-eight percentage points apart, and both look like plausible real returns. A figure
+that wrong would not be caught by anything downstream; Principle I forbids emitting it.
+
+**Both rates must be measured over the same span.** `deflate` takes two numbers and cannot
+tell what span either covers, so the caller annualises first (§23.3). Deflating an annual
+yield by six months of inflation would flatter the real return by roughly half the inflation.
+
+**Nothing is clamped.** A window in which prices fell produces a real rate *above* the
+nominal one; inflation above the nominal rate produces a *negative* real rate. Both are valid
+observations and are reported as the numbers they are.
+
+### 23.2 Inflation over a window is a product, not a sum
+
+`data/cpi/ua.toml` holds the published index of each month **against the previous month**:
+`100.9` means prices rose 0.9% during that month. Cumulative inflation over a window is the
+product of every month's `value / 100`, minus one:
+
+```
+cumulative = Π (valueₘ / 100) − 1
+```
+
+There is no level index and none is synthesised. Inventing a base-100 series would mean
+choosing a base period nobody published and carrying its rounding through every month since
+1991; the product is exact over whatever window the observations cover and needs no base.
+
+**A month-on-month series invites being summed, and the sum is visibly wrong.** Twelve months
+at 5% each:
+
+```
+sum:      12 × 0.05                = 0.60          (60%)
+product:  1.05¹² − 1               = 0.7958563…    (79.59%)
+```
+
+Nineteen and a half percentage points apart. The power is hand-checkable by squaring twice
+and multiplying once — `1.05² = 1.1025`, `1.05⁴ = 1.21550625`,
+`1.05⁸ = 1.4774554437890625`, `1.05¹² = 1.4774554437890625 × 1.21550625 = 1.7958563260221301`
+— and that window is the one `tests/worked_examples/test_deflation_arithmetic.py` uses,
+chosen precisely so a summing implementation cannot pass.
+
+### 23.3 Annualisation
+
+`nominal_ytm` is a rate **per annum**, so the inflation it is deflated by must be too:
+
+```
+annual = (1 + cumulative) ^ (periods_per_year / periods) − 1
+```
+
+`periods_per_year` is read off the series' **declared** periodicity — twelve for a monthly
+index — and never assumed. A quarterly series annualised as if it were monthly would be wrong
+by a factor of three with nothing in the output to say so.
+
+**Worked example, end to end.** Six declared months, deflating a 15.5% contractual yield:
+
+```
+months        100.9, 101.2, 99.8, 100.3, 102.1, 100.0
+product       1.009 × 1.012 × 0.998 × 1.003 × 1.021 × 1.000 = 1.043587563960392
+cumulative    0.043587563960391984          (over six months)
+annualised    1.043587563960392² − 1 = 0.0890750036527852
+real          1.155 / 1.0890750036527852 − 1 = 0.060533017584740056
+```
+
+The annualised figure is roughly twice the cumulative one. Setting the cumulative figure
+against an annual yield instead would have reported a real return of about 10.7% — four and a
+half points too flattering, from a units error that no downstream check would catch.
+
+### 23.4 Coverage: all or nothing, and a gap is named
+
+The realized figure requires a declared observation for **every** month of the deflation
+window. One missing month makes it typed-unavailable **naming that month**. Nothing is
+interpolated, nothing is carried forward, and the window is **never shortened** to the part
+that happens to be covered — that last one is the tempting repair, because it produces a
+number, and the number is genuinely real for *a* window, just not the one asked about.
+
+The coverage check is a tagged union returned **before** any arithmetic runs, so an uncovered
+window cannot reach the Fisher relation at all. A check inside the computation is a check
+somebody later moves, reorders or short-circuits.
+
+**The deflation window** runs from the month *after* the purchase to the month the last
+contractual flow lands in, inclusive. A published index for month *M* measures the price
+change *during* *M*, and a purchase made on any day of *M* has already paid *M*'s prices, so
+the first change the owner lives through is the one in *M + 1*. The last month is the last
+contractual flow's rather than the horizon's, because the figure being deflated is a property
+of the paper.
+
+**This bites today, and that is correct.** The declared series ends 2025-10, so every hurdle
+window reaching into 2026 is uncovered and the realized figure refuses, listing the months.
+Re-running `scripts/fetch_cpi.py` is the fix; the refusal is what stops a number being
+invented in the meantime.
+
+### 23.5 Two figures, never mixed
+
+| | deflated by | labelled |
+| --- | --- | --- |
+| `real.realized` | declared CPI observations covering the whole window | `basis = "realized_cpi"` |
+| `real.assumed` | the declared future-inflation belief | `basis = "declared_assumption"` |
+
+`HurdleRate.real` remains exactly **one** field; what it holds is a record carrying both.
+That is what keeps feature 001's promise: the result's shape did not change when the slot was
+filled. The record is never itself unavailable — when neither figure can be computed it holds
+two reasons, because *which* half is missing is the question a reader is actually asking.
+
+There is no third field combining them, and there is deliberately nowhere to put one.
+
+**A cited forecast is still an assumption.** An external published forecast carries a
+citation, a retrieval date and a staleness kind, and it is still a statement about a year that
+has not happened. It is labelled `declared_assumption` exactly like the owner's own belief,
+and no verification date moves it into the observed column: verifying a forecast vouches for
+the *quotation*, never for the number. There is **no default rate** anywhere — a missing
+belief makes the assumed figure unavailable, naming the absence.
+
+### 23.6 What a real figure carries
+
+Every `RealRate` states its `basis`, the `series_id` it is real *against*, the `window` it
+covers, and its own `provenance` — the union of the nominal figure's sources and every
+observation that deflated it. That union is the one place in the project where a *rate*
+carries provenance, and it has to: the CPI observations are not among the holding's inputs, so
+putting them on `HurdleRate.provenance` would make the *nominal* figure appear to rest on the
+price index.
+
+A long window therefore puts hundreds of sources on one figure — the shipped Ukrainian series
+has 411 observations, every one cited and every one unverified — and that is the honest
+answer rather than something to summarise away. Deflating a marked figure never launders its
+mark, and deflating by an unverified observation always adds one.
+
+**Staleness is a separate question from coverage**, and the output must not merge them. *"Is
+this observation stale?"* is the `cpi_index` kind's 45-day threshold, measured from the later
+of verification and retrieval: a published index for a month that has ended is a historical
+fact and does not decay, but the *retrieval* ages, because the publisher adds a month roughly
+every month. *"Does the series reach the end of my window?"* is coverage. Both can fire on one
+run, they point at different fixes — re-fetch, or declare the missing months — and reporting
+either as the other sends the owner to the wrong one.
+
+## 24. Where to look next
 
 | question | file |
 | --- | --- |
@@ -2035,6 +2208,11 @@ text is less readable to a human reading the source. The diagram is meant to be 
 | Is there a second number-rendering rule? | `tests/contract/test_diagram_one_number_rule.py` |
 | Do the marks survive the picture? | `tests/contract/test_diagram_marks.py` |
 | Can a hostile venue name break a diagram? | `tests/unit/test_diagram_escaping.py` |
+| Is the deflation arithmetic right? | `tests/worked_examples/test_deflation_arithmetic.py` |
+| What happens when prices fall? | `tests/worked_examples/test_falling_prices.py` |
+| Is the subtraction approximation really absent? | `tests/contract/test_no_subtraction_approximation.py` |
+| What does a CPI gap do to a real figure? | `tests/unit/test_cpi_coverage.py` |
+| Can an assumption be mistaken for an observation? | `tests/contract/test_two_figures_never_blend.py` |
 | What is still uncovered? | `docs/REQUIRED_TESTS.md` |
 
 The product specification is `docs/reference/SIMULATOR_SPEC.md`; the engine charter and the

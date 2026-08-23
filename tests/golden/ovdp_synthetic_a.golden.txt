@@ -13,8 +13,14 @@
 # deliberately absent; the declaration files' digests are deliberately present.
 #
 # THE TERMS PROJECTED HERE ARE SYNTHETIC AND UNVERIFIED. No figure below describes a
-# bond anyone can buy, and none of them accounts for funding-route cost, exit cost or
-# inflation. See docs/METHODOLOGY.md.
+# bond anyone can buy, and none of them accounts for funding-route cost or exit cost.
+#
+# The nominal figures exclude inflation and say so. Beside them the real-terms slot
+# carries two figures that never mix: one deflated by declared CPI observations, one
+# by a declared belief about future inflation. The second is an ASSUMPTION on its
+# face -- the declared rate is a placeholder, not a forecast -- and the first refuses
+# today, because the declared series ends before this holding does. See
+# docs/METHODOLOGY.md.
 
 == run ==
 
@@ -30,18 +36,22 @@ canonical_encoding terezy-canonical-v3
 
 == inputs ==
 
-instrument ovdp_synthetic_a     instruments/ovdp_synthetic_a.toml        sha256:6d6fcafc9e3da360c2f2c523704b488065f253c2db5fce362b3ad72cd6b5e49e
-instrument ovdp_synthetic_b     instruments/ovdp_synthetic_b.toml        sha256:3293c9bd0a9429223cd095c27585cb5ac9da3ba07d519be1d7f2fd69341fae7f
-tax_class  ua_government_bond   tax/ua.toml                              sha256:5806064ee33fa590756f31e6a07eea88a1c12ef04434426a527864a0a5bc7b77
+cpi_series           ua_cpi_monthly               cpi/ua.toml                              sha256:d75f814e2940eec463499e39ea2adea07da6149ff79bfac4681d08a051b26c7e
+inflation_assumption owner_placeholder_inflation  inflation/owner-001.toml                 sha256:624e2b5124527c2b30bc4c0773b2d8c79e9ffcfd38b0f253ab5080c36cd71d6c
+instrument           ovdp_synthetic_a             instruments/ovdp_synthetic_a.toml        sha256:6d6fcafc9e3da360c2f2c523704b488065f253c2db5fce362b3ad72cd6b5e49e
+instrument           ovdp_synthetic_b             instruments/ovdp_synthetic_b.toml        sha256:3293c9bd0a9429223cd095c27585cb5ac9da3ba07d519be1d7f2fd69341fae7f
+tax_class            ua_government_bond           tax/ua.toml                              sha256:5806064ee33fa590756f31e6a07eea88a1c12ef04434426a527864a0a5bc7b77
 
 == figures ==
 
 nominal_ytm                  0.16058553778779106
 nominal_cash_flow_return     0.16058553778779106
 real_realized                unavailable
-real_realized_because        no CPI series was declared for this run, so there is nothing to deflate by. None is assumed: a real rate derived from an undeclared inflation rate would be a fabricated number wearing the same label as a measured one.
-real_assumed                 unavailable
-real_assumed_because         no future-inflation assumption was declared for this run, so the projected portion of the horizon has no inflation rate to deflate by. There is no default rate: one would be a belief about the future that the owner never stated, presented as though he had.
+real_realized_because        the declared CPI series 'ua_cpi_monthly' does not cover every month of 2026-02..2028-01: 24 month(s) have no declared observation (2026-02, 2026-03, 2026-04, 2026-05, 2026-06, 2026-07, 2026-08, 2026-09, 2026-10, 2026-11, 2026-12, 2027-01, 2027-02, 2027-03, 2027-04, 2027-05, 2027-06, 2027-07, 2027-08, 2027-09, 2027-10, 2027-11, 2027-12, 2028-01). Nothing is interpolated and nothing is carried forward, and the window is not shortened to the part that is covered -- a real rate over the covered months would be a correct answer to a question nobody asked. Declaring the missing observations is the fix.
+real_assumed                 0.055077761625264454
+real_assumed_basis           declared_assumption
+real_assumed_against         owner_placeholder_inflation
+real_assumed_window          2026-02 .. 2028-01
 total_tax                    0.0 UAH
 accounts_for                 tax on every taxable event over the holding's life
 excludes                     exit route costs (out)
@@ -223,4 +233,4 @@ event  10  2028-01-17  ovdp_synthetic_a  quantity 10.0
 # sha256 over core.results.canonical.of_projection, taken by
 # data.manifest.digest_of_projection. Amounts reach it as float.hex(), so this
 # asserts bit-identity -- deliberately stricter than the project tolerance.
-sha256:667dc69330fa74c6d9b67b941c30a97debb58ea485094ec0eb3561269be0f70a
+sha256:0fdaace7c445521c07dd839bd4c4243a7b182e93e7d9337ab2aeb8589bca95d8

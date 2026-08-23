@@ -266,10 +266,25 @@ def test_the_month_before_the_retrieval_month_is_accepted(tmp_path: Path) -> Non
 
 
 def test_a_series_with_no_observations_is_refused(tmp_path: Path) -> None:
-    """An empty series would make every window uncovered for a reason naming the window."""
-    error = _load_error(_file(tmp_path, HEADER, name="empty.toml"))
+    """An empty series would make every window uncovered for a reason naming the window.
 
-    assert "empty.toml" in str(error)
+    Both spellings, because they fail at different layers and only one of them is this
+    loader's own. Omitting ``[[observation]]`` altogether is a missing required field and the
+    shape validation refuses it; writing ``observation = []`` is a well-formed document
+    declaring nothing, which pydantic accepts and the loader has to refuse itself. A test
+    exercising only the first would leave the second silently loading a series that covers no
+    month and blames every window for it.
+    """
+    omitted = _load_error(_file(tmp_path, HEADER, name="omitted.toml"))
+    # The array must precede the `[series]` header, or TOML reads it as a key *of* that
+    # table and the file fails as an unrecognised field instead -- a true message about the
+    # wrong problem, and the reason this is written out rather than appended.
+    empty = _load_error(_file(tmp_path, "observation = []\n" + HEADER, name="empty.toml"))
+
+    assert "omitted.toml" in str(omitted)
+    assert "observation" in str(omitted)
+    assert "empty.toml" in str(empty)
+    assert "declares no observations" in str(empty)
 
 
 def test_a_missing_file_is_reported_rather_than_read_as_an_empty_series(
@@ -364,3 +379,149 @@ def test_a_scratch_copy_of_the_shipped_file_still_loads(tmp_path: Path) -> None:
     shutil.copy(SHIPPED, copied)
 
     assert len(loader.cpi_from_file(copied).observations) == 411
+
+
+# --- the inflation assumption's own refusal battery ------------------------------------
+#
+# Same discipline as above, applied to the belief. Every one of these is a *refusal path*,
+# and a refusal nobody exercises is a refusal that stops working without anybody noticing --
+# which matters more here than for the series, because these are the paths that stop an
+# invented belief from reaching a figure labelled real.
+
+ASSUMPTION = """
+[inflation_assumption]
+id              = "xx_belief"
+owner_id        = "owner-001"
+annual_rate_pct = {rate}
+is_assumption   = {is_assumption}
+rationale       = "SYNTHETIC FIXTURE -- an invented belief."
+kind            = {kind}
+source          = {source}
+retrieved_on    = {retrieved_on}
+verified_on     = {verified_on}
+"""
+
+
+def _assumption(
+    tmp_path: Path,
+    *,
+    rate: str = "10.0",
+    is_assumption: str = "true",
+    kind: str = '""',
+    source: str = '""',
+    retrieved_on: str = '""',
+    verified_on: str = '""',
+    name: str = "belief.toml",
+) -> Path:
+    return _file(
+        tmp_path,
+        ASSUMPTION.format(
+            rate=rate,
+            is_assumption=is_assumption,
+            kind=kind,
+            source=source,
+            retrieved_on=retrieved_on,
+            verified_on=verified_on,
+        ),
+        name=name,
+    )
+
+
+def _assumption_error(path: Path) -> DeclarationError:
+    with pytest.raises(DeclarationError) as caught:
+        loader.inflation_assumption_from_file(path)
+    return caught.value
+
+
+def test_the_assumption_control_case_loads(tmp_path: Path) -> None:
+    """The owner's own belief: a rate, a rationale, and four empty citation keys."""
+    owner_id, assumption = loader.inflation_assumption_from_file(_assumption(tmp_path))
+
+    assert owner_id == "owner-001"
+    assert assumption.annual_rate == 0.10
+    assert assumption.provenance is None
+    assert assumption.kind is None
+
+
+def test_an_assumption_declared_as_not_an_assumption_is_refused(tmp_path: Path) -> None:
+    """The field exists to make the claim unmissable in the output, not to be switched off."""
+    error = _assumption_error(_assumption(tmp_path, is_assumption="false"))
+
+    assert "is_assumption" in str(error)
+    assert "belief.toml" in str(error)
+
+
+def test_a_rate_at_or_below_minus_one_hundred_percent_is_refused(tmp_path: Path) -> None:
+    """Prices cannot fall to nothing, and every real rate against such a figure is infinite."""
+    for bad in ("-100.0", "-150.0"):
+        error = _assumption_error(_assumption(tmp_path, rate=bad))
+        assert "annual_rate_pct" in str(error), bad
+
+
+def test_a_half_filled_citation_is_refused_rather_than_half_read(tmp_path: Path) -> None:
+    """A source with no retrieval date is a quotation nobody can date, and the reverse is a
+    date attached to nothing. Either is an edit somebody abandoned."""
+    for filled in ("kind", "source", "retrieved_on"):
+        error = _assumption_error(
+            _assumption(tmp_path, **{filled: '"cpi_index"'}, name=f"half_{filled}.toml")
+        )
+        assert f"half_{filled}.toml" in str(error), filled
+        assert "halfway" in str(error), filled
+
+
+def test_a_verification_date_without_a_source_is_refused(tmp_path: Path) -> None:
+    """There is nothing to have verified a bare belief against, so a date here claims a check
+    that cannot have happened."""
+    error = _assumption_error(_assumption(tmp_path, verified_on='"2026-08-23"'))
+
+    assert "verified_on" in str(error)
+
+
+def test_a_fully_cited_forecast_loads_and_carries_its_citation(tmp_path: Path) -> None:
+    """The other side of the half-filled rule: all three together, and it loads.
+
+    It is still an assumption -- ``is_assumption`` is the only value the record admits -- and
+    the citation says where the belief was read, not that next year's prices were observed.
+    """
+    _, assumption = loader.inflation_assumption_from_file(
+        _assumption(
+            tmp_path,
+            kind='"cpi_index"',
+            source='"SYNTHETIC FIXTURE -- an invented published forecast."',
+            retrieved_on='"2026-08-23"',
+            name="forecast.toml",
+        )
+    )
+
+    assert assumption.is_assumption is True
+    assert assumption.kind == "cpi_index"
+    assert assumption.provenance is not None
+    assert len(assumption.provenance.sources) == 1
+
+
+def test_an_empty_identity_or_rationale_on_the_assumption_is_refused(tmp_path: Path) -> None:
+    """A rate with no reasoning is indistinguishable from a typo; an unnamed belief cannot be
+    recorded in the manifest, and two runs would then be one result."""
+    body = _assumption(tmp_path).read_text(encoding="utf-8")
+    for blank, field in (
+        ('id              = "xx_belief"', "id"),
+        ('owner_id        = "owner-001"', "owner_id"),
+        ('rationale       = "SYNTHETIC FIXTURE -- an invented belief."', "rationale"),
+    ):
+        broken = body.replace(blank, blank.split("=")[0] + '= ""')
+        error = _assumption_error(_file(tmp_path, broken, name=f"blank_{field}.toml"))
+        assert field in str(error), field
+
+
+def test_two_declared_beliefs_are_refused_naming_both(scratch_root: Path) -> None:
+    """FR-015: two assumptions are two *runs*, each naming what it used -- never one run
+    holding both. Merging them, or preferring either, would state the owner's belief for him."""
+    (scratch_root / "scenarios" / "inflation").mkdir(parents=True)
+    for name in ("cautious.toml", "pessimistic.toml"):
+        _assumption(scratch_root / "scenarios" / "inflation", name=name)
+
+    with pytest.raises(DeclarationError) as caught:
+        resolver.inflation_from_data_root(scratch_root)
+
+    assert "cautious.toml" in str(caught.value)
+    assert "pessimistic.toml" in str(caught.value)

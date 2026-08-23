@@ -64,7 +64,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Final
+from typing import Final, assert_never
 
 from terezy.core.inflation import series as cpi
 from terezy.core.inflation.deflate import deflate
@@ -357,6 +357,8 @@ def _realized(
                 window=window,
                 provenance=prov.merge(nominal_provenance, cpi.provenance_of(covered.observations)),
             )
+        case _:  # pragma: no cover -- mypy proves this unreachable
+            assert_never(covered)
 
 
 def _assumed(

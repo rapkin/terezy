@@ -259,21 +259,21 @@ series purely as data; both load, the first drives results, and no source file i
 
 **Purpose**: the claims this feature makes about itself, made checkable.
 
-- [ ] T035 `tests/golden/test_end_to_end_ovdp.py` — render both real-slot entries, feed the
+- [x] T035 `tests/golden/test_end_to_end_ovdp.py` — render both real-slot entries, feed the
       shipped CPI series, and regenerate `tests/golden/ovdp_synthetic_a.golden.txt`. **Read the
       diff**: the real slot's lines, the canonical encoding tag and the digest may move; **every
       nominal figure, schedule row and tax charge must be byte-identical** (G1, FR-014). If a
       nominal figure moves, stop.
-- [ ] T036 [P] `docs/METHODOLOGY.md` — the Fisher relation, its plain-language definition and a
+- [x] T036 [P] `docs/METHODOLOGY.md` — the Fisher relation, its plain-language definition and a
       **worked example**, in the same change as the formula (FR-008, SC-010), plus the
       month-on-month chaining rule and the annualisation it feeds.
-- [ ] T037 [P] `docs/REQUIRED_TESTS.md` — flip the rows this feature closes and record their
+- [x] T037 [P] `docs/REQUIRED_TESTS.md` — flip the rows this feature closes and record their
       test paths; **F4 stays unflipped**, its second half being the display-currency feature's.
-- [ ] T038 [P] `specs/001-ovdp-hurdle-rate/spec.md` — the ⚙ cross-reference at FR-022 recording
+- [x] T038 [P] `specs/001-ovdp-hurdle-rate/spec.md` — the ⚙ cross-reference at FR-022 recording
       that the prohibition was **refined, not repealed** (FR-009's recorded obligation).
-- [ ] T039 [P] `data/README.md` — the `cpi/` row and the inflation-assumption row, so the data
+- [x] T039 [P] `data/README.md` — the `cpi/` row and the inflation-assumption row, so the data
       surface documents itself.
-- [ ] T040 Run every gate from the worktree and record the delta from T001's baseline:
+- [x] T040 Run every gate from the worktree and record the delta from T001's baseline:
       `ruff check`, `ruff format --check`, `mypy`, `lint-imports`, `check_provenance.py`,
       `pytest --cov`, `pytest -m "contract or invariant"`. Confirm
       `grep -rn "inflation is not modelled" src/` is empty.
