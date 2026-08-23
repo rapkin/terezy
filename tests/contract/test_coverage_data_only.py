@@ -59,19 +59,30 @@ def _scratch(tmp_path: Path) -> Path:
     return root
 
 
-def _report_from(root: Path) -> CoverageReport:
+def _report_from(root: Path, *, scenario_id: str | None = None) -> CoverageReport:
     """The report the ordinary loading path produces for a data root.
 
     Through :func:`coverage_from_data_root` rather than by building records by hand, because
     the claim under test is about *declarations reaching the report*, and a test that assembled
-    the records itself would skip the half of the journey that could break.
+    the records itself would skip the half of the journey that could break -- which is what
+    ``regimes={}`` used to do here, before the loader could flatten a scenario's regimes at
+    all. The regimes now come from the declarations like everything else.
+
+    ``scenario_id`` defaults to ``None`` -- FR-015's implicit regime, every declared route in
+    one block -- because that is what every case in *this* module wants: a venue added as data
+    must appear as a hole regardless of anybody's belief about the war. The loader itself
+    requires the argument (see ``resolve_coverage``); the default here is a fixture's choice,
+    stated once. What a declared scenario does to the report is
+    ``test_coverage_scenario_scoping.py``'s subject.
     """
-    declarations = resolver.coverage_from_data_root(root, base_currency=Currency.UAH)
+    declarations = resolver.coverage_from_data_root(
+        root, base_currency=Currency.UAH, scenario_id=scenario_id
+    )
     produced = coverage(
         venues=declarations.ramp.venues,
         streams=declarations.ramp.streams,
         routes=declarations.ramp.routes,
-        regimes={},
+        regimes=declarations.regimes,
         spendable=declarations.spendable,
     )
     assert isinstance(produced, CoverageReport), produced
@@ -489,7 +500,9 @@ def test_no_coverage_source_module_names_a_venue_route_or_stream_id() -> None:
     The ids are taken from the shipped declarations rather than listed here, so the scan grows
     with the registry instead of going stale the day a venue is added.
     """
-    declarations = resolver.coverage_from_data_root(DATA_ROOT, base_currency=Currency.UAH)
+    declarations = resolver.coverage_from_data_root(
+        DATA_ROOT, base_currency=Currency.UAH, scenario_id=None
+    )
     identifiers = (
         set(declarations.ramp.venues)
         | set(declarations.ramp.routes)

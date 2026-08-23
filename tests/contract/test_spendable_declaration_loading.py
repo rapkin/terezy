@@ -118,7 +118,9 @@ def test_the_shipped_spendable_file_loads() -> None:
 
 
 def test_the_shipped_data_root_resolves_for_coverage() -> None:
-    declarations = resolver.coverage_from_data_root(DATA_ROOT, base_currency=Currency.UAH)
+    declarations = resolver.coverage_from_data_root(
+        DATA_ROOT, base_currency=Currency.UAH, scenario_id=None
+    )
     assert declarations.spendable == frozenset(
         {SpendableEndpoint(venue_id="monobank_uah", currency=Currency.UAH)}
     )
@@ -225,7 +227,7 @@ def test_an_unknown_venue_is_refused(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     with pytest.raises(DeclarationError) as caught:
-        resolver.coverage_from_data_root(root, base_currency=Currency.UAH)
+        resolver.coverage_from_data_root(root, base_currency=Currency.UAH, scenario_id=None)
     _assert_names_file_and_field(caught.value, target, "venue")
     assert "nowhere" in caught.value.problem
 
@@ -244,7 +246,7 @@ def test_a_venue_that_cannot_hold_the_currency_is_refused(tmp_path: Path) -> Non
         encoding="utf-8",
     )
     with pytest.raises(DeclarationError) as caught:
-        resolver.coverage_from_data_root(root, base_currency=Currency.UAH)
+        resolver.coverage_from_data_root(root, base_currency=Currency.UAH, scenario_id=None)
     _assert_names_file_and_field(caught.value, target, "venue")
 
 
@@ -258,7 +260,7 @@ def test_a_non_base_currency_is_refused(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     with pytest.raises(DeclarationError) as caught:
-        resolver.coverage_from_data_root(root, base_currency=Currency.UAH)
+        resolver.coverage_from_data_root(root, base_currency=Currency.UAH, scenario_id=None)
     _assert_names_file_and_field(caught.value, target, "currency")
     assert "USD" in caught.value.problem
 
@@ -274,7 +276,7 @@ def test_an_owner_who_does_not_own_the_streams_is_refused(tmp_path: Path) -> Non
         encoding="utf-8",
     )
     with pytest.raises(DeclarationError) as caught:
-        resolver.coverage_from_data_root(root, base_currency=Currency.UAH)
+        resolver.coverage_from_data_root(root, base_currency=Currency.UAH, scenario_id=None)
     _assert_names_file_and_field(caught.value, target, "owner.id")
 
 
@@ -285,7 +287,7 @@ def test_an_empty_spendable_directory_is_refused(tmp_path: Path) -> None:
     for path in (root / "spendable").glob("*.toml"):
         path.unlink()
     with pytest.raises(DeclarationError) as caught:
-        resolver.coverage_from_data_root(root, base_currency=Currency.UAH)
+        resolver.coverage_from_data_root(root, base_currency=Currency.UAH, scenario_id=None)
     assert caught.value.file == root / resolver.SPENDABLE_DIR
 
 
@@ -301,7 +303,7 @@ def test_a_second_owner_file_is_refused_by_name(tmp_path: Path) -> None:
     root = _scratch_root(tmp_path)
     shutil.copy(root / "spendable" / "owner-001.toml", root / "spendable" / "owner-002.toml")
     with pytest.raises(DeclarationError) as caught:
-        resolver.coverage_from_data_root(root, base_currency=Currency.UAH)
+        resolver.coverage_from_data_root(root, base_currency=Currency.UAH, scenario_id=None)
     assert caught.value.file == root / resolver.SPENDABLE_DIR
 
 
@@ -342,7 +344,7 @@ def test_a_second_owners_streams_in_the_data_root_are_refused_not_blended(
     foreign = root / "streams" / "owner-002.toml"
     foreign.write_text(SECOND_OWNER_STREAM, encoding="utf-8")
     with pytest.raises(DeclarationError) as caught:
-        resolver.coverage_from_data_root(root, base_currency=Currency.UAH)
+        resolver.coverage_from_data_root(root, base_currency=Currency.UAH, scenario_id=None)
     _assert_names_file_and_field(caught.value, foreign, "owner_id")
     assert "owner-002" in caught.value.problem
     assert "owner-001" in caught.value.problem

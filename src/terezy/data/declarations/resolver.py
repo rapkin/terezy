@@ -35,6 +35,7 @@ unverifiable.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from terezy.core.primitives import money
@@ -44,7 +45,6 @@ from terezy.data.declarations.errors import DeclarationError
 
 if TYPE_CHECKING:  # pragma: no cover -- typing only
     from collections.abc import Mapping, Sequence
-    from pathlib import Path
 
     from terezy.core.instruments.interface import InstrumentDeclaration
     from terezy.core.primitives.currency import Currency
@@ -54,6 +54,7 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.routes.channels import FxChannel
     from terezy.core.routes.legs import Leg, Route
     from terezy.core.routes.venues import Venue
+    from terezy.core.scenarios.regimes import Regime
     from terezy.core.streams.streams import IncomeStream
     from terezy.core.tax.interface import TaxClass
     from terezy.data.declarations.loader import ScenarioDeclaration
@@ -1161,6 +1162,20 @@ class CoverageDeclarations:
     """Which file declared the list. Not decoration: it is what lets a later failure still name
     the file after the TOML has been discarded."""
 
+    scenario_id: str | None
+    """Which declared scenario's belief this set was resolved for, or ``None`` for FR-015's
+    single implicit regime. Carried beside the regimes it produced so a reader can see *whose*
+    belief the audit ran under -- a report is only reproducible if the world it assumed is
+    recorded, and "every route at once" is itself an assumption worth naming."""
+
+    regimes: Mapping[str, Regime]
+    """The named scenario's regimes, keyed by id -- the ``regimes`` argument of ``coverage``.
+
+    Empty when :attr:`scenario_id` is ``None``, which is what the audit reads as FR-015's
+    implicit regime. **Exactly one scenario's regimes**, never a merge of two: see
+    :func:`_regimes_of_scenario`.
+    """
+
 
 def _check_spendable(
     endpoint: SpendableEndpoint,
@@ -1261,10 +1276,69 @@ def _check_spendable_owner(
         )
 
 
+def _regimes_of_scenario(
+    scenario_id: str | None,
+    scenarios: Mapping[str, ScenarioDeclaration],
+    *,
+    scenario_files: Mapping[str, Path],
+) -> Mapping[str, Regime]:
+    """One named scenario's regimes, keyed by id -- or none at all, said out loud.
+
+    ⚙ **The audit is scoped to one scenario, and two scenarios are never blended**
+    (research.md D17, owner decision 2026-08-23). A scenario is the unit of belief: it declares
+    its regimes *and* the transition between them, so its regimes are alternatives to each
+    other. Two scenarios are alternatives to *one another*, and pooling their regimes into one
+    ``regimes`` mapping would produce a report about a world nobody declared -- four blocks
+    where the owner holds two beliefs of two regimes each, each block honestly labelled and the
+    set of them meaningless. There is therefore no way to ask for two, and no merge to get
+    wrong.
+
+    **An unknown ``scenario_id`` is refused, never quietly read as "no regime declared".** The
+    fallback would audit every declared route under the implicit regime and say so in the
+    ``source`` field, which is the flattering reading of a typo: a full-coverage-looking report
+    over a route set no belief in the registry supports. The refusal names the files that were
+    read and lists what they declare, so the caller can correct the name from the message.
+
+    ``None`` is FR-015's implicit regime and returns an empty mapping, which is what
+    ``coverage`` reads as "audit every declared route under one implicit regime".
+
+    Duplicate regime ids **within** a scenario are already refused by the loader
+    (``loader._regimes``), which is why keying by id here cannot silently drop one.
+    """
+    if scenario_id is None:
+        return {}
+    if scenario_id not in scenarios:
+        declared = sorted(scenarios)
+        files = sorted({path.name for path in scenario_files.values()})
+        # The directory rather than a file: no file declares the name that was asked for, so
+        # there is nothing more specific to point at. With no scenario file at all there is not
+        # even a directory to name, and the constant is what the message can honestly give.
+        where = (
+            sorted({path.parent for path in scenario_files.values()})[0]
+            if scenario_files
+            else Path(SCENARIOS_DIR)
+        )
+        raise DeclarationError(
+            where,
+            "",
+            f"was asked to audit coverage under scenario {scenario_id!r}, which is declared by "
+            f"none of the {len(files)} scenario file(s) read here ({', '.join(files) or 'none'})."
+            f" Declared scenario ids: {declared}. The audit runs against one scenario's regimes "
+            "-- a scenario is the unit of belief, and its regimes are alternatives to each "
+            "other -- so an unrecognised name is refused rather than read as 'no regime "
+            "declared': that fallback would audit every declared route under a belief nobody "
+            "stated and report it as coverage.",
+            f"name one of {declared}, or pass scenario_id=None to audit every declared route "
+            "under the single implicit regime (FR-015)",
+        )
+    return {regime.id: regime for regime in scenarios[scenario_id].regimes}
+
+
 def resolve_coverage(
     *,
     ramp: RampDeclarations,
     spendable_file: Path,
+    scenario_id: str | None,
 ) -> CoverageDeclarations:
     """The ramp declarations plus a resolved spendable list, checked against them.
 
@@ -1272,6 +1346,16 @@ def resolve_coverage(
     spendable list is checked against the *venues*, the *base currency* and the *streams*, all
     three of which are already resolved by then, and re-resolving them here would give a data
     root two chances to disagree with itself.
+
+    ⚙ **``scenario_id`` is required and nullable, rather than defaulted to ``None``.** The two
+    would behave identically until the day somebody forgets the argument, and then they differ
+    by exactly the thing this feature exists to prevent: a report that audits every declared
+    route under an implicit regime, while the registry declares regimes that believe in a
+    subset of them, is confident about a world nobody stated. FR-015's implicit regime is a
+    legitimate answer to *"audit everything"* and an illegitimate one to *"audit my scenario"*,
+    and only the caller knows which was asked. Making it required forces that sentence to be
+    written down at every call site; making it nullable keeps FR-015 reachable without a second
+    entry point. See :func:`_regimes_of_scenario` for what each value resolves to.
     """
     owner_id, endpoints = loader.spendable_from_file(spendable_file)
     _check_spendable_owner(
@@ -1289,10 +1373,16 @@ def resolve_coverage(
         ramp=ramp,
         spendable=frozenset(endpoints),
         spendable_file=spendable_file,
+        scenario_id=scenario_id,
+        regimes=_regimes_of_scenario(
+            scenario_id, ramp.scenarios, scenario_files=ramp.scenario_files
+        ),
     )
 
 
-def coverage_from_data_root(root: Path, *, base_currency: Currency) -> CoverageDeclarations:
+def coverage_from_data_root(
+    root: Path, *, base_currency: Currency, scenario_id: str | None
+) -> CoverageDeclarations:
     """Every declaration a coverage report needs, under one data root.
 
     :func:`ramp_from_data_root`'s six families, plus ``spendable/*.toml``. An empty
@@ -1341,4 +1431,5 @@ def coverage_from_data_root(root: Path, *, base_currency: Currency) -> CoverageD
     return resolve_coverage(
         ramp=ramp_from_data_root(root, base_currency=base_currency),
         spendable_file=declared[0],
+        scenario_id=scenario_id,
     )

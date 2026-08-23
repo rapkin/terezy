@@ -36,6 +36,25 @@ Validation, at the data layer:
   precedent.
 - An empty list is refused (research.md D13).
 
+## Loading entry point: which declarations, and under whose belief
+
+### `CoverageDeclarations` — `data/declarations/resolver.py`
+
+| Field | Type | Meaning |
+|---|---|---|
+| `ramp` | `RampDeclarations` | Venues, streams, routes, channels, kinds, scenarios |
+| `spendable` | `frozenset[SpendableEndpoint]` | The resolved list |
+| `spendable_file` | `Path` | Which file declared it |
+| `scenario_id` | `str \| None` | Which belief the audit runs under; `None` is FR-015's implicit regime |
+| `regimes` | `Mapping[str, Regime]` | That scenario's regimes by id — the `regimes` argument of `coverage()`. Empty when `scenario_id` is `None` |
+
+`resolve_coverage(*, ramp, spendable_file, scenario_id)` and
+`coverage_from_data_root(root, *, base_currency, scenario_id)` are the two entry points, and
+`scenario_id` is **required and nullable** on both (research.md D17). One scenario's regimes
+reach the audit, never two blended; an unknown id is refused at load rather than falling back
+to the implicit regime. Without this the loader could produce no `regimes` mapping at all and
+the shipped registry's declared regimes could not reach FR-013.
+
 ## The destination universe
 
 ### `Destination` — `core/routes/coverage.py`

@@ -272,3 +272,44 @@ regime ids and the spendable pairs that produced the report. It holds no `Path`.
 the identity; the data layer already keeps `route_files` and friends beside them, and
 `terezy.data.manifest` is where a digest belongs if one is ever wanted. Recording the ids in
 core keeps the report self-describing without dragging the filesystem into it.
+## D17 — The audit runs against one named scenario, and two are never blended
+
+**Decision.** `resolve_coverage(...)` and `coverage_from_data_root(...)` take a **required,
+nullable** `scenario_id`. A named scenario resolves to that scenario's regimes, keyed by
+regime id, and `CoverageDeclarations` carries them as the `regimes` argument `coverage()`
+takes. `scenario_id=None` is FR-015's single implicit regime. An unknown id is refused at
+load, naming the scenario directory, the files read and every declared scenario id.
+
+**Rationale.** Until this decision the loader could not produce a `regimes` mapping at all:
+`CoverageDeclarations` exposed `ramp.scenarios` and nothing flattened `ScenarioDeclaration.regimes`,
+so every real-data call site passed `regimes={}` — including the feature's own contract test.
+On the shipped registry, which declares `wartime` and `normalized` in
+`data/scenarios/war_end.toml`, that produced `source="implicit"`, no audited regime ids, and an
+audit of **every** declared route: a route set no declared regime believes in. FR-013's and
+FR-015's per-regime audit was unreachable from real data and untested through the loader.
+
+**A scenario is the unit of belief.** It declares its regimes *and* the transition between
+them, so its regimes are alternatives to each other; two scenarios are alternatives to one
+another. Pooling two scenarios' regimes into one mapping would produce a report about a world
+nobody declared — four blocks where the owner holds two beliefs of two regimes each, every
+block honestly labelled and the set of them meaningless. So the audit takes one scenario, there
+is no way to ask for two, and there is no merge to get wrong. Adding a second scenario file to
+the data root changes nothing about a report audited under the first.
+
+**Why the unknown id is refused rather than defaulted to implicit.** The fallback is the
+flattering reading of a typo: it audits every declared route, reports `source="implicit"`, and
+looks like thorough coverage of a world nobody stated — the confident-wrong output this feature
+exists to prevent (Principle I, FR-020's reasoning applied to the regime dimension).
+
+**Why the parameter is required rather than defaulted to `None`.** The two spellings behave
+identically until the day an argument is forgotten, and then they differ by exactly that
+failure: FR-015's implicit regime is a legitimate answer to *"audit everything"* and an
+illegitimate one to *"audit my scenario"*, and only the caller knows which was asked. Required
+forces the sentence to be written at every call site; nullable keeps FR-015 reachable without a
+second entry point.
+
+**Alternatives rejected.** *Flatten every scenario's regimes into one mapping*: the blend
+above, and it also breaks on two scenarios sharing a regime id, where one would silently win.
+*Take a `Mapping[str, Regime]` from the caller*: pushes the flattening — and the blend — into
+every call site, which is where it would be got wrong quietly. *Default `scenario_id=None`*:
+see above.

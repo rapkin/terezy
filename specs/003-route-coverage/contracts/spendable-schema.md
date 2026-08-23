@@ -70,13 +70,35 @@ class CoverageDeclarations:
     ramp: RampDeclarations
     spendable: frozenset[SpendableEndpoint]
     spendable_file: Path
+    scenario_id: str | None          # which belief was audited, or None for the implicit regime
+    regimes: Mapping[str, Regime]    # that scenario's regimes, keyed by id -- `coverage`'s argument
 
-def coverage_from_data_root(root: Path, *, base_currency: Currency) -> CoverageDeclarations
+def resolve_coverage(*, ramp, spendable_file, scenario_id: str | None) -> CoverageDeclarations
+def coverage_from_data_root(
+    root: Path, *, base_currency: Currency, scenario_id: str | None
+) -> CoverageDeclarations
 ```
 
 A record beside `RampDeclarations` rather than more fields on it, on the precedent
 `RampDeclarations` itself sets against `Declarations`: the two describe different runs, and
 a data root with no spendable file must still be able to cost a ramp.
+
+⚙ **Amended 2026-08-23: the audit is scoped to one named scenario** (research.md D17). The
+record originally exposed only `ramp.scenarios`, and nothing flattened a scenario's regimes
+into the mapping `coverage()` takes — so every real-data caller passed `regimes={}` and the
+shipped registry, which declares `wartime` and `normalized`, was audited as one *implicit*
+regime over a route set no declared regime believes in. FR-013 was unreachable from data.
+
+- A named `scenario_id` resolves to **that scenario's** regimes, keyed by regime id.
+- An unknown `scenario_id` is **refused at load**, naming the scenario directory, the files
+  read and every declared scenario id. It never falls back to the implicit regime: that
+  fallback is a full-looking report over a world nobody declared.
+- `scenario_id=None` is FR-015's single implicit regime. It is **required and nullable, not
+  defaulted**: the two behave alike until somebody forgets the argument, and only the caller
+  knows whether "audit everything" was the question.
+- **Two scenarios are never blended.** A scenario is the unit of belief and its regimes are
+  alternatives to each other; pooling two scenarios' regimes would report a world nobody
+  stated. There is no way to ask for two, so there is no merge to get wrong.
 
 ## Provenance gate
 
