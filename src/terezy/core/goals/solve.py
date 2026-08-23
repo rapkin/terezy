@@ -549,6 +549,14 @@ def _missed_or_unreachable(
     Both faces of the binding shortfall (FR-018), unless there is no second face: a plan that
     never gets there is *unreachable* rather than missed by a date nobody can name, and
     reporting a capped horizon in its place is what FR-019 forbids.
+
+    **A crossing that is not after the target date is not an arrival.** Under a shrinking
+    balance the crossing is the moment the money falls *through* the target on its way down,
+    which is a real date and the wrong answer twice over: it is in the past relative to the
+    target, and it describes losing the target rather than reaching it. The guard is the same
+    one :func:`_solve_date` applies at the evaluation date, moved to the date the owner asked
+    about -- ``Missed.reached_on`` promises a date *later* than the target date, and a promise
+    the record makes in its own docstring is one this function has to keep.
     """
     shortfall = money.sub(target_sum, reached)
     crossing = _crossing(
@@ -557,27 +565,27 @@ def _missed_or_unreachable(
         target=target_sum.amount,
         rate=monthly_rate(growth),
     )
-    reached_on = (
-        None
-        if crossing is None or crossing <= 0.0
-        else _first_month_end_at_or_after(inputs.as_of, crossing)
-    )
-    if reached_on is None:
-        return Unreachable(
-            reason=(
-                f"the goal {goal.id!r} is short by {shortfall.amount!r} "
-                f"{shortfall.currency.value} on {target_date.isoformat()}, and it is not "
-                "reached later either. "
-                + _unreachable_reason(
-                    goal_id=goal.id,
-                    starting=starting,
-                    contribution=contribution,
-                    target=target_sum,
-                    growth=growth,
-                )
+    horizon = months_between(inputs.as_of, target_date)
+    if crossing is not None and crossing > horizon:
+        reached_on = _first_month_end_at_or_after(inputs.as_of, crossing)
+        if reached_on is not None:
+            return Missed(shortfall_at_target=shortfall, reached_on=reached_on)
+    return Unreachable(
+        reason=(
+            f"the goal {goal.id!r} is short by {shortfall.amount!r} "
+            f"{shortfall.currency.value} on {target_date.isoformat()}, and there is no later "
+            "date on which it arrives. "
+            + _never_arrives_reason(
+                goal_id=goal.id,
+                starting=starting,
+                contribution=contribution,
+                target=target_sum,
+                growth=growth,
+                target_date=target_date,
+                falling_through=crossing,
             )
         )
-    return Missed(shortfall_at_target=shortfall, reached_on=reached_on)
+    )
 
 
 def _crossing(*, starting: float, contribution: float, target: float, rate: float) -> float | None:
@@ -647,6 +655,41 @@ def _first_month_end_at_or_after(as_of: date, crossing: float) -> date | None:
     return shift_months(as_of, months)
 
 
+def _never_arrives_reason(
+    *,
+    goal_id: str,
+    starting: Money,
+    contribution: Money,
+    target: Money,
+    growth: GrowthAssumption,
+    target_date: date,
+    falling_through: float | None,
+) -> str:
+    """Why a fully declared goal has no arrival date, when it is short on the one it asked for.
+
+    The first branch is the case a downward crossing would otherwise be reported as an arrival:
+    a crossing later than the evaluation date but no later than the target date can only be the
+    balance passing *below* the target, because a rising balance that crossed before the target
+    date would not be short on it. The message says so rather than naming a date, which is the
+    same distinction :func:`_solve_date` draws at the evaluation date.
+    """
+    if falling_through is not None and falling_through > 0.0:
+        return (
+            f"the balance starts at {starting.amount!r} {target.currency.value}, which is above "
+            f"the target, and falls through it about {falling_through!r} months after the "
+            f"evaluation date -- before {target_date.isoformat()}, not after it. That is losing "
+            "the target rather than reaching it, so it is not reported as the date the goal "
+            "arrives: under this assumption there is no such date."
+        )
+    return _unreachable_reason(
+        goal_id=goal_id,
+        starting=starting,
+        contribution=contribution,
+        target=target,
+        growth=growth,
+    )
+
+
 def _unreachable_reason(
     *,
     goal_id: str,
@@ -655,18 +698,22 @@ def _unreachable_reason(
     target: Money,
     growth: GrowthAssumption,
 ) -> str:
-    """Why a target is never reached, naming which of the two shapes it is.
+    """Why a target is never reached, naming which of the three shapes it is.
 
-    The first branch tests the *same* expression :func:`_crossing` used to give up, rather than
-    a restatement of it, so "the balance never changes" cannot be said about a balance that
-    shrinks -- which the obvious restatement (no contribution and a rate at or below zero) does
-    say, wrongly, under a negative assumption.
+    Each branch tests the expression that actually produced the failure rather than a
+    restatement of it, because a restatement is how a message comes to say something true of the
+    case somebody had in mind and false of the case in front of the reader.
 
-    The second branch is the ceiling, and it is reached only under a **negative** assumption: a
-    balance that moves at a rate of zero or more passes any target above it eventually, so
-    "never reached" and "not constant" together imply the balance is converging. That is why
-    there is no third branch and no fallback -- a fallback here could only be a sentence about
-    a case that cannot occur, which is the kind of guard that reads as protection and is not.
+    * **The balance never moves** -- the same test :func:`_crossing` gave up on.
+    * **Nothing goes in** and the balance is therefore decaying to nothing. Reachable only under
+      a negative assumption: a balance that moves at a rate of zero or more passes any target
+      above it eventually, so "not constant" and "never reached" together imply the rate is
+      negative, and with no contribution the level it converges to is zero.
+    * **A contribution converges to a ceiling** -- the level at which the monthly loss eats
+      exactly what goes in, which is the only remaining shape.
+
+    There is no fourth branch and no fallback. A fallback could only be a sentence about a case
+    that cannot occur, which is the kind of guard that reads as protection and is not.
     """
     rate = monthly_rate(growth)
     if _never_moves(starting=starting.amount, contribution=contribution.amount, rate=rate):
@@ -677,6 +724,14 @@ def _unreachable_reason(
             "changes nothing from one month to the next. So there is no date on which the "
             "target is reached -- not a distant one, and not a capped horizon standing in for "
             "one."
+        )
+    if contribution.amount == 0.0:
+        return (
+            f"the goal {goal_id!r} targets {target.amount!r} {target.currency.value}, and "
+            f"nothing goes in: at a growth assumption of {growth.annual_rate!r} the balance "
+            f"decays from {starting.amount!r} towards nothing rather than rising towards the "
+            "target. No date is reported because there is none -- an arbitrarily distant one "
+            "would be a nearest answer to a question that has no answer."
         )
     ceiling = -contribution.amount / rate
     return (

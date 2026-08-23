@@ -39,11 +39,11 @@ from datetime import date
 from pathlib import Path
 
 import pytest
-from hypothesis import assume, given
+from hypothesis import assume, example, given
 from hypothesis import strategies as st
 
 from terezy.core.goals import solve
-from terezy.core.goals.solve import SolveOutcome, projected_value
+from terezy.core.goals.solve import SolveOutcome, months_between, projected_value
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.conventions import shift_months
 from terezy.core.primitives.currency import Currency
@@ -55,6 +55,7 @@ from terezy.core.results.goal import (
     GoalOutcome,
     GrowthAssumption,
     Met,
+    Missed,
     NoContributionNeeded,
     Unreachable,
 )
@@ -65,6 +66,21 @@ OWNER = "owner-001"
 _ANNUAL_RATES = st.sampled_from(
     [-0.05, 0.0, 0.005, 0.01, 0.05, 0.1234, 0.12682503013196977, 0.25, 0.4]
 )
+_FEASIBILITY_RATES = st.sampled_from(
+    [-0.5, -0.05, 0.0, 0.005, 0.01, 0.05, 0.1234, 0.12682503013196977, 0.25, 0.4]
+)
+"""The same band with a **fast** decay added, for the feasibility property only.
+
+A rate of -50% a year takes a balance through a target in months rather than in centuries,
+which is what makes the falls-through-the-target case land inside a generated horizon at all.
+
+It is deliberately **not** in the round-trip band. At that rate a horizon of a few hundred
+months puts the balance within a nanoshare of the level it converges to, and inverting a value
+that close to an asymptote is ill-conditioned in float64 -- the round trip then measures the
+resolution of a logarithm rather than the agreement of the modes. That is a property of the
+inverse, not of the model, and widening the project tolerance to cover it would be exactly the
+absorption FR-013 exists to prevent.
+"""
 _STARTING = st.integers(min_value=0, max_value=5_000_000)
 _CONTRIBUTIONS = st.integers(min_value=0, max_value=200_000)
 _TARGETS = st.integers(min_value=10_000, max_value=20_000_000)
@@ -236,6 +252,85 @@ def test_a_goal_solved_and_then_fully_declared_is_met_with_no_margin(
     assert verdict.solved_for == "feasibility"
     assert isinstance(verdict.feasibility, Met), verdict.feasibility
     assert_money_close(verdict.feasibility.margin, Money(0.0, UAH, prov.EMPTY))
+
+
+# ---------------------------------------------------------------------------
+# A reported arrival is an arrival
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.invariant
+@example(
+    as_of=date(2026, 1, 31),
+    starting=100_000,
+    annual=-0.5,
+    contribution=0,
+    target=90_000,
+    horizon=23,
+)
+@example(
+    as_of=date(2026, 1, 31),
+    starting=100_000,
+    annual=-0.5,
+    contribution=100,
+    target=90_000,
+    horizon=23,
+)
+@given(
+    as_of=_AS_OF,
+    starting=_STARTING,
+    annual=_FEASIBILITY_RATES,
+    contribution=_CONTRIBUTIONS,
+    target=_TARGETS,
+    horizon=_HORIZONS,
+)
+def test_a_missed_goal_never_reports_a_date_at_or_before_the_one_it_missed(
+    *,
+    as_of: date,
+    starting: int,
+    annual: float,
+    contribution: int,
+    target: int,
+    horizon: int,
+) -> None:
+    """``Missed.reached_on`` is later than the target date, and the target is met by then.
+
+    A unit test pins the case that was wrong; this pins the *claim*, over every combination of
+    rate, contribution, starting amount and horizon the band generates. The failure it exists
+    to catch is not arithmetic: under a shrinking balance the crossing formula returns a real,
+    finite, entirely plausible date on which the balance passes **below** the target, and
+    reporting it says the owner arrives on a date he is in fact leaving.
+
+    Both halves are asserted, because either alone can be satisfied by a wrong answer: a date
+    after the target date that the balance has not reached, or a balance above the target on a
+    date that is not after the one that was asked for.
+
+    The two ``@example`` cases are the reported regression, pinned so it is checked on every
+    run rather than when the draw happens to land on it. The shape needs a fast decay, a
+    starting amount above the target *and* a horizon past the crossing all at once, which the
+    generated band reaches only occasionally -- and a regression guard that fires four times in
+    ten is not a guard.
+    """
+    inputs = _inputs(as_of, starting, annual)
+    target_date = shift_months(as_of, horizon)
+    outcome = _solve(
+        _goal(
+            contribution=float(contribution),
+            target_sum=float(target),
+            target_date=target_date,
+        ),
+        inputs,
+    )
+    assert isinstance(outcome, GoalOutcome), outcome
+    if not isinstance(outcome.feasibility, Missed):
+        return
+    assert outcome.feasibility.reached_on > target_date
+    at_arrival = projected_value(
+        inputs,
+        contribution=Money(float(contribution), UAH, prov.EMPTY),
+        months=months_between(as_of, outcome.feasibility.reached_on),
+    )
+    assert at_arrival.amount >= float(target) or is_close(at_arrival.amount, float(target))
 
 
 # ---------------------------------------------------------------------------

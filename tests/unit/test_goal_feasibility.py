@@ -20,6 +20,8 @@ from __future__ import annotations
 
 from datetime import date
 
+import pytest
+
 from terezy.core.goals import solve
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
@@ -126,6 +128,10 @@ def test_three_inconsistent_variables_are_missed_with_both_faces_of_the_shortfal
         outcome.feasibility.shortfall_at_target, Money(60_492.46685483324, UAH, prov.EMPTY)
     )
     assert outcome.feasibility.reached_on == date(2027, 6, 30)
+    # The direction the record promises and the shrinking-balance test below pins from the
+    # other side: an arrival is *later* than the date it was wanted by. A date before it would
+    # be the plan losing the target rather than reaching it.
+    assert outcome.feasibility.reached_on > IN_A_YEAR
 
 
 def test_a_missed_goal_reports_the_variables_exactly_as_declared() -> None:
@@ -257,3 +263,51 @@ def test_a_target_reached_past_the_end_of_the_calendar_names_the_months_instead(
     assert isinstance(outcome, Unreachable), outcome
     assert "months" in outcome.reason
     assert "calendar" in outcome.reason
+
+
+@pytest.mark.parametrize("contribution", [0.0, 100.0])
+def test_a_shrinking_balance_that_starts_above_the_target_reports_no_arrival(
+    contribution: float,
+) -> None:
+    """A crossing before the target date is the balance falling *through* it, not arriving.
+
+    The regression this pins: with a negative assumption and a starting amount above the
+    target, the crossing is a real, finite, future-of-the-evaluation-date month -- and reporting
+    it as ``Missed.reached_on`` told the owner he "gets there" on 2026-03-31 for a goal he had
+    set for 2028-01-01, twenty-two months later. Both the record's own docstring and
+    METHODOLOGY say an arrival is later than the target date, so the guard belongs here rather
+    than in the prose.
+
+    Parametrised over a zero and a non-zero contribution because the two take different
+    branches through the crossing formula and only one of them was reachable by accident.
+    """
+    outcome = _outcome(
+        _goal(contribution=contribution, target_sum=90_000.0, target_date=date(2028, 1, 1)),
+        _inputs(starting=100_000.0, annual=-0.5),
+    )
+    assert isinstance(outcome, GoalOutcome), outcome
+    assert isinstance(outcome.feasibility, Unreachable), outcome.feasibility
+    assert "falls through it" in outcome.feasibility.reason
+    assert "2028-01-01" in outcome.feasibility.reason
+    # The shortfall on the declared date is still reported: what is refused is a *date*, not
+    # the arithmetic.
+    assert "short by" in outcome.feasibility.reason
+
+
+def test_a_target_the_plan_decays_away_from_says_so_rather_than_naming_a_ceiling() -> None:
+    """The third shape of unreachable, and the one a two-branch message got wrong.
+
+    Nothing goes in and the assumption is negative, so the balance decays towards **nothing**.
+    The message must not describe a contribution "settling at" a level -- with no contribution
+    that level is zero, and a sentence about a zero ceiling is a true number inside a false
+    sentence.
+    """
+    outcome = _outcome(
+        _goal(contribution=0.0, target_sum=500_000.0),
+        _inputs(starting=100_000.0, annual=-0.5),
+    )
+    assert isinstance(outcome, Unreachable), outcome
+    assert "decays" in outcome.reason
+    assert "nothing goes in" in outcome.reason
+    assert "settles at" not in outcome.reason
+    assert "never moves" not in outcome.reason

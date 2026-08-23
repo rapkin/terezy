@@ -1984,14 +1984,25 @@ it:
 | verdict | carries |
 | --- | --- |
 | `Met` | the margin — zero when the target is met exactly, which is *met*, not missed by a rounding hair |
-| `Missed` | **both** the amount short on the target date and the first date the target would actually arrive |
+| `Missed` | **both** the amount short on the target date and the first date the target would actually arrive — which is always *later* than the target date |
 | `Unreachable` | the reason. Never a capped horizon, never an arbitrarily distant date |
 
-There are two shapes of unreachable and the reason distinguishes them: a balance that does not
-move at all (no contribution, no growth), and a balance whose growth has a ceiling — under a
-negative assumption a fixed contribution settles where the monthly loss equals the monthly
-payment, and a target above that level is never reached however long anyone waits. A solver
-that searched forward would have returned the end of its window and called it a date.
+There are three shapes of unreachable and the reason distinguishes them, each tested against
+the expression that actually produced the failure rather than a restatement of it: a balance
+that does not move at all (no contribution, no growth); a balance decaying towards nothing
+because nothing goes in and the assumption is negative; and a contribution whose ceiling is
+below the target — under a negative assumption a fixed contribution settles where the monthly
+loss eats exactly what goes in, and a target above that level is never reached however long
+anyone waits. A solver that searched forward would have returned the end of its window and
+called it a date.
+
+**A fourth case reports no date for the opposite reason: the target was met and then lost.**
+Under a shrinking balance that starts above the target, the crossing is real, finite and in the
+future — and it is the moment the money falls *through* the target on the way down. Reporting
+it as an arrival would tell an owner he gets there on a date he is in fact leaving, so a
+crossing that is not strictly later than the target date is refused as an arrival and the
+verdict is unreachable with the shortfall and the falling-through month in its reason. It is the
+same distinction §23.3 draws at the evaluation date, applied at the date the owner asked about.
 
 A third case is reported the same way and is worth naming: a target reached only past the last
 date the calendar can express. The month count goes into the reason exactly as computed, and
