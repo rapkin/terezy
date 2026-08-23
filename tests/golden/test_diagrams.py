@@ -427,26 +427,59 @@ class TestTheArtifactsCannotBeGreenAndWrong:
         assert "this is NOT the cost" in text
         assert "one-way cost 7.14%" not in text
 
-    def test_the_normalized_graph_records_the_mark_a_reader_most_needs_to_recognise(
-        self,
-    ) -> None:
+    def test_the_recorded_graphs_mark_exactly_the_destinations_nothing_leaves(self) -> None:
         """FR-005 in a shipped artifact, not only in a fixture.
 
-        ``normalized`` declares an inbound route to ``ibkr_usd`` and nothing leaving it, so the
-        destination renders **not comparison-ready** with an explicitly absent edge. ``wartime``
-        is partner-closed and produces no such mark, which is why this regime is recorded too:
-        the goldens are a delivery target, and this is the mark that most needs to be
-        recognisable on sight.
+        The mark that most needs to be recognisable on sight, checked on the delivered pages
+        against the declarations rather than against a list written here — so a regime gaining
+        or losing an undeclared exit moves the artifact and this test agrees with it.
+
+        **Both regimes now carry it, and that is the change worth naming.** ``wartime`` used to
+        be partner-closed, and this case used to assert the mark was absent from it. Since
+        ``deel_to_coinbase`` was declared (2026-08-23) it is not: that route deliberately names
+        no ``partner_route``, because nothing has been observed about how money leaves Coinbase,
+        so ``coinbase`` is a destination the wartime registry can reach and cannot cost the way
+        out of. The mark saying so on the shipped page is the useful output, not a regression.
+        The contrast the pair of artifacts draws is still there — ``normalized`` marks
+        ``ibkr_usd`` too, because it alone declares the corridor to the broker — and what keeps
+        the mark meaningful is that it lands on *some* venues and not on others, which is the
+        last assertion here.
         """
-        text = _recorded(NORMALIZED_FILE)
-        assert diagram_marks.token(Mark.NO_EXIT_DECLARED) in text
-        node = next(line for line in text.splitlines() if '["venue ibkr_usd' in line)
-        assert diagram_marks.token(Mark.NO_EXIT_DECLARED) in node
-        assert "not comparison-ready" in node
-        assert diagram_marks.token(Mark.NO_EXIT_DECLARED) not in _recorded(GRAPH_FILE), (
-            "wartime is partner-closed; if it stopped being so, this pair of artifacts no "
-            "longer contrasts a comparison-ready registry with one that is not"
-        )
+        recorded_marks: dict[str, set[str]] = {}
+        for artifact, regime_id in ((GRAPH_FILE, REGIME), (NORMALIZED_FILE, NORMALIZED)):
+            text = _recorded(artifact)
+            declared = fixture.shipped_declarations()
+            regime = fixture.shipped_regime(declared, SCENARIO, regime_id)
+            in_force = [declared.routes[route_id] for route_id in sorted(regime.route_ids)]
+            # FR-005's rule, restated from the declarations rather than from a list written
+            # here, so a regime gaining or losing a corridor moves both the artifact and the
+            # expectation. A venue an **inbound** route lands money at needs a declared
+            # **exit** route departing it; another inbound route leaving carries the money
+            # further away rather than back out, which is why `coinbase` is marked under
+            # `normalized` despite `coinbase_to_ibkr` departing it. Somewhere only exit routes
+            # arrive at is the way out, not a destination waiting for one.
+            reachable = {route.destination for route in in_force if route.direction == "inbound"}
+            exited = {route.origin for route in in_force if route.direction == "exit"}
+            stranded = reachable - exited
+            assert stranded, f"{artifact.name} no longer records the mark at all"
+
+            marked = {
+                line.split('["venue ', 1)[1].split(" ·", 1)[0]
+                for line in text.splitlines()
+                if '["venue ' in line and diagram_marks.token(Mark.NO_EXIT_DECLARED) in line
+            }
+            assert marked == stranded, artifact.name
+            for venue_id in sorted(stranded):
+                node = next(line for line in text.splitlines() if f'["venue {venue_id} ' in line)
+                assert "not comparison-ready" in node
+
+            # A mark on every venue would say nothing about any of them.
+            assert marked < set(declared.venues), artifact.name
+            recorded_marks[regime_id] = marked
+
+        # And the pair still contrasts two beliefs about one registry: the broker corridor is
+        # named by `normalized` alone, so only that page has a broker with no way out of it.
+        assert recorded_marks[NORMALIZED] - recorded_marks[REGIME] == {"ibkr_usd"}
 
     def test_both_declared_quote_forms_are_recorded_each_in_its_own_unit(self) -> None:
         """A premium per unit in ``wartime``'s p2p corridor, basis points in ``normalized``'s

@@ -1,0 +1,59 @@
+# ФОП dollars → spendable hryvnia. The way out, and the one the owner pays for twice.
+#
+# Two legs because two things happen: dollars on a ФОП currency account are sold for hryvnia
+# (leg 0, inside the venue), and the hryvnia is moved to a card he can actually spend from
+# (leg 1). Declared as one route because it is one corridor he uses, not two he chooses
+# between.
+#
+# **This is where the spread is paid the first time.** If he later wants dollars again on a
+# debit card he pays it a second time, in the other direction — and that second crossing is a
+# separate declared corridor, not a discount on this one. The round-trip figure 002 computes
+# over this pair is the number that makes the cost visible.
+#
+# **The tax base is not computed here and must not be.** Tax on the contract income is
+# assessed at the official NBU rate on the date the currency was credited to the ФОП account
+# — a different rate on a different date from the one this leg transacts at. Feature 011
+# introduces the official-rate series; nothing in this file may stand in for it.
+#
+# SYNTHETIC FIXTURE for every number.
+
+[route]
+id          = "fop_usd_to_monobank_uah"
+provider    = "ФОП bank"
+origin      = "fop"
+destination = "monobank_uah"
+direction   = "exit"
+status      = "open"
+
+  [[route.leg]]
+  index                  = 0
+  kind                   = "fx"
+  from_venue             = "fop"
+  to_venue               = "fop"
+  from_ccy               = "USD"
+  to_ccy                 = "UAH"
+  channel                = "bank_fop"
+  fee_pct                = 0.0
+  fee_fixed              = 0.0
+  latency_days           = 1
+  disruption_probability = 0.01
+  kind_of_observation    = "bank_fee_schedule"
+  source                 = "SYNTHETIC FIXTURE — invented. The sale itself carries no separate commission in this declaration; the whole cost sits in the channel's sell-side spread, which is the number worth observing first."
+  retrieved_on           = "2026-08-23"
+  verified_on            = ""
+
+  [[route.leg]]
+  index                  = 1
+  kind                   = "transfer"
+  from_venue             = "fop"
+  to_venue               = "monobank_uah"
+  from_ccy               = "UAH"
+  to_ccy                 = "UAH"
+  fee_pct                = 0.0
+  fee_fixed              = 0.0
+  latency_days           = 0
+  disruption_probability = 0.01
+  kind_of_observation    = "bank_fee_schedule"
+  source                 = "SYNTHETIC FIXTURE — invented. A ФОП-to-personal transfer may carry a bank fee the owner has not observed; declared free so that the round-trip figure is the spread and nothing else until it is."
+  retrieved_on           = "2026-08-23"
+  verified_on            = ""

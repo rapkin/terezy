@@ -51,6 +51,9 @@ WARTIME_ROUTES = frozenset(
         "monobank_to_binance_p2p",
         "monobank_to_binance_p2p_double",
         "binance_p2p_to_monobank",
+        "deel_to_fop",
+        "deel_to_coinbase",
+        "fop_usd_to_monobank_uah",
     }
 )
 """What the shipped wartime regime believes in. Restated here so a silent change to the
