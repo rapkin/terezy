@@ -28,7 +28,7 @@ in the data layer.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 import pydantic
@@ -898,8 +898,18 @@ class TestDatedRateSchedules:
         A file whose written order disagrees with its dates is one a human misreads -- and
         the reader is the person who has to check a rate against a statute. Reordering it
         here would make that file loadable, so the error is what stops it existing.
+
+        ⚙ **This test used a literal date and passed for the wrong reason.** It appended
+        ``2024-12-01``; when `ua_investment_profit` was re-dated to exactly that day, the
+        appended block stopped being *earlier* than the previous entry and became *equal*
+        to it, so the duplicate-date branch raised instead and the out-of-order branch lost
+        all coverage. Both branches report the same ``field_path``, so an assertion reading
+        only the field could never have noticed. Hence two changes: the date is **derived**
+        strictly earlier than whatever the file declares, and the assertion reads the
+        **message**, which is the only thing that distinguishes the two.
         """
-        text = TAX_UA.read_text(encoding="utf-8") + self._schedule_block("2024-12-01")
+        earlier = date.fromisoformat(self._last_effective_from()) - timedelta(days=1)
+        text = TAX_UA.read_text(encoding="utf-8") + self._schedule_block(earlier.isoformat())
         broken = _write(tmp_path, "unsorted.toml", text)
         with pytest.raises(DeclarationError) as raised:
             loader.tax_classes_from_file(broken)
@@ -908,6 +918,34 @@ class TestDatedRateSchedules:
             file=broken,
             field_path=(f"jurisdiction.tax_class[{self._last_class_id()}].rate[1].effective_from"),
         )
+        assert "before the previous entry's" in str(raised.value), (
+            "this must be the out-of-order refusal, not the duplicate-date one: they emit "
+            "the same field path and only the message tells them apart"
+        )
+
+    def test_the_two_order_refusals_are_distinguishable_from_each_other(
+        self, tmp_path: Path
+    ) -> None:
+        """The property that makes the two tests above independent, asserted directly.
+
+        Written because they were *not* independent: one silently became a second copy of
+        the other. A shared field path is fine, but then something has to differ, and this
+        pins what.
+        """
+        last = date.fromisoformat(self._last_effective_from())
+        messages = {}
+        for label, when in (("duplicate", last), ("out_of_order", last - timedelta(days=1))):
+            broken = _write(
+                tmp_path,
+                f"{label}.toml",
+                TAX_UA.read_text(encoding="utf-8") + self._schedule_block(when.isoformat()),
+            )
+            with pytest.raises(DeclarationError) as raised:
+                loader.tax_classes_from_file(broken)
+            messages[label] = str(raised.value)
+        assert "repeats" in messages["duplicate"]
+        assert "before the previous entry's" in messages["out_of_order"]
+        assert messages["duplicate"] != messages["out_of_order"]
 
     def test_a_negative_levy_rate_on_an_entry_is_refused(self, tmp_path: Path) -> None:
         """A refund is not a charge, and this rule does not model one."""

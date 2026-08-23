@@ -506,13 +506,67 @@ What else could reach each finding, and what was done about it.
 | A fixture hard-coding a date that is not its subject | five fund test modules | All repointed at `tests/synthetic.SCHEDULE_START` |
 | A run depending on the 15-day margin to the exemption's start | four modules projecting issue A | One assertion pins the relationship and names all four; each of the four carries a comment pointing at it |
 
+### Review round 2 — a test that passed for the wrong reason, and a rule that did not produce its dates
+
+**The out-of-order refusal lost all its coverage to this round's own change.**
+`test_entries_out_of_order_are_refused_rather_than_sorted` appended a literal `2024-12-01`;
+re-dating `ua_investment_profit` to exactly that day turned the appended block from
+*earlier* into *equal*, so the **duplicate-date** branch raised instead. Both branches emit
+the same `field_path` and the test asserted only that, so it stayed green while
+`loader.py`'s out-of-order branch went to zero coverage. Its sibling three tests up already
+derived its date and said in its docstring that *"a literal here would quietly stop testing
+duplication the day one did"* — the other test used a literal, and that is exactly what
+happened. Now: the date is derived strictly earlier, the assertion reads the **message**,
+and a third test pins that the two refusals are distinguishable at all.
+
+**Rule B1 did not produce the dates it was credited with.** `size_pegged_payment` applies
+`min(assumed, cap)`, so a *higher* ceiling in force *earlier* makes a payment **larger**.
+The ladder rises, so dating the 2024 step at the start of its year claims **more**, not
+less — the opposite of B1. Both cap entries are relabelled **B2**, which is what actually
+governs: `cap_on` returns the latest entry on or before a payment's date, the distribution
+class starts 2026-06-30, and every projectable payout selects the 2024 entry whatever day
+either carries — so the choice changes no figure. The dates are unchanged and no number
+moves. The 2023 entry also stopped contradicting itself: it claimed B1 "because this choice
+does change a figure" three sentences before saying it is unreachable.
+
+`ua.toml`'s header carried the false example, and **B1 now has no instance in this
+repository** — said in the header rather than papered over with a different example.
+
+**Merge damage to `main`'s content, from a mechanical renumber.** Two `§24.3`/`§24.5`
+self-references inside 008's Goals section were swept into `§26.x` by a blanket "+2" pass
+and pointed at nothing; ten of this branch's own `###` subheadings still carried their
+pre-merge numbers, colliding with main's real `### 22.1`; and a consumed blank line in
+`REQUIRED_TESTS.md` made a paragraph render as a table row. All repaired, and
+`/tmp/checkrefs.py`-style verification now confirms **every** `§` reference in
+`METHODOLOGY.md` resolves, with no duplicate section or subsection numbers, and the
+cross-file references from `REQUIRED_TESTS.md` and `data/README.md` resolve too.
+
+**Four refusals had no test, and running one of them found a real defect.**
+`_awaiting_cap`'s fallback reported the fund's **termination date** as `searched_on` when
+no verification task matched — a fabricated date in an audit field, reading as "somebody
+looked on this day" when nobody had. `searched_on` is now `date | None`, the fallback
+passes `None`, and the reason says the declaration is missing a task. The other three: the
+out-of-order branch above, the fund-loaded-first duplicate-id branch (the test is
+parametrised over both load orders rather than swapped from one to the other), and the
+negative settlement delay.
+
+**Two smaller.** `results/project.py`'s `case EventKind.DISTRIBUTION` is unreachable on the
+bond path — only `fixed_income` is in `REGISTRY` and it emits no distribution — and is now
+marked `# pragma: no cover` like the `assert_never` beside it, with why. It cannot be
+deleted: dropping it would break the exhaustiveness `assert_never` depends on.
+`inzhur_miltech.toml`'s "the purchase cost is identical under either reading" held only in
+practice mode; under the legal terms the 1% markup scales NAV and the two readings give
+1 017.04 against 1 010.00. And `cap_on`'s docstring said the caller treats an undeclared
+ceiling as unbounded "while saying so", when the caller in fact refuses — a docstring
+teaching a rule the code never had.
+
 ### T053 — the gates on the last commit, and the delta from T001
 
 | Gate | Baseline (T001) | Now | Delta |
 |---|---|---|---|
-| `pytest --cov` | 1198 passed | **2056 passed** | +858 (includes 004, 005, 008, the CPI series and the Deel/ФОП flow, merged in) |
-| coverage (floor 90%) | 99.77% | **99.60%** | −0.17 pt |
-| `pytest -m "contract or invariant"` | — | **940 passed**, 1116 deselected | — |
+| `pytest --cov` | 1198 passed | **2062 passed** | +864 (includes 004, 005, 008, the CPI series and the Deel/ФОП flow, merged in) |
+| coverage (floor 90%) | 99.77% | **99.74%** | −0.03 pt |
+| `pytest -m "contract or invariant"` | — | **942 passed**, 1120 deselected | — |
 | `check_provenance.py` | 0 errors, 24 unverified, 12 files | **0 errors, 470 unverified, 20 files** | the jump is the merged-in CPI series, one cited observation per month, plus the Deel/ФОП routes |
 | `ruff check` / `ruff format --check` | clean | clean | — |
 | `mypy` (strict) | clean, 144 files | clean, **208 files** | +64 |

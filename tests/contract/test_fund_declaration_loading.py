@@ -498,14 +498,33 @@ class TestReferencesResolveAcrossFiles:
         assert raised.value.field_path == "instrument.tax_classes.distribution"
         assert "disposal_gain" in str(raised.value)
 
-    def test_a_fund_and_a_bond_sharing_an_id_is_a_duplicate(self, tmp_path: Path) -> None:
-        """The id space is shared even though the maps are not: a holding names one id."""
+    @pytest.mark.parametrize("fund_first", [True, False])
+    def test_a_fund_and_a_bond_sharing_an_id_is_a_duplicate(
+        self, tmp_path: Path, *, fund_first: bool
+    ) -> None:
+        """The id space is shared even though the maps are not: a holding names one id.
+
+        ⚙ **Parametrised over the load order, because the check is written twice.** The
+        resolver dispatches per file, so the fund branch and the bond branch each carry
+        their own duplicate test, and a single ordering exercises only one of them —
+        files are loaded sorted, so the name decides which. One order left the fund
+        branch's refusal with no coverage at all, which is a refusal whose message could
+        have been false without anyone noticing.
+        """
         (tmp_path / "instruments").mkdir()
         (tmp_path / "tax").mkdir()
         (tmp_path / "tax" / "ua.toml").write_text(
             (DATA_ROOT / "tax" / "ua.toml").read_text(encoding="utf-8"), encoding="utf-8"
         )
-        (tmp_path / "instruments" / "a_fund.toml").write_text(
+        fund_name, bond_name = (
+            ("a_fund.toml", "b_bond.toml")
+            if fund_first
+            else (
+                "b_fund.toml",
+                "a_bond.toml",
+            )
+        )
+        (tmp_path / "instruments" / fund_name).write_text(
             _replace(
                 REIT.read_text(encoding="utf-8"),
                 'id                   = "inzhur_reit"',
@@ -513,7 +532,7 @@ class TestReferencesResolveAcrossFiles:
             ),
             encoding="utf-8",
         )
-        (tmp_path / "instruments" / "b_bond.toml").write_text(
+        (tmp_path / "instruments" / bond_name).write_text(
             (DATA_ROOT / "instruments" / "ovdp_synthetic_a.toml").read_text(encoding="utf-8"),
             encoding="utf-8",
         )
@@ -521,3 +540,5 @@ class TestReferencesResolveAcrossFiles:
             resolver.from_data_root(tmp_path)
         assert "ovdp_synthetic_a" in str(raised.value)
         assert "already declared" in str(raised.value)
+        # The error names the file loaded *second*, which is the one the reader must edit.
+        assert raised.value.file.name == (bond_name if fund_first else fund_name)

@@ -196,6 +196,7 @@ reinforces without closing:
 | **J4** | Half-covered and marked `[~]` above. A fund whose only guaranteed exit is its termination now says so on the result, and a redemption the terms do not owe is refused with the holding left open. What the row asks for and does not exist is a declared **lock-up** term compared against a horizon: these funds declare no lock-up, they declare an absence of obligation, which is a different fact reached by a different route. |
 | **E11** | Reinforced: every fund charge is recorded including a zero, and a disposal at a loss carries a `taxable_base` of zero *with the loss beside it on its own line*. The row is a **presentation** requirement for the waterfall — that a reader looking at `0.00` can tell exempted from not-applicable — and there is still no presentation surface. |
 | **B5** | Approached from one side: tax is assessed per disposal against per-lot basis consumed, and `charged_for_year` records the year it accrues to. The row also wants it **paid from cash on the due date**, with loss offset and carryforward, and this feature explicitly does not model any of the three (FR-008 says so in the output). Feature 009's. |
+
 **004-composed-paths** closes **no** row either, and says so rather than stretching one: no
 lettered behaviour above names composing declared routes into a candidate. Three rows it presses
 on directly, and one it reinforces along the way:

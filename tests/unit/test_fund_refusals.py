@@ -22,14 +22,18 @@ from typing import Final
 import pytest
 
 from terezy.core.errors import InconsistentTerms, InfeasiblePurchase, UnresolvedTaxClass
+from terezy.core.instruments import fund
 from terezy.core.instruments.fund import (
     DeclaredYield,
     DistributionTerms,
+    ExchangeRateAssumption,
     FundDeclaration,
     LegalTerms,
     LiquidityTerms,
     ObservedPractice,
+    Peg,
     SpreadTerms,
+    VerificationTask,
 )
 from terezy.core.instruments.interface import DateRange, Holding
 from terezy.core.primitives import provenance as prov
@@ -39,6 +43,7 @@ from terezy.core.primitives.provenance import Provenance, SourceRef
 from terezy.core.primitives.rates import NominalRate, RealTermsUnavailable
 from terezy.core.results import fund as fund_results
 from terezy.core.results.fund import (
+    AwaitingVerification,
     BesideTheHurdle,
     FundAssumptions,
     FundProjection,
@@ -334,3 +339,96 @@ def test_every_projection_states_the_mode_it_assumed(mode: str) -> None:
     outcome = _run(assumptions=_assumptions(liquidity_mode=mode))
     assert isinstance(outcome, FundProjection), outcome
     assert outcome.liquidity_mode == mode
+
+
+class TestTheGuardsWhoseMessagesHadNoTestAtAll:
+    """Three refusals the coverage report found unexercised. A refusal nobody runs is a
+    refusal whose message can be false without anyone noticing — and one of these was.
+    """
+
+    def test_a_negative_settlement_delay_is_refused_rather_than_clamped(self) -> None:
+        """A programmer-error guard, and it stays a guard: the loader refuses this in data.
+
+        Reached only if a caller builds terms in code, which the fixtures in this suite do.
+        Clamping to zero would turn a lost sign into a same-day settlement that reads as a
+        declared term.
+        """
+        with pytest.raises(ValueError, match="is not a delay"):
+            fund.settlement_date(date(2028, 1, 10), -1)
+
+    def test_zero_business_days_is_same_day_and_is_a_real_declared_value(self) -> None:
+        """So the guard above is about the sign, not about the boundary."""
+        assert fund.settlement_date(date(2028, 1, 10), 0) == date(2028, 1, 10)
+
+    def test_a_pegged_fund_with_no_ceiling_and_no_task_says_the_task_is_missing(
+        self,
+    ) -> None:
+        """The fallback wording in ``_awaiting_cap``, which had never been run.
+
+        Running it found a real defect: it used to report the fund's **termination date**
+        as ``searched_on``, which would have read as "somebody looked on this day" when
+        nobody had. A missing task is a defect in the declaration, and the refusal now says
+        so and carries ``None``.
+        """
+        pegged = _declaration(
+            distribution=DistributionTerms(
+                frequency="monthly",
+                basis_note="FIXTURE — a payout pegged to a currency with no declared ceiling.",
+                record_day="last_day_of_month",
+                payment_day=10,
+                paid_in=UAH,
+                peg=Peg(sized_in=Currency.USD, cap=()),
+                payout_share=0.5,
+                provenance=_fixture("pegged distribution terms"),
+            ),
+            verification_tasks=(),
+        )
+        outcome = _run(
+            declaration=pegged,
+            assumptions=_assumptions(
+                exchange_rate=ExchangeRateAssumption(
+                    uah_per_unit=42.0,
+                    is_assumption=True,
+                    rationale="FIXTURE — an owner-stated rate.",
+                )
+            ),
+        )
+        assert isinstance(outcome, AwaitingVerification), outcome
+        assert outcome.searched_on is None
+        assert "no verification task is declared" in outcome.searched
+        assert "not even a question to hand back" in outcome.reason
+
+    def test_the_same_fund_with_a_task_declared_hands_the_question_back(self) -> None:
+        """The other half, so the fallback is reached for the reason it claims."""
+        pegged = _declaration(
+            distribution=DistributionTerms(
+                frequency="monthly",
+                basis_note="FIXTURE — a payout pegged to a currency with no declared ceiling.",
+                record_day="last_day_of_month",
+                payment_day=10,
+                paid_in=UAH,
+                peg=Peg(sized_in=Currency.USD, cap=()),
+                payout_share=0.5,
+                provenance=_fixture("pegged distribution terms"),
+            ),
+            verification_tasks=(
+                VerificationTask(
+                    question="FIXTURE — which «граничний курс» applies?",
+                    searched="the fixture's imaginary регламент",
+                    searched_on=date(2026, 8, 23),
+                ),
+            ),
+        )
+        outcome = _run(
+            declaration=pegged,
+            assumptions=_assumptions(
+                exchange_rate=ExchangeRateAssumption(
+                    uah_per_unit=42.0,
+                    is_assumption=True,
+                    rationale="FIXTURE — an owner-stated rate.",
+                )
+            ),
+        )
+        assert isinstance(outcome, AwaitingVerification), outcome
+        assert outcome.searched_on == date(2026, 8, 23)
+        assert "not even a question to hand back" not in outcome.reason

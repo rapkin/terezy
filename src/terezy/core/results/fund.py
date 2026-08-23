@@ -196,7 +196,16 @@ class AwaitingVerification:
     instrument_id: str
     question: str
     searched: str
-    searched_on: date
+    searched_on: date | None
+    """When the document was searched, or ``None`` where the declaration records no task.
+
+    ⚙ ``None`` rather than a stand-in. This field used to fall back to the fund's
+    termination date when no matching :class:`~terezy.core.instruments.fund.VerificationTask`
+    was declared, which put a fabricated date in an audit field — the date would have read
+    as "somebody looked on this day" when nobody had. A missing task is itself a defect in
+    the declaration, and the refusal now says so instead of dressing it up.
+    """
+
     reason: str
 
 
@@ -753,6 +762,11 @@ def _pegged_distribution(
 def _awaiting_cap(declaration: FundDeclaration, paid_on: date) -> AwaitingVerification:
     """The cap question, as a refusal naming the task and the date it was needed for."""
     task = _task_mentioning(declaration, "курс")
+    unrecorded = (
+        " This fund declares a peg whose ceiling does not cover the date AND records no "
+        "verification task about the ceiling, so there is not even a question to hand back: "
+        "add a [[instrument.verification_task]] naming what has to be looked up."
+    )
     return AwaitingVerification(
         instrument_id=declaration.id,
         question=(
@@ -760,8 +774,10 @@ def _awaiting_cap(declaration: FundDeclaration, paid_on: date) -> AwaitingVerifi
             if task is not None
             else "the «граничний курс» in force — the ceiling the leases convert at"
         ),
-        searched=task.searched if task is not None else "the fund's primary documents",
-        searched_on=task.searched_on if task is not None else declaration.terminates_on,
+        searched=(
+            task.searched if task is not None else "nothing; no verification task is declared"
+        ),
+        searched_on=task.searched_on if task is not None else None,
         reason=(
             f"{declaration.id!r} declares no «граничний курс» in force on "
             f"{paid_on.isoformat()}, so it is not known whether the ceiling binds that "
@@ -769,6 +785,7 @@ def _awaiting_cap(declaration: FundDeclaration, paid_on: date) -> AwaitingVerifi
             "declared for this date' and 'there is no ceiling' are different claims, and "
             "the second one is the favourable one. Declare the cap in force, or move the "
             "projection inside the dates the declared ladder covers."
+            + ("" if task is not None else unrecorded)
         ),
     )
 

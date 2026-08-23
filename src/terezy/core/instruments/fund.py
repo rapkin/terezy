@@ -521,10 +521,15 @@ def exit_price_per_unit(declaration: FundDeclaration, nav: Money, discount: floa
 def cap_on(peg: Peg, on_date: date) -> CapEntry | None:
     """The «граничний курс» in force on a date, or ``None`` if the ladder starts later.
 
-    ``None`` is not "no ceiling": it is "no ceiling is declared for this date", and the
-    caller treats it as the pegged rate applying unbounded while saying so. Declaring a
-    ceiling of zero would size every payment at nothing, which is why the two cannot be
-    the same value.
+    ``None`` is not "no ceiling": it is "no ceiling is declared for this date", and **the
+    caller refuses**. It returns an ``AwaitingVerification`` naming the open question rather
+    than sizing the payment at the full assumed rate, because treating an undeclared ceiling
+    as an absent one is choosing the favourable reading in silence.
+
+    ⚙ This paragraph used to say the caller treated the rate as unbounded "while saying
+    so", which was never what the code did. Declaring a ceiling of zero would be different
+    again -- it would size every payment at nothing -- which is why zero is refused at the
+    data boundary and cannot stand in for "not declared".
     """
     for entry in reversed(peg.cap):
         if entry.effective_from <= on_date:

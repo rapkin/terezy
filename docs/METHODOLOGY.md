@@ -2113,7 +2113,7 @@ Nothing in that arithmetic knows the lots were seeded. The remainder of lot B ke
 
 `SIMULATOR_SPEC.md` §4.7. The owner states any two of a monthly contribution, a target sum and
 a target date, and `core.goals.solve` answers the third. All three declared is not an
-over-declaration — it is the feasibility question, §26.5.
+over-declaration — it is the feasibility question, §24.5.
 
 ### 24.1 The model, and why it is on the record
 
@@ -2243,7 +2243,7 @@ future — and it is the moment the money falls *through* the target on the way 
 it as an arrival would tell an owner he gets there on a date he is in fact leaving, so a
 crossing that is not strictly later than the target date is refused as an arrival and the
 verdict is unreachable with the shortfall and the falling-through month in its reason. It is the
-same distinction §26.3 draws at the evaluation date, applied at the date the owner asked about.
+same distinction §24.3 draws at the evaluation date, applied at the date the owner asked about.
 
 A third case is reported the same way and is worth naming: a target reached only past the last
 date the calendar can express. The month count goes into the reason exactly as computed, and
@@ -2285,7 +2285,7 @@ A tax rate is not a constant, it is a schedule. Ukrainian law moved the military
 1.5% to 5% in December 2024, and several published sources still show the old figure — so
 this is the shape the domain already has rather than future-proofing.
 
-### 22.1 The lookup
+### 25.1 The lookup
 
 A `TaxClass` carries `rates: tuple[RateEntry, ...]`, sorted oldest first and non-empty.
 `terezy.core.tax.schedule.rate_on(tax_class, on_date)` returns
@@ -2307,7 +2307,7 @@ is one `[[jurisdiction.tax_class.rate]]` block appended to a data file: no sourc
 changes and nothing is rebuilt, which is asserted in
 `tests/worked_examples/test_rate_schedule_straddle.py`.
 
-### 22.2 The effective date is a cited legal fact
+### 25.2 The effective date is a cited legal fact
 
 `effective_from` is **exactly the date its citation attests**, and nothing looser. Where a
 source establishes the current rate but says nothing about when it began, **no earlier entry
@@ -2326,7 +2326,7 @@ each rate was in force. None of the three classes has a legislated commencement 
 it, and each entry's `note` says so in as many words. An event dated before 2026-06-30 stops
 the run; the remedy is a citation for an earlier entry, never a widened date.
 
-### 22.3 Provenance is per entry
+### 25.3 Provenance is per entry
 
 Not per class. The rate before a legislated change and the rate after it were read from
 different sources on different days, and one of them may be verified while the other is
@@ -2342,7 +2342,7 @@ one. A `TaxCharge` therefore carries the citation of the **entry** that produced
 A bond's schedule comes from a contract that says what it will pay. A fund's comes from
 **what the fund says about itself**, and every part of the model below is shaped by that.
 
-### 23.1 The declared net yield, and how NAV moves
+### 26.1 The declared net yield, and how NAV moves
 
 One rate drives everything (owner decision B). There is no NAV series, no market price and
 no return model — only the fund's own stated rate, applied **pro rata and simply**:
@@ -2375,7 +2375,7 @@ settles**: the funds' documents state no pro-rating rule for a part month, so no
 invented — a part month simply does not pay, and that is stated here rather than assumed
 either way.
 
-### 23.2 Assumption-driven means the metric is refused
+### 26.2 Assumption-driven means the metric is refused
 
 Both Inzhur funds are declared `is_assumption_driven`, and the field is `Literal[True]`
 because this feature has no other case. Asking either of them for a volatility, a Sharpe or
@@ -2387,7 +2387,7 @@ Every projection also carries `rests_on`: what the figure depends on that is not
 observation of a market, written out in words. The unverified *mark* says that a figure is
 uncertain; `rests_on` says what a reader would have to go and check.
 
-### 23.3 A range stays a range
+### 26.3 A range stays a range
 
 MilTech states 25–29%. That is two numbers the fund published, not a figure with error bars.
 A projection either
@@ -2401,7 +2401,7 @@ requirement: the midpoint of a fund-stated range is the most seductive invented 
 the model, because it looks like arithmetic. A chosen point outside the declared range is
 refused rather than clamped to the nearer end.
 
-### 23.4 The peg: a term, not a conversion licence
+### 26.4 The peg: a term, not a conversion licence
 
 Ukrainian commercial rent is priced against the dollar and settled in hryvnia under a
 «граничний курс» — a ceiling on the rate the lease converts at. So the REIT's income is
@@ -2433,7 +2433,7 @@ Three refusals hold this together:
   "No ceiling is declared here" and "there is no ceiling" are different claims, and the
   second one is the favourable one.
 
-### 23.5 The spread is the modelled access cost; fees are context
+### 26.5 The spread is the modelled access cost; fees are context
 
 A purchase executes at NAV **plus** the declared entry markup and an exit at NAV **less** the
 declared discount, and both appear as their own lines with `round_trip_spread` beside them —
@@ -2447,7 +2447,7 @@ the declared net yield, so a reader can see what it is net *of*. **Nothing compu
 them, and no result record has a field for a computed fee.** Modelling a fund's internal
 profitability from outside would mean inventing its books.
 
-### 23.6 Liquidity: two claims, and no default between them
+### 26.6 Liquidity: two claims, and no default between them
 
 `LiquidityTerms` holds two records rather than one with a flag, because the регламент's
 obligations and the company's current practice are different kinds of claim and only one of
@@ -2475,7 +2475,7 @@ never silently outlives its fund: reaching `terminates_on` produces a dated term
 payout, taxed as a disposal, at NAV with **no** discount — the contract ended, nobody asked
 a favour.
 
-### 23.7 Researched is not verified
+### 26.7 Researched is not verified
 
 Every term of both real funds was read from the funds' own primary documents on 2026-08-22,
 and every `verified_on` is empty until the owner checks it against his investor cabinet.

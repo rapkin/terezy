@@ -39,10 +39,17 @@
 # they deliberately go opposite ways:
 #
 #   B1. If the choice of date would change a reported **figure**, take the reading that is
-#       conservative by consequence — the one under which the tool claims less. The peg
-#       ceiling in `data/instruments/inzhur_reit.toml` is the worked case: its ladder is
-#       dated from the first day of each attested year, which is the reading under which
-#       the ceiling binds soonest and the pegged payment is smallest.
+#       conservative by consequence — the one under which the tool claims less. Which
+#       direction that is has to be worked out per case from what the figure does, and it
+#       is not always "earlier": a «граничний курс» is applied as `min(assumed, cap)`, so a
+#       *higher* ceiling in force *earlier* makes a pegged payment **larger**, and B1 would
+#       therefore date a cap increase as late as its citation allows.
+#
+#       ⚙ **B1 has no instance in this repository today.** It was credited with dating the
+#       REIT's cap ladder and it did not: that ladder is a B2 case (see the entries), and
+#       the sentence that used to stand here claimed the first-day-of-year reading made the
+#       payment smallest, which is backwards for a rising ladder. The rule is kept because
+#       the next vague citation may well need it; the false worked example is not.
 #
 #   B2. If the choice changes **no** figure — a class with a single entry, where the date
 #       decides only how far back a run is possible — take the earliest date the citation

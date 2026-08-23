@@ -328,10 +328,16 @@ def _taxable_kind(kind: EventKind) -> TaxableEventKind | None:
     match kind:
         case EventKind.COUPON:
             return TaxableEventKind.COUPON
-        case EventKind.DISTRIBUTION:
-            # ⚙ feature 006: a fund payout, taxed under the class the instrument declares
-            # for distributions -- which is *not* the class its redemption falls under.
-            # The mapping is mechanical here; which class governs is the declaration's.
+        case EventKind.DISTRIBUTION:  # pragma: no cover -- unreachable on this path
+            # ⚙ feature 006. Present for exhaustiveness and **not** reachable here: this
+            # function maps the events of an ``InstrumentOps`` implementation, and the only
+            # one in ``registry.REGISTRY`` is ``fixed_income``, which emits no distribution.
+            # A fund has its own mapping in ``core.results.fund``. The arm cannot simply be
+            # dropped -- the ``assert_never`` below is what makes a forgotten event kind a
+            # type error, and omitting this one would make that assertion fail to compile
+            # rather than making the case impossible. Marked like the ``case _`` beside it,
+            # for the same reason: unreachable arms should say so rather than sit as an
+            # uncovered line a reader mistakes for an untested one.
             return TaxableEventKind.DISTRIBUTION
         case EventKind.PRINCIPAL_REPAYMENT | EventKind.REDEMPTION:
             # A redemption is a disposal: what is taxable is the realised gain, not the
