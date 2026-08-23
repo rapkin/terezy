@@ -498,7 +498,14 @@ class TestTheDiagramRendersTheResultAndNotTheRegistry:
                 if direction == "exit"
             )
         )
-        expected = list(enumerate(candidates.exit_segments_of(cost.exit_path)))
+        expected = list(
+            enumerate(
+                candidates.exit_segments_of(cost.exit_path),
+                # The exit continues the inbound chain's numbering, because the round trip
+                # is one journey and ``cost._exit_chain`` numbers it as one.
+                start=len(candidates.segments_of(cost.path)),
+            )
+        )
         assert drawn == expected, "a segment contributes one edge per leg; its identity is one"
 
 
@@ -566,7 +573,12 @@ class TestAComposedCandidateDrawsAsTheChainItIs:
                 if direction == "exit"
             )
         )
-        assert drawn == list(enumerate(candidates.exit_segments_of(cost.exit_path)))
+        assert drawn == list(
+            enumerate(
+                candidates.exit_segments_of(cost.exit_path),
+                start=len(candidates.segments_of(cost.path)),
+            )
+        )
         assert "way out: composed chain of 2 declared exit routes" in self._text().splitlines()[1]
 
     def test_the_by_segment_attribution_names_which_hop_charged(self) -> None:
@@ -724,3 +736,61 @@ class TestTheRoundingTheSegmentAxisMakesVisible:
         text = fixture.drawn_path(fixture.p2p_cost()).text
         node = next(line for line in text.splitlines() if "one-way cost by segment" in line)
         assert "each figure rounded on its own" not in node
+
+
+class TestOneJourneyIsNumberedOnce:
+    """**The round trip is one journey, and core numbers it as one.**
+
+    ``cost._exit_chain`` continues the exit's segment positions from the inbound chain's, and
+    says why in as many words: *two independent numberings would make "position 0" ambiguous in
+    a report*. ``SegmentAttribution.position`` is documented as **matching** ``Segment.position``.
+
+    The renderer restarted the exit at zero, and the contradiction was already sitting in a
+    checked-in golden: the by-segment node said ``segment 2 route r_back_one`` while the exit
+    edge for that very route said ``segment 0``. Both carriers name the route id, which softens
+    it -- but the node does not say which half a segment belongs to, so the *number* is the
+    cross-reference, and the cross-reference was wrong. That is exactly what FR-020's second
+    axis was added for: see which hop dominates, then go and find it.
+
+    Asserted against ``by_segment`` rather than against a rule restated here, so the diagram and
+    the engine cannot drift apart by each agreeing with a different convention.
+    """
+
+    @staticmethod
+    def _drawn(text: str) -> dict[int, str]:
+        return {position: route_id for _, position, route_id in segment_edges(text)}
+
+    def test_the_edges_and_the_by_segment_node_agree_on_every_position(self) -> None:
+        cost = fixture.composed_cost()
+        assert isinstance(cost.round_trip, RoundTripCost)
+        recorded = {entry.position: entry.route_id for entry in cost.round_trip.by_segment}
+        assert self._drawn(fixture.chain_path_of(cost).text) == recorded
+
+    def test_the_same_holds_for_a_declared_route_and_its_declared_exit(self) -> None:
+        """A declared route is a chain of one, so its exit is segment 1 -- not segment 0."""
+        cost = fixture.p2p_cost()
+        assert isinstance(cost.round_trip, RoundTripCost)
+        drawn = self._drawn(fixture.drawn_path(cost).text)
+        assert drawn == {entry.position: entry.route_id for entry in cost.round_trip.by_segment}
+        assert drawn[1] == "binance_p2p_to_monobank"
+
+    def test_no_position_names_two_different_routes(self) -> None:
+        """The defect stated as the collision it was: ``segment 1`` meant two things at once."""
+        for text in (
+            fixture.chain_path_of(fixture.composed_cost()).text,
+            fixture.drawn_path(fixture.p2p_cost()).text,
+        ):
+            by_position: dict[int, set[str]] = {}
+            for _, position, route_id in segment_edges(text):
+                by_position.setdefault(position, set()).add(route_id)
+            collided = {position: ids for position, ids in by_position.items() if len(ids) > 1}
+            assert not collided, collided
+
+    def test_every_position_in_the_node_leads_to_an_edge_and_the_reverse(self) -> None:
+        """The node's numbers are the only global ones, so each must lead somewhere real."""
+        cost = fixture.composed_cost()
+        assert isinstance(cost.round_trip, RoundTripCost)
+        text = fixture.chain_path_of(cost).text
+        assert {entry.position for entry in cost.round_trip.by_segment} == {
+            position for _, position, _ in segment_edges(text)
+        }

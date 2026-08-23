@@ -1,5 +1,5 @@
 flowchart LR
-    meta["costed path · regime: wartime · destination: binance · stream: salary_uah · way in: declared route monobank_to_binance_p2p · way out: declared route binance_p2p_to_monobank · status (way in, tightest segment): open · marks: UNVERIFIED + SYNTHETIC"]
+    meta["costed path · regime: wartime · destination: binance · stream: salary_uah · way in: declared route monobank_to_binance_p2p · way out: declared route binance_p2p_to_monobank · status (way in, tightest segment): open · marks: UNVERIFIED + SYNTHETIC"]:::unverified
     x0["one-way cost 6.67% of 10000.00 UAH sent · arrived 222.22 USD · conversion_spread 666.67 UAH · fixed_fee 0.00 UAH · percentage_fee 0.00 UAH · marks: UNVERIFIED + SYNTHETIC"]:::unverified
     x1["round-trip cost 12.22% of 10000.00 UAH sent · arrived 8777.78 UAH · conversion_spread 1222.22 UAH · fixed_fee 0.00 UAH · percentage_fee 0.00 UAH · marks: UNVERIFIED + SYNTHETIC"]:::unverified
     x2["one-way cost by segment · segment 0 route monobank_to_binance_p2p: conversion_spread 666.67 UAH, fixed_fee 0.00 UAH, percentage_fee 0.00 UAH"]
@@ -11,6 +11,6 @@ flowchart LR
     n1["venue monobank_uah"]
     n1 -->|"inbound · segment 0 · route monobank_to_binance_p2p · provider Binance P2P · leg 0 fx · UAH to USD · via channel p2p · declared fee 0.00% + 0.00 UAH · declared premium (buy side) +3.00 UAH per USD, applied above the reference 42.00 UAH per USD · status: open · marks: UNVERIFIED + SYNTHETIC"| n1
     n1 -->|"inbound · segment 0 · route monobank_to_binance_p2p · provider Binance P2P · leg 1 transfer · USD · declared fee 0.00% + 0.00 USD · status: open · marks: UNVERIFIED + SYNTHETIC"| n0
-    n0 -->|"exit · segment 0 · route binance_p2p_to_monobank · provider Binance P2P · leg 0 fx · USD to UAH · via channel p2p · declared fee 0.00% + 0.00 USD · declared premium (sell side) -2.50 UAH per USD, applied below the reference 42.00 UAH per USD · status: open · marks: UNVERIFIED + SYNTHETIC"| n0
-    n0 -->|"exit · segment 0 · route binance_p2p_to_monobank · provider Binance P2P · leg 1 transfer · UAH · declared fee 0.00% + 0.00 UAH · status: open · marks: UNVERIFIED + SYNTHETIC"| n1
+    n0 -->|"exit · segment 1 · route binance_p2p_to_monobank · provider Binance P2P · leg 0 fx · USD to UAH · via channel p2p · declared fee 0.00% + 0.00 USD · declared premium (sell side) -2.50 UAH per USD, applied below the reference 42.00 UAH per USD · status: open · marks: UNVERIFIED + SYNTHETIC"| n0
+    n0 -->|"exit · segment 1 · route binance_p2p_to_monobank · provider Binance P2P · leg 1 transfer · UAH · declared fee 0.00% + 0.00 UAH · status: open · marks: UNVERIFIED + SYNTHETIC"| n1
     classDef unverified stroke-dasharray: 4 2

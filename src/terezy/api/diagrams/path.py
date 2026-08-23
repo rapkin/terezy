@@ -371,16 +371,31 @@ def _walked(
     routes: Mapping[str, Route],
     direction: str,
     verdict: StalenessVerdict,
+    *,
+    position_from: int = 0,
 ) -> list[tuple[str, Segment, Route, StalenessVerdict]]:
     """One half of a journey, as the declared routes it is made of, numbered in chain order.
 
     A declared route is a chain of one and is not a special case here, which is the reading
     ``core.routes.path.segments_of`` establishes and this follows: one code path draws both, so
     a composed candidate cannot acquire a rendering of its own.
+
+    ``position_from`` continues the numbering from the previous half, because **the round trip
+    is one journey and core numbers it as one** -- ``cost._exit_chain`` takes the same argument
+    for the same reason, and ``SegmentAttribution.position`` is documented as *matching*
+    ``Segment.position``. Restarting the exit at zero was a real defect while it lasted: the
+    by-segment node reported ``segment 2`` and ``segment 3`` for the way out while the exit
+    edges said ``segment 0`` and ``segment 1``, so the one cross-reference FR-020's second axis
+    exists to provide -- see which hop dominates, then go find it -- pointed at the wrong hop.
     """
     return [
-        (direction, Segment(position=position, route_id=route_id), routes[route_id], verdict)
-        for position, route_id in enumerate(segment_ids)
+        (
+            direction,
+            Segment(position=position_from + offset, route_id=route_id),
+            routes[route_id],
+            verdict,
+        )
+        for offset, route_id in enumerate(segment_ids)
     ]
 
 
@@ -459,6 +474,7 @@ def _drawn(
                 routes,
                 EXIT,
                 result.round_trip.staleness,
+                position_from=len(candidates.segments_of(result.path)),
             )
         )
 
@@ -499,7 +515,11 @@ def _drawn(
                 f"status (way in, tightest segment): {result.status}",
                 marks.segment(tuple(caption_marks)),
             ),
-            style_class=marks.STYLE_CLASS[Mark.COMPOSED] if composed else None,
+            # Through the rule, not around it. What a composed caption emphasises is that
+            # it is composed (004 FR-013): the epistemic marks are already emphasised on
+            # the cost nodes beside it, and ``style_class_for``'s own docstring says which
+            # of several marks draws the eye changes nothing a reader needs.
+            style_class=marks.style_class_for((Mark.COMPOSED,) if composed else caption_marks),
         )
     ]
 

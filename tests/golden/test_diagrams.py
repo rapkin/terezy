@@ -504,11 +504,19 @@ class TestTheArtifactsCannotBeGreenAndWrong:
         """An unused ``classDef`` is dead weight in an artifact whose value is being read.
 
         Worse, it tells the next contributor that a state is styled when nothing in front of
-        them wears it. Asserted as an **equality** per artifact rather than as an absence, so
-        it holds in both directions and needs no list of exceptions: a diagram carries the
-        states it has, and a registry graph that started defining a class for composed chains
-        would fail here even though the class is perfectly valid on the other diagram kind.
+        them wears it. Asserted as an **equality** per artifact rather than as an absence, so it
+        holds in both directions and needs no list of exceptions: a diagram carries the states
+        it has, and a registry graph that started defining a class for composed chains would
+        fail here even though the class is perfectly valid on the other diagram kind.
+
+        The equality alone is **vacuously satisfiable** -- ``emitted`` is derived from
+        ``applied``, so both collapse to empty together and a renderer that stopped styling
+        entirely would pass. ``route_graph_wartime.mmd`` is already an artifact with neither, so
+        that is not hypothetical. The two assertions below compose with it rather than replacing
+        it: something is styled somewhere, and the two artifacts whose content *requires* a
+        class carry the specific one it requires.
         """
+        styled: dict[str, set[str]] = {}
         for artifact in ARTIFACTS:
             text = _recorded(artifact)
             emitted = {
@@ -522,12 +530,19 @@ class TestTheArtifactsCannotBeGreenAndWrong:
                 f"defines: {emitted ^ applied}"
             )
             assert emitted <= set(diagram_marks.STYLE_CLASS.values())
-        assert diagram_marks.STYLE_CLASS[Mark.CLOSED] not in {
-            line.split()[1]
-            for artifact in ARTIFACTS
-            for line in _recorded(artifact).splitlines()
-            if line.lstrip().startswith("classDef ")
-        }, "a closed route is an edge, and Mermaid styles a node -- nothing can carry it"
+            styled[artifact.name] = emitted
+
+        assert any(styled.values()), (
+            "no artifact styles anything, so the equality above holds vacuously everywhere: "
+            f"{styled}"
+        )
+        # And the two whose content demands a class carry that class, so the guard cannot be
+        # satisfied by styling something incidental somewhere else.
+        assert diagram_marks.STYLE_CLASS[Mark.NO_EXIT_DECLARED] in styled[NORMALIZED_FILE.name]
+        assert diagram_marks.STYLE_CLASS[Mark.UNVERIFIED] in styled[PATH_FILE.name]
+        assert diagram_marks.STYLE_CLASS[Mark.CLOSED] not in set().union(*styled.values()), (
+            "a closed route is an edge, and Mermaid styles a node -- nothing can carry it"
+        )
 
     def test_the_recorded_diagrams_say_they_are_built_on_synthetic_data(self) -> None:
         """§11 item 1: none of these figures has been observed, and both pictures say so."""

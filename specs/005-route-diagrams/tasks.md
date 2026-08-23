@@ -318,6 +318,16 @@ regenerated diagram contains the added venue and route, correctly connected and 
 - [x] T048 Widen the regime check to every segment of both halves, and emit a `classDef` for
   exactly the classes a diagram applies — derived from the emitted lines, so a registry graph
   stops defining classes only a costed path can carry
+- [x] T049 Number one journey once. ``_walked`` takes ``position_from`` and the exit continues
+  the inbound chain's positions, because core does (``cost._exit_chain``) and
+  ``SegmentAttribution.position`` is documented as *matching* ``Segment.position``. The restart
+  made the by-segment node's numbers -- the only global ones -- contradict the edges, which is
+  precisely the cross-reference FR-020's second axis exists to provide
+- [x] T050 Make the ``classDef`` equality non-vacuous: ``emitted`` is derived from ``applied``,
+  so both collapse to empty together. Kept the per-artifact equality and composed two guards
+  onto it -- something is styled somewhere, and the two artifacts whose content requires a
+  class carry that class
+- [x] T051 Pick the caption's style class through ``style_class_for`` rather than around it
 - [x] T032 Stop emitting the `closedRoute` `classDef`, which nothing can carry — Mermaid
   applies a class to a node and `CLOSED` only ever lands on an edge. The explanation moves into
   `marks.CLASS_DEFS`; the mark itself stays in the vocabulary and in the label text
