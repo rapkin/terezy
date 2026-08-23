@@ -537,7 +537,7 @@ self-references inside 008's Goals section were swept into `§26.x` by a blanket
 and pointed at nothing; ten of this branch's own `###` subheadings still carried their
 pre-merge numbers, colliding with main's real `### 22.1`; and a consumed blank line in
 `REQUIRED_TESTS.md` made a paragraph render as a table row. All repaired, and
-`/tmp/checkrefs.py`-style verification now confirms **every** `§` reference in
+`scripts/check_methodology_refs.py` — kept, because the next renumber will need it — confirms **every** `§` reference in
 `METHODOLOGY.md` resolves, with no duplicate section or subsection numbers, and the
 cross-file references from `REQUIRED_TESTS.md` and `data/README.md` resolve too.
 
