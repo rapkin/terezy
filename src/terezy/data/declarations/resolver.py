@@ -2238,7 +2238,8 @@ def _check_access_price(
     field_prefix: str,
 ) -> None:
     """A price is declared exactly where the instrument states none, and in its currency."""
-    price = entry.price_per_unit
+    quote = entry.quote
+    price = None if quote is None else quote.price
     if self_priced and price is not None:
         raise DeclarationError(
             path,

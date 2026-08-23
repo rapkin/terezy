@@ -9,12 +9,13 @@
 # wrong venue is money teleporting between venues for free, with the record still reading as a
 # coherent journey. Feature 004 shipped exactly that defect once.
 #
-# **Why it is not three more keys on `data/instruments/*.toml`.** The instrument's own file is
-# the more natural home for the price, and the reason it is not used is recorded rather than
-# dressed up: `tests/golden/ovdp_synthetic_a.golden.txt` records the sha256 of every
-# instrument declaration, so a key added to a shipped instrument file moves a golden feature
-# 010 must not move. `docs/METHODOLOGY.md` §28.6 names the seam so a later feature can move
-# these fields deliberately, with the golden re-recorded and the diff read.
+# **Why it is not four more keys on `data/instruments/*.toml`.** Everything declared here is a
+# property of the **option** — this instrument, reached this way — and not of the security.
+# The venue that sells it, the venue its proceeds land at, the price *at that venue*, and how
+# risky reaching it that way is: none of them is a term of the paper, and all of them change
+# if the same instrument is reached somewhere else. One instrument at two venues is two rows
+# here against one instrument file, which is a shape four more keys on the instrument
+# declaration could not hold.
 #
 # **What carries a citation and what does not.** A venue id, an instrument id and a
 # risk-class label are references and statements — there is nothing here for a source to vouch

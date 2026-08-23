@@ -60,7 +60,7 @@ from terezy.core.inflation.series import (
     Periodicity,
 )
 from terezy.core.instruments import registry as instrument_registry
-from terezy.core.instruments.access import InstrumentAccess
+from terezy.core.instruments.access import InstrumentAccess, VenueQuote
 from terezy.core.instruments.fund import (
     CapEntry,
     DeclaredYield,
@@ -3437,7 +3437,7 @@ def access_from_file(path: Path) -> tuple[InstrumentAccess, ...]:
                     "the instrument's proceeds land at a named venue, and that venue is where "
                     "the exit route has to depart from (FR-004)",
                 ),
-                price_per_unit=_access_price(path, prefix, entry.price),
+                quote=_access_price(path, prefix, entry.price),
                 risk_class=_require_text(
                     path,
                     f"{prefix}.risk_class",
@@ -3452,36 +3452,49 @@ def access_from_file(path: Path) -> tuple[InstrumentAccess, ...]:
 
 def _access_price(
     path: Path, prefix: str, declared: schema.AccessPriceTable | None
-) -> Money | None:
-    """The declared unit quote, or ``None`` where the table is absent.
+) -> VenueQuote | None:
+    """The declared unit quote and the kind it ages under, or ``None`` where the table is absent.
 
     ``None`` is the *statement* that this instrument prices itself, and it is returned here
     without judgement: whether this kind of instrument is entitled to make that statement is a
     relation between two files and belongs to the resolver.
+
+    ``kind=None`` is passed to :func:`_source_ref` because the kind is carried into the record
+    and checked at the field it becomes -- the same reading a leg's ``kind_of_observation``
+    gets, and the reason the error below can name ``[access.price].kind`` rather than a table.
     """
     if declared is None:
         return None
     field = f"{prefix}.price"
-    return Money(
-        _positive(
-            path,
-            f"{field}.per_unit",
-            declared.per_unit,
-            "a unit costs something. A price of zero or below would make a purchase acquire "
-            "unlimited units from any amount, and every figure downstream of it meaningless "
-            "rather than merely large",
+    return VenueQuote(
+        price=Money(
+            _positive(
+                path,
+                f"{field}.per_unit",
+                declared.per_unit,
+                "a unit costs something. A price of zero or below would make a purchase "
+                "acquire unlimited units from any amount, and every figure downstream of it "
+                "meaningless rather than merely large",
+            ),
+            _currency(path, f"{field}.currency", declared.currency),
+            prov.of(
+                [
+                    _source_ref(
+                        path,
+                        field,
+                        source=declared.source,
+                        retrieved_on=declared.retrieved_on,
+                        verified_on=declared.verified_on,
+                        kind=None,
+                    )
+                ]
+            ),
         ),
-        _currency(path, f"{field}.currency", declared.currency),
-        prov.of(
-            [
-                _source_ref(
-                    path,
-                    field,
-                    source=declared.source,
-                    retrieved_on=declared.retrieved_on,
-                    verified_on=declared.verified_on,
-                    kind=declared.kind,
-                )
-            ]
+        kind=_require_text(
+            path,
+            f"{field}.kind",
+            declared.kind,
+            "a venue quote ages under a declared threshold, and there is no default one "
+            "(FR-028): a price whose kind nobody named could never be reported stale",
         ),
     )

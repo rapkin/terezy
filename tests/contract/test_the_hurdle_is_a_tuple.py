@@ -5,18 +5,23 @@ the comparison MUST be produced by this same pipeline. A benchmark computed by a
 side channel would make the comparison unfalsifiable.* Two numbers that agree today prove
 nothing about tomorrow, and the drift would be invisible because both would look reasonable.
 
-So the first class below asserts **identity**, on 002's SC-016 precedent: the benchmark is an
+So the first class asserts the **origin** rather than the agreement: the benchmark is an
 *index*, so the figure the comparison calls the hurdle is literally an element of the sequence
 it ranks, and there is no field on the record for a second figure to live in. The falsifying
 experiment is in the same class: break the benchmark tuple's declarations and the whole
 comparison comes back as ``BenchmarkUnavailable`` -- which a side-channel benchmark could not
 do, because it would not have gone through the refusals.
 
-The second class is SC-002's number, and it is asserted at the project tolerance over routes
-that cost and delay **nothing**. The third explains, with an assertion rather than prose, why
-the shipped domestic pair does not reproduce 001's figure exactly: it declares one day in and
-three days out, and FR-015 puts waiting inside the span the rate is measured over. Asserting
-equality against it would need a tolerance loose enough to hide a real defect.
+⚙ **SC-002 as literally written does not hold, and this is where the departure lives.** The
+criterion says *the OVDP evaluated as a tuple through its zero-cost domestic routes reproduces
+feature 001's hurdle rate within the project tolerance*. Over the routes as they are declared
+the two figures are 0.1598 and 0.16059, which is outside it. The gap is entirely the one day
+in and the three days out that FR-015 puts **inside** the span the rate is measured over --
+waiting is a cost, and that is an owner decision of 2026-08-22 rather than an inference. So
+the equality is asserted over ``without_latency``, a fixture that edits the declarations, and
+the class below isolates what the edit removed. It is recorded on ``plan.md``'s departures
+list as well as here, because a departure that lives only in a test docstring is one the next
+reader of the spec will not find.
 """
 
 from __future__ import annotations
@@ -261,10 +266,16 @@ class TestWaitingIsACostAndTheShippedRoutesCharge:
 
     def test_the_gap_is_four_days_of_it_and_no_more(self) -> None:
         # A sanity band, stated as loose (docs/METHODOLOGY.md §11.3): four days on a two-year
-        # holding at roughly 16% is of the order of 16% x 4/730 = 0.09 percentage points, and
-        # what the band rules out is a gap of the size a *fee* would make. The exact figure is
-        # the root of a series whose dates all moved, so there is no closed form to check it
-        # against, and inventing a tighter bound would be asserting the implementation.
+        # holding at roughly 16% is of the order of 16% x 4/730 = 0.09 percentage points. The
+        # exact figure is the root of a series whose dates all moved, so there is no closed
+        # form to check it against, and inventing a tighter bound would be asserting the
+        # implementation.
+        #
+        # The band does **not** rule out a fee, and saying it did would be over-claiming: a
+        # 0.10% exit fee moves the two rates 0.00143 apart, inside the 0.002 bound. What rules
+        # a fee out is the sibling assertion above -- a fee changes what *arrives*, and
+        # `reaches` is equal at the project tolerance, which fails for a fee as small as
+        # 0.05%. The two assertions together say "the dates moved and the amounts did not".
         shipped = _outcome(fixtures.shipped(), fixtures.hurdle_tuple(), AT_ISSUE)
         instant = _outcome(
             fixtures.without_latency(fixtures.shipped()), fixtures.hurdle_tuple(), AT_ISSUE
@@ -278,6 +289,80 @@ class TestWaitingIsACostAndTheShippedRoutesCharge:
         # The mechanism behind the gap, so the band above rests on something checkable.
         for arrival in _outcome(fixtures.shipped(), fixtures.hurdle_tuple(), AT_ISSUE).arrivals:
             assert (arrival.arrived_on - arrival.released_on).days == 3
+
+
+class TestEveryTupleOfferedLandsInExactlyOneOfTheThreePlaces:
+    """Ranked, not comparable, or refused -- a **partition**, not a total that adds up.
+
+    A silent exclusion is how a comparison comes to recommend the only option left standing,
+    and here the missing ones would be precisely the options nobody has finished declaring.
+    Counting the three lists and comparing the total against the number offered does not catch
+    that: one tuple in two buckets and another in none sums correctly. So the keys are
+    compared as sets, and duplicates are ruled out separately.
+    """
+
+    def _all_three(self) -> Registries:
+        """A twin of the free way in, and a way out whose flat fee exceeds every release."""
+        registries = fixtures.with_new_route(
+            fixtures.shipped(),
+            fixtures.route(
+                "test_twin_in",
+                origin="monobank_uah",
+                destination="inzhur",
+                direction="inbound",
+                partner=fixtures.DOMESTIC_OUT,
+            ),
+        )
+        return fixtures.with_new_route(
+            registries,
+            fixtures.route(
+                "test_ruinous_out",
+                origin="inzhur",
+                destination="monobank_uah",
+                direction="exit",
+                fee_fixed=20_000.0,
+            ),
+        )
+
+    def _offered(self) -> tuple[Tuple, ...]:
+        """One tuple bound for each of the three places, so the partition has work to do."""
+        return (
+            fixtures.replace(
+                fixtures.hurdle_tuple(),
+                route_in=fixtures.FundingPath(
+                    destination_id="inzhur",
+                    stream_id=fixtures.SALARY,
+                    route_id="test_twin_in",
+                ),
+            ),
+            fixtures.hurdle_tuple(route_out=fixtures.DeclaredExit(route_id="test_ruinous_out")),
+            fixtures.replace(
+                fixtures.hurdle_tuple(),
+                route_in=fixtures.FundingPath(
+                    destination_id="inzhur",
+                    stream_id=fixtures.SALARY,
+                    route_id="no_such_route",
+                ),
+            ),
+        )
+
+    def test_the_three_lists_partition_the_tuples_offered(self) -> None:
+        comparison = _ranked(self._all_three(), self._offered())
+        landed = [
+            *(outcome.key for outcome in comparison.ranked),
+            *(outcome.key for outcome in comparison.not_comparable),
+            *(item.key for item in comparison.refused),
+        ]
+        assert len(landed) == len(set(landed))
+        assert set(landed) == {*self._offered(), fixtures.hurdle_tuple()}
+
+    def test_each_of_the_three_places_is_actually_occupied(self) -> None:
+        # Otherwise the partition above would hold on a comparison that ranked everything, and
+        # the two lists it exists to police would never be exercised at all.
+        comparison = _ranked(self._all_three(), self._offered())
+        assert len(comparison.ranked) == 2
+        assert len(comparison.not_comparable) == 1
+        assert len(comparison.refused) == 1
 
 
 class TestEveryComparisonCarriesTheBenchmark:

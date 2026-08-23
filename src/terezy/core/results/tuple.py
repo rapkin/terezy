@@ -441,8 +441,10 @@ class SeamDoesNotChain:
     FR-004, and the one place this feature is most likely to be silently wrong. Feature 004
     shipped an exit chain anchored at neither end: money moved between venues for free, and
     the record still read as a coherent three-hop journey -- an arriving amount in one currency
-    beside a cost fraction computed in another. The same failure is available here at two more
-    seams, so both are anchored and each is tested with a deliberate mismatch.
+    beside a cost fraction computed in another. Two more places where two declarations have to
+    meet at a *venue* are available here, so both are anchored and each is tested with a
+    deliberate mismatch. The third seam is not a place at all and has its own record:
+    :class:`FundedFromAnotherStream`.
 
     Bridging the gap is what must never happen: a conversion or a transfer nobody declared,
     inserted to make two declarations meet, is an invented leg at an invented rate.
@@ -458,6 +460,33 @@ class SeamDoesNotChain:
     right: str
     """Where it would have to be, as ``venue/currency`` -- where the purchase happens, or
     where the way out departs from."""
+
+    reason: str
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class FundedFromAnotherStream:
+    """The tuple names one funding stream and its way in is costed from another (FR-010).
+
+    The third seam, and the only one with no venue in it. A
+    :class:`~terezy.core.routes.path.Candidate` carries its own ``stream_id`` and the way in
+    is costed from *that* one -- the same acquisition is free from the hryvnia salary and
+    crosses a P2P spread from the dollar contract income -- while :attr:`Tuple.stream_id` is
+    what resolves the stream, keys the way out, and appears in every report. Two fields, one
+    fact, and until this refusal existed nothing compared them: a tuple claiming to be funded
+    from ``contract_usd`` over the free domestic hryvnia route produced complete, plausible
+    figures for a journey nobody could make.
+
+    Refused rather than resolved in either direction. Preferring the tuple's would re-cost a
+    way in the caller did not name; preferring the candidate's would silently rewrite the key
+    the whole comparison is built on, which is the term SC-004 exists to protect.
+    """
+
+    tuple_stream_id: str
+    """The stream the tuple says funds the purchase."""
+
+    route_stream_id: str
+    """The stream the way in is costed from."""
 
     reason: str
 
@@ -688,6 +717,7 @@ class InstrumentDemandsCash:
 TupleRefused = (
     DeclarationMissing
     | SeamDoesNotChain
+    | FundedFromAnotherStream
     | RouteInUnusable
     | WayOutUnusable
     | NoExitRouteDeclared
@@ -701,10 +731,14 @@ TupleRefused = (
     | TaxCurrencyConversionUnavailable
     | InstrumentDemandsCash
 )
-"""Every way a tuple honestly produces no outcome. Match exhaustively.
+"""The fifteen ways a tuple honestly produces no outcome. Match exhaustively.
 
 Never a partial outcome and never an empty one. A ``case _:`` arm the type checker proves
 unreachable means a new member becomes an error at every site that must handle it.
+
+The count is asserted rather than left to rot: ``tests/unit/test_tuple_refusals.py`` compares
+it against ``get_args``, so a sixteenth member fails a test instead of quietly making this
+sentence false.
 """
 
 

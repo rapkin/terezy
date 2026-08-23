@@ -6,21 +6,27 @@ is a sum of calls that already work; the chaining rule is the join's own content
 
 Feature 004 shipped an exit chain anchored at **neither** end. Money moved between venues for
 free, and the record still read as a coherent three-hop journey -- an arriving amount in one
-currency beside a cost fraction computed in another. The same failure is available here at two
-more seams::
+currency beside a cost fraction computed in another. The same failure is available here at
+three more seams::
 
+    the tuple's stream == the stream the way in is costed from
     stream --[ way in ]--> (venue, currency) == where the purchase happens
     where the proceeds land == (venue, currency) --[ way out ]--> a spendable endpoint
 
-Each seam has **two halves**, and both are tested with a deliberate mismatch:
+The two positional seams have **two halves** each, and both are tested with a deliberate
+mismatch:
 
 * the **venue**, which nothing else guards -- two hryvnia venues are identical to a currency
   check, and a way in landing at the wrong one funds a purchase with money that never arrived;
 * the **currency**, which is the half a reader assumes is the whole check.
 
-Four cases, and each asserts that the refusal **names both sides**. A refusal saying only
-"the seam does not chain" would leave the reader to work out which declaration to open, and a
-refusal naming only the side it found first would send them to the wrong one.
+The **funding** seam has no halves and no venue: a `Candidate` carries its own `stream_id` and
+the way in is costed from that one, while the tuple's own is what keys the way out and appears
+in every report. Two fields, one fact, and the last class here is its deliberate mismatch.
+
+Each case asserts that the refusal **names both sides**. A refusal saying only "the seam does
+not chain" would leave the reader to work out which declaration to open, and a refusal naming
+only the side it found first would send them to the wrong one.
 
 What must never happen is the fifth outcome: a figure. Bridging either gap means a transfer or
 a conversion nobody declared, at a rate nobody quoted, and it is the single most tempting
@@ -34,7 +40,12 @@ import pytest
 
 from terezy.core.decision.tuple_outcome import Registries, evaluate
 from terezy.core.primitives.money import Money
-from terezy.core.results.tuple import SeamDoesNotChain, Tuple, TupleOutcome
+from terezy.core.results.tuple import (
+    FundedFromAnotherStream,
+    SeamDoesNotChain,
+    Tuple,
+    TupleOutcome,
+)
 from terezy.core.routes.path import ComposedExit, DeclaredExit, FundingPath
 from tests import tuple_registries as fixtures
 
@@ -236,3 +247,27 @@ class TestNoSeamIsBridged:
         )
         assert refusal.left == "inzhur/UAH"
         assert refusal.right == "binance/UAH"
+
+
+class TestTheFundingSeamTheTupleAndItsWayIn:
+    """The tuple's stream and the stream its way in is costed from must be the same one."""
+
+    def test_a_way_in_costed_from_another_stream_is_refused_naming_both(self) -> None:
+        # `contract_usd` arrives at `deel` as dollars and has to cross a P2P spread to reach
+        # `inzhur`; the hryvnia salary walks the free domestic route. A tuple claiming the
+        # first and costing the second is the whole of feature 004's defect on the term SC-004
+        # exists to protect -- and it produced figures identical to the free route's, with no
+        # refusal anywhere, because nothing compared the two strings.
+        candidate = fixtures.replace(fixtures.hurdle_tuple(), stream_id="contract_usd")
+        refusal = _evaluated(fixtures.shipped(), candidate)
+        assert isinstance(refusal, FundedFromAnotherStream), refusal
+        assert refusal.tuple_stream_id == "contract_usd"
+        assert refusal.route_stream_id == fixtures.SALARY
+        assert "contract_usd" in refusal.reason
+        assert fixtures.SALARY in refusal.reason
+
+    def test_it_is_refused_before_anything_is_costed(self) -> None:
+        # Not "costed and then flagged": which income pays is part of what a cost *is*, so
+        # there is no figure to report and none is produced.
+        candidate = fixtures.replace(fixtures.hurdle_tuple(), stream_id="contract_usd")
+        assert not isinstance(_evaluated(fixtures.shipped(), candidate), TupleOutcome)

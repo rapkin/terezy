@@ -13,11 +13,11 @@ reproduce feature 004's unanchored exit chain -- see
 :class:`~terezy.core.results.tuple.SeamDoesNotChain` for what that cost. So the venue is
 declared, and a mismatch is refused naming both sides.
 
-**Each field is a fact about the instrument *as reached*, not about the paper:**
+**Every field but the key is a fact about the instrument *as reached*, not about the paper:**
 
 * where it is bought and where its proceeds land -- properties of the venue that sells it;
-* what one unit costs at that venue -- a quote, cited like any other observation. A fund
-  states its own price (``nav_per_unit`` plus the declared entry markup) and therefore
+* what one unit costs at that venue -- a quote, cited and aged like any other observation. A
+  fund states its own price (``nav_per_unit`` plus the declared entry markup) and therefore
   declares none here; a bond states a face value, which is what it *repays*, and no purchase
   price at all;
 * the declared risk class -- Principle VI's fifth term. It sits here rather than on the
@@ -25,13 +25,13 @@ declared, and a mismatch is refused naming both sides.
   instrument, reached this way -- and not of the security. It is carried into every outcome
   and **scored nowhere** (research.md D9).
 
-⚙ **Why a separate declaration rather than three keys on the instrument file.** The
-instrument's own file is the more natural home for the price and arguably for the risk class,
-and the honest reason it is not used is recorded rather than dressed up: the golden result
-file records the sha256 of every instrument declaration, so a key added to a shipped
-instrument file moves a golden that feature 010 must not move. The seam is named in
-``docs/METHODOLOGY.md`` §28.6 so that a later feature can move these fields deliberately,
-with the golden re-recorded and the diff read.
+⚙ **Why a separate declaration rather than four keys on the instrument file.** The argument
+the risk class makes above is the argument for all of them, and it does not need a second
+one: every field here is a property of the **option** rather than of the security. One
+instrument reachable at two venues is two access rows against one instrument file -- two
+purchase venues, two quotes, two risk readings, and one set of terms the paper actually
+carries. Folding them into the instrument declaration would make that shape unrepresentable
+and would have to invent a scheme for a price per venue on a record that is not keyed by one.
 
 No behaviour, per owner decision D-E. The record is data; whether it resolves against the
 declared venues and instruments is the resolver's question, where the file and the field can
@@ -43,6 +43,24 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from terezy.core.primitives.money import Money
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class VenueQuote:
+    """One venue's price for one unit, with the kind it ages under.
+
+    The two travel together because a price with no threshold can never be reported stale,
+    and a threshold with no price is nothing at all. Two nullable fields on
+    :class:`InstrumentAccess` would let the pair come apart -- a quote whose kind was dropped
+    would read as fresh forever, which is the silent permissive default FR-028 forbids.
+    """
+
+    price: Money
+    """The quote, in the instrument's own currency (the resolver refuses any other)."""
+
+    kind: str
+    """The ``ObservationKind`` this quote ages under. A price goes out of date faster than a
+    coupon rate does, which is the whole reason the threshold is declared per kind."""
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -75,7 +93,7 @@ class InstrumentAccess:
     declared here.
     """
 
-    price_per_unit: Money | None
+    quote: VenueQuote | None
     """What one unit costs at :attr:`bought_at`, or ``None`` where the instrument states it.
 
     ``None`` is a *statement*, not an omission, and the resolver enforces which kinds may make

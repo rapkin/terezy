@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any, Final
 
 from terezy.core.decision.tuple_outcome import Registries
-from terezy.core.instruments.access import InstrumentAccess
+from terezy.core.instruments.access import InstrumentAccess, VenueQuote
 from terezy.core.instruments.fund import BuybackAvailability, ChosenPoint, LiquidityMode
 from terezy.core.instruments.interface import Assumptions, DateRange
 from terezy.core.primitives import provenance as prov
@@ -69,12 +69,14 @@ __all__ = [
     "FundingPath",
     "Money",
     "Registries",
+    "VenueQuote",
     "access",
     "date",
     "fund_tuple",
     "fx_route",
     "hurdle_tuple",
     "prov",
+    "quote",
     "replace",
     "route",
     "shipped",
@@ -368,6 +370,11 @@ def access(
         instrument_id=instrument_id,
         bought_at=bought_at,
         proceeds_to=proceeds_to,
-        price_per_unit=None if price is None else Money(price, UAH, prov.EMPTY),
+        quote=None if price is None else quote(price),
         risk_class="test_fixture",
     )
+
+
+def quote(price: float, *, kind: str = "venue_terms") -> VenueQuote:
+    """One venue quote in hryvnia, ageing under a declared kind. A test fixture."""
+    return VenueQuote(price=Money(price, UAH, prov.EMPTY), kind=kind)

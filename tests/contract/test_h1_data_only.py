@@ -271,7 +271,7 @@ class TestTheFourNewDeclarationsLoad:
         entry = _registries(tmp_path).access[INSTRUMENT]
         assert entry.bought_at == VENUE
         assert entry.proceeds_to == VENUE
-        assert entry.price_per_unit is not None
+        assert entry.quote is not None
 
 
 class TestItRunsTheFullPipelineAndAppearsInTheComparison:

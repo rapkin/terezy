@@ -2817,17 +2817,19 @@ declaration does not state: **where it is bought**, **where its proceeds land**,
 unit costs at that venue**, and its **declared risk class**.
 
 The first two are the seam anchors of §28.2 — without them the join could check only the
-currency. The third is a venue quote, cited like any other observation: a bond states a face
-value, which is what it *repays*, and sizing a purchase from it would be assuming par in code.
-A fund states its own net asset value and entry markup, so a price here is **refused** — one
-price in two files is one fact in two places, and the day either is updated the figures would
-rest on whichever the code happened to read.
+currency. The third is a venue quote, cited like any other observation and **aged like one**:
+it names the `ObservationKind` it ages under, and a stale quote surfaces on every tuple sized
+from it. A bond states a face value, which is what it *repays*, and sizing a purchase from it
+would be assuming par in code. A fund states its own net asset value and entry markup, so a
+price here is **refused** — one price in two files is one fact in two places, and the day
+either is updated the figures would rest on whichever the code happened to read.
 
-⚙ **A recorded seam.** The instrument's own file is the more natural home for the price and
-arguably for the risk class. It is not used because `tests/golden/ovdp_synthetic_a.golden.txt`
-records the sha256 of every instrument declaration, so a key added to a shipped instrument
-file moves a golden feature 010 must not move. A later feature can move these fields
-deliberately, with the golden re-recorded and the diff read.
+⚙ **Why not four more keys on the instrument declaration.** Every field here is a property of
+the **option** — this instrument, reached this way — and not of the security. One instrument
+reachable at two venues is two access rows against one instrument file: two purchase venues,
+two quotes, two risk readings, and one set of terms the paper actually carries. Folding these
+into the instrument's own declaration would make that shape unrepresentable and would need a
+scheme for a price per venue on a record that is not keyed by one.
 
 ### 28.7 One horizon, and no reinvestment
 

@@ -53,6 +53,15 @@ def _all_verified(provenance: Provenance) -> Provenance:
     return prov.of(_verified(source) for source in provenance.sources)
 
 
+def _aged(source: SourceRef) -> SourceRef:
+    """Read long ago and never checked since -- the only pairing that is actually stale.
+
+    A source ages from the later of its two dates, so backdating the retrieval of a value
+    verified last month changes nothing.
+    """
+    return replace(source, retrieved_on=VERY_OLD, verified_on=None)
+
+
 def _leg(leg: Leg, *, verified: bool, retrieved_on: date | None = None) -> Leg:
     """One leg's citations, verified or not, and optionally aged.
 
@@ -82,12 +91,17 @@ def _registries(
     *,
     unverified_part: str | None,
     stale_route_in: bool = False,
+    stale_price: bool = False,
 ) -> Registries:
     """The shipped registry with everything verified except the named part.
 
     ``None`` verifies everything, which is the control: without it the whole battery could
     pass on a join that never propagated anything, because the shipped repository has no
     verified value in it at all.
+
+    ``stale_price`` backdates the **venue quote** rather than a route leg, because that is the
+    one declared value this feature added and the one whose ageing had nowhere to go: a leg
+    was aged by 002's costing long before the join existed.
     """
     registries = fixtures.shipped()
     routes = dict(registries.routes)
@@ -123,8 +137,13 @@ def _registries(
         for entry in tax_class.rates
     )
     access = registries.access[fixtures.OVDP]
-    price = access.price_per_unit
-    assert price is not None
+    quote = access.quote
+    assert quote is not None
+    price = quote.price
+    if stale_price:
+        price = replace(
+            price, provenance=prov.of(_aged(source) for source in price.provenance.sources)
+        )
     return replace(
         registries,
         routes=routes,
@@ -150,7 +169,13 @@ def _registries(
         access={
             **registries.access,
             fixtures.OVDP: replace(
-                access, price_per_unit=replace(price, provenance=_all_verified(price.provenance))
+                access,
+                quote=replace(
+                    quote,
+                    price=price
+                    if stale_price
+                    else replace(price, provenance=_all_verified(price.provenance)),
+                ),
             ),
         },
     )
@@ -229,6 +254,26 @@ class TestStalenessSurfacesOnTheOutcome:
         # empty `stale` is a claim only as strong as that list.
         outcome = _outcome(_registries(unverified_part=None))
         assert outcome.staleness.assessed
+        assert not stale.any_stale(outcome.staleness)
+
+    def test_the_venue_quote_is_aged_too_and_not_merely_carried(self) -> None:
+        # The value this feature added, and the one with no earlier owner to age it: the
+        # purchase is sized from the quote, and nothing in a projection ever sees it. A quote
+        # read in 2020 and never checked since is past every declared threshold, and an
+        # outcome that reported it fresh would be resting a whole comparison on a price
+        # nobody has looked at in six years.
+        outcome = _outcome(_registries(unverified_part=None, stale_price=True))
+        assert stale.any_stale(outcome.staleness)
+        assert any(
+            item.source_id.startswith("access/instruments") for item in outcome.staleness.stale
+        )
+
+    def test_a_fresh_quote_is_named_in_assessed_rather_than_skipped(self) -> None:
+        # "Nothing was aged" and "everything was aged and nothing was stale" are different
+        # claims, and before the quote was merged in it was the first one wearing the second
+        # one's green tick.
+        outcome = _outcome(_registries(unverified_part=None))
+        assert any(item.startswith("access/instruments") for item in outcome.staleness.assessed)
         assert not stale.any_stale(outcome.staleness)
 
     def test_the_thresholds_are_the_declared_ones(self) -> None:

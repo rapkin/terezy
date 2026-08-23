@@ -6,8 +6,17 @@ balance*; this suite makes it true of a **holding**, which is the whole point of
 
 The two streams here are both hryvnia, and deliberately so. A dollar stream funding a hryvnia
 fund would differ in the ramp *and* in whether a rate exists at all
-(``tests/unit/test_infeasible_tuples.py`` covers that separately), and a fixture differing in
-two things lets a test pass for the other reason.
+(``tests/unit/test_rate_and_horizon_boundaries.py`` covers that separately), and a fixture
+differing in two things lets a test pass for the other reason.
+
+**What each class isolates**, because the two questions are different and the second one is
+the one that was untested. A stream's contribution to a *cost* runs through the route: its
+currency and its arrival venue decide which declared routes can carry its money at all, so two
+streams that genuinely differ are also two routes, and the first class below measures that
+difference. Two hryvnia streams arriving at the same venue are cost-identical over one route --
+and they are still **two tuples**, with two keys, and the way out of each is charged under its
+own. The second class holds the route fixed, varies only the stream, and reads that key off a
+refusal rather than inferring it from a figure that would differ anyway.
 
 The instrument is ``inzhur_miltech``, which declares no buyable increment, so the ramp
 difference flows through the purchase proportionally instead of being rounded away by a whole
@@ -24,7 +33,7 @@ from typing import Final
 from terezy.core.decision.tuple_outcome import Registries, evaluate
 from terezy.core.primitives.rates import NominalRate
 from terezy.core.primitives.tolerance import is_close
-from terezy.core.results.tuple import Tuple, TupleOutcome
+from terezy.core.results.tuple import Tuple, TupleOutcome, WayOutUnusable
 from terezy.core.routes.path import FundingPath
 from tests import tuple_registries as fixtures
 
@@ -150,10 +159,40 @@ class TestNoFigureIsAttributableToTheInstrumentAlone:
         assert outcome.key.route_out is not None
         assert outcome.key.exit_terms is not None
 
+
+class TestTheStreamIsTheTermAndNotTheRouteWearingItsName:
+    """One route, two streams. Whatever differs here differs because of the *income*."""
+
+    def test_two_streams_over_one_route_are_two_tuples_with_two_keys(self) -> None:
+        # Cost-identical, and still two entries. A comparison that collapsed them would be
+        # answering "what does MilTech return" -- the question Principle VI says has no answer.
+        first = _outcome(_tuple(fixtures.SALARY, FREE_ROUTE))
+        second = _outcome(_tuple(SECOND_STREAM, FREE_ROUTE))
+        assert first.key != second.key
+        assert first.key.route_in == replace(second.key.route_in, stream_id=fixtures.SALARY)
+        assert is_close(first.reaches.amount, second.reaches.amount)
+
     def test_the_way_out_cost_is_keyed_by_the_stream_that_funded_the_holding(self) -> None:
-        # The way out is the half a reader would least expect to be keyed, and the half that
-        # would blend most quietly: the same exit route repatriating two holdings bought from
-        # two incomes is two figures, because what it is charging on differs.
-        free = _outcome(_tuple(fixtures.SALARY, FREE_ROUTE))
-        costly = _outcome(_tuple(SECOND_STREAM, COSTLY_ROUTE))
-        assert free.arrivals[-1].released != costly.arrivals[-1].released
+        # The key, **read** -- not inferred from two amounts that would have differed anyway.
+        # A way out that will not carry what the holding released refuses with the candidate it
+        # was costing, and that candidate's `stream_id` is the join's own answer to "which
+        # income is this exit a cost of". Hard-coding it would blend the two silently: the same
+        # exit route repatriating two holdings bought from two incomes is two figures.
+        blocked = fixtures.with_leg(
+            _registries(),
+            fixtures.DOMESTIC_OUT,
+            minimum=fixtures.Money(1_000_000.0, fixtures.UAH, fixtures.prov.EMPTY),
+        )
+        keyed = {}
+        for stream in (fixtures.SALARY, SECOND_STREAM):
+            refusal = evaluate(
+                _tuple(stream, FREE_ROUTE),
+                amount=fixtures.AMOUNT,
+                horizon=fixtures.DateRange(start=fixtures.ISSUE_DATE, end=fixtures.HORIZON_END),
+                as_of=fixtures.AS_OF,
+                continuation=fixtures.HOLD_AS_CASH,
+                registries=blocked,
+            )
+            assert isinstance(refusal, WayOutUnusable), refusal
+            keyed[stream] = refusal.refused.path.stream_id
+        assert keyed == {fixtures.SALARY: fixtures.SALARY, SECOND_STREAM: SECOND_STREAM}

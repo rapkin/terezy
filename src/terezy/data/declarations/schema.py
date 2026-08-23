@@ -1627,11 +1627,12 @@ class InflationAssumptionFile(BaseModel):
 # "nothing is declared here" -- which here is exactly one field, ``price``, feeding a core
 # field that is itself ``Money | None``.
 #
-# ⚙ **A separate file rather than three keys on the instrument declaration**, and the reason
-# is recorded rather than dressed up: ``tests/golden/ovdp_synthetic_a.golden.txt`` records the
-# sha256 of every instrument file, so a key added to a shipped one moves a golden this feature
-# must not move. ``core.instruments.access`` names the seam; a later feature may move these
-# fields with the golden re-recorded and the diff read.
+# ⚙ **A separate file rather than four keys on the instrument declaration.** Every field here
+# is a property of the **option** -- this instrument, reached this way -- rather than of the
+# security: where it is bought, where its proceeds land, what a unit costs *at that venue*,
+# and how risky reaching it that way is. One instrument reachable at two venues is two rows
+# here against one instrument file, and folding these keys into the instrument declaration
+# would make that shape unrepresentable.
 #
 # ⚙ **``[[access]]`` itself carries no numeric leaf and therefore no citation**, deliberately.
 # A venue id, an instrument id and a risk-class label are references and statements, not

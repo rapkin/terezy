@@ -198,7 +198,7 @@ class TestAnAmountThatWillNotBuyOneIncrement:
         registries = fixtures.with_access(
             _registries(),
             fixtures.OVDP,
-            price_per_unit=Money(20_000.0, UAH, prov.EMPTY),
+            quote=fixtures.quote(20_000.0),
         )
         refusal = _evaluate(registries, fixtures.hurdle_tuple(), 10_000.0)
         assert isinstance(refusal, BuysNoWholeUnit), refusal
@@ -214,7 +214,7 @@ class TestAnAmountThatWillNotBuyOneIncrement:
         # instrument that owns the constraint, with its own shortfall. Two refusals for two
         # genuinely different facts: what arrived, and what was spent.
         registries = fixtures.with_access(
-            _registries(), "ovdp_synthetic_b", price_per_unit=Money(1_200.0, UAH, prov.EMPTY)
+            _registries(), "ovdp_synthetic_b", quote=fixtures.quote(1_200.0)
         )
         refusal = _evaluate(
             registries,

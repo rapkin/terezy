@@ -11,18 +11,24 @@ know where to check it.
 Its only original content is **the chaining rule and the refusals**, and that is where it can
 be wrong.
 
-## The two seams, and why both are anchored
+## The three seams, and why all of them are anchored
 
+    the tuple's stream == the stream the way in is costed from
     stream --[ way in ]--> (venue, currency) == where the purchase happens
     where the proceeds land == (venue, currency) --[ way out ]--> a spendable endpoint
 
 Feature 004 learned the cost of leaving one of these open. Its exit chain was anchored at
 neither end: money moved between venues for free, and the record still read as a coherent
 three-hop journey -- an arriving amount in one currency beside a cost fraction computed in
-another. The same failure is available here twice, so both seams are checked, both halves of
-each (the venue **and** the currency), and a mismatch is a typed refusal naming both sides.
-Bridging one would be an invented leg at an invented rate, which is the single most tempting
-fabrication in this feature: the two declarations look adjacent.
+another. The same failure is available here three times, so all three are checked -- both
+halves of the two positional ones (the venue **and** the currency) -- and a mismatch is a
+typed refusal naming both sides. Bridging one would be an invented leg at an invented rate,
+which is the single most tempting fabrication in this feature: the declarations look adjacent.
+
+The first seam has no venue in it and is the easiest to miss for exactly that reason: the way
+in is costed from the *candidate's* stream and everything else reads the *tuple's*, so two
+strings hold one fact. A tuple funded on paper from the dollar contract income and costed over
+the free domestic hryvnia route is the shape of it, and every figure it produced looked right.
 
 ## What travels the way out, and why it is a series
 
@@ -111,6 +117,7 @@ from terezy.core.results.tuple import (
     CannotSpanHorizon,
     ContinuationAssumption,
     DeclarationMissing,
+    FundedFromAnotherStream,
     InstrumentDemandsCash,
     InstrumentRefused,
     NoExitRouteDeclared,
@@ -351,6 +358,8 @@ def _hold(
         undeployed=bought.undeployed,
         horizon=horizon,
         continuation=continuation,
+        kinds=registries.kinds,
+        as_of=as_of,
     )
 
 
@@ -428,6 +437,20 @@ def _prepare(tuple_: Tuple, registries: Registries) -> _Prepared | TupleRefused:
                 f"no declared stream is named {tuple_.stream_id!r}, and which stream funds a "
                 "purchase is part of what a cost *is* (Principle VI). Known streams: "
                 f"{sorted(registries.streams)}."
+            ),
+        )
+    if tuple_.route_in.stream_id != tuple_.stream_id:
+        return FundedFromAnotherStream(
+            tuple_stream_id=tuple_.stream_id,
+            route_stream_id=tuple_.route_in.stream_id,
+            reason=(
+                f"this tuple says it is funded from {tuple_.stream_id!r}, and its way in is "
+                f"costed from {tuple_.route_in.stream_id!r}. Which income pays for a purchase "
+                "is part of what the cost *is* (Principle VI), so the two cannot differ: the "
+                "figures would be a ramp from one stream reported under the key of another, "
+                "and both halves would look entirely reasonable. Neither is preferred over "
+                "the other, because guessing which the caller meant would either re-cost a "
+                "way in nobody named or rewrite the key the comparison is built on."
             ),
         )
     unknown = [name for name in segments_of(tuple_.route_in) if name not in registries.routes]
@@ -822,7 +845,7 @@ def _price_for(prepared: _Prepared) -> Money:
         case FundDeclaration(), FundAssumptions():
             return fund_terms.entry_price_for(prepared.declared, prepared.plan.liquidity_mode)
         case _:
-            quoted = prepared.access.price_per_unit
+            quoted = prepared.access.quote
             if quoted is None:  # pragma: no cover -- the resolver refuses this at load
                 raise ValueError(
                     f"{prepared.declared.id!r} declares no price of its own and its access "
@@ -830,7 +853,7 @@ def _price_for(prepared: _Prepared) -> Money:
                     "load, so reaching here means a Registries was built in code with a "
                     "declaration the data boundary would not have accepted."
                 )
-            return quoted
+            return quoted.price
 
 
 def _minimum_ticket(prepared: _Prepared) -> Money | None:
@@ -1153,6 +1176,8 @@ def _assemble(
     undeployed: UndeployedCash | None,
     horizon: DateRange,
     continuation: ContinuationAssumption,
+    kinds: Mapping[str, ObservationKind],
+    as_of: date,
 ) -> TupleOutcome:
     """Everything the owning calls returned, summed and chained. No new arithmetic here.
 
@@ -1199,9 +1224,33 @@ def _assemble(
             ]
         ),
         staleness=stale.merge_all(
-            [one_way.staleness, *(charged.staleness for charged in way_out_costs)]
+            [
+                one_way.staleness,
+                *(charged.staleness for charged in way_out_costs),
+                _quote_staleness(prepared, kinds=kinds, as_of=as_of),
+            ]
         ),
     )
+
+
+def _quote_staleness(
+    prepared: _Prepared, *, kinds: Mapping[str, ObservationKind], as_of: date
+) -> stale.StalenessVerdict:
+    """The venue quote, aged against the kind its own declaration names (FR-019).
+
+    Aged here rather than left to the projection, because no projection sees it: a bond's
+    lifecycle is sized from its face value, and the quote is what the *join* sized the
+    purchase from. It is the one declared value this feature added, and a figure resting on a
+    price nobody has looked at since 2019 is exactly what a per-kind threshold exists to say.
+
+    :data:`~terezy.core.primitives.staleness.UNASSESSED` where the instrument prices itself:
+    there is no quote to age, and the fund's own declared values are aged by the call that
+    owns them.
+    """
+    quote = prepared.access.quote
+    if quote is None:
+        return stale.UNASSESSED
+    return stale.staleness_of(quote.price.provenance, kinds, kind=quote.kind, as_of=as_of)
 
 
 def _parts(

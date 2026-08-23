@@ -81,14 +81,19 @@ class TestTheWellFormedFileLoads:
         declared = loader.access_from_file(_written(tmp_path, WELL_FORMED))
         assert len(declared) == 1
         assert declared[0].instrument_id == "ovdp_synthetic_a"
-        assert declared[0].price_per_unit is not None
-        assert declared[0].price_per_unit.currency is Currency.UAH
+        quote = declared[0].quote
+        assert quote is not None
+        assert quote.price.currency is Currency.UAH
 
-    def test_the_price_carries_its_citation(self, tmp_path: Path) -> None:
-        declared = loader.access_from_file(_written(tmp_path, WELL_FORMED))
-        price = declared[0].price_per_unit
-        assert price is not None
-        assert price.provenance.sources
+    def test_the_price_carries_its_citation_and_the_kind_it_ages_under(
+        self, tmp_path: Path
+    ) -> None:
+        # Both, on one record: a price whose kind was dropped on the way in would read as
+        # fresh forever, and nothing downstream could tell that from a threshold it had met.
+        quote = loader.access_from_file(_written(tmp_path, WELL_FORMED))[0].quote
+        assert quote is not None
+        assert quote.price.provenance.sources
+        assert quote.kind == "venue_terms"
 
 
 class TestOneFileReadInIsolation:
