@@ -78,18 +78,22 @@ _TERM = CausationRef(
 
 
 def _seed(*, estimated: bool) -> SeedLot:
-    """One lot of 100 units costing 98 000.00 UAH, known or estimated, and nothing else differs."""
+    """One lot of 100 units costing 98 000.00 UAH, known or estimated, and nothing else differs.
+
+    **The cost is built with empty provenance in both cases, deliberately.** The mark lives on
+    ``basis`` and nowhere else here, which is exactly the lot a caller assembling seeds without
+    a file produces -- the caller ``core.errors`` and the resolver both keep a refusal for. If
+    the join between the two fields ever moves back out of ``core.ledger.seeds``, every
+    assertion below goes red rather than only the ones that happen to go through the loader.
+    """
     if estimated:
-        guessed = seeds.basis_estimated(
+        basis: seeds.Basis = seeds.basis_estimated(
             declared_at="tests/test_estimated_basis_propagates#seed[0]",
             reason=ESTIMATE_REASON,
             estimated_for=ACQUIRED_ON,
         )
-        basis: seeds.Basis = guessed
-        sources = prov.of([guessed.mark])
     else:
         basis = seeds.KNOWN
-        sources = prov.EMPTY
     return SeedLot(
         owner_id=OWNER,
         lot_id="seed-0",
@@ -97,7 +101,7 @@ def _seed(*, estimated: bool) -> SeedLot:
         instrument_id=INSTRUMENT,
         quantity=100.0,
         acquired_on=ACQUIRED_ON,
-        cost=Money(98_000.0, UAH, sources),
+        cost=Money(98_000.0, UAH, prov.EMPTY),
         basis=basis,
     )
 
@@ -171,6 +175,25 @@ def _money_fields(record: Disposal | TaxCharge) -> dict[str, Money]:
 # ---------------------------------------------------------------------------
 # The estimated basis reaches the gain, and through it the tax
 # ---------------------------------------------------------------------------
+
+
+def test_the_mark_reaches_the_ledger_from_the_declaration_rather_than_from_the_cost() -> None:
+    """The structural claim, stated as its own case rather than left implicit in the others.
+
+    ``SeedLot`` holds the amount and the basis in two fields, and nothing in the type system
+    couples them. Before ``seeds.seed_cost`` existed the mark reached the gain only because the
+    loader attached it at construction, so a lot assembled in code -- with ``basis`` saying
+    *estimated* and ``cost`` carrying nothing -- folded into an entirely unmarked gain and an
+    entirely unmarked tax. The declaration and the amount are joined in the module that owns
+    the declaration, so the route the lot took cannot change what it says.
+    """
+    lot = _seed(estimated=True)
+    assert lot.cost.provenance == prov.EMPTY
+    assert seeds.rests_on_estimated_basis(seeds.seed_cost(lot).provenance)
+    opened = seeds.opening_events((lot,), DECLARED, opens_on=OPENS_ON)
+    assert isinstance(opened, tuple), opened
+    (opening,) = opened
+    assert seeds.rests_on_estimated_basis(opening.amount.provenance)
 
 
 def test_the_gain_on_an_estimated_basis_lot_is_marked() -> None:

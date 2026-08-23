@@ -1841,8 +1841,10 @@ value: a cost whose reliability nobody stated would produce a tax figure that lo
 confident as a documented one, and the owner's real holdings will certainly contain lots whose
 price he no longer has.
 
-An estimated basis is **not** a second kind of mark. It is a `SourceRef` in the lot's
-provenance with no verification date, so it rides the machinery §10 already describes:
+An estimated basis is **not** a second kind of mark. It is a `SourceRef` carried on the lot's
+declared basis and joined to the cost by `seeds.seed_cost` — the one path a seed takes into
+the ledger — so a lot assembled in code carries it exactly as one read from a file does. From
+there it rides the machinery §10 already describes:
 `merge` carries it into the consumed basis, into the realised gain, and through
 `tax.flat_rate.charge` into the **tax**. Nobody has to remember to propagate it, because
 nothing in the seed code does the propagating.

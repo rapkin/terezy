@@ -16,10 +16,12 @@ here.
 from __future__ import annotations
 
 from datetime import date
+from pathlib import Path
 
 from terezy.core.ledger import seeds
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.provenance import SourceRef
+from terezy.data.declarations import loader
 
 REASON = "bought in three tranches in 2024 and the broker statement is gone"
 
@@ -104,3 +106,31 @@ def test_two_estimates_of_one_lot_are_one_mark_and_two_lots_are_two() -> None:
     assert same.mark == ESTIMATED.mark
     merged = prov.merge(prov.of([ESTIMATED.mark, same.mark]), prov.of([other.mark]))
     assert seeds.basis_estimated_sources(merged) == frozenset({ESTIMATED.mark, other.mark})
+
+
+def test_no_curated_declaration_can_collide_with_the_estimated_basis_namespace() -> None:
+    """Belt and braces on the id prefix, over every file the repository actually ships.
+
+    Propagation never consults the namespace -- ``merge`` is a set union and
+    :func:`is_basis_estimated` has no production caller -- so a collision could not launder a
+    mark. What it could do is make an *inspection* lie: a curated table whose id happened to
+    start with the prefix would read as the owner's own estimate, sending a reader to look for
+    a receipt instead of checking a source.
+
+    The check is over ``loader.source_id``'s output for every shipped declaration rather than
+    over a hand-written example, because the id scheme is what would have to change for the
+    collision to become possible.
+    """
+    data_root = Path(__file__).resolve().parents[2] / "data"
+    declarations = sorted(data_root.rglob("*.toml"))
+    assert declarations, (
+        "the data root has no declarations; this test is looking in the wrong place"
+    )
+    for path in declarations:
+        for table in (
+            "instrument.terms",
+            "jurisdiction.tax_class[0]",
+            "route.leg[0]",
+            "channel[0]",
+        ):
+            assert not loader.source_id(path, table).startswith(seeds.BASIS_ESTIMATED_PREFIX)

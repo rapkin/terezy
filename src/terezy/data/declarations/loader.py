@@ -2148,11 +2148,12 @@ def composition_from_file(path: Path) -> tuple[str, SegmentBound]:
 #   two lines is wrong, and either guess is a declaration it invented: ignoring the reason
 #   drops something the owner wrote, and marking the figure contradicts what he said (FR-008).
 #
-# **Provenance is attached here, and it is the only place it could be.** A known basis rests
-# on no cited source -- `prov.EMPTY`, the reading `data/streams/` already has for an owner's
-# own salary -- while an estimated one carries the mark `core.ledger.seeds.basis_estimated`
-# builds, so the guess follows the cost into the gain and the tax without anything downstream
-# having to remember (FR-007).
+# **The mark on an estimated basis is built here and joined to the cost in the core.** This is
+# where the owner's reason enters the system, so `core.ledger.seeds.basis_estimated` is called
+# here to turn it into a `SourceRef` -- but the *join* between that mark and the amount happens
+# in `seeds.seed_cost`, not in this function. The declared cost therefore rests on no cited
+# source of its own (`prov.EMPTY`, the reading `data/streams/` already has for a salary), and a
+# seed assembled without a file still reaches the ledger marked (008 FR-007).
 #
 # What is *not* here, because it needs a second file or a run: whether the instrument exists
 # (the resolver holds every declaration), whether the goal's currency is the run's base
@@ -2309,30 +2310,18 @@ def seeds_from_file(path: Path, *, base_currency: Currency) -> tuple[str, tuple[
                         "later disposal compute the wrong gain (FR-006)",
                     ),
                     base_currency,
-                    _basis_provenance(basis),
+                    # The declared amount rests on no cited source: an owner's own record is
+                    # not an observation, the reading `data/streams/` already takes for a
+                    # salary. Where the cost is a *guess*, the mark that says so travels on
+                    # `basis` and `core.ledger.seeds.seed_cost` joins the two -- so a lot the
+                    # loader never saw carries it too, and this boundary is not the only thing
+                    # standing between a guessed cost and an unmarked tax (008 FR-007).
+                    prov.EMPTY,
                 ),
                 basis=basis,
             )
         )
     return owner_id, tuple(declared)
-
-
-def _basis_provenance(basis: seeds.Basis) -> Provenance:
-    """What the declared cost rests on: nothing, or the owner's own estimate.
-
-    A known cost gets ``prov.EMPTY`` -- the reading ``data/streams/`` already has for a salary:
-    an owner's own record is not an observation, so there is no source to cite and nothing to
-    mark. An estimated one carries the mark, which is how the guess reaches the tax.
-
-    This is one of the two places in the project entitled to hand ``Money`` its provenance, and
-    it is the whole of FR-007's mechanism: attach it here and every transform downstream
-    carries it, because none of them can drop it.
-    """
-    match basis:
-        case seeds.BasisKnown():
-            return prov.EMPTY
-        case seeds.BasisEstimated():
-            return prov.of([basis.mark])
 
 
 def goals_from_file(path: Path) -> tuple[str, tuple[Goal, ...]]:

@@ -51,6 +51,7 @@ from typing import TYPE_CHECKING, Final, assert_never
 from terezy.core.errors import InconsistentTerms, SeedInstrumentUndeclared
 from terezy.core.ledger.events import CausationKind, CausationRef, Event, EventKind, LotRef
 from terezy.core.primitives import money
+from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance, SourceRef
 
@@ -154,12 +155,17 @@ class SeedLot:
     """When it was acquired. What a holding-period rule would later be measured from."""
 
     cost: Money
-    """What was paid for these units, **in the base currency** (FR-010).
+    """The amount the owner declared, **in the base currency** (FR-010), exactly as written.
 
     A cost, not a current value. §4.8 is explicit and the spec's own sentence is the argument:
     a seed stated as "I hold 100 units worth X today" cannot produce a disposal gain at all,
-    because the tax engine needs lots. Where the number is a guess, :attr:`basis` says so and
-    this amount carries the mark.
+    because the tax engine needs lots.
+
+    **Read :func:`seed_cost`, not this field.** Where the number is a guess, the mark that says
+    so lives on :attr:`basis`, and this field holds only what the declaration wrote. Reading it
+    directly would take the amount and leave the epistemics behind on a neighbouring field --
+    which is how a guessed cost becomes an unmarked tax. ``seed_cost`` puts the two back
+    together and is what :func:`opening_events` uses.
     """
 
     basis: Basis
@@ -221,6 +227,38 @@ def rests_on_estimated_basis(provenance: Provenance) -> bool:
     makes the gain a guess, and a figure is only as trustworthy as its least-trustworthy input.
     """
     return any(is_basis_estimated(ref) for ref in provenance.sources)
+
+
+def seed_cost(lot: SeedLot) -> Money:
+    """The declared cost, resting on everything it actually rests on -- the estimate included.
+
+    **This function is why a guessed cost cannot become an unmarked tax.** ``SeedLot`` carries
+    the amount and the basis in two fields, and nothing in the type system stops a caller
+    building one whose ``cost`` has empty provenance beside a ``basis`` that says *estimated* --
+    a caller ``core.errors`` and the resolver both already anticipate, since each keeps a
+    refusal for seeds "assembled without going through a file at all". Before this function
+    existed the mark reached the gain only because the loader happened to attach it at
+    construction, so a hand-built lot folded into an unmarked gain and an unmarked tax while
+    the declaration said the cost was a guess.
+
+    So the join is made here, in the module that owns the declaration, and
+    :func:`opening_events` is the only path a seed takes into the ledger. The mark is merged
+    rather than replaced: whatever the cost already rests on is kept, because
+    ``money.scale_sourced`` can only ever *add* sources -- which is also what makes calling
+    this on an already-marked cost a no-op rather than a duplicate.
+
+    ``scale_sourced`` by a factor of one is the sanctioned way to say "the same amount, resting
+    on more than it did": it is the one function that unions provenance into an amount without
+    changing it, and going around it would mean constructing ``Money`` here, which this module
+    is not entitled to do.
+    """
+    match lot.basis:
+        case BasisKnown():
+            return lot.cost
+        case BasisEstimated():
+            return money.scale_sourced(lot.cost, 1.0, prov.of([lot.basis.mark]))
+        case _:  # pragma: no cover -- mypy proves this unreachable
+            assert_never(lot.basis)
 
 
 def opening_events(
@@ -317,6 +355,10 @@ def _inconsistency(
 def _opening_event(lot: SeedLot, *, sequence: int) -> Event:
     """One declared lot as the purchase it was.
 
+    The amount is :func:`seed_cost`, not ``lot.cost``: the declared number *and* the mark on a
+    basis the owner is guessing at, joined here so the ledger cannot receive one without the
+    other.
+
     ``EventKind.PURCHASE`` rather than a kind of its own. A second kind meaning "cash out, a
     lot in" would have to be learned by the fold, by every conservation recomputation and by
     the tax mapping, and the first consumer that had not learned it would drop seeded holdings
@@ -327,7 +369,7 @@ def _opening_event(lot: SeedLot, *, sequence: int) -> Event:
         sequence=sequence,
         occurred_on=lot.acquired_on,
         kind=EventKind.PURCHASE,
-        amount=money.scale(lot.cost, -1.0),
+        amount=money.scale(seed_cost(lot), -1.0),
         owner_id=lot.owner_id,
         caused_by=CausationRef(
             kind=CausationKind.SEED_DECLARATION,

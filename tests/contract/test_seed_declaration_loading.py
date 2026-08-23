@@ -119,12 +119,12 @@ def test_the_shipped_file_says_on_its_face_that_it_is_synthetic() -> None:
     assert "SYNTHETIC FIXTURE" in SEEDS.read_text(encoding="utf-8")
 
 
-def test_a_known_basis_carries_no_mark_and_an_estimated_one_marks_its_cost() -> None:
-    """FR-006 and FR-007 at the boundary: the mark is attached where the value enters.
+def test_the_declared_basis_is_read_from_the_file_and_carries_the_owners_reason() -> None:
+    """FR-006 and FR-008 at the boundary: the two words, and the reason one of them requires.
 
-    The known lot's cost rests on no source -- an owner's own record is not an observation,
-    the same reading ``data/streams/`` already has -- while the estimated lot's cost carries
-    the mark that will follow it into the gain and the tax.
+    What the loader builds is the *declaration* -- the amount as written and the basis as
+    stated. It deliberately does **not** join them: ``core.ledger.seeds.seed_cost`` does that,
+    so the join holds for a lot this loader never saw. The next test asserts the join.
     """
     _, declared = loader.seeds_from_file(SEEDS, base_currency=Currency.UAH)
     known, estimated = declared
@@ -132,9 +132,19 @@ def test_a_known_basis_carries_no_mark_and_an_estimated_one_marks_its_cost() -> 
     assert known.cost.provenance == prov.EMPTY
     assert isinstance(estimated.basis, seeds.BasisEstimated)
     assert estimated.basis.reason in estimated.basis.mark.citation
-    assert seeds.basis_estimated_sources(estimated.cost.provenance) == frozenset(
+    assert estimated.basis.mark.verified_on is None
+
+
+def test_the_cost_a_loaded_lot_enters_the_ledger_with_carries_its_basis_mark() -> None:
+    """The join, over the shipped file: an estimated lot's cost is marked and a known one's is
+    not, whichever route the lot took into the system."""
+    _, declared = loader.seeds_from_file(SEEDS, base_currency=Currency.UAH)
+    known, estimated = declared
+    assert isinstance(estimated.basis, seeds.BasisEstimated)
+    assert seeds.basis_estimated_sources(seeds.seed_cost(estimated).provenance) == frozenset(
         {estimated.basis.mark}
     )
+    assert seeds.seed_cost(known).provenance == prov.EMPTY
 
 
 def test_every_lot_traces_to_the_entry_that_declared_it() -> None:
