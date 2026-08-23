@@ -16,7 +16,7 @@ reader decides which kind of thing it is.
 from __future__ import annotations
 
 import dataclasses
-from typing import Final
+from typing import Final, get_args
 
 import pytest
 
@@ -26,6 +26,7 @@ from terezy.core.results.hurdle import EXCLUDES as HURDLE_EXCLUDES
 from terezy.core.results.tuple import (
     ACCOUNTS_FOR,
     EXCLUDES,
+    Part,
     RateNotComparable,
     TupleOutcome,
 )
@@ -124,6 +125,12 @@ class TestNoFigureIsReportedWithoutItsScope:
         assert outcome.excludes == EXCLUDES
         assert outcome.accounts_for
         assert outcome.excludes
+
+    def test_every_member_of_the_closed_part_set_is_actually_reported(self) -> None:
+        # The claim `Part` cannot make about itself: a closed set is only worth closing if the
+        # builder fills every member. A part quietly dropped would leave a term of the round
+        # trip with no line at all, and the total a reader adds up would still look right.
+        assert {line.part for line in _outcome().parts} == set(get_args(Part))
 
     def test_every_part_names_the_call_that_produced_it(self) -> None:
         # The mechanical half of "the join invents nothing": a part with no named producer is

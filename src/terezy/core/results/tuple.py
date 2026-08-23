@@ -4,11 +4,11 @@ Constitution Principle VI names the product's unit of analysis::
 
     (instrument) x (funding route in) x (tax treatment) x (exit route out) x (risk class)
 
-Every feature so far computed one term of it and said in writing that it ignored the others:
-the hurdle rate carries an ``excludes`` field admitting it omits route costs, and every route
-cost stops at a currency balance that never buys anything. These records are the join, and
-`SIMULATOR_SPEC.md` §8 question 1 -- *does anything beat 15.5% tax-free OVDP after every other
-option's fees, taxes and access costs?* -- is the question they exist to make computable.
+These records are the join, and `SIMULATOR_SPEC.md` §8 question 1 -- *does anything beat
+15.5% tax-free OVDP after every other option's fees, taxes and access costs?* -- is the
+question they exist to make computable. What feature 001's hurdle rate excluded, a tuple
+outcome accounts for, and that is asserted rather than described:
+``tests/contract/test_every_figure_states_its_scope.py``.
 
 **The rule that governs this module: nothing here holds a figure the join computed itself.**
 Every amount below came from the call that owns it -- 002's costing, 001's or 006's
@@ -73,8 +73,8 @@ class Tuple:
     outcome attributed to an instrument alone stays unrepresentable, as 002's FR-008 and 004's
     FR-011 already require, because there is no type here with a shape to hold one.
 
-    Keyword-only: four of the six fields are strings or string-shaped, and a positional
-    constructor would let the instrument and the stream be transposed with no type error.
+    Keyword-only: ``instrument_id`` and ``stream_id`` are adjacent strings, and a positional
+    constructor would let them be transposed with no type error anywhere.
     """
 
     instrument_id: str
@@ -104,8 +104,10 @@ Part = Literal["ramp_in", "entry", "lifecycle", "tax", "exit_terms", "ramp_out"]
 
 Closed rather than a free-form string for :class:`~terezy.core.results.ramp.CostComponent`'s
 reason: a free mapping would let a term invent a name, and then "a reader can see which part
-dominates" would be satisfiable by a figure hiding under a key nobody reads. Six members,
-because the round trip has six places money changes hands and no seventh.
+dominates" would be satisfiable by a figure hiding under a key nobody reads. That every
+member is actually reported is asserted in
+``tests/contract/test_every_figure_states_its_scope.py``, because a closed set the builder
+does not fill is a gap nothing else catches.
 """
 
 
@@ -681,10 +683,10 @@ TupleRefused = (
     | TaxCurrencyConversionUnavailable
     | InstrumentDemandsCash
 )
-"""The fourteen ways a tuple honestly produces no outcome. Match exhaustively.
+"""Every way a tuple honestly produces no outcome. Match exhaustively.
 
 Never a partial outcome and never an empty one. A ``case _:`` arm the type checker proves
-unreachable means a fifteenth becomes an error at every site that must handle it.
+unreachable means a new member becomes an error at every site that must handle it.
 """
 
 

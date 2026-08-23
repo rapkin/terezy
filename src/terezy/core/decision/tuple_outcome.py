@@ -155,16 +155,12 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
 Declared = InstrumentDeclaration | FundDeclaration
 """The two declaration kinds a tuple can name, matched with ``match``.
 
-⚙ **A two-armed match, and the seam is recorded rather than hidden.**
-``core.instruments.registry``'s own section comment says what 010 needs in order to rank a
-bond against a fund in one candidate set: a common *result*, not a common instrument
-interface. That is what :class:`~terezy.core.results.tuple.TupleOutcome` is. Until the two
-projections return one shape, the join has to know which one to call -- and that is a branch
-on a **declaration kind**, which Principle II permits (a kind is an algorithm, and the
-registry already dispatches on one) and not a branch on an instrument id, which it does not.
-Adding a third *instrument* is data; adding a third *kind* is code, here and in
-``registry.DECLARATION_KINDS`` and in the resolver's ``LOADERS_BY_KIND``, exactly as it
-already was.
+⚙ **A two-armed match, and the seam is recorded rather than hidden.** The two projections
+return different shapes, so the join has to know which one to call. That is a branch on a
+**declaration kind** -- an algorithm, which Principle II leaves as code -- and never a branch
+on an instrument id, which it forbids and which ``tests/contract/test_h1_data_only.py``
+scans for. Adding a third instrument is data; adding a third kind is code, here and wherever
+else the kind is dispatched on.
 """
 
 
@@ -272,16 +268,10 @@ def _route_in(
     The order matters and is the plan's: the chaining rule first, because it is the part that
     can be silently wrong, and everything after it is a sum of calls that already work.
 
-    ⚙ **``cost_one`` is asked for the declaration's own way out, and its round trip is
-    deliberately unused.** This tuple's way out starts where the *instrument* releases its
-    proceeds, which is not in general where the inbound chain ended, so 002's round-trip figure
-    is about a different journey and reporting it would be a one-way figure in a round-trip
-    slot. It is not suppressed, because there is one costing function and it prices what it
-    prices; ``FROM_THE_DECLARATION`` is passed by name so the behaviour is stated rather than
-    inherited from a default nobody reads. The consequence worth knowing: on a registry the
-    loader never saw, an inbound route naming a partner that does not depart from where it
-    arrives raises there rather than refusing here -- which is 002's ``_check_partner`` rule
-    doing its job one layer down, and is unreachable through a resolved data root.
+    ⚙ **``cost_one``'s own round-trip figure is deliberately unused.** This tuple's way out
+    starts where the *instrument* releases its proceeds, which is not in general where the
+    inbound chain ended, so that figure is about a different journey and reporting it would put
+    a figure for one journey in the slot for another.
     """
     costed = cost.cost_one(
         tuple_.route_in,
@@ -481,11 +471,6 @@ def _currency_of(declared: Declared) -> Currency:
             assert_never(declared)
 
 
-def _declared_classes(declared: Declared) -> Mapping[str, str]:
-    """Which class id governs each kind of income, keyed by the kind's declared name."""
-    return {kind.value: class_id for kind, class_id in declared.tax_classes.items()}
-
-
 def _unresolved_class(
     declared: Declared, tax_classes: Mapping[str, TaxClass]
 ) -> DeclarationMissing | None:
@@ -496,11 +481,7 @@ def _unresolved_class(
     part named so the remedy is a file in ``data/tax/`` rather than a search.
     """
     missing = sorted(
-        {
-            class_id
-            for class_id in _declared_classes(declared).values()
-            if class_id not in tax_classes
-        }
+        {class_id for class_id in declared.tax_classes.values() if class_id not in tax_classes}
     )
     if not missing:
         return None
@@ -606,8 +587,7 @@ def _way_out_chain(
 
     Two anchors, and they are the second seam: the chain must **depart from where the
     instrument releases its proceeds**, and it must **end somewhere the owner actually
-    spends**. Feature 004 shipped without the first and money teleported; feature 003's FR-022
-    is the second, and a chain that stops short has not got the money out.
+    spends**. A chain that stops short has not got the money out.
     """
     chain = _chosen_way_out(tuple_.route_out, tuple_, prepared, proceeds_at, registries)
     if not isinstance(chain, ExitChain):
@@ -672,8 +652,7 @@ def _identity_way_out(
 
     Derived from the declarations it is safe by construction; asserted by a caller it is the
     bare statement that the instrument releases its proceeds somewhere the owner already
-    spends from. Unchecked, feature 004 produced exactly this: a confident round trip for
-    money still sitting at a venue it could not be spent from.
+    spends from, and its whole content is a claim about the far end.
     """
     endpoints = cost.spendable_junctions(registries.spendable)
     if proceeds_at in endpoints:
@@ -870,12 +849,11 @@ def _minimum_ticket(prepared: _Prepared) -> Money | None:
 
 
 def _min_unit(prepared: _Prepared) -> float:
-    """The smallest buyable increment the declaration states, or one unit's worth of nothing.
+    """The smallest buyable increment the declaration states, or ``0.0`` where it states none.
 
-    ``1.0`` would be an invented increment for a declaration kind that states none, so a fund
-    returns the smallest positive float that leaves :func:`_whole_increments` an identity: the
-    arriving amount buys exactly what it buys, and the remainder is zero because there is no
-    declared increment to leave one.
+    ``1.0`` would be an invented increment -- rounding a fund's purchase to whole certificates
+    is a term its declaration does not contain. ``0.0`` is read by :func:`_whole_increments` as
+    *no increment*, and the arriving amount then buys exactly what it buys.
     """
     match prepared.declared:
         case InstrumentDeclaration():

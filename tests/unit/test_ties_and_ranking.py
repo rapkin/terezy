@@ -98,6 +98,16 @@ class TestATieIsReportedAsATie:
         assert len(comparison.ranked) == 1
         assert comparison.ties == ()
 
+    def test_every_tuple_offered_lands_in_exactly_one_of_the_three_places(self) -> None:
+        # Ranked, not comparable, or refused -- and counted rather than asserted in prose. A
+        # tuple that fell out of all three would be a silent exclusion, which is how a
+        # comparison comes to recommend the only option left standing.
+        offered = (_via(TWIN_ROUTE), _via(DEARER_ROUTE), _via("no_such_route"))
+        comparison = _ranked(offered)
+        landed = len(comparison.ranked) + len(comparison.not_comparable) + len(comparison.refused)
+        assert landed == len({*offered, fixtures.hurdle_tuple()})
+        assert len(comparison.refused) == 1
+
 
 class TestTheOrderingIsDeterministicWithoutBeingAPreference:
     """Both halves, because either alone is a defect."""

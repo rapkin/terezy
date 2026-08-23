@@ -8,14 +8,12 @@ both carry a currency and stop there.
 ``IncomeStream.arrives_at`` is the only non-route declaration in the project that names a
 venue at all.
 
-**That gap is why this record exists, and it is not a small one.** Feature 004 shipped an
-exit chain anchored at neither end: money moved between venues for free and the record still
-read as a coherent three-hop journey, with an arriving amount in one currency beside a cost
-fraction computed in another. Checking only the currency at this feature's two seams would
-reproduce exactly that. So the venue is declared, and a mismatch is refused naming both
-sides.
+**That gap is why this record exists.** Checking only the currency at either seam would
+reproduce feature 004's unanchored exit chain -- see
+:class:`~terezy.core.results.tuple.SeamDoesNotChain` for what that cost. So the venue is
+declared, and a mismatch is refused naming both sides.
 
-**Three facts, and each is a fact about the instrument *as reached*, not about the paper:**
+**Each field is a fact about the instrument *as reached*, not about the paper:**
 
 * where it is bought and where its proceeds land -- properties of the venue that sells it;
 * what one unit costs at that venue -- a quote, cited like any other observation. A fund
@@ -51,11 +49,9 @@ from terezy.core.primitives.money import Money
 class InstrumentAccess:
     """One instrument, as it is reached: the venues, the unit price, and the risk class.
 
-    Keyword-only, because five of the six fields are strings and a positional constructor
-    would let ``bought_at`` and ``proceeds_to`` be transposed with no type error anywhere --
-    the same trade :class:`~terezy.core.routes.path.FundingPath` makes, and for the same
-    reason: transposing those two is a silent defect that produces a coherent-looking round
-    trip through the wrong venues.
+    Keyword-only, because ``bought_at`` and ``proceeds_to`` are adjacent strings and a
+    positional constructor would let them be transposed with no type error anywhere -- a
+    silent defect producing a coherent-looking round trip through the wrong venues.
     """
 
     instrument_id: str

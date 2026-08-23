@@ -15,10 +15,6 @@ which is a claim about shared origin rather than about two numbers agreeing toda
 benchmark computed by a privileged side channel would drift from what it benchmarks, and the
 drift would be invisible because both figures would look reasonable.
 
-002's ``Ranking.recommended`` set the precedent and its argument is unchanged. This module
-adds nothing to it except the direction of the sort: a ranking of routes orders by *cost
-ascending*, and a comparison of tuples orders by *return descending*.
-
 ## One horizon, stated once
 
 Every tuple is evaluated over the same :class:`~terezy.core.instruments.interface.DateRange`
@@ -32,7 +28,7 @@ assumption nobody declared -- the invented number this feature is most likely to
 * **Ranked** -- comparison-ready: an amount, and a rate to order it by.
 * **Not comparable** -- computed in full, with no rate: a tuple funded in one currency and
   spent in another, whose amount is real and whose ratio is not available until the
-  official-rate machinery exists. 002's ``Ranking.not_comparable``, unchanged.
+  official-rate machinery exists.
 * **Refused** -- no outcome at all, carrying the typed reason. Never dropped: a silent
   exclusion is how a comparison comes to recommend the only option left standing, and here the
   missing ones are exactly the options nobody has finished declaring.
@@ -42,9 +38,8 @@ A contract test counts them: every tuple offered lands in exactly one.
 ## Ties, and being able to say nothing beats the hurdle
 
 Two outcomes within the single project tolerance are a **tie** and are reported as one
-(FR-013), *including* a tie between a tuple and the hurdle itself. The tie rule is 002's,
-anchored rather than chained for the reason ``routes.ranking._ties`` gives: tolerance equality
-is not transitive, and chaining would let a band of arbitrary width become one tie.
+(FR-013), *including* a tie between a tuple and the hurdle itself. The grouping rule lives
+once, in :func:`terezy.core.primitives.tolerance.tied_groups`.
 
 :attr:`~terezy.core.results.tuple.Comparison.beats_benchmark` is a field rather than something
 a reader derives from the ordering, because deriving it means re-implementing the tie rule at
@@ -61,7 +56,7 @@ from terezy.core.decision.tuple_outcome import Registries, evaluate
 from terezy.core.instruments.interface import DateRange
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.rates import NominalRate
-from terezy.core.primitives.tolerance import is_close
+from terezy.core.primitives.tolerance import is_close, tied_groups
 from terezy.core.results.tuple import (
     BenchmarkUnavailable,
     Comparison,
@@ -103,7 +98,8 @@ def compare(
     invite the head of the list to be read as a winner.
     """
     candidates = (benchmark, *(item for item in tuples if item != benchmark))
-    scored: list[tuple[Tuple, TupleOutcome]] = []
+    rated: list[tuple[float, TupleOutcome]] = []
+    unrated: list[TupleOutcome] = []
     refused: list[RefusedTuple] = []
     for candidate in candidates:
         outcome = evaluate(
@@ -114,115 +110,56 @@ def compare(
             continuation=continuation,
             registries=registries,
         )
-        if isinstance(outcome, TupleOutcome):
-            scored.append((candidate, outcome))
-        else:
+        if not isinstance(outcome, TupleOutcome):
             refused.append(RefusedTuple(key=candidate, refusal=outcome))
-    rated = [outcome for _, outcome in scored if isinstance(outcome.implied_rate, NominalRate)]
-    unrated = tuple(
-        outcome for _, outcome in scored if isinstance(outcome.implied_rate, RateNotComparable)
+        elif isinstance(rate := outcome.implied_rate, NominalRate):
+            rated.append((rate.value, outcome))
+        else:
+            unrated.append(outcome)
+    # Descending, and the sort is stable, so tied outcomes keep the order the caller supplied
+    # them in. `_ties` is what stops the head of a tied group being read as a winner.
+    ordered = sorted(rated, key=lambda pair: -pair[0])
+    ranked = tuple(outcome for _, outcome in ordered)
+    index = next(
+        (position for position, outcome in enumerate(ranked) if outcome.key == benchmark), None
     )
-    benchmarked = next((outcome for key, outcome in scored if key is candidates[0]), None)
-    if benchmarked is None or benchmarked not in rated:
+    if index is None:
         return _no_benchmark(
-            benchmark, benchmarked, scored=tuple(rated), unrated=unrated, refused=tuple(refused)
+            benchmark,
+            scored=ranked,
+            unrated=tuple(unrated),
+            refused=tuple(refused),
         )
-    ranked = tuple(sorted(rated, key=_by_return))
-    index = next(position for position, outcome in enumerate(ranked) if outcome is benchmarked)
+    rates = [rate for rate, _ in ordered]
     return Comparison(
         horizon=horizon,
         continuation=continuation,
         ranked=ranked,
         benchmark=index,
-        ties=_ties(ranked),
+        ties=tied_groups(rates),
         refused=tuple(refused),
-        not_comparable=unrated,
-        beats_benchmark=_beats(ranked, index),
+        not_comparable=tuple(unrated),
+        beats_benchmark=_beats(rates, index),
     )
 
 
-def _rate_of(outcome: TupleOutcome) -> float:
-    """The outcome's rate, for an outcome already established to have one.
-
-    A narrowing helper rather than a cast: the split in :func:`compare` established that this
-    outcome's ``implied_rate`` is a figure, and this is where that knowledge survives into the
-    sort key -- the same shape ``routes.ranking._Comparable`` takes for a round-trip cost.
-    """
-    rate = outcome.implied_rate
-    if isinstance(rate, NominalRate):
-        return rate.value
-    raise TypeError(  # pragma: no cover -- `compare` filters these out before sorting
-        f"an outcome for {outcome.key.instrument_id!r} reached the ranking with no rate. "
-        "Outcomes carrying RateNotComparable belong in `not_comparable`, which is where "
-        "`compare` puts them."
-    )
-
-
-def _by_return(outcome: TupleOutcome) -> float:
-    """Best first: the negated rate, so the sort is ascending on a descending quantity.
-
-    **One key, not three.** 002's ranking orders on ``(cost, ceiling, latency)`` because those
-    were the three things FR-016 put in priority order; here the owner asked one question --
-    what comes back, after everything -- and the amount and the span are already inside the
-    rate. A second key would be a preference the owner did not state, and where two rates
-    genuinely agree the answer is a tie rather than a tiebreak.
-
-    Python's sort is stable, so tied outcomes keep the order the caller supplied them in and
-    the sequence is deterministic; :func:`_ties` is what stops the head of a tied group being
-    read as a winner.
-    """
-    return -_rate_of(outcome)
-
-
-def _ties(ranked: Sequence[TupleOutcome]) -> tuple[tuple[int, ...], ...]:
-    """Groups of indices whose rate is the same within the project tolerance (FR-013).
-
-    002's ``routes.ranking._ties``, unchanged in rule and in reasoning: grouped **against each
-    group's first member** rather than chained neighbour to neighbour, because tolerance
-    equality is not transitive and chaining would let a band of arbitrary width become one tie
-    as candidates accumulate -- the tolerance absorbing a real difference. Anchoring bounds
-    every reported tie at one tolerance wide.
-
-    The sequence is sorted, so tied entries are adjacent and one pass suffices. Groups of one
-    are not ties and are not reported.
-    """
-    groups: list[tuple[int, ...]] = []
-    current: list[int] = []
-    anchor: float | None = None
-    for index, outcome in enumerate(ranked):
-        rate = _rate_of(outcome)
-        if anchor is not None and is_close(rate, anchor):
-            current.append(index)
-            continue
-        if len(current) > 1:
-            groups.append(tuple(current))
-        anchor = rate
-        current = [index]
-    if len(current) > 1:
-        groups.append(tuple(current))
-    return tuple(groups)
-
-
-def _beats(ranked: Sequence[TupleOutcome], benchmark: int) -> tuple[int, ...]:
+def _beats(rates: Sequence[float], benchmark: int) -> tuple[int, ...]:
     """Which tuples beat the benchmark by more than the project tolerance (FR-011).
 
     Strictly more: an outcome within the tolerance of the hurdle is a **tie** and is not a
     winner, which is what makes "nothing beats the hurdle" sayable when it is true by a
     whisker in either direction. The benchmark never appears in its own list.
     """
-    hurdle = _rate_of(ranked[benchmark])
+    hurdle = rates[benchmark]
     return tuple(
         index
-        for index, outcome in enumerate(ranked)
-        if index != benchmark
-        and _rate_of(outcome) > hurdle
-        and not is_close(_rate_of(outcome), hurdle)
+        for index, rate in enumerate(rates)
+        if index != benchmark and rate > hurdle and not is_close(rate, hurdle)
     )
 
 
 def _no_benchmark(
     benchmark: Tuple,
-    outcome: TupleOutcome | None,
     *,
     scored: tuple[TupleOutcome, ...],
     unrated: tuple[TupleOutcome, ...],
@@ -231,40 +168,35 @@ def _no_benchmark(
     """There is no comparison, only its parts -- and the parts are carried, not discarded.
 
     Two ways to arrive here and they are different facts, so the reason says which: the
-    benchmark tuple **refused** (a declaration is missing, a seam does not chain, its route is
-    closed), or it produced a complete outcome with **no rate** to rank anything against.
+    benchmark tuple **refused** outright, or it produced a complete outcome with **no rate** to
+    rank anything against.
     """
-    if outcome is None:
-        refusal = next(item.refusal for item in refused if item.key == benchmark)
-        reason = (
-            f"the benchmark tuple for {benchmark.instrument_id!r} produced no outcome, so "
-            "there is nothing to compare against. The other tuples' figures are carried "
-            "below rather than discarded, and they are deliberately not ranked: FR-011 says "
-            "the hurdle is always scored and always shown, and a ranking with no benchmark "
-            "invites its own head to be read as a winner."
-        )
+    unavailable = next(
+        (outcome.implied_rate for outcome in unrated if outcome.key == benchmark), None
+    )
+    if isinstance(unavailable, RateNotComparable):
         return BenchmarkUnavailable(
-            refusal=refusal,
+            refusal=unavailable,
             scored=scored,
             refused=refused,
             not_comparable=unrated,
-            reason=reason,
-        )
-    rate = outcome.implied_rate
-    if not isinstance(rate, RateNotComparable):  # pragma: no cover -- `compare` proves this
-        raise TypeError(
-            f"the benchmark for {benchmark.instrument_id!r} has a rate and should have been "
-            "ranked. `compare` only reaches here when it has none."
+            reason=(
+                f"the benchmark tuple for {benchmark.instrument_id!r} produced a complete "
+                f"outcome and no rate: {unavailable.reason} Nothing can be ranked against a "
+                "benchmark with no figure to compare, and ranking the rest without one would "
+                "let the head of the list read as a winner."
+            ),
         )
     return BenchmarkUnavailable(
-        refusal=rate,
+        refusal=next(item.refusal for item in refused if item.key == benchmark),
         scored=scored,
         refused=refused,
         not_comparable=unrated,
         reason=(
-            f"the benchmark tuple for {benchmark.instrument_id!r} produced a complete outcome "
-            f"and no rate: {rate.reason} Nothing can be ranked against a benchmark with no "
-            "figure to compare, and ranking the rest without one would let the head of the "
-            "list read as a winner."
+            f"the benchmark tuple for {benchmark.instrument_id!r} produced no outcome, so "
+            "there is nothing to compare against. The other tuples' figures are carried below "
+            "rather than discarded, and they are deliberately not ranked: FR-011 says the "
+            "hurdle is always scored and always shown, and a ranking with no benchmark invites "
+            "its own head to be read as a winner."
         ),
     )

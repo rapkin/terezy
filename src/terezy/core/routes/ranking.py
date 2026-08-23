@@ -77,7 +77,7 @@ from typing import assert_never
 
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.staleness import ObservationKind
-from terezy.core.primitives.tolerance import is_close
+from terezy.core.primitives.tolerance import tied_groups
 from terezy.core.results.coverage import SpendableEndpoint
 from terezy.core.results.ramp import (
     NothingComparable,
@@ -133,35 +133,13 @@ def _order_key(entry: _Comparable) -> tuple[float, float, int]:
 
 
 def _ties(ordered: Sequence[_Comparable]) -> tuple[tuple[int, ...], ...]:
-    """Groups of indices whose round-trip cost is the same within the project tolerance.
+    """Groups of candidates whose round-trip cost is the same within the project tolerance.
 
-    On round-trip cost **alone** (FR-018): the ceilings and latencies that ordered the sequence
-    play no part in deciding what is tied.
-
-    **Grouped against each group's first member rather than chained neighbour to neighbour**,
-    and the choice is forced. Tolerance-based equality is not transitive -- ``a ~ b`` and
-    ``b ~ c`` does not give ``a ~ c`` -- so some rule has to be picked. Chaining would let a
-    band of arbitrary width become one tie as candidates accumulate, which is the tolerance
-    absorbing a real difference: exactly the "defect wearing a green tick" the tolerance module
-    warns about. Anchoring bounds every reported tie at one tolerance wide.
-
-    The sequence is sorted, so tied entries are adjacent and one pass suffices. Groups of one
-    are not ties and are not reported.
+    On round-trip cost **alone** (FR-018): the ceilings and latencies that ordered the
+    sequence play no part in deciding what is tied. The grouping rule itself is
+    :func:`terezy.core.primitives.tolerance.tied_groups`.
     """
-    groups: list[tuple[int, ...]] = []
-    current: list[int] = []
-    anchor: float | None = None
-    for index, (_, round_trip) in enumerate(ordered):
-        if anchor is not None and is_close(round_trip.fraction, anchor):
-            current.append(index)
-            continue
-        if len(current) > 1:
-            groups.append(tuple(current))
-        anchor = round_trip.fraction
-        current = [index]
-    if len(current) > 1:
-        groups.append(tuple(current))
-    return tuple(groups)
+    return tied_groups([round_trip.fraction for _, round_trip in ordered])
 
 
 def _nothing_comparable(
