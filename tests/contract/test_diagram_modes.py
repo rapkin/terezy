@@ -32,7 +32,7 @@ from pathlib import Path
 
 import pytest
 
-from terezy.api.diagrams import Diagram, Mode, figures, render_graph
+from terezy.api.diagrams import Diagram, Mode, figures, graph, render_graph
 from terezy.core.routes import channels
 from terezy.core.routes.channels import Side
 from tests import diagram_registries as fixture
@@ -122,7 +122,7 @@ class TestTheTwoModesDifferByFiguresAndNothingElse:
         found = figure_bearing_fields(fixture.six_state_graph(Mode.TOPOLOGY).text)
         assert not found, f"a topology diagram carries figures: {found}"
 
-    def test_no_renderer_composes_a_declared_figure_field_from_its_own_literal(self) -> None:
+    def test_no_module_but_one_spells_the_declared_figure_prefix(self) -> None:
         """**L5.** SC-012's strip assertion is built from one constant, so there must be one.
 
         Both renderers draw the same edge, and each once carried its own ``"declared fee "``
@@ -130,44 +130,75 @@ class TestTheTwoModesDifferByFiguresAndNothingElse:
         above, which knows only ``figures.FIGURE_FIELD``, would have quietly stopped covering
         whatever the other renderer emitted.
 
-        Looks for the shape of the defect rather than the word: an f-string whose leading
-        literal *is* the prefix, which is how a field gets composed. A module explaining the
-        prefix in prose, or naming it in a caption, is neither -- and the mode note on every
-        registry graph legitimately contains the word.
+        The scan is over **every string constant** in the package rather than over one
+        composition shape, so it catches the literal however it is put together: an f-string,
+        ``+``, ``%``, ``.format``, or a bare assignment. That is possible because the prefix is
+        a whole word at the start of a string, and the one caption that legitimately talks
+        about declared figures is worded not to begin with it.
+
+        **What it cannot reach**, stated rather than implied: a prefix assembled from pieces
+        (``"decl" "ared "``), one built at run time, or one imported and then rebuilt. Those
+        are not the natural regression -- which is someone retyping the literal at a new call
+        site -- and no source scan short of executing the module would see them.
         """
         home = REPO_ROOT / "src" / "terezy" / "api" / "diagrams" / "figures.py"
         offenders: dict[str, list[str]] = {}
         for path in sorted(home.parent.rglob("*.py")):
             if path == home:
                 continue
-            tree = ast.parse(source_scan.executable_source(path))
             found = [
-                node.values[0].value
-                for node in ast.walk(tree)
-                if isinstance(node, ast.JoinedStr)
-                and node.values
-                and isinstance(node.values[0], ast.Constant)
-                and isinstance(node.values[0].value, str)
-                and node.values[0].value.startswith(figures.FIGURE_FIELD)
+                node.value
+                for node in ast.walk(ast.parse(source_scan.executable_source(path)))
+                if isinstance(node, ast.Constant)
+                and isinstance(node.value, str)
+                and node.value.startswith(figures.FIGURE_FIELD)
             ]
             if found:
                 offenders[path.name] = found
         assert not offenders, (
-            f"a renderer composes a declared-figure field from its own literal: {offenders}. "
-            "The prefixes are defined once in figures.py and imported, because the two diagram "
-            "kinds draw the same edge and must not disagree about what a declared figure is"
+            f"a module spells the declared-figure prefix itself: {offenders}. It is defined "
+            "once in figures.py and imported, because the two diagram kinds draw the same edge "
+            "and must not disagree about what a declared figure is"
         )
 
-    def test_that_scan_would_catch_a_reinstated_literal(self) -> None:
-        """A scan that cannot fail protects nothing."""
-        planted = f'def f(x: float) -> str:\n    return f"{figures.FEE_FIELD}{{x}}"\n'
-        tree = ast.parse(source_scan.strip_prose(planted))
+    @pytest.mark.parametrize(
+        "planted",
+        [
+            'def f(x: float) -> str:\n    return f"{PREFIX}{x}"\n',
+            'def f(x: float) -> str:\n    return "{PREFIX}" + str(x)\n',
+            'def f(x: float) -> str:\n    return "{PREFIX}{}".format(x)\n',
+            'def f(x: float) -> str:\n    return "{PREFIX}%s" % x\n',
+            'FEE = "{PREFIX}fee "\n',
+        ],
+        ids=["f-string", "concatenation", "format", "percent", "assignment"],
+    )
+    def test_that_scan_catches_every_way_the_literal_gets_retyped(self, planted: str) -> None:
+        """A scan that cannot fail protects nothing, and one shape of failure is not enough."""
+        source = planted.replace("{PREFIX}", figures.FIGURE_FIELD)
         assert any(
-            isinstance(node, ast.JoinedStr)
-            and isinstance(node.values[0], ast.Constant)
-            and str(node.values[0].value).startswith(figures.FIGURE_FIELD)
-            for node in ast.walk(tree)
+            isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and node.value.startswith(figures.FIGURE_FIELD)
+            for node in ast.walk(ast.parse(source_scan.strip_prose(source)))
         )
+
+    def test_that_scan_does_not_fire_on_prose_or_on_the_caption(self) -> None:
+        """Explaining the prefix is not repeating it, and the mode caption has to say the word.
+
+        The caption is worded so it does not *begin* with the prefix, which is what lets the
+        scan be a blanket rule instead of a shape-matcher with holes in it.
+        """
+        prose = f'"""A docstring about {figures.FIGURE_FIELD}fee fields."""\nX: int = 1\n'
+        assert not [
+            node
+            for node in ast.walk(ast.parse(source_scan.strip_prose(prose)))
+            if isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and node.value.startswith(figures.FIGURE_FIELD)
+        ]
+        note = graph._MODE_NOTE[Mode.DECLARED_FIGURES]
+        assert figures.FIGURE_FIELD in note
+        assert not note.startswith(figures.FIGURE_FIELD)
 
     def test_the_with_figures_diagram_carries_declared_fees_with_their_provenance_state(
         self,

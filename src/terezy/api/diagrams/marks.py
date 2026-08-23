@@ -32,6 +32,7 @@ from collections.abc import Iterable, Mapping
 from enum import Enum
 from typing import Final
 
+from terezy.api.diagrams import mermaid
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.provenance import Provenance
 
@@ -149,8 +150,15 @@ The wording avoids the word *stale* on purpose: ``"STALENESS NOT ASSESSED"`` con
 assertion asks of a diagram -- would answer yes for a label saying the opposite.
 """
 
-PREFIX: Final = "marks: "
-"""How a marks segment begins, so a reader and a test can find it in a label."""
+PREFIX: Final = mermaid.MARKS_FIELD
+"""How a marks segment begins, so a reader and a test can find it in a label.
+
+Owned by :mod:`terezy.api.diagrams.mermaid` and imported back, because the token is only
+reliable if :func:`mermaid.escape` reserves it -- a declared provider named
+``marks: VERIFIED AND CURRENT`` otherwise puts those exact characters into a label beside a
+real marks field saying ``STALE``. Two definitions of one token would let the escape and the
+vocabulary drift apart, and the drift would be invisible until someone forged one.
+"""
 
 JOIN: Final = " + "
 

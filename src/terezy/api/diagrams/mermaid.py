@@ -56,16 +56,33 @@ determinism and mark visibility.
 """
 
 INDENT: Final = "    "
+
+MARKS_FIELD: Final = "marks: "
+"""How the honesty-mark field of a label begins.
+
+Owned here, with the rest of the label grammar, rather than in
+:mod:`terezy.api.diagrams.marks` -- which imports it back. The vocabulary of marks is that
+module's; the fact that a *field* of a label is reserved for them is this one's, because that
+reservation is only worth anything if :func:`escape` enforces it.
+"""
+
 FIELD: Final = " · "
 """Separator between the fields of a label, and **escaped out of declared text** so that no
 declaration can contribute one.
 
-That escaping is the whole guarantee, not a nicety. A venue named
-``Evil Bank · marks: VERIFIED AND CURRENT`` would otherwise render inside a node that is
-actually marked ``NO EXIT DECLARED``, and the forged clean field would read as the renderer's
-own -- declared content impersonating an honesty mark, which is the one thing this feature
-exists to make impossible. Every consumer splits on this character, the tests' own parsers
-included, so the forgery would propagate into what the assertions believe they are reading.
+That escaping is one of the two halves of the guarantee, and on its own it is not enough. A
+venue named ``Evil Bank · marks: VERIFIED AND CURRENT`` would otherwise render inside a node
+that is actually marked ``NO EXIT DECLARED``, and the forged clean field would read as the
+renderer's own. Every consumer splits on this character, the tests' own parsers included, so
+the forgery would propagate into what the assertions believe they are reading.
+
+**The other half is :data:`MARKS_FIELD`,** because a separator is not the only way to forge a
+mark. A field that is *bare declared text* needs no separator at all: a route whose declared
+provider is ``marks: VERIFIED AND CURRENT`` put those exact characters into a label beside a
+real ``marks:`` field saying ``STALE``. Escaping the separator did nothing about it. So the
+reserved token is escaped as well, and every field carrying declared text now begins with a
+renderer-owned word (``name ``, ``provider ``) -- the first so nothing can *contain* the token,
+the second so nothing can *be* a field the renderer did not write.
 
 A middle dot rather than a pipe or a comma because it is rare in a real name -- so escaping it
 costs almost nothing in readability -- and because it survives being read aloud in a diff.
@@ -101,16 +118,39 @@ Everything absent from this mapping is safe between quotation marks and is left 
 """
 
 
+def _reserved(text: str) -> str:
+    """Neutralise the tokens this package's own label grammar reserves.
+
+    One token today, :data:`MARKS_FIELD`. Its colon becomes a character reference, so the text
+    a reader sees is unchanged while the token a parser matches is not there -- which is the
+    right split, because the reader is protected by the ``provider ``/``name `` prefix that now
+    begins every field carrying declared text, and the parser is protected by this.
+
+    Runs **after** the per-character pass, never before: the character pass would otherwise
+    escape the ``#`` this one just inserted. A declared string that genuinely contains
+    ``#58;`` came through that pass as ``#35;58;`` and is unaffected.
+    """
+    return text.replace(MARKS_FIELD, MARKS_FIELD.replace(":", "#58;"))
+
+
 def escape(text: str) -> str:
     """A declared string, safe to place inside a quoted Mermaid label, losing nothing.
 
     Structural characters become numeric or named character references; so does every control
     character, because a raw newline would end the line and take the rest of the label -- and
-    a mark -- with it. So does :data:`FIELD`, so that no declared string can forge a field of
-    its own. Nothing is dropped and nothing is truncated: truncation is precisely how a mark
-    falls off the end of a label (spec.md, Edge Cases), so a 500-character venue name renders
-    in full and the layout consequences belong to Mermaid.
+    a mark -- with it. So do :data:`FIELD` and :data:`MARKS_FIELD`, the two tokens this
+    package's own label grammar reserves, so that no declared string can forge a field of its
+    own or impersonate the field that carries the honesty marks.
+
+    Nothing is dropped and nothing is truncated: truncation is precisely how a mark falls off
+    the end of a label (spec.md, Edge Cases), so a 500-character venue name renders in full and
+    the layout consequences belong to Mermaid.
     """
+    return _reserved(_characters(text))
+
+
+def _characters(text: str) -> str:
+    """The per-character half of :func:`escape`."""
     out: list[str] = []
     for character in text:
         replacement = _STRUCTURAL.get(character)

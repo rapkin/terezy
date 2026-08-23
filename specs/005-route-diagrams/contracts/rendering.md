@@ -41,9 +41,11 @@ were weighed:
   and the resolved `as_of` is printed on the face of the diagram.
 
 `render_path` needs neither: `OneWayCost.staleness` and `RoundTripCost.staleness` are verdicts
-feature 002 already computed under each leg's own declared threshold, so the path renderer
-**reads** the result's verdict instead of recomputing it. Two computations of one fact
-eventually disagree.
+feature 002 already computed under **each observation's** own declared threshold — the leg's fee
+schedule, the channel's reference rate, each channel side — so the path renderer **reads** the
+result's verdict instead of recomputing it. Two computations of one fact eventually disagree.
+An edge is matched against that verdict as a whole, its channel quote included: matching only
+the leg's own sources left a stale premium invisible on the edge that charges it.
 
 ⚙ **`channels` was added on the owner's ruling of 2026-08-23, and the reason is the strongest
 in the feature.** FR-006's with-figures mode names "fees, premiums", and a premium is declared

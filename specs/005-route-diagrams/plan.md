@@ -59,8 +59,8 @@ This is the first feature to put anything substantial in `api`.
 through one rule; byte-identical output for identical input; valid Mermaid under hostile
 names; no dependency that phones home.
 
-**Scale/Scope**: 1 new `api` package (4 modules), 1 new script, ~6 test modules, 2 golden
-artifacts. No change to `core`, no change to `data`, no new declaration.
+**Scale/Scope**: 1 new `api` package (⚙ 6 modules, see below), 1 new script, ~7 test modules,
+⚙ 3 golden artifacts. No change to `core`, no change to `data`, no new declaration.
 
 ## Constitution Check
 
@@ -121,6 +121,7 @@ src/terezy/api/
     ├── numbers.py                      THE number-rendering rule, and nothing else
     ├── marks.py                        the mark vocabulary and its label tokens
     ├── mermaid.py                      node ids, escaping, the dialect
+    ├── figures.py                      ⚙ ADDED — the declared figures an edge carries
     ├── graph.py                        the declared route graph, two modes
     └── path.py                         one costed path, and refusals drawn as refusals
 
@@ -147,6 +148,20 @@ tests/contract/
 tests/unit/
 └── test_diagram_escaping.py            SC-008, SC-001 — hostile names, injective node ids
 ```
+
+⚙ **`figures.py` was added during implementation, on the owner's ruling of 2026-08-23 and the
+review that followed it.** Once the declared channel premium had to appear on *both* diagram
+kinds, the two renderers were composing the same edge's figures — and each carried its own
+`"declared fee "` literal with nothing binding them, so changing one would silently diverge
+them and weaken SC-012's strip assertion, which is built from a single constant. The module
+owns the three field prefixes and the quote rendering; both renderers import it. Folding it into
+`graph.py` was rejected because it would make `path.py` import a renderer.
+
+⚙ **A third golden artifact was added for the same reason**: `route_graph_normalized.mmd`, the
+one shipped regime that produces a *no exit declared* mark and the only one whose corridor
+declares its premium in basis points. The goldens are a delivery target and not only a test
+device, so the mark a reader most needs to recognise on sight is recorded rather than left to a
+fixture.
 
 **Structure Decision**: a new `api.diagrams` package — the first substantial inhabitant of
 the `api` layer — one script beside `scripts/check_provenance.py`, and `core` untouched.

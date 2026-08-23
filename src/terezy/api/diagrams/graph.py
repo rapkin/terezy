@@ -74,8 +74,8 @@ from terezy.core.scenarios.regimes import Regime
 _MODE_NOTE: Mapping[Mode, str] = {
     Mode.TOPOLOGY: "no figures shown -- an absent number is not a zero",
     Mode.DECLARED_FIGURES: (
-        "declared per-leg fees and channel premiums only -- no computed ramp cost appears "
-        "on a registry graph"
+        "shows declared per-leg fees and channel premiums only -- no computed ramp cost "
+        "appears on a registry graph"
     ),
 }
 """What each mode's name means, said on the diagram beside it.
@@ -203,7 +203,7 @@ def _leg_fields(
     """
     fields = [
         f"route {mermaid.escape(route.id)}",
-        mermaid.escape(route.provider),
+        f"provider {mermaid.escape(route.provider)}",
         f"leg {leg.index} {mermaid.escape(leg.kind)}",
         _currency_field(leg),
     ]
@@ -341,7 +341,10 @@ def render_graph(
 
     for venue_id in sorted(venues):
         venue = venues[venue_id]
-        fields = [f"venue {mermaid.escape(venue.id)}", mermaid.escape(venue.name)]
+        fields = [
+            f"venue {mermaid.escape(venue.id)}",
+            f"name {mermaid.escape(venue.name)}",
+        ]
         style: str | None = None
         if venue_id in without_exit:
             fields.append(marks.segment((Mark.NO_EXIT_DECLARED,)))

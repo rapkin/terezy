@@ -290,6 +290,20 @@ regenerated diagram contains the added venue and route, correctly connected and 
   against `numbers.basis_points`, and delete the assertion made dead by the line above it
 - [x] T039 **L7** `channels` joins `_distinct_ids`: an edge labels `via channel` from the
   mapping key while its premium comes from the record, and nothing checked the two agree
+- [x] T040 **F1** Close the second route to a forged mark. Escaping the separator stopped a
+  declaration *adding* a field; a venue's name and a route's provider were emitted bare, so a
+  declaration could *be* one. Every field carrying declared text now opens with a
+  renderer-owned word, `mermaid.MARKS_FIELD` is reserved out of declared text, and the suite
+  reads the marks field by position rather than searching the label for a word
+- [x] T041 **F3** Pin `path._is_assessed` the way `_is_stale` was pinned: a result whose
+  verdict never aged its channel renders `AGE NOT ASSESSED` on the edge that shows the quote,
+  and clean on the leg beside it
+- [x] T042 **F4** Widen the prefix scan from one f-string shape to every string constant in the
+  package, which reaches `+`, `%`, `.format` and a bare assignment as well. What it still
+  cannot reach is stated in its docstring rather than implied
+- [x] T043 **F5** Correct three references the earlier fixes left behind: a deleted function
+  named in a fixture docstring, the path renderer's staleness described per *leg* rather than
+  per observation, and a plan that said four modules over a six-module tree
 - [x] T032 Stop emitting the `closedRoute` `classDef`, which nothing can carry — Mermaid
   applies a class to a node and `CLOSED` only ever lands on an edge. The explanation moves into
   `marks.CLASS_DEFS`; the mark itself stays in the vocabulary and in the label text

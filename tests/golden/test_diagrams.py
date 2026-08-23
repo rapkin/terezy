@@ -34,6 +34,7 @@ the hand-computed figures ``tests/worked_examples/test_ramp_p2p_premium.py`` che
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import sys
 from dataclasses import replace
@@ -58,6 +59,26 @@ UPDATE_VARIABLE: Final = "TEREZY_UPDATE_GOLDEN"
 GRAPH_FILE: Final = Path(__file__).with_name("route_graph_wartime.mmd")
 NORMALIZED_FILE: Final = Path(__file__).with_name("route_graph_normalized.mmd")
 PATH_FILE: Final = Path(__file__).with_name("costed_path_p2p.mmd")
+
+CLOSED_TOKENS: Final = frozenset(
+    {
+        "UAH",
+        "USD",
+        "UAH to USD",
+        "USD to UAH",
+        "inbound",
+        "exit",
+        "not comparison-ready",
+        "the absent edge, drawn rather than omitted",
+        "the exit that would go here has not been declared",
+    }
+)
+"""Fields that are renderer-owned tokens from a closed set rather than prefixed text.
+
+Currencies come from an enum validated at the data boundary, and the rest are literals this
+package writes. None of them can carry a declared string, which is what the check above is
+about.
+"""
 
 ARTIFACTS: Final = (GRAPH_FILE, NORMALIZED_FILE, PATH_FILE)
 """Every checked-in diagram. The properties below hold of all three or of none."""
@@ -323,7 +344,56 @@ class TestTheArtifactsCannotBeGreenAndWrong:
 
     def test_the_recorded_graph_holds_every_declared_venue(self) -> None:
         for venue_id in sorted(fixture.shipped_declarations().venues):
-            assert f'["venue {venue_id} · ' in _recorded(GRAPH_FILE)
+            assert f'["venue {venue_id} · name ' in _recorded(GRAPH_FILE)
+
+    def test_no_recorded_field_is_bare_declared_text(self) -> None:
+        """Every field carrying a declared string is opened by a renderer-owned word.
+
+        The structural half of the forgery guarantee, checked on the delivered artifacts rather
+        than only on a fixture: a venue's name and a route's provider were once emitted bare, so
+        a declaration spelling ``marks: VERIFIED AND CURRENT`` *was* a field. Every field now
+        begins with one of the words below, and none of those words can come from a declaration
+        -- ``mermaid.escape`` reserves the token that opens the marks field.
+        """
+        opens = (
+            "venue ",
+            "name ",
+            "route ",
+            "provider ",
+            "leg ",
+            "via channel ",
+            "status: ",
+            "marks: ",
+            figures.FIGURE_FIELD,
+        )
+        # Only the elements that carry free declared text: nodes named ``n<k>`` (a venue) and
+        # the edges between them (a route's legs). A caption or an ``x<k>`` annotation is
+        # renderer prose with a declared id inside a sentence the renderer opened, which is the
+        # same guarantee reached by a different route.
+        drawn = re.compile(r'^\s+n\d+(?:\["(?P<node>.*?)"\]|.*?\|"(?P<edge>.*?)"\|)')
+        checked = 0
+        for artifact in ARTIFACTS:
+            for line in _recorded(artifact).splitlines():
+                found = drawn.match(line)
+                if found is None:
+                    continue
+                label = found.group("node") or found.group("edge")
+                if label is None:
+                    continue
+                checked += 1
+                for field in label.split(" · "):
+                    assert field.startswith(opens) or field in CLOSED_TOKENS, field
+        assert checked >= 20, f"only {checked} venue nodes and route edges were examined"
+
+    def test_exactly_one_field_per_label_opens_the_marks_field(self) -> None:
+        """A second one would mean a declaration contributed it."""
+        for artifact in ARTIFACTS:
+            for line in _recorded(artifact).splitlines():
+                found = re.search(r'\|"(.*?)"\| |\["(.*?)"\]', line)
+                if found is None:
+                    continue
+                label = "".join(part for part in found.groups() if part)
+                assert label.count("marks: ") <= 1, line
 
     def test_the_recorded_path_shows_the_hand_computed_p2p_figures(self) -> None:
         """The arithmetic METHODOLOGY §16.2 shows and the worked example checks.

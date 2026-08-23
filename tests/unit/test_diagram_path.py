@@ -302,6 +302,46 @@ class TestEveryFigureIsTheResultsFigureThroughTheOneRule:
         assert quote is not None
         assert {ref.id for ref in figures.sources(quote).sources} & stale_ids
 
+    def test_an_edge_whose_quote_was_never_aged_says_so_rather_than_reading_clean(
+        self,
+    ) -> None:
+        """**F3.** ``AGE NOT ASSESSED`` is the third absence, and it must reach a real edge.
+
+        The sibling of the stale case, and it fails the same way: if the verdict is consulted
+        only about the leg's own sources, an edge whose *premium* was never aged reports
+        ``VERIFIED AND CURRENT`` -- "nobody checked" wearing "checked and clean"'s tick, which
+        is the exact ambiguity ``staleness.UNASSESSED`` exists to remove.
+
+        No real run produces this: ``cost._aged`` ages every observation on every leg. A caller
+        holding a narrower verdict can, so the renderer must not assume otherwise.
+        """
+        text = fixture.drawn_path(fixture.unassessed_cost()).text
+        converting = next(
+            label for _, label, _ in EDGE.findall(text) if "inbound" in label and " fx · " in label
+        )
+        transferring = next(
+            label
+            for _, label, _ in EDGE.findall(text)
+            if "inbound" in label and " transfer · " in label
+        )
+        assert diagram_marks.UNASSESSED in fixture.marks_in(converting)
+        assert diagram_marks.CLEAN not in fixture.marks_in(converting)
+        assert diagram_marks.UNASSESSED not in fixture.marks_in(transferring), (
+            "the transfer leg's own sources were assessed, so it must stay unmarked -- an "
+            "absence reported everywhere reports nothing"
+        )
+
+    def test_that_narrowed_verdict_still_covers_every_leg_the_result_costed(self) -> None:
+        """Otherwise the contrast above is about a missing leg, not a missing quote."""
+        declared = fixture.shipped_declarations()
+        assessed = set(fixture.unassessed_cost().one_way.staleness.assessed)
+        for route_id in (fixture.P2P_ROUTE, "binance_p2p_to_monobank"):
+            for leg in declared.routes[route_id].legs:
+                assert {ref.id for ref in leg.provenance.sources} <= assessed
+        quote = figures.quote_for(declared.routes[fixture.P2P_ROUTE].legs[0], declared.channels)
+        assert quote is not None
+        assert not {ref.id for ref in figures.sources(quote).sources} <= assessed
+
     def test_a_leg_with_no_figure_to_show_shows_no_number(self) -> None:
         """FR-008's second half: an edge shows a figure with its provenance state, or none.
 

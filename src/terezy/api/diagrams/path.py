@@ -154,7 +154,7 @@ def _leg_fields(
     fields = [
         direction,
         f"route {mermaid.escape(route.id)}",
-        mermaid.escape(route.provider),
+        f"provider {mermaid.escape(route.provider)}",
         f"leg {leg.index} {mermaid.escape(leg.kind)}",
         currency,
     ]

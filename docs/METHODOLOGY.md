@@ -1723,11 +1723,23 @@ on a fresh-fee leg does not render clean (§18, and `cost._channel_verdicts` one
 channel file declares a kind three times — reference rate, buy side, sell side — and collapsing
 them reports a 7-day premium fresh at 82 days.
 
-**A declared name can never forge a label field.** A label is a sequence of fields separated
-by ` · `, so that separator is escaped out of declared text along with Mermaid's own
-metacharacters. Without it a venue named `Evil Bank · marks: VERIFIED AND CURRENT` renders a
-clean marks field, in the renderer's own voice, inside a node that is actually marked
-`NO EXIT DECLARED` — declared content impersonating an honesty mark.
+**A declared name can never forge a label field.** A label is a sequence of fields separated by
+` · `, and a mark is a field, so a declaration forges a mark if it can *add* a field or *be*
+one. Both are closed, by different mechanisms:
+
+- the separator and the token that opens the marks field are escaped out of declared text, so
+  nothing a declaration contributes can add a field or open that one;
+- every field carrying declared text begins with a renderer-owned word (`name …`, `provider …`),
+  so nothing a declaration contributes can *be* a field.
+
+Escaping the separator alone was not enough, and the gap is worth recording: a venue's name and
+a route's provider were emitted as bare unprefixed text, so a route declaring its provider as
+`marks: VERIFIED AND CURRENT` needed no separator at all — those characters landed in a label
+whose real marks field said `UNVERIFIED + CLOSED`.
+
+The consequence is what makes the marks readable at all: **exactly one field per label opens
+with `marks: `**, so a diagram is asked what it is marked by reading that field, never by
+searching the label for a word. The test suite reads it that way.
 
 **A refusal is never drawn as a path.** `RouteUnusable`, `ExitCostUnknown` and
 `NothingComparable` each produce a typed `NothingToDraw` carrying the refusal's own reason

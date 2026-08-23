@@ -25,7 +25,7 @@ from datetime import date
 
 import pytest
 
-from terezy.api.diagrams import Diagram, Mode, figures, marks, render_graph
+from terezy.api.diagrams import Diagram, Mode, figures, marks, mermaid, render_graph
 from terezy.api.diagrams.marks import Mark
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives import staleness
@@ -210,23 +210,23 @@ class TestAllSixStatesInOneDiagram:
     def test_the_states_are_pairwise_distinguishable_on_their_own_edges(self) -> None:
         """Not merely present somewhere -- present on the element they describe."""
         labels = fixture.labels_by_route(self._rendered())
-        assert marks.CLEAN in labels[fixture.VERIFIED_ROUTE]
-        assert marks.token(Mark.UNVERIFIED) in labels[fixture.UNVERIFIED_ROUTE]
-        assert marks.token(Mark.STALE) in labels[fixture.STALE_ROUTE]
-        assert marks.token(Mark.UNVERIFIED) in labels[fixture.BOTH_ROUTE]
-        assert marks.token(Mark.STALE) in labels[fixture.BOTH_ROUTE]
-        assert marks.token(Mark.CLOSED) in labels[fixture.CLOSED_ROUTE]
+        assert marks.CLEAN in fixture.marks_in(labels[fixture.VERIFIED_ROUTE])
+        assert marks.token(Mark.UNVERIFIED) in fixture.marks_in(labels[fixture.UNVERIFIED_ROUTE])
+        assert marks.token(Mark.STALE) in fixture.marks_in(labels[fixture.STALE_ROUTE])
+        assert marks.token(Mark.UNVERIFIED) in fixture.marks_in(labels[fixture.BOTH_ROUTE])
+        assert marks.token(Mark.STALE) in fixture.marks_in(labels[fixture.BOTH_ROUTE])
+        assert marks.token(Mark.CLOSED) in fixture.marks_in(labels[fixture.CLOSED_ROUTE])
 
     def test_stale_and_unverified_are_not_the_same_mark_on_the_same_edge(self) -> None:
         labels = fixture.labels_by_route(self._rendered())
-        assert marks.token(Mark.STALE) not in labels[fixture.UNVERIFIED_ROUTE]
-        assert marks.token(Mark.UNVERIFIED) not in labels[fixture.STALE_ROUTE]
+        assert marks.token(Mark.STALE) not in fixture.marks_in(labels[fixture.UNVERIFIED_ROUTE])
+        assert marks.token(Mark.UNVERIFIED) not in fixture.marks_in(labels[fixture.STALE_ROUTE])
 
     def test_a_closed_route_is_present_marked_and_distinct_from_an_open_one(self) -> None:
         """FR-004: closed and nonexistent are different facts and must look different."""
         labels = fixture.labels_by_route(self._rendered())
         assert fixture.CLOSED_ROUTE in labels, "a closed route was omitted rather than marked"
-        assert marks.token(Mark.CLOSED) not in labels[fixture.VERIFIED_ROUTE]
+        assert marks.token(Mark.CLOSED) not in fixture.marks_in(labels[fixture.VERIFIED_ROUTE])
         assert "status: closed" in labels[fixture.CLOSED_ROUTE]
         assert "status: open" in labels[fixture.VERIFIED_ROUTE]
 
@@ -262,12 +262,12 @@ class TestTheUnverifiedMarkPropagatesToEveryElement:
         labels = fixture.labels_by_route(text)
         derived = [label for route_id, label in labels.items() if route_id in fixture.DERIVED_FROM]
         assert derived, "the fixture drew nothing, so 100% of nothing is not the claim"
-        assert all(marks.token(Mark.UNVERIFIED) in label for label in derived)
+        assert all(marks.token(Mark.UNVERIFIED) in fixture.marks_in(label) for label in derived)
 
     def test_the_route_that_does_not_rest_on_it_is_not_marked(self) -> None:
         """A mark that appears everywhere carries no information."""
         labels = fixture.labels_by_route(unstyled(fixture.one_unverified_graph().text))
-        assert marks.token(Mark.UNVERIFIED) not in labels[fixture.VERIFIED_ROUTE]
+        assert marks.token(Mark.UNVERIFIED) not in fixture.marks_in(labels[fixture.VERIFIED_ROUTE])
 
 
 class TestTheChannelPremiumCarriesItsOwnMarks:
@@ -282,11 +282,11 @@ class TestTheChannelPremiumCarriesItsOwnMarks:
     def test_a_stale_premium_on_a_fresh_fee_leg_does_not_render_clean(self) -> None:
         text = unstyled(fixture.graph_of(fixture.stale_premium_registry()).text)
         label = fixture.labels_by_route(text)[fixture.STALE_PREMIUM_ROUTE]
-        assert marks.token(Mark.STALE) in label, (
+        assert marks.token(Mark.STALE) in fixture.marks_in(label), (
             "the leg's own fee schedule is fresh and verified; the premium it applies was "
             "last seen years ago, and the edge showing that premium must say so"
         )
-        assert marks.CLEAN not in label
+        assert marks.CLEAN not in fixture.marks_in(label)
 
     def test_the_fee_schedule_behind_that_leg_really_is_fresh_and_verified(self) -> None:
         """Otherwise the test above would pass for the wrong reason."""
@@ -315,8 +315,8 @@ class TestTheChannelPremiumCarriesItsOwnMarks:
         label = fixture.labels_by_route(
             unstyled(fixture.graph_of(fixture.stale_premium_registry()).text)
         )[fixture.STALE_PREMIUM_ROUTE]
-        assert marks.token(Mark.STALE) in label
-        assert marks.CLEAN not in label
+        assert marks.token(Mark.STALE) in fixture.marks_in(label)
+        assert marks.CLEAN not in fixture.marks_in(label)
 
     def test_the_discriminating_age_really_discriminates(self) -> None:
         """Otherwise the test above passes under the collapsed implementation too.
@@ -405,6 +405,77 @@ class TestTheChannelPremiumCarriesItsOwnMarks:
             )
 
 
+class TestNoDeclaredStringCanForgeAMark:
+    """**F1.** Escaping the separator closed one route to a forged mark. There were three.
+
+    A label is a sequence of fields, and a mark is a field. So a declaration forges a mark if it
+    can *add* a field -- which the separator allowed -- **or** if it can *be* one, which two
+    fields allowed by being bare, unprefixed declared text: a venue's name and a route's
+    provider. Neither needed a separator. A route whose declared provider is
+    ``marks: VERIFIED AND CURRENT`` put those exact characters into a label whose real marks
+    field said ``UNVERIFIED + CLOSED``.
+
+    Both routes are closed now, and by different mechanisms, because they are different
+    failures. Every field carrying declared text begins with a renderer-owned word
+    (``name ``, ``provider ``), so no declaration can *be* a field; and
+    ``mermaid.MARKS_FIELD`` is reserved out of declared text, so no declaration can *contain*
+    the token either. The first protects a reader looking at the picture, the second protects
+    everything that parses the text -- a diff, a golden file, and the assertions in this suite.
+    """
+
+    @staticmethod
+    def _label() -> str:
+        text = unstyled(fixture.graph_of(fixture.forged_registry()).text)
+        return fixture.labels_by_route(text)[fixture.FORGED_ROUTE]
+
+    def test_the_forged_provider_does_not_read_as_a_clean_mark(self) -> None:
+        """The reviewer's own demonstration, in the assertion shape this suite uses."""
+        label = self._label()
+        assert marks.CLEAN not in fixture.marks_in(label), (
+            "a declared provider is reading as the renderer's own clean mark, on a route that "
+            f"is actually unverified and closed: {label}"
+        )
+
+    def test_the_forged_venue_name_does_not_read_as_a_clean_mark(self) -> None:
+        text = unstyled(fixture.graph_of(fixture.forged_registry()).text)
+        node = next(line for line in text.splitlines() if fixture.FORGED_VENUE in line)
+        assert "marks: " not in node, (
+            "a venue node with no mark of its own must not acquire one from its declared name: "
+            f"{node}"
+        )
+
+    def test_the_label_carries_exactly_one_marks_field_and_it_is_the_real_one(self) -> None:
+        """Read by position in the grammar rather than by substring -- the stronger form."""
+        assert fixture.marks_of(self._label()) == marks.segment(
+            (Mark.UNVERIFIED, Mark.CLOSED), unsourced=False
+        )
+
+    def test_no_field_of_the_label_is_bare_declared_text(self) -> None:
+        """The structural half: a declaration can no longer *be* a field.
+
+        Both declared strings are still displayed in full -- nothing is dropped and nothing is
+        truncated -- but each sits inside a field the renderer opened and named.
+        """
+        fields = fixture.fields_of(self._label())
+        assert fixture.FORGERY not in fields
+        assert any(field.startswith("provider ") for field in fields)
+        assert any(fixture.FORGERY.replace(":", "#58;") in field for field in fields), (
+            "the declared provider must still be shown in full; escaping is not truncation"
+        )
+
+    def test_the_forgery_is_still_the_declared_string_after_decoding(self) -> None:
+        """FR-017: escaping may never cost a reader the name that was declared."""
+        assert mermaid.escape(fixture.FORGERY).replace("#58;", ":") == fixture.FORGERY
+
+    def test_the_fixture_really_declares_a_forgery_and_a_contradicting_mark(self) -> None:
+        """Otherwise every assertion above passes for a reason that is not about forging."""
+        registry = fixture.forged_registry()
+        assert registry.venues[fixture.FORGED_VENUE].name == fixture.FORGERY
+        assert registry.routes[fixture.FORGED_ROUTE].provider == fixture.FORGERY
+        assert fixture.FORGERY == marks.PREFIX + marks.CLEAN
+        assert registry.routes[fixture.FORGED_ROUTE].status == "closed"
+
+
 class TestEveryShippedRouteRendersSynthetic:
     """The shipped registry is invented, and the picture of it says so.
 
@@ -430,7 +501,9 @@ class TestEveryShippedRouteRendersSynthetic:
         text = unstyled(rendered.text)
         labels = fixture.labels_by_route(text)
         assert set(labels) == set(regime.route_ids)
-        assert all(marks.token(Mark.SYNTHETIC) in label for label in labels.values())
+        assert all(
+            marks.token(Mark.SYNTHETIC) in fixture.marks_in(label) for label in labels.values()
+        )
 
 
 class TestTheFixtureIsHonestAboutWhatItProves:

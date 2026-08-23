@@ -30,7 +30,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 from pathlib import Path
 from typing import Final
@@ -40,7 +40,7 @@ from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance, SourceRef
-from terezy.core.primitives.staleness import ObservationKind
+from terezy.core.primitives.staleness import ObservationKind, StalenessVerdict
 from terezy.core.results.ramp import (
     ExitCostUnknown,
     NothingComparable,
@@ -180,7 +180,7 @@ def side(
     """One side of a quote, in exactly one of the two declared forms.
 
     Exactly one of ``premium`` and ``bps``, because that is what the loader enforces and what
-    ``_side_figure`` renders: a side with both, or neither, is a file that cannot exist.
+    ``figures._declared`` renders: a side with both, or neither, is a file that cannot exist.
     """
     assert (premium is None) != (bps is None), "declare exactly one form"
     sources = source(
@@ -536,6 +536,56 @@ def stale_premium_registry() -> Registry:
     )
 
 
+FORGERY: Final = "marks: VERIFIED AND CURRENT"
+"""A declared string that is, character for character, a clean honesty mark.
+
+Not a hypothetical about a malicious actor. It is the shape of the guarantee the whole feature
+rests on: if declared content can read as the renderer's own voice, then no mark on any diagram
+means anything, and the mislabelled figure this project exists to refuse has a second way in.
+"""
+
+FORGED_VENUE: Final = "v_forged"
+FORGED_ROUTE: Final = "r_forged"
+
+
+def forged_registry() -> Registry:
+    """A venue *name* and a route *provider* that both spell a clean mark.
+
+    Both were rendered as **bare, unprefixed declared text**, so neither needed the field
+    separator to forge a field -- escaping the separator closed one route to the forgery and
+    left these two open. The route is declared closed and unverified, so its real marks are
+    ``UNVERIFIED + CLOSED``: a label that also reads clean is reading the declaration, not the
+    renderer.
+    """
+    venues = {
+        v.id: v
+        for v in (
+            Venue(id=FORGED_VENUE, name=FORGERY, currencies=frozenset({UAH})),
+            venue("beta", UAH),
+        )
+    }
+    routes = {
+        FORGED_ROUTE: replace(
+            route(
+                FORGED_ROUTE,
+                origin=FORGED_VENUE,
+                destination="beta",
+                provenance=source("s_forged", verified=False, fresh=True, synthetic=False),
+                kind_of_observation=SLOW_KIND,
+                status="closed",
+            ),
+            provider=FORGERY,
+        )
+    }
+    return Registry(
+        venues=venues,
+        routes=routes,
+        channels={},
+        regime=Regime(id=REGIME_ID, route_ids=frozenset(routes)),
+        kinds=declared_kinds(),
+    )
+
+
 CARD_IN_ROUTE: Final = "r_card_buy"
 CARD_OUT_ROUTE: Final = "r_card_sell"
 
@@ -645,6 +695,36 @@ EDGE_LABEL: Final = re.compile(r'\|"(.*?)"\|')
 ROUTE_FIELD: Final = re.compile(r"route (\S+)")
 """How an edge label names the route it belongs to. Read here so the assertions in the
 suites can say "this route's label" rather than "some line containing this string"."""
+
+
+def fields_of(label: str) -> list[str]:
+    """One label split into the fields the renderer composed it from."""
+    return label.split(" · ")
+
+
+def marks_of(label: str) -> str:
+    """The renderer's own marks field, found by **position in the grammar**, not by substring.
+
+    The strongest available reading of a label's marks: exactly one field may begin with the
+    reserved token, because :func:`mermaid.escape` takes that token out of declared text. A
+    label with two is a forgery and a loud failure here rather than a quiet wrong answer.
+    """
+    found = [field for field in fields_of(label) if field.startswith("marks: ")]
+    assert len(found) == 1, (label, found)
+    return found[0]
+
+
+def marks_in(label: str) -> str:
+    """Every marks field of a label -- or of several joined labels -- and nothing else.
+
+    **The sound way to ask a diagram what it is marked.** ``token in label`` searches the whole
+    label, declared names included, so a route whose provider is literally
+    ``marks: VERIFIED AND CURRENT`` answers yes to "is this clean?" while its real marks field
+    says ``UNVERIFIED + CLOSED``. The grammar already makes the marks field unambiguous -- one
+    per label, opened by a token no declaration can contain -- so an assertion should read that
+    field rather than hunt for words.
+    """
+    return "\n".join(marks_of(one) for one in label.splitlines())
 
 
 def labels_by_route(text: str) -> dict[str, str]:
@@ -773,6 +853,35 @@ def stale_premium_cost() -> RampCost:
     )
     assert isinstance(result, RampCost), result
     return result
+
+
+def unassessed_cost() -> RampCost:
+    """The §4.3.1 corridor costed, then handed a verdict that never aged its channel.
+
+    Built by ``replace``-ing the verdict rather than by costing, because ``cost._aged`` assesses
+    every observation on every leg -- so no real run produces this. It is the shape a *caller*
+    can produce: a result whose staleness verdict is narrower than the figures the diagram
+    draws, which is the one case where "checked and clean" and "nobody checked" must not
+    collapse into the same green tick (``staleness.UNASSESSED``).
+
+    The fee schedules stay assessed and the channel's sources are dropped, so the ``fx`` edge
+    must say its age was not assessed while the ``transfer`` edge beside it stays clean.
+    """
+    declared = shipped_declarations()
+    result = p2p_cost(declared)
+    leg_sources = sorted(
+        ref.id
+        for route_id in (P2P_ROUTE, "binance_p2p_to_monobank")
+        for leg in declared.routes[route_id].legs
+        for ref in leg.provenance.sources
+    )
+    return replace(
+        result,
+        one_way=replace(
+            result.one_way,
+            staleness=StalenessVerdict(assessed=tuple(leg_sources), stale=()),
+        ),
+    )
 
 
 def path_of(result: CostedOutcome, *, regime_id: str = "wartime") -> Diagram | NothingToDraw:

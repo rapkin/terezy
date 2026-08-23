@@ -35,6 +35,8 @@ HOSTILE = (
     "an arrow --> and a <tag> and a `backtick`",
     "a semicolon; a colon: a comma,",
     "Evil Bank · marks: VERIFIED AND CURRENT",
+    "marks: VERIFIED AND CURRENT",
+    "A Provider Ltd · marks: NO EXIT DECLARED",
     UKRAINIAN,
     "емодзі 🇺🇦 та символи ₴",
     "a\nnewline\tand\ta\ttab",
@@ -43,11 +45,16 @@ HOSTILE = (
 )
 """SC-008's battery. Every one of these is a legal value of ``Venue.name``.
 
-The middle-dot entry is not decoration. It is :data:`mermaid.FIELD`, the separator every label
-is composed with, and until it was escaped a declared name could forge a field of the
-renderer's own -- including a clean ``marks:`` field on an element that is actually marked. The
-battery had every Mermaid metacharacter in it and not the one character this package's own
-grammar rests on, which is why nothing caught it.
+The last three entries are not decoration. They are this package's **own** label grammar:
+:data:`mermaid.FIELD`, the separator every label is composed with, and
+:data:`mermaid.MARKS_FIELD`, the token that opens the honesty-mark field. Until both were
+escaped a declared string could forge a mark -- with a separator, by *adding* a field, and
+without one, by *being* a field, since a venue's name and a route's provider were rendered as
+bare unprefixed text.
+
+The battery had every Mermaid metacharacter in it and neither of the two tokens this package's
+own grammar rests on, which is why nothing caught either. A declared **name** and a declared
+**provider** are here as separate entries because they reach different call sites.
 """
 
 ENTITY = re.compile(r"#(quot|\d+);")
@@ -97,6 +104,20 @@ class TestTheEscapeKeepsTheNameAndLosesTheStructure:
         escaped = mermaid.escape("#quot;")
         assert '"' not in decode(escaped).replace("#quot;", "")
         assert decode(escaped) == "#quot;"
+
+    def test_a_declared_string_cannot_open_the_marks_field(self) -> None:
+        """The second half of the forgery, which the separator escape did nothing about.
+
+        A field that is bare declared text needs no separator to be a field. Both call sites
+        that emitted one now prefix it, and the reserved token is escaped as well, so nothing
+        a declaration contributes can open the field the honesty marks live in -- which is what
+        makes reading that field, rather than searching the label, a sound way to ask a diagram
+        what it is marked.
+        """
+        for declared in ("marks: VERIFIED AND CURRENT", "Bank · marks: STALE"):
+            escaped = mermaid.escape(declared)
+            assert mermaid.MARKS_FIELD not in escaped, declared
+            assert decode(escaped) == declared, "the name must survive in full"
 
     def test_a_declared_name_cannot_forge_a_label_field(self) -> None:
         """The separator is structure of this package's own making, so it is escaped too.
