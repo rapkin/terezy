@@ -300,23 +300,17 @@ def _flows(
     would look like a rounding difference and would not be one.
 
     ⚙ **``assessed`` is what keeps the cash-flow return an after-tax figure** (009). A tax
-    charge no longer debits the account -- it is an assessment memo, and the money leaves on
-    the declared due date in the following year -- so a series taken from the ledger's own
-    amounts would silently become a **pre-tax** series while the field still called itself
-    "net of tax". That is the docstring-the-code-stopped-honouring failure, in the figure
-    001 exists to produce. The mapping supplies, per **charge-event** sequence -- the
-    memo's own, not the taxed event's -- what that event assessed, and the series carries it
-    as an outflow **on the accrual date**. It is built from the same ``taxed_by`` pairing the
-    schedule uses, so the two cannot disagree about which line a charge belongs to.
+    charge no longer debits the account, so a series taken from the ledger's own amounts would
+    silently become a **pre-tax** series while the field still called itself net of tax. The
+    mapping supplies, per **charge-event** sequence -- the memo's own, not the taxed event's --
+    what that event assessed, and it is the same ``taxed_by`` pairing the schedule uses, so
+    the two cannot disagree about which line a charge belongs to.
 
-    **Accrual rather than payment, deliberately, and it is a different claim from the
-    ledger's.** This figure annualises the return of the *paper*: what the holding earns and
-    what the tax on it costs. When that tax is actually settled is a fact about the owner's
-    tax year rather than about the instrument, and it is modelled where it belongs -- as a
-    dated payment event, by ``core.results.tax_year.settle``. Placing the charge at accrual
-    also makes the figure the conservative of the two readings (paying earlier is worse),
-    and it keeps the series term-for-term identical to feature 001's, which is why the
-    golden artefact's ``nominal_cash_flow_return`` does not move.
+    **Accrual rather than payment, deliberately.** This figure annualises the return of the
+    *paper*: what the holding earns and what the tax on it costs. When that tax is settled is
+    a fact about the owner's tax year rather than about the instrument. Accrual is also the
+    conservative of the two readings -- paying earlier is worse -- and it keeps the series
+    term-for-term identical to the one 001 recorded.
     """
     charged = assessed or {}
     return tuple(
@@ -331,9 +325,7 @@ def _flows(
 def _flow_amount(event: Event, assessed: Mapping[int, Money]) -> float:
     """One event's contribution to a return series: its cash, or the tax it assessed.
 
-    A charge event contributes the negated charge rather than its own (zero) amount, and no
-    other kind is ever in ``assessed`` -- the mapping is built from the charges themselves,
-    beside the events they were interleaved with.
+    A charge event contributes the negated charge rather than its own (zero) amount.
     """
     charge = assessed.get(event.sequence)
     return event.amount.amount if charge is None else -charge.amount
@@ -544,17 +536,12 @@ def _tax_event(taxed: Event, charge: TaxCharge, *, sequence: int) -> Event:
     the liability *accrued*; ``charged_for_year`` records the year it accrues to.
 
     ⚙ **Feature 009 took the cash out of this line** (research.md D1). It used to debit the
-    account by the charge on the day the income arrived, which is the predecessor's defect
-    B5: tax deducted at trade time. The amount is now :func:`terezy.core.tax.year.memo_amount`
-    -- the charge's own money at no magnitude, so the citation still travels -- and the
-    liability leaves cash as a ``TAX_PAYMENT`` on the declared due date in the following
-    year, assembled by ``core.results.tax_year.settle`` from the annual statement.
+    account by the charge on the day the income arrived, which is defect B5. The amount is now
+    :func:`terezy.core.tax.year.memo_amount` -- the charge's own money at no magnitude, so the
+    citation still travels -- and the liability leaves cash as a ``TAX_PAYMENT`` later.
 
-    Nothing about the exempt case changes, which is the point: the charge was zero, the
-    negation produced ``-0.0``, and the memo produces ``-0.0`` too.
-
-    A charge of zero still becomes an event. It is the record that the exemption was
-    applied -- traceable to its class and its citation like any other figure (FR-003, C6).
+    A charge of zero still becomes an event: it is the record that the exemption was applied,
+    traceable to its class and its citation like any other figure (FR-003, C6).
     """
     return Event(
         sequence=sequence,

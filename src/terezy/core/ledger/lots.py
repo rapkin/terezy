@@ -212,15 +212,15 @@ class LotMethod(Enum):
 
     ⚙ **Feature 009 added the two that 001 left out**, and put them here rather than in a tax
     module because two of them already lived here: four methods split across two modules is
-    how a fifth ends up in a third (009 research.md D10).
+    how a fifth ends up in a third (research.md D10).
 
     The value strings are the data contract -- what a scenario declares and what
     :data:`SELECTION_FNS` is keyed by. The enum exists beside them so that a **figure** cannot
     carry an unchecked method name: :func:`method_named` is the one place a name becomes a
-    member, and everything feature 009 emits carries a member.
+    member.
 
-    What the law says about each method is **not** here. That is declared data with a
-    citation, and it reaches a figure as ``terezy.core.tax.year.MethodStanding``.
+    What the law says about each method is **not** here: that is declared data with a
+    citation.
     """
 
     FIFO = "fifo"
@@ -358,18 +358,17 @@ def _pro_rata(lots: tuple[Lot, ...], quantity: float, named: str | None) -> Sele
 def _named_lot(lots: tuple[Lot, ...], quantity: float, named: str | None) -> Selection | LotRefusal:
     """Specific lot: exactly the lot the disposal named, and no other.
 
-    Three ways it cannot be honoured, all of them refusals and none of them a fallback to
-    another method: a name that matches nothing, a lot that no longer exists because it was
-    consumed, and a lot holding fewer units than were asked for. Falling back would consume a
-    different basis from the one the owner chose, which is the whole reason the method exists.
+    Where it cannot be honoured it refuses rather than falling back, because falling back
+    would consume a different basis from the one the owner chose -- which is the whole reason
+    the method exists.
 
-    **One lot per disposal.** Disposing of two named lots is two disposal events, each naming
-    its own lot and its own quantity -- the event vocabulary carries one ``lot_id``, and a
-    partial honouring of a multi-lot request is what the spec's edge case forbids.
+    **One lot per disposal.** Disposing of two named lots is two disposal events, each with
+    its own lot and quantity: a partially honoured multi-lot request is what the spec's edge
+    case forbids, and the event vocabulary carries one ``lot_id``.
     """
     if named is None:
         return LotNotNamed(
-            instrument_id=lots[0].instrument_id if lots else "<no position>",
+            instrument_id=_position_of(lots),
             reason=(
                 "the specific-lot method requires the disposal to name the lot it consumes, "
                 "and this one names none. There is no fallback ordering: the method exists "
@@ -381,7 +380,7 @@ def _named_lot(lots: tuple[Lot, ...], quantity: float, named: str | None) -> Sel
     if not found or found[0].quantity + TOLERANCE < quantity:
         available = found[0].quantity if found else 0.0
         return NamedLotUnavailable(
-            instrument_id=lots[0].instrument_id if lots else "<no position>",
+            instrument_id=_position_of(lots),
             lot_id=named,
             requested=quantity,
             available=available,
@@ -393,6 +392,16 @@ def _named_lot(lots: tuple[Lot, ...], quantity: float, named: str | None) -> Sel
             ),
         )
     return ((found[0], quantity),)
+
+
+def _position_of(lots: tuple[Lot, ...]) -> str:
+    """Which position a refusal is about, or a stand-in where there is no lot to ask.
+
+    An empty tuple reaches here only from a disposal against a position holding nothing, which
+    ``consume`` refuses first -- so the stand-in is for a caller of :func:`basis_consumed`
+    testing the selection directly.
+    """
+    return lots[0].instrument_id if lots else "<no position>"
 
 
 def _refuse_naming(
@@ -407,7 +416,7 @@ def _refuse_naming(
     if named is None:
         return None
     return LotNamedUnderWrongMethod(
-        instrument_id=lots[0].instrument_id if lots else "<no position>",
+        instrument_id=_position_of(lots),
         lot_id=named,
         method=method,
         reason=(

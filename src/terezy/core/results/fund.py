@@ -347,9 +347,7 @@ class FundProjection:
     net_proceeds: Money
     """Every inflow less every outflow less the tax assessed: what the holding returned.
 
-    ⚙ **An outcome, not a cash timeline** (009). The ledger holds the gross until the
-    liability is settled on its declared due date in the following year, so the tax is
-    subtracted here rather than read off a balance -- see :func:`_net_proceeds`.
+    An outcome, not a cash timeline -- see :func:`_net_proceeds`.
     """
 
     peg_statement: str | None
@@ -1073,20 +1071,16 @@ def _interleave(
 def _tax_event(taxed: Event, charge: TaxCharge, *, sequence: int) -> Event:
     """The ledger line for one charge: an assessment recorded, and no cash moved.
 
-    ⚙ **Feature 009 took the cash out of this line**, exactly as it did for
-    ``core.results.project._tax_event`` -- the sibling path reaching the same claim. A fund
-    is where it mattered: ``ua_ci_fund_distribution`` charges 14% and ``ua_investment_profit``
-    23%, so this line really did deduct tax from the account on the day of the payout, which
-    is the predecessor's defect B5 (FR-001). The amount is now
+    ⚙ **Feature 009 took the cash out of this line**, which is where defect B5 actually bit:
+    a fund's classes charge real rates, so this line really did deduct tax from the account on
+    the day of the payout (FR-001). The amount is now
     :func:`terezy.core.tax.year.memo_amount` -- the charge's own money at no magnitude, so the
     rate entry's citation still travels with it -- and the liability leaves cash as a
-    ``TAX_PAYMENT`` on the declared due date in the following year.
+    ``TAX_PAYMENT`` later.
 
-    What this projection reports is unchanged: every tax figure in a ``FundProjection`` is
-    read off the ``TaxCharge`` records, never off the ledger's balance, so the distribution
-    lines, the exit line and the class subtotals say what they said before. What moves is the
-    **cash balance**, which now holds the gross until the tax is actually paid -- which is the
-    honest reading and the reason the feature exists.
+    Every tax figure this projection reports is read off the ``TaxCharge`` records rather than
+    off a balance, so what moves is the **cash**, which now holds the gross until the tax is
+    actually paid.
     """
     return Event(
         sequence=sequence,
@@ -1171,18 +1165,14 @@ def _assemble(
 def _net_proceeds(state: LedgerState, total_tax: Money, currency: Currency) -> Money:
     """Every inflow less every outflow **less the tax assessed**: what the holding returned.
 
-    ⚙ **The tax is subtracted explicitly since feature 009**, and the reason is the whole
-    of that feature: a tax charge no longer debits the account on the day the income
-    arrived, so the ledger now holds the **gross** until the liability is settled on its
-    declared due date in the following year. Summing the events alone would therefore have
-    turned this field into a pre-tax figure while its own docstring still said "after tax"
-    -- the quiet kind of wrong, and in the field feeding :func:`beside_hurdle`, where a
-    fund would have gained 23% against an exempt bond overnight.
+    ⚙ **The tax is subtracted explicitly since feature 009**: a charge no longer debits the
+    account on the day the income arrived, so summing the events alone would turn this field
+    into a pre-tax figure while it still called itself after tax -- in the field feeding
+    :func:`beside_hurdle`, where a taxed fund would gain against an exempt bond overnight.
 
-    **This is an outcome, not a cash timeline.** It states what the holding returns once its
-    tax is paid, and says nothing about *when*. The dated answer -- and the question of
-    whether the cash is even there on the due date -- is ``core.results.tax_year.settle``,
-    which folds the payment into the ledger as an ordinary event.
+    **An outcome, not a cash timeline.** It states what the holding returns once its tax is
+    paid and says nothing about *when*; the dated answer, and whether the cash is even there
+    on the due date, is ``core.results.tax_year.settle``.
     """
     return money.sub(money.total([event.amount for event in state.applied], currency), total_tax)
 

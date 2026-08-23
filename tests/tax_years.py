@@ -9,8 +9,8 @@ file anywhere near it.
 
 **The rates are deliberately not the Ukrainian ones.** 10% and 5% are round numbers chosen so
 that every figure in the worked examples is checkable in the head, and so that no figure
-computed here could be mistaken for a real Ukrainian liability. The declared pack charges 18%
-and 5%; a test that quoted 23% would look like an answer.
+computed here could be mistaken for a real liability. A test quoting the rate the shipped pack
+declares would look like an answer.
 
 Not a test module -- ``pytest`` collects only ``test_*.py``, so this file is imported, never
 run.

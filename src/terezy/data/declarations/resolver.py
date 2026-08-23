@@ -2109,10 +2109,10 @@ def inflation_from_data_root(root: Path) -> InflationDeclarations:
 #
 # Two relations a per-file validator structurally cannot check:
 #
-# **A class mapped to a category that no rate pack declares.** `data/tax/timing/ua.toml` names
-# `ua_investment_profit`; whether that class exists is a fact about `data/tax/ua.toml`, and
-# reading it as "no rules apply" would be the silent default this whole layer exists to
-# prevent -- a class with rates and no category cannot be assessed at all.
+# **A class mapped to a category that no rate pack declares.** Whether the class exists is a
+# fact about another file, and reading the dangling reference as "no rules apply" would be the
+# silent default this layer exists to prevent -- a class with rates and no category cannot be
+# assessed at all.
 #
 # **Two files declaring one jurisdiction's rules.** Each is valid alone; together, whichever
 # loaded second would win by directory order and every liability would rest on the other one.

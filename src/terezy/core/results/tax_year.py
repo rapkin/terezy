@@ -10,27 +10,11 @@ it settles, it is folded by ``engine.apply`` like a coupon, and every conservati
 traceability property counts it without being taught it exists. *If a property fails only for
 ledgers containing a payment, the event is wrong -- never the invariant.*
 
-**Three things this module refuses to do**, each of them the comfortable answer:
-
-*It does not let cash go negative.* A due date whose liability exceeds the balance produces
-:class:`InsufficientCashForTax` -- the liability, the cash, the shortfall, the date, and the
-ledger up to that moment -- and the run stops there (FR-009, FR-012).
-
-*It does not sell anything.* Which holdings a forced sale would draw on, in what order, sized
-how, consuming which basis, is the owner's explicitly recorded deferral (FR-010,
-``features.toml``'s ``forced-sale-policy``). An engine-invented trade is a tax position taken
-on the owner's behalf, and it would be taken on the worst possible day.
-
-*It does not pay late.* Statutory interest as an alternative to selling was offered to the
-owner and not taken (FR-011). Neither penalties nor interest are modelled, so neither is
-guessed at.
-
-**Sequence numbers are reassigned once, over the merged stream**, exactly as
-``results.project`` does when it interleaves charges: the ledger requires sequence order to
-agree with date order, and a payment lands between events that already have numbers.
-``allocated_to`` moves with the renumbering -- a fee whose allocation was left pointing at an
-old number would silently leave the gain it belongs to (008's ``seeds`` shifted allocations
-for the same reason).
+**Three things it refuses to do on a due date the cash cannot cover**, each of them the
+comfortable answer: overdraw the balance, sell something, or pay late. The first is
+:class:`InsufficientCashForTax`; the other two are the owner's recorded deferrals (FR-010,
+FR-011), because an engine-invented trade is a tax position taken on his behalf, on the worst
+possible day.
 """
 
 from __future__ import annotations
@@ -104,10 +88,9 @@ class Settlement:
     stream: tuple[Event, ...]
     """The whole event stream with payments woven in and renumbered.
 
-    The **whole** stream rather than just the payments, deliberately. A caller handed a
-    handful of payment events would have to merge and renumber them itself, and the two ways
-    that goes wrong -- a sequence that disagrees with the dates, an ``allocated_to`` left
-    pointing at an old number -- both produce a ledger that folds and lies.
+    The **whole** stream rather than just the payments: a caller handed a handful of payment
+    events would have to merge and renumber them itself, and both ways that goes wrong produce
+    a ledger that folds and lies (see :func:`_merged`).
     """
 
     ledger: LedgerState

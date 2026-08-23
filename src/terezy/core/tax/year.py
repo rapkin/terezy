@@ -1,48 +1,22 @@
-"""The tax year: what a charge does *not* do at event time, and what the year does with it.
+""":func:`statements` folds a ledger's charges into annual statements, one per
+``(tax year x declared income category)``.
 
-Feature 001 charged tax per event and left the timing open. Feature 009 closes it, and the
-first thing that means is a subtraction: **a charge stops moving money**.
+It nets where the declared treatment nets, carries losses where the declared rule carries
+them, and refuses -- by name -- wherever a declared input is missing. Everything it reads is
+already in the ledger: a charge accrues beside its event and moves no money, which is what
+makes tax-deducted-at-trade-time (defect B5) unreachable rather than discouraged
+(``ledger.events.EventKind.TAX_CHARGE``, research.md D1).
 
-``core.results.project`` and ``core.results.fund`` both used to give a tax charge the negated
-charge as its cash effect, on the date the income arrived. That is the predecessor's defect
-B5 in miniature -- ``REWRITE_BRIEF`` §4.3 -- and it was invisible only because every class
-in the shipped registry was exempt, so the amount deducted happened to be zero. It is not
-zero for ``ua_investment_profit`` at 23%, and a portfolio that pays its tax on the day of the
-trade both misstates the position and hides the fact that the money is actually needed in
-August of the following year.
-
-So: the gross amount lands in the ledger, :func:`memo_amount` gives the charge event no cash
-effect at all, and the year is assembled afterwards from the charges that were recorded
-beside the events. ``events.check_shape`` refuses a charge that moves money, which is what
-makes this structural rather than advisory (research.md D1).
-
----
-
-**What this module is, in one sentence.** :func:`statements` folds a ledger's charges into one
-:class:`AnnualStatement` per ``(tax year x declared income category)``, netting where the
-declared treatment says to net, carrying losses where the declared rule says to carry, and
-refusing -- by name -- wherever a declared input is missing.
-
-**Three rules it exists to keep, none of which is optional.**
-
-*No figure is a liability without the method that produced it.* Ukrainian law prescribes no
-basis method for a self-declaring individual: the ПКУ is silent, DPS/ZIR guidance points at a
-proportional (average-cost) reading of the packet, and Методика МФУ № 1484 prescribes FIFO
-where a **tax agent** computes. Those two source-backed readings give **different numbers**.
-So :class:`AssessedLiability` cannot be constructed without a :class:`LotMethod` and its
-declared :class:`MethodStanding`, and no field anywhere here is a bare total. "The tax you
-would owe" is not expressible; four labelled what-ifs are (FR-024, research.md D5).
-
-*No default method, no default filing status, no default due date.* Each absence is a typed
-refusal naming what is missing. "The tool assumed you filed" and "the tool assumed you did
-not" are different wrong answers and each silently changes the after-tax ranking (FR-014).
+**Two traps the arithmetic here is shaped around.**
 
 *The levy's base is the netted base.* PIT and the military levy are separate lines computed
-from the **same** carryforward-reduced figure -- пп. 1.2 п. 16-1 підрозділу 10 розділу XX ПКУ
-takes the levy's object from ст. 163, and only the positive net investment result enters
-taxable income (пп. 164.2.9 with пп. 170.2.6). A levy assessed on gross while the PIT uses
-the netted figure produces a levy whose base exceeds the PIT's, which no reader catches from
-a total (FR-017, SC-011).
+from the **same** carryforward-reduced figure. Assessing the levy on gross while the PIT uses
+the netted figure gives a levy whose base exceeds the PIT's, which no reader catches from a
+total (FR-017; the citations are in ``data/tax/timing/``).
+
+*No figure is a liability without the method that produced it.* The sources point two ways on
+which basis method governs a self-declarant and give **different numbers**, so "the tax you
+would owe" is not expressible here -- see :class:`AssessedLiability` (FR-024).
 """
 
 from __future__ import annotations
@@ -95,86 +69,71 @@ def memo_amount(total: Money) -> Money:
 
 
 class Treatment(Enum):
-    """How a declared income category's year is put together. A closed set, declared in data.
+    """How a category's year is assembled. Declared per category, with its citation, in data.
 
-    The three members are the three readings пп. 170.2 ПКУ actually supports, and they are
-    *different claims about the same money* rather than three levels of the same one.
+    Three different claims about the same money, not three levels of one.
     """
 
     NETS = "nets"
-    """Investment operations: the year's gains and losses net to one result before any rate
-    applies, and a negative result carries forward (пп. 170.2.1, пп. 170.2.6 ПКУ)."""
+    """Gains and losses net to one annual result before any rate applies, and a negative
+    result carries forward."""
 
     PER_EVENT = "per_event"
-    """Each item is charged on its own and nothing nets -- ISI distributions under
-    пп. 167.5.4 ПКУ are a separate kind of passive income, and an investment loss never
-    reduces them. The year's liability is the sum of the charges already computed."""
+    """Nothing nets: the year's liability is the sum of the charges already computed."""
 
     OUTSIDE = "outside"
-    """Outside the investment-profit calculation altogether, on **both** sides: neither the
-    income nor the costs enter it (пп. 165.1.52, пп. 170.2.8 останній абзац, пп. 164.2.9
-    ПКУ). This is the OVDP exemption, and the consequence that must be modelled is the
-    unwelcome half -- an exempt **loss buys no tax shield** (FR-013, SC-005)."""
+    """Outside the netting on **both** sides, income and costs alike. The consequence that
+    must be modelled is the unwelcome half: an exempt loss buys no shield (SC-005)."""
 
 
 class Carryforward(Enum):
     """What a category does with a negative annual result. Declared, never inferred."""
 
     UNLIMITED = "unlimited"
-    """Carries into the following years until fully absorbed, with no time limit --
-    пп. 170.2.6 ПКУ, абзац третій. SETTLED by the primary text."""
+    """Carries into the following years until fully absorbed, with no time limit."""
 
     NONE = "none"
-    """A negative result carries nowhere. The reading that applies to a category whose
-    treatment is not ``NETS``: there is no annual result for a loss to be part of."""
+    """A negative result carries nowhere -- there is no annual result for it to be part of."""
 
 
 class SettlementBehaviour(Enum):
     """Who pays, and when. FR-003: a declared property of the class, entered as data."""
 
     SELF_ASSESSED = "self_assessed"
-    """The individual declares and pays, on the deadlines the rule declares. The behaviour
-    this feature implements."""
+    """The individual declares and pays, on the declared deadlines."""
 
     WITHHELD_AT_SOURCE = "withheld_at_source"
-    """A tax agent withholds at payment, so nothing is owed on a later date. **Declarable
-    and not implemented** (FR-003): a class declaring it produces a statement, and settling
-    one is a typed refusal naming the feature that will model it, rather than a self-assessed
-    payment invented on its behalf."""
+    """An agent withholds at payment, so nothing is owed on a later date. **Declarable and
+    not implemented** (FR-003): settling one is a refusal rather than a self-assessed payment
+    invented on its behalf."""
 
 
 class MethodVerdict(Enum):
-    """What legal standing a basis method has, as researched in spec.md FR-024.
+    """What backs a basis method. A property of the *law*, declared with its citation in data.
 
-    A property of the *law*, declared in data with its citation -- not an attribute of the
-    code that implements the method. All four methods compute; what differs is what backs
-    them, and a figure that does not say which is a figure a reader cannot weigh.
+    All four methods compute; what differs is what stands behind them, and a figure that does
+    not say which is one a reader cannot weigh.
     """
 
     SELF_DECLARANT_GUIDANCE = "self_declarant_guidance"
-    """DPS/ZIR recognises costs «пропорційно до частки такого реалізованого активу» -- an
-    average-cost reading over the packet пп. 170.2.7 ПКУ defines. **INTERPRETED**: guidance
-    and form mechanics, one inference deep."""
+    """Guidance addressed to a self-declaring individual recognises this method."""
 
     TAX_AGENT_METHODOLOGY = "tax_agent_methodology"
-    """Методика МФУ № 1484 (реєстр. z0100-12), п. 3.3 prescribes FIFO where a tax agent
-    computes the tax. **SETTLED for the agent case**, and silent about a self-declarant."""
+    """A methodology binding a **tax agent** prescribes it, and says nothing about a
+    self-declarant."""
 
     NO_SOURCE = "no_source"
-    """Nothing in the researched sources backs this method for either case. It remains
-    computable as a what-if -- the ПКУ prescribes no method at all, settled *by absence* --
-    and it may never be presented as the liability."""
+    """Nothing found backs it for either case. Computable as a what-if, never the liability."""
 
 
 SOURCE_BACKED: Final[frozenset[MethodVerdict]] = frozenset(
     {MethodVerdict.SELF_DECLARANT_GUIDANCE, MethodVerdict.TAX_AGENT_METHODOLOGY}
 )
-"""The two verdicts a source stands behind -- and the reason the gap is visible.
+"""The verdicts a source stands behind, and the reason the gap has to stay visible.
 
-For a self-declaring individual these two give **different numbers** on the same trades, and
-which one a "most likely" reading takes is unanswered. That is why a figure produced under
-either of them also carries the self-declarant switch: the arithmetic is certain and the
-choice of arithmetic is not (FR-024).
+The two give **different numbers** on the same trades, and which governs a self-declarant is
+unanswered -- so a figure produced under either also carries the self-declarant switch. The
+arithmetic is certain; the choice of arithmetic is not (FR-024).
 """
 
 
@@ -201,10 +160,8 @@ class MethodStanding:
 class AnnualDate:
     """A recurring calendar deadline: a month and a day, with no year of its own.
 
-    A deadline is not a date -- 1 August is the rule, and *which* 1 August depends on the tax
-    year being settled. Storing a full date would need a year invented at load time, which is
-    exactly the kind of fabricated legal fact ``tax.schedule``'s ``effective_from`` docstring
-    warns about.
+    A deadline is not a date: 1 August is the rule, and *which* 1 August depends on the year
+    being settled. Storing a full date would need a year invented at load time.
     """
 
     month: int
@@ -218,12 +175,10 @@ class AnnualDate:
 class TimingRule:
     """When a category's year is declared and paid, and by whom. Declared, cited data.
 
-    ⚙ **FR-003 asks for the settlement behaviour as a property of the tax class**, and it is
-    one -- through the class's declared category. A class names its category, the category
-    names its timing, and adding a withheld-at-source class is therefore a data-only change
-    exactly as FR-003 requires. Declaring the deadlines per class instead would let two
-    classes in one category declare two different deadlines for the *same* annual statement,
-    which is not a thing that can be true.
+    **Per category rather than per class**, which still satisfies FR-003's "a property of the
+    tax class": a class names its category and the category names its timing, so a
+    withheld-at-source class stays a data-only addition. Deadlines declared per class would
+    let two classes in one category declare two deadlines for the *same* annual statement.
     """
 
     category_id: str
@@ -233,9 +188,9 @@ class TimingRule:
     """Self-assessed, or withheld by an agent."""
 
     declare_by: AnnualDate
-    """The declaration deadline in the year **after** the tax year. Carried even though this
-    feature models no filing event, because FR-005 names it as a declared legal value and an
-    undeclared one is a refusal rather than a blank."""
+    """The declaration deadline in the year **after** the tax year. Carried although no filing
+    event is modelled: FR-005 makes it a declared legal value, so its absence is a refusal
+    rather than a blank."""
 
     pay_by: AnnualDate
     """The payment deadline in the year after the tax year. This is the date cash moves."""
@@ -274,9 +229,8 @@ class AssessmentRules:
 
     jurisdiction_id: str
     tax_currency: Currency
-    """The currency a liability is assessed in. UAH throughout, and stated rather than
-    assumed: a taxable event in another currency is refused, not converted (see
-    :class:`TaxCurrencyConversionUnavailable`)."""
+    """The currency a liability is assessed in. Stated rather than assumed: a taxable result
+    in another currency is refused, never converted (:class:`TaxCurrencyConversionUnavailable`)."""
 
     categories: Mapping[str, IncomeCategory]
     category_of_class: Mapping[str, str]
@@ -315,10 +269,9 @@ class FilingDecisions:
 class ChainPosition(Enum):
     """The two readings of a carryforward that meets a year whose declaration was missed.
 
-    **UNSETTLED** (spec.md FR-015): form Ф1 mechanically pulls the loss from the immediately
-    previous year's declaration, and no ДПС ruling was found on restoring a broken chain by
-    уточнююча декларація. Neither branch is a default; every figure produced under either is
-    labelled, and the resolution path is an individual tax consultation (art. 52 PKU).
+    **UNSETTLED**, and neither branch is a default: they give different tax, every figure
+    produced under either is labelled, and the declared position carries its own reasoning
+    (FR-015, ``data/scenarios/tax/``).
     """
 
     BROKEN_FORFEITS = "chain_broken_forfeits"
@@ -332,10 +285,9 @@ class ChainPosition(Enum):
 class UnsettledSwitch:
     """A legal question no source settles, the position taken, and how it will be retired.
 
-    Declared under ``data/scenarios/``, which is exempt from the citation gate for exactly
-    this reason: an unsettled reading is a **belief**, and a belief needs a label and a
-    visible consequence rather than a source (research.md D6). Putting one in code would make
-    it look like a rule.
+    Declared rather than coded: an unsettled reading is a **belief**, and it needs a label and
+    a visible consequence rather than a source. In code it would look like a rule
+    (research.md D6).
     """
 
     question: str
@@ -361,11 +313,7 @@ class ChainContinuity:
 
 @dataclass(frozen=True, slots=True)
 class SelfDeclarantMethod:
-    """The declared position on which source-backed method a self-declarant uses.
-
-    Two sources point two ways and the numbers differ; this records which way the run reads
-    it, and the label that says the reading is unsettled.
-    """
+    """The declared position on which source-backed method a self-declarant uses, labelled."""
 
     method: LotMethod
     switch: UnsettledSwitch
@@ -407,33 +355,31 @@ class ChargeRef:
     from_disposal: bool
     """Whether :attr:`result` came from a disposal the fold realised.
 
-    It decides one thing and it matters: only a disposal's result depends on which lots were
-    consumed, so only a statement containing one rests on the basis method's unsettled
-    reading. A year of coupons and distributions is the same number under all four methods,
-    and labelling it with the method switch would be a label on nothing (FR-024, SC-012).
+    It decides one thing: only a disposal's result depends on which lots were consumed, so
+    only a statement containing one rests on the basis method's unsettled reading. A year of
+    coupons is the same number under all four methods, and a label on it would be a label on
+    nothing (SC-012).
     """
 
     result: Money
     """What this item contributes to the year's netting: **signed**, so a loss is negative.
 
     Deliberately not ``charge.taxable_base``. For a disposal this is the realised gain the
-    fold computed, taken from the ledger, and a per-event rule is entitled to charge a
-    *different* base -- ``core.results.fund`` charges nothing on a loss, which is right for a
-    line that says what was charged and wrong for a year that has to net. The year clamps
-    once, where the law clamps it (пп. 170.2.6), and not once per event.
+    fold computed, because a per-event rule is entitled to charge a *different* base -- one
+    that charges nothing on a loss is right for a line saying what was charged and wrong for a
+    year that has to net. The year clamps once, where the statute clamps it, not once per
+    event.
     """
 
 
 @dataclass(frozen=True, slots=True)
 class AssessedLiability:
-    """What a year owes, and what produced it. **Never a bare total** (FR-024, D5).
+    """What a year owes, and what produced it. **Never a bare total** (FR-024).
 
-    There is no field named ``total`` alone and no way to build this record without naming
-    the basis method and its legal standing. That is deliberate and it is the sharpest
-    application of Principle I in the repository: the law supports at least two readings of
-    which method governs a self-declarant, they give different numbers, and a single
-    unlabelled figure would be more confident than its inputs -- where the input is an
-    unanswered legal question.
+    There is no field named ``total`` alone and no way to build this record without naming the
+    basis method and its standing. The law supports at least two readings of which method
+    governs a self-declarant and they give different numbers, so a single unlabelled figure
+    would be more confident than its inputs -- where the input is an unanswered legal question.
     """
 
     pit: Money
@@ -446,13 +392,13 @@ class AssessedLiability:
     """What both rates were applied to: the netted, carryforward-reduced figure."""
 
     method: LotMethod
-    """Which basis method produced the disposals behind the base. Repeated here rather than
-    only on the statement, deliberately: a liability lifted out of its statement still has to
-    say what produced it."""
+    """Which basis method produced the disposals behind the base. Here as well as on the
+    statement, deliberately: a liability lifted out of its statement still says what produced
+    it."""
 
     standing: MethodStanding
-    """What the law is found to say about that method -- the citation travels with the
-    figure, so a reader can see whether a source backs it at all."""
+    """What the law is found to say about that method, so the citation travels with the
+    figure."""
 
     rests_on: Provenance
     """The rate entries, the category, the timing rule, the method standing and the bases.
@@ -522,13 +468,12 @@ class CarryforwardState:
 
     base_above_all_filed: Money
     """How much larger this year's base is than it would have been had every declaration been
-    filed. **Signed**, and it is genuinely negative sometimes.
+    filed. **Signed**, and genuinely negative sometimes.
 
-    A missed declaration does not always destroy relief -- under the chain-restorable reading
-    it can merely postpone it, so the year that finally claims the whole carried loss has a
-    *smaller* base than the all-filed counterfactual, which had already spent part of it. A
-    figure clamped at zero would hide that, and the constitution puts a silent clamp in its
-    top severity class. What the reader wants over a whole run is
+    A missed declaration does not always destroy relief: under the chain-restorable reading it
+    can merely postpone it, so the year that finally claims the whole carried loss has a
+    *smaller* base than the all-filed counterfactual, which had already spent part of it.
+    Clamping that at zero would hide it. What a reader wants over a whole run is
     :attr:`cost_of_not_filing_to_date`, which nets those years against each other.
     """
 
@@ -650,11 +595,9 @@ class MethodStandingUndeclared:
 class RateChangedWithinTaxYear:
     """A netting year's items fall under two different dated rate entries.
 
-    Refused rather than resolved. A netting category charges **one** annual result, so
-    charging it needs one pair of rates, and nothing in the sources says how an annual base is
-    split across a mid-year change. The evidence that this is genuinely open is that the
-    2024 levy rise needed its own law to answer it -- Закон № 4113-IX kept incomes in the 2024
-    annual declaration at 1.5% -- and a rule that had to be legislated is not one to infer.
+    Refused rather than resolved: a netting category charges one annual result, and nothing in
+    the sources says how an annual base is split across a mid-year change. The reason carried
+    on the record says what the evidence for that is.
     """
 
     tax_year: int
@@ -1064,15 +1007,14 @@ def _per_event_year(
     """A year of a category that does not net: the liability is the charges already computed.
 
     Nothing is re-derived, and that is the point. Where no netting happens, applying a rate to
-    an annual total and applying it per event give the same answer only while the rate does
-    not change mid-year -- and 006 ships a fixture class whose rate does. Summing the charges
-    is right in both cases, and it keeps every dated entry that was actually in force.
+    an annual total and applying it per event agree only while the rate does not change
+    mid-year. Summing the charges is right either way, and it keeps every dated entry that was
+    actually in force.
 
     **A category declared ``OUTSIDE`` comes through here too, and that is deliberate.** Its
-    operations are outside the investment-profit calculation on both sides, which means they
-    net with nothing -- so an OVDP loss reduces no other year's base, exactly as FR-013
-    requires and SC-005 asserts. What distinguishes the two treatments is not the arithmetic
-    but the claim, and :attr:`AnnualStatement.treatment` carries it.
+    operations net with nothing, so an exempt loss reduces no other year's base (SC-005). What
+    distinguishes the two treatments is not the arithmetic but the claim, and
+    :attr:`AnnualStatement.treatment` carries it.
     """
     pit = money.total([item.charge.pit for item in items], currency)
     levy = money.total([item.charge.levy for item in items], currency)
@@ -1426,15 +1368,10 @@ def _chain(
 ) -> _ChainOutcome | UnsettledPositionUndeclared:
     """What survives a gap in the declarations, per the declared -- and unsettled -- reading.
 
-    The label is ``None`` whenever the question did not arise, which is the ordinary case: an
-    unbroken chain, or nothing carried. A label attached to every statement regardless of
-    whether the reading changed its arithmetic is a label a reader learns to ignore.
-
-    **The question**: a loss was declared, then a year with investment operations went
-    undeclared. Form Ф1 pulls the loss from the *immediately previous* year's declaration, and
-    no ДПС ruling was found on restoring the chain by уточнююча декларація -- so the law does
-    not settle whether the loss survives the gap. Both branches are modelled, neither is a
-    default, and the resolution path is an IPK under art. 52 PKU (FR-015).
+    The question arises only where a loss was declared and a later year with investment
+    operations was not, so the label is ``None`` in the ordinary case: an unbroken chain, or
+    nothing carried. A label attached to every statement regardless of whether the reading
+    changed its arithmetic is a label a reader learns to ignore.
     """
     if carried.last_operations_year_filed or carried.balance.amount <= 0.0:
         return carried.balance, zero, carried.origins, None
@@ -1495,10 +1432,9 @@ def _single_entry(
     """The one rate entry a netting year's annual base is charged at, or why there is not one.
 
     A netting category charges **one** annual result, so it needs one pair of rates. Two
-    refusals rather than a resolution, because nothing in the sources says how an annual base
-    is split across a mid-year change -- the evidence being that the 2024 levy rise needed its
-    own law to answer exactly that question (Закон № 4113-IX kept incomes in the 2024 annual
-    declaration at 1.5%). A rule that had to be legislated is not one to infer.
+    refusals rather than one, because the fixes differ: a year spanning two dated entries is
+    corrected in a rate schedule, and a category holding two classes is corrected in the
+    category mapping. Each refusal's own reason says why it is not inferred instead.
     """
     classes = tuple(sorted({item.charge.tax_class_id for item in items}))
     if len(classes) > 1:
