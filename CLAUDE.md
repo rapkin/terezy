@@ -155,6 +155,33 @@ An undocumented formula is an incomplete feature. Every metric carries a plain-l
 definition; every tax figure links to its rule, source and verification date;
 `docs/METHODOLOGY.md` is updated in the same change as the formula it describes.
 
+**A comment describes its own subject and nothing else.** This is the rule that keeps the
+rest honest, and it is not a style preference — it is what stops prose going stale. A
+docstring explaining why *this* function does what it does can only become false when the
+function changes. A docstring claiming what the registry contains, what another module does,
+or how many cases exist elsewhere becomes false the moment anything else moves, and nothing
+checks it. **A claim about behaviour outside the thing you are annotating is a test, or it is
+not written.**
+
+On 2026-08-23 one day's reviews found seven pieces of prose that had become false: a count
+that said three where its own list said four, "a fund implements `Instrument`" over a dead
+method, "a declared name can never forge a label field" over an open hole, a docstring
+teaching a rule the code never had, and a section of `METHODOLOGY.md` silently reverted by a
+merge. Every one was caught by expensive review. Half of `core/` is prose; that is where the
+staleness lives.
+
+**Prose earns its place by preventing a named defect.** A decision taken against an obvious
+alternative, a trap with a name, a gap stated with its date. Restating what the code says
+earns nothing, and restating the constitution earns less — it is already written down, and
+the copy is what drifts.
+
+**Prefer the mechanical form.** Where a claim is worth making, it is usually worth asserting:
+`scripts/check_methodology_refs.py`, a scan that pins how many places construct a record, an
+`emitted == applied` equality. A check cannot go stale silently; a sentence can.
+
+Reviews treat prose that makes an unverifiable claim about elsewhere as a finding, at the
+same weight as a guard whose message is false — because it is the same defect.
+
 ## Privacy
 
 This repo will hold a complete picture of one person's finances. No analytics, no CDN
