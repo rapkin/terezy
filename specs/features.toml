@@ -34,7 +34,7 @@ why    = "the spendable-endpoint list is declared by 003 (its FR-004); 004's com
 
 [[feature]]
 id     = "005-route-diagrams"
-status = "spec"
+status = "in-progress"
 needs  = ["002-ramp-cost"]
 
 [[feature]]

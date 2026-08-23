@@ -36,10 +36,10 @@ is not touched** — that is FR-020 and Principle III, and `lint-imports` enforc
 
 **Purpose**: the package exists and the layer boundary is proved before anything is built in it.
 
-- [ ] T001 Create the package skeleton `src/terezy/api/diagrams/__init__.py` with the module
+- [x] T001 Create the package skeleton `src/terezy/api/diagrams/__init__.py` with the module
   docstring only (why the renderer is in `api` — research.md D1) and no public names yet, so
   every test below fails on the name it needs rather than on the import path
-- [ ] T002 Extend `tests/contract/test_architecture_boundaries.py` with a case asserting
+- [x] T002 Extend `tests/contract/test_architecture_boundaries.py` with a case asserting
   `terezy.api.diagrams` imports nothing from `terezy.cli`, imports no rendering dependency, and
   that no module under `src/terezy/core/` imports `terezy.api` — the `api → core` direction only
   (Principle III, plan.md constitution check)
@@ -58,38 +58,38 @@ Phases 3–7 calls these; getting them last means rewriting every call site (pla
 
 ### Tests first
 
-- [ ] T003 [P] Write `tests/contract/test_diagram_one_number_rule.py` asserting: `percent` and
+- [x] T003 [P] Write `tests/contract/test_diagram_one_number_rule.py` asserting: `percent` and
   `amount` render fixed two decimals through one shared private helper; the rule **rounds** and
   the rounding is visible (`0.005` cases stated); `numbers.py`'s executable source contains
   exactly **one** float format spec; and the grep — no `:.Nf`, `round(`, `format(`, `%.Nf` or
   `Decimal` anywhere else in `src/terezy/api/diagrams/`, with a planted-violation positive
   control proving the scan can fail (SC-006, FR-022, research.md D2)
-- [ ] T004 [P] Write `tests/unit/test_diagram_escaping.py` asserting: SC-008's hostile-name
+- [x] T004 [P] Write `tests/unit/test_diagram_escaping.py` asserting: SC-008's hostile-name
   battery (double quote, `#`, `|`, `[`, `]`, `<`, `>`, backtick, braces, `-->`, Cyrillic, emoji,
   a newline, a very long name) escapes to output whose structure is intact and whose name is
   displayed intact after entity decoding; node ids are positional `n<k>` and **injective** over a
   list containing `binance-p2p` and `binance_p2p` (research.md D3); a label is never truncated
   (SC-008, SC-001, FR-017, FR-018)
-- [ ] T005 [P] Write `tests/contract/test_diagram_marks.py` covering the mark vocabulary in
+- [x] T005 [P] Write `tests/contract/test_diagram_marks.py` covering the mark vocabulary in
   isolation: the six `Mark` members render pairwise-distinct tokens, an empty mark set renders
   the named clean state rather than an empty space, unsourced renders as itself, and
   unverified-and-stale shows **both** — one never swallows the other (SC-004, FR-012–FR-015)
 
 ### Implementation
 
-- [ ] T006 `src/terezy/api/diagrams/numbers.py` — `DECIMAL_PLACES`, one private `_fixed`
+- [x] T006 `src/terezy/api/diagrams/numbers.py` — `DECIMAL_PLACES`, one private `_fixed`
   helper holding the project's only diagram float format, `percent(fraction) -> str` and
   `amount(Money) -> str`. The module docstring states that the rule **rounds** and that **the
   diagram is therefore not the audit trail**, on the model of the single project tolerance
   (FR-022, research.md D2)
-- [ ] T007 [P] `src/terezy/api/diagrams/mermaid.py` — the dialect: `flowchart LR`, `escape`
+- [x] T007 [P] `src/terezy/api/diagrams/mermaid.py` — the dialect: `flowchart LR`, `escape`
   (numeric character references, `#` first), positional `node_id(index)`, `node`, `edge`,
   `class_def`, and `document`. No venue, provider, route or corridor is named here (Principle II)
-- [ ] T008 `src/terezy/api/diagrams/marks.py` — the closed `Mark` enum (six members from
+- [x] T008 `src/terezy/api/diagrams/marks.py` — the closed `Mark` enum (six members from
   data-model.md), its label tokens, the two named non-mark states (clean, unsourced), the
   `classDef` style-class names, and the synthetic-citation token the declarations already use.
   Marks live in **label text**; styling may only add emphasis (FR-015, research.md D4)
-- [ ] T009 `src/terezy/api/diagrams/__init__.py` — the shared records: frozen `Diagram`
+- [x] T009 `src/terezy/api/diagrams/__init__.py` — the shared records: frozen `Diagram`
   (`text`, `kind`, `regime_id`, `mode`), frozen `NothingToDraw` (`reason`, `kind`), and the
   closed `Mode` enum (`TOPOLOGY | DECLARED_FIGURES`). A tagged union, never a `Diagram` with an
   `ok` flag (owner decision D-E, research.md D7)
@@ -109,13 +109,13 @@ in the regime is edges following its legs in order.
 
 ### Tests first
 
-- [ ] T010 [P] [US1] Write `tests/contract/test_diagram_modes.py`: the same registry in
+- [x] T010 [P] [US1] Write `tests/contract/test_diagram_modes.py`: the same registry in
   `TOPOLOGY` and in `DECLARED_FIGURES` differs **by figures only** (strip the figure segments
   from the with-figures text and it equals the topology text); each names its mode on the
   diagram itself; **neither** carries a computed ramp cost, verified over every label; every
   diagram names exactly one regime and a merged no-regime graph is not expressible
   (SC-012, SC-009, FR-006, FR-019)
-- [ ] T011 [P] [US1] Write `tests/unit/test_diagram_graph.py`: SC-001 over a whole fixture —
+- [x] T011 [P] [US1] Write `tests/unit/test_diagram_graph.py`: SC-001 over a whole fixture —
   every venue a node exactly once, every regime route drawn as edges in leg order, two routes
   between the same pair drawn as two distinct edges, a self-edge drawn and not dropped, an
   isolated venue present, an empty registry and a regime with no routes rendered as an
@@ -125,11 +125,11 @@ in the regime is edges following its legs in order.
 
 ### Implementation
 
-- [ ] T012 [US1] `src/terezy/api/diagrams/graph.py` — `render_graph`: sorted venues to
+- [x] T012 [US1] `src/terezy/api/diagrams/graph.py` — `render_graph`: sorted venues to
   positional nodes, sorted regime routes to edges in leg order, the caption node carrying the
   regime, the mode and the as-of date, the two modes, and the loud failures. Derived entirely
   from the declarations; nothing hand-maintained (FR-002, FR-006, FR-019, research.md D5, D8, D9)
-- [ ] T013 [US1] Export `render_graph` from `src/terezy/api/diagrams/__init__.py`
+- [x] T013 [US1] Export `render_graph` from `src/terezy/api/diagrams/__init__.py`
 
 **Checkpoint**: US1 is independently verifiable — `uv run pytest -k diagram_graph` and
 `-k diagram_modes` are green.
