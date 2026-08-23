@@ -348,10 +348,7 @@ def _pro_rata(lots: tuple[Lot, ...], quantity: float, named: str | None) -> Sele
     refused = _refuse_naming(lots, named, LotMethod.AVERAGE_COST)
     if refused is not None:
         return refused
-    held = sum(lot.quantity for lot in lots)
-    if held <= 0.0:  # pragma: no cover -- ``consume`` refuses an over-consumption first
-        return ()
-    fraction = quantity / held
+    fraction = quantity / sum(lot.quantity for lot in lots)
     return tuple((lot, lot.quantity * fraction) for lot in lots)
 
 
@@ -480,10 +477,24 @@ def basis_consumed(
 ) -> Selection | LotRefusal:
     """Which lots a disposal draws on under one method, or why it cannot be answered.
 
-    The pure half of :func:`consume`: no position, no arithmetic on money, and every refusal a
-    value rather than a raise, so the four methods' selection behaviour can be checked
-    directly.
+    The pure half of :func:`consume`: no position, no arithmetic on money, and every refusal
+    about the *choice of lots* a value rather than a raise, so the four methods' selection
+    behaviour can be checked directly.
+
+    **A disposal larger than the lots hold raises**, here as well as in :func:`consume`, and
+    the two checks are deliberately not one: this one compares against the lots themselves and
+    ``consume``'s compares against the position's independently accumulated quantity, which is
+    what makes C2 a comparison of two figures rather than of a number with itself. Without
+    this one, a caller reaching the selection directly would get a short selection under FIFO
+    and an over-100% fraction under average cost -- a wrong answer rather than a refusal.
     """
+    held = sum(lot.quantity for lot in lots)
+    if quantity <= 0.0 or quantity > held + TOLERANCE:
+        raise LedgerInvariantError(
+            f"cannot select {quantity!r} units from lots holding {held!r}. A disposal of "
+            "nothing is not a disposal, and one larger than the holding would consume a basis "
+            "that was never paid."
+        )
     return selection_for(method)(lots, quantity, named_lot)
 
 

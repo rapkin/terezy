@@ -1417,7 +1417,10 @@ def _entries_for(
             )
         entry = rate_on(declared, item.occurred_on)
         if isinstance(entry, RateUndeclaredBefore):
-            return entry  # pragma: no cover -- flat_rate refused such an event before this
+            # pragma: no cover -- unreachable within one run: the charge exists only because
+            # ``flat_rate`` found an entry on this same date, and a class whose schedule has
+            # since changed would be a pack from a different run.
+            return entry  # pragma: no cover
         found.append(entry)
     return tuple(found)
 

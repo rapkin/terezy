@@ -407,6 +407,22 @@ def test_a_conflict_reaching_the_fold_stops_it_with_the_refusal_s_own_words() ->
         _fold(stream)
 
 
+def test_selecting_more_units_than_the_lots_hold_is_refused_at_the_selection_too() -> None:
+    """The public selection may not answer a question the lots cannot support.
+
+    ``consume`` refuses the same thing against the position's own accumulated quantity; this
+    one guards the lots. Without it a direct caller would get a short selection under FIFO and
+    a fraction above one under average cost -- a wrong answer rather than a refusal.
+    """
+    held = (_lot("lot-1", quantity=10.0, cost=1_000.0),)
+    for method in (lots.FIFO, lots.LIFO, lots.AVERAGE_COST):
+        with pytest.raises(LedgerInvariantError, match="never paid"):
+            lots.basis_consumed(held, 40.0, method=method)
+
+    with pytest.raises(LedgerInvariantError, match="not a disposal"):
+        lots.basis_consumed(held, 0.0, method=lots.FIFO)
+
+
 def _lot(lot_id: str, *, quantity: float, cost: float) -> lots.Lot:
     return lots.Lot(
         lot_id=lot_id,
