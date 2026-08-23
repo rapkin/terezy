@@ -43,6 +43,16 @@ Buying with the departing 10 000.00 would have acquired **ten** units, which is 
 this example exists to catch: a plausible schedule, one unit too large, and every figure
 downstream of it wrong by eleven percent.
 
+**What the rate is measured against**, which is not the same number::
+
+    invested     10 000 - 850             =  9 150.00
+
+The 850.00 is cash at `inzhur`, not money lost. Discounting the arrivals back to the whole
+10 000.00 would price it as a **total loss** and report this bond at 8.96%; discounting them
+back to the 9 000.00 of paper would forget the 150.00 ramp entirely and report 15.50%. Both
+are outside the band asserted below. What the netting assumes — that the 850.00 is recoverable
+at par — is not free and is stated in the outcome's own `excludes`.
+
 **The lifecycle.** Nine units of 1 000.00 face at 15.5% is 1 395.00 of interest a year, and
 each coupon is ``1 395 x days / 365`` on the accrual periods issue A's own worked example
 derives (``tests/worked_examples/test_ovdp_schedule.py``): 181, 184, 181, 184 days.
@@ -116,6 +126,20 @@ PRICE: Final = 1_000.0
 UNITS: Final = 9.0
 COST: Final = UNITS * PRICE
 UNDEPLOYED: Final = ARRIVED - COST
+INVESTED: Final = SENT - UNDEPLOYED
+"""9 150.00 -- what left the stream, less the remainder that made the trip and bought nothing.
+
+The denominator of the rate. It is **not** ``COST``: the 150.00 the way in took is money the
+owner spent to hold 9 000.00 of paper, and it belongs in the rate.
+"""
+
+RATE: Final = 0.14442645895184436
+"""The internal rate of return of the four arrivals against ``INVESTED``, on act/365.
+
+A root has no closed form, so it is recorded rather than derived -- and it is checkable by
+hand at the assertion site, where discounting the four hand-listed arrivals at this rate is
+shown to come back to 9 150.00 and not to 10 000.00.
+"""
 
 ANNUAL_INTEREST: Final = UNITS * PRICE * 0.155
 """1 395.00 -- nine units of 1 000.00 face at 15.5%."""
@@ -300,36 +324,49 @@ class TestTheTwoFigures:
         assert_money_close(_outcome().reaches, Money(expected, UAH, prov.EMPTY))
         assert _outcome().reaches.currency is UAH
 
-    def test_the_rate_discounts_the_hand_listed_arrivals_back_to_the_outlay(self) -> None:
-        # A rate is a root, so it cannot be checked against a decimal literal. What can be
-        # checked by hand is the identity that defines it: at the returned rate, the present
-        # value of the arrivals listed above equals the 10 000.00 that left the stream.
+    def test_the_rate_discounts_the_arrivals_back_to_what_was_actually_invested(self) -> None:
+        # The identity that defines the rate, and -- because the denominator is the thing that
+        # can be wrong -- the two wrong denominators, named and excluded.
+        #
+        # At the returned rate the present value of the four arrivals listed above is the
+        # 9 150.00 that was actually invested. It is *not* the 10 000.00 that left the stream:
+        # discounting back to that would be pricing the 850.00 sitting at `inzhur` as a total
+        # loss, and this assertion is what fails if it ever does again.
         #
         # Times are act/365 -- the instrument's own convention, so the tuple's rate and
         # feature 001's hurdle are measured on the same clock -- from the outlay on
         # 2026-01-15 to each arrival:
         #   2026-07-15 -> 181 days     2027-01-15 -> 365 days
         #   2027-07-15 -> 546 days     2028-01-17 -> 732 days
-        outcome = _outcome()
-        rate = outcome.implied_rate
+        rate = _outcome().implied_rate
         assert isinstance(rate, NominalRate)
+        assert is_close(rate.value, RATE)
         days = (181, 365, 546, 732)
         present_value = sum(
             _repatriated(released) / (1.0 + rate.value) ** (day / 365)
             for day, (_, released) in zip(days, RELEASES, strict=True)
         )
-        assert is_close(present_value, SENT)
+        assert is_close(INVESTED, 9_150.0)
+        assert is_close(present_value, INVESTED)
+        assert not is_close(present_value, SENT)
+        assert not is_close(present_value, COST)
 
-    def test_the_rate_is_well_below_the_coupon_because_the_ramp_took_a_tenth(self) -> None:
+    def test_the_rate_is_the_coupon_less_the_ramp_and_the_way_out(self) -> None:
         # A sanity band, stated as loose rather than dressed up as the project tolerance
-        # (docs/METHODOLOGY.md §11.3). The bond pays 15.5% on 9 000.00 of paper bought with
-        # 10 000.00 of salary, so before any exit fee the owner's return is roughly
-        # 0.155 x 0.9 = 14%, and the way out takes another 0.5% plus four flat fees. What the
-        # band asserts is that the ramp is visible in the rate at all -- a join that ignored
-        # it would land near 16%, which is the sentence this feature exists to prevent.
+        # (docs/METHODOLOGY.md §11.3), and its arithmetic is the three terms that move it:
+        #
+        #   coupons      1 395.00 a year on 9 150.00 invested        =  15.25%
+        #   way out         98.95 over two years, ~49.48 a year      =  -0.54%
+        #   the ramp     9 000.00 comes back against 9 150.00 out,
+        #                a 150.00 shortfall over two years           =  -0.82%
+        #                                                               -------
+        #                                                               ~13.9%, and
+        # compounding lifts it to 14.44%. The band is what rules out the two ways the
+        # denominator can be wrong: charging the 850.00 remainder as a loss lands at 8.96%,
+        # and measuring against the 9 000.00 of paper forgets the ramp and lands at 15.50%.
         rate = _outcome().implied_rate
         assert isinstance(rate, NominalRate)
-        assert 0.07 < rate.value < 0.09
+        assert 0.14 < rate.value < 0.15
 
     def test_the_span_runs_from_the_outlay_to_the_last_arrival(self) -> None:
         # Latency is inside the span (FR-015). Both routes declare none here, so the span ends

@@ -6,7 +6,12 @@ incomplete figure, and this feature's job was to move both items from one set to
 So the first class checks the **move**: what 001 excluded, a tuple outcome accounts for, and
 neither set is a decoration nobody maintains.
 
-The second class is the "not sampled" clause. It walks every field of every outcome and
+The second class reads a scope statement off the outcome and checks it against what the
+pipeline **did**. That is the half a set of strings cannot do for itself: the undeployed
+clause was false for a whole feature while every assertion about it passed, because every
+assertion about it compared the code's constant against the code's constant.
+
+The third class is the "not sampled" clause. It walks every field of every outcome and
 refusal this suite can produce and requires each to be classified -- a figure, a statement of
 scope, a key, a mark. A field nobody classified is a figure nobody labelled, and the closed
 classification is deliberate friction: adding one to the record fails this module until a
@@ -21,6 +26,7 @@ from typing import Final, get_args
 import pytest
 
 from terezy.core.decision.tuple_outcome import evaluate
+from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.rates import NominalRate
 from terezy.core.results.hurdle import EXCLUDES as HURDLE_EXCLUDES
 from terezy.core.results.tuple import (
@@ -63,10 +69,10 @@ CLASSIFIED: Final[frozenset[str]] = frozenset(
 """Every field of :class:`TupleOutcome`, classified. See the module docstring on why closed."""
 
 
-def _outcome() -> TupleOutcome:
+def _outcome(sent: float | None = None) -> TupleOutcome:
     outcome = evaluate(
         fixtures.hurdle_tuple(),
-        amount=fixtures.AMOUNT,
+        amount=fixtures.AMOUNT if sent is None else fixtures.Money(sent, fixtures.UAH, prov.EMPTY),
         horizon=fixtures.DateRange(start=fixtures.ISSUE_DATE, end=fixtures.HORIZON_END),
         as_of=fixtures.AS_OF,
         continuation=fixtures.HOLD_AS_CASH,
@@ -105,11 +111,50 @@ class TestWhatFeatureOneExcludedThisFeatureAccountsFor:
         # nothing else in the output would tell them so.
         assert any("latency" in item for item in _outcome().accounts_for)
 
-    def test_it_states_the_three_things_it_still_leaves_out(self) -> None:
+    def test_it_states_the_four_things_it_still_leaves_out(self) -> None:
         outcome = _outcome()
+        assert len(outcome.excludes) == 4
         assert any("inflation" in item for item in outcome.excludes)
         assert any("risk class" in item for item in outcome.excludes)
         assert any("undeployed" in item for item in outcome.excludes)
+        assert any("holidays" in item for item in outcome.excludes)
+
+
+class TestAScopeStatementIsCheckedAgainstTheBehaviourItDescribes:
+    """SC-009's teeth. A scope statement asserted only against itself is a decoration.
+
+    Every claim below is read **off the outcome's own words** and then checked against what
+    the pipeline actually did with the same inputs. The undeployed clause is here because it
+    was false once: the rate charged the remainder as a total loss while three statements,
+    this set among them, said it was measured on the money actually invested.
+    """
+
+    def test_the_undeployed_clause_is_true_of_the_rate(self) -> None:
+        # 10 500.00 over the shipped domestic route arrives whole and buys ten units at par,
+        # stranding 500.00 at `inzhur`. The clause says the rate is measured on the money
+        # actually invested; if it is, this rate is the rate of the 10 000.00 purchase that
+        # buys exactly the same ten units, to the last digit.
+        stranded = _outcome(10_500.0)
+        exact = _outcome()
+        clause = next(item for item in stranded.excludes if "undeployed" in item)
+        assert "money actually invested" in clause
+        assert stranded.undeployed is not None
+        assert exact.undeployed is None
+        left_over, deployed = stranded.implied_rate, exact.implied_rate
+        assert isinstance(left_over, NominalRate)
+        assert isinstance(deployed, NominalRate)
+        assert left_over.value == deployed.value
+
+    def test_the_latency_clause_is_true_of_the_span(self) -> None:
+        # `accounts_for` says settlement latency is inside the span the rate is measured over.
+        # The shipped way out declares three days, so the span has to end three days after the
+        # instrument last released anything -- not on the release date.
+        outcome = _outcome()
+        clause = next(item for item in outcome.accounts_for if "latency" in item)
+        assert "inside the span" in clause
+        last = outcome.arrivals[-1]
+        assert outcome.span.end == last.arrived_on
+        assert last.arrived_on > last.released_on
 
 
 class TestNoFigureIsReportedWithoutItsScope:
@@ -118,13 +163,6 @@ class TestNoFigureIsReportedWithoutItsScope:
     def test_every_field_of_the_outcome_is_classified(self) -> None:
         fields = {field.name for field in dataclasses.fields(TupleOutcome)}
         assert fields == CLASSIFIED
-
-    def test_the_outcome_carries_both_sets_and_neither_is_empty(self) -> None:
-        outcome = _outcome()
-        assert outcome.accounts_for == ACCOUNTS_FOR
-        assert outcome.excludes == EXCLUDES
-        assert outcome.accounts_for
-        assert outcome.excludes
 
     def test_every_member_of_the_closed_part_set_is_actually_reported(self) -> None:
         # The claim `Part` cannot make about itself: a closed set is only worth closing if the

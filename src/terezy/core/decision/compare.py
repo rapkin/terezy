@@ -9,11 +9,11 @@ of a chart that flatters the expensive options.
 :attr:`~terezy.core.results.tuple.Comparison.benchmark` is an **index** into the ranked
 sequence, never a separately computed figure beside it (FR-012, research.md D3). The hurdle in
 this comparison *is* the OVDP evaluated as a tuple through its declared domestic routes, by
-:func:`terezy.core.decision.tuple_outcome.evaluate`, ranked with everything else -- so a test
-asserts ``comparison.ranked[comparison.benchmark] is the_benchmark_outcome`` with ``is``,
-which is a claim about shared origin rather than about two numbers agreeing today. A
-benchmark computed by a privileged side channel would drift from what it benchmarks, and the
-drift would be invisible because both figures would look reasonable.
+the loop below, ranked with everything else -- which is a claim about shared origin rather
+than about two numbers agreeing today. A benchmark computed by a privileged side channel
+would drift from what it benchmarks, and the drift would be invisible because both figures
+would look reasonable; it would also survive a broken declaration, because it would never
+have consulted one, and this one returns :class:`BenchmarkUnavailable` instead.
 
 ## One horizon, stated once
 
@@ -33,7 +33,8 @@ assumption nobody declared -- the invented number this feature is most likely to
   exclusion is how a comparison comes to recommend the only option left standing, and here the
   missing ones are exactly the options nobody has finished declaring.
 
-A contract test counts them: every tuple offered lands in exactly one.
+Every tuple offered lands in exactly one of the three, and the three are disjoint: the loop
+below appends each candidate to one list and to no other.
 
 ## Ties, and being able to say nothing beats the hurdle
 
@@ -117,7 +118,7 @@ def compare(
         else:
             unrated.append(outcome)
     # Descending, and the sort is stable, so tied outcomes keep the order the caller supplied
-    # them in. `_ties` is what stops the head of a tied group being read as a winner.
+    # them in. `Comparison.ties` is what stops the head of a tied group being read as a winner.
     ordered = sorted(rated, key=lambda pair: -pair[0])
     ranked = tuple(outcome for _, outcome in ordered)
     index = next(
@@ -126,7 +127,10 @@ def compare(
     if index is None:
         return _no_benchmark(
             benchmark,
-            scored=ranked,
+            # Candidate order, not `ranked`: with no benchmark there is nothing to rank
+            # against, and sorting by rate here would hand the caller the ordering that
+            # `BenchmarkUnavailable` exists to withhold.
+            scored=tuple(outcome for _, outcome in rated),
             unrated=tuple(unrated),
             refused=tuple(refused),
         )

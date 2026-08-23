@@ -21,6 +21,7 @@ from typing import Final
 from terezy.core.decision.tuple_outcome import Registries, evaluate
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.money import Money
+from terezy.core.primitives.rates import NominalRate
 from terezy.core.primitives.tolerance import assert_money_close, is_close
 from terezy.core.results.tuple import (
     BelowMinimumTicket,
@@ -138,14 +139,44 @@ class TestARemainderTheIncrementCannotDeploy:
 
     def test_the_remainder_is_not_in_the_amount_that_reaches_the_endpoint(self) -> None:
         # It is money that made the trip and bought nothing, and it is still at the venue.
-        # Sweeping it into `reaches` would report it as having come home; sweeping it into the
-        # rate would report it as having been invested. Both are stated on the record's face.
+        # Sweeping it into `reaches` would report it as having come home.
         outcome = _evaluate(_registries(), fixtures.hurdle_tuple(), 1_500.0)
         assert isinstance(outcome, TupleOutcome)
-        assert any("undeployed" in item for item in outcome.excludes)
         one_unit = _evaluate(_registries(), fixtures.hurdle_tuple(), 1_000.0)
         assert isinstance(one_unit, TupleOutcome)
         assert is_close(outcome.reaches.amount, one_unit.reaches.amount)
+
+    def test_the_remainder_moves_the_rate_by_nothing(self) -> None:
+        # **Two rates, compared** -- because the interesting question about a remainder is not
+        # whether the word appears in a scope statement, it is what the figure does.
+        #
+        # 1 500.00 and 1 000.00 over a route that charges nothing both buy exactly one unit of
+        # issue A at 1 000.00, so both holdings are the same holding and both return the same
+        # arrivals on the same dates. The rate is therefore identical, and it is identical
+        # because the 500.00 sitting at `inzhur` is netted off the outlay rather than
+        # discounted as a loss: charging it as one makes these two figures 23 percentage
+        # points apart and reports a 16% sovereign bond at -7%.
+        remainder = _evaluate(_registries(), fixtures.hurdle_tuple(), 1_500.0)
+        exact = _evaluate(_registries(), fixtures.hurdle_tuple(), 1_000.0)
+        assert isinstance(remainder, TupleOutcome)
+        assert isinstance(exact, TupleOutcome)
+        assert remainder.undeployed is not None
+        assert exact.undeployed is None
+        stranded, deployed = remainder.implied_rate, exact.implied_rate
+        assert isinstance(stranded, NominalRate)
+        assert isinstance(deployed, NominalRate)
+        assert is_close(stranded.value, deployed.value)
+        assert stranded.value > 0.15
+
+    def test_the_assumption_the_netting_makes_is_on_the_outcomes_face(self) -> None:
+        # Netting the remainder off the outlay assumes it is recoverable at par, and it is
+        # not: it sits behind the same exit the holding does. The assumption is stated rather
+        # than buried, which is the only thing that makes the netting honest.
+        outcome = _evaluate(_registries(), fixtures.hurdle_tuple(), 1_500.0)
+        assert isinstance(outcome, TupleOutcome)
+        clause = next(item for item in outcome.excludes if "undeployed" in item)
+        assert "money actually invested" in clause
+        assert "what getting it back would cost" in clause
 
     def test_an_exact_multiple_leaves_no_remainder_at_all(self) -> None:
         # `None` rather than a zero, because "there was nothing left over" and "the leftover

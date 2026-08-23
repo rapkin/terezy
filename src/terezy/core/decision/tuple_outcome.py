@@ -41,19 +41,21 @@ anywhere for an undeclared reinvestment assumption to be applied to.
 The comparable figure is a money-weighted return over the tuple's **actual span**, from the
 first outlay to the last arrival, with ramp and settlement latency inside it because waiting
 is a cost (FR-015, owner decision 2026-08-22). It is
-:func:`terezy.core.results.hurdle.internal_rate_of_return` over the outlay and the arrivals on
-their own dates -- the same root find that produces feature 001's benchmark, which is what
-makes hurdle-versus-tuple one kind of number against the same kind.
+:func:`terezy.core.results.hurdle.internal_rate_of_return` over the arrivals on their own
+dates, against the money that was **actually invested** -- what left the stream, less any
+remainder the purchase could not deploy. That is the same root find that produces feature
+001's benchmark, which is what makes hurdle-versus-tuple one kind of number against the same
+kind.
 
-**It refuses where the outlay and the endpoint are in different currencies**, and that is
-reachable in the shipped registry rather than a theoretical case: the dollar contract income
-reaching a hryvnia fund produces a dollar outflow and hryvnia inflows, and an internal rate of
-return over the two is not a rate of anything. Valuing the outlay in hryvnia needs a reference
-rate on a date, which is feature 011 and does not exist -- and a channel rate is not one: a
-channel is a market you transact in, and the rate that values an outlay against a return is a
-reference. So the **amount** is reported and the **rate** is a typed absence naming what is
-missing, on ``RealTermsUnavailable``'s precedent, and the comparison keeps such a tuple out of
-the ranking while showing it (002's ``Ranking.not_comparable``, unchanged).
+**It refuses where those amounts are not all in one currency**, and that is reachable in the
+shipped registry rather than a theoretical case: the dollar contract income reaching a hryvnia
+fund produces a dollar outflow and hryvnia inflows, and an internal rate of return over the
+two is not a rate of anything. Valuing one in the other needs a reference rate on a date,
+which is feature 011 and does not exist -- and a channel rate is not one: a channel is a
+market you transact in, and the rate that values an outlay against a return is a reference. So
+the **amount** is reported and the **rate** is a typed absence naming what is missing, on
+``RealTermsUnavailable``'s precedent, and the comparison keeps such a tuple out of the ranking
+while showing it (002's ``Ranking.not_comparable``, unchanged).
 
 ## No clock
 
@@ -1175,6 +1177,7 @@ def _assemble(
         implied_rate=_rate(
             prepared,
             outlay=outlay,
+            undeployed=undeployed,
             arrivals=arrivals,
             endpoint_currency=endpoint_currency,
             span=span,
@@ -1334,11 +1337,23 @@ def _rate(
     prepared: _Prepared,
     *,
     outlay: Money,
+    undeployed: UndeployedCash | None,
     arrivals: tuple[Arrival, ...],
     endpoint_currency: Currency,
     span: DateRange,
 ) -> NominalRate | RateNotComparable:
     """The money-weighted return over the span, or a typed statement of why there is none.
+
+    **The payment out at ``t=0`` is the money that was actually invested**: what left the
+    stream, less any remainder the purchase could not deploy. The remainder is not lost -- it
+    is cash sitting at the purchase venue -- and leaving it in the series would price it as a
+    total loss, which is a figure more confident than its inputs in the mirror image of the
+    flattering direction. On the shipped registry the difference is a 16% sovereign bond
+    reported at -7% because 500.00 could not buy an eleventh unit.
+
+    Netting it off assumes the remainder is recoverable at par, and it is not: it sits behind
+    the same exit the holding does. That assumption is not buried here -- it is one of the
+    outcome's own scope statements, in :data:`~terezy.core.results.tuple.EXCLUDES`.
 
     Time is measured with the **instrument's declared day-count convention**, from the first
     outlay -- the same convention that sized the instrument's own flows, so this rate and
@@ -1358,19 +1373,33 @@ def _rate(
     nothing is not positive, and one statement covers both.
     """
     endpoint = endpoint_currency
-    if outlay.currency is not endpoint:
+    stranded = None if undeployed is None else undeployed.amount
+    # One guard for one rule: the three amounts the series is built out of -- what left, what
+    # stayed behind, what came back -- have to be in one currency, because a money-weighted
+    # return over two of them is not a rate of anything.
+    currencies = {outlay.currency, endpoint} | (set() if stranded is None else {stranded.currency})
+    if len(currencies) > 1:
+        stayed = (
+            ""
+            if stranded is None
+            else (
+                f", and {stranded.amount!r} {stranded.currency.value} stayed behind at "
+                "the purchase venue"
+            )
+        )
         return RateNotComparable(
             reason=(
                 f"the outlay is {outlay.currency.value} and what comes back is "
-                f"{endpoint.value}. A money-weighted return over two currencies is not a rate "
-                "of anything, and valuing the outlay in the other one needs a reference rate "
-                "on a date. A channel rate is not one: a channel is a market you transact in, "
-                "and using its price to value an outlay against a return would put a "
-                "transaction price where a valuation belongs. The amount that reaches a "
-                "spendable endpoint is unaffected and is reported."
+                f"{endpoint.value}{stayed}. A money-weighted return over two currencies is "
+                "not a rate of anything, and valuing one of them in the other needs a "
+                "reference rate on a date. A channel rate is not one: a channel is a market "
+                "you transact in, and using its price to value an outlay against a return "
+                "would put a transaction price where a valuation belongs. The amount that "
+                "reaches a spendable endpoint is unaffected and is reported."
             ),
             missing="the official rate for a date (feature 011-official-rate)",
         )
+    invested = outlay if stranded is None else money.sub(outlay, stranded)
     received = money.total([arrival.amount for arrival in arrivals], endpoint)
     if any(arrival.amount.amount < 0.0 for arrival in arrivals) or received.amount <= 0.0:
         return RateNotComparable(
@@ -1384,7 +1413,7 @@ def _rate(
             missing="a conventional series -- one payment out at the start, receipts after it",
         )
     year_fraction = day_count(_day_count_of(prepared))
-    flows: list[CashFlow] = [(0.0, -outlay.amount)]
+    flows: list[CashFlow] = [(0.0, -invested.amount)]
     flows.extend(
         (year_fraction(span.start, arrival.arrived_on), arrival.amount.amount)
         for arrival in arrivals

@@ -169,10 +169,15 @@ class UndeployedCash:
     facts are on the record. Rounding it into the purchase would spend money the owner did not
     agree to spend; rounding it out of the report would make the money disappear.
 
-    It is deliberately **not** part of :attr:`TupleOutcome.reaches` and not part of the rate.
-    Bringing it home would mean deciding *when* the owner sweeps it -- an assumption nobody
-    declared -- and pricing a second journey nobody asked for. So the rate is measured on the
-    money that was actually invested, and what was not invested is stated beside it.
+    It is deliberately **not** part of :attr:`TupleOutcome.reaches`, and it is netted off the
+    outlay the rate is measured against rather than left in the series. Bringing it home would
+    mean deciding *when* the owner sweeps it -- an assumption nobody declared -- and pricing a
+    second journey nobody asked for; leaving it in the outlay would price it as a **total
+    loss**, which it is not. So the rate is measured on the money that was actually invested,
+    and what was not invested is stated beside it.
+
+    Both halves of that are on the outcome's face rather than only here: see the undeployed
+    clause of :data:`EXCLUDES`, which says the recovery is not costed.
     """
 
     amount: Money
@@ -208,7 +213,9 @@ EXCLUDES: Final[frozenset[str]] = frozenset(
     {
         "inflation (every figure here is nominal)",
         "the risk class, which is declared and carried but never scored",
-        "undeployed cash, which is reported separately and is not in the rate",
+        "the cost of recovering undeployed cash: the rate is measured on the money actually "
+        "invested, and the remainder is reported at the venue it is sitting at, with no "
+        "figure for what getting it back would cost",
         "public holidays (weekends are observed; no holiday calendar is modelled)",
     }
 )
@@ -228,7 +235,12 @@ class TupleOutcome:
     "unrepresentable" is a property of the type rather than a rule to remember."""
 
     outlay: Money
-    """What left the income stream, in the stream's currency, on :attr:`span`'s first day."""
+    """What left the income stream, in the stream's currency, on :attr:`span`'s first day.
+
+    The whole amount, including any part of it :attr:`undeployed` says bought nothing --
+    :attr:`implied_rate` is the figure measured net of that, and reporting the netted number
+    here as well would leave the money that made the trip unaccounted for anywhere.
+    """
 
     parts: tuple[PartContribution, ...]
     """Each term's contribution, separately (FR-005). Six entries, in journey order."""
@@ -253,11 +265,17 @@ class TupleOutcome:
     implied_rate: NominalRate | RateNotComparable
     """The money-weighted return over :attr:`span` (FR-015), or a typed statement of why none.
 
-    The internal rate of return of the outlay and the arrivals, on their own dates, measured
-    with the instrument's declared day-count convention -- the same convention that sized its
-    flows. Computed by :func:`terezy.core.results.hurdle.internal_rate_of_return`, which is
-    also what produces feature 001's benchmark, so hurdle-versus-tuple is one kind of number
-    against the same kind.
+    The internal rate of return of the arrivals on their own dates against the money actually
+    invested -- :attr:`outlay` less whatever :attr:`undeployed` says bought nothing -- measured
+    with the instrument's declared day-count convention, the same convention that sized the
+    instrument's flows. Computed by
+    :func:`terezy.core.results.hurdle.internal_rate_of_return`, which is also what produces
+    feature 001's benchmark, so hurdle-versus-tuple is one kind of number against the same
+    kind.
+
+    **A remainder therefore moves this figure by nothing at all**, which is the honest answer:
+    the same holding was bought either way, and a whole outlay against a part-sized holding
+    would price the stranded cash as a total loss.
 
     Ramp latency and settlement latency sit **inside** the span, because waiting is a cost
     (owner decision, 2026-08-22).
@@ -726,13 +744,11 @@ class Comparison:
     benchmark: int
     """An **index** into :attr:`ranked`, never a copy of one of its entries.
 
-    This is the whole of FR-012 and of research.md D3. The hurdle is not a figure computed
-    beside the comparison; it is the OVDP evaluated as a tuple through its declared domestic
-    routes, by :func:`terezy.core.decision.tuple_outcome.evaluate`, ranked with everything
-    else. Holding an index rather than a record means a test asserts
-    ``comparison.ranked[comparison.benchmark] is benchmark_outcome`` -- identity, not two
-    numbers that happen to agree today. A separately computed benchmark drifts from what it
-    benchmarks, and the drift is invisible because both numbers look reasonable.
+    This is the whole of FR-012 and of research.md D3. Holding an index rather than a record
+    means there is nowhere here for a separately computed benchmark to sit: whatever this
+    points at came out of the same call, in the same loop, as everything it is ranked against.
+    A separately computed benchmark drifts from what it benchmarks, and the drift is invisible
+    because both numbers look reasonable.
 
     002's ``Ranking.recommended`` sets the precedent, and its argument applies unchanged.
     """

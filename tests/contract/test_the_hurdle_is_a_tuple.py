@@ -138,6 +138,46 @@ class TestTheBenchmarkIsOneOfTheThingsItBenchmarks:
         assert len(comparison.scored) == 1
         assert comparison.scored[0].key.instrument_id == fixtures.MILTECH
 
+    def test_the_carried_outcomes_are_in_candidate_order_and_not_ranked(self) -> None:
+        # The other half of the sentence above, and it needs **two** outcomes to say anything:
+        # with one, "unranked" and "ranked" are the same list. These two are offered dearest
+        # first, so candidate order and rate order disagree -- and `scored` must be the former.
+        # Sorting here would hand back the ordering `BenchmarkUnavailable` exists to withhold,
+        # and its own `reason` says so: a ranking with no benchmark invites its own head to be
+        # read as a winner.
+        registries = fixtures.with_new_route(
+            fixtures.without_access(fixtures.shipped(), fixtures.OVDP),
+            fixtures.route(
+                "test_costly_in",
+                origin="monobank_uah",
+                destination="inzhur",
+                direction="inbound",
+                partner=fixtures.DOMESTIC_OUT,
+                fee_pct=0.05,
+            ),
+        )
+        dear = fixtures.replace(
+            fixtures.fund_tuple(
+                fixtures.MILTECH,
+                exit_on=fixtures.MILTECH_EXIT,
+                yield_point=fixtures.MILTECH_POINT,
+            ),
+            route_in=fixtures.FundingPath(
+                destination_id="inzhur", stream_id=fixtures.SALARY, route_id="test_costly_in"
+            ),
+        )
+        cheap = fixtures.fund_tuple(
+            fixtures.MILTECH, exit_on=fixtures.MILTECH_EXIT, yield_point=fixtures.MILTECH_POINT
+        )
+        comparison = _compared(registries, (dear, cheap))
+        assert isinstance(comparison, BenchmarkUnavailable)
+        assert [outcome.key for outcome in comparison.scored] == [dear, cheap]
+        rates = [outcome.implied_rate for outcome in comparison.scored]
+        assert all(isinstance(rate, NominalRate) for rate in rates)
+        values = [rate.value for rate in rates if isinstance(rate, NominalRate)]
+        assert values != sorted(values, reverse=True)
+        assert "not ranked" in comparison.reason
+
 
 class TestTheHurdleReproducesFeatureOnesFigure:
     """SC-002, at the project tolerance, over routes that cost and delay nothing."""
@@ -193,9 +233,9 @@ class TestTheHurdleReproducesFeatureOnesFigure:
         self,
     ) -> None:
         # The precondition of the equality above, asserted rather than assumed: at par, ten
-        # thousand buys exactly ten units and leaves no remainder. A remainder would sit at
-        # the venue and be excluded from the rate, and the two figures would part company for
-        # a reason that has nothing to do with the pipeline.
+        # thousand buys exactly ten units and leaves no remainder, so the money that left the
+        # stream and the money the rate is measured on are the same number here. The equality
+        # therefore rests on the pipeline rather than on the netting rule for a remainder.
         outcome = _outcome(self._one_hundred_percent_domestic(), fixtures.hurdle_tuple(), AT_ISSUE)
         assert outcome.undeployed is None
 

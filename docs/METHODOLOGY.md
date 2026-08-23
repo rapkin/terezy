@@ -2744,9 +2744,17 @@ The increment is declared or it does not exist. A bond declares `min_unit` and i
 whole increments of it; a fund declares none, so its arriving amount buys exactly what it
 buys. Rounding a fund's purchase to whole certificates would be inventing a term.
 
-The remainder is **reported with its amount and its venue**, and is deliberately outside both
-the amount that reaches the endpoint and the rate. Bringing it home would need a date nobody
-declared; sweeping it into the rate would report it as invested.
+The remainder is **reported with its amount and its venue**, and it is outside the amount that
+reaches the endpoint: bringing it home would need a date nobody declared, and sweeping it into
+the purchase would spend money the owner did not agree to spend.
+
+It is also **netted off the outlay the rate is measured against** — 10 000 − 850 = 9 150 here —
+rather than left in the series. The remainder is cash at the purchase venue, not money lost,
+and discounting the arrivals back to the whole 10 000 would price it as a total loss: on the
+shipped registry that is the difference between a 16% sovereign bond and a reported −7%,
+produced by nothing more than a unit price that does not divide the arriving amount. The
+netting assumes the remainder is recoverable at par, which is not free — it sits behind the
+same exit the holding does — and that assumption is one of the outcome's own `excludes`.
 
 ### 28.4 What goes home, and when
 
@@ -2778,8 +2786,8 @@ Every outcome carries **both**: the amount that reaches a spendable endpoint, an
 implies. Reporting one invites a reader to derive the other under an assumption the tool never
 made, and the assumption available here is reinvestment.
 
-The rate is the internal rate of return of the outlay and the arrivals **on their own dates**,
-measured with the instrument's declared day-count convention — the same convention that sized
+The rate is the internal rate of return of the arrivals **on their own dates** against the
+money actually invested (§28.3), measured with the instrument's declared day-count convention — the same convention that sized
 its flows, and the same root find that produces feature 001's benchmark (§3.2). Ramp latency
 and settlement latency sit **inside** the span, because waiting is a cost (owner decision,
 2026-08-22). The consequence is worth stating: the shipped domestic pair costs exactly nothing
@@ -2789,10 +2797,11 @@ and three days out.
 The rate is a **typed absence** rather than a figure in three cases, and the amount is
 unaffected in all three:
 
-* the outlay and the endpoint are in **different currencies** — a dollar outflow against
-  hryvnia inflows is not a rate of anything, and valuing the outlay needs a reference rate on
-  a date, which is feature 011. A channel rate is not one: a channel is a market you transact
-  in, and the rate that values an outlay against a return is a reference;
+* the amounts the series is built from — what left, what stayed behind undeployed, what came
+  back — are **not all in one currency**. A dollar outflow against hryvnia inflows is not a
+  rate of anything, and valuing one in the other needs a reference rate on a date, which is
+  feature 011. A channel rate is not one: a channel is a market you transact in, and the rate
+  that values an outlay against a return is a reference;
 * the round trip returned nothing;
 * an arrival is negative, because the repatriation charges exceeded what was released. A
   series that is not one payment out followed by receipts has no single internal rate of
@@ -2862,6 +2871,11 @@ repatriations, with both conservation identities checked.
 10 000.00  =  9 000.00 (bought) + 150.00 (way in) + 850.00 (undeployed)
 11 790.00  =  11 691.05 (reached) + 98.95 (way out)
 ```
+
+The rate is 14.44%, measured against the 9 150.00 actually invested. The two wrong
+denominators are worth naming because each looks reasonable: the whole 10 000.00 gives 8.96%
+and prices the stranded 850.00 as a loss, and the 9 000.00 of paper gives 15.50% and forgets
+the ramp.
 
 ---
 
