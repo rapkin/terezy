@@ -46,8 +46,12 @@ exactly that. The commit grant is about not making the user click a button, not 
 rewriting history.
 
 **`/condense` runs after the work is green and before the review.** It reads the branch diff
-and cuts the prose that does not earn its place — restatement, and claims about elsewhere
-that nothing checks — while keeping what prevents a named defect. In that order for two
+and cuts what does not earn its place, in prose **and** in code, on one rule: **one fact, one
+place**. A comment claiming what another module does, a helper restating a computation, two
+fields holding one truth — all the same shape, and in this repository the duplicate is where
+the drift happened every time. It keeps what prevents a named defect and what makes a wrong
+state unrepresentable; collapsing a tagged union into a flag is not simplification, it is
+moving the complexity into the reader's head. In that order for two
 reasons: the review then reads the text that will land, and the review's own check on
 unverifiable claims applies to the condensed version rather than to prose about to be
 deleted. It is also the one pass that re-reads every comment on the branch, which is where a

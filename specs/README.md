@@ -30,9 +30,9 @@ Every feature goes through the same seven steps. None is optional.
 3. **Gates at every checkpoint.** `ruff check` + `ruff format --check .`, `mypy`,
    `pytest --cov`, `lint-imports`, `check_provenance.py` — all green before any commit
    (the `/commit` skill runs them). Never loosen a gate to pass it.
-4. **Condense.** Once the work is green, `/condense` over the branch diff: cut the prose
-   that does not earn its place — restatement, and claims about elsewhere that nothing
-   checks — and keep what prevents a named defect. Before the review, not after, so the
+4. **Condense.** Once the work is green, `/condense` over the branch diff: cut what does not
+   earn its place, in prose and in code, on one rule — **one fact, one place**. Keep what
+   prevents a named defect and what makes a wrong state unrepresentable. Before the review, not after, so the
    review reads what will land. It is also the only pass that re-reads every comment on the
    branch, which is where a stale claim otherwise survives to be found expensively later.
 5. **Review, then iterate. This is a blocking gate, not a courtesy pass.** Before
