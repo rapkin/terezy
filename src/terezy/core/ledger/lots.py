@@ -118,7 +118,7 @@ class Position:
     """The lots held, in acquisition order.
 
     Acquisition order, not consumption order: the order is a fact about the history and
-    each selection method imposes its own ordering on top (see :func:`consumption_order`).
+    each selection method draws on them in its own way (see :data:`SELECTION_FNS`).
     Keeping the tuple in one canonical order also means two positions holding the same
     lots compare equal, which C4's digest relies on.
     """
@@ -207,83 +207,233 @@ class Disposal:
     """The term or rule that caused the disposal, copied from its event (FR-008)."""
 
 
-ConsumptionOrderFn = Callable[[tuple[Lot, ...]], tuple[Lot, ...]]
-"""A selection method, as an ordering: ``lots -> the order to consume them in``."""
-
-
-def _oldest_first(items: tuple[Lot, ...]) -> tuple[Lot, ...]:
-    """FIFO: the earliest acquisition is consumed first.
-
-    Sorted on ``(acquired_on, lot_id)`` rather than relying on the tuple already being in
-    acquisition order. The tie-break on ``lot_id`` matters: two lots acquired on the same
-    date would otherwise be ordered by sort stability, and the basis consumed -- and so
-    the tax -- would depend on the order the collection happened to be built in.
-    """
-    return tuple(sorted(items, key=lambda lot: (lot.acquired_on, lot.lot_id)))
-
-
-def _newest_first(items: tuple[Lot, ...]) -> tuple[Lot, ...]:
-    """LIFO: the most recent acquisition is consumed first, with the same tie-break."""
-    return tuple(sorted(items, key=lambda lot: (lot.acquired_on, lot.lot_id), reverse=True))
-
-
 class LotMethod(Enum):
-    """The four basis methods, as a closed set. **No default anywhere** (FR-020, D5).
+    """The four basis methods, as a closed set. **No default anywhere** (FR-020).
 
-    ⚙ **Added by feature 009**, together with the two implementations 001 deliberately left
-    out. All four live here rather than in a tax module, because two of them already did and
-    four methods split across two modules is how a fifth ends up in a third (009 research.md
-    D10).
+    ⚙ **Feature 009 added the two that 001 left out**, and put them here rather than in a tax
+    module because two of them already lived here: four methods split across two modules is
+    how a fifth ends up in a third (009 research.md D10).
 
-    The value strings are the data contract: they are what a scenario declares, what
-    ``CONSUMPTION_FNS`` is keyed by, and what a result renders. The enum exists beside those
-    strings so that a **figure** cannot carry an unchecked method name: everything feature 009
-    emits carries a ``LotMethod``, and the one place a name becomes one is :func:`method_named`,
-    which refuses anything else by name.
+    The value strings are the data contract -- what a scenario declares and what
+    :data:`SELECTION_FNS` is keyed by. The enum exists beside them so that a **figure** cannot
+    carry an unchecked method name: :func:`method_named` is the one place a name becomes a
+    member, and everything feature 009 emits carries a member.
 
-    **What the law says about each of them is not here.** It is declared data -- the Tax Code
-    prescribes no method at all, DPS/ZIR guidance points at a proportional reading for a
-    self-declarant, and Metodyka MFU No. 1484 prescribes FIFO where a tax agent computes -- and
-    it reaches a figure as ``terezy.core.tax.year.MethodStanding``. A verdict about the law
-    hard-coded next to an implementation would be exactly the domain knowledge Principle II
-    keeps out of the engine.
+    What the law says about each method is **not** here. That is declared data with a
+    citation, and it reaches a figure as ``terezy.core.tax.year.MethodStanding``.
     """
 
     FIFO = "fifo"
-    """First in, first out."""
-
     LIFO = "lifo"
-    """Last in, first out."""
-
     AVERAGE_COST = "average_cost"
-    """Every lot contributes basis in proportion to the units it holds, over the whole packet
-    the asset is (пп. 170.2.7). The reading DPS/ZIR guidance recognises for a self-declarant."""
-
     SPECIFIC_LOT = "specific_lot"
-    """Exactly the lot the disposal names, and no other. The disposal 001 refused loudly."""
 
 
 FIFO: Final = LotMethod.FIFO.value
-"""First in, first out."""
-
 LIFO: Final = LotMethod.LIFO.value
-"""Last in, first out."""
-
 AVERAGE_COST: Final = LotMethod.AVERAGE_COST.value
-"""Pro rata over the packet. ⚙ Feature 009."""
-
 SPECIFIC_LOT: Final = LotMethod.SPECIFIC_LOT.value
-"""The named lot, and a refusal where it cannot be honoured exactly. ⚙ Feature 009."""
+
+
+@dataclass(frozen=True, slots=True)
+class LotNotNamed:
+    """A specific-lot disposal that names no lot (FR-021)."""
+
+    instrument_id: str
+    reason: str
+
+
+@dataclass(frozen=True, slots=True)
+class LotNamedUnderWrongMethod:
+    """A disposal names a lot under a method that does not select by name (FR-022).
+
+    Refused rather than ignored: ignoring the naming would consume a different basis from the
+    one the caller asked for, and produce a plausible tax on it.
+    """
+
+    instrument_id: str
+    lot_id: str
+    method: LotMethod
+    reason: str
+
+
+@dataclass(frozen=True, slots=True)
+class NamedLotUnavailable:
+    """The named lot does not exist, is already consumed, or holds too few units (FR-021).
+
+    One record for the three, because they are one fact -- the named lot cannot supply what
+    was asked -- and :attr:`available` tells them apart: absent and exhausted both hold
+    nothing (an exhausted lot is dropped from the position), and too-few holds something.
+    """
+
+    instrument_id: str
+    lot_id: str
+    requested: float
+    available: float
+    reason: str
+
+
+LotRefusal = LotNotNamed | LotNamedUnderWrongMethod | NamedLotUnavailable
+"""Why a disposal's basis could not be selected. Match exhaustively."""
+
+Selection = tuple[tuple[Lot, float], ...]
+"""Which lots a disposal draws on and how many units from each, in consumption order."""
+
+SelectionFn = Callable[[tuple[Lot, ...], float, str | None], Selection | LotRefusal]
+"""A basis method: ``(lots, quantity, the lot named by the disposal) -> what to consume``.
+
+⚙ **Feature 009 widened this from an ordering.** FIFO and LIFO are orderings, and average
+cost is not -- it takes a share of *every* lot -- and specific-lot is not either, since it
+depends on what the disposal named. Keeping the narrower shape would have forced two of the
+four methods to be expressed as something they are not.
+"""
+
+
+def _greedy(ordered: tuple[Lot, ...], quantity: float) -> Selection:
+    """Take whole lots in the given order until the quantity is met, splitting the last.
+
+    Shared by FIFO and LIFO, which differ only in the order they are handed.
+    """
+    remaining = quantity
+    taken: list[tuple[Lot, float]] = []
+    for lot in ordered:
+        if remaining <= TOLERANCE:
+            break
+        units = min(lot.quantity, remaining)
+        taken.append((lot, units))
+        remaining -= units
+    return tuple(taken)
+
+
+def _oldest_first(
+    lots: tuple[Lot, ...], quantity: float, named: str | None
+) -> Selection | LotRefusal:
+    """FIFO: the earliest acquisition is consumed first.
+
+    Sorted on ``(acquired_on, lot_id)`` rather than relying on the tuple already being in
+    acquisition order. The tie-break on ``lot_id`` matters: two lots acquired on the same date
+    would otherwise be ordered by sort stability, and the basis consumed -- and so the tax --
+    would depend on the order the collection happened to be built in.
+    """
+    refused = _refuse_naming(lots, named, LotMethod.FIFO)
+    if refused is not None:
+        return refused
+    return _greedy(tuple(sorted(lots, key=lambda lot: (lot.acquired_on, lot.lot_id))), quantity)
+
+
+def _newest_first(
+    lots: tuple[Lot, ...], quantity: float, named: str | None
+) -> Selection | LotRefusal:
+    """LIFO: the most recent acquisition is consumed first, with the same tie-break."""
+    refused = _refuse_naming(lots, named, LotMethod.LIFO)
+    if refused is not None:
+        return refused
+    return _greedy(
+        tuple(sorted(lots, key=lambda lot: (lot.acquired_on, lot.lot_id), reverse=True)),
+        quantity,
+    )
+
+
+def _pro_rata(lots: tuple[Lot, ...], quantity: float, named: str | None) -> Selection | LotRefusal:
+    """Average cost: every lot gives up the same fraction of its units, and of its cost.
+
+    The fraction is ``quantity / units held``, applied to each lot, which is what makes the
+    basis consumed the average unit cost times the units sold **and** leaves the remaining
+    position at the same average unit cost. Consuming the same total basis out of one or two
+    lots instead would give the same tax today and a different position tomorrow.
+
+    The lots are ordered as they are held rather than sorted, because the fraction is the same
+    for all of them: no order can change the answer, so imposing one would suggest it could.
+    """
+    refused = _refuse_naming(lots, named, LotMethod.AVERAGE_COST)
+    if refused is not None:
+        return refused
+    held = sum(lot.quantity for lot in lots)
+    if held <= 0.0:  # pragma: no cover -- ``consume`` refuses an over-consumption first
+        return ()
+    fraction = quantity / held
+    return tuple((lot, lot.quantity * fraction) for lot in lots)
+
+
+def _named_lot(lots: tuple[Lot, ...], quantity: float, named: str | None) -> Selection | LotRefusal:
+    """Specific lot: exactly the lot the disposal named, and no other.
+
+    Three ways it cannot be honoured, all of them refusals and none of them a fallback to
+    another method: a name that matches nothing, a lot that no longer exists because it was
+    consumed, and a lot holding fewer units than were asked for. Falling back would consume a
+    different basis from the one the owner chose, which is the whole reason the method exists.
+
+    **One lot per disposal.** Disposing of two named lots is two disposal events, each naming
+    its own lot and its own quantity -- the event vocabulary carries one ``lot_id``, and a
+    partial honouring of a multi-lot request is what the spec's edge case forbids.
+    """
+    if named is None:
+        return LotNotNamed(
+            instrument_id=lots[0].instrument_id if lots else "<no position>",
+            reason=(
+                "the specific-lot method requires the disposal to name the lot it consumes, "
+                "and this one names none. There is no fallback ordering: the method exists "
+                "precisely so the owner chooses the basis, and choosing one for him would "
+                "tax a different acquisition from the one he sold."
+            ),
+        )
+    found = [lot for lot in lots if lot.lot_id == named]
+    if not found or found[0].quantity + TOLERANCE < quantity:
+        available = found[0].quantity if found else 0.0
+        return NamedLotUnavailable(
+            instrument_id=lots[0].instrument_id if lots else "<no position>",
+            lot_id=named,
+            requested=quantity,
+            available=available,
+            reason=(
+                f"the disposal names lot {named!r} for {quantity!r} units and that lot holds "
+                f"{available!r}. A lot that does not exist, one already consumed, and one "
+                "holding too few units are all refused here rather than made up from "
+                "another lot: the basis consumed would be one the owner did not choose."
+            ),
+        )
+    return ((found[0], quantity),)
+
+
+def _refuse_naming(
+    lots: tuple[Lot, ...], named: str | None, method: LotMethod
+) -> LotNamedUnderWrongMethod | None:
+    """A lot named under a method that does not select by name is a conflict (FR-022).
+
+    ``None`` where nothing was named, which is the ordinary case. Silently ignoring the name
+    would consume by the configured method instead -- a different basis, a different tax, and
+    an instruction the caller believed had been followed.
+    """
+    if named is None:
+        return None
+    return LotNamedUnderWrongMethod(
+        instrument_id=lots[0].instrument_id if lots else "<no position>",
+        lot_id=named,
+        method=method,
+        reason=(
+            f"the disposal names lot {named!r}, and this run consumes by {method.value!r}, "
+            "which selects lots by rule rather than by name. Reported rather than ignored: "
+            "ignoring the naming would consume a different basis from the one asked for and "
+            f"tax it plausibly. Either declare the {SPECIFIC_LOT!r} method, or drop the name."
+        ),
+    )
+
+
+SELECTION_FNS: Final[Mapping[str, SelectionFn]] = {
+    FIFO: _oldest_first,
+    LIFO: _newest_first,
+    AVERAGE_COST: _pro_rata,
+    SPECIFIC_LOT: _named_lot,
+}
+"""Every basis method this engine implements, keyed by its declared name."""
 
 
 def method_named(name: str) -> LotMethod:
     """The declared name as a checked method, or a raise naming the four that exist.
 
-    The one place a string becomes a :class:`LotMethod`, so that every figure downstream
-    carries a member of a closed set rather than whatever the caller typed. A raise rather
-    than a typed refusal for the same reason :func:`consumption_order` raises: by the time a
-    fold is running, the name has already passed the data boundary, and an unknown one here
-    is a bug in the code that assembled the run.
+    A raise rather than a typed refusal for the reason :func:`selection_for` gives: by the
+    time a fold is running, the name has passed the data boundary, so an unknown one here is a
+    bug in the code that assembled the run rather than a fact about the money.
     """
     for method in LotMethod:
         if method.value == name:
@@ -291,38 +441,41 @@ def method_named(name: str) -> LotMethod:
     raise LedgerInvariantError(
         f"unknown lot consumption method {name!r}. There is no default method: the choice "
         f"changes the basis consumed and therefore the tax. Known methods: "
-        f"{sorted(member.value for member in LotMethod)}"
+        f"{sorted(SELECTION_FNS)}"
     )
 
 
-CONSUMPTION_ORDER_FNS: Final[Mapping[str, ConsumptionOrderFn]] = {
-    FIFO: _oldest_first,
-    LIFO: _newest_first,
-}
-"""The selection methods this engine implements.
+def selection_for(name: str) -> SelectionFn:
+    """The basis method a configured name selects, or a raise naming what is known.
 
-Average cost and specific-lot selection are named by E6 in ``docs/REQUIRED_TESTS.md`` and
-are not implemented here. They are absent rather than approximated: an average-cost result
-computed as FIFO would be a wrong tax figure that looked right.
-"""
-
-
-def consumption_order(name: str) -> ConsumptionOrderFn:
-    """The selection method a configured name selects, or a raise naming what is known.
-
-    An explicit membership test rather than ``dict.get`` with a default, for the same
-    reason ``primitives.conventions`` does it that way: no reading of this code should
-    suggest that a default method exists. Silently applying FIFO to a scenario that
-    configured LIFO produces a different tax on the same trades, and it produces it
-    plausibly.
+    An explicit membership test rather than ``dict.get`` with a default, for the same reason
+    ``primitives.conventions`` does it that way: no reading of this code should suggest that a
+    default method exists. Silently applying FIFO to a scenario that configured LIFO produces
+    a different tax on the same trades, and it produces it plausibly.
     """
-    if name not in CONSUMPTION_ORDER_FNS:
+    if name not in SELECTION_FNS:
         raise LedgerInvariantError(
             f"unknown lot consumption method {name!r}. There is no default method: the "
             f"choice changes the basis consumed and therefore the tax. Known methods: "
-            f"{sorted(CONSUMPTION_ORDER_FNS)}"
+            f"{sorted(SELECTION_FNS)}"
         )
-    return CONSUMPTION_ORDER_FNS[name]
+    return SELECTION_FNS[name]
+
+
+def basis_consumed(
+    lots: tuple[Lot, ...],
+    quantity: float,
+    *,
+    method: str,
+    named_lot: str | None = None,
+) -> Selection | LotRefusal:
+    """Which lots a disposal draws on under one method, or why it cannot be answered.
+
+    The pure half of :func:`consume`: no position, no arithmetic on money, and every refusal a
+    value rather than a raise, so the four methods' selection behaviour can be checked
+    directly.
+    """
+    return selection_for(method)(lots, quantity, named_lot)
 
 
 def opening(instrument_id: str, trade_currency: Currency, base_currency: Currency) -> Position:
@@ -387,7 +540,9 @@ def add_lot(position: Position, lot: Lot) -> Position:
     )
 
 
-def consume(position: Position, quantity: float, method: str) -> Consumption:
+def consume(
+    position: Position, quantity: float, method: str, *, named_lot: str | None = None
+) -> Consumption:
     """Remove units from a position by the configured method, and report what they cost.
 
     Partial consumption of a lot splits its cost pro rata -- ``scale`` by the fraction of
@@ -400,6 +555,12 @@ def consume(position: Position, quantity: float, method: str) -> Consumption:
     validated declaration, so a disposal exceeding the holding is a bug in the generator,
     and a ledger that let it through would report a negative position (C2) and a basis
     consumed that was never paid.
+
+    ⚙ **A refusal from the selection is raised here** rather than returned (009). The typed
+    refusals are values at :func:`basis_consumed`, where the four methods can be checked
+    directly; by the time a stream is being folded, a disposal that contradicts the run's
+    method is a stream this engine cannot fold at all -- the same class of thing as a
+    quantity of zero, and it stops the run for the same reason.
     """
     if quantity <= 0.0:
         raise LedgerInvariantError(
@@ -413,18 +574,22 @@ def consume(position: Position, quantity: float, method: str) -> Consumption:
             "negative holding and a basis that was never paid."
         )
 
-    order = consumption_order(method)
+    selected = basis_consumed(position.lots, quantity, method=method, named_lot=named_lot)
+    if not isinstance(selected, tuple):
+        raise LedgerInvariantError(selected.reason)
+
     remaining_to_take = quantity
     consumed_trade: list[Money] = []
     consumed_base: list[Money] = []
     consumed_from: list[tuple[str, float]] = []
-    survivors: dict[str, Lot] = {}
+    survivors: dict[str, Lot] = {
+        lot.lot_id: lot
+        for lot in position.lots
+        if lot.lot_id not in {taken.lot_id for taken, _ in selected}
+    }
 
-    for lot in order(position.lots):
-        if remaining_to_take <= TOLERANCE:
-            survivors[lot.lot_id] = lot
-            continue
-        taken = min(lot.quantity, remaining_to_take)
+    for lot, units in selected:
+        taken = min(units, lot.quantity)
         exhausted = lot.quantity - taken <= TOLERANCE
         if exhausted:
             # A residual within the tolerance is not a lot: it would be dropped below,
@@ -602,7 +767,12 @@ def _close(
             f"event {event.sequence} disposes of {ref.instrument_id!r}, which is not "
             "held. Proceeds without a basis would be reported as pure gain."
         )
-    consumption = consume(position, ev.quantity_of(event), consumption_method)
+    consumption = consume(
+        position,
+        ev.quantity_of(event),
+        consumption_method,
+        named_lot=ref.lot_id,
+    )
     disposal = realise(event, consumption, fees, base_currency)
     return {**positions, ref.instrument_id: consumption.position}, disposal
 

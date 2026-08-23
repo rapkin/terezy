@@ -171,20 +171,19 @@ def test_a_lot_opening_event_may_not_increase_cash() -> None:
         events.check_shape(event)
 
 
-def test_a_disposal_may_not_name_a_specific_lot() -> None:
-    """Specific-lot selection is refused rather than ignored.
+def test_a_disposal_may_name_a_lot_and_the_shape_rules_allow_it() -> None:
+    """⚙ Feature 009: naming a lot is a specific-lot request, not a malformed event.
 
-    Ignoring the naming would consume lots by the configured method instead, which is a
-    different basis and therefore a different tax -- computed silently, from an instruction
-    the caller believed had been followed. E6 in ``docs/REQUIRED_TESTS.md`` is where
-    specific-lot selection arrives; until then this is a refusal.
+    Whether the naming is *honoured* depends on the run's method, which ``check_shape`` does
+    not know -- so the conflict is refused where the method is known, in
+    ``lots.basis_consumed``, and asserted in this module under the lot tests below.
     """
     event = replace(
         _redemption(1, proceeds=600.0, quantity=5.0),
         lot_ref=events.LotRef(instrument_id=INSTRUMENT, lot_id="lot-1"),
     )
-    with pytest.raises(LedgerInvariantError, match="Specific-lot selection is not implemented"):
-        events.check_shape(event)
+
+    events.check_shape(event)
 
 
 def test_a_tax_charge_may_not_move_cash() -> None:
@@ -334,7 +333,90 @@ def test_a_fee_allocated_outside_the_stream_is_refused() -> None:
 def test_an_unknown_consumption_method_is_refused_with_the_known_ones_named() -> None:
     """There is no default method: the choice changes the tax."""
     with pytest.raises(LedgerInvariantError, match="unknown lot consumption method 'average'"):
-        lots.consumption_order("average")
+        lots.selection_for("average")
+
+
+def test_the_four_known_methods_are_named_in_the_refusal() -> None:
+    """FR-020: a reader of the failure learns what would have worked."""
+    with pytest.raises(LedgerInvariantError, match=r"average_cost.*fifo.*lifo.*specific_lot"):
+        lots.selection_for("weighted")
+
+
+def test_a_specific_lot_disposal_that_names_nothing_is_refused() -> None:
+    """FR-021: no fallback ordering, because the method exists so the owner chooses."""
+    refusal = lots.basis_consumed(
+        (_lot("lot-1", quantity=10.0, cost=1_000.0),), 5.0, method=lots.SPECIFIC_LOT
+    )
+
+    assert isinstance(refusal, lots.LotNotNamed), refusal
+    assert "names none" in refusal.reason
+
+
+def test_a_named_lot_that_does_not_exist_is_refused_with_the_shortfall() -> None:
+    refusal = lots.basis_consumed(
+        (_lot("lot-1", quantity=10.0, cost=1_000.0),),
+        5.0,
+        method=lots.SPECIFIC_LOT,
+        named_lot="lot-9",
+    )
+
+    assert isinstance(refusal, lots.NamedLotUnavailable), refusal
+    assert refusal.lot_id == "lot-9"
+    assert refusal.available == 0.0
+    assert refusal.requested == 5.0
+
+
+def test_a_named_lot_holding_too_few_units_is_refused_rather_than_topped_up() -> None:
+    refusal = lots.basis_consumed(
+        (_lot("lot-1", quantity=10.0, cost=1_000.0), _lot("lot-2", quantity=50.0, cost=5_000.0)),
+        40.0,
+        method=lots.SPECIFIC_LOT,
+        named_lot="lot-1",
+    )
+
+    assert isinstance(refusal, lots.NamedLotUnavailable), refusal
+    assert refusal.available == 10.0
+    assert refusal.requested == 40.0
+
+
+def test_naming_a_lot_under_any_other_method_is_a_conflict() -> None:
+    """FR-022. Ignoring the name would tax a basis the caller did not ask for."""
+    for method in (lots.FIFO, lots.LIFO, lots.AVERAGE_COST):
+        refusal = lots.basis_consumed(
+            (_lot("lot-1", quantity=10.0, cost=1_000.0),),
+            5.0,
+            method=method,
+            named_lot="lot-1",
+        )
+
+        assert isinstance(refusal, lots.LotNamedUnderWrongMethod), refusal
+        assert refusal.method.value == method
+
+
+def test_a_conflict_reaching_the_fold_stops_it_with_the_refusal_s_own_words() -> None:
+    """A stream that contradicts the run's method is one this engine cannot fold."""
+    stream = [
+        _deposit(0),
+        _purchase(1, "lot-1", cost=1_000.0, quantity=10.0, day=2),
+        replace(
+            _redemption(2, proceeds=600.0, quantity=5.0),
+            lot_ref=events.LotRef(instrument_id=INSTRUMENT, lot_id="lot-1"),
+        ),
+    ]
+    with pytest.raises(LedgerInvariantError, match="selects lots by rule rather than by name"):
+        _fold(stream)
+
+
+def _lot(lot_id: str, *, quantity: float, cost: float) -> lots.Lot:
+    return lots.Lot(
+        lot_id=lot_id,
+        instrument_id=INSTRUMENT,
+        acquired_on=date(2026, 1, 1),
+        quantity=quantity,
+        cost_trade_ccy=_uah(cost),
+        cost_base_ccy=_uah(cost),
+        fx_rate_used=None,
+    )
 
 
 def test_the_engine_refuses_an_unknown_method_before_folding_anything() -> None:

@@ -53,6 +53,7 @@ from datetime import date, timedelta
 from hypothesis import strategies as st
 
 from terezy.core.ledger.events import CausationKind, CausationRef, Event, EventKind, LotRef
+from terezy.core.ledger.lots import SELECTION_FNS, SPECIFIC_LOT
 from terezy.core.primitives import provenance
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
@@ -103,6 +104,16 @@ class Stream:
     events: tuple[Event, ...]
     currency: Currency
     instrument_id: str
+    method: str
+    """The basis method this stream is valid under, drawn with it.
+
+    ⚙ **Feature 009 (SC-006).** The method is part of the stream rather than fixed by the
+    suite because two of the four constrain what a *valid* stream looks like: under
+    specific-lot a disposal must name a lot and may not exceed that lot's own units. Folding
+    every stream under one method would have left three of the four untested by the
+    conservation properties, and average cost -- which consumes a share of every lot rather
+    than draining them in order -- is the one most likely to break basis conservation.
+    """
 
 
 _QUANTITIES = st.integers(min_value=1, max_value=1_000)
@@ -124,6 +135,7 @@ def event_streams(draw: st.DrawFn, currency: Currency = Currency.UAH) -> Stream:
     the engine relies on: the fold order is the sequence, never the order the collection
     happened to arrive in.
     """
+    method = draw(st.sampled_from(sorted(SELECTION_FNS)))
     opening = draw(st.integers(min_value=10_000, max_value=1_000_000))
     first_day = draw(st.dates(min_value=date(2024, 1, 1), max_value=date(2026, 1, 1)))
     gaps = draw(st.lists(st.integers(min_value=0, max_value=120), min_size=1, max_size=8))
@@ -146,6 +158,9 @@ def event_streams(draw: st.DrawFn, currency: Currency = Currency.UAH) -> Stream:
     on = first_day
     held = 0
     lots_created = 0
+    open_lots: dict[str, int] = {}
+    """Units remaining per open lot, maintained for specific-lot, where a disposal may not
+    exceed the units of the lot it names. The other three are constrained by the total."""
 
     for gap in gaps:
         on = on + timedelta(days=gap)
@@ -161,6 +176,7 @@ def event_streams(draw: st.DrawFn, currency: Currency = Currency.UAH) -> Stream:
             cost = quantity * draw(_UNIT_PRICES)
             lots_created += 1
             held += quantity
+            open_lots[f"lot-{lots_created}"] = quantity
             events.append(
                 Event(
                     sequence=sequence,
@@ -221,7 +237,16 @@ def event_streams(draw: st.DrawFn, currency: Currency = Currency.UAH) -> Stream:
                 )
             )
         else:
-            quantity = draw(st.integers(min_value=1, max_value=held))
+            if method == SPECIFIC_LOT:
+                lot_id = draw(st.sampled_from(sorted(open_lots)))
+                quantity = draw(st.integers(min_value=1, max_value=open_lots[lot_id]))
+                open_lots[lot_id] -= quantity
+                if open_lots[lot_id] == 0:
+                    del open_lots[lot_id]
+                named: str | None = lot_id
+            else:
+                quantity = draw(st.integers(min_value=1, max_value=held))
+                named = None
             held -= quantity
             proceeds = quantity * draw(_UNIT_PRICES)
             disposal_sequence = sequence + 1
@@ -247,11 +272,11 @@ def event_streams(draw: st.DrawFn, currency: Currency = Currency.UAH) -> Stream:
                     amount=Money(float(proceeds), currency, prov),
                     owner_id=OWNER,
                     caused_by=_TERM,
-                    lot_ref=LotRef(instrument_id=INSTRUMENT, lot_id=None),
+                    lot_ref=LotRef(instrument_id=INSTRUMENT, lot_id=named),
                     quantity=float(quantity),
                     allocated_to=None,
                     capacity_pool=None,
                 )
             )
 
-    return Stream(events=tuple(events), currency=currency, instrument_id=INSTRUMENT)
+    return Stream(events=tuple(events), currency=currency, instrument_id=INSTRUMENT, method=method)

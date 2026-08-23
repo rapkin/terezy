@@ -82,7 +82,7 @@ def _fold(stream: Stream) -> engine.LedgerState:
     return engine.fold(
         stream.events,
         base_currency=stream.currency,
-        consumption_method=lots.FIFO,
+        consumption_method=stream.method,
     )
 
 
@@ -90,7 +90,7 @@ def _history(stream: Stream) -> tuple[engine.LedgerState, ...]:
     return engine.history(
         stream.events,
         base_currency=stream.currency,
-        consumption_method=lots.FIFO,
+        consumption_method=stream.method,
     )
 
 
@@ -244,7 +244,7 @@ def test_positions_rebuilt_from_events_match_the_folded_ledger(stream: Stream) -
     rebuilt = lots.rebuild(
         stream.events,
         base_currency=stream.currency,
-        consumption_method=lots.FIFO,
+        consumption_method=stream.method,
     )
     assert rebuilt == _fold(stream).positions
 

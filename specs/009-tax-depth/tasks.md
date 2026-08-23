@@ -63,7 +63,7 @@ golden**.
 
 - [X] T013 [P] Create `src/terezy/core/tax/year.py` with the frozen records: `IncomeCategory`, `Treatment`, `CarryforwardRule`, `TimingRule`, `Settlement behaviour`, `LotMethod`, `MethodStanding`, `UnsettledSwitch`, `FilingDecisions`, `AssessmentRules`, `ChargeRef`, `CarryforwardState`, `AssessedLiability`, `AnnualStatement`, and the `TaxYearRefusal` union — **no constructor produces a liability without its method** (data-model.md)
 - [X] T014 [P] Create `src/terezy/core/results/tax_year.py` with the settlement-side records: `TaxPayment`, `OpenObligation`, `Settlement`, `InsufficientCashForTax`, `WithholdingNotModelled`
-- [ ] T015 (test) Assert `AssessedLiability` cannot be constructed without a `LotMethod` and that no field on any record in either module is a bare unlabelled liability, in `tests/contract/test_method_is_never_implicit.py`
+- [X] T015 (test) Assert `AssessedLiability` cannot be constructed without a `LotMethod` and that no field on any record in either module is a bare unlabelled liability, in `tests/contract/test_method_is_never_implicit.py`
 
 ### The declarations
 
@@ -93,7 +93,7 @@ outflow settles it on the declared due date of the following year.
 - [X] T024 (test) [P] [US1] Assert an assessed-but-not-yet-due liability at the horizon is reported as an open obligation in `tests/unit/test_annual_statement.py` (FR-007)
 - [X] T025 [US1] Implement `statements(...)` in `src/terezy/core/tax/year.py`: the fold from charges to statements, per year and declared category, with the netted base, the zero reason, and the method on every figure
 - [X] T026 [US1] Implement `settle(...)` in `src/terezy/core/results/tax_year.py`: due date from the declared rule, the payment woven into the stream and renumbered, the statement named on the event, open obligations reported rather than dropped
-- [ ] T027 (test) [US1] Assert a withheld-at-source class refuses rather than being silently self-assessed, in `tests/unit/test_annual_statement.py` (FR-003)
+- [X] T027 (test) [US1] Assert a withheld-at-source class refuses rather than being silently self-assessed, in `tests/unit/test_annual_statement.py` (FR-003)
 
 **Checkpoint**: US1 is testable on its own; every later story extends this fold.
 
@@ -108,14 +108,14 @@ levy on the same netted base.
 tax hand-checked in both branches, and the two differing by exactly the hand-computed value
 of the carryforward.
 
-- [ ] T028 (test) [US2] Hand-compute the loss-year-then-gain-year fixture in both branches in `tests/worked_examples/test_loss_carryforward.py`, with the arithmetic checked in and the difference asserted against the carryforward's own value (SC-001, SC-010)
-- [ ] T029 (test) [P] [US2] Assert PIT and the levy are both computed from the **same netted, carryforward-reduced base** and reported as separate lines, and that a negative year yields two zeros citing the netting, in `tests/worked_examples/test_loss_carryforward.py` (SC-011)
-- [ ] T030 (test) [P] [US2] Assert an exempt-security (OVDP) loss beside taxable gains changes neither the taxable result nor the tax, and appears nowhere in the netting, in `tests/worked_examples/test_loss_carryforward.py` (SC-005)
+- [X] T028 (test) [US2] Hand-compute the loss-year-then-gain-year fixture in both branches in `tests/worked_examples/test_loss_carryforward.py`, with the arithmetic checked in and the difference asserted against the carryforward's own value (SC-001, SC-010)
+- [X] T029 (test) [P] [US2] Assert PIT and the levy are both computed from the **same netted, carryforward-reduced base** and reported as separate lines, and that a negative year yields two zeros citing the netting, in `tests/worked_examples/test_loss_carryforward.py` (SC-011)
+- [X] T030 (test) [P] [US2] Assert an exempt-security (OVDP) loss beside taxable gains changes neither the taxable result nor the tax, and appears nowhere in the netting, in `tests/worked_examples/test_loss_carryforward.py` (SC-005)
 - [ ] T031 (test) [P] [US2] Assert a scenario reaching a year with investment operations and no declared filing decision refuses, naming the year, in `tests/contract/test_tax_declaration_loading.py` (FR-014)
-- [ ] T032 (test) [P] [US2] Assert both chain-continuity branches produce their own hand-computed figure and that each figure carries the unsettled label, in `tests/contract/test_unsettled_is_labelled.py` (FR-015, SC-012)
-- [ ] T033 [US2] Implement netting, the carryforward ledger and the forfeiture figure in `src/terezy/core/tax/year.py`, per declared category treatment and declared carryforward rule
-- [ ] T034 [US2] Implement the chain-continuity switch's two branches in `src/terezy/core/tax/year.py`, labelling every statement whose figures rest on it
-- [ ] T035 (test) [P] [US2] Assert a carryforward still open at the horizon is reported with its origin year in `tests/unit/test_annual_statement.py` (FR-019)
+- [X] T032 (test) [P] [US2] Assert both chain-continuity branches produce their own hand-computed figure and that each figure carries the unsettled label, in `tests/contract/test_unsettled_is_labelled.py` (FR-015, SC-012)
+- [X] T033 [US2] Implement netting, the carryforward ledger and the forfeiture figure in `src/terezy/core/tax/year.py`, per declared category treatment and declared carryforward rule
+- [X] T034 [US2] Implement the chain-continuity switch's two branches in `src/terezy/core/tax/year.py`, labelling every statement whose figures rest on it
+- [X] T035 (test) [P] [US2] Assert a carryforward still open at the horizon is reported with its origin year in `tests/unit/test_annual_statement.py` (FR-019)
 
 **Checkpoint**: E2 closes — both branches, both hand-computed.
 
@@ -129,14 +129,14 @@ of the carryforward.
 each run's tax checked against its own hand-computed arithmetic, and the four pairwise
 distinct by construction.
 
-- [ ] T036 (test) [US3] Hand-compute the three-lot partial-sale fixture under FIFO, LIFO, average-cost and specific-lot in `tests/worked_examples/test_four_lot_methods.py`, with each method's arithmetic checked in and the four results asserted pairwise distinct (FR-025, SC-002)
-- [ ] T037 (test) [P] [US3] Assert the specific-lot refusals — an unknown lot, an exhausted lot, a lot holding too few units — each naming the lot and the shortfall, and never falling back to another method, in `tests/unit/test_ledger_failures.py` (FR-021)
-- [ ] T038 (test) [P] [US3] Assert a disposal naming a lot under any method other than specific-lot is a conflict, never a silently ignored hint, in `tests/unit/test_ledger_failures.py` (FR-022)
+- [X] T036 (test) [US3] Hand-compute the three-lot partial-sale fixture under FIFO, LIFO, average-cost and specific-lot in `tests/worked_examples/test_four_lot_methods.py`, with each method's arithmetic checked in and the four results asserted pairwise distinct (FR-025, SC-002)
+- [X] T037 (test) [P] [US3] Assert the specific-lot refusals — an unknown lot, an exhausted lot, a lot holding too few units — each naming the lot and the shortfall, and never falling back to another method, in `tests/unit/test_ledger_failures.py` (FR-021)
+- [X] T038 (test) [P] [US3] Assert a disposal naming a lot under any method other than specific-lot is a conflict, never a silently ignored hint, in `tests/unit/test_ledger_failures.py` (FR-022)
 - [ ] T039 (test) [P] [US3] Assert an unknown or absent method fails naming the four known methods, in `tests/contract/test_tax_declaration_loading.py` (FR-020)
-- [ ] T040 [US3] Implement `basis_consumed` and the four selection functions in `src/terezy/core/ledger/lots.py` — all four together, where the existing two live (research.md D10) — with average cost consuming pro rata over the packet and specific lot consuming exactly the named lot
-- [ ] T041 [US3] Widen `_check_closing` in `src/terezy/core/ledger/events.py` so a named lot is a specific-lot request rather than a refusal, and move the method conflict to where the method is known
-- [ ] T042 (test) [P] [US3] Draw all four methods into the conservation properties in `tests/invariants/test_ledger_conservation.py` (SC-006, FR-023)
-- [ ] T043 (test) [P] [US3] Assert every emitted tax figure states the method that produced it, and that the two source-backed candidates carry their citations, in `tests/contract/test_method_is_never_implicit.py` (FR-024, SC-012)
+- [X] T040 [US3] Implement `basis_consumed` and the four selection functions in `src/terezy/core/ledger/lots.py` — all four together, where the existing two live (research.md D10) — with average cost consuming pro rata over the packet and specific lot consuming exactly the named lot
+- [X] T041 [US3] Widen `_check_closing` in `src/terezy/core/ledger/events.py` so a named lot is a specific-lot request rather than a refusal, and move the method conflict to where the method is known
+- [X] T042 (test) [P] [US3] Draw all four methods into the conservation properties in `tests/invariants/test_ledger_conservation.py` (SC-006, FR-023)
+- [X] T043 (test) [P] [US3] Assert every emitted tax figure states the method that produced it, and that the two source-backed candidates carry their citations, in `tests/contract/test_method_is_never_implicit.py` (FR-024, SC-012)
 
 **Checkpoint**: E6 closes.
 
@@ -150,9 +150,9 @@ distinct by construction.
 date stops on that date with the hand-computed liability, cash and shortfall; no date shows
 negative cash and no disposal the scenario did not declare appears.
 
-- [ ] T044 (test) [US4] Assert the typed shortfall outcome carries the hand-computed liability, cash available and shortfall, and that the projection up to the failure date is still traceable, in `tests/unit/test_insufficient_cash.py` (SC-004, FR-009, FR-012)
-- [ ] T045 (test) [P] [US4] Assert over generated scenarios that no shortfall run ends with a negative balance, a partial payment, or an engine-generated disposal, in `tests/invariants/test_no_silent_clamping.py` (SC-004)
-- [ ] T046 [US4] Implement the shortfall path in `src/terezy/core/results/tax_year.py::settle` — stop, name it, touch nothing
+- [X] T044 (test) [US4] Assert the typed shortfall outcome carries the hand-computed liability, cash available and shortfall, and that the projection up to the failure date is still traceable, in `tests/unit/test_insufficient_cash.py` (SC-004, FR-009, FR-012)
+- [X] T045 (test) [P] [US4] Assert over generated scenarios that no shortfall run ends with a negative balance, a partial payment, or an engine-generated disposal, in `tests/invariants/test_no_silent_clamping.py` (SC-004)
+- [X] T046 [US4] Implement the shortfall path in `src/terezy/core/results/tax_year.py::settle` — stop, name it, touch nothing
 
 **Checkpoint**: E7's first half closes; its forced-sale half stays the owner's recorded
 deferral.

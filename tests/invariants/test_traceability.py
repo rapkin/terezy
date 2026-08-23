@@ -38,7 +38,7 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from terezy.core.ledger import canonical, engine, events, lots
+from terezy.core.ledger import canonical, engine, events
 from terezy.core.primitives import money, provenance
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.tolerance import assert_money_close, is_close
@@ -51,7 +51,7 @@ def _fold(stream: Stream) -> engine.LedgerState:
     return engine.fold(
         stream.events,
         base_currency=stream.currency,
-        consumption_method=lots.FIFO,
+        consumption_method=stream.method,
     )
 
 
@@ -255,7 +255,7 @@ def test_the_state_is_a_function_of_the_events_and_not_of_their_arrival_order(
         engine.fold(
             shuffled,
             base_currency=stream.currency,
-            consumption_method=lots.FIFO,
+            consumption_method=stream.method,
         )
     )
 

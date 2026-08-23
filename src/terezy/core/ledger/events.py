@@ -238,11 +238,12 @@ class LotRef:
     lot_id: str | None
     """The lot opened by this event, or ``None`` where no single lot is named.
 
-    Set on a lot-opening event, where it is the identity of the lot being created. On a
-    disposal it is ``None``: which lots are consumed is decided by the configured
-    selection method, not by the event. A disposal that *does* name a lot is asking for
-    specific-lot selection, which this feature does not implement -- and is refused
-    loudly rather than having the naming quietly ignored.
+    Set on a lot-opening event, where it is the identity of the lot being created.
+
+    On a disposal it is the lot the disposal **chose**, or ``None`` where the configured
+    method chooses instead. ⚙ Feature 009 made the first case real: naming a lot asks for
+    specific-lot selection, and ``lots.basis_consumed`` refuses the naming under any other
+    method rather than ignoring it, because ignoring it would tax a different basis.
     """
 
 
@@ -449,14 +450,7 @@ def _check_opening(event: Event) -> None:
 
 
 def _check_closing(event: Event) -> None:
-    ref = lot_ref_of(event)
-    if ref.lot_id is not None:
-        raise LedgerInvariantError(
-            f"event {event.sequence} disposes of lot {ref.lot_id!r} specifically. "
-            "Specific-lot selection is not implemented in this feature -- the configured "
-            "consumption method decides which lots are consumed. The naming is refused "
-            "rather than ignored, because ignoring it would tax the wrong basis."
-        )
+    lot_ref_of(event)
     if quantity_of(event) <= 0.0:
         raise LedgerInvariantError(
             f"event {event.sequence} disposes of {event.quantity!r} units. A disposal of "
