@@ -39,7 +39,7 @@ from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance, SourceRef
 from terezy.core.primitives.staleness import ObservationKind
-from terezy.core.results.coverage import SpendableEndpoint
+from terezy.core.results.coverage import Destination, SpendableEndpoint
 from terezy.core.routes.channels import ChannelSide, FxChannel
 from terezy.core.routes.legs import FX, TRANSFER, Leg, Route, RouteStatus
 from terezy.core.routes.path import FundingPath
@@ -1072,4 +1072,140 @@ def coverage_registries(draw: st.DrawFn) -> CoverageRegistry:
         routes=routes,
         channels={CHANNEL_ID: _channel(42.0, 3.0, -3.0)},
         spendable=frozenset({SpendableEndpoint(venue_id=HOME_VENUE, currency=BASE_CURRENCY)}),
+    )
+
+
+# ---------------------------------------------------------------------------
+# 004-composed-paths: registries whose route graph is worth searching
+# ---------------------------------------------------------------------------
+#
+# The strategies above generate **one route at a time**, because the properties they serve are
+# about arithmetic. The composition properties are about a *graph*: what chains, what loops,
+# what runs longer than the bound, and what would connect only by mixing directions. So they
+# need a generator that produces a whole registry, and one whose graph is dense enough that a
+# cycle and an over-long corridor are the ordinary case rather than a lucky draw.
+#
+# ⚙ **Every ordered pair of venues is a coin flip, in each direction.** Four venues give twelve
+# ordered pairs and twenty-four possible corridors, so a drawn registry routinely contains a
+# two-cycle (`a -> b` and `b -> a` both inbound), a corridor needing more hops than any
+# plausible bound, and a pair whose only completion runs through a route declared `exit`. Those
+# three are exactly SC-004, SC-005 and SC-016, and a sparser generator would pass all three by
+# never producing the shape.
+#
+# **Nothing here is drawn that composition reads for a *number*.** Every leg is zero-fee, has no
+# minimum, no maximum, no cap and no window -- because the search consults none of those and a
+# generator that varied them would be varying the wrong thing. Feasibility on a date is
+# `cost_one`'s answer and is exercised by the unit suite, which can declare a closed segment on
+# purpose.
+
+COMPOSE_VENUES: tuple[str, ...] = ("v_a", "v_b", "v_c", "v_d")
+"""Four venues, so a chain can be three segments long without repeating one."""
+
+COMPOSE_ORIGIN = COMPOSE_VENUES[0]
+"""Where the drawn stream's money arrives, and where every inbound chain starts."""
+
+COMPOSE_TARGET = COMPOSE_VENUES[-1]
+"""The destination asked about, and the one declared spendable endpoint -- so the inbound and
+exit questions are asked about the same graph from opposite ends."""
+
+
+@dataclass(frozen=True, slots=True)
+class CompositionRegistry:
+    """One generated route graph, and everything a search over it needs."""
+
+    routes: Mapping[str, Route]
+    currencies: Mapping[str, Currency]
+    stream: IncomeStream
+    destination: Destination
+    """The venue and currency an inbound chain must reach, and an exit chain must leave.
+
+    A field rather than something derived on access: records here carry data and nothing else
+    (owner decision D-E), and a hand-built registry has to be able to name a destination that
+    is not the generated one.
+    """
+
+    spendable: frozenset[SpendableEndpoint]
+
+
+def _searchable_leg(*, from_venue: str, to_venue: str, currencies: Mapping[str, Currency]) -> Leg:
+    """One movement with nothing on it that binds: the search reads endpoints, not limits."""
+    from_ccy = currencies[from_venue]
+    to_ccy = currencies[to_venue]
+    converts = from_ccy is not to_ccy
+    return Leg(
+        index=0,
+        kind=FX if converts else TRANSFER,
+        from_venue=from_venue,
+        to_venue=to_venue,
+        from_ccy=from_ccy,
+        to_ccy=to_ccy,
+        channel=CHANNEL_ID if converts else None,
+        fee_pct=0.0,
+        fee_fixed=Money(0.0, from_ccy, FEE_SOURCES),
+        minimum=None,
+        maximum=None,
+        monthly_cap=None,
+        capacity_pool=None,
+        latency_days=0,
+        available_from=None,
+        available_until=None,
+        disruption_probability=0.0,
+        kind_of_observation=P2P_PREMIUM.id if converts else BANK_FEE_SCHEDULE.id,
+        provenance=FEE_SOURCES,
+    )
+
+
+@st.composite
+def composition_registries(draw: st.DrawFn) -> CompositionRegistry:
+    """A route graph with a drawn set of corridors, in both directions, over four venues.
+
+    Each venue holds **one** drawn currency, so "the venues match but the currencies do not" is
+    a shape the generator produces rather than one it has to be told about -- and a junction
+    that does not join is then an ordinary draw rather than a hand-written case.
+
+    The stream is built here rather than taken from the module constants above because its
+    arrival currency has to be the drawn currency of the origin venue: a stream delivering
+    dollars where the first corridor moves hryvnia is a *funding mismatch*, which is costing's
+    refusal and not the search's business.
+    """
+    currencies = {venue: draw(st.sampled_from(Currency)) for venue in COMPOSE_VENUES}
+    routes: dict[str, Route] = {}
+    for origin in COMPOSE_VENUES:
+        for destination in COMPOSE_VENUES:
+            if origin == destination:
+                continue
+            for direction in ("inbound", "exit"):
+                if not draw(st.booleans()):
+                    continue
+                route_id = f"{direction}_{origin}_{destination}"
+                routes[route_id] = Route(
+                    id=route_id,
+                    provider=f"Synthetic {route_id}",
+                    origin=origin,
+                    destination=destination,
+                    direction="inbound" if direction == "inbound" else "exit",
+                    partner_route=None,
+                    status="open",
+                    legs=(
+                        _searchable_leg(
+                            from_venue=origin, to_venue=destination, currencies=currencies
+                        ),
+                    ),
+                )
+    return CompositionRegistry(
+        routes=routes,
+        currencies=currencies,
+        destination=Destination(venue_id=COMPOSE_TARGET, currency=currencies[COMPOSE_TARGET]),
+        stream=IncomeStream(
+            id="salary_generated",
+            owner_id=OWNER_ID,
+            amount=Money(0.0, currencies[COMPOSE_ORIGIN], prov.EMPTY),
+            cadence="monthly",
+            arrives_at=COMPOSE_ORIGIN,
+            indexation=Indexation(policy="none", rate=None),
+            income_tax_rate=None,
+        ),
+        spendable=frozenset(
+            {SpendableEndpoint(venue_id=COMPOSE_TARGET, currency=currencies[COMPOSE_TARGET])}
+        ),
     )

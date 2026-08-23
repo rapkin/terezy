@@ -153,15 +153,15 @@ them in one league.
 **Independent Test**: declare A→B and B→C and no A→C; ask for C; check the composed candidate's
 arriving amount and cost percentages against hand-computed leg-by-leg arithmetic.
 
-- [ ] T018 [P] [US1] Add the composed fixtures to `tests/composed_registries.py` — a hand-built
+- [X] T018 [P] [US1] Add the composed fixtures to `tests/composed_registries.py` — a hand-built
       A→B→C registry with no end-to-end declaration, a junction whose venue matches and whose
       currency does not, and a chain whose concatenation reproduces a declared route leg for leg.
       Every number invented, every `verified_on` empty, said so in capitals.
-- [ ] T019 [US1] Write `tests/worked_examples/test_composed_arithmetic.py` (SC-001, SC-014) —
+- [X] T019 [US1] Write `tests/worked_examples/test_composed_arithmetic.py` (SC-001, SC-014) —
       leg-by-leg arithmetic worked out by hand and checked in beside the assertion; the composed
       figure against it within the single imported tolerance; attribution naming both the
       dominating component and the dominating segment, each traced to its declaration.
-- [ ] T020 [US1] Implement `compose` and `SegmentBound` in `src/terezy/core/routes/compose.py`:
+- [X] T020 [US1] Implement `compose` and `SegmentBound` in `src/terezy/core/routes/compose.py`:
       an adjacency index per direction from `(venue, currency)` to departing routes with each
       bucket **sorted by route id** (**T-5**), depth-first with a visited-venue set (**T-4**: no
       pruning by cost, no partial-cost cache, no heuristic), the declared bound as the only depth
@@ -202,21 +202,21 @@ and enumeration order influencing nothing.
 **Independent Test**: a registry whose graph contains a loop and a corridor longer than the bound;
 no candidate visits a venue twice, none exceeds the bound, and the bound is visible in the result.
 
-- [ ] T024 [P] [US3] Add the search strategies to `tests/invariants/route_graphs.py` — a
+- [X] T024 [P] [US3] Add the search strategies to `tests/invariants/route_graphs.py` — a
       Hypothesis strategy producing a connectable route graph with cycles, with corridors beyond
       any plausible bound, and with routes declared in both directions.
-- [ ] T025 [US3] Write `tests/invariants/test_composition_search.py` (SC-004, SC-005, SC-016) —
+- [X] T025 [US3] Write `tests/invariants/test_composition_search.py` (SC-004, SC-005, SC-016) —
       zero candidates visit a venue twice **over the entire emitted set**; with a bound of `n`
       nothing longer than `n` appears and **everything** connectable up to `n` does, checked
       against an independently written brute-force enumerator; the bound travels with the
       results; and no candidate mixes directions, including on a registry where the only
       completion of an inbound chain runs through a route declared exit.
-- [ ] T026 [US3] Write `tests/invariants/test_composition_order.py` (SC-003) — reversing the
+- [X] T026 [US3] Write `tests/invariants/test_composition_order.py` (SC-003) — reversing the
       declaration order of the registry changes no candidate, no figure, no ranking position, no
       recommendation and no tie; and a composed candidate and a declared route costing the same
       within the project tolerance are reported as a tie rather than resolved by which the search
       found first.
-- [ ] T027 [US3] Write `tests/unit/test_composed_duplicates.py` (SC-013) — a registry declaring a
+- [X] T027 [US3] Write `tests/unit/test_composed_duplicates.py` (SC-013) — a registry declaring a
       route **and** its exact segment-wise equivalent yields the declared route once and the
       composed duplicate never, with `Leg.index` normalised before the comparison (**T-3**), and
       a chain over the same venues with different legs standing as a distinct candidate.

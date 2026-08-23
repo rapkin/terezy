@@ -113,6 +113,16 @@ symmetric spread would let a round trip computed as twice the one way pass."""
 SALARY_VENUE = "salary_venue"
 EXCHANGE = "exchange"
 BROKER = "broker"
+MIRROR = "mirror_exchange"
+"""A second exchange declaring the *same terms* as the first.
+
+It exists so a hand-declared end-to-end route can cost exactly what the chain through
+:data:`EXCHANGE` costs while being a genuinely different journey -- same premium, same fees,
+different venue in the middle. That is a **tie**, not a duplicate: FR-009 suppresses a
+concatenation identical leg for leg, and two chains over different venues are two candidates
+however closely their numbers agree.
+"""
+
 HOME = "home"
 """The one venue the owner spends from. An exit chain has to reach here to complete a round
 trip (FR-022)."""
@@ -148,6 +158,7 @@ VENUES: Mapping[str, Venue] = {
     ),
     EXCHANGE: Venue(id=EXCHANGE, name="Exchange (SYNTHETIC)", currencies=frozenset({UAH, USD})),
     BROKER: Venue(id=BROKER, name="Broker (SYNTHETIC)", currencies=frozenset({USD})),
+    MIRROR: Venue(id=MIRROR, name="Mirror exchange (SYNTHETIC)", currencies=frozenset({UAH, USD})),
     HOME: Venue(id=HOME, name="Home rail (SYNTHETIC)", currencies=frozenset({UAH})),
 }
 
@@ -405,3 +416,98 @@ def two_hop() -> Registry:
     direction. Everything the worked examples assert is arithmetic over these four.
     """
     return registry(SALARY_TO_EXCHANGE, EXCHANGE_TO_BROKER, BROKER_TO_EXCHANGE, EXCHANGE_TO_HOME)
+
+
+SALARY_TO_BROKER_VIA_MIRROR = corridor(
+    "in_salary_to_broker_via_mirror",
+    direction="inbound",
+    legs=(
+        leg(
+            index=0,
+            from_venue=SALARY_VENUE,
+            to_venue=MIRROR,
+            from_ccy=UAH,
+            to_ccy=USD,
+            latency_days=1,
+            disruption=0.05,
+        ),
+        leg(
+            index=1,
+            from_venue=MIRROR,
+            to_venue=BROKER,
+            from_ccy=USD,
+            to_ccy=USD,
+            fee_pct=0.01,
+            fee_fixed=1.0,
+            latency_days=2,
+            disruption=0.02,
+        ),
+    ),
+    partner_route=BROKER_TO_EXCHANGE.id,
+)
+"""A hand-declared end-to-end route whose numbers match the chain's exactly.
+
+Same premium, same 1% and flat dollar, same latencies -- and a **different venue in the
+middle**, so its legs differ and FR-009 leaves both candidates standing. The two therefore cost
+the same within the project tolerance and are a tie, which is the shape SC-003 is about: a tie
+is reported as a tie and never resolved in favour of whichever the search found first.
+"""
+
+SALARY_TO_BROKER_SAME_LEGS = corridor(
+    "in_salary_to_broker_declared",
+    direction="inbound",
+    legs=(
+        leg(
+            index=0,
+            from_venue=SALARY_VENUE,
+            to_venue=EXCHANGE,
+            from_ccy=UAH,
+            to_ccy=USD,
+            latency_days=1,
+            disruption=0.05,
+        ),
+        leg(
+            index=1,
+            from_venue=EXCHANGE,
+            to_venue=BROKER,
+            from_ccy=USD,
+            to_ccy=USD,
+            fee_pct=0.01,
+            fee_fixed=1.0,
+            latency_days=2,
+            disruption=0.02,
+        ),
+    ),
+    partner_route=BROKER_TO_EXCHANGE.id,
+)
+"""The chain's **exact segment-wise equivalent**, declared end to end by hand.
+
+Leg for leg identical to concatenating ``in_salary_to_exchange`` with
+``in_exchange_to_broker`` -- same venues, same currencies, same fees, same latencies. It is the
+same real-world sequence of movements, so a ranking holds it **once**, as the declared route
+(FR-009). The trap SC-013 exists to catch is that ``Leg.index`` is per route, so the
+concatenation numbers its legs ``0, 0`` where this route numbers them ``0, 1``: compared
+naively they never match and the duplicate survives.
+"""
+
+
+def tied() -> Registry:
+    """The two-hop corridor plus a hand-declared equivalent over a different middle venue."""
+    return registry(
+        SALARY_TO_EXCHANGE,
+        EXCHANGE_TO_BROKER,
+        SALARY_TO_BROKER_VIA_MIRROR,
+        BROKER_TO_EXCHANGE,
+        EXCHANGE_TO_HOME,
+    )
+
+
+def duplicated() -> Registry:
+    """The two-hop corridor plus a hand-declared route with the identical leg chain."""
+    return registry(
+        SALARY_TO_EXCHANGE,
+        EXCHANGE_TO_BROKER,
+        SALARY_TO_BROKER_SAME_LEGS,
+        BROKER_TO_EXCHANGE,
+        EXCHANGE_TO_HOME,
+    )
