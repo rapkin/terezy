@@ -285,6 +285,7 @@ class TestARegimeCannotBeExpressedAsALegWindow:
             kinds=route_graphs.KINDS,
             on_date=AFTER,
             as_of=route_graphs.AS_OF,
+            spendable=route_graphs.p2p_graph().spendable,
         )
         assert isinstance(observed, RouteUnusable), observed
         assert observed.binding_constraint == "leg.available_until"
@@ -317,6 +318,7 @@ class TestARegimeCannotBeExpressedAsALegWindow:
                 kinds=route_graphs.KINDS,
                 on_date=AFTER,
                 as_of=route_graphs.AS_OF,
+                spendable=route_graphs.p2p_graph().spendable,
             ),
             RampCost,
         )

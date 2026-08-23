@@ -43,6 +43,7 @@ from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.staleness import ObservationKind
 from terezy.core.primitives.tolerance import is_close
+from terezy.core.results.coverage import SpendableEndpoint
 from terezy.core.results.ramp import (
     CostComponent,
     RampCost,
@@ -58,6 +59,14 @@ from terezy.core.streams.streams import IncomeStream, Indexation
 from terezy.data.declarations import resolver
 
 pytestmark = pytest.mark.contract
+
+SPENDABLE = frozenset({SpendableEndpoint(venue_id="monobank_uah", currency=Currency.UAH)})
+"""Where the shipped registry says money counts as having come back out.
+
+Restated here rather than loaded from ``data/spendable/`` so this battery keeps testing the
+*routes*: a change to the spendable list should not turn a route test red, and a change to
+this line should be a deliberate statement about what these rankings assume.
+"""
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DATA_ROOT = REPO_ROOT / "data"
@@ -132,6 +141,7 @@ def _rank(
         kinds=declarations.kinds,
         on_date=ON_DATE,
         as_of=AS_OF,
+        spendable=SPENDABLE,
     )
     assert isinstance(outcome, Ranking), f"nothing was comparable: {outcome}"
     return outcome
@@ -219,6 +229,7 @@ class TestTheShippedCorridorsRankAsHandComputed:
             kinds=declarations.kinds,
             on_date=ON_DATE,
             as_of=AS_OF,
+            spendable=SPENDABLE,
         )
         assert not isinstance(ranked, Ranking), (
             "the only candidate has no declared exit, so there is nothing comparable to rank "
@@ -935,6 +946,7 @@ def _hand_built_cost(*, buy_premium: float = 3.0) -> RampCost:
         },
         on_date=ON_DATE,
         as_of=AS_OF,
+        spendable=SPENDABLE,
     )
     assert isinstance(outcome, Ranking)
     return recommended_cost(outcome)

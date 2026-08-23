@@ -43,6 +43,7 @@ from terezy.core.routes.path import (
     ComposedExit,
     ComposedPath,
     DeclaredExit,
+    ExitChain,
     FundingPath,
     segments_of,
 )
@@ -61,18 +62,19 @@ CHAIN = ComposedPath(
 EXIT_CHAIN = ComposedExit(segments=("out_broker_to_exchange", "out_exchange_to_home"))
 
 
-def _costed(candidate: Candidate = CHAIN) -> RampCost:
+def _costed(candidate: Candidate = CHAIN, exit_path: ExitChain = EXIT_CHAIN) -> RampCost:
     world = fixtures.two_hop()
     outcome = cost.cost_one(
         candidate,
         AMOUNT,
-        exit_path=EXIT_CHAIN,
+        exit_path=exit_path,
         routes=world.routes,
         channels=world.channels,
         streams=world.streams,
         kinds=world.kinds,
         on_date=fixtures.ON_DATE,
         as_of=fixtures.AS_OF,
+        spendable=world.spendable,
     )
     assert isinstance(outcome, RampCost), outcome
     return outcome
@@ -147,7 +149,12 @@ class TestThereIsOneCostingFunctionAndOneProducerOfLegs:
             route_id="in_salary_to_exchange",
         )
         assert cost.legs_of(declared, world.routes) == world.routes["in_salary_to_exchange"].legs
-        assert len(_costed(declared).one_way.by_segment) == 1
+        # Its own way out, because a way out has to leave from where the money actually is: this
+        # candidate stops at the exchange, so the broker's exit chain is not its exit chain.
+        assert (
+            len(_costed(declared, DeclaredExit(route_id="out_exchange_to_home")).one_way.by_segment)
+            == 1
+        )
 
     def test_a_composition_of_one_is_refused_rather_than_costed(self) -> None:
         """A ``ComposedPath`` with a single segment is a declared route wearing the wrong type.
@@ -193,10 +200,20 @@ class TestTheJoinLaundersNothing:
 
     def test_the_sources_of_every_segment_reach_the_composed_figure(self) -> None:
         """One segment's declaration cannot vanish at the join: a figure that could not name
-        which fee schedule it rests on is not traceable (Principle III)."""
+        which fee schedule it rests on is not traceable (Principle III).
+
+        ⚙ **Each corridor cites its own invented schedule**, so this can actually fail. While
+        every leg shared one ``SourceRef``, the union of the two segments' provenance was that
+        one object whether or not the second segment's mark survived -- the assertion held on a
+        laundered join as readily as on an honest one.
+        """
         costed = _costed()
-        assert fixtures.FEE_SOURCE in costed.one_way.provenance.sources
-        assert fixtures.RATE_SOURCE in costed.one_way.provenance.sources
+        expected = {
+            fixtures.fee_source_ref("in_salary_to_exchange"),
+            fixtures.fee_source_ref("in_exchange_to_broker"),
+            fixtures.RATE_SOURCE,
+        }
+        assert expected <= costed.one_way.provenance.sources
 
     def test_a_stale_value_on_one_segment_makes_the_whole_candidate_stale(self) -> None:
         """FR-018: staleness is evaluated **per value by its declared kind**, across every
@@ -211,7 +228,12 @@ class TestTheJoinLaundersNothing:
         verdict = costed.one_way.staleness
         assert verdict.stale, verdict
         assert {entry.kind_id for entry in verdict.stale} == {fixtures.P2P_PREMIUM.id}
-        assert fixtures.FEE_SOURCE.id in verdict.assessed
+        # Both segments' fee schedules were aged, each under its own kind, and neither was
+        # dropped: the verdict names them individually rather than collapsing to one id.
+        assert {
+            fixtures.fee_source_ref("in_salary_to_exchange").id,
+            fixtures.fee_source_ref("in_exchange_to_broker").id,
+        } <= set(verdict.assessed)
 
 
 class TestNoCostIsAttributableToADestinationAlone:
@@ -374,6 +396,7 @@ class TestTheGuardsOnAnIncoherentExitChain:
             kinds=world.kinds,
             on_date=fixtures.ON_DATE,
             as_of=fixtures.AS_OF,
+            spendable=world.spendable,
         )
 
     def test_a_composed_exit_of_one_segment_is_refused(self) -> None:
@@ -396,6 +419,45 @@ class TestTheGuardsOnAnIncoherentExitChain:
         with pytest.raises(ValueError, match="declared inbound"):
             self._cost(DeclaredExit(route_id="in_exchange_to_broker"))
 
-    def test_an_exit_chain_whose_junction_does_not_join_is_refused(self) -> None:
-        with pytest.raises(ValueError, match="do not join"):
+    def test_an_exit_chain_that_does_not_leave_from_where_the_money_is_refused(self) -> None:
+        """F1's first face. ``out_exchange_to_home`` departs from the **exchange**, and this
+        candidate's money is at the **broker**.
+
+        Walking it anyway would move 219 USD from broker to exchange for free, across a junction
+        nobody declared -- and what came out would be a coherent-looking round trip over two
+        unrelated journeys. This is ``_check_partner``'s "sharpest of the five" applied where a
+        caller-supplied chain never met the loader.
+        """
+        with pytest.raises(ValueError, match="do not meet"):
             self._cost(ComposedExit(segments=("out_exchange_to_home", "out_broker_to_exchange")))
+
+    def test_an_exit_chain_whose_internal_junction_does_not_join_is_refused(self) -> None:
+        """The head is right and the seam inside the chain is not: the second segment departs
+        from a venue the first never reached."""
+        stray = fixtures.corridor(
+            "out_mirror_to_home_stray",
+            direction="exit",
+            legs=(
+                fixtures.leg(
+                    index=0,
+                    from_venue=fixtures.MIRROR,
+                    to_venue=fixtures.HOME,
+                    from_ccy=fixtures.USD,
+                    to_ccy=fixtures.UAH,
+                ),
+            ),
+        )
+        world = fixtures.two_hop()
+        with pytest.raises(ValueError, match="do not join"):
+            cost.cost_one(
+                CHAIN,
+                AMOUNT,
+                exit_path=ComposedExit(segments=("out_broker_to_exchange", stray.id)),
+                routes={**world.routes, stray.id: stray},
+                channels=world.channels,
+                streams=world.streams,
+                kinds=world.kinds,
+                on_date=fixtures.ON_DATE,
+                as_of=fixtures.AS_OF,
+                spendable=world.spendable,
+            )

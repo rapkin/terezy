@@ -62,6 +62,7 @@ def _costed(*, amount: float = SENT, with_exit: bool = False) -> RampCost:
         kinds=route_graphs.KINDS,
         on_date=route_graphs.ON_DATE,
         as_of=route_graphs.AS_OF,
+        spendable=graph.spendable,
     )
     assert isinstance(costed, RampCost), costed
     return costed
@@ -165,6 +166,7 @@ class TestTheBarIsWhatARankingMeasuresAgainst:
             kinds=route_graphs.KINDS,
             on_date=route_graphs.ON_DATE,
             as_of=route_graphs.AS_OF,
+            spendable=domestic.spendable | offshore.spendable,
         )
         assert isinstance(ranked, Ranking), ranked
         return ranked

@@ -1493,18 +1493,19 @@ def _check_composition_owner(
     streams: Mapping[str, IncomeStream],
     *,
     path: Path,
-    stream_files: Mapping[str, Path],
 ) -> None:
     """The bound must belong to the owner whose streams it is resolved with (Principle VII).
 
-    The same two halves :func:`_check_spendable_owner` establishes, for the same reason and with
-    the same failure if either is dropped: the run must hold **exactly** this owner's streams,
-    not merely include them. A composed candidate is keyed by its stream, so a bound resolved
-    beside a second owner's streams would decide how far *his* money is allowed to travel -- one
-    person's stated preference silently applied to another person's registry.
+    A composed candidate is keyed by its stream, so a bound resolved beside somebody else's
+    streams would decide how far *his* money is allowed to travel -- one person's stated
+    preference silently applied to another person's registry.
 
-    The offending declaration in the second case is the stream file that does not belong in this
-    run: the bound is correct about itself.
+    ⚙ **Only one half of :func:`_check_spendable_owner`'s check is here, and the other half is
+    not missing.** That function also refuses a run holding a *second* owner's streams beside the
+    first's, and :func:`resolve_composition` takes an already-resolved
+    :class:`CoverageDeclarations` -- which has been through exactly that refusal. Repeating it
+    here was unreachable code: no input can arrive with a foreign stream still in it. A guard
+    that cannot fire is worse than no guard, because it reads as protection.
     """
     owners = sorted({stream.owner_id for stream in streams.values()})
     if owner_id not in owners:
@@ -1516,23 +1517,6 @@ def _check_composition_owner(
             "bound belonging to somebody else would decide this owner's reach -- and which "
             "corridors he is shown at all.",
             f"name one of {owners}, or resolve this bound against that owner's streams",
-        )
-    foreign = sorted(
-        (stream.owner_id, stream.id) for stream in streams.values() if stream.owner_id != owner_id
-    )
-    if foreign:
-        first_owner, first_stream = foreign[0]
-        raise DeclarationError(
-            stream_files[first_stream],
-            "stream.owner_id",
-            f"declares stream {first_stream!r} for owner {first_owner!r}, and this composition "
-            f"run resolves the segment bound of owner {owner_id!r}. The streams loaded together "
-            f"belong to {owners}, and the foreign ones are "
-            f"{[f'{stream} ({owner})' for owner, stream in foreign]}. Composition enumerates "
-            "candidates per stream against one declared bound, so a second owner's streams "
-            "would have their reach decided by this owner's policy.",
-            f"resolve one owner's registry at a time: keep only owner {owner_id!r}'s streams in "
-            "this data root, or resolve this run against the matching composition file",
         )
 
 
@@ -1547,12 +1531,7 @@ def resolve_composition(
     chances to disagree with itself.
     """
     owner_id, bound = loader.composition_from_file(composition_file)
-    _check_composition_owner(
-        owner_id,
-        coverage.ramp.streams,
-        path=composition_file,
-        stream_files=coverage.ramp.stream_files,
-    )
+    _check_composition_owner(owner_id, coverage.ramp.streams, path=composition_file)
     return CompositionDeclarations(
         coverage=coverage, bound=bound, composition_file=composition_file
     )

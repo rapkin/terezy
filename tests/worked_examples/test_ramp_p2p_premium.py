@@ -112,6 +112,7 @@ def _cost(graph: route_graphs.Graph, *, amount: float = SENT) -> RampCost:
         kinds=route_graphs.KINDS,
         on_date=route_graphs.ON_DATE,
         as_of=route_graphs.AS_OF,
+        spendable=graph.spendable,
     )
     assert isinstance(costed, RampCost), costed
     return costed
@@ -306,6 +307,7 @@ class TestTheFindingTheFeatureExistsFor:
             kinds=route_graphs.KINDS,
             on_date=route_graphs.ON_DATE,
             as_of=route_graphs.AS_OF,
+            spendable=domestic.spendable | offshore.spendable,
         )
         assert not isinstance(ranked, NothingComparable), ranked
         return ranked

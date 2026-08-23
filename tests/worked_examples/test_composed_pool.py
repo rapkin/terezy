@@ -171,6 +171,7 @@ class TestTheCostedChainReportsOneCeiling:
             kinds=world.kinds,
             on_date=fixtures.ON_DATE,
             as_of=fixtures.AS_OF,
+            spendable=world.spendable,
         )
         assert isinstance(costed, RampCost), costed
         assert costed.ceiling is not None

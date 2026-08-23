@@ -492,6 +492,7 @@ class TestAChannelSideAgesUnderItsOwnDeclaredKind:
             kinds=route_graphs.KINDS,
             on_date=route_graphs.ON_DATE,
             as_of=route_graphs.AS_OF,
+            spendable=graph.spendable,
         )
         assert isinstance(costed, RampCost)
         return costed.one_way.staleness

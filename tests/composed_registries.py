@@ -79,6 +79,32 @@ RATE_SOURCE = SourceRef(
     verified_on=None,
 )
 FEE_SOURCES: Provenance = prov.of([FEE_SOURCE])
+
+
+def fee_source_ref(corridor_id: str) -> SourceRef:
+    """The single citation :func:`fee_source` wraps, for a test that wants to name it."""
+    return SourceRef(
+        id=f"synthetic:composed-fees:{corridor_id}",
+        citation=(
+            f"SYNTHETIC FIXTURE -- invented fee schedule for {corridor_id}. Not an observed tariff."
+        ),
+        retrieved_on=RETRIEVED_ON,
+        verified_on=None,
+    )
+
+
+def fee_source(corridor_id: str) -> Provenance:
+    """A citation of this corridor's **own** invented fee schedule.
+
+    ⚙ **One source per corridor, not one shared object.** Every leg here used to cite the same
+    ``FEE_SOURCE``, which made "the sources of every segment reach the composed figure" a claim
+    no assertion could actually check: the union of one source with itself is that source, so the
+    test passed whether or not the second segment's mark survived the join. Distinct ids make the
+    propagation visible, and a dropped mark shows up as a missing id rather than as nothing.
+    """
+    return prov.of([fee_source_ref(corridor_id)])
+
+
 RATE_SOURCES: Provenance = prov.of([RATE_SOURCE])
 
 P2P_PREMIUM = ObservationKind(
@@ -242,6 +268,7 @@ def leg(
     disruption: float = 0.0,
     channel_id: str = CHANNEL_ID,
     observation: str | None = None,
+    sources: Provenance | None = None,
 ) -> Leg:
     """One declared movement. ``fx`` when the currencies differ, a plain transfer otherwise.
 
@@ -273,7 +300,7 @@ def leg(
             if observation is not None
             else (P2P_PREMIUM.id if converts else BANK_FEE_SCHEDULE.id)
         ),
-        provenance=FEE_SOURCES,
+        provenance=FEE_SOURCES if sources is None else sources,
     )
 
 
@@ -300,7 +327,15 @@ def corridor(
         direction=direction,
         partner_route=partner_route,
         status=status,
-        legs=legs,
+        # Every leg cites **this corridor's** fee schedule unless it named its own, so a figure
+        # derived from two segments carries two ids and a dropped mark is visible as a missing
+        # one. See :func:`fee_source`.
+        legs=tuple(
+            leg
+            if leg.provenance is not FEE_SOURCES
+            else replace(leg, provenance=fee_source(route_id))
+            for leg in legs
+        ),
     )
 
 

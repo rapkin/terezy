@@ -111,6 +111,7 @@ def _ranked(routes: Mapping[str, Route], candidates: tuple[Candidate, ...]) -> R
         kinds=world.kinds,
         on_date=fixtures.ON_DATE,
         as_of=fixtures.AS_OF,
+        spendable=world.spendable,
     )
     assert isinstance(result, Ranking), result
     return result

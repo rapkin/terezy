@@ -81,6 +81,34 @@ is one declaration short of being reachable. Nothing may be fabricated to span t
 """
 
 
+CUSTODY_EXIT = fixtures.corridor(
+    "out_custody_to_broker",
+    direction="exit",
+    legs=(
+        fixtures.leg(
+            index=0,
+            from_venue=CUSTODY,
+            to_venue=fixtures.BROKER,
+            from_ccy=fixtures.USD,
+            to_ccy=fixtures.USD,
+            fee_fixed=3.0,
+        ),
+    ),
+)
+"""The first hop of custody's own way out.
+
+⚙ **Added after review.** The round-trip assertion below first reused the broker's exit chain,
+which departs from the **broker** while this candidate's money is at **custody** -- a way out for
+a different journey, paired with this one in a loop. Costing refuses it now, which is exactly the
+defect the head anchor was added for, and the honest repair is to declare the hop rather than to
+weaken the assertion.
+"""
+
+CUSTODY_EXIT_CHAIN = ComposedExit(
+    segments=("out_custody_to_broker", "out_broker_to_exchange", "out_exchange_to_home")
+)
+
+
 def _candidates(routes: dict[str, Route], destination: Destination) -> tuple[Candidate, ...]:
     world = fixtures.two_hop()
     result = compose.compose(
@@ -120,15 +148,20 @@ class TestOneDeclarationExtendsTheReachableGraph:
         """Not merely reachable: costed by the one costing function, with a round-trip figure,
         and taking its place in the ordinary ranking.
 
-        The way out is the same chain the broker already had, because custody's own exit is a
-        further declaration nobody has written -- so the candidate ranked here is costed in and
-        back out through declarations that all existed before this test invented one hop.
+        The way out is custody's own first hop onto the broker's existing chain, so the round
+        trip is costed through four declarations of which this test invented two -- and the way
+        out **leaves from where the money actually is**, which is the anchor a chain borrowed
+        from another destination would fail.
         """
-        routes = {**fixtures.two_hop().routes, ONWARD.id: ONWARD}
+        routes = {
+            **fixtures.two_hop().routes,
+            ONWARD.id: ONWARD,
+            CUSTODY_EXIT.id: CUSTODY_EXIT,
+        }
         world = fixtures.two_hop()
         (candidate,) = _candidates(routes, CUSTODY_USD)
         outcome = ranking.rank(
-            [Journey(path=candidate, exit_path=EXIT_CHAIN)],
+            [Journey(path=candidate, exit_path=CUSTODY_EXIT_CHAIN)],
             AMOUNT,
             routes=routes,
             channels=world.channels,
@@ -136,6 +169,7 @@ class TestOneDeclarationExtendsTheReachableGraph:
             kinds=world.kinds,
             on_date=fixtures.ON_DATE,
             as_of=fixtures.AS_OF,
+            spendable=world.spendable,
         )
         assert isinstance(outcome, Ranking), outcome
         (entry,) = outcome.costed

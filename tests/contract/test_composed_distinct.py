@@ -43,6 +43,7 @@ from terezy.core.routes.legs import Route
 from terezy.core.routes.path import (
     ComposedExit,
     ComposedPath,
+    DeclaredExit,
     FundingPath,
     Journey,
     candidate_id,
@@ -123,6 +124,7 @@ def _rank(*journeys: Journey) -> Ranking:
         kinds=world.kinds,
         on_date=fixtures.ON_DATE,
         as_of=fixtures.AS_OF,
+        spendable=fixtures.SPENDABLE,
     )
     assert isinstance(outcome, Ranking), outcome
     return outcome
@@ -178,6 +180,7 @@ class TestEveryReportedCandidateSaysWhichKindItIs:
             kinds=world.kinds,
             on_date=fixtures.ON_DATE,
             as_of=fixtures.AS_OF,
+            spendable=fixtures.SPENDABLE,
         )
         (excluded,) = outcome.excluded
         assert isinstance(excluded.path, ComposedPath)
@@ -222,6 +225,7 @@ class TestTwoExitChainsAreTwoRoundTripFigures:
                 kinds=fixtures.tied().kinds,
                 on_date=fixtures.ON_DATE,
                 as_of=fixtures.AS_OF,
+                spendable=fixtures.SPENDABLE,
             )
             for chain in (VIA_EXCHANGE, VIA_MIRROR)
         ]
@@ -288,7 +292,153 @@ class TestTheExitChainAndTheRoundTripSlotAgree:
             kinds=world.kinds,
             on_date=fixtures.ON_DATE,
             as_of=fixtures.AS_OF,
+            spendable=fixtures.SPENDABLE,
         )
         assert isinstance(costed, RampCost)
         assert isinstance(costed.round_trip, ExitCostUnknown)
         assert costed.exit_path is None
+
+
+class TestTheSeamBetweenTheWayInAndTheWayOut:
+    """F1: an exit chain is anchored at **both** ends, or the money teleports.
+
+    ``_routes_for`` anchors the inbound chain at its tail against the destination it claims.
+    ``_exit_routes`` had no anchor at either end, so a way out for one destination could be
+    paired with a way in to another and walked as though they met -- which is a one-loop mistake
+    through this feature's own surface, since ``rank`` takes a ``Journey`` from any caller.
+
+    Both faces are pinned below. Neither produced an error before the anchors existed; both
+    produced a confident, coherent-looking round-trip figure.
+    """
+
+    def test_an_exit_that_departs_from_somewhere_else_is_refused(self) -> None:
+        """**Face (a): the money teleports.**
+
+        The candidate arrives at the **broker**; ``out_exchange_to_home`` departs from the
+        **exchange**. Walking it moved 219 USD between the two for free, across a junction
+        nobody declared -- FR-002's "a junction never converts, charges or waits" broken at the
+        one junction nothing checked. The result read as a coherent three-hop journey, which is
+        why nothing noticed.
+        """
+        world = fixtures.tied()
+        with pytest.raises(ValueError, match="do not meet"):
+            cost.cost_one(
+                CHAIN,
+                AMOUNT,
+                exit_path=DeclaredExit(route_id="out_exchange_to_home"),
+                routes=_world(),
+                channels=world.channels,
+                streams=world.streams,
+                kinds=world.kinds,
+                on_date=fixtures.ON_DATE,
+                as_of=fixtures.AS_OF,
+                spendable=world.spendable,
+            )
+
+    def test_an_exit_that_does_not_reach_a_spendable_endpoint_is_refused(self) -> None:
+        """**Face (b): the round trip does not return spendable money.**
+
+        The seam is fine -- ``out_broker_to_exchange`` does leave the broker -- but the chain
+        ends holding **dollars at an exchange**, which is not somewhere the owner spends. FR-012
+        and FR-022 both require an exit chain to reach a declared spendable endpoint, and 002's
+        loader refused exactly this for a ``partner_route``.
+
+        Worse than a missing figure: ``arrived`` was then in dollars while ``fraction`` was
+        computed from hryvnia components, so one record carried two figures describing different
+        things.
+        """
+        world = fixtures.tied()
+        with pytest.raises(ValueError, match="not a declared spendable endpoint"):
+            cost.cost_one(
+                CHAIN,
+                AMOUNT,
+                exit_path=DeclaredExit(route_id="out_broker_to_exchange"),
+                routes=_world(),
+                channels=world.channels,
+                streams=world.streams,
+                kinds=world.kinds,
+                on_date=fixtures.ON_DATE,
+                as_of=fixtures.AS_OF,
+                spendable=world.spendable,
+            )
+
+    def test_a_correctly_anchored_chain_still_costs(self) -> None:
+        """The anchors refuse mispairings, not exit chains. Without this the two above would
+        pass against a function that refused everything."""
+        ranked = _rank(Journey(path=CHAIN, exit_path=VIA_EXCHANGE))
+        (entry,) = ranked.costed
+        assert isinstance(entry.round_trip, RoundTripCost)
+
+
+class TestTheKeyAndTheRoundTripSlotCannotDisagree:
+    """F2: ``exit_path is None`` **exactly when** there is no round-trip figure.
+
+    The record's own docstring said "and never otherwise ... asserted rather than assumed", and
+    it was false: ``cost_one`` filled both slots from the chain it had chosen, while
+    ``_round_trip`` refuses on two further paths afterwards. The key is now derived from the
+    outcome, so the biconditional holds by construction.
+    """
+
+    def test_a_closed_way_out_clears_the_key_it_would_have_been_ranked_under(self) -> None:
+        """The case the old tests missed. A chain was chosen, then found closed on the date --
+        so there is no round-trip figure, and no chain this figure is keyed by."""
+        shut = dataclasses.replace(fixtures.EXCHANGE_TO_HOME, status="closed")
+        world = fixtures.tied()
+        costed = cost.cost_one(
+            CHAIN,
+            AMOUNT,
+            exit_path=VIA_EXCHANGE,
+            routes={**_world(), shut.id: shut},
+            channels=world.channels,
+            streams=world.streams,
+            kinds=world.kinds,
+            on_date=fixtures.ON_DATE,
+            as_of=fixtures.AS_OF,
+            spendable=world.spendable,
+        )
+        assert isinstance(costed, RampCost), costed
+        assert isinstance(costed.round_trip, ExitCostUnknown)
+        assert "closed" in costed.round_trip.reason
+        assert costed.exit_path is None
+
+    def test_a_way_out_that_will_not_carry_what_arrived_clears_it_too(self) -> None:
+        """The second late refusal: the chain exists, is open, and its minimum bites."""
+        strict = dataclasses.replace(
+            fixtures.BROKER_TO_EXCHANGE,
+            legs=(
+                dataclasses.replace(
+                    fixtures.BROKER_TO_EXCHANGE.legs[0],
+                    minimum=Money(10_000.0, Currency.USD, prov.EMPTY),
+                ),
+            ),
+        )
+        world = fixtures.tied()
+        costed = cost.cost_one(
+            CHAIN,
+            AMOUNT,
+            exit_path=VIA_EXCHANGE,
+            routes={**_world(), strict.id: strict},
+            channels=world.channels,
+            streams=world.streams,
+            kinds=world.kinds,
+            on_date=fixtures.ON_DATE,
+            as_of=fixtures.AS_OF,
+            spendable=world.spendable,
+        )
+        assert isinstance(costed, RampCost), costed
+        assert isinstance(costed.round_trip, ExitCostUnknown)
+        assert costed.exit_path is None
+
+    def test_the_correspondence_holds_in_both_directions_on_every_reported_candidate(
+        self,
+    ) -> None:
+        """Stated over a whole ranking rather than one record, because the claim is about the
+        type and a consumer reads it that way: ``exit_path is not None`` means there is a
+        round-trip figure, always."""
+        ranked = _rank(
+            Journey(path=CHAIN, exit_path=VIA_EXCHANGE),
+            Journey(path=CHAIN, exit_path=VIA_MIRROR),
+            Journey(path=DECLARED, exit_path=VIA_EXCHANGE),
+        )
+        for entry in (*ranked.costed, *ranked.not_comparable):
+            assert (entry.exit_path is not None) == isinstance(entry.round_trip, RoundTripCost)

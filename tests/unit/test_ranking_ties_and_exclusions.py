@@ -46,6 +46,7 @@ from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.tolerance import is_close
+from terezy.core.results.coverage import SpendableEndpoint
 from terezy.core.results.ramp import (
     ExitCostUnknown,
     NothingComparable,
@@ -69,6 +70,18 @@ _EXIT_TEMPLATE = _TEMPLATE.routes["inzhur_exit"]
 
 Candidate = tuple[FundingPath, Mapping[str, Route]]
 """One path and the route declarations it needs -- the inbound route and, usually, its exit."""
+
+
+SPENDABLE: frozenset[SpendableEndpoint] = frozenset()
+"""**Nowhere is declared spendable here, and that is deliberate.**
+
+These fixtures predate the spendable list and their subject is 002's partner rule: a route
+with a declared way out, and one without. A destination that happened to appear in this set
+would satisfy its own exit requirement by identity (003 FR-002) and quietly acquire a
+round-trip figure, turning "nobody costed the way out" into "there was nothing to do" --
+which is a different claim and is exercised where it belongs, in the composed suites and in
+``tests/invariants/test_coverage_costing_agreement.py``.
+"""
 
 
 def _uah(amount: float) -> Money:
@@ -134,6 +147,7 @@ def _rank(*candidates: Candidate) -> Ranking | NothingComparable:
         kinds=route_graphs.KINDS,
         on_date=route_graphs.ON_DATE,
         as_of=route_graphs.AS_OF,
+        spendable=SPENDABLE,
     )
 
 

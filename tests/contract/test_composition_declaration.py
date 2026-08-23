@@ -328,12 +328,18 @@ person's money is allowed to travel, and therefore which corridors he is shown a
 def test_a_second_owners_streams_in_the_data_root_are_refused_not_blended(
     tmp_path: Path,
 ) -> None:
-    """Principle VII, on the side a membership check leaves open.
+    """Principle VII, on the side a membership check leaves open -- **inherited, not re-armed.**
 
-    ``ramp_from_data_root`` globs every ``streams/*.toml``, so two owners' streams load together
-    and asking only whether the bound's owner is *among* them lets the other owner's streams be
-    enumerated against this owner's policy. The refusal names the **stream file** that does not
-    belong in this run, because the composition file is correct about itself.
+    ``ramp_from_data_root`` globs every ``streams/*.toml``, so two owners' streams load together,
+    and a run that enumerated the other owner's streams against this owner's declared reach would
+    apply one person's stated policy to another person's registry.
+
+    ⚙ **The refusal comes from the coverage resolution this record builds on**, not from a
+    composition-specific check. ``resolve_composition`` takes an already-resolved
+    ``CoverageDeclarations``, and the spendable list's owner check has already refused the
+    foreign stream by then -- so a second copy in ``_check_composition_owner`` was unreachable
+    code and was removed. This test is what keeps the inheritance honest: composition must not
+    grow an entry point that skips it.
     """
     root = _scratch_root(tmp_path)
     foreign = root / "streams" / "owner-002.toml"

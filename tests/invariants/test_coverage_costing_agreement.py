@@ -72,11 +72,17 @@ from __future__ import annotations
 import pytest
 from hypothesis import given, settings
 
-from terezy.core.results.coverage import CoverageReport, NotReady, Ready
+from terezy.core.results.coverage import (
+    SATISFIED_BY_IDENTITY,
+    CoverageReport,
+    NotReady,
+    Ready,
+    SpendableEndpoint,
+)
 from terezy.core.results.ramp import ExitCostUnknown, RampCost, RoundTripCost, RouteUnusable
 from terezy.core.routes.cost import cost_one
 from terezy.core.routes.coverage import coverage
-from terezy.core.routes.path import FundingPath
+from terezy.core.routes.path import EXIT_BY_IDENTITY, FundingPath
 from tests.invariants import route_graphs
 from tests.invariants.route_graphs import CoverageRegistry, coverage_registries
 
@@ -104,6 +110,7 @@ def _costed(
             kinds=route_graphs.KINDS,
             on_date=route_graphs.ON_DATE,
             as_of=route_graphs.AS_OF,
+            spendable=registry.spendable,
         )
         for route in registry.routes.values()
         if route.destination == destination_venue
@@ -308,3 +315,77 @@ def test_the_battery_produced_both_ready_and_not_ready_verdicts() -> None:
     properties above have been passing for the wrong reason.
     """
     assert {"Ready", "NotReady"} == _SEEN, f"the battery only produced {_SEEN or 'nothing'}"
+
+
+# ---------------------------------------------------------------------------
+# 004-composed-paths: the reconciliation, pinned rather than drawn
+# ---------------------------------------------------------------------------
+
+
+def _identity_registry() -> CoverageRegistry:
+    """One inbound route landing on the spendable endpoint, declaring **no** partner.
+
+    The exact shape ``features.toml`` recorded as ``identity-exit-vs-partner-requirement``:
+    coverage marks the pair ready because the money has arrived where the owner spends (003
+    FR-002), while 002's costing found no ``partner_route`` and refused with
+    ``ExitCostUnknown`` -- the FR-018 disagreement that entry says must not exist.
+
+    Built by hand rather than drawn, because the generator reaches this shape by a coin flip and
+    a reconciliation that a re-seed can skip is not pinned.
+    """
+    return CoverageRegistry(
+        venues={
+            route_graphs.HOME_VENUE: route_graphs.venues_for_agreement()[0],
+            route_graphs.CONTRACT_VENUE: route_graphs.venues_for_agreement()[1],
+        },
+        streams=route_graphs.COVERAGE_STREAMS,
+        routes={
+            route_graphs.SPENDABLE_INBOUND: route_graphs.spendable_inbound(partner=None),
+        },
+        channels=route_graphs.AGREEMENT_CHANNELS,
+        spendable=frozenset(
+            {
+                SpendableEndpoint(
+                    venue_id=route_graphs.HOME_VENUE, currency=route_graphs.BASE_CURRENCY
+                )
+            }
+        ),
+    )
+
+
+def _verdict_for(report: CoverageReport, venue: str, stream_id: str) -> Ready | NotReady:
+    (block,) = report.regimes
+    for verdict in block.verdicts:
+        if verdict.destination.venue_id == venue and verdict.stream_id == stream_id:
+            return verdict
+    raise AssertionError(f"no verdict for {venue!r} and {stream_id!r}")
+
+
+def test_a_spendable_destination_with_no_partner_is_ready_and_costing_agrees() -> None:
+    """**The closed tension, run through both views on one registry.**
+
+    Coverage is *invoked*, not restated: a hand-written precondition asserting what coverage
+    would say is a second implementation of the rule under test, and it agrees with itself by
+    construction. So this builds one registry, folds it through ``coverage``, walks it through
+    ``cost_one``, and asserts the two reach the same verdict about the same pair.
+
+    Without the derivation in ``_exit_chain_of`` this fails exactly as the recorded entry
+    described: ``Ready`` on one side, ``ExitCostUnknown`` on the other.
+    """
+    registry = _identity_registry()
+    report = coverage(
+        venues=registry.venues,
+        streams=registry.streams,
+        routes=registry.routes,
+        regimes={},
+        spendable=registry.spendable,
+    )
+    assert isinstance(report, CoverageReport), report
+    verdict = _verdict_for(report, route_graphs.HOME_VENUE, route_graphs.COVERAGE_CONTRACT.id)
+    assert isinstance(verdict, Ready), verdict
+    assert verdict.exits is SATISFIED_BY_IDENTITY, verdict.exits
+
+    (costed,) = _costed(registry, route_graphs.HOME_VENUE, route_graphs.COVERAGE_CONTRACT.id)
+    assert isinstance(costed, RampCost), costed
+    assert isinstance(costed.round_trip, RoundTripCost), costed.round_trip
+    assert costed.exit_path is EXIT_BY_IDENTITY

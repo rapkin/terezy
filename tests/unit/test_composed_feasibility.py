@@ -32,7 +32,7 @@ from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.tolerance import is_close
 from terezy.core.results.composed import Enumeration, SegmentBound
-from terezy.core.results.ramp import RampCost, Ranking, RouteUnusable
+from terezy.core.results.ramp import RampCost, Ranking, RoundTripCost, RouteUnusable
 from terezy.core.routes import compose, cost, ranking
 from terezy.core.routes.legs import Route
 from terezy.core.routes.path import (
@@ -72,6 +72,7 @@ def _costed(routes: dict[str, Route], amount: Money = AMOUNT) -> RampCost | Rout
         kinds=world.kinds,
         on_date=fixtures.ON_DATE,
         as_of=fixtures.AS_OF,
+        spendable=world.spendable,
     )
 
 
@@ -114,6 +115,7 @@ class TestAClosedSegmentExcludesTheChainAndSaysWhichOne:
             kinds=world.kinds,
             on_date=fixtures.ON_DATE,
             as_of=fixtures.AS_OF,
+            spendable=world.spendable,
         )
         assert isinstance(outcome, RouteUnusable), outcome
         assert outcome.binding_segment is None
@@ -133,6 +135,7 @@ class TestAClosedSegmentExcludesTheChainAndSaysWhichOne:
             kinds=world.kinds,
             on_date=fixtures.ON_DATE,
             as_of=fixtures.AS_OF,
+            spendable=world.spendable,
         )
         assert not isinstance(outcome, Ranking)
         (excluded,) = outcome.excluded
@@ -282,3 +285,51 @@ class TestNoCandidateMixesRouteSetsAcrossARegimeTransition:
         in_force = _in_force(BEFORE)
         assert regimes.paths_in_force([CHAIN], in_force) == ()
         assert "in_exchange_to_broker" in in_force.excluded
+
+
+class TestTheStatusOfAChainIsItsTightestSegment:
+    """F4: the rule is *most constrained wins*, and it is asserted rather than only documented.
+
+    It matches how the other whole-chain figures already behave -- ``ceiling`` is the tightest
+    declared cap and ``disruption_probability`` the largest single leg -- and it is the reading
+    that cannot mislead: a chain is no more usable than its tightest link, and ``status`` is
+    what a reader scans to decide whether to trust the figure beside it.
+
+    Before these tests, mutating the rule to ``resolved[0].status`` or ``resolved[-1].status``
+    passed the whole suite.
+    """
+
+    def test_a_constrained_first_segment_makes_the_chain_constrained(self) -> None:
+        tight = dataclasses.replace(fixtures.SALARY_TO_EXCHANGE, status="constrained")
+        outcome = _costed(_world(first=tight))
+        assert isinstance(outcome, RampCost), outcome
+        assert outcome.status == "constrained"
+
+    def test_a_constrained_last_segment_makes_the_chain_constrained(self) -> None:
+        """The half that ``resolved[0].status`` would get wrong."""
+        tight = dataclasses.replace(fixtures.EXCHANGE_TO_BROKER, status="constrained")
+        outcome = _costed(_world(second=tight))
+        assert isinstance(outcome, RampCost), outcome
+        assert outcome.status == "constrained"
+
+    def test_a_chain_of_open_segments_is_open(self) -> None:
+        """So the rule is not simply "always constrained"."""
+        outcome = _costed(_world())
+        assert isinstance(outcome, RampCost), outcome
+        assert outcome.status == "open"
+
+    def test_a_constrained_exit_segment_leaves_the_way_in_open(self) -> None:
+        """The stated gap, pinned so it is a decision rather than an oversight.
+
+        ``status`` is 002's field about the **way in**, and a constrained *exit* segment does not
+        move it -- on a record whose headline number is the round trip. Widening it would change
+        what the field means for every declared route that already carries one, so the honest fix
+        is a second field for the way out rather than a quiet redefinition of this one. A
+        **closed** exit segment is unaffected either way: it yields ``ExitCostUnknown`` naming the
+        route, so the round-trip slot says so in words.
+        """
+        tight = dataclasses.replace(fixtures.EXCHANGE_TO_HOME, status="constrained")
+        outcome = _costed(_world(exit_hop=tight))
+        assert isinstance(outcome, RampCost), outcome
+        assert outcome.status == "open"
+        assert isinstance(outcome.round_trip, RoundTripCost), outcome.round_trip

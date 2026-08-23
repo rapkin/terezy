@@ -221,6 +221,7 @@ class TestADanglingPartnerIsNotAMissingRoundTrip:
                 kinds=route_graphs.KINDS,
                 on_date=route_graphs.ON_DATE,
                 as_of=route_graphs.AS_OF,
+                spendable=graph.spendable,
             )
 
     def test_a_route_declaring_no_partner_reports_exit_cost_unknown(self) -> None:
@@ -235,6 +236,7 @@ class TestADanglingPartnerIsNotAMissingRoundTrip:
             kinds=route_graphs.KINDS,
             on_date=route_graphs.ON_DATE,
             as_of=route_graphs.AS_OF,
+            spendable=graph.spendable,
         )
         assert isinstance(costed, RampCost)
         assert isinstance(costed.round_trip, ExitCostUnknown)
@@ -273,6 +275,7 @@ class TestAClosedExitPartnerIsNotACostableRoundTrip:
             kinds=route_graphs.KINDS,
             on_date=route_graphs.ON_DATE,
             as_of=route_graphs.AS_OF,
+            spendable=graph.spendable,
         )
         assert isinstance(costed, RampCost)
         return costed

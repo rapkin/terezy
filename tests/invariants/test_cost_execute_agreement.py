@@ -80,6 +80,7 @@ def _costed(graph: route_graphs.Graph, amount: float) -> RampCost | RouteUnusabl
         kinds=route_graphs.KINDS,
         on_date=route_graphs.ON_DATE,
         as_of=route_graphs.AS_OF,
+        spendable=graph.spendable,
     )
 
 

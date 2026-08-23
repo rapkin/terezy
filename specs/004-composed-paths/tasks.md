@@ -305,6 +305,43 @@ to a test. **Commit.**
 
 ---
 
+## Phase 9: Review round (independent review, 2026-08-23)
+
+Eleven findings. The four flagged judgment calls were upheld; the rest are fixed below, each
+with the test that pins it and a revert check proving that test fails without the fix.
+
+- [X] R1 **F1 (top severity)** — anchor the exit chain at **both** ends in
+      `src/terezy/core/routes/cost.py`: it departs from where the inbound chain arrived, and a
+      caller-supplied chain ends at a declared spendable endpoint. Both faces pinned in
+      `tests/contract/test_composed_distinct.py::TestTheSeamBetweenTheWayInAndTheWayOut`.
+- [X] R2 **F11** — one junction rule, `_checked_joins`, used by both chain validators. The
+      duplication is where the divergence hid, so it is gone rather than fixed twice.
+- [X] R3 **F2 (high)** — `RampCost.exit_path` is derived from the round-trip **outcome**, so the
+      biconditional holds by construction. Both late refusals pinned in
+      `tests/contract/test_composed_distinct.py::TestTheKeyAndTheRoundTripSlotCannotDisagree`.
+- [X] R4 **F3 (high)** — `EXIT_BY_IDENTITY` is **derived** from the declared spendable list in
+      `_exit_chain_of`, so no caller has to opt in. `tests/invariants/test_coverage_costing_agreement.py`
+      runs one registry through `coverage` **and** costing and asserts they agree.
+- [X] R5 **F4 (medium)** — the most-constrained-segment rule is documented on `RampCost.status`,
+      in `docs/METHODOLOGY.md` §21.7, and pinned against mutation in
+      `tests/unit/test_composed_feasibility.py::TestTheStatusOfAChainIsItsTightestSegment`.
+- [X] R6 **F5 (medium)** — FR-009's "differing terms are distinct" half, parametrised over every
+      previously-untested leg field in `tests/unit/test_composed_duplicates.py`.
+- [X] R7 **F6** — `contracts/composition.md` amended to the shape that shipped, with the guard
+      recorded as the reason.
+- [X] R8 **F7** — the generator docstring no longer claims a non-joining junction it cannot
+      produce; the measurement is recorded and the rule's real home is named.
+- [X] R9 **F8** — a decoy for the transitive nesting exemption, in both directions.
+- [X] R10 **F10** — `exit_path` and `by_segment` are rendered **and digested** in the golden, and
+      the artefact regenerated deliberately.
+- [X] R11 — each corridor fixture cites its own invented fee schedule, so the propagation
+      assertions can actually fail; and `rank`'s docstring states the second application of
+      `FROM_THE_DECLARATION`.
+- [X] R12 — removed an unreachable duplicate of the foreign-stream guard in
+      `resolver._check_composition_owner`; the coverage resolution it builds on already refuses.
+
+---
+
 ## Dependencies & execution order
 
 ### Phase dependencies

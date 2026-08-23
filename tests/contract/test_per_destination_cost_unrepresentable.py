@@ -437,6 +437,41 @@ class TestTheScanWouldActuallyCatchAViolation:
         assert not _accepts_a_bare_destination(cost_one)
         assert _takes_the_triple(cost_one)
 
+    def test_the_transitive_nesting_exemption_still_refuses_an_unreachable_record(self) -> None:
+        """The decoy the widened exemption needed, and did not have.
+
+        Making the nesting closure transitive was necessary -- ``SegmentAttribution`` is keyed by
+        its **grandparent** ``RampCost`` -- but it widened the exempt set from the eight types
+        directly held by a keyed record to everything reachable from one. An exemption that grew
+        without a decoy is an exemption nobody has seen fail.
+
+        So: a record carrying a cost figure that **nothing keyed reaches** must still be caught.
+        The closure walks out from the keyed records only, so a type held by no result record at
+        all is outside it however transitive the walk becomes.
+        """
+        nested = _records_nested_in_keyed_records()
+
+        @dataclasses.dataclass(frozen=True)
+        class OrphanedAttribution:
+            """A cost figure hanging off nothing -- exempt only if the closure over-reaches."""
+
+            fraction: float
+
+        assert OrphanedAttribution.__name__ not in nested
+        fields = {field.name for field in dataclasses.fields(OrphanedAttribution)}
+        assert fields & COST_FIGURE_NAMES
+        assert not _is_keyed(OrphanedAttribution)
+
+    def test_the_transitive_exemption_does_reach_the_record_it_was_widened_for(self) -> None:
+        """The other half: ``SegmentAttribution`` is two hops from the key and **is** exempt.
+
+        Without this the decoy above would pass against a closure that had been reverted to one
+        level, and the widening would look untested in the direction it actually changed.
+        """
+        nested = _records_nested_in_keyed_records()
+        assert "OneWayCost" in nested, "the direct hop is missing; this test is stale"
+        assert "SegmentAttribution" in nested
+
     def test_a_sequence_of_triples_is_the_triple_too(self) -> None:
         # ``rank``'s shape. Many whole keys is not a partial key, and refusing the plural
         # would push a ranking function into taking three parallel lists -- which is the
@@ -493,6 +528,7 @@ class TestTheTripleMustBeCoherentAndNotMerelyPresent:
             kinds=route_graphs.KINDS,
             on_date=route_graphs.ON_DATE,
             as_of=route_graphs.AS_OF,
+            spendable=frozenset(),
         )
 
     def test_a_path_naming_an_undeclared_route_fails_naming_the_known_ones(self) -> None:

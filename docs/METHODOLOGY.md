@@ -1713,7 +1713,43 @@ Nothing combines them, and there is **no field** for a combined figure. Compound
 The structural refusal is worth more than a comment here, because the comment is what gets deleted
 by the next contributor who "just needs a single number for the ranking".
 
-### 21.7 The way out, in three shapes
+### 21.7 What a chain's status reports
+
+A composed candidate's `status` is the **most constrained** status any of its segments declares:
+`constrained` if any one is, `open` only if all of them are. A chain is no more usable than its
+tightest link, and taking the first segment's status or the last would let a constrained corridor
+hide behind an open one — in the field a reader scans to decide whether to trust the figure
+beside it. It is the shape the other whole-chain figures already take: the `ceiling` is the
+tightest declared cap and the disruption probability the largest single leg.
+
+A `closed` segment never reaches the figure at all: the candidate is excluded with the binding
+**segment** named, so a reader of a three-hop chain knows which declaration to open.
+
+**It describes the way in only, and that is a stated gap.** A constrained *exit* segment leaves
+the status `open` on a record whose headline number is the round trip. Widening it would change
+what the field means for every declared route that already carries one, so the honest fix is a
+second field for the way out rather than a quiet redefinition of this one. A **closed** exit
+segment is unaffected either way — it produces *exit cost unknown* naming the route, so the
+round-trip slot says so in words.
+
+### 21.8 The seam between the way in and the way out
+
+A round trip is **one** journey, so the exit chain is anchored at both ends: it departs from the
+venue the inbound chain arrived at, in the currency it arrived in, and it ends at a declared
+spendable endpoint.
+
+Neither anchor is decoration. Without the first, an exit chain belonging to one destination can
+be paired with a way in to another and walked as though the two met — the money crosses a
+junction nobody declared, for free, and what comes out is a coherent-looking round trip over two
+unrelated journeys. Without the second, a round trip can "complete" while the money is still
+sitting in dollars at an exchange, and the record then carries an arriving amount in one currency
+beside a cost fraction computed in another: two figures describing different things.
+
+Feature 002 enforced both at load for a declared `partner_route`. They are enforced again here
+because a chain assembled at query time never met the loader, and because the search that would
+only ever emit a well-anchored chain is not the only way one arrives.
+
+### 21.9 The way out, in three shapes
 
 A round trip exists when there is a way out, and there are exactly three ways there can be one:
 
@@ -1744,6 +1780,14 @@ destination ready by identity, while 002's costing required a declared partner a
 the disagreement 003's own FR-018 says must not exist, recorded in `specs/features.toml` as
 `identity-exit-vs-partner-requirement` and naming composition as the thing that would make it
 real. The sentinel is that resolution, and the entry comes off the future list with this feature.
+
+**The identity case is derived, not opted into.** Costing reads the same declared spendable
+list the coverage report reads, and where the destination is on it the sentinel is the way out —
+without a caller passing anything. That is what closes the disagreement rather than merely making
+it closable: a reconciliation only a caller can opt into leaves the recorded violation exactly
+where it was, because no caller opts in. Identity also **supersedes** a declared partner, which is
+the reading feature 003 already took: where the money is already spendable, a further declared hop
+is a journey the owner has no reason to make.
 
 **Where nothing chains, the gap stands.** A destination from which no declared exit segments reach
 a spendable endpoint still reports *exit cost unknown*, stays out of the round-trip ranking, and

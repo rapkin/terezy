@@ -11,13 +11,27 @@ def compose(
     stream: IncomeStream,
     destination: Destination,
     direction: RouteDirection,
-    regime: Regime,
+    regime_id: str,
     bound: SegmentBound,
     spendable: frozenset[SpendableEndpoint],
 ) -> Enumeration | CompositionRefused
 
 def legs_of(candidate: Candidate, routes: Mapping[str, Route]) -> tuple[Leg, ...]
 ```
+
+⚙ **`regime_id: str`, not `regime: Regime`** — amended 2026-08-23 to the shape that shipped.
+`tests/unit/test_transition_is_an_assumption.py` forbids every module in `core/routes/` except
+`coverage.py` from importing `terezy.core.scenarios` or binding `Regime`, so that the costing
+engine cannot turn an assumption into a leg field. Taking the record would have breached that
+landed guard *and* put a second place in the engine that decides which routes a regime includes.
+The narrowing stays `scenarios.routes_in_force`'s — exactly as it already is for `cost_one` —
+and what reaches `compose` is the narrowed mapping plus the id it was narrowed for, which is
+what `data-model.md` already records on `Enumeration.regime_id`. G14 is unchanged and is checked
+by handing the function a regime's routes and no others.
+
+`cost_one` and `rank` also take `spendable: frozenset[SpendableEndpoint]`, which the original
+contract did not anticipate: costing needs it to derive `EXIT_BY_IDENTITY` (G11) and to hold a
+caller-supplied exit chain to the anchor G1 states.
 
 `legs_of` is the whole of "composition adds no arithmetic": it turns either kind of
 candidate into one leg sequence, re-indexed across the concatenation, and `cost_one` walks
@@ -27,9 +41,16 @@ that sequence exactly as it always did. There is no second costing path to keep 
 
 ## Guarantees
 
-**G1 — Connectivity is exact.** Adjacent segments join only where the destination venue and
-arriving currency of one equal the origin venue and departing currency of the next. A
-junction never converts, charges or waits. (FR-001, FR-002)
+**G1 — Connectivity is exact, and it is anchored at both ends.** Adjacent segments join only
+where the destination venue and arriving currency of one equal the origin venue and departing
+currency of the next. A junction never converts, charges or waits. (FR-001, FR-002)
+
+The same rule binds the **seam between the two chains**: an exit chain departs from where the
+inbound chain arrived, in the currency it arrived in, and a caller-supplied one ends at a
+declared spendable endpoint. `compose` only ever emits chains satisfying both, so the checks
+live where a chain can reach costing without having been through the search — and they raise,
+because a way out that does not leave from where the money is, or does not get it anywhere the
+owner spends, is a construction error rather than a fact about the money.
 
 **G2 — Nothing is invented.** No rate, fee, cap, minimum, latency, status, window or
 probability exists on a composed candidate that does not exist on one of its segments. No

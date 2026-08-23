@@ -118,6 +118,7 @@ def _costed() -> RampCost:
         kinds=world.kinds,
         on_date=fixtures.ON_DATE,
         as_of=fixtures.AS_OF,
+        spendable=world.spendable,
     )
     assert isinstance(outcome, RampCost), outcome
     return outcome

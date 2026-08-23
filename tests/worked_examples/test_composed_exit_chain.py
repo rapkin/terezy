@@ -152,6 +152,7 @@ def _costed(
         kinds=world.kinds,
         on_date=fixtures.ON_DATE,
         as_of=fixtures.AS_OF,
+        spendable=world.spendable,
     )
     assert isinstance(outcome, RampCost), outcome
     return outcome
@@ -313,6 +314,7 @@ class TestWhereNothingChainsTheGapStandsUnchanged:
             kinds=fixtures.stranded().kinds,
             on_date=fixtures.ON_DATE,
             as_of=fixtures.AS_OF,
+            spendable=fixtures.stranded().spendable,
         )
         assert isinstance(costed, RampCost), costed
         assert isinstance(costed.round_trip, ExitCostUnknown)
@@ -331,6 +333,7 @@ class TestWhereNothingChainsTheGapStandsUnchanged:
             kinds=fixtures.stranded().kinds,
             on_date=fixtures.ON_DATE,
             as_of=fixtures.AS_OF,
+            spendable=fixtures.stranded().spendable,
         )
         assert isinstance(costed, RampCost)
         assert is_close(costed.one_way.arrived.amount, ARRIVED_AT_BROKER)
@@ -347,6 +350,7 @@ class TestWhereNothingChainsTheGapStandsUnchanged:
             kinds=world.kinds,
             on_date=fixtures.ON_DATE,
             as_of=fixtures.AS_OF,
+            spendable=world.spendable,
         )
         assert isinstance(outcome, NothingComparable), outcome
         assert [candidate_id(entry.path) for entry in outcome.not_comparable] == [
@@ -381,12 +385,43 @@ class TestADestinationThatIsItselfSpendable:
         )
         assert world.routes["in_salary_to_home"].partner_route is None
 
-    def test_without_the_sentinel_the_declaration_still_yields_exit_cost_unknown(self) -> None:
-        """002's behaviour, unchanged and still reachable. The sentinel is a *statement the
-        caller makes*, not an inference the engine draws from a venue id -- because whether a
-        venue is spendable is the owner's declaration and not costing's to guess."""
+    def test_the_declaration_alone_now_yields_the_round_trip_by_identity(self) -> None:
+        """**The reconciliation, and the whole point of it: nobody has to opt in.**
+
+        ``FROM_THE_DECLARATION`` is what every 002-era caller passes and what a bare candidate
+        resolves to. Before this, it found no ``partner_route`` here and returned
+        ``ExitCostUnknown`` -- while feature 003's coverage called the same pair **ready** by
+        identity, which is the disagreement its own FR-018 says must not exist.
+
+        Costing now reads the spendable list and reaches coverage's verdict on its own. A
+        sentinel a caller had to pass by hand would have left the recorded violation exactly
+        where it was, since no caller passes it.
+        """
         world = fixtures.spendable_destination()
         costed = _costed(world, path=self.PATH, exit_path=FROM_THE_DECLARATION)
+        assert isinstance(costed.round_trip, RoundTripCost)
+        assert costed.exit_path is EXIT_BY_IDENTITY
+
+    def test_a_destination_that_is_not_spendable_still_needs_a_declared_way_out(self) -> None:
+        """The other side of the same derivation, so it cannot fire everywhere.
+
+        The identity rule is a *match against the owner's declared list*, not a shortcut. Move
+        the spendable endpoint somewhere else and the same route with the same absent partner is
+        back to ``ExitCostUnknown``, which is 002's answer and the correct one.
+        """
+        world = fixtures.spendable_destination()
+        costed = cost.cost_one(
+            self.PATH,
+            _uah(SENT),
+            routes=world.routes,
+            channels=world.channels,
+            streams=world.streams,
+            kinds=world.kinds,
+            on_date=fixtures.ON_DATE,
+            as_of=fixtures.AS_OF,
+            spendable=frozenset(),
+        )
+        assert isinstance(costed, RampCost)
         assert isinstance(costed.round_trip, ExitCostUnknown)
         assert costed.exit_path is None
 
@@ -428,6 +463,7 @@ class TestADestinationThatIsItselfSpendable:
             kinds=world.kinds,
             on_date=fixtures.ON_DATE,
             as_of=fixtures.AS_OF,
+            spendable=world.spendable,
         )
         assert not isinstance(outcome, NothingComparable), outcome
         assert len(outcome.costed) == 1

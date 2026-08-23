@@ -78,6 +78,7 @@ from typing import assert_never
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.staleness import ObservationKind
 from terezy.core.primitives.tolerance import is_close
+from terezy.core.results.coverage import SpendableEndpoint
 from terezy.core.results.ramp import (
     NothingComparable,
     RampCost,
@@ -211,6 +212,7 @@ def rank(
     kinds: Mapping[str, ObservationKind],
     on_date: date,
     as_of: date,
+    spendable: frozenset[SpendableEndpoint],
 ) -> Ranking | NothingComparable:
     """Cost every candidate with ``cost_one`` and order the comparable ones. FR-016, FR-018, FR-029.
 
@@ -227,6 +229,17 @@ def rank(
     other like anything else and tied when they agree within the project tolerance. A single
     record holding both figures would have no defined position in an ordering by round-trip
     cost, and picking one to order by is the blend FR-012 forbids.
+
+    ⚙ **A bare candidate defers to the declaration twice over, and it is worth saying once.**
+    ``journey_of`` pairs it with :data:`~terezy.core.routes.path.FROM_THE_DECLARATION`, and
+    ``cost_one`` then resolves *that* against the declarations -- so a **composed** candidate
+    passed bare is costed against the ``partner_route`` of its **last segment**, or by identity
+    where its destination is itself spendable. Both readings are the right ones, and neither is
+    obvious from the call site: a caller who wants a particular way out passes a ``Journey``.
+
+    ``spendable`` is the owner's declared list of where money counts as having come back out. It
+    reaches ``cost_one`` unchanged, because whether a destination satisfies its own exit
+    requirement (003 FR-002) is a fact about his life rather than something a ranking may infer.
 
     One amount for every candidate, because a comparison of costs at different amounts is not a
     comparison. The amount is a separate argument from the paths for the same reason
@@ -266,6 +279,7 @@ def rank(
             kinds=kinds,
             on_date=on_date,
             as_of=as_of,
+            spendable=spendable,
             exit_path=journey.exit_path,
         )
         match outcome:

@@ -18,12 +18,14 @@ route      monobank_to_binance_p2p            sha256:bbc3d7bd9c338891f1f6bdba323
 route      monobank_to_binance_p2p_double     sha256:e23f102032c347bbbd87a396d0bdcd1393c907ab90840779c33feb48dab8e693
 file       channels/uah_usd                   sha256:f8c7d96d5387a21efff9857b9326692a07049d9ed989a8ec107771b37dd7422e
 file       streams/owner-001                  sha256:6651ba42cf373ee55559b8975a623d01b50d565dc5e1a523d156dd42ad4cbe13
+file       spendable/owner-001                sha256:61c7032c91239c7ead90e912b644978b0f399da6da8b06cbdbb8c26c2250646c
 file       observation_kinds                  sha256:5fce57016fecf3ceb49c7e2d9ad0d3da8e450d05c3404ac836dbc3ace04321c1
 file       venues                             sha256:b0417dd2c35ca6dcefd5fc122fce8598665d9881936f138dabaff7f82c2e7850
 
 ## ranking -- lexicographic on (round trip, ceiling desc, latency)
 
 [0] monobank_to_binance_card
+      exit_path         binance_p2p_to_monobank
       stream            salary_uah
       destination       binance
       status            open
@@ -38,10 +40,20 @@ file       venues                             sha256:b0417dd2c35ca6dcefd5fc122fc
       one_way  conversion_spread 147.78325123152803 UAH
       one_way  fixed_fee        0.0 UAH
       one_way  percentage_fee   0.0 UAH
+      one_way  seg[0] monobank_to_binance_card   conversion_spread  147.78325123152803 UAH
+      one_way  seg[0] monobank_to_binance_card   fixed_fee          0.0 UAH
+      one_way  seg[0] monobank_to_binance_card   percentage_fee     0.0 UAH
       round    fraction 0.07342247243725088
       round    channels ('card', 'p2p')
+      round    seg[0] monobank_to_binance_card   conversion_spread  147.78325123152803 UAH
+      round    seg[0] monobank_to_binance_card   fixed_fee          0.0 UAH
+      round    seg[0] monobank_to_binance_card   percentage_fee     0.0 UAH
+      round    seg[1] binance_p2p_to_monobank    conversion_spread  586.4414731409806 UAH
+      round    seg[1] binance_p2p_to_monobank    fixed_fee          0.0 UAH
+      round    seg[1] binance_p2p_to_monobank    percentage_fee     0.0 UAH
 
 [1] monobank_to_binance_p2p
+      exit_path         binance_p2p_to_monobank
       stream            salary_uah
       destination       binance
       status            open
@@ -56,10 +68,20 @@ file       venues                             sha256:b0417dd2c35ca6dcefd5fc122fc
       one_way  conversion_spread 666.6666666666665 UAH
       one_way  fixed_fee        0.0 UAH
       one_way  percentage_fee   0.0 UAH
+      one_way  seg[0] monobank_to_binance_p2p    conversion_spread  666.6666666666665 UAH
+      one_way  seg[0] monobank_to_binance_p2p    fixed_fee          0.0 UAH
+      one_way  seg[0] monobank_to_binance_p2p    percentage_fee     0.0 UAH
       round    fraction 0.12222222222222222
       round    channels ('p2p', 'p2p')
+      round    seg[0] monobank_to_binance_p2p    conversion_spread  666.6666666666665 UAH
+      round    seg[0] monobank_to_binance_p2p    fixed_fee          0.0 UAH
+      round    seg[0] monobank_to_binance_p2p    percentage_fee     0.0 UAH
+      round    seg[1] binance_p2p_to_monobank    conversion_spread  555.5555555555557 UAH
+      round    seg[1] binance_p2p_to_monobank    fixed_fee          0.0 UAH
+      round    seg[1] binance_p2p_to_monobank    percentage_fee     0.0 UAH
 
 [2] monobank_to_binance_p2p_double
+      exit_path         binance_p2p_to_monobank
       stream            salary_uah
       destination       binance
       status            open
@@ -74,8 +96,17 @@ file       venues                             sha256:b0417dd2c35ca6dcefd5fc122fc
       one_way  conversion_spread 1807.4074074074072 UAH
       one_way  fixed_fee        0.0 UAH
       one_way  percentage_fee   0.0 UAH
+      one_way  seg[0] monobank_to_binance_p2p_double conversion_spread  1807.4074074074072 UAH
+      one_way  seg[0] monobank_to_binance_p2p_double fixed_fee          0.0 UAH
+      one_way  seg[0] monobank_to_binance_p2p_double percentage_fee     0.0 UAH
       round    fraction 0.22950617283950614
       round    channels ('p2p', 'p2p', 'p2p', 'p2p')
+      round    seg[0] monobank_to_binance_p2p_double conversion_spread  1807.4074074074072 UAH
+      round    seg[0] monobank_to_binance_p2p_double fixed_fee          0.0 UAH
+      round    seg[0] monobank_to_binance_p2p_double percentage_fee     0.0 UAH
+      round    seg[1] binance_p2p_to_monobank    conversion_spread  487.65432098765433 UAH
+      round    seg[1] binance_p2p_to_monobank    fixed_fee          0.0 UAH
+      round    seg[1] binance_p2p_to_monobank    percentage_fee     0.0 UAH
 
 recommended   0 (monobank_to_binance_card)
 ties          ()
@@ -83,4 +114,4 @@ excluded      0
 not_comparable 0
 
 ## digest over core.routes.ranking output
-sha256:175d37310f623fd11d7913fe88fcf116421c06999486b7a178c1734f431db875
+sha256:7976ae6c802a646d2aa583500f95d52fb70634f738e7bdd00c542a6da9140a2d

@@ -47,6 +47,7 @@ import terezy.core.routes
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
+from terezy.core.results.coverage import SpendableEndpoint
 from terezy.core.results.ramp import (
     CostComponent,
     ExitCostUnknown,
@@ -63,6 +64,17 @@ from terezy.core.routes import cost, ranking
 from tests.invariants import route_graphs
 
 pytestmark = pytest.mark.contract
+
+SPENDABLE: frozenset[SpendableEndpoint] = frozenset()
+"""**Nowhere is declared spendable here, and that is deliberate.**
+
+These fixtures predate the spendable list and their subject is 002's partner rule: a route
+with a declared way out, and one without. A destination that happened to appear in this set
+would satisfy its own exit requirement by identity (003 FR-002) and quietly acquire a
+round-trip figure, turning "nobody costed the way out" into "there was nothing to do" --
+which is a different claim and is exercised where it belongs, in the composed suites and in
+``tests/invariants/test_coverage_costing_agreement.py``.
+"""
 
 LABELS = ("one_way", "round_trip")
 """The only two labels a cost figure may carry, and the only two field names that carry them."""
@@ -240,6 +252,7 @@ def _cost_one_of(graph: route_graphs.Graph) -> RampCost | Any:
         kinds=route_graphs.KINDS,
         on_date=route_graphs.ON_DATE,
         as_of=route_graphs.AS_OF,
+        spendable=SPENDABLE,
     )
 
 
@@ -261,6 +274,7 @@ def _ranked() -> Ranking:
         kinds=route_graphs.KINDS,
         on_date=route_graphs.ON_DATE,
         as_of=route_graphs.AS_OF,
+        spendable=SPENDABLE,
     )
     assert isinstance(ranked, Ranking), ranked
     return ranked

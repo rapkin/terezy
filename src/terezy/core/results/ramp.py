@@ -299,9 +299,16 @@ class RampCost:
     cost -- and picking one to order by is the blend FR-012 forbids, arrived at by accident.
 
     ``None`` **exactly when** :attr:`round_trip` is :class:`ExitCostUnknown`, and never
-    otherwise: a candidate nobody has costed a way out for has no exit chain to be keyed by. The
-    correspondence is asserted rather than assumed, in
-    ``tests/contract/test_composed_distinct.py``.
+    otherwise: a candidate with no round-trip figure has no exit chain to be keyed by.
+
+    ⚙ **The biconditional holds by construction, and it did not always.** ``cost_one`` derives
+    this field *from the round-trip outcome* in one expression, so the two cannot drift. The
+    first implementation filled both slots from the chain it had chosen, which was right for the
+    "nobody declared a way out" case and wrong for the two that come later -- a way out declared
+    **closed** on the date, and one that **will not carry what arrived**. Both refuse with
+    ``ExitCostUnknown`` while a chain had already been chosen, so the record claimed a key for a
+    figure it did not have. A consumer reading ``exit_path is not None`` as "there is a
+    round-trip figure" is the natural reading, and it is now correct.
 
     ⚙ **A departure from data-model.md**, which types this field ``ExitChain`` outright. Three
     members cannot express "there is no way out" without a fourth that would then have to be
@@ -334,9 +341,25 @@ class RampCost:
     """
 
     status: RouteStatus
-    """The route's declared status. A ``constrained`` route is costed and reported as
-    constrained; a ``closed`` one never reaches this record at all -- it is excluded with its
-    status recorded (FR-014)."""
+    """The declared status of the way in: **the most constrained any segment declares**.
+
+    A ``constrained`` route is costed and reported as constrained; a ``closed`` one never
+    reaches this record at all -- it is excluded with its status recorded, and on a chain with
+    the binding segment named too (FR-014, FR-015).
+
+    ⚙ **On a chain this is the tightest segment's status, not the first's or the last's** (004).
+    A chain is no more usable than its tightest link, and taking either end would let a
+    constrained corridor hide behind an open one -- in the field a reader scans to decide
+    whether to trust the figure beside it. It is the same shape :attr:`ceiling` (the tightest
+    declared cap) and :attr:`disruption_probability` (the largest single leg) already take.
+
+    ⚙ **It describes the way in only.** A constrained *exit* segment leaves this ``open`` on a
+    record whose headline number is the round trip, and that is a stated gap rather than a
+    decision: ``status`` is 002's field about the inbound route, widening it to the round trip
+    would change what it means for every declared route that already carries one, and the
+    honest fix is a second field for the way out rather than a quiet redefinition of this one.
+    A closed exit segment is *not* affected -- it yields ``ExitCostUnknown`` naming the route,
+    so the round-trip slot says so in words."""
 
     disruption_probability: float
     """The largest single-leg probability that this route stops working, in ``[0, 1]``.

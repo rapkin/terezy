@@ -95,6 +95,7 @@ def _refused(
         kinds=route_graphs.KINDS,
         on_date=on_date,
         as_of=route_graphs.AS_OF,
+        spendable=TEMPLATE.spendable,
     )
     assert isinstance(outcome, RouteUnusable), outcome
     return outcome
@@ -110,6 +111,7 @@ def _rank(routes: Mapping[str, Route], *paths: FundingPath) -> Ranking | Nothing
         kinds=route_graphs.KINDS,
         on_date=route_graphs.ON_DATE,
         as_of=route_graphs.AS_OF,
+        spendable=TEMPLATE.spendable,
     )
 
 
@@ -156,6 +158,7 @@ class TestBelowADeclaredMinimum:
             kinds=route_graphs.KINDS,
             on_date=route_graphs.ON_DATE,
             as_of=route_graphs.AS_OF,
+            spendable=TEMPLATE.spendable,
         )
         assert isinstance(outcome, RampCost)
         assert_money_close(outcome.one_way.arrived, _uah(25_000.0))
@@ -191,6 +194,7 @@ class TestOverADeclaredMaximum:
             kinds=route_graphs.KINDS,
             on_date=route_graphs.ON_DATE,
             as_of=route_graphs.AS_OF,
+            spendable=TEMPLATE.spendable,
         )
         assert isinstance(outcome, RampCost)
 
@@ -239,6 +243,7 @@ class TestClosedOnTheDate:
             kinds=route_graphs.KINDS,
             on_date=date(2027, 6, 1),
             as_of=route_graphs.AS_OF,
+            spendable=TEMPLATE.spendable,
         )
         assert isinstance(outcome, RampCost)
 
@@ -314,6 +319,7 @@ class TestACapIsNotARefusal:
             kinds=route_graphs.KINDS,
             on_date=route_graphs.ON_DATE,
             as_of=route_graphs.AS_OF,
+            spendable=TEMPLATE.spendable,
         )
         assert isinstance(outcome, RampCost)
         assert outcome.ceiling is not None
@@ -350,6 +356,7 @@ class TestARefusalIsAValueAndAProgrammerErrorIsARaise:
                 kinds=route_graphs.KINDS,
                 on_date=route_graphs.ON_DATE,
                 as_of=route_graphs.AS_OF,
+                spendable=TEMPLATE.spendable,
             )
 
     def test_a_negative_amount_raises_rather_than_refusing(self) -> None:
@@ -366,6 +373,7 @@ class TestARefusalIsAValueAndAProgrammerErrorIsARaise:
                 kinds=route_graphs.KINDS,
                 on_date=route_graphs.ON_DATE,
                 as_of=route_graphs.AS_OF,
+                spendable=TEMPLATE.spendable,
             )
 
     def test_a_refusal_is_not_a_cost_of_zero(self) -> None:

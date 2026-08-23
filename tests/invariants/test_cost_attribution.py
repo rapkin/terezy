@@ -78,6 +78,7 @@ def _cost(graph: Graph, amount: float) -> RampCost | RouteUnusable:
         kinds=KINDS,
         on_date=ON_DATE,
         as_of=AS_OF,
+        spendable=graph.spendable,
     )
 
 
@@ -267,6 +268,7 @@ def test_a_route_of_zero_fee_legs_costs_exactly_zero() -> None:
         kinds=KINDS,
         on_date=ON_DATE,
         as_of=AS_OF,
+        spendable=graph.spendable,
     )
     assert isinstance(costed, RampCost)
     assert costed.one_way.arrived.amount == 10_000.0
@@ -293,6 +295,7 @@ def test_a_fee_on_a_zero_amount_is_reported_rather_than_absorbed(fixed: float) -
         kinds=KINDS,
         on_date=ON_DATE,
         as_of=AS_OF,
+        spendable=graph.spendable,
     )
     assert isinstance(costed, RampCost)
     assert costed.one_way.arrived.amount < 0.0
@@ -317,6 +320,7 @@ def test_a_negative_amount_is_refused_rather_than_costed() -> None:
             kinds=KINDS,
             on_date=ON_DATE,
             as_of=AS_OF,
+            spendable=graph.spendable,
         )
 
 
@@ -338,6 +342,7 @@ def test_a_closed_route_is_excluded_with_its_status_recorded() -> None:
         kinds=KINDS,
         on_date=ON_DATE,
         as_of=AS_OF,
+        spendable=graph.spendable,
     )
     assert isinstance(costed, RouteUnusable)
     assert costed.binding_constraint == "route.status"
@@ -368,6 +373,7 @@ def test_a_declared_monthly_cap_is_reported_as_the_ceiling_in_the_sending_curren
         kinds=KINDS,
         on_date=ON_DATE,
         as_of=AS_OF,
+        spendable=graph.spendable,
     )
     assert isinstance(costed, RampCost)
     assert costed.ceiling is not None
@@ -392,6 +398,7 @@ def test_the_disruption_probability_rides_beside_the_cost_and_never_inside_it() 
         kinds=KINDS,
         on_date=ON_DATE,
         as_of=AS_OF,
+        spendable=graph.spendable,
     )
     assert isinstance(costed, RampCost)
     assert costed.one_way.fraction == 0.0
@@ -442,6 +449,7 @@ def _composed(amount: float) -> RampCost:
         kinds=world.kinds,
         on_date=composed_fixtures.ON_DATE,
         as_of=composed_fixtures.AS_OF,
+        spendable=world.spendable,
     )
     assert isinstance(costed, RampCost), costed
     return costed
