@@ -181,7 +181,7 @@ events and netting move with it, with no source change.
 - [X] T052 [P] Add the new questions to `docs/METHODOLOGY.md` §28's "where to look next" table
 - [X] T053 Flip **E2** and **E6** in `docs/REQUIRED_TESTS.md` with their test paths, and annotate **E7** as partially closed with the forced-sale deferral stated
 - [X] T054 Record the forced-sale and late-payment-interest deferrals as `[[future]]` entries in `specs/features.toml`
-- [ ] T055 Run every gate — ruff, mypy, lint-imports, check_provenance, check_methodology_refs, `pytest --cov`, `pytest -m "contract or invariant"` — and record the delta from T001's baseline
+- [X] T055 Run every gate — ruff, mypy, lint-imports, check_provenance, check_methodology_refs, `pytest --cov`, `pytest -m "contract or invariant"` — and record the delta from T001's baseline
 - [X] T056 Run `specs/009-tax-depth/quickstart.md` end to end and confirm each of its five sections says what it claims
 
 ---

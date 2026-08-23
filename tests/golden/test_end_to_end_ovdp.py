@@ -100,6 +100,7 @@ from terezy.core.instruments.interface import (
     Holding,
     InstrumentDeclaration,
 )
+from terezy.core.ledger import lots
 from terezy.core.ledger.accounts import CashBalance
 from terezy.core.ledger.engine import LedgerState
 from terezy.core.ledger.events import Event, EventKind
@@ -111,8 +112,10 @@ from terezy.core.primitives.provenance import Provenance, SourceRef
 from terezy.core.primitives.rates import RealRate, RealTermsUnavailable
 from terezy.core.primitives.tolerance import assert_money_close, is_close
 from terezy.core.results import project
+from terezy.core.results import tax_year as settlement
 from terezy.core.results.project import Projection
 from terezy.core.results.schedule import CashFlowRow
+from terezy.core.tax import year as tax_year
 from terezy.core.tax.interface import TaxCharge, TaxClass
 from terezy.data import manifest
 from terezy.data.declarations import resolver
@@ -832,6 +835,50 @@ class TestTaxDepthChangedNothingAboutTheExemptPath:
         result, _ = _run()
 
         assert not [event for event in result.ledger.applied if event.kind is EventKind.TAX_PAYMENT]
+
+    def test_a_year_of_exclusively_exempt_income_is_assessed_at_zero_and_settles_nothing(
+        self,
+    ) -> None:
+        """SC-009's other half, against the **shipped** declarations rather than a fixture.
+
+        The statement exists and says zero *citing the exemption* -- a missing statement and a
+        statement saying zero are different claims, and only the second one says the year was
+        looked at (FR-006). And no cash moves for it, which is why this artefact cannot.
+        """
+        result, declarations = _run()
+        rules = resolver.tax_rules_from_data_root(DATA_ROOT, declarations)["ua"]
+        positions = resolver.tax_positions_from_data_root(DATA_ROOT)
+        assert positions is not None
+        filing, switches, _ = positions
+
+        assessed = tax_year.statements(
+            result.ledger,
+            result.charges,
+            rules=rules,
+            tax_classes=declarations.tax_classes,
+            filing=filing,
+            method=lots.LotMethod.FIFO,
+            switches=switches,
+        )
+        assert isinstance(assessed, tuple), assessed
+        assert [statement.tax_year for statement in assessed] == [2026, 2027, 2028]
+        for statement in assessed:
+            assert statement.zero_because is tax_year.ZeroReason.EXEMPT
+            assert tax_year.liability_total(statement.liability).amount == 0.0
+            assert statement.treatment is tax_year.Treatment.OUTSIDE
+
+        settled = settlement.settle(
+            result.ledger.applied,
+            assessed,
+            owner_id=OWNER_ID,
+            base_currency=UAH,
+            method=lots.LotMethod.FIFO,
+            horizon_end=date(2030, 1, 1),
+        )
+        assert isinstance(settled, settlement.Settlement), settled
+        assert settled.payments == ()
+        assert settled.outstanding == ()
+        assert settled.stream == result.ledger.applied
 
     def test_the_exempt_zeroes_still_cite_the_exemption_that_produced_them(self) -> None:
         """A memo at zero cash is still evidence: ``memo_amount`` keeps the charge's sources.
