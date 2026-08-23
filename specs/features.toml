@@ -74,6 +74,13 @@ needs  = ["002-ramp-cost"]
 why    = "the tax-currency role (Principle VI) has never had machinery: 011's per-kind staleness threshold follows 002's FR-028 and lands in the same `data/observation_kinds.toml`, and 011's central prohibition — the official rate never prices a leg, a channel rate never strikes a tax base — is the rule 002 already wrote at `core/routes/legs.py::channel_for` and `data/declarations/resolver.py::_check_channel`, which 011 must leave standing"
 note   = "one open [NEEDS CLARIFICATION] (FR-011): the citable primary text of the NBU rule for a date no rate is published for. Not a blocker — the specified default in its absence is a refusal — but it must reach /speckit-clarify before planning"
 
+[[feature]]
+id     = "012-fop-group-3"
+status = "spec"
+needs  = ["002-ramp-cost", "006-inzhur-instruments", "011-official-rate"]
+why    = "006 for dated rate schedules (E10) — the regime's two components commence on different dates under one law — and for the precedent of a declaration naming tax classes instead of carrying a rate; 011 because the base is the credited foreign amount at the official rate on the CREDIT date, a different number from the hryvnia the compulsory sale produces; 002 because the scalar `IncomeStream.income_tax_rate` that 012 retires is 002's FR-007, and the deployable-capacity types whose undeclared-is-not-zero behaviour must survive the migration are 002's"
+note   = "one open [NEEDS CLARIFICATION] (FR-022): whether contract income credited somewhere other than the ФОП account falls under this regime at all — a legal question, not a modelling choice. Until answered, such a stream refuses rather than being charged at these rates. Five owner verification tasks are recorded in the spec, the load-bearing one being the statutory ЄСВ monthly amounts"
+
 # Named future work — seams already recorded inside landed specs, not yet features.
 
 [[future]]
