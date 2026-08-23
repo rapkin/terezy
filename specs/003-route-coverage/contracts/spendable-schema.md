@@ -40,7 +40,7 @@ currency = "UAH"
 
 | Path | Type | Rule |
 |---|---|---|
-| `owner.id` | string | Non-empty. Must match the owner of the streams it is resolved with |
+| `owner.id` | string | Non-empty. Must be the owner of **every** stream it is resolved with, not merely one of them |
 | `spendable[].venue` | string | Must name a declared venue; unknown ids fail at load naming file and field |
 | `spendable[].currency` | string | Must be the base currency the set was resolved against (FR-004) |
 
@@ -54,6 +54,7 @@ currency = "UAH"
 | Duplicate `(venue, currency)` | The loader's existing duplicate-id precedent |
 | Empty `[[spendable]]` list | Would make every exit deficit 3 — a confident wrong answer built out of a forgotten line (research.md D13) |
 | Empty `data/spendable/` directory | The reason `ramp_from_data_root` already gives: a mistyped path and an empty world are indistinguishable downstream |
+| A second owner's streams in the same data root | ⚙ **Added 2026-08-23.** `ramp_from_data_root` globs every `streams/*.toml`, so a foreign owner's streams load beside this list and are scored against it. Refused naming the foreign **stream file**, both owner ids and every foreign stream: the same blend the second-spendable-file refusal forbids, arriving through the streams |
 | Extra keys | `STRICT` config, as every other declaration file |
 
 ## Loader surface

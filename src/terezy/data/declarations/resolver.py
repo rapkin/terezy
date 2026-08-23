@@ -1201,6 +1201,7 @@ def _check_spendable_owner(
     streams: Mapping[str, IncomeStream],
     *,
     path: Path,
+    stream_files: Mapping[str, Path],
 ) -> None:
     """The list must belong to the owner whose streams it is resolved with (Principle VII).
 
@@ -1209,6 +1210,23 @@ def _check_spendable_owner(
     every verdict is a `(destination x stream)`, and the spendable list is what decides half of
     it. A list belonging to somebody else would answer this owner's question with that owner's
     life.
+
+    ⚙ **The run must hold exactly one owner's streams, not merely include his** (correction,
+    2026-08-23). Asking only ``owner_id in owners`` was the leak: ``ramp_from_data_root`` globs
+    every ``streams/*.toml``, so a second owner's file loads beside the first, his streams are
+    paired with *this* owner's spendable list, and his destinations come out marked ready on
+    somebody else's definition of where money can be spent. That is exactly what
+    :func:`coverage_from_data_root` refuses in as many words on the spendable side -- "merging
+    two lists would let one owner's spendable venues decide the other's verdicts" -- and a guard
+    whose stated claim is false is worse than no guard.
+
+    **Refused here rather than in `ramp_from_data_root`, and against the foreign stream file.**
+    A ramp comparison costs one named `(destination x stream x route)` at a time and blends
+    nothing across owners, so multi-owner streams are not a defect there; a coverage run folds
+    over *every* stream at once, which is what makes the second owner's presence a wrong answer
+    rather than an unused file. The offending declaration is the stream file that does not
+    belong in this run -- the spendable list is correct about itself -- so that is the file the
+    error names, with both owner ids and every foreign stream in the message.
     """
     owners = sorted({stream.owner_id for stream in streams.values()})
     if owner_id not in owners:
@@ -1221,6 +1239,25 @@ def _check_spendable_owner(
             "belonging to somebody else would answer this owner's question with another "
             "person's life.",
             f"name one of {owners}, or resolve this list against that owner's streams",
+        )
+    foreign = sorted(
+        (stream.owner_id, stream.id) for stream in streams.values() if stream.owner_id != owner_id
+    )
+    if foreign:
+        first_owner, first_stream = foreign[0]
+        raise DeclarationError(
+            stream_files[first_stream],
+            "stream.owner_id",
+            f"declares stream {first_stream!r} for owner {first_owner!r}, and this coverage run "
+            f"resolves the spendable list of owner {owner_id!r}. The streams loaded together "
+            f"belong to {owners}, and the foreign ones are "
+            f"{[f'{stream} ({owner})' for owner, stream in foreign]}. A coverage report folds "
+            "over every stream at once against one spendable list, so a second owner's streams "
+            "would have their verdicts decided by this owner's spendable venues -- the same "
+            "blend the second-spendable-file refusal says cannot happen, arriving through the "
+            "streams instead.",
+            f"resolve one owner's registry at a time: keep only owner {owner_id!r}'s streams in "
+            "this data root, or resolve this run against the matching spendable list",
         )
 
 
@@ -1237,7 +1274,9 @@ def resolve_coverage(
     root two chances to disagree with itself.
     """
     owner_id, endpoints = loader.spendable_from_file(spendable_file)
-    _check_spendable_owner(owner_id, ramp.streams, path=spendable_file)
+    _check_spendable_owner(
+        owner_id, ramp.streams, path=spendable_file, stream_files=ramp.stream_files
+    )
     for position, endpoint in enumerate(endpoints):
         _check_spendable(
             endpoint,
@@ -1269,6 +1308,12 @@ def coverage_from_data_root(root: Path, *, base_currency: Currency) -> CoverageD
     and the owner acts differently on each. Merging two owners' lists silently would let one
     person's spendable venues decide the other person's verdicts -- and this file is per-owner
     precisely so that cannot happen.
+
+    **The same blend arrives through ``streams/`` and is refused there too.** This directory
+    holds one file, but ``ramp_from_data_root`` globs every ``streams/*.toml``, so the claim
+    above is only true because :func:`_check_spendable_owner` requires the streams loaded
+    beside the list to be *this* owner's and no one else's. Without that half, the sentence
+    here would be false in the one direction nobody was looking.
     """
     declared = sorted((root / SPENDABLE_DIR).glob("*.toml"))
     if not declared:

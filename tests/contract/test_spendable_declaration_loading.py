@@ -305,6 +305,50 @@ def test_a_second_owner_file_is_refused_by_name(tmp_path: Path) -> None:
     assert caught.value.file == root / resolver.SPENDABLE_DIR
 
 
+SECOND_OWNER_STREAM = """# SYNTHETIC FIXTURE -- a second owner's salary, from a contract test.
+
+[[stream]]
+id         = "salary_two"
+owner_id   = "owner-002"
+currency   = "UAH"
+amount     = 0.0
+cadence    = "monthly"
+arrives_at = "inzhur"
+
+  [stream.indexation]
+  policy = "none"
+"""
+"""A stream belonging to somebody else, in the same data root.
+
+``arrives_at = "inzhur"`` on purpose: ``inzhur`` is a destination the shipped registry has a
+declared way in and out of, so if this stream were resolved it would be marked **ready** --
+owner-002's verdict decided by owner-001's spendable list, which is the leak this refusal
+exists to close.
+"""
+
+
+def test_a_second_owners_streams_in_the_data_root_are_refused_not_blended(
+    tmp_path: Path,
+) -> None:
+    """Principle VII, on the side the spendable check used to leave open.
+
+    ``ramp_from_data_root`` globs every ``streams/*.toml``, so two owners' streams load
+    together, and the owner check asked only whether the spendable list's owner was *among*
+    them. He was -- so the report went on to score the other owner's streams against this
+    owner's spendable list, which is precisely what ``coverage_from_data_root``'s
+    second-spendable-file refusal says cannot happen.
+    """
+    root = _scratch_root(tmp_path)
+    foreign = root / "streams" / "owner-002.toml"
+    foreign.write_text(SECOND_OWNER_STREAM, encoding="utf-8")
+    with pytest.raises(DeclarationError) as caught:
+        resolver.coverage_from_data_root(root, base_currency=Currency.UAH)
+    _assert_names_file_and_field(caught.value, foreign, "owner_id")
+    assert "owner-002" in caught.value.problem
+    assert "owner-001" in caught.value.problem
+    assert "salary_two" in caught.value.problem
+
+
 # ---------------------------------------------------------------------------
 # The provenance gate, confirmed with the new file present (research.md D4)
 # ---------------------------------------------------------------------------
