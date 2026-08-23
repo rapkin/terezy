@@ -49,7 +49,7 @@ import tomllib
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Final, assert_never
+from typing import TYPE_CHECKING, Any, Final, Literal, assert_never, cast
 
 from pydantic import BaseModel, ValidationError
 
@@ -60,11 +60,26 @@ from terezy.core.inflation.series import (
     Periodicity,
 )
 from terezy.core.instruments import registry as instrument_registry
+from terezy.core.instruments.fund import (
+    CapEntry,
+    DeclaredYield,
+    DistributionTerms,
+    FeeFact,
+    FundDeclaration,
+    LegalTerms,
+    LiquidityTerms,
+    ObservedPractice,
+    Peg,
+    SpreadTerms,
+    VerificationTask,
+)
 from terezy.core.instruments.interface import (
     BondTerms,
     InstrumentConstraints,
     InstrumentDeclaration,
 )
+from terezy.core.ledger import seeds
+from terezy.core.ledger.seeds import SeedLot
 from terezy.core.primitives import conventions, periods
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
@@ -73,6 +88,7 @@ from terezy.core.primitives.provenance import Provenance, SourceRef
 from terezy.core.primitives.staleness import ObservationKind
 from terezy.core.results.composed import SegmentBound
 from terezy.core.results.coverage import SpendableEndpoint
+from terezy.core.results.goal import Goal
 from terezy.core.routes import capacity, legs
 from terezy.core.routes.channels import ChannelSide, FxChannel, Side, effective_rate
 from terezy.core.routes.legs import Leg, Route
@@ -81,6 +97,7 @@ from terezy.core.scenarios.regimes import Regime, RegimeTransition
 from terezy.core.streams import streams
 from terezy.core.streams.streams import IncomeStream, Indexation
 from terezy.core.tax.interface import TaxableEventKind, TaxClass
+from terezy.core.tax.schedule import RateEntry
 from terezy.data.declarations import schema
 from terezy.data.declarations.errors import DeclarationError
 
@@ -635,43 +652,121 @@ def _tax_class(path: Path, entry: schema.TaxClassTable) -> TaxClass:
             "make it look as though it were.",
             "list the income kinds this class governs",
         )
-    sources = prov.of(
-        [
-            _source_ref(
-                path,
-                field_prefix,
-                source=entry.source,
-                retrieved_on=entry.retrieved_on,
-                verified_on=entry.verified_on,
-                kind=entry.kind,
-            )
-        ]
-    )
     return TaxClass(
         id=class_id,
         applies_to=frozenset(
             _taxable_kind(path, f"{field_prefix}.applies_to", kind) for kind in entry.applies_to
         ),
-        pit_rate=_as_fraction(
-            _non_negative(
-                path,
-                f"{field_prefix}.pit_rate_pct",
-                entry.pit_rate_pct,
-                "a negative rate would be a refund rather than a charge, which is not "
-                "what this rule models",
-            )
-        ),
-        levy_rate=_as_fraction(
-            _non_negative(
-                path,
-                f"{field_prefix}.levy_rate_pct",
-                entry.levy_rate_pct,
-                "a negative rate would be a refund rather than a charge, which is not "
-                "what this rule models",
-            )
-        ),
-        provenance=sources,
+        rates=_rate_schedule(path, entry.rate, field_prefix=field_prefix),
     )
+
+
+def _rate_schedule(
+    path: Path,
+    declared: list[schema.RateEntryTable],
+    *,
+    field_prefix: str,
+) -> tuple[RateEntry, ...]:
+    """``[[jurisdiction.tax_class.rate]]`` as the core's dated schedule, validated here.
+
+    Four checks, all at load because all four need the file's name to be actionable
+    (contracts/tax-schedule.md, loader validation table):
+
+    * **empty** -- a class with no rate cannot charge anything, and a silent zero is the
+      worst possible reading of that;
+    * **duplicate effective date** -- two rates in force at once has no meaning, so one of
+      them is a typo;
+    * **out of order** -- the schedule is left in file order rather than sorted, so that
+      the file reads as what it means and the fold is a plain scan. Sorting silently would
+      make the file's order a thing nobody has to get right, and a reviewer scanning a
+      misordered schedule would read the wrong rate as current;
+    * **negative rate** -- a refund, which this rule does not model.
+
+    The order check is the one worth being deliberate about. Sorting here was the obvious
+    alternative and it is refused: a schedule whose written order disagrees with its
+    effective order is a file a human misreads, and the load-time error is what stops that
+    file existing at all.
+    """
+    if not declared:
+        raise DeclarationError(
+            path,
+            f"{field_prefix}.rate",
+            "declares no dated rate entry, so the class can charge nothing at all. An "
+            "empty schedule is reported rather than read as an exemption: 'no rate is "
+            "declared' and 'the declared rate is zero' are opposite claims, and only the "
+            "second one has a citation behind it.",
+            "declare at least one [[jurisdiction.tax_class.rate]] with its effective_from",
+        )
+    entries: list[RateEntry] = []
+    for index, table in enumerate(declared):
+        entry_prefix = f"{field_prefix}.rate[{index}]"
+        effective_from = _parse_date(path, f"{entry_prefix}.effective_from", table.effective_from)
+        _require_text(
+            path,
+            f"{entry_prefix}.note",
+            table.note,
+            "a dated entry states in words what its citation attests about the rate and "
+            "about the date it came into force -- the date is the field a reviewer most "
+            "needs prose for, because the rate can be checked at a glance and the date "
+            "usually cannot",
+        )
+        if entries and effective_from == entries[-1].effective_from:
+            raise DeclarationError(
+                path,
+                f"{entry_prefix}.effective_from",
+                f"repeats {effective_from.isoformat()}, which the previous entry already "
+                "declares. Two rates in force on one date has no meaning, and neither "
+                "entry is preferred: whichever the lookup reached first would win by "
+                "accident of file order.",
+                "correct one of the two dates, or delete the entry that is a duplicate",
+            )
+        if entries and effective_from < entries[-1].effective_from:
+            raise DeclarationError(
+                path,
+                f"{entry_prefix}.effective_from",
+                f"is {effective_from.isoformat()}, before the previous entry's "
+                f"{entries[-1].effective_from.isoformat()}. The schedule is read in the "
+                "order it is written and is not silently sorted: a file whose order "
+                "disagrees with its dates is one a human misreads, and reordering it here "
+                "would make that file loadable.",
+                "write the entries oldest first",
+            )
+        entries.append(
+            RateEntry(
+                effective_from=effective_from,
+                pit_rate=_as_fraction(
+                    _non_negative(
+                        path,
+                        f"{entry_prefix}.pit_rate_pct",
+                        table.pit_rate_pct,
+                        "a negative rate would be a refund rather than a charge, which is "
+                        "not what this rule models",
+                    )
+                ),
+                levy_rate=_as_fraction(
+                    _non_negative(
+                        path,
+                        f"{entry_prefix}.levy_rate_pct",
+                        table.levy_rate_pct,
+                        "a negative rate would be a refund rather than a charge, which is "
+                        "not what this rule models",
+                    )
+                ),
+                provenance=prov.of(
+                    [
+                        _source_ref(
+                            path,
+                            entry_prefix,
+                            source=table.source,
+                            retrieved_on=table.retrieved_on,
+                            verified_on=table.verified_on,
+                            kind=table.kind,
+                        )
+                    ]
+                ),
+            )
+        )
+    return tuple(entries)
 
 
 def tax_classes_from_file(path: Path) -> tuple[TaxClass, ...]:
@@ -2072,6 +2167,467 @@ def spendable_from_file(path: Path) -> tuple[str, tuple[SpendableEndpoint, ...]]
 
 
 # ---------------------------------------------------------------------------
+# 006-inzhur-instruments: collective-investment funds
+# ---------------------------------------------------------------------------
+#
+# Same four responsibilities in the same order -- read, shape, meaning, construct -- and the
+# same two rules: **percent becomes a fraction exactly once**, in :func:`_as_fraction`, and
+# **no pydantic type crosses this line**.
+#
+# ⚙ What is different here, and it is the whole point of the feature: a fund's numbers come
+# from what the fund says about *itself*. Every table below therefore carries its own
+# citation and is expected to carry an **empty** ``verified_on`` -- researched is not
+# verified, and the mark propagates to every figure derived from it (FR-002). The provenance
+# gate reports these as unverified rather than failing, which is the correct outcome and not
+# something to work around.
+#
+# Two refusals here have no analogue in the bond loader and are worth naming. A
+# ``verification_task`` that carries a **value** is refused, because the entire purpose of
+# that record is that it holds none (research.md D8) -- ``extra="forbid"`` does the work, and
+# the contract test asserts it. And ``is_assumption_driven = false`` is refused, because the
+# core field is ``Literal[True]``: a fund whose terms are observed rather than stated is a
+# different declaration, and silently accepting ``false`` would produce a record whose type
+# says one thing and whose file says another.
+
+
+FUND_BASIS: Final[Mapping[str, str]] = {
+    "simple_annual": "a simple annual rate in the fund's own currency",
+    "usd_equivalent_annual": "an annual rate on the unit's value in the pegged currency",
+}
+"""The declared-yield bases this engine models, with what each one means.
+
+A mapping rather than a set so :func:`_known` can list them, and so the meaning of each is
+written down next to the name a file has to spell correctly.
+"""
+
+FUND_FREQUENCIES: Final[Mapping[str, str]] = {"monthly": "one payout a month"}
+"""The distribution frequencies implemented. Monthly is what both Inzhur products declare;
+a quarterly fund arrives as another entry here plus the date arithmetic, not as a branch."""
+
+FUND_RECORD_DAYS: Final[Mapping[str, str]] = {
+    "last_day_of_month": "entitlement is fixed on the last calendar day of the month"
+}
+"""The record-day rules implemented."""
+
+FUND_BUYBACK_TERMS: Final[Mapping[str, str]] = {
+    "discretionary": "the manager may buy back before termination, and is not obliged to"
+}
+"""What a регламент can say about an early exit. There is deliberately no ``guaranteed``
+member: none of the declared funds owes one, and adding the word before a fund that owes it
+exists would invite a file to claim it."""
+
+_MAX_PAYMENT_DAY: Final = 28
+"""The last day of the shortest month, so a declared payment day exists in every month."""
+
+
+def _fund_source(path: Path, table: str, entry: Any) -> Provenance:
+    """One fund table's citation. Every sourced table in a fund file goes through here."""
+    return prov.of(
+        [
+            _source_ref(
+                path,
+                table,
+                source=entry.source,
+                retrieved_on=entry.retrieved_on,
+                verified_on=entry.verified_on,
+                kind=entry.kind,
+            )
+        ]
+    )
+
+
+def _fraction_in_range(path: Path, field_path: str, percent: float, what: str) -> float:
+    """A declared percentage that must land in ``[0, 1]`` as a fraction.
+
+    The markup and the discount are both shares of NAV, so a declared 150% is not an
+    aggressive spread -- it is a number that cannot be a share of anything. Refused rather
+    than clamped, as everywhere else at this boundary.
+    """
+    return _bounded(
+        path,
+        field_path,
+        _as_fraction(_non_negative(path, field_path, percent, f"{what} cannot be negative")),
+        f"{what} is a share of net asset value, so above 100% it is not a share at all",
+    )
+
+
+def _declared_yield(path: Path, table: schema.DeclaredYieldTable, *, prefix: str) -> DeclaredYield:
+    """``[instrument.declared_yield]`` as the core record, range preserved as a range."""
+    low = _as_fraction(
+        _non_negative(
+            path,
+            f"{prefix}.low_pct",
+            table.low_pct,
+            "a fund stating a negative return is stating a loss, which this engine does "
+            "not model as a yield",
+        )
+    )
+    high = _as_fraction(
+        _non_negative(path, f"{prefix}.high_pct", table.high_pct, "the same holds here")
+    )
+    if high < low:
+        raise DeclarationError(
+            path,
+            f"{prefix}.high_pct",
+            f"is {table.high_pct!r}, below the declared low of {table.low_pct!r}. A range "
+            "whose ends are the wrong way round is a typo, and swapping them here would "
+            "make the file's own statement unreadable.",
+            "write the low end first",
+        )
+    basis = _known(path, f"{prefix}.basis", table.basis, FUND_BASIS, "declared-yield basis")
+    return DeclaredYield(
+        low=low,
+        high=high,
+        basis=cast('Literal["simple_annual", "usd_equivalent_annual"]', basis),
+        provenance=_fund_source(path, prefix, table),
+    )
+
+
+def _peg(path: Path, table: schema.PegTable, *, prefix: str) -> Peg:
+    """``[instrument.distribution.peg]`` as the core record, cap ladder oldest first."""
+    entries: list[CapEntry] = []
+    for index, entry in enumerate(table.cap):
+        entry_prefix = f"{prefix}.cap[{index}]"
+        effective_from = _parse_date(path, f"{entry_prefix}.effective_from", entry.effective_from)
+        if entries and effective_from <= entries[-1].effective_from:
+            raise DeclarationError(
+                path,
+                f"{entry_prefix}.effective_from",
+                f"is {effective_from.isoformat()}, on or before the previous entry's "
+                f"{entries[-1].effective_from.isoformat()}. The ladder is read in the "
+                "order it is written and is not sorted here, for the same reason a tax "
+                "schedule is not: a file whose order disagrees with its dates is one a "
+                "human misreads.",
+                "write the cap entries oldest first, with no repeated date",
+            )
+        entries.append(
+            CapEntry(
+                effective_from=effective_from,
+                uah_per_unit=_positive(
+                    path,
+                    f"{entry_prefix}.uah_per_unit",
+                    entry.uah_per_unit,
+                    "a ceiling of zero or less would size every pegged payment at nothing, "
+                    "which is not what an undeclared ceiling means",
+                ),
+                provenance=_fund_source(path, entry_prefix, entry),
+            )
+        )
+    return Peg(
+        sized_in=_currency(path, f"{prefix}.sized_in", table.sized_in),
+        cap=tuple(entries),
+    )
+
+
+def _distribution(
+    path: Path,
+    table: schema.DistributionTable,
+    *,
+    prefix: str,
+) -> DistributionTerms:
+    """``[instrument.distribution]`` as the core record."""
+    if not 1 <= table.payment_day <= _MAX_PAYMENT_DAY:
+        raise DeclarationError(
+            path,
+            f"{prefix}.payment_day",
+            f"is {table.payment_day!r}. A payment day must exist in every month, so it is "
+            f"bounded at {_MAX_PAYMENT_DAY}: a fund declaring the 31st would pay in seven "
+            "months of the year and silently skip the rest.",
+            f"write a day between 1 and {_MAX_PAYMENT_DAY}",
+        )
+    frequency = _known(
+        path, f"{prefix}.frequency", table.frequency, FUND_FREQUENCIES, "distribution frequency"
+    )
+    record_day = _known(
+        path, f"{prefix}.record_day", table.record_day, FUND_RECORD_DAYS, "record-day rule"
+    )
+    return DistributionTerms(
+        frequency=cast('Literal["monthly"]', frequency),
+        basis_note=_require_text(
+            path,
+            f"{prefix}.basis_note",
+            table.basis_note,
+            "a payout whose declared basis nobody wrote down is one a reader cannot check "
+            "against the fund's own documents",
+        ),
+        record_day=cast('Literal["last_day_of_month"]', record_day),
+        payment_day=table.payment_day,
+        paid_in=_currency(path, f"{prefix}.paid_in", table.paid_in),
+        peg=None if table.peg is None else _peg(path, table.peg, prefix=f"{prefix}.peg"),
+        payout_share=_fraction_in_range(
+            path, f"{prefix}.payout_share_pct", table.payout_share_pct, "the payout share"
+        ),
+        provenance=_fund_source(path, prefix, table),
+    )
+
+
+def _spread(path: Path, table: schema.SpreadTable, *, prefix: str) -> SpreadTerms:
+    """``[instrument.spread]`` as the core record, with the live settings kept separate."""
+    maxima = {
+        "entry_markup": _fraction_in_range(
+            path, f"{prefix}.entry_markup_max_pct", table.entry_markup_max_pct, "an entry markup"
+        ),
+        "exit_discount": _fraction_in_range(
+            path, f"{prefix}.exit_discount_max_pct", table.exit_discount_max_pct, "an exit discount"
+        ),
+    }
+    live = {
+        "entry_markup": _fraction_in_range(
+            path, f"{prefix}.live_entry_markup_pct", table.live_entry_markup_pct, "an entry markup"
+        ),
+        "exit_discount": _fraction_in_range(
+            path,
+            f"{prefix}.live_exit_discount_pct",
+            table.live_exit_discount_pct,
+            "an exit discount",
+        ),
+    }
+    for what, field in (
+        ("entry_markup", "live_entry_markup_pct"),
+        ("exit_discount", "live_exit_discount_pct"),
+    ):
+        if live[what] > maxima[what]:
+            raise DeclarationError(
+                path,
+                f"{prefix}.{field}",
+                f"declares a live {what.replace('_', ' ')} above the maximum the terms "
+                f"allow ({live[what]!r} against {maxima[what]!r}). One of the two is "
+                "wrong, and the engine cannot say which: charging the live figure would "
+                "exceed the declared ceiling, and capping it would hide the disagreement.",
+                "correct the live setting, or the maximum the terms declare",
+            )
+    return SpreadTerms(
+        entry_markup_max=maxima["entry_markup"],
+        exit_discount_max=maxima["exit_discount"],
+        live_entry_markup=live["entry_markup"],
+        live_exit_discount=live["exit_discount"],
+        provenance=_fund_source(path, prefix, table),
+    )
+
+
+def _liquidity(path: Path, table: schema.LiquidityTable, *, prefix: str) -> LiquidityTerms:
+    """``[instrument.liquidity]`` as two records, kept distinguishable."""
+    legal_prefix = f"{prefix}.legal"
+    practice_prefix = f"{prefix}.practice"
+    buyback = _known(
+        path,
+        f"{legal_prefix}.buyback_before_termination",
+        table.legal.buyback_before_termination,
+        FUND_BUYBACK_TERMS,
+        "pre-termination buyback term",
+    )
+    if not table.practice.is_revocable:
+        raise DeclarationError(
+            path,
+            f"{practice_prefix}.is_revocable",
+            "declares an observed practice that cannot be revoked, which is an obligation "
+            "rather than a practice. The distinction is the whole reason the two are "
+            "separate records: what the регламент owes and what the company currently "
+            "does are different kinds of claim.",
+            "declare it in [instrument.liquidity.legal] if the fund is actually obliged",
+        )
+    return LiquidityTerms(
+        legal=LegalTerms(
+            buyback_before_termination=cast('Literal["discretionary"]', buyback),
+            settlement_business_days=_non_negative_days(
+                path,
+                f"{legal_prefix}.settlement_business_days",
+                table.legal.settlement_business_days,
+                "a settlement delay may be zero but not negative",
+            ),
+            note=_require_text(
+                path,
+                f"{legal_prefix}.note",
+                table.legal.note,
+                "the legal terms state in words what the fund owes, so a reader can check "
+                "the citation against the claim",
+            ),
+            provenance=_fund_source(path, legal_prefix, table.legal),
+        ),
+        practice=ObservedPractice(
+            settlement_business_days=_non_negative_days(
+                path,
+                f"{practice_prefix}.settlement_business_days",
+                table.practice.settlement_business_days,
+                "a settlement delay may be zero but not negative",
+            ),
+            is_revocable=True,
+            note=_require_text(
+                path,
+                f"{practice_prefix}.note",
+                table.practice.note,
+                "an observed practice states in words what the company currently does, and "
+                "that it may stop",
+            ),
+            provenance=_fund_source(path, practice_prefix, table.practice),
+        ),
+    )
+
+
+def fund_from_file(path: Path) -> FundDeclaration:
+    """One ``data/instruments/<id>.toml`` declaring a fund, as a ``FundDeclaration``.
+
+    Nothing is inferred from the file *name*, as with a bond: a renamed file is the same
+    declaration, and a file whose name disagrees with its ``id`` is not reinterpreted.
+    """
+    document = read_document(path)
+    table = _validate(schema.FundFile, document, path).instrument
+    prefix = INSTRUMENT_TABLE
+    _known(
+        path,
+        f"{prefix}.class",
+        table.instrument_class,
+        {instrument_registry.COLLECTIVE_INVESTMENT_FUND: "a collective-investment fund"},
+        "fund instrument class",
+    )
+    if not table.is_assumption_driven:
+        raise DeclarationError(
+            path,
+            f"{prefix}.is_assumption_driven",
+            "declares a fund whose figures are not assumption-driven. This engine has no "
+            "such case: a fund's projections are contractual arithmetic over terms the "
+            "fund states about itself, and the core field is Literal[True] so there is "
+            "nothing for false to become. A fund with an observed price history is a "
+            "different declaration and a different feature.",
+            "declare is_assumption_driven = true, or declare a different instrument class",
+        )
+    currency = _currency(path, f"{prefix}.unit_currency", table.unit_currency)
+    terminates_on = _parse_date(path, f"{prefix}.terminates_on", table.terminates_on)
+    cutoff = _optional_date(path, f"{prefix}.subscription_cutoff", table.subscription_cutoff)
+    if cutoff is not None and terminates_on < cutoff:
+        raise DeclarationError(
+            path,
+            f"{prefix}.terminates_on",
+            f"is {terminates_on.isoformat()}, before the subscription cutoff "
+            f"{cutoff.isoformat()}. A fund that ends before it stops accepting money "
+            "cannot be bought at all, and projecting it would report a holding nobody "
+            "could have opened.",
+            "correct whichever of the two dates is wrong",
+        )
+    nav_prefix = f"{prefix}.nav"
+    return FundDeclaration(
+        id=_require_text(
+            path,
+            f"{prefix}.id",
+            table.id,
+            "every declaration needs an identifier, because that is what a holding and a "
+            "result refer to it by",
+        ),
+        name=_require_text(
+            path,
+            f"{prefix}.name",
+            table.name,
+            "a declaration a reader cannot recognise by name is one they cannot check",
+        ),
+        unit_currency=currency,
+        is_assumption_driven=True,
+        nav_per_unit=Money(
+            _positive(
+                path,
+                f"{nav_prefix}.per_unit",
+                table.nav.per_unit,
+                "a unit worth nothing has no price for a markup to be a share of, and "
+                "every figure computed from it would be zero while the projection still "
+                "looked complete",
+            ),
+            currency,
+            _fund_source(path, nav_prefix, table.nav),
+        ),
+        day_count=_known(
+            path, f"{prefix}.day_count", table.day_count, conventions.DAY_COUNT_FNS, "day-count"
+        ),
+        declared_yield=_declared_yield(
+            path, table.declared_yield, prefix=f"{prefix}.declared_yield"
+        ),
+        distribution=(
+            None
+            if table.distribution is None
+            else _distribution(path, table.distribution, prefix=f"{prefix}.distribution")
+        ),
+        spread=_spread(path, table.spread, prefix=f"{prefix}.spread"),
+        liquidity=_liquidity(path, table.liquidity, prefix=f"{prefix}.liquidity"),
+        minimum_units=_positive(
+            path,
+            f"{prefix}.constraints.minimum_units",
+            table.constraints.minimum_units,
+            "a minimum of zero units is not a constraint, and declaring one would make "
+            "every purchase feasible by definition",
+        ),
+        subscription_cutoff=cutoff,
+        terminates_on=terminates_on,
+        tax_classes=_tax_class_references(
+            path, table.tax_classes, field_prefix=f"{prefix}.tax_classes"
+        ),
+        fee_context=tuple(
+            FeeFact(
+                what=_require_text(
+                    path,
+                    f"{prefix}.fee_fact[{index}].what",
+                    entry.what,
+                    "a fee fact recorded as context for the declared yield has to say what "
+                    "it is, because nothing computes from it and the words are all there is",
+                ),
+                provenance=_fund_source(path, f"{prefix}.fee_fact[{index}]", entry),
+            )
+            for index, entry in enumerate(table.fee_fact)
+        ),
+        verification_tasks=tuple(
+            VerificationTask(
+                question=_require_text(
+                    path,
+                    f"{prefix}.verification_task[{index}].question",
+                    entry.question,
+                    "an open question with no question is not a task",
+                ),
+                searched=_require_text(
+                    path,
+                    f"{prefix}.verification_task[{index}].searched",
+                    entry.searched,
+                    "a task says which document was read, so the next reader does not read "
+                    "it again",
+                ),
+                searched_on=_parse_date(
+                    path,
+                    f"{prefix}.verification_task[{index}].searched_on",
+                    entry.searched_on,
+                ),
+            )
+            for index, entry in enumerate(table.verification_task)
+        ),
+    )
+
+
+def declared_class_of(path: Path) -> str:
+    """The ``[instrument] class`` of a declaration file, read without validating the rest.
+
+    The resolver's dispatch key, and the only thing read before a loader is chosen. A bond
+    file and a fund file share a directory and a root table and have almost nothing else in
+    common, so *something* has to look first; reading one key is the smallest thing that
+    can, and it fails naming the file when the key is missing rather than guessing.
+    """
+    document = read_document(path)
+    table = document.get(INSTRUMENT_TABLE)
+    if not isinstance(table, dict):
+        raise DeclarationError(
+            path,
+            INSTRUMENT_TABLE,
+            "is missing, so the file declares no instrument at all. Every declaration file "
+            "under data/instruments/ has an [instrument] table naming what it declares.",
+            "add an [instrument] table",
+        )
+    declared = table.get("class")
+    if not isinstance(declared, str) or not declared.strip():
+        raise DeclarationError(
+            path,
+            f"{INSTRUMENT_TABLE}.class",
+            "is missing or empty, so nothing can say which kind of declaration this is. "
+            "There is no default: reading an unlabelled file as a bond would fail later, "
+            "against a field the reader never wrote.",
+            'declare class = "fixed_income" or class = "collective_investment_fund"',
+        )
+    return declared
+
+
 # 004-composed-paths: the segment bound
 # ---------------------------------------------------------------------------
 #
@@ -2129,6 +2685,305 @@ def composition_from_file(path: Path) -> tuple[str, SegmentBound]:
             "chain that many",
         )
     return owner_id, SegmentBound(max_segments=file.composition.max_segments)
+
+
+# ---------------------------------------------------------------------------
+# 008-seed-and-goals: the owner's opening lots, and what the money is for
+# ---------------------------------------------------------------------------
+#
+# Same four responsibilities -- read, shape, meaning, construct -- and the same difference
+# `spendable` and `composition` already have: **no citation is read and none is expected.**
+# What the owner paid for a lot and what sum he is aiming at are his own records, not
+# observations of the world, so there is nothing for a source to vouch for. Both directories
+# are named in `EXEMPT_DIRS` of `scripts/check_provenance.py` **with their reason recorded**,
+# which is the one way a directory is permitted to be out of scope under a fail-closed gate.
+#
+# **The refusals that are this feature's own** are the two the honesty mechanism rests on:
+#
+# * `basis` must be `known` or `estimated`, with no default. A cost whose reliability nobody
+#   stated would produce a confidently unmarked tax figure, which is the defect class this
+#   project exists to remove (FR-006).
+# * `estimated` requires `reason` and `known` forbids it. The loader cannot know which of the
+#   two lines is wrong, and either guess is a declaration it invented: ignoring the reason
+#   drops something the owner wrote, and marking the figure contradicts what he said (FR-008).
+#
+# **The mark on an estimated basis is built here and joined to the cost in the core.** This is
+# where the owner's reason enters the system, so `core.ledger.seeds.basis_estimated` is called
+# here to turn it into a `SourceRef` -- but the *join* between that mark and the amount happens
+# in `seeds.seed_cost`, not in this function. The declared cost therefore rests on no cited
+# source of its own (`prov.EMPTY`, the reading `data/streams/` already has for a salary), and a
+# seed assembled without a file still reaches the ledger marked (008 FR-007).
+#
+# What is *not* here, because it needs a second file or a run: whether the instrument exists
+# (the resolver holds every declaration), whether the goal's currency is the run's base
+# currency (`spendable`'s precedent -- a base currency is a property of the run), and whether
+# the acquisition date is consistent with the instrument's issue date. The last of those is
+# deliberately **not** a load error at all: it is a well-formed declaration of an impossible
+# history, and the engine reports it as a typed `InconsistentTerms` -- the same division this
+# module already draws for a maturity on or before its issue date.
+
+SEED_TABLE: Final = "seed"
+"""Root array of a seed file, and the prefix of every field path in one."""
+
+GOAL_TABLE: Final = "goal"
+"""Root array of a goal file."""
+
+BASIS_KNOWN: Final = "known"
+"""The declared word for a cost the owner is sure of."""
+
+BASIS_ESTIMATED: Final = "estimated"
+"""The declared word for a cost he is not. Requires a reason; produces a propagating mark."""
+
+_GOAL_VARIABLES: Final = ("monthly_contribution", "target_sum", "target_date")
+"""The three, in declaration order. Any two fix the third (FR-011)."""
+
+_VARIABLES_A_GOAL_NEEDS: Final = 2
+"""Named so the check below reads as the rule it is rather than as a magic number."""
+
+
+def _owner_of(path: Path, table: schema.OwnerTable, *, what: str) -> str:
+    """The owner a per-owner file belongs to, non-empty.
+
+    Shared by the two loaders below rather than written twice: it is one claim -- whose file
+    this is -- and two copies would eventually disagree about whether the id may be blank.
+    """
+    return _require_text(
+        path,
+        f"{OWNER_TABLE}.id",
+        table.id,
+        f"{what} is one person's declaration about his own life, and every record built from "
+        "it carries him from the first commit (Principle VII)",
+    )
+
+
+def _basis(
+    path: Path, entry: schema.SeedTable, *, field_prefix: str, declared_at: str
+) -> seeds.Basis:
+    """``known`` or ``estimated``, with the reason rule the two words imply.
+
+    The pairing is checked here rather than in the shape validation because pydantic can see
+    one field at a time: "``reason`` is required for one value of ``basis`` and forbidden for
+    the other" is a statement about two fields, and the message has to be able to say which
+    of the two the author probably meant.
+    """
+    declared = entry.basis
+    if declared not in (BASIS_KNOWN, BASIS_ESTIMATED):
+        raise DeclarationError(
+            path,
+            f"{field_prefix}.basis",
+            f"declares {declared!r}, which is neither {BASIS_KNOWN!r} nor {BASIS_ESTIMATED!r}. "
+            "There is no third kind of basis and no default: a cost whose reliability nobody "
+            "stated would produce a tax figure that looks as confident as a documented one.",
+            f"write {BASIS_KNOWN!r} if you know what these units cost, or {BASIS_ESTIMATED!r} "
+            "with a reason if you are stating it from memory",
+        )
+    if declared == BASIS_KNOWN:
+        if entry.reason is not None:
+            raise DeclarationError(
+                path,
+                f"{field_prefix}.reason",
+                f"is declared beside a {BASIS_KNOWN!r} basis. A reason explains why a cost is "
+                "a guess, so one of the two lines is wrong -- and the loader cannot tell "
+                "which. Ignoring the reason would drop something you wrote; marking the "
+                "figure would contradict what you said.",
+                f"delete the reason, or change the basis to {BASIS_ESTIMATED!r}",
+            )
+        return seeds.KNOWN
+    if entry.reason is None:
+        raise DeclarationError(
+            path,
+            f"{field_prefix}.reason",
+            f"is absent beside an {BASIS_ESTIMATED!r} basis. The mark this estimate puts on "
+            "every figure derived from the lot -- the gain, the tax on it, everything "
+            "containing either -- has to state why the cost is a guess (FR-008).",
+            "write what makes the cost uncertain, in your own words",
+        )
+    return seeds.basis_estimated(
+        declared_at=declared_at,
+        reason=_require_text(
+            path,
+            f"{field_prefix}.reason",
+            entry.reason,
+            "an empty reason is not a reason: a mark that cannot say what it rests on is a "
+            "taint flag rather than provenance",
+        ),
+        estimated_for=_parse_date(path, f"{field_prefix}.acquired_on", entry.acquired_on),
+    )
+
+
+def seeds_from_file(path: Path, *, base_currency: Currency) -> tuple[str, tuple[SeedLot, ...]]:
+    """One ``data/seeds/<owner>.toml`` as its owner id and the lots it declares.
+
+    Returns the owner beside the lots rather than folding him into the file record, on
+    ``spendable_from_file``'s precedent -- though each lot *does* carry him, because a lot
+    outlives the file it was read from and "whose holding is this" must still be answerable
+    when it does.
+
+    ``base_currency`` is required and keyword-only because the file states no currency and
+    must not: a declared cost is in the base currency by FR-010, and the base currency is a
+    property of the run rather than of the holding. Passing it in is what keeps this loader
+    from hard-wiring hryvnia into the one place a second jurisdiction would have to change.
+
+    Lot ids come from the entry's position -- ``seed-0``, ``seed-1`` -- rather than being
+    declared. Two purchases of one instrument on one date are legitimate and must be two lots,
+    so identity cannot be derived from ``(instrument, date)``; and asking the owner to invent
+    an id would be a field with nothing to say.
+    """
+    document = read_document(path)
+    file = _validate(schema.SeedFile, document, path)
+    owner_id = _owner_of(path, file.owner, what="a declaration of what he already holds")
+    declared: list[SeedLot] = []
+    for position, entry in enumerate(file.seed):
+        field_prefix = f"{SEED_TABLE}[{position}]"
+        declared_at = source_id(path, field_prefix)
+        basis = _basis(path, entry, field_prefix=field_prefix, declared_at=declared_at)
+        declared.append(
+            SeedLot(
+                owner_id=owner_id,
+                lot_id=f"{SEED_TABLE}-{position}",
+                declared_at=declared_at,
+                is_synthetic=entry.is_synthetic,
+                instrument_id=_require_text(
+                    path,
+                    f"{field_prefix}.instrument_id",
+                    entry.instrument_id,
+                    "a lot is a holding *of* something, and the something is checked against "
+                    "the curated instrument declarations (FR-005)",
+                ),
+                quantity=_positive(
+                    path,
+                    f"{field_prefix}.quantity",
+                    entry.quantity,
+                    "a lot may not exist at zero or below: an empty lot would keep an "
+                    "acquisition date alive that holds nothing and would take its turn in the "
+                    "consumption order",
+                ),
+                acquired_on=_parse_date(path, f"{field_prefix}.acquired_on", entry.acquired_on),
+                cost=Money(
+                    _non_negative(
+                        path,
+                        f"{field_prefix}.cost",
+                        entry.cost,
+                        "a rebate is not a basis. Zero is a real declaration -- a holding that "
+                        "genuinely cost nothing -- and is accepted; what is refused is the "
+                        "field being absent, because a zero nobody wrote would make every "
+                        "later disposal compute the wrong gain (FR-006)",
+                    ),
+                    base_currency,
+                    # The declared amount rests on no cited source: an owner's own record is
+                    # not an observation, the reading `data/streams/` already takes for a
+                    # salary. Where the cost is a *guess*, the mark that says so travels on
+                    # `basis` and `core.ledger.seeds.seed_cost` joins the two -- so a lot the
+                    # loader never saw carries it too, and this boundary is not the only thing
+                    # standing between a guessed cost and an unmarked tax (008 FR-007).
+                    prov.EMPTY,
+                ),
+                basis=basis,
+            )
+        )
+    return owner_id, tuple(declared)
+
+
+def goals_from_file(path: Path) -> tuple[str, tuple[Goal, ...]]:
+    """One ``data/goals/<owner>.toml`` as its owner id and the targets it declares.
+
+    No ``base_currency`` argument, unlike :func:`seeds_from_file`, and the asymmetry is the
+    declarations': a goal *states* its currency (FR-016 keeps the field so the multi-currency
+    case stays open) while a seed's cost has no currency field at all. Whether the stated
+    currency is the run's base currency is therefore a question for the resolver, exactly as
+    it is for the spendable list.
+
+    **Fewer than two of the three variables is refused here, naming what is missing** (FR-011).
+    It is a property of one entry read in isolation, so it belongs to the loader; and the
+    message lists the absent fields rather than saying "declare more", because the whole point
+    is that the tool will not choose which one to invent.
+    """
+    document = read_document(path)
+    file = _validate(schema.GoalFile, document, path)
+    owner_id = _owner_of(path, file.owner, what="a declaration of what his money is for")
+    declared: list[Goal] = []
+    seen: dict[str, int] = {}
+    for position, entry in enumerate(file.goal):
+        field_prefix = f"{GOAL_TABLE}[{position}]"
+        goal_id = _require_text(
+            path,
+            f"{field_prefix}.id",
+            entry.id,
+            "a goal is reported against by id, and an unnamed target cannot be reported "
+            "against at all",
+        )
+        if goal_id in seen:
+            raise DeclarationError(
+                path,
+                f"{field_prefix}.id",
+                f"declares the goal id {goal_id!r} for the second time; entry {seen[goal_id]} "
+                "of this file already declares it. The two are not merged and neither is "
+                "preferred: two targets with one name cannot be told apart, so neither could "
+                "be reported on.",
+                "rename one of the two goals, or delete the one that is a duplicate",
+            )
+        seen[goal_id] = position
+        currency = _currency(path, f"{field_prefix}.currency", entry.currency)
+        _require_two_variables(path, entry, field_prefix=field_prefix)
+        declared.append(
+            Goal(
+                owner_id=owner_id,
+                id=goal_id,
+                is_synthetic=entry.is_synthetic,
+                currency=currency,
+                monthly_contribution=None
+                if entry.monthly_contribution is None
+                else Money(
+                    _non_negative(
+                        path,
+                        f"{field_prefix}.monthly_contribution",
+                        entry.monthly_contribution,
+                        "a withdrawal is not a contribution. Zero is a real declaration -- a "
+                        "goal reached out of growth on the starting amount alone -- and is "
+                        "accepted",
+                    ),
+                    currency,
+                    prov.EMPTY,
+                ),
+                target_sum=None
+                if entry.target_sum is None
+                else Money(
+                    _positive(
+                        path,
+                        f"{field_prefix}.target_sum",
+                        entry.target_sum,
+                        "a target of zero is not something to aim at and a negative one is not "
+                        "a target",
+                    ),
+                    currency,
+                    prov.EMPTY,
+                ),
+                target_date=_optional_date(path, f"{field_prefix}.target_date", entry.target_date),
+            )
+        )
+    return owner_id, tuple(declared)
+
+
+def _require_two_variables(path: Path, entry: schema.GoalTable, *, field_prefix: str) -> None:
+    """FR-011: any two of the three fix the third, and fewer than two fixes nothing.
+
+    The absent ones are named in the message. A goal declaring only a target sum could be
+    completed by inventing a contribution or by inventing a date, and either would be the tool
+    answering a question the owner did not ask -- so it says which two fields it found nothing
+    in and stops.
+    """
+    missing = [name for name in _GOAL_VARIABLES if getattr(entry, name) is None]
+    if len(_GOAL_VARIABLES) - len(missing) >= _VARIABLES_A_GOAL_NEEDS:
+        return
+    raise DeclarationError(
+        path,
+        field_prefix,
+        f"declares fewer than two of {list(_GOAL_VARIABLES)}: nothing is declared for "
+        f"{missing}. Any two fix the third, and fewer than two fix nothing -- filling one in "
+        "would be the tool inventing the plan rather than solving it.",
+        "declare two of monthly_contribution, target_sum and target_date -- or all three, "
+        "which asks whether they are consistent",
+    )
 
 
 # ---------------------------------------------------------------------------

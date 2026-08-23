@@ -21,6 +21,7 @@ LAYER_MODULES = (
     "terezy.core.streams",
     "terezy.core.scenarios",
     "terezy.core.ledger",
+    "terezy.core.goals",
     "terezy.core.tax",
     "terezy.core.metrics",
     "terezy.core.analysis",

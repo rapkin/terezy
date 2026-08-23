@@ -1,0 +1,114 @@
+# SYNTHETIC FIXTURE. Every term in this file is invented.
+#
+# The third fund, and its whole purpose is that it is **different**: a different peg
+# ceiling on a different date, a different spread, different settlement delays under both
+# liquidity modes, a subscription cutoff the real REIT does not have, a payout share below
+# 100% so its NAV moves, and its own tax classes on a **two-entry** dated schedule
+# (`data/tax/synthetic_fixture.toml`).
+#
+# SC-010 is the claim this file exists to prove: it produces a complete result, and **not
+# one line of source code** was written or changed to accept it. If adding a fourth fund
+# ever needs an engine edit, the abstraction is wrong (Principle II).
+#
+# It is assumption-driven like every fund, and every `verified_on` is empty because there
+# is nothing to verify invented terms against.
+
+[instrument]
+id                   = "synthetic_fund_c"
+name                 = "Synthetic fund C — TEST FIXTURE, terms invented, different in every term"
+class                = "collective_investment_fund"
+unit_currency        = "UAH"
+is_assumption_driven = true
+day_count            = "act/365"
+terminates_on        = "2031-12-31"
+subscription_cutoff  = "2028-06-30"
+
+  [instrument.nav]
+  per_unit     = 250.0
+  kind         = "fund_terms"
+  source       = "SYNTHETIC FIXTURE — an invented net asset value per unit, chosen unlike either real fund's."
+  retrieved_on = "2026-08-23"
+  verified_on  = ""
+
+  [instrument.declared_yield]
+  low_pct      = 8.0
+  high_pct     = 8.0
+  basis        = "usd_equivalent_annual"
+  kind         = "fund_stated_yield"
+  source       = "SYNTHETIC FIXTURE — an invented point rate. Not a target any fund published."
+  retrieved_on = "2026-08-23"
+  verified_on  = ""
+
+  [instrument.distribution]
+  frequency        = "monthly"
+  basis_note       = "FIXTURE — an invented monthly payout of 60% of the declared yield, the rest retained so that NAV moves."
+  record_day       = "last_day_of_month"
+  payment_day      = 20
+  paid_in          = "UAH"
+  payout_share_pct = 60.0
+  kind             = "fund_terms"
+  source           = "SYNTHETIC FIXTURE — invented distribution terms, deliberately unlike the REIT's."
+  retrieved_on     = "2026-08-23"
+  verified_on      = ""
+
+    [instrument.distribution.peg]
+    sized_in = "USD"
+
+      [[instrument.distribution.peg.cap]]
+      effective_from = "2027-01-01"
+      uah_per_unit   = 45.0
+      kind           = "fund_terms"
+      source         = "SYNTHETIC FIXTURE — an invented ceiling starting on an invented date, deliberately later than the REIT's ladder so that a payment before it is refused rather than sized."
+      retrieved_on   = "2026-08-23"
+      verified_on    = ""
+
+  [instrument.spread]
+  entry_markup_max_pct   = 2.0
+  exit_discount_max_pct  = 5.0
+  live_entry_markup_pct  = 0.5
+  live_exit_discount_pct = 1.0
+  kind                   = "fund_terms"
+  source                 = "SYNTHETIC FIXTURE — an invented spread, wider than either real fund's and with the live settings below the maxima."
+  retrieved_on           = "2026-08-23"
+  verified_on            = ""
+
+  [instrument.liquidity.legal]
+  buyback_before_termination = "discretionary"
+  settlement_business_days   = 30
+  note                       = "FIXTURE — an invented legal floor: no obligation before 2031-12-31, and thirty business days to settle when the manager does choose to buy back."
+  kind                       = "fund_liquidity"
+  source                     = "SYNTHETIC FIXTURE — not read from any регламент."
+  retrieved_on               = "2026-08-23"
+  verified_on                = ""
+
+  [instrument.liquidity.practice]
+  settlement_business_days = 3
+  is_revocable             = true
+  note                     = "FIXTURE — an invented practice of settling in three business days rather than same-day, so the two funds' practice modes differ too."
+  kind                     = "fund_liquidity"
+  source                   = "SYNTHETIC FIXTURE — not an observation of any company's behaviour."
+  retrieved_on             = "2026-08-23"
+  verified_on              = ""
+
+  [instrument.constraints]
+  minimum_units = 4.0
+  kind          = "venue_terms"
+  source        = "SYNTHETIC FIXTURE — an invented minimum of four units, unlike the REIT's one."
+  retrieved_on  = "2026-08-23"
+  verified_on   = ""
+
+  [instrument.tax_classes]
+  distribution  = "synthetic_fund_payout"
+  disposal_gain = "synthetic_fund_disposal"
+
+  [[instrument.fee_fact]]
+  what         = "FIXTURE — an invented management fee of up to 3% a year, recorded as context for the declared yield and never computed."
+  kind         = "fund_terms"
+  source       = "SYNTHETIC FIXTURE — not read from any document."
+  retrieved_on = "2026-08-23"
+  verified_on  = ""
+
+  [[instrument.verification_task]]
+  question    = "FIXTURE — an invented open question, so that a data-only fund also carries a task with no value field: what «граничний курс» applies before 2027?"
+  searched    = "nothing; this fund does not exist"
+  searched_on = "2026-08-23"

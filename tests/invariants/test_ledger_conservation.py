@@ -45,14 +45,28 @@ from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.tolerance import TOLERANCE, assert_money_close, is_close
 from tests.invariants.event_streams import Stream, event_streams
+from tests.invariants.seeded_streams import seeded_event_streams
 
-STREAMS = st.sampled_from(Currency).flatmap(lambda currency: event_streams(currency=currency))
-"""Generated histories in each currency the system knows.
+STREAMS = st.sampled_from(Currency).flatmap(
+    lambda currency: st.one_of(
+        event_streams(currency=currency),
+        seeded_event_streams(currency=currency),
+    )
+)
+"""Generated histories in each currency the system knows, seeded and unseeded.
 
 Drawn across both currencies rather than fixing UAH so that the base-currency slots are
 exercised against a base that is not the project default. Feature 001 only ever produces
 UAH, but a conservation property that has only ever seen one currency is a property about
 UAH, not about the ledger.
+
+⚙ **Seeded ledgers joined the draw with feature 008 (SC-005), and not one property below
+changed.** That is the whole point rather than a convenience: research.md D1 claims a
+declared seed lot is an ordinary ledger citizen, opening the ledger through the same path a
+purchase takes, and the only way to test that claim is to feed the properties that already
+exist a body of ledgers that begin from seeds. A property that had to be taught about seeds
+would be evidence against the claim, so if one fails here the fix is in
+``core.ledger.seeds`` -- never a special case in an invariant (quickstart §1).
 """
 
 

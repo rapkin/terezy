@@ -85,8 +85,14 @@ Mention any of these in the result; none of them blocks the commit on its own.
   recorded in the same commit. If it wasn't, say so.
 - **New data under `data/`** needs `source`, `retrieved_on` and `verified_on`. The
   provenance script enforces it; an empty `verified_on` is fine and expected.
-- **Nothing secret, ever.** No `.env`, no credentials, no per-user financial data
-  (`data/user/`, `cache/`, `runs/` are gitignored — keep it that way).
+- **Nothing secret, and no real personal data, ever.** No `.env`, no credentials, and no
+  figure that describes the owner's actual position. The repository holds **public facts**
+  (fees, tax rates, inflation data) and **synthetic fixtures labelled as such**; the owner's
+  own declarations under `data/seeds/`, `data/goals/`, `data/streams/`, `data/spendable/` and
+  `data/composition/` are committed *because* what ships in them is synthetic and says so on
+  its face. A file in one of those that stops being synthetic stops being committable. What a
+  run *produces* stays out regardless (`data/user/`, `cache/`, `runs/` are gitignored — keep
+  it that way). See `data/README.md` rule 5.
 - **New dependency in `core/`** wants a justification in the message; the constitution
   asks for one.
 

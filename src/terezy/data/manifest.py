@@ -82,6 +82,7 @@ from pathlib import Path
 from typing import Final, Literal, assert_never
 
 import terezy
+from terezy.core.instruments.fund import FundDeclaration
 from terezy.core.instruments.interface import (
     Assumptions,
     DateRange,
@@ -94,6 +95,7 @@ from terezy.core.primitives.provenance import Provenance
 from terezy.core.primitives.rates import RealRate
 from terezy.core.results import canonical
 from terezy.core.results.project import Projection
+from terezy.core.tax.interface import TaxClass
 from terezy.data.declarations.errors import DeclarationError
 from terezy.data.declarations.resolver import Declarations, InflationDeclarations
 
@@ -124,14 +126,22 @@ Carried in the value rather than only in this constant so that a stored digest c
 compared against one taken with a different algorithm by accident.
 """
 
-InputKind = Literal["cpi_series", "inflation_assumption", "instrument", "tax_class"]
+InputKind = Literal["cpi_series", "fund", "inflation_assumption", "instrument", "tax_class"]
 """What kind of declaration an :class:`InputRef` describes. A closed set, not a free string.
 
-⚙ **Two members added by feature 007.** FR-015 requires the manifest to record *which*
-inflation declaration produced a result -- two runs differing only in their declared belief
-are two results, and a manifest that did not name the belief could not tell them apart. The
-CPI series is recorded for the same reason from the other side: a real figure is only
-reproducible if the manifest says which series deflated it and at which version.
+⚙ ``"fund"`` joined with feature 006. Kept distinct from ``"instrument"`` rather than folded
+into it: the two are different declarations in the same directory, and a manifest that
+called them one thing would hide which kind of file a run was actually fed.
+
+⚙ ``"cpi_series"`` and ``"inflation_assumption"`` joined with feature 007. FR-015 requires the
+manifest to record *which* inflation declaration produced a result -- two runs differing only
+in their declared belief are two results, and a manifest that did not name the belief could
+not tell them apart. The CPI series is recorded for the same reason from the other side: a
+real figure is only reproducible if the manifest says which series deflated it, at which
+version.
+
+Listed alphabetically because :func:`input_refs` sorts by ``(kind, id)``, so the order here is
+the order a manifest reads in.
 """
 
 
@@ -340,11 +350,59 @@ def input_refs(declarations: Declarations) -> tuple[InputRef, ...]:
             id=identifier,
             file=file_name(declarations.tax_class_files[identifier]),
             version=file_version(declarations.tax_class_files[identifier]),
-            unverified_sources=_unverified_ids(declared.provenance),
+            unverified_sources=_unverified_ids(_tax_class_provenance(declared)),
         )
         for identifier, declared in declarations.tax_classes.items()
     ]
-    return tuple(sorted([*instruments, *tax_classes], key=lambda ref: (ref.kind, ref.id)))
+    funds = [
+        InputRef(
+            kind="fund",
+            id=identifier,
+            file=file_name(declarations.fund_files[identifier]),
+            version=file_version(declarations.fund_files[identifier]),
+            unverified_sources=_unverified_ids(_fund_provenance(declared)),
+        )
+        for identifier, declared in declarations.funds.items()
+    ]
+    return tuple(sorted([*instruments, *tax_classes, *funds], key=lambda ref: (ref.kind, ref.id)))
+
+
+def _fund_provenance(declared: FundDeclaration) -> Provenance:
+    """Every source behind one fund declaration, including the ones nothing computes from.
+
+    ⚙ Feature 006. A fund carries more independent observations than a bond does -- its NAV,
+    its stated yield, its distribution terms, its spread, both readings of its liquidity,
+    each dated cap entry and each recorded fee fact -- and every one of them is a separate
+    citation with its own verification date. The union is taken over all of them, including
+    the fee facts that are context rather than computed terms: they are still things a
+    reader was told, and a manifest that recorded only what the arithmetic touched would
+    call a file verified while part of it was not.
+    """
+    sources = [
+        declared.nav_per_unit.provenance,
+        declared.declared_yield.provenance,
+        declared.spread.provenance,
+        declared.liquidity.legal.provenance,
+        declared.liquidity.practice.provenance,
+        *(fee.provenance for fee in declared.fee_context),
+    ]
+    terms = declared.distribution
+    if terms is not None:
+        sources.append(terms.provenance)
+        if terms.peg is not None:
+            sources.extend(entry.provenance for entry in terms.peg.cap)
+    return prov.merge_all(sources)
+
+
+def _tax_class_provenance(declared: TaxClass) -> Provenance:
+    """Every source behind one tax class: the citation of each dated rate entry.
+
+    ⚙ Feature 006 moved the citation from the class to its entries, because two rates
+    cited by two sources are two observations. A manifest that recorded only the entry in
+    force today would call the class verified while an earlier, still-reachable entry was
+    not -- so the union is taken over the whole schedule.
+    """
+    return prov.merge_all(entry.provenance for entry in declared.rates)
 
 
 def inflation_input_refs(declarations: InflationDeclarations) -> tuple[InputRef, ...]:

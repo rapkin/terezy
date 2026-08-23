@@ -53,6 +53,7 @@ from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance, SourceRef
 from terezy.core.tax.interface import TaxableEventKind, TaxClass
+from terezy.core.tax.schedule import RateEntry
 
 UAH = Currency.UAH
 
@@ -100,27 +101,78 @@ MATURITY_DATE = date(2028, 1, 15)
 ADJUSTED_MATURITY = date(2028, 1, 17)
 """2028-01-15 is a Saturday, so a ``following`` rule pays the last flow on the Monday."""
 
+SCHEDULE_START = date(2020, 1, 1)
+"""The effective date every fixture schedule below starts at.
+
+Chosen far enough before ``ISSUE_DATE`` that no fixture accidentally becomes a test of
+FR-012's refusal. It is a **fixture** date and claims nothing about Ukrainian law: the
+real classes in ``data/tax/ua.toml`` start at the date their citation attests, and that
+date is much later. A test that wants the refusal declares its own schedule --
+``tests/unit/test_schedule_refusals.py`` does exactly that.
+"""
+
 EXEMPT_CLASS = TaxClass(
     id="synthetic_government_bond",
     applies_to=frozenset({TaxableEventKind.COUPON, TaxableEventKind.DISPOSAL_GAIN}),
-    pit_rate=0.0,
-    levy_rate=0.0,
-    provenance=prov.of([EXEMPTION_SOURCE]),
+    rates=(
+        RateEntry(
+            effective_from=SCHEDULE_START,
+            pit_rate=0.0,
+            levy_rate=0.0,
+            provenance=prov.of([EXEMPTION_SOURCE]),
+        ),
+    ),
 )
-"""The exemption: not a special type, just a class declaring zeroes with a citation."""
+"""The exemption: not a special type, just a class whose one dated entry declares zeroes
+with a citation."""
 
 TAXED_CLASS = TaxClass(
     id="synthetic_taxed",
     applies_to=frozenset({TaxableEventKind.COUPON, TaxableEventKind.DISPOSAL_GAIN}),
-    pit_rate=0.18,
-    levy_rate=0.015,
-    provenance=prov.of([TAXED_SOURCE]),
+    rates=(
+        RateEntry(
+            effective_from=SCHEDULE_START,
+            pit_rate=0.18,
+            levy_rate=0.015,
+            provenance=prov.of([TAXED_SOURCE]),
+        ),
+    ),
 )
 """Invented non-zero rates. They are **not** a claim about Ukrainian law -- they exist so
 that a test can prove the rule applies whatever the class carries, and that PIT and the
 levy stay separate lines. Any figure derived from them is a fixture, not a tax opinion."""
 
 TAX_PACK = {EXEMPT_CLASS.id: EXEMPT_CLASS, TAXED_CLASS.id: TAXED_CLASS}
+
+
+def rates(
+    pit: float,
+    levy: float,
+    *,
+    source: SourceRef = TAXED_SOURCE,
+    effective_from: date = SCHEDULE_START,
+) -> tuple[RateEntry, ...]:
+    """A one-entry schedule, for a test whose subject is the rates rather than the dates.
+
+    Most tests in this suite care that *a* rate applies, not that it applies *from* a
+    particular day, and spelling out a ``RateEntry`` at each of those sites would bury the
+    thing being tested. The dated behaviour has its own two modules --
+    ``tests/unit/test_rate_lookup_boundary.py`` and ``tests/unit/test_schedule_refusals.py``
+    -- which build their schedules explicitly, because there the date *is* the subject.
+    """
+    return (
+        RateEntry(
+            effective_from=effective_from,
+            pit_rate=pit,
+            levy_rate=levy,
+            provenance=prov.of([source]),
+        ),
+    )
+
+
+def rate_provenance(declared: TaxClass) -> Provenance:
+    """The union of a class's entries' citations -- what its charges will be marked by."""
+    return prov.merge_all(entry.provenance for entry in declared.rates)
 
 
 def terms(**overrides: Any) -> BondTerms:

@@ -1,0 +1,43 @@
+# SYNTHETIC FIXTURE. This is not the owner's goal.
+#
+# His real target — how much, by when, out of what — is unstated (`SIMULATOR_SPEC.md` §11
+# item 3) and will replace this file when it arrives. Nothing below is a plan anyone holds,
+# and no figure solved from it may be quoted as if it were (008 FR-025).
+#
+# **Per-owner data, not curated.** Beside `data/seeds/`, `data/streams/`, `data/spendable/`
+# and `data/composition/`, on the boundary Principle VII draws: what the money is for is one
+# person's life, not a public fact about the world.
+#
+# **NO CITATION KEYS, and their absence is the design.** A target sum is a decision, not an
+# observation — there is nothing for a source to vouch for. The same exemption `objectives`
+# and `strategies` carry, recorded by name in `scripts/check_provenance.py`.
+#
+# **Exactly two of the three variables, or all three.** Two is a solve: the tool answers the
+# third. Three is the feasibility question — met with the margin, or missed with the amount
+# short and the date the target would actually arrive. Fewer than two is refused naming what
+# is missing, because filling one in would be the tool inventing the plan.
+#
+# **The growth assumption and the starting amount are not declared here**, and that is
+# deliberate rather than an omission (008 FR-012). Neither is a property of the goal: they
+# are inputs to the evaluation, they carry their own provenance, and there is no default for
+# either. A rate written here would silently become "the rate", and a goal evaluated against
+# a rate nobody chose is a number about nobody's plan.
+#
+# **`currency` is stated rather than assumed** (008 FR-016). It must be the base currency
+# today: a goal in another currency is refused as *not yet modelled*, naming the missing FX
+# modelling, because a USD target and a UAH target are genuinely different goals under
+# devaluation. The field stays because the multi-currency case is deferred, not closed —
+# `specs/features.toml` records `multi-currency-goals` as owner-requested future work.
+
+[owner]
+id = "owner-001"
+
+# Two of the three: how much goes in each month, and how much is wanted. The tool solves the
+# date — and reports both the exact solution and the first month-end on which the target is
+# actually reached, because those are two different facts.
+[[goal]]
+id                   = "flat_deposit"
+is_synthetic         = true
+currency             = "UAH"
+monthly_contribution = 20_000.0
+target_sum           = 1_200_000.0

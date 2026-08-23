@@ -28,7 +28,7 @@ in the data layer.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 import pydantic
@@ -40,7 +40,9 @@ from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.results import project
+from terezy.core.results.project import Projection
 from terezy.core.tax.interface import TaxableEventKind
+from terezy.core.tax.schedule import RateUndeclaredBefore
 from terezy.data.declarations import loader, resolver
 from terezy.data.declarations.errors import DeclarationError
 
@@ -147,11 +149,10 @@ class TestTheShippedFilesLoad:
 
     def test_the_tax_class_loads_its_zero_rates_as_fractions(self) -> None:
         classes = loader.tax_classes_from_file(TAX_UA)
-        assert len(classes) == 1
-        exempt = classes[0]
-        assert exempt.id == "ua_government_bond"
-        assert exempt.pit_rate == 0.0
-        assert exempt.levy_rate == 0.0
+        exempt = next(declared for declared in classes if declared.id == "ua_government_bond")
+        (only_entry,) = exempt.rates
+        assert only_entry.pit_rate == 0.0
+        assert only_entry.levy_rate == 0.0
         assert exempt.applies_to == frozenset(
             {TaxableEventKind.COUPON, TaxableEventKind.DISPOSAL_GAIN}
         )
@@ -166,7 +167,7 @@ class TestTheShippedFilesLoad:
         declaration = loader.instrument_from_file(INSTRUMENT_A)
         assert prov.is_unverified(declaration.terms.provenance)
         assert prov.is_unverified(declaration.constraints.provenance)
-        assert prov.is_unverified(loader.tax_classes_from_file(TAX_UA)[0].provenance)
+        assert prov.is_unverified(loader.tax_classes_from_file(TAX_UA)[0].rates[0].provenance)
 
     def test_every_source_ref_names_the_file_and_table_it_came_from(self) -> None:
         """A figure must trace back to *where* it was declared, not just to a citation.
@@ -179,8 +180,13 @@ class TestTheShippedFilesLoad:
         constraint_ids = {ref.id for ref in declaration.constraints.provenance.sources}
         assert terms_ids == {"instruments/ovdp_synthetic_a.toml#instrument.terms"}
         assert constraint_ids == {"instruments/ovdp_synthetic_a.toml#instrument.constraints"}
-        assert {ref.id for ref in loader.tax_classes_from_file(TAX_UA)[0].provenance.sources} == {
-            "tax/ua.toml#jurisdiction.tax_class[ua_government_bond]"
+        exempt = next(
+            declared
+            for declared in loader.tax_classes_from_file(TAX_UA)
+            if declared.id == "ua_government_bond"
+        )
+        assert {ref.id for ref in exempt.rates[0].provenance.sources} == {
+            "tax/ua.toml#jurisdiction.tax_class[ua_government_bond].rate[0]"
         }
 
 
@@ -320,7 +326,7 @@ class TestWrongType:
         _assert_names_file_and_field(raised.value, file=broken, field_path=field_path)
 
     def test_a_wrong_type_inside_an_array_of_tables_names_its_index(self, tmp_path: Path) -> None:
-        """``jurisdiction.tax_class[0].pit_rate_pct`` -- the index, because that is all
+        """``jurisdiction.tax_class[0].rate[0].pit_rate_pct`` -- the index, because that is all
         pydantic has.
 
         A malformed entry may not carry a usable ``id`` to name it by, so the shape
@@ -332,13 +338,13 @@ class TestWrongType:
             tmp_path,
             "ua_wrong_type.toml",
             _replace(
-                TAX_UA.read_text(encoding="utf-8"), "pit_rate_pct  = 0.0", 'pit_rate_pct  = "0"'
+                TAX_UA.read_text(encoding="utf-8"), "pit_rate_pct   = 0.0", 'pit_rate_pct   = "0"'
             ),
         )
         with pytest.raises(DeclarationError) as raised:
             loader.tax_classes_from_file(broken)
         _assert_names_file_and_field(
-            raised.value, file=broken, field_path="jurisdiction.tax_class[0].pit_rate_pct"
+            raised.value, file=broken, field_path="jurisdiction.tax_class[0].rate[0].pit_rate_pct"
         )
 
 
@@ -510,8 +516,8 @@ class TestUnresolvedTaxClassReference:
             "ua_coupon_only.toml",
             _replace(
                 TAX_UA.read_text(encoding="utf-8"),
-                'applies_to    = ["coupon", "disposal_gain"]',
-                'applies_to    = ["coupon"]',
+                'applies_to = ["coupon", "disposal_gain"]',
+                'applies_to = ["coupon"]',
             ),
         )
         with pytest.raises(DeclarationError) as raised:
@@ -530,8 +536,8 @@ class TestUnresolvedTaxClassReference:
                 "instrument.tax_classes.dividend",
             ),
             (
-                'applies_to    = ["coupon", "disposal_gain"]',
-                'applies_to    = ["coupon", "windfall"]',
+                'applies_to = ["coupon", "disposal_gain"]',
+                'applies_to = ["coupon", "windfall"]',
                 "jurisdiction.tax_class[ua_government_bond].applies_to",
             ),
         ],
@@ -664,13 +670,13 @@ class TestNonPositiveAmounts:
         ("old", "new", "field_path"),
         [
             (
-                "pit_rate_pct  = 0.0",
-                "pit_rate_pct  = -18.0",
-                "jurisdiction.tax_class[ua_government_bond].pit_rate_pct",
+                "pit_rate_pct   = 0.0",
+                "pit_rate_pct   = -18.0",
+                "jurisdiction.tax_class[ua_government_bond].rate[0].pit_rate_pct",
             ),
             (
-                'applies_to    = ["coupon", "disposal_gain"]',
-                "applies_to    = []",
+                'applies_to = ["coupon", "disposal_gain"]',
+                "applies_to = []",
                 "jurisdiction.tax_class[ua_government_bond].applies_to",
             ),
         ],
@@ -801,6 +807,310 @@ class TestAnImpossibleInstrumentIsNotALoadError:
         assert "2025-01-15" in outcome.reason
 
 
+class TestDatedRateSchedules:
+    """⚙ Feature 006: the schedule's own enforced rules, all naming file and field.
+
+    Five ways a dated schedule can be wrong, and one thing that is *not* wrong. The
+    schedule is the shape a tax rate has now (research.md D1), so every one of these is a
+    file a maintainer could plausibly write by hand, and every one of them must be caught
+    where the file can be named rather than mid-projection.
+    """
+
+    def _last_class_id(self) -> str:
+        """Which class an entry appended to the end of the shipped file lands under.
+
+        Computed rather than written down: the file gains classes as features land, and a
+        hard-coded id would silently start testing a different class than the one the
+        appended block actually belongs to.
+        """
+        return loader.tax_classes_from_file(TAX_UA)[-1].id
+
+    def _last_effective_from(self) -> str:
+        """The effective date of that class's last entry, so a duplicate really duplicates.
+
+        Derived for the same reason the id is: the shipped classes are dated by what their
+        citations attest, and those dates move when a better citation is found. A literal
+        here would quietly stop testing duplication the day one did.
+        """
+        return loader.tax_classes_from_file(TAX_UA)[-1].rates[-1].effective_from.isoformat()
+
+    def _without_the_schedule(self) -> str:
+        """The shipped tax file with its ``[[...rate]]`` block cut off.
+
+        The caller appends ``rate = []`` to it, so the case under test is a schedule
+        declared **empty** rather than one whose key is missing. The missing key is
+        already covered by ``TestMissingRequiredField``'s rule, and the two failures are
+        different: one is a file that forgot a section, the other is a file that says, in
+        as many words, that this class has no rates.
+        """
+        text = TAX_UA.read_text(encoding="utf-8")
+        marker = "  [[jurisdiction.tax_class.rate]]"
+        assert marker in text, "the shipped fixture no longer declares a rate block"
+        return text[: text.index(marker)]
+
+    def _schedule_block(self, effective_from: str) -> str:
+        return (
+            "\n  [[jurisdiction.tax_class.rate]]\n"
+            f'  effective_from = "{effective_from}"\n'
+            "  pit_rate_pct   = 0.0\n"
+            "  levy_rate_pct  = 0.0\n"
+            '  note           = "FIXTURE -- a second entry added by a test."\n'
+            '  kind           = "tax_rule"\n'
+            '  source         = "FIXTURE -- not an observation."\n'
+            '  retrieved_on   = "2026-08-23"\n'
+            '  verified_on    = ""\n'
+        )
+
+    def test_a_class_with_no_dated_entry_is_refused(self, tmp_path: Path) -> None:
+        """A class that can charge nothing must not be readable as an exemption.
+
+        The two are opposite claims: an exemption is a cited zero, and an empty schedule
+        is the absence of any citation at all.
+        """
+        broken = _write(tmp_path, "no_rates.toml", self._without_the_schedule() + "rate = []\n")
+        with pytest.raises(DeclarationError) as raised:
+            loader.tax_classes_from_file(broken)
+        _assert_names_file_and_field(
+            raised.value,
+            file=broken,
+            field_path="jurisdiction.tax_class[ua_government_bond].rate",
+        )
+
+    def test_two_entries_with_the_same_effective_date_are_refused(self, tmp_path: Path) -> None:
+        """Two rates in force on one date has no meaning, and neither may win by order."""
+        # The block lands under the file's *last* class, whichever that is, and repeats
+        # that class's own last effective date.
+        text = TAX_UA.read_text(encoding="utf-8") + self._schedule_block(
+            self._last_effective_from()
+        )
+        broken = _write(tmp_path, "duplicate_dates.toml", text)
+        with pytest.raises(DeclarationError) as raised:
+            loader.tax_classes_from_file(broken)
+        _assert_names_file_and_field(
+            raised.value,
+            file=broken,
+            field_path=(f"jurisdiction.tax_class[{self._last_class_id()}].rate[1].effective_from"),
+        )
+
+    def test_entries_out_of_order_are_refused_rather_than_sorted(self, tmp_path: Path) -> None:
+        """Sorting silently was the obvious alternative and it is refused.
+
+        A file whose written order disagrees with its dates is one a human misreads -- and
+        the reader is the person who has to check a rate against a statute. Reordering it
+        here would make that file loadable, so the error is what stops it existing.
+
+        ⚙ **This test used a literal date and passed for the wrong reason.** It appended
+        ``2024-12-01``; when `ua_investment_profit` was re-dated to exactly that day, the
+        appended block stopped being *earlier* than the previous entry and became *equal*
+        to it, so the duplicate-date branch raised instead and the out-of-order branch lost
+        all coverage. Both branches report the same ``field_path``, so an assertion reading
+        only the field could never have noticed. Hence two changes: the date is **derived**
+        strictly earlier than whatever the file declares, and the assertion reads the
+        **message**, which is the only thing that distinguishes the two.
+        """
+        earlier = date.fromisoformat(self._last_effective_from()) - timedelta(days=1)
+        text = TAX_UA.read_text(encoding="utf-8") + self._schedule_block(earlier.isoformat())
+        broken = _write(tmp_path, "unsorted.toml", text)
+        with pytest.raises(DeclarationError) as raised:
+            loader.tax_classes_from_file(broken)
+        _assert_names_file_and_field(
+            raised.value,
+            file=broken,
+            field_path=(f"jurisdiction.tax_class[{self._last_class_id()}].rate[1].effective_from"),
+        )
+        assert "before the previous entry's" in str(raised.value), (
+            "this must be the out-of-order refusal, not the duplicate-date one: they emit "
+            "the same field path and only the message tells them apart"
+        )
+
+    def test_the_two_order_refusals_are_distinguishable_from_each_other(
+        self, tmp_path: Path
+    ) -> None:
+        """The property that makes the two tests above independent, asserted directly.
+
+        Written because they were *not* independent: one silently became a second copy of
+        the other. A shared field path is fine, but then something has to differ, and this
+        pins what.
+        """
+        last = date.fromisoformat(self._last_effective_from())
+        messages = {}
+        for label, when in (("duplicate", last), ("out_of_order", last - timedelta(days=1))):
+            broken = _write(
+                tmp_path,
+                f"{label}.toml",
+                TAX_UA.read_text(encoding="utf-8") + self._schedule_block(when.isoformat()),
+            )
+            with pytest.raises(DeclarationError) as raised:
+                loader.tax_classes_from_file(broken)
+            messages[label] = str(raised.value)
+        assert "repeats" in messages["duplicate"]
+        assert "before the previous entry's" in messages["out_of_order"]
+        assert messages["duplicate"] != messages["out_of_order"]
+
+    def test_a_negative_levy_rate_on_an_entry_is_refused(self, tmp_path: Path) -> None:
+        """A refund is not a charge, and this rule does not model one."""
+        broken = _write(
+            tmp_path,
+            "negative_levy.toml",
+            _replace(
+                TAX_UA.read_text(encoding="utf-8"), "levy_rate_pct  = 0.0", "levy_rate_pct  = -5.0"
+            ),
+        )
+        with pytest.raises(DeclarationError) as raised:
+            loader.tax_classes_from_file(broken)
+        _assert_names_file_and_field(
+            raised.value,
+            file=broken,
+            field_path="jurisdiction.tax_class[ua_government_bond].rate[0].levy_rate_pct",
+        )
+
+    def test_an_entry_with_no_citation_is_refused(self, tmp_path: Path) -> None:
+        """The citation moved onto the entry, and so did the requirement to have one."""
+        broken = _write(
+            tmp_path,
+            "uncited_entry.toml",
+            _replace(
+                TAX_UA.read_text(encoding="utf-8"), "source         =", "source         = ''  #"
+            ),
+        )
+        with pytest.raises(DeclarationError) as raised:
+            loader.tax_classes_from_file(broken)
+        _assert_names_file_and_field(
+            raised.value,
+            file=broken,
+            field_path="jurisdiction.tax_class[ua_government_bond].rate[0].source",
+        )
+
+    def test_an_entry_with_no_note_is_refused(self, tmp_path: Path) -> None:
+        """The effective date is the field a reviewer most needs prose for.
+
+        A rate can be checked against its source at a glance; the date it came into force
+        usually cannot, so an entry that explains neither is one nobody can review.
+        """
+        broken = _write(
+            tmp_path,
+            "unexplained_entry.toml",
+            _replace(
+                TAX_UA.read_text(encoding="utf-8"),
+                "note           = ",
+                'note           = ""  #',
+            ),
+        )
+        with pytest.raises(DeclarationError) as raised:
+            loader.tax_classes_from_file(broken)
+        _assert_names_file_and_field(
+            raised.value,
+            file=broken,
+            field_path="jurisdiction.tax_class[ua_government_bond].rate[0].note",
+        )
+
+    def test_a_schedule_starting_after_an_event_is_not_a_load_error(self, tmp_path: Path) -> None:
+        """The one thing here that is not the loader's business, and the reason FR-012 exists.
+
+        A schedule that does not reach back to an event is a perfectly well-formed file --
+        it is the *honest* file, when no citation supports an earlier entry. The refusal
+        belongs to the projection, which knows the event's date, and it is asserted in
+        ``tests/unit/test_schedule_refusals.py``. Catching it here would mean the loader
+        deciding which events a run is allowed to contain.
+        """
+        text = _replace(
+            TAX_UA.read_text(encoding="utf-8"),
+            'effective_from = "2026-06-30"',
+            'effective_from = "2099-01-01"',
+        )
+        loaded = loader.tax_classes_from_file(_write(tmp_path, "far_future.toml", text))
+        (declared,) = [entry for entry in loaded if entry.id == "ua_government_bond"]
+        assert declared.rates[0].effective_from == date(2099, 1, 1)
+
+
+class TestTheShippedRegistryRefusesAnUncoveredEvent:
+    """FR-012 firing on **shipped** data, through the real registry. Nothing is mutated here.
+
+    Every other refusal in this module is a deliberately broken file written to a scratch
+    directory. This one is the repository as it stands: `ovdp_synthetic_b` pays its first
+    coupon on 2026-06-02, and the citation behind `ua_government_bond` reaches back only to
+    2026-06-30, so a holding bought at issue has an event no declared rate covers.
+
+    **Why that state is kept rather than fixed.** The obvious tidy-up is to move the
+    fixture's invented issue date, and it was tried and reverted: it makes every gate green
+    while removing the only place a reader can watch the refusal happen on real data. The
+    other tidy-up — widening the exemption's effective date — is the invented legal fact D2
+    forbids. So the refusal stays, and this test is what stops it being "fixed" by accident.
+    """
+
+    def _projected(self, purchased_on: date) -> object:
+        declarations = resolver.from_data_root(DATA_ROOT)
+        return project.project(
+            declarations.instruments["ovdp_synthetic_b"],
+            Holding(
+                owner_id="owner-1",
+                instrument_id="ovdp_synthetic_b",
+                quantity=10.0,
+                purchased_on=purchased_on,
+                cost=Money(10_000.0, Currency.UAH, prov.EMPTY),
+            ),
+            DateRange(start=purchased_on, end=date(2029, 3, 31)),
+            Assumptions(consumption_method="fifo", coupon_policy="hold_cash"),
+            tax_classes=declarations.tax_classes,
+        )
+
+    def test_a_holding_bought_at_issue_is_refused_naming_the_class_and_the_date(self) -> None:
+        outcome = self._projected(date(2026, 3, 2))
+        assert isinstance(outcome, RateUndeclaredBefore), outcome
+        assert outcome.tax_class_id == "ua_government_bond"
+        assert outcome.event_date == date(2026, 6, 2)
+        assert outcome.earliest_declared == date(2026, 6, 30)
+
+    def test_the_refusal_says_what_a_reader_would_have_to_go_and_find(self) -> None:
+        outcome = self._projected(date(2026, 3, 2))
+        assert isinstance(outcome, RateUndeclaredBefore)
+        assert "cited legal fact" in outcome.reason
+        assert "dated entry" in outcome.reason
+
+    def test_nothing_is_charged_at_the_earliest_rate_instead(self) -> None:
+        """The failure this forecloses: a zero that looks like the exemption applying."""
+        outcome = self._projected(date(2026, 3, 2))
+        assert not hasattr(outcome, "charges")
+        assert not hasattr(outcome, "hurdle")
+
+    def test_a_holding_bought_inside_the_covered_window_projects_completely(self) -> None:
+        """So the refusal is about the date and not about the declaration being broken."""
+        outcome = self._projected(date(2026, 7, 2))
+        assert isinstance(outcome, Projection), outcome
+        assert outcome.hurdle.total_tax.amount == 0.0
+
+    def test_issue_a_is_covered_by_fifteen_days_and_that_margin_is_deliberate(self) -> None:
+        """Four checked-in runs of issue A depend on this margin. It was luck; make it a claim.
+
+        `ovdp_synthetic_a` is issued 2026-01-15 and pays its first coupon on 2026-07-15,
+        fifteen days after the earliest entry the exemption's citation reaches. A purchase
+        is not a taxable event, so the January date is irrelevant and the July one is not.
+
+        The runs that rest on this, and would otherwise fail somewhere unhelpful if either
+        date moved:
+
+        * `tests/golden/test_end_to_end_ovdp.py`
+        * `tests/contract/test_provenance_propagation.py`
+        * `tests/invariants/test_determinism.py`
+        * `tests/contract/test_data_only_extensibility.py`
+
+        If a better citation moves the exemption **earlier**, this test keeps passing and
+        the margin simply widens. If one moves it **later** than 2026-07-15, this fails
+        first and says which four modules to re-date — which is the whole point of writing
+        the dependency down rather than leaving four suites to discover it separately.
+        """
+        declarations = resolver.from_data_root(DATA_ROOT)
+        exemption = declarations.tax_classes["ua_government_bond"]
+        earliest = min(entry.effective_from for entry in exemption.rates)
+        first_taxable_event = date(2026, 7, 15)
+        assert earliest <= first_taxable_event, (
+            f"the exemption now starts {earliest.isoformat()}, after issue A's first "
+            f"coupon on {first_taxable_event.isoformat()}. The four modules named in this "
+            "test's docstring project issue A and will all fail; re-date their holdings "
+            "rather than widening the exemption's effective date."
+        )
+
+
 class TestTheBatteryCoversTheContract:
     """The battery is only a proof of SC-004 if it covers every row of the table.
 
@@ -827,6 +1137,8 @@ class TestTheBatteryCoversTheContract:
             "TestUnresolvedTaxClassReference",
             "TestUnknownConventionName",
             "TestNonPositiveAmounts",
+            "TestDatedRateSchedules",
+            "TestTheShippedRegistryRefusesAnUncoveredEvent",
             "TestMalformedFile",
             "TestNoPydanticTypeEscapes",
             "TestAnImpossibleInstrumentIsNotALoadError",

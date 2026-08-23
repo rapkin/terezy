@@ -14,6 +14,19 @@
 # 30/360 makes every quarter exactly 0.25 of a year, so each coupon is
 # 1000 x 0.1225 x 0.25 = 30.625 per unit -- deliberately chosen so the difference from
 # issue A's day count is visible in arithmetic a reader can do in their head.
+#
+# ⚙ **This issue cannot be projected from its own issue date, and that is deliberate.**
+# Its first coupon falls 2026-06-02, before the earliest entry the `ua_government_bond`
+# exemption's citation reaches (2026-06-30, see `data/tax/ua.toml`), so a holding bought at
+# issue is refused with a typed `RateUndeclaredBefore` rather than charged at a rate nobody
+# cited. It is the repository's checked-in example of FR-012 firing on shipped data
+# (`tests/contract/test_declaration_loading.py::TestTheShippedRegistryRefusesAnUncoveredEvent`),
+# and a holding bought from 2026-07-02 projects completely. Issue A escapes only because
+# its first *taxable* event is its 2026-07-15 coupon — a purchase is not taxable.
+#
+# The remedy is a citation that reaches further back, never an edit to these dates: they
+# are invented, but moving them to dodge a refusal would hide the one thing the refusal
+# exists to show.
 
 [instrument]
 id           = "ovdp_synthetic_b"

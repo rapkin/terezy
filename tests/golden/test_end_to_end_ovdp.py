@@ -130,6 +130,10 @@ INSTRUMENT_ID: Final = "ovdp_synthetic_a"
 OWNER_ID: Final = "owner-1"
 QUANTITY: Final = 10.0
 COST: Final = 10_000.0
+# ⚙ This run projects `ovdp_synthetic_a`, whose first *taxable* event is its 2026-07-15
+# coupon -- fifteen days after the earliest entry the `ua_government_bond` exemption's
+# citation reaches. That dependency is asserted, once, in
+# `tests/contract/test_declaration_loading.py::TestTheShippedRegistryRefusesAnUncoveredEvent`.
 PURCHASED_ON: Final = date(2026, 1, 15)
 HORIZON_END: Final = date(2028, 1, 31)
 
@@ -252,7 +256,17 @@ def _verified_declaration(declaration: InstrumentDeclaration) -> InstrumentDecla
 
 
 def _verified_class(declared: TaxClass) -> TaxClass:
-    return replace(declared, provenance=_verified(declared.provenance))
+    """The same class with every dated entry's sources verified, rates untouched.
+
+    ⚙ Per entry since feature 006: the citation moved off the class and onto the schedule,
+    so verifying "the class" means verifying each entry.
+    """
+    return replace(
+        declared,
+        rates=tuple(
+            replace(entry, provenance=_verified(entry.provenance)) for entry in declared.rates
+        ),
+    )
 
 
 def _verified_declarations(declarations: resolver.Declarations) -> resolver.Declarations:

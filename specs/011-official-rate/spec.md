@@ -1,0 +1,556 @@
+# Feature Specification: The official rate and the tax-currency role
+
+**Feature Directory**: `specs/011-official-rate`
+
+**Feature Branch**: `spec/011-012-fop` (spec-writing worktree; squash-lands per `specs/README.md`)
+
+**Created**: 2026-08-23
+
+**Status**: Draft — **one open `[NEEDS CLARIFICATION]`** (FR-011, the non-publication-day
+rule). Everything else is settled; the open item narrows behaviour rather than blocking
+it, because the specified default in its absence is a refusal.
+
+**Input**: The official rate — the third currency role, which has been declared since the
+first commit and has never had any machinery behind it. Official rates enter as declared,
+dated, sourced observations in the same epistemic category as CPI; the tax base of a
+foreign-currency event is that event's own amount at the official rate for that event's
+own date; and the amount actually received is never computed from it.
+
+---
+
+## Why this feature exists
+
+Constitution Principle VI names three currency roles — **base** (UAH), **tax** (UAH at the
+official rate on the transaction date) and **display** (user-switchable) — and says that
+conflating any two of them is a defect. Two of the three are built. The third is a
+docstring.
+
+`core/primitives/currency.py` states the rule and then says, correctly, that the enum is
+"deliberately not a role". `core/tax/interface.py` says `TaxContext.taxable_base` is "the
+amount the rates are applied to, **in the tax currency**", and adds the honest caveat that
+"all three currency roles are UAH here, so the obligation is negative: do not collapse
+them… because for a foreign security it will not" hold. Neither file is wrong. What is
+missing is underneath both of them: **there is no dated official-rate series anywhere in
+the repository, and no function that converts an amount at the official rate for a date.**
+Every taxable amount the engine has ever computed has been hryvnia already, so the tax
+role has never had to exist.
+
+Two sites refuse to fill the gap by accident, and both are right to.
+`core/routes/legs.py` (`channel_for`) says: *"There is deliberately no fallback channel.
+Substituting 'the official rate' for a misspelt channel id would silently reprice a P2P leg
+at the reference and delete the entire spread this feature exists to measure."*
+`data/declarations/resolver.py` (`_check_channel`) repeats it at load time. Those refusals
+are load-bearing and this feature does not touch them. Their consequence is simply that the
+tax side has nothing at all to work with.
+
+### The distinction this whole feature rests on
+
+An **FX channel is a market you transact in**. It has two sides, a spread, a fee, a
+counterparty, and it decides how much money you end up with. An **official rate is a legal
+reference you never transact at**. It has one side, no spread and no counterparty, and it
+decides nothing about how much money you end up with — it decides what number the law says
+your income was.
+
+Conflating them is the failure mode this feature exists to prevent, and it is a
+*bidirectional* prohibition:
+
+- the official rate determines a **tax base**, and never an amount received;
+- a channel rate determines an amount **received**, and never a tax base.
+
+`SIMULATOR_SPEC.md` §4.4 states the same thing as a headline finding: *"Tax on FX gains
+never received: the trade uses a channel rate, the tax uses the NBU rate. This asymmetry is
+a headline effect and belongs in the attribution."* Nothing in the repository can express
+that sentence today, because half of it does not exist.
+
+### What this feature does *not* claim to finish
+
+`features.toml` records `fx-tax-asymmetry-f1`: *"flat-in-USD posts taxable UAH gain; needs
+a taxable foreign instrument + dated official rates"*. That entry names two prerequisites.
+This feature supplies exactly one of them. **011 makes required test F1 reachable; it does
+not close it**, because F1 needs a taxable foreign-currency *position* — an instrument with
+a cost basis struck at one date's official rate and proceeds struck at another's — and no
+such instrument is declared here or by feature 012. The `[[future]]` entry stays open, with
+one of its two blockers removed. See "Required tests this feature relates to".
+
+## User Scenarios & Testing *(mandatory)*
+
+### User Story 1 - A foreign-currency event has a hryvnia tax base (Priority: P1)
+
+The owner declares official-rate observations — dated, sourced, one value per date. An
+income or disposal event denominated in dollars is then taxed on a hryvnia base: the
+event's own amount, converted at the official rate for the event's own date. The output
+shows the rate that did the converting, the date that rate belongs to, and the series it
+came from, so the base can be re-derived on paper.
+
+**Why this priority**: This is the feature. Without it there is no tax currency, only a
+docstring saying there should be one, and every future foreign-currency figure would have
+to invent its own conversion at the point of use — which is how a project ends up with
+three different answers to the same question.
+
+**Independent Test**: Declare a small set of clearly-labelled synthetic official-rate
+observations, tax a dollar-denominated event dated inside that window, and check the
+hryvnia base against arithmetic worked out by hand on paper.
+
+**Acceptance Scenarios**:
+
+1. **Given** a declared official-rate series covering a date, and a taxable event on that
+   date denominated in a currency other than the tax currency, **When** the charge is
+   computed, **Then** the taxable base is the event's amount converted at that date's
+   declared official rate, matching hand-computed arithmetic within the single project
+   tolerance.
+2. **Given** the same charge, **When** it is inspected, **Then** it names the series, the
+   observation date whose rate was used, the rate value and the quotation unit — enough to
+   re-derive the base without opening a data file.
+3. **Given** a taxable event already denominated in the tax currency, **When** the charge
+   is computed, **Then** no official rate is consulted, the base is the amount itself, and
+   no rate-unavailable reason is attached to a figure that never needed a rate.
+4. **Given** two events of the same dollar amount on two dates with different declared
+   official rates, **When** both are charged, **Then** their hryvnia bases differ by
+   exactly the declared rate difference times the amount — the date is load-bearing, not
+   decorative.
+
+---
+
+### User Story 2 - The rate you are taxed at is not the rate you sold at (Priority: P1)
+
+A dollar amount is credited on one date and converted to hryvnia on another, through a
+declared channel, at a market price. Two different numbers come out of that: what the law
+says the income was, and what the owner actually has. The tool reports both, labelled, and
+never lets either stand in for the other.
+
+**Why this priority**: Equal-highest with Story 1, because a tax base is only useful next
+to the money it is a base *for*. This is the structural half of the asymmetry
+`SIMULATOR_SPEC.md` §4.4 calls a headline effect, and it is the half that is cheap to get
+wrong: one careless substitution of the official rate into a cost path, or of a channel's
+reference rate into a tax path, and both numbers become the same number and the finding
+disappears.
+
+**Independent Test**: Run one dollar amount through a declared channel to hryvnia and
+through the official rate to a tax base, on deliberately different dates and deliberately
+different rates, and confirm the two figures are separately reported, separately labelled
+and never equal by construction.
+
+**Acceptance Scenarios**:
+
+1. **Given** an amount credited in a foreign currency and later converted through a
+   declared channel, **When** results are produced, **Then** the hryvnia **received** comes
+   from the channel and the hryvnia **taxable base** comes from the official rate, both are
+   reported, and neither is presented as the other.
+2. **Given** a route leg whose channel is missing or misspelt, **When** costing runs,
+   **Then** it refuses exactly as it does today; the official rate is never substituted,
+   and this feature adds no path by which it could be.
+3. **Given** a declared channel carrying a `reference_rate`, **When** a tax base is
+   computed, **Then** the reference rate is not consulted: a mid-market reference used for
+   costing is not a legal reference, and using one for the other would be inventing a legal
+   value.
+4. **Given** the display currency is switched, **When** every figure re-renders, **Then**
+   no tax base, no charge and no ranking changes by a single digit.
+
+---
+
+### User Story 3 - A date with no declared rate refuses (Priority: P1)
+
+The publisher does not publish a rate for every calendar day. Where no rate is declared for
+an event's date, the tool says so — naming the series, the pair and the date — rather than
+reaching for the nearest one.
+
+**Why this priority**: P1 rather than P2 because the wrong behaviour here is silent and
+plausible. Interpolating, carrying yesterday's rate forward, or snapping to the nearest
+observation all produce a number that looks exactly like a correct number, and every tax
+figure downstream inherits the invention without a mark. 007 settled the same question for
+CPI (its FR-004) and this feature settles it identically for rates.
+
+**Independent Test**: Ask for a tax base on a date inside a declared gap, before the
+series' first observation, and after its last, and confirm all three produce typed
+refusals naming the specific date — and that no configuration makes any of them return a
+number.
+
+**Acceptance Scenarios**:
+
+1. **Given** a taxable event on a date the declared series does not cover, **When** the
+   charge is attempted, **Then** the outcome is a typed refusal naming the series, the
+   currency pair and the date, and no charge is produced.
+2. **Given** the same case, **When** the refusal is inspected, **Then** no value has been
+   interpolated between neighbouring observations, carried forward from an earlier date, or
+   taken from the nearest observation in either direction.
+3. **Given** a series that declares a non-publication-day rule with its own citation,
+   **When** an event falls on a day the rule covers, **Then** the rule selects a declared
+   observation from another date, the base is computed from that observation, and the
+   output states which date's rate was applied to which date's event.
+4. **Given** a series that declares no such rule, **When** an event falls on a
+   non-publication day, **Then** scenario 1's refusal stands — the absence of a declared
+   rule is not permission to pick one.
+
+---
+
+### User Story 4 - The mark reaches every tax figure (Priority: P2)
+
+Every official-rate observation carries its source, its retrieval date and its verification
+date. A rate that nobody has verified marks the tax base computed from it, and everything
+computed from that. A rate that has aged past its declared threshold says so on every
+figure it touched.
+
+**Why this priority**: P2 only because Stories 1–3 must exist before there is anything to
+mark. The requirement itself is Principle I and is not negotiable: an official rate is the
+single input that turns a foreign amount into a legal one, and an unmarked tax figure
+resting on an unverified rate is precisely the confidently-wrong number this project exists
+to refuse.
+
+**Independent Test**: Leave one observation unverified and confirm every derived tax figure
+carries the mark; age one past its declared threshold and confirm every derived tax figure
+reports the staleness; declare the rate kind with no threshold and confirm loading fails.
+
+**Acceptance Scenarios**:
+
+1. **Given** an official-rate observation with an empty verification date, **When** a tax
+   base is computed from it, **Then** that base, the charge derived from it and every
+   figure downstream carry the unverified mark.
+2. **Given** an observation whose age — from the later of its verification and retrieval
+   dates — exceeds the declared threshold for its kind, **When** a tax figure is derived,
+   **Then** the figure reports the staleness, naming the observation and its threshold.
+3. **Given** an official-rate value kind declared with no staleness threshold, **When** the
+   data is loaded, **Then** loading fails naming the kind, rather than defaulting to a
+   permissive threshold.
+4. **Given** a taxable event whose own inputs are marked and a fully verified rate, **When**
+   the base is converted, **Then** the event's mark survives the conversion: converting a
+   marked amount never launders the mark.
+
+---
+
+### User Story 5 - Nothing treats one country's rate as the rate (Priority: P3)
+
+Official rates are declared per publishing authority and per ordered currency pair. A
+second series — another central bank, another pair, another jurisdiction's tax currency —
+is a data-only addition that loads and is addressable, even though nothing consumes a
+second one yet.
+
+**Why this priority**: Principle II applied to the input most likely to be hard-coded as a
+singleton, and P3 for the same reason 007's equivalent story was: if Stories 1–4 are built
+correctly this already works, and this story's job is to prove it before a second
+jurisdiction (required test E8) discovers otherwise.
+
+**Independent Test**: Declare a second, differently identified series purely as data and
+confirm it loads and is addressable, with the first still driving results and no source
+file edited.
+
+**Acceptance Scenarios**:
+
+1. **Given** a second official-rate series with a distinct identity declared purely as
+   data, **When** it is loaded, **Then** loading succeeds and the series is addressable,
+   with zero source lines changed.
+2. **Given** two series that both quote the same pair, **When** a tax base is computed,
+   **Then** the series used is the one the jurisdiction declares for its tax currency —
+   named in the output — and never picked by whichever loaded first.
+3. **Given** an official rate quoted per a number of units other than one, **When** a base
+   is computed, **Then** the declared quotation unit is applied and appears in the output;
+   a series with no declared quotation unit fails at load rather than defaulting to one.
+
+---
+
+### Edge Cases
+
+- **An event on a weekend or a public holiday** — the publisher does not publish that day.
+  Either the series declares a cited non-publication-day rule and the output states which
+  date's rate was applied, or the request refuses naming the date. There is no third
+  behaviour, and the engine never decides for itself what a weekend is (FR-011).
+- **A date inside a gap in an otherwise continuous series** — a refusal naming the date,
+  identical in shape to the weekend case; the engine cannot tell the two apart and must not
+  try.
+- **A date before the series' earliest observation, or after its latest** — a refusal
+  naming the date and the covered window. No extrapolation in either direction; "the last
+  known rate" is an invention with a plausible face.
+- **Two observations for the same series, pair and date** — a load-time collision naming
+  the file. One date, one official rate: unlike a channel, there is nothing here for a
+  second value to legitimately be.
+- **An observation dated in the future** — rejected at load. A rate for a date that has not
+  arrived is a forecast wearing an observation's clothes (007's own edge case, restated
+  where it bites harder: a forecast rate would silently set a legal base).
+- **An observation declared with two sides (a buy and a sell)** — a load failure. Two sides
+  is what a channel has. An official rate that acquired a spread would be a channel with a
+  government's name on it, and the whole distinction would be gone.
+- **A rate of zero, a negative rate, or a missing quotation unit** — load failure naming
+  the file and the field. No default unit, because a rate quoted per 100 units read as per
+  1 is wrong by two orders of magnitude and looks entirely reasonable.
+- **A route leg naming no channel, or an unknown one** — costing refuses exactly as it does
+  today. This feature adds no fallback and removes none of the existing refusals.
+- **A tax base requested for an event already in the tax currency** — no rate is consulted
+  and no rate-unavailable reason is produced. A refusal for a rate nobody needed is a false
+  refusal, and a false refusal trains a reader to ignore true ones.
+- **A tax base requested against a series that does not quote the event's currency pair** —
+  refused naming both. No pair is inferred from another, exactly as 002's `_check_channel`
+  refuses to infer one.
+- **The display currency switched to the currency an event was denominated in** — the tax
+  base does not move. It is fixed by law at the official rate on the event's date and has
+  nothing to do with what the reader is looking at (Principle VI).
+- **An official-rate observation with an empty verification date** — proceeds under the
+  unverified mark, exactly like every other observed value; distinct from a missing
+  observation, which does not proceed at all.
+
+## Requirements *(mandatory)*
+
+### Functional Requirements
+
+**The official rate as declared data**
+
+- **FR-001**: Official rates MUST enter the system as declared, dated observations in data
+  files. Each observation states the date it applies to, the value, its source, its
+  retrieval date and its verification date — which MAY be empty but MUST NOT be absent. No
+  official-rate value may originate from an implementer's or an agent's memory. This is the
+  same epistemic category, and deliberately the same shape of obligation, as 007's CPI
+  observations (its FR-001).
+- **FR-002**: A series MUST declare its own identity: the authority that publishes it, the
+  ordered currency pair it quotes, and the **quotation unit** — the number of units of the
+  quoted currency the value is stated per. The quotation unit MUST be declared explicitly
+  and MUST NOT default. ⚙ A published table that quotes some currencies per 1 unit and
+  others per 100 is normal, and a value read at the wrong unit is wrong by two orders of
+  magnitude while looking entirely plausible. A default here would make that failure silent.
+- **FR-003**: Exactly one observation MUST exist per (series, date). A second is a
+  load-time collision naming the file, and no observation may carry two sides. ⚙ An
+  official rate is one number. Two sides is the defining property of an `FxChannel`, and a
+  rate that acquired a spread would be a channel with a government's name on it.
+- **FR-004**: Loading official-rate data MUST fail loudly — naming the file and the
+  offending field or date — on a malformed value, an unrecognised field, a missing required
+  field, a duplicate date, a non-positive rate, a missing or non-positive quotation unit, a
+  date that has not yet arrived, an observation carrying two sides, or a duplicated series
+  identity. No default MUST be substituted for anything absent.
+- **FR-005**: Nothing in the system may treat one country's official rate as a singleton. A
+  second series with a different identity MUST be a data-only addition that loads and is
+  addressable, even though no second series is consumed in this feature — exactly what 007
+  FR-002 requires of CPI, for the same reason (required test E8, a second jurisdiction).
+- **FR-006**: Official rates MUST be a staleness kind of their own, with a threshold
+  declared alongside the kind, following 002's FR-028 pattern: per kind of value, no
+  permissive default, and a kind with no declared threshold fails at load. Staleness is
+  measured from the later of an observation's verification and retrieval dates (002's
+  FR-025 rule). ⚙ The kind is its own and not `tax_rule`: a legal *rate* changes by
+  legislation and a six-month re-read is the right prompt, while an official *rate series*
+  ages the way `cpi_index` does — what decays is the retrieval, because the publisher adds
+  a day roughly every day and a series fetched long ago is a series missing its recent end.
+
+**The tax base**
+
+- **FR-007**: The taxable base of an event denominated in a currency other than the tax
+  currency MUST be that event's own amount converted at the official rate declared **for
+  that event's own date**, taken from the series the jurisdiction declares for its tax
+  currency. Never an average, never a period rate, never the rate on a neighbouring date,
+  and never a rate from a series the jurisdiction did not name.
+- **FR-008**: This feature MUST NOT introduce a second notion of "the event's date". It
+  consumes the date the taxable event already carries — 006's assumption records the
+  standing default (the date the proceeds are received) and any class-specific legal timing
+  rule arrives as cited data — and looks the rate up on exactly that date. ⚙ Two modules
+  each with their own opinion about which date a taxable event happens on is how a tax
+  figure becomes unreproducible, and it is precisely the kind of drift the tuple principle
+  is written against.
+- **FR-009**: An event already denominated in the tax currency MUST NOT consult an official
+  rate at all: its base is its amount, and no rate-unavailable reason may be attached to it.
+- **FR-010**: Where no observation is declared for the event's date, the outcome MUST be a
+  typed refusal naming the series, the currency pair and the date. The system MUST NOT
+  interpolate between observations, extrapolate past either end, carry a previous date's
+  value forward, or snap to the nearest observation. A missing rate is a gap, exactly as a
+  missing CPI month is a gap (007 FR-004).
+- **FR-011**: A series MAY declare a **non-publication-day rule** — a statement of which
+  declared observation governs a date the publisher does not publish for — and that rule
+  MUST be declared data carrying its own citation, never engine logic. The engine MUST NOT
+  contain any notion of a weekend, a public holiday or a banking calendar. Where a series
+  declares no such rule, FR-010's refusal stands: the absence of a rule is not permission to
+  choose one. Where a rule does apply, the output MUST state **which observation's date**
+  supplied the rate alongside the event's own date, so a Friday rate applied to a Sunday
+  event is visible rather than implied.
+
+  [NEEDS CLARIFICATION: the Ukrainian rule's citable primary text. Search results
+  consistently paraphrase it as *"the rate set on the last business day before a weekend or
+  holiday applies through those days"*, and the governing instrument appears to be the NBU
+  Board Resolution on setting the official hryvnia exchange rate (No. 148 of 10 December
+  2019, referenced by name on `bank.gov.ua`), but no primary text could be retrieved:
+  `bank.gov.ua` returns HTTP 403 to retrieval and `zakon.rada.gov.ua` renders its statute
+  text client-side. **What resolves it**: the owner supplying, or confirming, the specific
+  clause that states which rate governs a day the National Bank does not set one, together
+  with a URL the value can be re-read from. Until then the UA series declares **no**
+  non-publication-day rule and every non-publication date refuses under FR-010 — which is
+  the honest state, not a degraded one.]
+
+**The prohibition, in both directions**
+
+- **FR-012**: The amount **received** MUST NEVER be computed from an official rate. A
+  realised amount comes from the declared channel that actually did the converting (002's
+  machinery). This feature MUST NOT add any path — a fallback, a default, a "reference"
+  option — by which an official rate could price a route leg, and the existing refusals at
+  `core/routes/legs.py` and `data/declarations/resolver.py` MUST remain exactly as they are.
+- **FR-013**: A channel's `reference_rate` MUST NEVER serve as a tax rate. ⚙ Two reasons,
+  and the weaker one is that today's is a synthetic fixture. The stronger one is
+  categorical: a reference rate is a mid-market number used to express a spread, chosen by
+  whoever declared the channel; an official rate is set by an authority and named by law. A
+  system that let one stand in for the other would be inventing a legal value from a
+  costing convenience.
+- **FR-014**: Switching the display currency MUST NOT change any tax base, any charge, or
+  any ranking (Principle VI). ⚙ Restated here as a prohibition because this is the first
+  feature that could plausibly break it: it introduces the first conversion the tax side
+  performs, and a conversion module that does not know which role it is serving is exactly
+  how the roles get conflated.
+
+**Provenance and reporting**
+
+- **FR-015**: Every figure derived through an official-rate conversion MUST carry the union
+  of the converted amount's provenance and the rate observation's. An unverified mark or a
+  staleness report on either side MUST appear on the base, on the charge and on everything
+  derived from them. A transform that drops the mark is a defect of the highest severity.
+- **FR-016**: Every converted tax base MUST report the series it used, the observation date
+  whose rate was applied, the rate value and the quotation unit — enough for a reader to
+  re-derive the base on paper without opening a data file. ⚙ Principle III's
+  every-number-traceable rule, made concrete for the one conversion where the inputs are
+  invisible in the result: a hryvnia figure gives no hint of which dollar amount and which
+  date produced it.
+
+### Key Entities
+
+- **Official-rate series** — a declared, identified sequence of single-sided rate
+  observations from one publishing authority for one ordered currency pair: its authority,
+  its pair, its quotation unit, optionally its non-publication-day rule, and its
+  observations. Shaped so a second series is a data-only addition.
+- **Official-rate observation** — one date's published rate: the date, the value, source,
+  retrieval date, verification date. The atom of the tax currency. One per date, one side,
+  no spread.
+- **Quotation unit** — the number of units the observation's value is stated per. Declared,
+  never defaulted, and reported on every figure it scaled.
+- **Non-publication-day rule** — a declared, cited statement of which observation governs a
+  date the publisher does not publish for. Data with a citation; absent it, the date
+  refuses.
+- **Official-rate staleness kind** — the declared threshold governing when rate
+  observations count as stale, following 002's per-kind pattern; its own kind, no permissive
+  default.
+- **Tax-currency conversion** — the record of one base being struck: the source amount, the
+  series, the observation date used, the rate, the quotation unit, the resulting base, and
+  the union of both sides' provenance. What FR-016 reports and what a hand check re-derives.
+- **Official-rate-unavailable reason** — the typed refusal naming the series, the pair and
+  the date for which no observation is declared. Not an error, not a zero, and not a number.
+- Reused unchanged: the provenance record, the money record and its currency tag, the tax
+  class and charge records of feature 001, the channels and legs of feature 002.
+
+## Success Criteria *(mandatory)*
+
+### Measurable Outcomes
+
+- **SC-001**: A dollar-denominated taxable event on a covered date produces a hryvnia base
+  matching an independently hand-computed conversion within the single project tolerance,
+  with the arithmetic recorded alongside the check. (FR-007)
+- **SC-002**: The same amount taxed on two dates with different declared rates produces
+  bases differing by exactly the declared rate difference times the amount — verified
+  against hand arithmetic, not against the engine's own other answer. (FR-007)
+- **SC-003**: Across a deliberate battery of uncovered dates — a gap in the middle, a date
+  before the first observation, a date after the last — 100% produce typed refusals naming
+  the series, the pair and the date, and zero produce a number. No configuration, flag or
+  option exists that makes any of them interpolate, extrapolate or carry forward. (FR-010)
+- **SC-004**: Across a deliberate battery of broken rate files — malformed value, unknown
+  field, missing field, duplicate date, non-positive rate, missing quotation unit,
+  future-dated observation, a two-sided observation, duplicated series identity — every
+  case fails naming the file and the offending field or date, and no case substitutes a
+  default. (FR-003, FR-004)
+- **SC-005**: With one rate observation left unverified, 100% of tax bases and charges
+  derived from it carry the unverified mark; with the converted amount's own inputs marked
+  and the rate fully verified, the derived base still carries the mark. No derived figure
+  appears unmarked in either direction. (FR-015)
+- **SC-006**: An observation aged past its declared threshold marks every derived tax
+  figure stale, naming the observation and its threshold; a rate kind declared without a
+  threshold fails at load; fresh observations produce zero staleness warnings. (FR-006)
+- **SC-007**: One dollar amount converted through a declared channel and struck as a tax
+  base at a deliberately different official rate produces two separately reported,
+  separately labelled figures, and no output presents either as the other. (Story 2)
+- **SC-008**: No cost, route, leg or channel figure anywhere in the system is derived from
+  an official rate, and no tax base anywhere is derived from a channel rate or a channel's
+  reference rate — asserted as a standing property of the whole engine, not of one call
+  site. (FR-012, FR-013)
+- **SC-009**: A full run repeated with the display currency switched produces bit-identical
+  tax bases, charges and rankings. (FR-014)
+- **SC-010**: An event denominated in the tax currency produces its base with no official
+  rate consulted and no rate-unavailable reason attached, in 100% of cases. (FR-009)
+- **SC-011**: A second official-rate series with a distinct identity, declared purely as
+  data, loads and is addressable with zero lines of source code changed; and the series a
+  tax base used is named in its output rather than being whichever loaded first. (FR-005)
+- **SC-012**: A rate declared per a quotation unit other than one produces a base matching
+  hand arithmetic that applies the unit, and the unit appears in the output; omitting the
+  unit fails at load. (FR-002)
+- **SC-013**: `docs/METHODOLOGY.md` gains the tax-base conversion — its plain-language
+  definition, the date-selection rule, and a worked example — in the same change that
+  implements it, verified by that change's own diff rather than by a follow-up. (FR-016 and
+  the constitution's documentation clause)
+
+## Assumptions
+
+- **No real rate values enter with this spec.** Acceptance examples run against
+  clearly-labelled synthetic observations whose values are stated in the test itself,
+  exactly as 001 did with its synthetic issue and 007 with its synthetic CPI. The examples
+  test the conversion arithmetic, not the hryvnia. Real observations arrive later as a data
+  file carrying its own provenance from the published source, and nothing is invented to
+  make an example work.
+- **How the real data arrives is tooling, and is out of this feature's scope.**
+  `scripts/fetch_cpi.py` established the pattern: a repository script retrieves a series and
+  writes a declaration with an **empty** `verified_on`, because automation retrieves and
+  never verifies — `data/cpi/ua.toml`'s header says so in as many words, including "do not
+  hand-edit: re-run the script and read the diff". The National Bank publishes official
+  rates through an open developer API and the same pattern applies unchanged. Building that
+  script is not part of this feature, and the general case is already recorded as the
+  `provider-automation` `[[future]]` entry. What this feature owes it is only the data shape
+  the script would write into.
+- **One consuming jurisdiction, one pair.** UA is the only jurisdiction whose tax currency
+  is served here, and UAH/USD the only pair exercised. The second series of FR-005 is
+  declarable and addressable, not consumed.
+- **Rate selection is by event date, not by settlement or booking date.** FR-008 defers to
+  the date the taxable event already carries; this feature introduces no new timing rule and
+  resolves no timing question. Any class-specific legal timing rule arrives as cited data,
+  per 006's FR-011.
+- **No FX gain or loss line.** This feature makes the asymmetry computable and reportable as
+  two figures side by side. Attributing the difference as its own named line in a waterfall,
+  and the flat-in-USD taxable-gain case itself, need a taxable foreign-currency position and
+  belong to whichever feature declares one.
+- **No delivery surface.** As in 001, 006 and 007: results are produced and asserted by the
+  test suite; there is no UI and no CLI in this feature.
+
+## Clarifications resolved
+
+Two questions were raised while writing this specification. One was resolvable from the
+repository's own recorded decisions and is recorded here as settled; one is not resolvable
+without the owner and is carried as FR-011's `[NEEDS CLARIFICATION]`.
+
+| # | Question | Decision | Where it landed |
+|---|---|---|---|
+| 1 | Is the official rate a kind of `FxChannel` — a one-sided channel with a zero spread — or a separate thing? | **A separate thing, and the separation is the feature.** A channel is a market you transact in and decides an amount received; an official rate is a legal reference you never transact at and decides a tax base. Declaring the official rate as a channel would make the single most valuable finding in `SIMULATOR_SPEC.md` §4.4 inexpressible, because the two numbers it contrasts would be the same number. Settled by the constitution's own three-roles clause and by the two refusals already written into `legs.py` and `resolver.py`. | FR-003, FR-012, FR-013, SC-008; the whole "Why this feature exists" section |
+| 2 | What governs an event dated on a day the publisher does not publish for? | **Open.** The *shape* is settled — a declared, cited, per-series rule or a refusal, never engine logic and never a weekend the engine knows about — and the default in the rule's absence is the refusal. The *content* of the Ukrainian rule is not settled and is not guessable. | FR-011, and its `[NEEDS CLARIFICATION]` |
+
+## Required tests this feature relates to
+
+- **F1** (*"A position flat in USD across a devaluation produces a positive taxable gain in
+  UAH. This test is the reason the rewrite exists."*) is **not closed** by this feature.
+  `features.toml` records its two blockers as *"a taxable foreign instrument + dated
+  official rates"*; this feature removes the second and leaves the first. F1 needs a
+  position with a cost basis struck at one date's official rate and proceeds struck at
+  another's, and no instrument declared in the registry today is denominated in a foreign
+  currency. The `fx-tax-asymmetry-f1` `[[future]]` entry therefore stays open, with its note
+  narrowed to the remaining blocker when this feature lands.
+- **F3** (*"Historical series convert at per-date rates, never at today's rate"*) is **not
+  closed** either, and is deliberately not attempted: F3 is a statement about the display
+  switch converting a chart, which is a channel-rate question about presentation, not a
+  tax-currency question. Sharing the phrase "per-date rates" with this feature is a
+  coincidence of wording, and treating it as the same requirement would conflate the display
+  and tax roles in the one place the constitution names explicitly.
+- **F2** (*"Switching display currency changes no realised amount, no tax figure, and no
+  after-tax UAH ranking"*) is likewise not closed — there is no display switch — but FR-014
+  and SC-009 establish the tax-figure half of it as a standing property before the switch
+  exists, so the row cannot be closed later by a feature that never checked it.
+- Per the constitution, every behaviour above lands with a hand-computed worked example (the
+  conversion arithmetic, SC-001, SC-002, SC-012), load-failure coverage (SC-004), refusal
+  coverage (SC-003), and propagation checks (SC-005, SC-006). SC-008's whole-engine property
+  is a `contract` test, since it is a compliance statement about Principle VI rather than an
+  assertion about one call site.
+
+## Out of scope
+
+Named explicitly so the plan does not drift into them: the display-currency switch and all
+of required tests F2, F3 and F4's presentation behaviour; converting historical series for
+charts; any FX forecast, path or scenario (`SIMULATOR_SPEC.md` §4.4's "UAH paths are
+scenarios, never forecasts" belongs to whichever feature introduces one); the fetch script
+and the `Provider` interface generally, already recorded as the `provider-automation`
+`[[future]]` entry; a foreign-currency-denominated instrument and therefore F1 itself; the
+FX gain or loss as a named attribution line; any change to how route legs, channels or
+costs are computed, which this feature explicitly leaves untouched; the ФОП regime, the
+income-stream tax class and the mandatory sale of foreign currency, all of which are feature
+012; filing, payment timing and loss carryforward (required tests E2, E7); crypto tax
+scenarios; and the web and command-line interfaces.

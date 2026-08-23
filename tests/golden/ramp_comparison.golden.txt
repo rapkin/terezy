@@ -22,7 +22,7 @@ route      monobank_to_binance_p2p_double     sha256:e23f102032c347bbbd87a396d0b
 file       channels/uah_usd                   sha256:9af2c88cdb5740cd1d5c028233740e571a33d713f597ad58d603cf868b2309b5
 file       streams/owner-001                  sha256:31804f35d44753be121f9f944bcdbe2778fe9f7d100e4aecf56a0a2f4844688a
 file       spendable/owner-001                sha256:61c7032c91239c7ead90e912b644978b0f399da6da8b06cbdbb8c26c2250646c
-file       observation_kinds                  sha256:25af10b7a761b502e2b1c7e5b539ba5a860c872d0f9a4fb0c51879457b23b719
+file       observation_kinds                  sha256:2ff2b9dbcc4a0a2bc3c8cbe9a8a368effe2da873b93c36f850146a2baa998bb5
 file       venues                             sha256:4a49969b706b27bebdc4b10c8d293a1732296f083ec687824df02e659d02016c
 
 ## ranking -- lexicographic on (round trip, ceiling desc, latency)

@@ -134,7 +134,7 @@ DAY_COUNT_FNS: Final[Mapping[str, DayCountFn]] = {
 """The day-count conventions this engine implements. The key set is the whole contract."""
 
 
-def _shift_months(anchor: date, months: int) -> date:
+def shift_months(anchor: date, months: int) -> date:
     """Move a date by whole months, clamping the day to the target month's length.
 
     31 January minus one month is 31 December; 31 March minus one month is 28 February
@@ -142,6 +142,12 @@ def _shift_months(anchor: date, months: int) -> date:
     every time, never to the result of a previous shift, so a schedule cannot drift: a
     quarterly bond maturing on a 31st has coupons on the 31st of every long month rather
     than sliding to the 30th once it has passed a short one.
+
+    ⚙ **Public since feature 008**, which measures a goal's contribution schedule in
+    monthly anniversaries of the date the goal is evaluated from. A bond's month and a
+    goal's month are the same month, and two implementations of this clamping rule would
+    be two answers to "what is one month after 31 January" -- so there is one, here, and
+    the goal solver imports it rather than writing its own.
     """
     month_index = anchor.month - 1 + months
     year = anchor.year + month_index // _MONTHS_IN_YEAR
@@ -164,7 +170,7 @@ def _coupon_dates(start: date, end: date, months: int) -> tuple[date, ...]:
     while current > start:
         dates.append(current)
         steps += 1
-        current = _shift_months(end, -steps * months)
+        current = shift_months(end, -steps * months)
     return tuple(reversed(dates))
 
 
@@ -208,6 +214,19 @@ def _is_weekend(day: date) -> bool:
     visible way rather than wrong from an uncited hard-coded calendar.
     """
     return day.weekday() >= _SATURDAY
+
+
+def is_business_day(day: date) -> bool:
+    """Whether a date is a business day -- that is, not a weekend.
+
+    ⚙ **Made public by feature 006**, which needs to count *forward* N business days to a
+    settlement date rather than merely adjust one off a weekend. Exposed here rather than
+    reimplemented beside the caller so that "what counts as a business day" has one home:
+    the day public holidays arrive as declared data, one function changes and every
+    settlement date changes with it. The weekends-only limitation and its reason are
+    :func:`_is_weekend`'s, unchanged.
+    """
+    return not _is_weekend(day)
 
 
 def _unadjusted(day: date) -> date:

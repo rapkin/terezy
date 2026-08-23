@@ -146,21 +146,43 @@ def test_the_five_reasons_are_all_different_from_one_another() -> None:
     assert len(texts) == 5
 
 
-def test_no_reason_anywhere_still_says_inflation_is_not_modelled() -> None:
-    """The repository-wide check. 001's sentence was true then and is false now.
+OWNED_BY_THIS_FEATURE = (
+    "core/inflation",
+    "core/results/hurdle.py",
+    "core/primitives/rates.py",
+)
+"""The modules that produce the hurdle rate's real-terms slot.
 
-    Grepping the whole of ``src/`` rather than the two modules that used to hold it, because
-    the sentence is exactly the sort of text that gets copied into a neighbouring docstring
-    and left behind.
+⚙ **Narrowed from the whole of ``src/`` when 006 and 008 landed**, and narrowed rather than
+deleted. Both features have real-terms slots of their own -- ``results/fund.py`` states that
+its comparison is nominal, ``results/goal.py`` that a goal is -- and both statements are
+**true of their own figures**: 007 filled ``HurdleRate.real``, not every real slot in the
+project. Grepping all of ``src/`` would have made this test demand that two honest sentences
+be deleted, which is the opposite of what it is for. What it still forbids is 001's generic
+reason surviving in the place 007 replaced it.
+"""
+
+
+def test_no_reason_in_this_features_modules_still_says_inflation_is_not_modelled() -> None:
+    """001's sentence was true then and is false of the hurdle rate now.
+
+    Scoped to the modules this feature produces, and every one of them is scanned rather than
+    the two that used to hold the sentence, because it is exactly the sort of text that gets
+    copied into a neighbouring docstring and left behind.
     """
-    offenders = [
+    owned = [
         path
         for path in SRC.rglob("*.py")
-        if "inflation is not modelled" in path.read_text(encoding="utf-8")
+        if any(part in path.as_posix() for part in OWNED_BY_THIS_FEATURE)
+    ]
+    assert owned, "the scan found none of this feature's modules; the paths above are stale"
+    offenders = [
+        path for path in owned if "inflation is not modelled" in path.read_text(encoding="utf-8")
     ]
 
     assert not offenders, (
         f"{[str(path) for path in offenders]} still say inflation is not modelled. It was "
-        "feature 001's honest statement and this feature makes it false; every refusal now "
-        "names the specific missing month, series, figure or assumption (FR-012)."
+        "feature 001's honest statement about the hurdle rate and this feature makes it "
+        "false; every refusal now names the specific missing month, series, figure or "
+        "assumption (FR-012)."
     )

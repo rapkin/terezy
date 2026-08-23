@@ -77,6 +77,7 @@ from terezy.core.results.hurdle import CashFlow, HurdleRate
 from terezy.core.results.schedule import CashFlowSchedule, ConventionsApplied
 from terezy.core.tax import registry as tax_registry
 from terezy.core.tax.interface import TaxableEventKind, TaxCharge, TaxClass, TaxContext
+from terezy.core.tax.schedule import RateUndeclaredBefore
 
 
 @dataclass(frozen=True, slots=True)
@@ -165,7 +166,7 @@ def project(
     )
 
     charged = _charge_every_taxable_event(declaration, gross_state, tax_classes)
-    if isinstance(charged, UnresolvedTaxClass):
+    if isinstance(charged, UnresolvedTaxClass | RateUndeclaredBefore):
         return charged
 
     combined, charges, taxed_by = _interleave(gross_state, charged)
@@ -300,7 +301,7 @@ def _charge_every_taxable_event(
     declaration: InstrumentDeclaration,
     state: LedgerState,
     tax_classes: Mapping[str, TaxClass],
-) -> tuple[TaxCharge, ...] | UnresolvedTaxClass:
+) -> tuple[TaxCharge, ...] | TaxFailure:
     """One charge per taxable event, keyed later by the event it was charged on.
 
     Every taxable event gets a charge, including one whose base is zero and one whose rate
@@ -357,7 +358,11 @@ def _charge_every_taxable_event(
             ),
         )
         match outcome:
-            case UnresolvedTaxClass():
+            case UnresolvedTaxClass() | RateUndeclaredBefore():
+                # ⚙ feature 006: a class can exist, cover the kind, and still have no
+                # rate in force on the event's date. Returned rather than skipped -- an
+                # uncharged event is indistinguishable from an exempt one in the ledger,
+                # and the whole point of FR-012 is that the two are opposite claims.
                 return outcome
             case TaxCharge():
                 charges.append(outcome)
@@ -379,10 +384,23 @@ def _taxable_kind(kind: EventKind) -> TaxableEventKind | None:
     match kind:
         case EventKind.COUPON:
             return TaxableEventKind.COUPON
-        case EventKind.PRINCIPAL_REPAYMENT:
-            # Redemption is a disposal: what is taxable is the realised gain, not the
-            # principal returned. For a bond redeemed at par that gain is exactly zero,
-            # and taxing the principal instead would tax the owner's own money back.
+        case EventKind.DISTRIBUTION:  # pragma: no cover -- unreachable on this path
+            # ⚙ feature 006. Present for exhaustiveness and **not** reachable here: this
+            # function maps the events of an ``InstrumentOps`` implementation, and the only
+            # one in ``registry.REGISTRY`` is ``fixed_income``, which emits no distribution.
+            # A fund has its own mapping in ``core.results.fund``. The arm cannot simply be
+            # dropped -- the ``assert_never`` below is what makes a forgotten event kind a
+            # type error, and omitting this one would make that assertion fail to compile
+            # rather than making the case impossible. Marked like the ``case _`` beside it,
+            # for the same reason: unreachable arms should say so rather than sit as an
+            # uncovered line a reader mistakes for an untested one.
+            return TaxableEventKind.DISTRIBUTION
+        case EventKind.PRINCIPAL_REPAYMENT | EventKind.REDEMPTION:
+            # A redemption is a disposal: what is taxable is the realised gain, not the
+            # amount returned. For a bond redeemed at par that gain is exactly zero, and
+            # taxing the principal instead would tax the owner's own money back. A fund
+            # buyback is the same claim about a different contract, which is why the two
+            # kinds share this arm.
             return TaxableEventKind.DISPOSAL_GAIN
         case EventKind.RAMP_MOVEMENT:
             # Whether a conversion is taxable is a *declaration*, never a claim of this

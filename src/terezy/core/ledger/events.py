@@ -85,6 +85,28 @@ class EventKind(Enum):
     FEE = "fee"
     """An explicit cost line. See the module docstring on ``allocated_to``."""
 
+    DISTRIBUTION = "distribution"
+    """A payout from a collective-investment fund. Cash only; it touches no lot.
+
+    ⚙ **Added by feature 006.** Distinct from ``COUPON`` even though both are cash into
+    the account against a holding that stays put, because they are not the same claim and
+    are not taxed alike: a coupon is contractual interest on a debt instrument, and a
+    fund distribution is a share of what the fund earned, charged under a different class
+    at a different rate (``SIMULATOR_SPEC.md`` §4.5). Folding the two together would make
+    the two-class split of required test E1 unrepresentable in the ledger.
+    """
+
+    REDEMPTION = "redemption"
+    """Cash in against fund units surrendered -- a disposal, like a bond's repayment.
+
+    ⚙ **Added by feature 006**, and deliberately not spelled ``PRINCIPAL_REPAYMENT``. A
+    fund buying its certificates back is not repaying principal: there is no principal,
+    the price is NAV less whatever discount the terms allow, and the amount can be less
+    than what was put in. The kind reaches the canonical form and every rendered
+    schedule, so a name that described the wrong contract would be a wrong label on a
+    real figure.
+    """
+
     RAMP_MOVEMENT = "ramp_movement"
     """Money crossing a funding route: out of one currency, into another.
 
@@ -139,6 +161,23 @@ class CausationKind(Enum):
     charged by neither an instrument term nor a tax rule -- so without this member such a fee
     would have to claim a cause it does not have, which is worse than a widened set: a
     traceable figure pointing at the wrong declaration.
+    """
+
+    SEED_DECLARATION = "seed_declaration"
+    """A declared opening lot: what the owner already held when the projection started.
+
+    ⚙ **The fourth member, added with feature 008.** It passes the test the docstring above
+    sets rather than widening it: a seed declaration is *a kind of declaration resolvable
+    back to the file it was read from* -- ``id`` is the declaration reference the loader
+    built from the file and the entry (``seeds/owner-001.toml#seed[0]``), so a reader who
+    asks where an opening lot came from is sent to the line that declares it.
+
+    What it is emphatically not is the catch-all the docstring forbids. It cannot become the
+    place an untracked event ends up, because exactly one function produces it
+    (``core.ledger.seeds.opening_events``) and that function is reached only from a declared
+    seed. The alternative was worse than a fourth member: an opening lot claiming an
+    instrument term as its cause would be a traceable figure pointing at the wrong
+    declaration, sending a reader to a coupon term that has nothing to do with the lot.
     """
 
 
@@ -248,13 +287,16 @@ LOT_OPENING_KINDS: Final[frozenset[EventKind]] = frozenset(
 )
 """The kinds that create a lot. Cash out, units in."""
 
-LOT_CLOSING_KINDS: Final[frozenset[EventKind]] = frozenset({EventKind.PRINCIPAL_REPAYMENT})
+LOT_CLOSING_KINDS: Final[frozenset[EventKind]] = frozenset(
+    {EventKind.PRINCIPAL_REPAYMENT, EventKind.REDEMPTION}
+)
 """The kinds that consume lots. Cash in, units out."""
 
 CASH_ONLY_KINDS: Final[frozenset[EventKind]] = frozenset(
     {
         EventKind.CASH_DEPOSIT,
         EventKind.COUPON,
+        EventKind.DISTRIBUTION,
         EventKind.TAX_CHARGE,
         EventKind.FEE,
         EventKind.RAMP_MOVEMENT,
@@ -332,11 +374,12 @@ def check_shape(event: Event) -> None:
     match event.kind:
         case EventKind.PURCHASE | EventKind.REINVESTMENT:
             _check_opening(event)
-        case EventKind.PRINCIPAL_REPAYMENT:
+        case EventKind.PRINCIPAL_REPAYMENT | EventKind.REDEMPTION:
             _check_closing(event)
         case (
             EventKind.CASH_DEPOSIT
             | EventKind.COUPON
+            | EventKind.DISTRIBUTION
             | EventKind.TAX_CHARGE
             | EventKind.FEE
             | EventKind.RAMP_MOVEMENT

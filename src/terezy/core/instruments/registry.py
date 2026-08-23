@@ -1,9 +1,16 @@
-"""The instrument registry: a mapping from a declared instrument class to its functions.
+"""The instrument registry: which declaration kinds project as an **event stream**.
 
 *"Registries are mappings of functions, not subclass dispatch"* (owner decision D-E).
-The key set of :data:`REGISTRY` is the exact list of instrument classes this engine
-implements, readable in one line and impossible to extend at a distance -- no
-registration decorator, no import-time side effect, no subclass scan.
+The key set of :data:`REGISTRY` is readable in one line and impossible to extend at a
+distance -- no registration decorator, no import-time side effect, no subclass scan.
+
+⚙ **:data:`REGISTRY` is not the list of everything this engine calls an instrument**, and
+reading it that way was a real mistake in feature 006's plan before it was corrected. It is
+the dispatch for declaration kinds whose projection *is* a stream of ledger events, which is
+what :class:`~terezy.core.instruments.interface.InstrumentOps` describes. A
+collective-investment fund is a declared instrument class and is deliberately **not** here;
+:data:`DECLARATION_KINDS` at the foot of this module is the complete vocabulary, and the
+section comment above it says why the two lists differ.
 
 **Why this is a third module rather than living in ``interface.py``.** The contract in
 ``specs/001-ovdp-hurdle-rate/contracts/instrument-interface.md`` writes ``REGISTRY``
@@ -51,7 +58,11 @@ close to the implementation as the import graph allows.
 REGISTRY: Final[Mapping[str, InstrumentOps]] = {
     FIXED_INCOME: OPS,
 }
-"""Every instrument class this engine implements."""
+"""Every declaration kind whose projection is an event stream.
+
+**Not every instrument class**: see :data:`DECLARATION_KINDS` for the full vocabulary and
+the section comment beside it for why a fund is not in here.
+"""
 
 
 def ops_for(instrument_class: str) -> InstrumentOps:
@@ -63,3 +74,68 @@ def ops_for(instrument_class: str) -> InstrumentOps:
             f"{sorted(REGISTRY)}"
         )
     return REGISTRY[instrument_class]
+
+
+# ---------------------------------------------------------------------------
+# 006-inzhur-instruments: the declaration kinds, which are not all instruments
+# ---------------------------------------------------------------------------
+#
+# ⚙ **A fund is a declared instrument class, and it is deliberately NOT in `REGISTRY`.**
+# `InstrumentOps` is the `Instrument` plugin interface of Principle II, and a fund does not
+# satisfy it. Three concrete mismatches, none of them cosmetic:
+#
+#   1. **Different inputs.** `EventsFn` takes `Assumptions` -- a consumption method and a
+#      coupon policy. A fund run additionally needs a liquidity mode, whether the
+#      discretionary buyback is on offer, an exit date, a chosen point inside a stated
+#      range and an exchange-rate assumption. None of those has a default anywhere, so a
+#      widened `Assumptions` would force every bond run to state a liquidity mode.
+#   2. **Different failures.** A fund refuses in ways a bond cannot -- after the
+#      subscription cutoff, with no buyback owed, with no rate assumption to size a peg,
+#      with a value recorded only as an unanswered question. `InstrumentFailure` covers
+#      none of them.
+#   3. **A different arity of answer.** A fund stating a range and no chosen point yields
+#      *two* projections. No signature returning one schedule can express that, and
+#      collapsing it is the midpoint this feature exists to refuse.
+#
+# Making `InstrumentOps` generic over both would put `Any` in the registry and force every
+# call site to narrow before it could call -- a registry that type-checks nothing, claiming
+# a uniformity it cannot deliver. That is a worse lie than two records, so the two are kept
+# apart and the difference is written down here.
+#
+# **Is a fund a fifth plugin interface? No -- ruled on by the owner, 2026-08-23.** Principle
+# II permits exactly four and says a fifth needs an amendment. This adds no fifth: there is
+# no `FundOps`, no second mapping of functions, no new dispatch mechanism, and adding a
+# third fund is a data-only change (SC-010 proves it, and a fourth is added in a scratch
+# directory by `tests/contract/test_fund_data_only.py`). What it adds is a second
+# declaration *kind* under the same concept, projected by its own function because its
+# result shape differs. **No amendment is required, and none was made.**
+#
+# The decisive point is mismatch 3 above, and it is worth being exact about: the fund does
+# not fit `EventsFn` because its **output genuinely differs**, not because of a typing
+# accident. There are only two ways to force a range through a signature returning one
+# stream -- pick a point inside it, which FR-023 forbids by name, or widen the return type
+# for bonds too, which would make every existing caller handle a case that cannot arise for
+# a bond. Neither is an improvement; both are the interface bending to a shape it was not
+# built for.
+#
+# What generic code consumes both today: `data.manifest.input_refs`, per kind, and
+# `data.declarations.resolver.Declarations`, which keys both into one id space.
+#
+# **The recorded seam for feature 010.** What 010 needs in order to rank a bond against a
+# fund in one candidate set is a common *result* -- an after-tax, after-cost figure carrying
+# its provenance and its exclusions -- not a common instrument interface.
+# `core.results.fund.BesideTheHurdle` is the first of those and is where to start; widening
+# the instrument interface would not have advanced it by a line.
+
+COLLECTIVE_INVESTMENT_FUND: Final = "collective_investment_fund"
+"""A collective-investment fund: `core.instruments.fund`, projected by
+`core.results.fund.project_fund`."""
+
+DECLARATION_KINDS: Final[frozenset[str]] = frozenset({FIXED_INCOME, COLLECTIVE_INVESTMENT_FUND})
+"""Every ``[instrument] class`` a declaration file may name, instrument or otherwise.
+
+The vocabulary lives in `core` because it is domain knowledge; which *loader* parses each
+one is the data layer's business and lives beside the loaders. Reading the set from here
+is what lets `data.declarations.resolver` dispatch on a declared name rather than on an
+``if`` naming one class -- a branch that would have to be edited for a third kind.
+"""
