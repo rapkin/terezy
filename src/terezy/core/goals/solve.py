@@ -599,18 +599,31 @@ def _crossing(*, starting: float, contribution: float, target: float, rate: floa
       that level is a genuine ceiling, and a target above it is not reached however long
       anyone waits.
     """
+    if _never_moves(starting=starting, contribution=contribution, rate=rate):
+        return None
     if rate == 0.0:
-        if contribution == 0.0:
-            return None
         return (target - starting) / contribution
     level = contribution / rate
-    denominator = starting + level
-    if denominator == 0.0:
-        return None
-    ratio = (target + level) / denominator
+    ratio = (target + level) / (starting + level)
     if ratio <= 0.0:
         return None
     return math.log(ratio) / math.log1p(rate)
+
+
+def _never_moves(*, starting: float, contribution: float, rate: float) -> bool:
+    """Whether the balance is the same on every date, so there is no crossing to find.
+
+    Two ways for that to happen and they are the same statement: nothing goes in and nothing
+    grows on what is there (``C = 0`` with either no rate or no balance), or -- under a negative
+    assumption -- the contribution exactly offsets the loss on the balance it sits on, which is
+    ``S = -C/i``.
+
+    Shared with :func:`_unreachable_reason` rather than re-derived there, so the message a
+    reader is given cannot claim the balance never changes about a balance that shrinks.
+    """
+    if rate == 0.0:
+        return contribution == 0.0
+    return starting + contribution / rate == 0.0
 
 
 def _first_month_end_at_or_after(as_of: date, crossing: float) -> date | None:
@@ -642,21 +655,37 @@ def _unreachable_reason(
     target: Money,
     growth: GrowthAssumption,
 ) -> str:
-    """Why a target is never reached, naming which of the two shapes it is."""
-    if growth.annual_rate <= 0.0 and contribution.amount == 0.0:
+    """Why a target is never reached, naming which of the two shapes it is.
+
+    The first branch tests the *same* expression :func:`_crossing` used to give up, rather than
+    a restatement of it, so "the balance never changes" cannot be said about a balance that
+    shrinks -- which the obvious restatement (no contribution and a rate at or below zero) does
+    say, wrongly, under a negative assumption.
+
+    The second branch is the ceiling, and it is reached only under a **negative** assumption: a
+    balance that moves at a rate of zero or more passes any target above it eventually, so
+    "never reached" and "not constant" together imply the balance is converging. That is why
+    there is no third branch and no fallback -- a fallback here could only be a sentence about
+    a case that cannot occur, which is the kind of guard that reads as protection and is not.
+    """
+    rate = monthly_rate(growth)
+    if _never_moves(starting=starting.amount, contribution=contribution.amount, rate=rate):
         return (
-            f"the goal {goal_id!r} targets {target.amount!r} {target.currency.value} from "
-            f"{starting.amount!r} with no contribution and a growth assumption of "
-            f"{growth.annual_rate!r}. The balance never changes, so there is no date on which "
-            "the target is reached -- not a distant one, and not a capped horizon standing in "
-            "for one."
+            f"the goal {goal_id!r} targets {target.amount!r} {target.currency.value} and the "
+            f"balance never moves off {starting.amount!r}: a contribution of "
+            f"{contribution.amount!r} against a growth assumption of {growth.annual_rate!r} "
+            "changes nothing from one month to the next. So there is no date on which the "
+            "target is reached -- not a distant one, and not a capped horizon standing in for "
+            "one."
         )
+    ceiling = -contribution.amount / rate
     return (
         f"the goal {goal_id!r} targets {target.amount!r} {target.currency.value}, which the "
-        f"stated plan never reaches: at a growth assumption of {growth.annual_rate!r} a "
-        f"contribution of {contribution.amount!r} settles below that level rather than passing "
-        "through it. No date is reported, because there is none -- an arbitrarily distant one "
-        "would be a nearest answer to a question with no answer."
+        f"stated plan converges towards but never passes. At a growth assumption of "
+        f"{growth.annual_rate!r} the balance loses each month roughly what a contribution of "
+        f"{contribution.amount!r} puts in, and settles at {ceiling!r} "
+        f"{target.currency.value}. No date is reported because there is none -- an arbitrarily "
+        "distant one would be a nearest answer to a question that has no answer."
     )
 
 

@@ -269,7 +269,7 @@ feasibility union and the refusals) still lands with the solver in Phase 6.
 - [x] T039 [P] `data/README.md`: the two new per-owner directories and their exemption
 - [x] T040 Flip `008-seed-and-goals` to `status = "in-progress"` in `specs/features.toml` (with the
       first implementation commit; **not** to `done`)
-- [ ] T041 Run every gate from the worktree and record the numbers for the final report:
+- [x] T041 Run every gate from the worktree and record the numbers for the final report:
       `ruff check`, `ruff format --check`, `mypy`, `lint-imports`, `check_provenance.py`,
       `pytest --cov`, `pytest -m "contract or invariant"`
 

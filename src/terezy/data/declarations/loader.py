@@ -2196,7 +2196,9 @@ def _owner_of(path: Path, table: schema.OwnerTable, *, what: str) -> str:
     )
 
 
-def _basis(path: Path, entry: schema.SeedTable, *, field_prefix: str) -> seeds.Basis:
+def _basis(
+    path: Path, entry: schema.SeedTable, *, field_prefix: str, declared_at: str
+) -> seeds.Basis:
     """``known`` or ``estimated``, with the reason rule the two words imply.
 
     The pairing is checked here rather than in the shape validation because pydantic can see
@@ -2237,7 +2239,7 @@ def _basis(path: Path, entry: schema.SeedTable, *, field_prefix: str) -> seeds.B
             "write what makes the cost uncertain, in your own words",
         )
     return seeds.basis_estimated(
-        declared_at=source_id(path, f"{SEED_TABLE}[{_position_of(field_prefix)}]"),
+        declared_at=declared_at,
         reason=_require_text(
             path,
             f"{field_prefix}.reason",
@@ -2247,16 +2249,6 @@ def _basis(path: Path, entry: schema.SeedTable, *, field_prefix: str) -> seeds.B
         ),
         estimated_for=_parse_date(path, f"{field_prefix}.acquired_on", entry.acquired_on),
     )
-
-
-def _position_of(field_prefix: str) -> str:
-    """The entry index out of a field prefix like ``seed[1]``.
-
-    The declaration reference and the field prefix must name the same entry, so the index is
-    read back from the prefix rather than passed a second time: two parameters carrying one
-    fact are two places for it to disagree.
-    """
-    return field_prefix.removeprefix(f"{SEED_TABLE}[").removesuffix("]")
 
 
 def seeds_from_file(path: Path, *, base_currency: Currency) -> tuple[str, tuple[SeedLot, ...]]:
@@ -2283,12 +2275,13 @@ def seeds_from_file(path: Path, *, base_currency: Currency) -> tuple[str, tuple[
     declared: list[SeedLot] = []
     for position, entry in enumerate(file.seed):
         field_prefix = f"{SEED_TABLE}[{position}]"
-        basis = _basis(path, entry, field_prefix=field_prefix)
+        declared_at = source_id(path, field_prefix)
+        basis = _basis(path, entry, field_prefix=field_prefix, declared_at=declared_at)
         declared.append(
             SeedLot(
                 owner_id=owner_id,
                 lot_id=f"{SEED_TABLE}-{position}",
-                declared_at=source_id(path, field_prefix),
+                declared_at=declared_at,
                 instrument_id=_require_text(
                     path,
                     f"{field_prefix}.instrument_id",

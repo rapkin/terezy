@@ -209,6 +209,38 @@ def test_the_first_refusal_wins_and_nothing_is_partially_opened() -> None:
     assert isinstance(outcome, SeedInstrumentUndeclared)
 
 
+def test_disposing_of_more_than_is_seeded_is_refused_naming_what_is_held() -> None:
+    """Spec, Edge Cases: never silently clipped.
+
+    The refusal is the ledger's own -- a seeded lot is an ordinary lot, so over-consumption is
+    caught by the same guard that catches it for a purchased one, and this asserts that the
+    seeded path really does reach it rather than opening a position the engine will let go
+    negative.
+    """
+    opened = _opened(_lot(quantity=10.0))
+    stream = (
+        *opened,
+        events.Event(
+            sequence=len(opened),
+            occurred_on=date(2026, 8, 1),
+            kind=EventKind.PRINCIPAL_REPAYMENT,
+            amount=Money(20_000.0, UAH, prov.EMPTY),
+            owner_id=OWNER,
+            caused_by=events.CausationRef(
+                kind=CausationKind.INSTRUMENT_TERM,
+                id=f"{INSTRUMENT}:redemption",
+                detail="a disposal larger than the holding",
+            ),
+            lot_ref=events.LotRef(instrument_id=INSTRUMENT, lot_id=None),
+            quantity=25.0,
+            allocated_to=None,
+            capacity_pool=None,
+        ),
+    )
+    with pytest.raises(LedgerInvariantError, match=r"only 10\.0 are held"):
+        engine.fold(stream, base_currency=UAH, consumption_method=lots.FIFO)
+
+
 @pytest.mark.parametrize("quantity", [0.0, -3.0])
 def test_a_non_positive_quantity_reaching_the_core_is_a_programmer_error(quantity: float) -> None:
     """The loader refuses it naming the file and the field; if one gets this far the fold

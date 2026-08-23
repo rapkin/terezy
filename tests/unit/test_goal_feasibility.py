@@ -147,6 +147,11 @@ def test_a_target_that_can_never_be_reached_is_unreachable_with_its_reason() -> 
 
     Nothing about this is a long wait. The balance is constant, so there is no date at which
     the target arrives, and reporting one -- however distant -- would be a nearest answer.
+
+    The assertion is on *which* reason, not merely that there is one. The two shapes of
+    unreachable are told apart by the message, and a message that said "the balance never
+    moves" about a shrinking balance would be false while still passing a "reason is non-empty"
+    check -- which is what the neighbouring shrinking-balance test pins from the other side.
     """
     outcome = _outcome(
         _goal(contribution=0.0, target_sum=500_000.0, target_date=IN_A_YEAR),
@@ -154,8 +159,8 @@ def test_a_target_that_can_never_be_reached_is_unreachable_with_its_reason() -> 
     )
     assert isinstance(outcome, GoalOutcome), outcome
     assert isinstance(outcome.feasibility, Unreachable)
-    assert outcome.feasibility.reason.strip()
-    assert "never" in outcome.feasibility.reason or "no" in outcome.feasibility.reason
+    assert "never moves" in outcome.feasibility.reason
+    assert "capped horizon" in outcome.feasibility.reason
 
 
 def test_an_unreachable_target_in_the_date_mode_is_the_whole_answer() -> None:
@@ -186,7 +191,13 @@ def test_a_target_above_the_asymptote_of_a_shrinking_balance_is_unreachable() ->
         _inputs(starting=0.0, annual=-0.20),
     )
     assert isinstance(outcome, Unreachable), outcome
-    assert outcome.reason.strip()
+    # The reason names the ceiling rather than saying "never" and stopping, and it does *not*
+    # claim the balance never moves -- it moves, which is the whole shape of this case. The
+    # ceiling is where a monthly loss of 1.84% eats the thousand that goes in:
+    #     1 000 / (1 - 0.8 ** (1/12)) = 54 278.59101175934
+    assert "converges" in outcome.reason
+    assert "54278.59101175934" in outcome.reason
+    assert "never moves" not in outcome.reason
 
 
 # ---------------------------------------------------------------------------
