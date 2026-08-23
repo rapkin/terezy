@@ -328,10 +328,17 @@ def _taxable_kind(kind: EventKind) -> TaxableEventKind | None:
     match kind:
         case EventKind.COUPON:
             return TaxableEventKind.COUPON
-        case EventKind.PRINCIPAL_REPAYMENT:
-            # Redemption is a disposal: what is taxable is the realised gain, not the
-            # principal returned. For a bond redeemed at par that gain is exactly zero,
-            # and taxing the principal instead would tax the owner's own money back.
+        case EventKind.DISTRIBUTION:
+            # ⚙ feature 006: a fund payout, taxed under the class the instrument declares
+            # for distributions -- which is *not* the class its redemption falls under.
+            # The mapping is mechanical here; which class governs is the declaration's.
+            return TaxableEventKind.DISTRIBUTION
+        case EventKind.PRINCIPAL_REPAYMENT | EventKind.REDEMPTION:
+            # A redemption is a disposal: what is taxable is the realised gain, not the
+            # amount returned. For a bond redeemed at par that gain is exactly zero, and
+            # taxing the principal instead would tax the owner's own money back. A fund
+            # buyback is the same claim about a different contract, which is why the two
+            # kinds share this arm.
             return TaxableEventKind.DISPOSAL_GAIN
         case EventKind.RAMP_MOVEMENT:
             # Whether a conversion is taxable is a *declaration*, never a claim of this

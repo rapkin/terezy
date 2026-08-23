@@ -181,9 +181,11 @@ class TestBothIssuesLoadFromTheDataRoot:
     def test_both_instruments_and_the_one_shared_class_are_declared(self) -> None:
         declarations = _declarations()
         assert set(declarations.instruments) == {ISSUE_A, ISSUE_B}
-        assert set(declarations.tax_classes) == {"ua_government_bond"}
+        assert "ua_government_bond" in declarations.tax_classes
         # FR-013's second half: another instrument *sharing an existing tax class* is
-        # also a data-only change. Both issues point at the same declared class.
+        # also a data-only change. Both issues point at the same declared class -- and the
+        # fund classes feature 006 added sit beside it in the same pack without either
+        # bond acquiring a reference to them.
         for instrument in declarations.instruments.values():
             assert set(instrument.tax_classes.values()) == {"ua_government_bond"}
 

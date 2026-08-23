@@ -38,6 +38,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from terezy.core.instruments import fund as fund_instrument
 from terezy.core.primitives import money
 from terezy.core.routes.venues import can_hold
 from terezy.data.declarations import loader
@@ -46,6 +47,7 @@ from terezy.data.declarations.errors import DeclarationError
 if TYPE_CHECKING:  # pragma: no cover -- typing only
     from collections.abc import Mapping, Sequence
 
+    from terezy.core.instruments.fund import FundDeclaration
     from terezy.core.instruments.interface import InstrumentDeclaration
     from terezy.core.primitives.currency import Currency
     from terezy.core.primitives.money import Money
@@ -88,6 +90,22 @@ class Declarations:
 
     tax_class_files: Mapping[str, Path]
     """Which file declared each tax class."""
+
+    funds: Mapping[str, FundDeclaration]
+    """⚙ **Added by feature 006.** Declared collective-investment funds by id.
+
+    A separate map rather than a wider :attr:`instruments`, because a fund and a bond have
+    almost nothing in common beyond an id: no coupon, no maturity, no face value. One map
+    of a union type would make every consumer narrow before it could read a field, and the
+    two are consumed by different projections anyway.
+
+    The **id space is shared**, though: a fund and a bond declaring the same id is a
+    duplicate and is refused, because a holding names an instrument by id and would
+    otherwise resolve to whichever map was searched first.
+    """
+
+    fund_files: Mapping[str, Path]
+    """Which file declared each fund."""
 
 
 def _refuse_duplicate(
@@ -141,18 +159,38 @@ def resolve(
 
     instruments: dict[str, InstrumentDeclaration] = {}
     instrument_files_by_id: dict[str, Path] = {}
+    funds: dict[str, FundDeclaration] = {}
+    fund_files_by_id: dict[str, Path] = {}
+    files_by_id: dict[str, Path] = {}
     for path in instrument_files:
+        # ⚙ feature 006: one directory, two kinds of declaration, told apart by the one key
+        # they share. See ``loader.declared_class_of``.
+        if loader.declared_class_of(path) == fund_instrument.COLLECTIVE_INVESTMENT_FUND:
+            declared_fund = loader.fund_from_file(path)
+            if declared_fund.id in files_by_id:
+                raise _refuse_duplicate(
+                    "instrument",
+                    declared_fund.id,
+                    "instrument.id",
+                    files_by_id[declared_fund.id],
+                    path,
+                )
+            funds[declared_fund.id] = declared_fund
+            fund_files_by_id[declared_fund.id] = path
+            files_by_id[declared_fund.id] = path
+            continue
         declaration = loader.instrument_from_file(path)
-        if declaration.id in instruments:
+        if declaration.id in files_by_id:
             raise _refuse_duplicate(
                 "instrument",
                 declaration.id,
                 "instrument.id",
-                instrument_files_by_id[declaration.id],
+                files_by_id[declaration.id],
                 path,
             )
         instruments[declaration.id] = declaration
         instrument_files_by_id[declaration.id] = path
+        files_by_id[declaration.id] = path
 
     for identifier, declaration in instruments.items():
         _check_references(
@@ -160,12 +198,20 @@ def resolve(
             tax_classes,
             path=instrument_files_by_id[identifier],
         )
+    for identifier, declared_fund in funds.items():
+        _check_fund_references(
+            declared_fund,
+            tax_classes,
+            path=fund_files_by_id[identifier],
+        )
 
     return Declarations(
         instruments=instruments,
         tax_classes=tax_classes,
         instrument_files=instrument_files_by_id,
         tax_class_files=tax_class_files,
+        funds=funds,
+        fund_files=fund_files_by_id,
     )
 
 
@@ -1433,3 +1479,57 @@ def coverage_from_data_root(
         spendable_file=declared[0],
         scenario_id=scenario_id,
     )
+
+
+# ---------------------------------------------------------------------------
+# 006-inzhur-instruments: fund reference resolution
+# ---------------------------------------------------------------------------
+#
+# The same cross-file pass a bond declaration gets, over the same tax pack. It lives here
+# rather than in the loader for the reason every check in this module does: whether a class
+# id resolves depends on files ``fund_from_file`` has never opened.
+
+
+def _check_fund_references(
+    declared: FundDeclaration,
+    tax_classes: Mapping[str, TaxClass],
+    *,
+    path: Path,
+) -> None:
+    """Every tax class a fund names must exist **and** cover the kind named.
+
+    Both halves, exactly as for a bond -- and the second matters more here than anywhere
+    else in the project, because a fund is the first instrument to name *two different*
+    classes. A distribution class that quietly did not cover ``distribution`` would be
+    refused mid-projection, against an event, rather than here against the file that
+    declared the reference.
+    """
+    for kind, class_id in declared.tax_classes.items():
+        field_path = f"instrument.tax_classes.{kind.value}"
+        found = tax_classes.get(class_id)
+        if found is None:
+            raise DeclarationError(
+                path,
+                field_path,
+                f"{declared.id!r} taxes its {kind.value!r} income under the class "
+                f"{class_id!r}, which no tax file declares. The reference is reported "
+                "rather than treated as untaxed: an exemption is a cited claim and a "
+                "missing rule is not, and reading the second as the first would flatter "
+                "every figure derived from this fund by exactly the tax never charged.",
+                f"declare {class_id!r} in a data/tax file, or reference a class that exists"
+                f" ({', '.join(sorted(tax_classes)) or 'none are declared'})",
+            )
+        if kind not in found.applies_to:
+            raise DeclarationError(
+                path,
+                field_path,
+                f"{declared.id!r} taxes its {kind.value!r} income under the class "
+                f"{class_id!r}, which declares that it applies to "
+                f"{', '.join(sorted(applies.value for applies in found.applies_to))} and "
+                "not to that kind. A fund is taxed one way on a payout and another on an "
+                "exit, so a class pointed at the wrong kind is the single easiest mistake "
+                "to make in a fund declaration — and it is caught here rather than "
+                "mid-projection.",
+                f"add {kind.value!r} to that class's applies_to if the rule covers it, or "
+                "reference the class that does",
+            )

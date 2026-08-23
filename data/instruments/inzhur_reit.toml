@@ -1,0 +1,172 @@
+# ІНЖУР REIT — a real, buyable fund, researched from its own primary documents.
+#
+# **RESEARCHED IS NOT VERIFIED.** Every value below was read on 2026-08-22 from the fund's
+# регламент (ред. 07.05.2025), its проспект (28.05.2025), its fund page and Inzhur's own
+# news, and every `verified_on` is EMPTY until the owner checks it against his investor
+# cabinet. That is the expected state, not a defect: the mark propagates to every figure
+# derived from these terms (FR-002), and `scripts/check_provenance.py` reports them as
+# unverified rather than failing.
+#
+# **THIS IS AN ASSUMPTION-DRIVEN INSTRUMENT.** No volatility, no Sharpe, no Sortino, no
+# statistical metric may ever be emitted for it. Its projections are contractual arithmetic
+# over the terms below plus the owner's stated assumptions, and the output says so.
+#
+# **Income is declared in USD-equivalent terms; the money is hryvnia** (owner decision A).
+# Ukrainian commercial rents are priced against the dollar and settled in hryvnia under a
+# «граничний курс» — a ceiling on the rate. So the payout is *sized* in USD and *paid* in
+# UAH, and every hryvnia figure needs an exchange-rate assumption the owner states. There
+# is no rate feed here and none is invented.
+#
+# **Six things the primary documents do not answer** are recorded as
+# `[[instrument.verification_task]]` entries, which carry no value field at all. A
+# projection needing one refuses by naming the task rather than filling in a plausible
+# number.
+#
+# **Fees are context, not modelled flows** (owner decision B). The management and
+# performance fee clauses are recorded as `[[instrument.fee_fact]]` so a reader can see what
+# the declared net yield is net of; nothing accrues from them.
+
+[instrument]
+id                   = "inzhur_reit"
+name                 = "ІНЖУР REIT — closed-end non-diversified venture fund (ЗНПІФ)"
+class                = "collective_investment_fund"
+unit_currency        = "UAH"
+is_assumption_driven = true
+day_count            = "act/365"
+terminates_on        = "2045-05-20"
+
+  # No subscription cutoff is declared: the fund page describes an open offer, and the
+  # регламент names no closing date for subscriptions. The key is omitted rather than
+  # filled with the termination date, which would be a cutoff nobody wrote.
+
+  [instrument.nav]
+  per_unit     = 10.9975
+  kind         = "fund_terms"
+  source       = "https://www.inzhur.reit/offer/inzhur-reit — the net asset value per certificate shown on the fund page, accessed 2026-08-22. The certificate's nominal is 10.00 грн; this is the shown NAV, which is what a purchase and a buyback are priced against."
+  retrieved_on = "2026-08-22"
+  verified_on  = ""
+
+  [instrument.declared_yield]
+  low_pct  = 9.5
+  high_pct = 9.5
+  basis    = "usd_equivalent_annual"
+  kind     = "fund_stated_yield"
+  source   = "https://www.inzhur.reit/offer/inzhur-reit — the fund's stated target distribution yield of 9.5% a year in USD-equivalent terms, accessed 2026-08-22. A TARGET THE FUND STATES ABOUT ITSELF, not a promise and not an observation of a market. The shown trailing twelve months (11.52%) is an observation of the past and is deliberately NOT entered as a term."
+  retrieved_on = "2026-08-22"
+  verified_on  = ""
+
+  [instrument.distribution]
+  frequency        = "monthly"
+  basis_note       = "Not less than 90% of net rental profit, distributed monthly. Declared in words and never computed: modelling the fund's own books from outside would be an assumption wearing the shape of a computation (owner decision B)."
+  record_day       = "last_day_of_month"
+  payment_day      = 10
+  paid_in          = "UAH"
+  payout_share_pct = 100.0
+  kind             = "fund_terms"
+  source           = "Регламент ЗНПІФ «ІНЖУР REIT» (ред. 07.05.2025) and Проспект (28.05.2025), read in full 2026-08-22, hosted on the d2zk2gr3fhkmim.cloudfront.net host linked from https://www.inzhur.reit/offer/inzhur-reit — monthly distributions of at least 90% of net rental profit, record date the last day of the month, paid by the 10th of the following month, in hryvnia. payout_share_pct is 100 because the stated 9.5% is a DISTRIBUTION target: all of it is paid out and none of it is modelled as NAV growth. Property may well revalue; putting a revaluation figure nobody published into the model would be inventing the fund's balance sheet."
+  retrieved_on     = "2026-08-22"
+  verified_on      = ""
+
+    [instrument.distribution.peg]
+    sized_in = "USD"
+
+      [[instrument.distribution.peg.cap]]
+      effective_from = "2023-01-01"
+      uah_per_unit   = 37.49
+      kind           = "fund_terms"
+      source         = "Pre-2025 secondary evidence for the leases' «граничний курс» ladder, recorded in specs/006-inzhur-instruments/spec.md FR-027 from the 2026-08-22 research pass. THE SOURCE GIVES THE YEAR, NOT THE DAY: the entry is dated from the first day of the attested year, which is the earliest that year can mean and therefore the reading under which the ceiling binds soonest — the conservative direction for a pegged payment. The exact effective date is part of verification task 2."
+      retrieved_on   = "2026-08-22"
+      verified_on    = ""
+
+      [[instrument.distribution.peg.cap]]
+      effective_from = "2024-01-01"
+      uah_per_unit   = 41.24
+      kind           = "fund_terms"
+      source         = "Pre-2025 secondary evidence for the leases' «граничний курс» ladder — the +10%/yr step from 37.49, recorded in specs/006-inzhur-instruments/spec.md FR-027 from the 2026-08-22 research pass. Dated from the first day of the attested year for the same reason as the 2023 entry. WHETHER THE LADDER SURVIVED INTO THE CONSOLIDATED 2025 FUND IS NOT KNOWN, and no entry is written for 2025 or later. A declared ceiling stays in force until a later one supersedes it, exactly as a tax rate does, so this 41.24 is what a 2027 payment converts against — an assumption the empty verified_on marks and verification task 2 exists to close. What is refused rather than assumed is the other direction: a payment dated BEFORE 2023-01-01 has no declared ceiling at all and is not sized at the full assumed rate."
+      retrieved_on   = "2026-08-22"
+      verified_on    = ""
+
+  [instrument.spread]
+  entry_markup_max_pct   = 1.0
+  exit_discount_max_pct  = 1.0
+  live_entry_markup_pct  = 1.0
+  live_exit_discount_pct = 0.0
+  kind                   = "fund_terms"
+  source                 = "Регламент ЗНПІФ «ІНЖУР REIT» (ред. 07.05.2025) for the maxima — an entry markup of up to 1% of NAV and an exit discount of up to 1%. The LIVE settings are unverified inferences from observed prices and are recorded as such: the fund page's entry price of ≈ 11.11 грн against the shown NAV of 10.9975 is consistent with the 1% markup being charged (10.9975 × 1.01 = 11.107), while a secondary source claims zero; and Inzhur's news of 07.04.2025 states the buyback commission was cancelled, which is why the live exit discount is declared zero. Verification task 3 exists to settle both."
+  retrieved_on           = "2026-08-22"
+  verified_on            = ""
+
+  [instrument.liquidity.legal]
+  buyback_before_termination = "discretionary"
+  settlement_business_days   = 15
+  note                       = "The регламент owes NO buyback before the fund's termination date of 2045-05-20. An earlier exit is at the manager's discretion, at a discretionary discount of up to the declared maximum, settled within 15 business days. This is the floor: everything better than it is a favour, not a right."
+  kind                       = "fund_liquidity"
+  source                     = "Регламент ЗНПІФ «ІНЖУР REIT» (ред. 07.05.2025), read in full 2026-08-22 — no redemption windows exist and no buyback obligation arises before termination."
+  retrieved_on               = "2026-08-22"
+  verified_on                = ""
+
+  [instrument.liquidity.practice]
+  settlement_business_days = 0
+  is_revocable             = true
+  note                     = "In practice Inzhur buys certificates back at NAV within hours, at zero commission. A REVOCABLE COMPANY PRACTICE, not an obligation: the company may stop the day it becomes expensive, which is precisely when an owner would need it. Every projection assuming this mode says so on its face."
+  kind                     = "fund_liquidity"
+  source                   = "https://www.inzhur.reit/offer/inzhur-reit and Inzhur news of 07.04.2025 announcing that the buyback commission was cancelled, accessed 2026-08-22."
+  retrieved_on             = "2026-08-22"
+  verified_on              = ""
+
+  [instrument.constraints]
+  minimum_units = 1.0
+  kind          = "venue_terms"
+  source        = "https://www.inzhur.reit/offer/inzhur-reit — the minimum purchase is one certificate, accessed 2026-08-22."
+  retrieved_on  = "2026-08-22"
+  verified_on   = ""
+
+  [instrument.tax_classes]
+  distribution  = "ua_ci_fund_distribution"
+  disposal_gain = "ua_investment_profit"
+
+  [[instrument.fee_fact]]
+  what         = "Management fee of up to 2% a year of net asset value, accrued at one twelfth monthly and pro-rata reduced in a month the fund underperforms."
+  kind         = "fund_terms"
+  source       = "Регламент ЗНПІФ «ІНЖУР REIT» (ред. 07.05.2025), read 2026-08-22. Recorded as context for the declared net yield; nothing accrues from it (owner decision B)."
+  retrieved_on = "2026-08-22"
+  verified_on  = ""
+
+  [[instrument.fee_fact]]
+  what         = "Performance fee of up to 25% of profit above the 9.5%-in-USD projection, hard-capped at 15% of profit above a benchmark of the NBU average key rate."
+  kind         = "fund_terms"
+  source       = "Регламент ЗНПІФ «ІНЖУР REIT» (ред. 07.05.2025), read 2026-08-22. Recorded as context, not modelled."
+  retrieved_on = "2026-08-22"
+  verified_on  = ""
+
+  [[instrument.fee_fact]]
+  what         = "Other fund expenses are capped at 5%."
+  kind         = "fund_terms"
+  source       = "Регламент ЗНПІФ «ІНЖУР REIT» (ред. 07.05.2025), read 2026-08-22. Recorded as context, not modelled."
+  retrieved_on = "2026-08-22"
+  verified_on  = ""
+
+  [[instrument.verification_task]]
+  question    = "The rate-fixing rule converting the USD-pegged rent into each hryvnia payment: which rate, on which date?"
+  searched    = "Регламент ЗНПІФ «ІНЖУР REIT» (ред. 07.05.2025) and Проспект (28.05.2025), read in full"
+  searched_on = "2026-08-22"
+
+  [[instrument.verification_task]]
+  question    = "The current «граничний курс» values, and whether the +10%/yr ladder (2023: 37.49; 2024: 41.24) survives in the consolidated 2025 fund — including the exact effective date of each step, which the evidence gives only by year."
+  searched    = "Регламент ЗНПІФ «ІНЖУР REIT» (ред. 07.05.2025), Проспект (28.05.2025) and the fund page"
+  searched_on = "2026-08-22"
+
+  [[instrument.verification_task]]
+  question    = "Whether the 1% entry markup and the 1% exit discount are currently charged: the live entry price of ≈ 11.11 грн suggests the markup is, while a secondary source claims zero. Check the live buy and sell prices in the investor cabinet."
+  searched    = "The fund page and a secondary broker listing"
+  searched_on = "2026-08-22"
+
+  [[instrument.verification_task]]
+  question    = "The ІНЖУР КЕПІТАЛ investment-firm commission amount, if any."
+  searched    = "Регламент ЗНПІФ «ІНЖУР REIT» (ред. 07.05.2025), Проспект (28.05.2025) and the fund page"
+  searched_on = "2026-08-22"
+
+  [[instrument.verification_task]]
+  question    = "Whether any organized secondary market exists for the fund's certificates."
+  searched    = "Регламент ЗНПІФ «ІНЖУР REIT» (ред. 07.05.2025) and the fund page"
+  searched_on = "2026-08-22"

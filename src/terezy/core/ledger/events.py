@@ -85,6 +85,28 @@ class EventKind(Enum):
     FEE = "fee"
     """An explicit cost line. See the module docstring on ``allocated_to``."""
 
+    DISTRIBUTION = "distribution"
+    """A payout from a collective-investment fund. Cash only; it touches no lot.
+
+    ⚙ **Added by feature 006.** Distinct from ``COUPON`` even though both are cash into
+    the account against a holding that stays put, because they are not the same claim and
+    are not taxed alike: a coupon is contractual interest on a debt instrument, and a
+    fund distribution is a share of what the fund earned, charged under a different class
+    at a different rate (``SIMULATOR_SPEC.md`` §4.5). Folding the two together would make
+    the two-class split of required test E1 unrepresentable in the ledger.
+    """
+
+    REDEMPTION = "redemption"
+    """Cash in against fund units surrendered -- a disposal, like a bond's repayment.
+
+    ⚙ **Added by feature 006**, and deliberately not spelled ``PRINCIPAL_REPAYMENT``. A
+    fund buying its certificates back is not repaying principal: there is no principal,
+    the price is NAV less whatever discount the terms allow, and the amount can be less
+    than what was put in. The kind reaches the canonical form and every rendered
+    schedule, so a name that described the wrong contract would be a wrong label on a
+    real figure.
+    """
+
     RAMP_MOVEMENT = "ramp_movement"
     """Money crossing a funding route: out of one currency, into another.
 
@@ -248,13 +270,16 @@ LOT_OPENING_KINDS: Final[frozenset[EventKind]] = frozenset(
 )
 """The kinds that create a lot. Cash out, units in."""
 
-LOT_CLOSING_KINDS: Final[frozenset[EventKind]] = frozenset({EventKind.PRINCIPAL_REPAYMENT})
+LOT_CLOSING_KINDS: Final[frozenset[EventKind]] = frozenset(
+    {EventKind.PRINCIPAL_REPAYMENT, EventKind.REDEMPTION}
+)
 """The kinds that consume lots. Cash in, units out."""
 
 CASH_ONLY_KINDS: Final[frozenset[EventKind]] = frozenset(
     {
         EventKind.CASH_DEPOSIT,
         EventKind.COUPON,
+        EventKind.DISTRIBUTION,
         EventKind.TAX_CHARGE,
         EventKind.FEE,
         EventKind.RAMP_MOVEMENT,
@@ -332,11 +357,12 @@ def check_shape(event: Event) -> None:
     match event.kind:
         case EventKind.PURCHASE | EventKind.REINVESTMENT:
             _check_opening(event)
-        case EventKind.PRINCIPAL_REPAYMENT:
+        case EventKind.PRINCIPAL_REPAYMENT | EventKind.REDEMPTION:
             _check_closing(event)
         case (
             EventKind.CASH_DEPOSIT
             | EventKind.COUPON
+            | EventKind.DISTRIBUTION
             | EventKind.TAX_CHARGE
             | EventKind.FEE
             | EventKind.RAMP_MOVEMENT

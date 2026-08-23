@@ -814,6 +814,15 @@ class TestDatedRateSchedules:
     where the file can be named rather than mid-projection.
     """
 
+    def _last_class_id(self) -> str:
+        """Which class an entry appended to the end of the shipped file lands under.
+
+        Computed rather than written down: the file gains classes as features land, and a
+        hard-coded id would silently start testing a different class than the one the
+        appended block actually belongs to.
+        """
+        return loader.tax_classes_from_file(TAX_UA)[-1].id
+
     def _without_the_schedule(self) -> str:
         """The shipped tax file with its ``[[...rate]]`` block cut off.
 
@@ -859,13 +868,14 @@ class TestDatedRateSchedules:
     def test_two_entries_with_the_same_effective_date_are_refused(self, tmp_path: Path) -> None:
         """Two rates in force on one date has no meaning, and neither may win by order."""
         text = TAX_UA.read_text(encoding="utf-8") + self._schedule_block("2026-06-30")
+        # The block lands under the file's *last* class, whichever that is.
         broken = _write(tmp_path, "duplicate_dates.toml", text)
         with pytest.raises(DeclarationError) as raised:
             loader.tax_classes_from_file(broken)
         _assert_names_file_and_field(
             raised.value,
             file=broken,
-            field_path="jurisdiction.tax_class[ua_government_bond].rate[1].effective_from",
+            field_path=(f"jurisdiction.tax_class[{self._last_class_id()}].rate[1].effective_from"),
         )
 
     def test_entries_out_of_order_are_refused_rather_than_sorted(self, tmp_path: Path) -> None:
@@ -882,7 +892,7 @@ class TestDatedRateSchedules:
         _assert_names_file_and_field(
             raised.value,
             file=broken,
-            field_path="jurisdiction.tax_class[ua_government_bond].rate[1].effective_from",
+            field_path=(f"jurisdiction.tax_class[{self._last_class_id()}].rate[1].effective_from"),
         )
 
     def test_a_negative_levy_rate_on_an_entry_is_refused(self, tmp_path: Path) -> None:

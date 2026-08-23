@@ -50,7 +50,7 @@ declaration vocabulary the new data needs.
 - [x] T002 [P] Declare the observation kinds the fund and schedule tables age under —
       `fund_terms`, `fund_stated_yield`, `fund_liquidity` — each with `staleness_days`
       and a `note` giving the reason, in `data/observation_kinds.toml`
-- [ ] T003 [P] Add the `006-inzhur-instruments` banner comment at the end of
+- [x] T003 [P] Add the `006-inzhur-instruments` banner comment at the end of
       `src/terezy/data/declarations/schema.py`,
       `src/terezy/data/declarations/loader.py` and
       `src/terezy/data/declarations/resolver.py`, matching the existing per-feature
@@ -163,52 +163,52 @@ per-class subtotals in the output. Closes required test **E1**.
 redemption and check every charge, and the per-class subtotals, against arithmetic
 worked out by hand.
 
-- [ ] T021 [P] [US1] Write the failing contract test for fund-declaration loading —
+- [x] T021 [P] [US1] Write the failing contract test for fund-declaration loading —
       every refusal in contracts/fund-declaration.md: a valued term with no `source` or
       `retrieved_on`, `tax_classes` naming an undeclared class, a `verification_task`
       carrying a value, a missing `terminates_on`, an extra key, a markup or discount
       outside 0–100%, a termination date before the subscription cutoff — in
       `tests/contract/test_fund_declaration_loading.py` (FR-003)
-- [ ] T022 [P] [US1] Write the failing hand-computed worked example for the two-class
+- [x] T022 [P] [US1] Write the failing hand-computed worked example for the two-class
       split — one distribution, one redemption of the same units, the arithmetic for each
       charge and each per-class subtotal written out beside the assertion, the disposal
       base being proceeds minus basis consumed minus fees allocated, a disposal at a loss
       charging exactly zero and reporting the loss with the carryforward statement — in
       `tests/worked_examples/test_two_tax_classes.py` (SC-001, FR-006–FR-008)
-- [ ] T023 [US1] Declare the two new tax classes — `ua_ci_fund_distribution` (9% + 5%)
+- [x] T023 [US1] Declare the two new tax classes — `ua_ci_fund_distribution` (9% + 5%)
       and `ua_investment_profit` (18% + 5%) — as dated schedules in `data/tax/ua.toml`,
       each rate carrying the citation `SIMULATOR_SPEC.md` §4.5 records for it, its
       retrieval date and an **empty** verification date (FR-009)
-- [ ] T024 [US1] Add the fund records to `src/terezy/core/instruments/fund.py`:
+- [x] T024 [US1] Add the fund records to `src/terezy/core/instruments/fund.py`:
       `FundDeclaration`, `DeclaredYield`, `DistributionTerms`, `Peg`, `CapEntry`,
       `SpreadTerms`, `LiquidityTerms`, `LegalTerms`, `ObservedPractice`, `FeeFact`,
       `VerificationTask` — frozen, slotted, `is_assumption_driven: Literal[True]`, and
       **no field for a computed fee** (data-model.md, research.md D9, D10)
-- [ ] T025 [US1] Add the fund event generator to
+- [x] T025 [US1] Add the fund event generator to
       `src/terezy/core/instruments/fund.py`: purchase at NAV plus the declared entry
       markup, the declared distributions, and the exit — as ledger events, gross, with
       provenance on every amount and a typed failure where the terms cannot hold
-- [ ] T026 [US1] Add `EventKind.DISTRIBUTION` to `src/terezy/core/ledger/events.py` and
+- [x] T026 [US1] Add `EventKind.DISTRIBUTION` to `src/terezy/core/ledger/events.py` and
       map it to `TaxableEventKind.DISTRIBUTION` in the exhaustive match in
       `src/terezy/core/results/project.py`
-- [ ] T027 [US1] Add the fund tables to `src/terezy/data/declarations/schema.py` under
+- [x] T027 [US1] Add the fund tables to `src/terezy/data/declarations/schema.py` under
       the 006 banner: `FundTable` and its sub-tables, `STRICT`, no defaults
-- [ ] T028 [US1] Add `fund_from_file` and its helpers to
+- [x] T028 [US1] Add `fund_from_file` and its helpers to
       `src/terezy/data/declarations/loader.py` under the 006 banner, converting percent
       to a fraction exactly once and refusing every condition in T021
-- [ ] T029 [US1] Teach `src/terezy/data/declarations/resolver.py` to dispatch an
+- [x] T029 [US1] Teach `src/terezy/data/declarations/resolver.py` to dispatch an
       instrument file to the fund loader by its declared `class`, to key funds by id, to
       refuse a duplicate id across instruments and funds, and to check every fund's tax
       class references resolve **and** cover the kind named
-- [ ] T030 [US1] Add `FundProjection`, `ClassSubtotal`, `DistributionLine` and the six
+- [x] T030 [US1] Add `FundProjection`, `ClassSubtotal`, `DistributionLine` and the six
       typed refusals to `src/terezy/core/results/fund.py`, with per-class subtotals and
       **no field a statistical metric could sit in** (FR-007, research.md D4, D10)
-- [ ] T031 [US1] Wire the projection in `src/terezy/core/results/fund.py`: fold the gross
+- [x] T031 [US1] Wire the projection in `src/terezy/core/results/fund.py`: fold the gross
       events, charge every taxable event under the class its kind maps to, interleave the
       charges, fold again, and read every reported figure off the ledger
-- [ ] T032 [US1] Declare `data/instruments/inzhur_reit.toml` with the researched terms,
+- [x] T032 [US1] Declare `data/instruments/inzhur_reit.toml` with the researched terms,
       their primary-document citations and empty verification dates (FR-026, FR-027)
-- [ ] T033 [US1] Extend `src/terezy/data/manifest.py` so a fund declaration is an input
+- [x] T033 [US1] Extend `src/terezy/data/manifest.py` so a fund declaration is an input
       reference like any other, carrying the ids of its unverified sources
 
 **Checkpoint**: E1's behaviour is executable and hand-checked; the REIT is declared.
