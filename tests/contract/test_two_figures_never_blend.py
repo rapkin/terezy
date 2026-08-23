@@ -29,6 +29,7 @@ naming the assumption it used, and the manifest records which declaration produc
 
 from __future__ import annotations
 
+import ast
 import dataclasses
 from datetime import date
 from pathlib import Path
@@ -40,7 +41,7 @@ from terezy.core.primitives.rates import NominalRate, RealRate
 from terezy.core.results import canonical, hurdle
 from terezy.data import manifest
 from terezy.data.declarations import loader, resolver
-from tests import cpi_fixtures
+from tests import cpi_fixtures, source_scan
 
 pytestmark = pytest.mark.contract
 
@@ -322,3 +323,61 @@ def test_a_run_given_no_inflation_declarations_records_none_rather_than_a_defaul
     (root / "cpi").mkdir(parents=True)
 
     assert manifest.inflation_input_refs(resolver.inflation_from_data_root(root)) == ()
+
+
+# --- and there is exactly one place each of these things is built -----------------------
+#
+# Every test above pins the behaviour of `real_terms`. None of them says anything about a
+# *second* function that also builds a real figure -- a convenience helper, a summary line, a
+# later feature deflating something else -- and a second one is how the labelling rules get
+# quietly bypassed: it would satisfy the type checker, produce a `RealRate`, and be free to
+# put whatever it liked in `basis`.
+#
+# So the construction sites are counted. Today there are exactly two `RealRate` calls, one per
+# basis, in one module, and every one of them is exercised above. A third is not forbidden
+# forever -- it is made *visible*, and this is where the reviewer is asked whether the new one
+# labels itself honestly. Prose is stripped first, on the same reading as the AST scan for the
+# subtraction approximation.
+
+
+def _construction_sites(name: str) -> dict[str, int]:
+    """Where in ``src/`` something of this name is called, and how often, prose excluded."""
+    found: dict[str, int] = {}
+    for path in sorted((REPO_ROOT / "src" / "terezy").rglob("*.py")):
+        tree = ast.parse(source_scan.executable_source(path))
+        calls = sum(
+            1
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == name
+        )
+        if calls:
+            found[str(path.relative_to(REPO_ROOT))] = calls
+    return found
+
+
+def test_a_real_rate_is_built_in_exactly_two_places_one_per_basis() -> None:
+    """Both are in ``real_terms``, both are tested above, and a third would show up here."""
+    assert _construction_sites("RealRate") == {"src/terezy/core/results/hurdle.py": 2}, (
+        "a real figure is now built somewhere this suite does not check. Every RealRate must "
+        "carry an honest `basis`, its series and its window (FR-010, FR-011); a second "
+        "construction site is a second chance to get that wrong. Test the new one, then widen "
+        "this count deliberately."
+    )
+
+
+def test_the_fisher_relation_is_called_in_exactly_two_places() -> None:
+    """One call per figure. A third caller is a third rate nobody has labelled."""
+    assert _construction_sites("deflate") == {"src/terezy/core/results/hurdle.py": 2}
+
+
+def test_the_slot_is_built_in_exactly_two_places() -> None:
+    """``real_terms`` and the ``NOT_DEFLATED`` constant, and nothing else assembles the pair."""
+    assert _construction_sites("RealTerms") == {"src/terezy/core/results/hurdle.py": 2}
+
+
+def test_the_scan_is_falsifiable() -> None:
+    """It must be able to see a construction, or the three tests above are green by accident."""
+    assert _construction_sites("NominalRate")
+    assert _construction_sites("nothing_is_called_this") == {}
