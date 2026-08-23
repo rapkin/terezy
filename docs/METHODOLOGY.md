@@ -2688,6 +2688,150 @@ today the nominal side of that merge is `UNASSESSED` and only the CPI side is ge
 assessed. The merge point exists so that when those records gain their kind, one caller
 changes and every real figure inherits the verdict.
 
+## 29. The tax year: assessed to a year, paid from cash, and never labelled
+
+Feature 001 charged tax per event and left the timing open. This section is what closed it.
+
+### 29.1 A charge assesses; a payment settles
+
+The predecessor deducted tax from the portfolio at the moment of the trade
+(`REWRITE_BRIEF` §4.3, defect B5), and this engine did the same in miniature: the
+`TAX_CHARGE` event carried the negated charge as its cash effect. It was invisible only
+because every class in the shipped registry was exempt, so the amount deducted was zero.
+
+Now:
+
+> **gross lands in the ledger, the charge is recorded beside it, and the year is assembled
+> afterwards.**
+
+A `TAX_CHARGE` event moves **nothing** — `events.check_shape` refuses one whose amount is not
+zero, so a stream that deducts tax at trade time cannot be folded by any caller. What moves
+money is a `TAX_PAYMENT`, on the declared due date in the following year, folded like any
+other event so cash conservation counts it without being taught it exists.
+
+Two figures state the after-tax outcome and are computed from the **charges** rather than from
+a balance the ledger deliberately no longer reduces: `HurdleRate.nominal_cash_flow_return`
+places each charge at accrual, and `FundProjection.net_proceeds` subtracts the tax assessed.
+Accrual rather than payment is a claim about the *paper*: what the holding earns and what the
+tax on it costs. *When* the money leaves is a fact about the owner's tax year, and that is
+`core.results.tax_year.settle`.
+
+### 29.2 The order the law puts the arithmetic in
+
+Per `(tax year x declared income category)`, for a category whose declared treatment is
+`nets`:
+
+1. the year's operations net to **one** result — gains against losses, before any rate;
+2. a carried loss reduces that result, **if there is a declaration to claim it in**;
+3. only what remains positive is charged, and **both lines are charged on it**;
+4. anything negative becomes, or stays, a carryforward attributed to its origin year.
+
+Step 3 is the only clamp in the feature, and it is the statute's: a negative annual result
+means a zero base and no levy, with the loss preserved rather than swallowed.
+
+**The levy's base is the netted base.** PIT and the military levy are separate lines computed
+from the same carryforward-reduced figure. Assessing the levy on gross while the PIT uses the
+netted figure produces a levy whose base exceeds the PIT's — arithmetic no reader catches from
+a total.
+
+A category declared `per_event` (fund distributions) sums the charges already computed, which
+is also what keeps a class whose rate changes mid-year computable. A category declared
+`outside` (exempt securities) nets with nothing on **either** side: no tax on an exempt gain,
+and **no shield from an exempt loss**.
+
+### 29.3 A year with a mid-year rate change refuses
+
+A netting category charges one annual result, so it needs one pair of rates. Where a year's
+items fall under two dated entries the assessment **refuses** rather than splitting the base,
+because no source says how an annual base is split across a change. The evidence that this is
+genuinely open: the 2024 levy rise needed its own law to answer exactly that question.
+
+### 29.4 Filing is an input, and not filing has a price
+
+Whether the owner filed is declared per year with no default. `"The tool assumed you filed"`
+and `"the tool assumed you did not"` are different wrong answers and each silently changes the
+after-tax ranking, so a year with investment operations and no declared decision refuses.
+
+An unfiled year cannot claim a carried loss — the deduction is claimed *in a declaration* —
+and its own loss never becomes a carryforward at all. Forfeiture is per loss year rather than
+a permanent state: a later loss year that *is* filed carries normally.
+
+`CarryforwardState.cost_of_not_filing_to_date` is the cumulative extra tax the missed
+declarations have caused, measured against the counterfactual in which every declaration was
+filed. Cumulative rather than per-year, because a single year cannot answer the question:
+under the chain-restorable reading below, an unfiled year pays early and the year that absorbs
+the loss pays less, and only the running total says whether anything was actually lost.
+
+### 29.5 Four methods, four figures, and none of them is the liability
+
+The Tax Code prescribes **no** basis method — settled by absence. Tax-service guidance
+recognises costs proportionally, which is average cost over the packet, for a self-declaring
+individual. The methodology binding a **tax agent** prescribes FIFO, and a fund redeeming its
+own securities is not a tax agent. So for a self-declarant two sources point two ways and give
+**different numbers** on the same trades, and nothing settles which governs.
+
+The consequence is structural rather than editorial: `AssessedLiability` cannot be constructed
+without a `LotMethod` and the declared `MethodStanding` that says what backs it, and there is
+no field holding a bare total. "The tax you would owe" is not expressible.
+
+The four, on one three-lot position selling 150 of 400 units for 37 500.00
+(`tests/worked_examples/test_four_lot_methods.py`):
+
+| method | basis consumed | gain | tax at the fixture 15% |
+| --- | --- | --- | --- |
+| FIFO | 16 500.00 | 21 000.00 | 3 150.00 |
+| LIFO | 26 500.00 | 11 000.00 | 1 650.00 |
+| average cost | 21 000.00 | 16 500.00 | 2 475.00 |
+| specific lot | 19 500.00 | 18 000.00 | 2 700.00 |
+
+Average cost takes the same **fraction of every lot** rather than draining lots in an order,
+which is what leaves the remaining position at the same average unit cost. Specific lot
+consumes exactly the lot the disposal names and refuses — naming the lot and the shortfall —
+when it cannot; naming a lot under any other method is a conflict rather than a hint, because
+ignoring it would tax a basis the owner did not choose.
+
+### 29.6 Two questions the law does not answer, and how they are carried
+
+Each is a declared switch under `data/scenarios/tax/`, with no default, labelled on every
+figure whose arithmetic **actually** rests on it — a label on everything is a label a reader
+learns to ignore.
+
+*Does a carried loss survive a year whose declaration was missed?* Form Ф1 pulls the loss from
+the immediately previous year's declaration, and no ruling was found on restoring a broken
+chain. Both branches are modelled and they give different tax.
+
+*Which source-backed method governs a self-declarant?* See §29.5.
+
+Each records an individual tax consultation (art. 52 PKU) as the citation that would retire
+the label.
+
+### 29.7 When the cash is not there
+
+The liability is paid from the tax-currency balance on the declared due date. If the balance
+is smaller, the run stops with a typed report naming the liability, the cash available, the
+shortfall and the date — and **nothing is sold**. Which holdings a forced sale would draw on
+is the owner's recorded deferral, and an engine-invented trade is a tax position taken on his
+behalf on the worst possible day. Paying late under statutory interest was offered and not
+taken, so no penalty is modelled either.
+
+A liability assessed inside the horizon but due after it is reported as an open obligation
+rather than dropped: a closing balance that quietly absorbed next August's tax bill would
+overstate the outcome by exactly the tax.
+
+### 29.8 What is declared, and the one value that is not researched
+
+`data/tax/timing/<jurisdiction>.toml` declares the categories with their netting treatment and
+carryforward rule, the deadlines and settlement behaviour, and what the sources say about each
+basis method. Every table carrying a number is cited and every `verified_on` is empty, so
+every figure resting on one renders marked.
+
+One value has no source: **how a payment deadline falling on a non-business day is treated**.
+The convention is declared as the one that applies the cited date exactly as cited, because
+`following` would assert that the law grants an extension — a second legal fact nobody has
+attested. When it is found, one field changes and no source does.
+
+---
+
 ## 28. Where to look next
 
 | question | file |
@@ -2697,6 +2841,12 @@ changes and every real figure inherits the verdict.
 | Are the day counts right? | `tests/worked_examples/test_day_count.py` |
 | What does a whole run produce? | `tests/golden/ovdp_synthetic_a.golden.txt` |
 | Does the ledger conserve? | `tests/invariants/test_ledger_conservation.py` |
+| What does a loss year cost if I do not file it? | `tests/worked_examples/test_loss_carryforward.py` |
+| What does each basis method actually consume? | `tests/worked_examples/test_four_lot_methods.py` |
+| When does the tax money leave? | `tests/worked_examples/test_tax_payment.py` |
+| What happens if the cash is not there? | `tests/unit/test_insufficient_cash.py` |
+| Can a figure hide which method produced it? | `tests/contract/test_method_is_never_implicit.py` |
+| Is an unsettled reading of the law visible on the figure? | `tests/contract/test_unsettled_is_labelled.py` |
 | Is the run reproducible? | `tests/invariants/test_determinism.py` |
 | Does the mark survive? | `tests/contract/test_provenance_propagation.py` |
 | Is a new instrument really data-only? | `tests/contract/test_data_only_extensibility.py` |

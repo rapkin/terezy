@@ -110,6 +110,11 @@ after = ["004-composed-paths"]
 note  = "instruments as terminal nodes; 004 FR-014 deferral, owner-confirmed future need"
 
 [[future]]
+id    = "late-payment-interest"
+after = ["009-tax-depth"]
+note  = "paying a tax liability late under statutory interest, as an alternative to selling. Offered to the owner on 2026-08-22 and NOT taken (009 FR-011); recorded so the deferral is a decision rather than a gap"
+
+[[future]]
 id    = "fx-tax-asymmetry-f1"
 after = ["002-ramp-cost"]
 note  = "flat-in-USD posts taxable UAH gain; needs a taxable foreign instrument + dated official rates"
@@ -127,7 +132,7 @@ note  = "owner-requested (2026-08-22): goals in non-base currencies once multi-j
 [[future]]
 id    = "forced-sale-policy"
 after = ["009-tax-depth"]
-note  = "owner-deferred (2026-08-22): which positions a forced tax-payment sale draws on and how it is sized; until then insufficient cash is a typed insolvency report — E7 closes only partially in 009"
+note  = "owner-deferred (2026-08-22, 009 FR-010): which positions a forced tax-payment sale draws on, in what order, sized how, consuming which basis — and the sale is itself a taxable disposal. 009 lands the typed shortfall report instead and sells nothing, which is why E7's second clause stays open"
 
 [[future]]
 id    = "martial-law-ends-one-belief-two-places"

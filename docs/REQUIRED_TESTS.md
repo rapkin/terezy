@@ -94,12 +94,12 @@ xfailed, or deleted without an amendment.
 | # | Example | Test |
 |---|---|---|
 | E1 | An Inzhur distribution taxed at 9% + 5% and a redemption of the same units taxed at 18% + 5%, both in one run from one instrument — the two classes must not collide. | `[x]` `tests/worked_examples/test_two_tax_classes.py`, with the isolation property in `tests/invariants/test_rate_schedule_isolation.py` |
-| E2 | A loss year followed by a gain year nets correctly; a run that omits the loss-year declaration forfeits the carryforward. **Both branches tested.** | `[ ]` |
+| E2 | A loss year followed by a gain year nets correctly; a run that omits the loss-year declaration forfeits the carryforward. **Both branches tested.** | `[x]` `tests/worked_examples/test_loss_carryforward.py`, with the chain-continuity branches in `tests/contract/test_unsettled_is_labelled.py` |
 | E3 | Foreign dividend with 15% withholding: PIT credit applied, military levy **not** credited. | `[ ]` |
 | E4 | Crypto scenarios `current_practice`, `draft_18_5`, `draft_transitional_5_5` produce three different hand-checkable results from identical market data. | `[ ]` |
 | E5 | Every tax figure renders with `source` and `verified_on`; an empty `verified_on` marks the figure **and everything derived from it**. | `[x]` `tests/contract/test_provenance_propagation.py` |
-| E6 | Lot-selection methods (FIFO / LIFO / average / specific) on a three-lot position with a partial sale each produce their own hand-computed tax. | `[ ]` |
-| E7 | Tax paid from cash in the following tax year; insufficient cash forces a sale, which is itself taxed. | `[ ]` |
+| E6 | Lot-selection methods (FIFO / LIFO / average / specific) on a three-lot position with a partial sale each produce their own hand-computed tax. | `[x]` `tests/worked_examples/test_four_lot_methods.py`, with the refusals in `tests/unit/test_ledger_failures.py` and the four drawn into the conservation properties in `tests/invariants/test_ledger_conservation.py` |
+| E7 | Tax paid from cash in the following tax year; insufficient cash forces a sale, which is itself taxed. | `[ ]` — **first clause closed, second deliberately open.** Tax is assessed to its year and paid from cash on the declared due date of the following year: `tests/worked_examples/test_tax_payment.py`. Insufficient cash produces a typed shortfall report and **sells nothing**: `tests/unit/test_insufficient_cash.py`. The forced sale is an owner-recorded deferral (009 FR-010, `forced-sale-policy` in `specs/features.toml`) — which holdings it would draw on, in what order, sized how, is a portfolio decision the owner reserved, so the row stays open until that feature lands |
 | E8 | The same scenario under jurisdiction A vs B differs only in the tax terms; the gross market outcome is bit-identical. | `[ ]` |
 | E9 | A residency change mid-simulation is applied by date, including positions held across the change. | `[ ]` |
 | E11 | A **zero** tax figure distinguishes *exempted* from *not applicable* when rendered. The engine already separates them — a taxable event's zero cites its tax class, a non-taxable row's zero cites nothing because there is nothing to cite — but a reader looking at a schedule table sees `0.00` on every row either way. A presentation requirement for the waterfall (spec §5.3), recorded here so the distinction the engine preserves is not thrown away at the last step. | `[ ]` |
@@ -230,6 +230,17 @@ never an omission. `tests/contract/test_diagram_refusals.py`.
 | **E5** | Pressed on from a new direction: the propagating mark now describes the *owner's own memory* rather than only a market observation, and it reaches the tax through the transforms that already existed rather than through a second system. `tests/contract/test_estimated_basis_propagates.py` sweeps every money field of `TaxCharge` from the dataclass, so a field added later is inside the 100% claim. The row's own test stays `tests/contract/test_provenance_propagation.py`. |
 | **B10** | Exercised again, and deliberately in the opposite direction from 003: no seeds and no goals is an **ordinary run**, not a typed empty outcome, because an absent holding cannot be mistaken for a mistyped path. `tests/contract/test_empty_seeds_and_goals.py`. The row is about insufficient data anywhere in the engine, so one feature's rule about emptiness does not close it. |
 | **H2** | Two new declarations fail at load naming file and field for every refusal in their contract, on the existing loader path: `tests/contract/test_seed_declaration_loading.py`, `tests/contract/test_goal_declaration_loading.py`. The row's own test stays `tests/contract/test_declaration_loading.py`. |
+
+
+**009-tax-depth** closes **E2** and **E6**, and closes the first clause of **E7**. Four rows it
+reinforces without closing:
+
+| Row | How, and why the box does not move |
+|---|---|
+| **C1–C3** | The conservation and traceability properties now draw ledgers containing **tax payments**, and are folded under **all four** basis methods rather than only FIFO — and again **not one property changed**. `tests/invariants/event_streams.py` draws the method with the stream, because two of the four constrain what a valid stream looks like. If a property fails only for ledgers containing a payment, the event is wrong, never the invariant. |
+| **E5** | Pressed on again: the propagating mark now describes a **legal rule** — a deadline, a netting treatment, a finding about a basis method — and reaches the annual liability through the same machinery. `tests/contract/test_provenance_propagation.py` sweeps the money fields of `AnnualStatement`, `AssessedLiability` and `CarryforwardState` from the dataclasses, so a field added later is inside the claim. |
+| **E11** | The *exempted* / *not applicable* distinction now exists at the **annual** level too: `AnnualStatement.zero_because` tells an exempt zero from a netted one from a year in which nothing happened, and exemption is read off the **rates** rather than off the amounts, so a break-even disposal under a 23% class is not called an exemption. Still a presentation requirement, so the box does not move. |
+| **H2** | Two new declarations fail at load naming file and field for every refusal in their contract: `tests/contract/test_tax_declaration_loading.py`. The row's own test stays `tests/contract/test_declaration_loading.py`. |
 
 ---
 
