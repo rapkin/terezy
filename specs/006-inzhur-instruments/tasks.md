@@ -510,12 +510,12 @@ What else could reach each finding, and what was done about it.
 
 | Gate | Baseline (T001) | Now | Delta |
 |---|---|---|---|
-| `pytest --cov` | 1198 passed | **1895 passed** | +697 (includes 004, 005, the CPI series and the Deel/ФОП flow, merged in) |
-| coverage (floor 90%) | 99.77% | **99.57%** | −0.20 pt |
-| `pytest -m "contract or invariant"` | — | **866 passed**, 1029 deselected | — |
+| `pytest --cov` | 1198 passed | **2056 passed** | +858 (includes 004, 005, 008, the CPI series and the Deel/ФОП flow, merged in) |
+| coverage (floor 90%) | 99.77% | **99.60%** | −0.17 pt |
+| `pytest -m "contract or invariant"` | — | **940 passed**, 1116 deselected | — |
 | `check_provenance.py` | 0 errors, 24 unverified, 12 files | **0 errors, 470 unverified, 20 files** | the jump is the merged-in CPI series, one cited observation per month, plus the Deel/ФОП routes |
 | `ruff check` / `ruff format --check` | clean | clean | — |
-| `mypy` (strict) | clean, 144 files | clean, **189 files** | +45 |
+| `mypy` (strict) | clean, 144 files | clean, **208 files** | +64 |
 | `lint-imports` | 4 contracts kept | 4 kept, 0 broken | — |
 
 The new unverified values are the expected state, not a regression: every term of both
