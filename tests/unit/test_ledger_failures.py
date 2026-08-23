@@ -187,6 +187,54 @@ def test_a_disposal_may_not_name_a_specific_lot() -> None:
         events.check_shape(event)
 
 
+def test_a_tax_charge_may_not_move_cash() -> None:
+    """FR-001, and defect B5's structural cure: an assessment settles nothing.
+
+    ⚙ **Feature 009.** This is the check that makes "no tax is deducted at event time" a
+    property of the ledger rather than a discipline in two result modules. Both of them --
+    ``results.project`` and ``results.fund`` -- used to give the charge event the negated
+    charge as its cash effect, and it was invisible only because every class in the shipped
+    registry was exempt, so the deduction happened to be zero. With this rule in place a
+    stream that deducts tax at trade time cannot be folded by any caller, including one
+    written later.
+    """
+    event = _event(1, events.EventKind.TAX_CHARGE, -90.0, day=2)
+    with pytest.raises(LedgerInvariantError, match="A charge is an assessment"):
+        events.check_shape(event)
+
+
+def test_a_tax_charge_of_either_signed_zero_is_accepted() -> None:
+    """The sign of a zero says nothing about the money, and the check tests the magnitude.
+
+    ``-0.0`` is what ``tax.year.memo_amount`` produces -- a charge recorded on the outflow
+    side at no magnitude -- and ``0.0`` is what a hand-built fixture is likely to write. Both
+    are the same claim, and a rule that admitted one and refused the other would be a rule
+    about floating-point representation rather than about tax.
+    """
+    events.check_shape(_event(1, events.EventKind.TAX_CHARGE, -0.0, day=2))
+    events.check_shape(_event(2, events.EventKind.TAX_CHARGE, 0.0, day=2))
+
+
+def test_a_tax_payment_may_not_credit_the_account() -> None:
+    """Settling a liability takes money out; this feature models no refund (FR-011)."""
+    event = _event(1, events.EventKind.TAX_PAYMENT, 90.0, day=2)
+    with pytest.raises(LedgerInvariantError, match="sign was lost upstream"):
+        events.check_shape(event)
+
+
+def test_a_tax_payment_takes_money_out_and_touches_no_holding() -> None:
+    """The ordinary case, folded: cash down by the liability, positions untouched."""
+    stream = [
+        _deposit(0),
+        _purchase(1, "lot-1", cost=1_000.0, quantity=10.0, day=2),
+        _event(2, events.EventKind.TAX_PAYMENT, -230.0, day=3),
+    ]
+    state = _fold(stream)
+    assert_money_close(state.accounts[Currency.UAH].balance, _uah(98_770.0))
+    assert state.positions[INSTRUMENT].quantity == 10.0
+    assert state.disposals == ()
+
+
 def test_a_disposal_of_nothing_is_refused() -> None:
     event = _redemption(1, proceeds=600.0, quantity=0.0)
     with pytest.raises(LedgerInvariantError, match="not an event; it is a missing one"):
@@ -477,13 +525,17 @@ def test_an_empty_stream_folds_to_an_empty_ledger_and_no_history() -> None:
 def test_history_snapshots_after_the_last_event_of_each_date() -> None:
     """Two events on one date give one snapshot, holding both.
 
-    An end-of-day balance is what FR-009 is about. A snapshot taken between a coupon and
-    the tax charged on it would show a balance that never existed at the close of any day.
+    An end-of-day balance is what FR-009 is about. A snapshot taken between a coupon and a
+    payment made the same day would show a balance that never existed at the close of any
+    day.
+
+    ⚙ The second event is a ``TAX_PAYMENT`` since feature 009: a ``TAX_CHARGE`` moves no
+    cash any more, so it could no longer make the point this test is about.
     """
     stream = [
         _deposit(0, day=1),
         _event(1, events.EventKind.COUPON, 500.0, day=5),
-        _event(2, events.EventKind.TAX_CHARGE, -90.0, day=5),
+        _event(2, events.EventKind.TAX_PAYMENT, -90.0, day=5),
     ]
     snapshots = engine.history(stream, base_currency=Currency.UAH, consumption_method=lots.FIFO)
     assert [state.as_of for state in snapshots] == [date(2026, 1, 1), date(2026, 1, 5)]

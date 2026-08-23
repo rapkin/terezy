@@ -67,6 +67,14 @@ purchase takes, and the only way to test that claim is to feed the properties th
 exist a body of ledgers that begin from seeds. A property that had to be taught about seeds
 would be evidence against the claim, so if one fails here the fix is in
 ``core.ledger.seeds`` -- never a special case in an invariant (quickstart §1).
+
+⚙ **Ledgers containing tax payments joined the draw with feature 009 (SC-006), on exactly
+that precedent, and again not one property below changed.** A payment is what settles an
+annual assessment out of cash on its declared due date, and 009 research.md D2 claims it is
+an ordinary ledger event; the drawn streams therefore contain both halves of the split -- a
+``TAX_CHARGE`` that assesses and moves nothing, and a ``TAX_PAYMENT`` that moves money -- and
+the properties count them without being told either exists. **If a property fails only for
+ledgers containing a payment, the event is wrong, not the invariant.**
 """
 
 

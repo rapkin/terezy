@@ -83,9 +83,14 @@ def test_a_tax_charge_is_caused_by_a_tax_rule_and_not_by_a_term(stream: Stream) 
     A ledger that labelled every event "instrument term" would pass the previous property
     and be useless: the question a reader asks of a tax line is *which rule charged this*,
     and answering it with the bond's coupon term is a wrong answer, not a vague one.
+
+    ⚙ **Feature 009 added the payment to the tax side of the split**, and did not loosen it:
+    each kind is still pinned to exactly one causation kind, and the money that settles a
+    tax year has to name the rule that assessed it for the same reason the assessment does.
+    A payment traceable only to "an instrument term" would send a reader to a coupon.
     """
     for event in _fold(stream).applied:
-        if event.kind is events.EventKind.TAX_CHARGE:
+        if event.kind in {events.EventKind.TAX_CHARGE, events.EventKind.TAX_PAYMENT}:
             assert event.caused_by.kind is events.CausationKind.TAX_RULE
         else:
             assert event.caused_by.kind is events.CausationKind.INSTRUMENT_TERM

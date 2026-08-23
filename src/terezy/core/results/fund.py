@@ -62,6 +62,7 @@ from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance
 from terezy.core.results.hurdle import HurdleRate
 from terezy.core.tax import registry as tax_registry
+from terezy.core.tax import year as tax_year
 from terezy.core.tax.interface import TaxableEventKind, TaxCharge, TaxClass, TaxContext
 from terezy.core.tax.schedule import RateEntry, RateUndeclaredBefore, rate_on
 
@@ -344,7 +345,12 @@ class FundProjection:
 
     total_tax: Money
     net_proceeds: Money
-    """Every inflow less every outflow, tax included: what the holding actually returned."""
+    """Every inflow less every outflow less the tax assessed: what the holding returned.
+
+    ⚙ **An outcome, not a cash timeline** (009). The ledger holds the gross until the
+    liability is settled on its declared due date in the following year, so the tax is
+    subtracted here rather than read off a balance -- see :func:`_net_proceeds`.
+    """
 
     peg_statement: str | None
     yield_basis: DeclaredYield | ChosenPoint
@@ -1065,12 +1071,28 @@ def _interleave(
 
 
 def _tax_event(taxed: Event, charge: TaxCharge, *, sequence: int) -> Event:
-    """The ledger line for one charge: cash out, on the date the income arrived."""
+    """The ledger line for one charge: an assessment recorded, and no cash moved.
+
+    ⚙ **Feature 009 took the cash out of this line**, exactly as it did for
+    ``core.results.project._tax_event`` -- the sibling path reaching the same claim. A fund
+    is where it mattered: ``ua_ci_fund_distribution`` charges 14% and ``ua_investment_profit``
+    23%, so this line really did deduct tax from the account on the day of the payout, which
+    is the predecessor's defect B5 (FR-001). The amount is now
+    :func:`terezy.core.tax.year.memo_amount` -- the charge's own money at no magnitude, so the
+    rate entry's citation still travels with it -- and the liability leaves cash as a
+    ``TAX_PAYMENT`` on the declared due date in the following year.
+
+    What this projection reports is unchanged: every tax figure in a ``FundProjection`` is
+    read off the ``TaxCharge`` records, never off the ledger's balance, so the distribution
+    lines, the exit line and the class subtotals say what they said before. What moves is the
+    **cash balance**, which now holds the gross until the tax is actually paid -- which is the
+    honest reading and the reason the feature exists.
+    """
     return Event(
         sequence=sequence,
         occurred_on=taxed.occurred_on,
         kind=EventKind.TAX_CHARGE,
-        amount=money.scale(charge.total, -1.0),
+        amount=tax_year.memo_amount(charge.total),
         owner_id=taxed.owner_id,
         caused_by=CausationRef(
             kind=CausationKind.TAX_RULE,
@@ -1132,7 +1154,7 @@ def _assemble(
         ),
         round_trip_spread=money.add(entry_spread, exit_spread),
         total_tax=total_tax,
-        net_proceeds=_net_proceeds(state, currency),
+        net_proceeds=_net_proceeds(state, total_tax, currency),
         peg_statement=_peg_statement(declaration, plan, lines),
         yield_basis=basis,
         excludes=(ROUTE_COSTS_EXCLUDED, NOMINAL_ONLY),
@@ -1146,9 +1168,23 @@ def _assemble(
     )
 
 
-def _net_proceeds(state: LedgerState, currency: Currency) -> Money:
-    """Every inflow less every outflow: what the holding actually returned, after tax."""
-    return money.total([event.amount for event in state.applied], currency)
+def _net_proceeds(state: LedgerState, total_tax: Money, currency: Currency) -> Money:
+    """Every inflow less every outflow **less the tax assessed**: what the holding returned.
+
+    ⚙ **The tax is subtracted explicitly since feature 009**, and the reason is the whole
+    of that feature: a tax charge no longer debits the account on the day the income
+    arrived, so the ledger now holds the **gross** until the liability is settled on its
+    declared due date in the following year. Summing the events alone would therefore have
+    turned this field into a pre-tax figure while its own docstring still said "after tax"
+    -- the quiet kind of wrong, and in the field feeding :func:`beside_hurdle`, where a
+    fund would have gained 23% against an exempt bond overnight.
+
+    **This is an outcome, not a cash timeline.** It states what the holding returns once its
+    tax is paid, and says nothing about *when*. The dated answer -- and the question of
+    whether the cash is even there on the due date -- is ``core.results.tax_year.settle``,
+    which folds the payment into the ledger as an ordinary event.
+    """
+    return money.sub(money.total([event.amount for event in state.applied], currency), total_tax)
 
 
 def _distribution_lines(

@@ -803,6 +803,49 @@ class TestFillingTheRealSlotChangedNothingNominal:
         assert with_cpi.hurdle.real != without.hurdle.real
 
 
+class TestTaxDepthChangedNothingAboutTheExemptPath:
+    """009 FR-026 and SC-009, as three claims rather than one artefact comparison.
+
+    Feature 009 stopped a tax charge from moving cash and gave the ledger a payment event.
+    Neither may touch a year of exclusively exempt income, and the artefact comparison above
+    already says so -- as one assertion over 230 lines, which tells a reader that *something*
+    moved rather than *what*. These pin the two claims that matter separately, because they
+    are separate: a statement of zero still exists (asserted where the statements are built,
+    in ``tests/unit/test_annual_statement.py``), and **no cash moves for it**.
+    """
+
+    def test_no_tax_charge_in_the_exempt_run_moves_any_cash(self) -> None:
+        """Every charge is recorded, and every one of them settles nothing."""
+        result, _ = _run()
+
+        charges = [event for event in result.ledger.applied if event.kind is EventKind.TAX_CHARGE]
+        assert len(charges) == COUPON_COUNT + 1, "one per coupon, plus the redemption"
+        assert all(event.amount.amount == 0.0 for event in charges)
+
+    def test_a_year_of_exclusively_exempt_income_produces_no_payment_event(self) -> None:
+        """SC-009. A zero liability is settled by nothing at all, so no cash leaves.
+
+        This is the assertion that would catch the exempt path growing a behaviour it should
+        not have: a payment event of zero would be indistinguishable from a payment in the
+        totals, and it would put a date in the ledger on which nothing happened.
+        """
+        result, _ = _run()
+
+        assert not [event for event in result.ledger.applied if event.kind is EventKind.TAX_PAYMENT]
+
+    def test_the_exempt_zeroes_still_cite_the_exemption_that_produced_them(self) -> None:
+        """A memo at zero cash is still evidence: ``memo_amount`` keeps the charge's sources.
+
+        Building the amount with ``money.zero`` instead would have dropped the citation, and
+        an uncited zero is indistinguishable from a rule that never ran (E11).
+        """
+        result, _ = _run()
+
+        for event in result.ledger.applied:
+            if event.kind is EventKind.TAX_CHARGE:
+                assert event.amount.provenance.sources
+
+
 class TestTheRealSlotSaysWhatItCanAndRefusesWhatItCannot:
     """007 FR-009 and FR-012, end to end on the declarations the project actually ships."""
 

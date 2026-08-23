@@ -27,6 +27,15 @@ unverified one, and both. E5's propagation assertions belong to a later phase, b
 generating streams that are sometimes unverified means the ledger is exercised against
 marked money from the start rather than having the mark bolted on later.
 
+⚙ **Feature 009 split the tax operations in two, and changed nothing else.** A
+``TAX_CHARGE`` is now an assessment that moves no money, so the generator draws it at zero
+cash; a ``TAX_PAYMENT`` is the money actually leaving on a declared due date, so the
+generator draws that too, from zero upwards. The point of drawing both is the claim 008
+made for seeds and 009 makes for payments: a payment is an **ordinary ledger citizen**, and
+the way to test that is to feed the conservation and traceability properties that already
+exist a body of ledgers containing payments and change not one of them. If a property fails
+only for those ledgers, the event is wrong -- never the invariant (009 research.md D2).
+
 **Every disposal carries a fee line**, drawn from zero upwards and allocated to that
 disposal by sequence number. Feature 001 charges no fees -- route and exit costs are
 outside the hurdle-rate figure by construction -- so without this the third term of C3's
@@ -99,7 +108,10 @@ class Stream:
 _QUANTITIES = st.integers(min_value=1, max_value=1_000)
 _UNIT_PRICES = st.integers(min_value=1, max_value=2_000)
 _CASH_AMOUNTS = st.integers(min_value=1, max_value=100_000)
-_TAX_AMOUNTS = st.integers(min_value=0, max_value=50_000)
+_TAX_PAYMENTS = st.integers(min_value=0, max_value=50_000)
+"""What a settled year takes out of cash. Zero is drawn as often as anything else: a year
+assessed at nothing produces no payment at all in production, and a zero-amount payment is
+the boundary a generator should still put through the fold."""
 _FEE_AMOUNTS = st.integers(min_value=0, max_value=500)
 
 
@@ -139,7 +151,7 @@ def event_streams(draw: st.DrawFn, currency: Currency = Currency.UAH) -> Stream:
         on = on + timedelta(days=gap)
         sequence = len(events)
         prov = draw(st.sampled_from(PROVENANCE_POOL))
-        operations = ["buy", "coupon", "tax"]
+        operations = ["buy", "coupon", "assess", "pay_tax"]
         if held > 0:
             operations.append("redeem")
         operation = draw(st.sampled_from(operations))
@@ -178,13 +190,28 @@ def event_streams(draw: st.DrawFn, currency: Currency = Currency.UAH) -> Stream:
                     capacity_pool=None,
                 )
             )
-        elif operation == "tax":
+        elif operation == "assess":
             events.append(
                 Event(
                     sequence=sequence,
                     occurred_on=on,
                     kind=EventKind.TAX_CHARGE,
-                    amount=Money(-float(draw(_TAX_AMOUNTS)), currency, prov),
+                    amount=Money(-0.0, currency, prov),
+                    owner_id=OWNER,
+                    caused_by=_RULE,
+                    lot_ref=None,
+                    quantity=None,
+                    allocated_to=None,
+                    capacity_pool=None,
+                )
+            )
+        elif operation == "pay_tax":
+            events.append(
+                Event(
+                    sequence=sequence,
+                    occurred_on=on,
+                    kind=EventKind.TAX_PAYMENT,
+                    amount=Money(-float(draw(_TAX_PAYMENTS)), currency, prov),
                     owner_id=OWNER,
                     caused_by=_RULE,
                     lot_ref=None,

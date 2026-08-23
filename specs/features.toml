@@ -63,7 +63,7 @@ why    = "seed lots with known/estimated basis (J2) and target sum/date/contribu
 
 [[feature]]
 id     = "009-tax-depth"
-status = "spec"
+status = "in-progress"
 needs  = ["001-ovdp-hurdle-rate", "006-inzhur-instruments"]
 why    = "loss offset and carryforward (E2), average/specific lot methods (E6), tax paid from cash next year (E7); 006's redemption is the first real disposal with a gain"
 
