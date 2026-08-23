@@ -2000,7 +2000,278 @@ turns every hostile character — quotes, pipes, arrows, Cyrillic, emoji — int
 problem that the escaping solves, and never an identity problem. The cost, accepted: the raw
 text is less readable to a human reading the source. The diagram is meant to be rendered.
 
-## 23. Where to look next
+## 23. Seed lots: what is already held, and what a guessed cost does to the tax
+
+Every projection before feature 008 started from zero, which describes a hypothetical person
+with no assets. A **seed** is a holding the owner already has, declared in
+`data/seeds/<owner>.toml`, and it enters the ledger as an opening lot.
+
+### 23.1 A seed is a cost, never a current value
+
+`SIMULATOR_SPEC.md` §4.8 is explicit and the reason is arithmetic rather than bookkeeping: the
+tax engine needs **lots**, and a lot is *units acquired on a date at a price*. A holding stated
+as "100 units worth 120 000 today" cannot produce a disposal gain at all — a gain is proceeds
+minus the basis consumed, and a current value is not a basis. Declaring one and then taxing
+against it would report the whole proceeds as gain.
+
+So a seed states five things: the instrument, the quantity, the acquisition date, what was
+paid, and whether the holding is invented — `is_synthetic` is a required field rather than a
+comment, because `data/README.md` rule 5 permits these files in the repository only while what
+is in them is a labelled fixture. The cost is in the base currency, always: there is deliberately no `currency` key,
+because converting a foreign-currency basis needs a rate on the acquisition date and an
+assumed rate underneath a tax figure is exactly the confident wrongness this project exists to
+remove.
+
+### 23.2 It opens the ledger through the path a purchase takes
+
+`core.ledger.seeds.opening_events` turns each declared lot into a `PURCHASE` event — the kind
+the engine already opens lots with — dated on the acquisition, carrying the declared cost as
+its cash outflow, and caused by `SEED_DECLARATION` so it resolves back to the line of the file
+that declared it. There is no seed lot type, no parallel position store, and no branch in the
+fold that knows a lot was seeded.
+
+That is not economy for its own sake. Every conservation invariant has to count seeded lots
+from day one, and the cheapest way to guarantee it is to give the invariants nothing new to
+count: `tests/invariants/test_ledger_conservation.py` now draws ledgers that begin from seeds
+into the properties that already existed, and **not one of them changed**. A separate "seed
+position" would have had to be taught to each of them, and the first one nobody taught would
+have been the defect.
+
+**A seeded ledger's cash goes negative, and that is the honest reading.** The stream contains
+the acquisitions and not the funding that paid for them years ago. A seed declares what is
+*held*; the deposit that bought it is not something the owner declared, and inventing one to
+make the balance tidy would put a placeholder value in the result and leave cash conservation
+checking a number the engine made up.
+
+### 23.3 A guessed cost is a guessed tax
+
+Every lot declares its basis as `known` or `estimated`. There is no default and no third
+value: a cost whose reliability nobody stated would produce a tax figure that looks exactly as
+confident as a documented one, and the owner's real holdings will certainly contain lots whose
+price he no longer has.
+
+An estimated basis is **not** a second kind of mark. It is a `SourceRef` carried on the lot's
+declared basis and joined to the cost by `seeds.seed_cost` — the one path a seed takes into
+the ledger — so a lot assembled in code carries it exactly as one read from a file does. From
+there it rides the machinery §10 already describes:
+`merge` carries it into the consumed basis, into the realised gain, and through
+`tax.flat_rate.charge` into the **tax**. Nobody has to remember to propagate it, because
+nothing in the seed code does the propagating.
+
+```
+lot.cost  (marked)
+   -> lots.consume       consumed basis          marked
+   -> lots.realise       realised gain           marked
+   -> flat_rate.charge   pit, levy, total, base  marked
+```
+
+The mark states its reason — the owner's own words, required whenever `basis = "estimated"` —
+and tells itself apart from an unverified market observation by its `SourceRef` id, which is
+namespaced `basis-estimated:`. Both make a figure unverified and both propagate by the same
+rule; they differ in what a reader should do. An unverified market value is checked against
+its source. An estimated acquisition cost cannot be, and the only cure is the owner finding
+the receipt.
+
+What is *not* marked is what does not depend on the guess: the proceeds of the disposal, and
+the fees charged against it. A mark on every figure in the record would be indistinguishable
+from no mark at all.
+
+### 23.4 Worked example
+
+`tests/worked_examples/test_seeded_disposal.py`, with the arithmetic checked in beside each
+assertion. Two lots of one synthetic bond — 100 units at 98 000.00 and 50 units at 52 500.00 —
+and 120 units redeemed for 138 000.00 with a 250.00 fee:
+
+```
+FIFO consumes lot A whole and 20 of lot B's 50 units
+
+consumed basis = 98 000.00 + 52 500.00 x 20/50
+               = 98 000.00 + 21 000.00
+               = 119 000.00 UAH
+
+realised gain  = 138 000.00 - 119 000.00 - 250.00
+               = 18 750.00 UAH
+```
+
+Nothing in that arithmetic knows the lots were seeded. The remainder of lot B keeps
+`cost - consumed` rather than a rescaled cost, for the reason §6.2 gives.
+
+---
+
+## 24. Goals: fix any two, solve the third
+
+`SIMULATOR_SPEC.md` §4.7. The owner states any two of a monthly contribution, a target sum and
+a target date, and `core.goals.solve` answers the third. All three declared is not an
+over-declaration — it is the feasibility question, §24.5.
+
+### 24.1 The model, and why it is on the record
+
+Everything is a rearrangement of one function:
+
+```
+V(t) = S * (1+i)^t  +  C * ((1+i)^t - 1) / i        (i != 0)
+V(t) = S + C * t                                    (i == 0)
+```
+
+where `S` is the stated starting amount, `C` the monthly contribution, `t` a real number of
+months and `i` the monthly rate. Four conventions decide what those symbols mean, and all four
+travel **in the result** (`GoalOutcome.conventions`) rather than living only here:
+
+| convention | value | why it matters |
+| --- | --- | --- |
+| `contribution_timing` | `end_of_period` | Paying at the start multiplies the annuity term by `(1+i)`: 1 268 UAH on a twelve-month, ten-thousand-a-month plan at one percent. |
+| `compounding` | `monthly` | Once per month, on the whole balance. |
+| `monthly_rate` | `twelfth_root_of_annual` | `i = (1+g)^(1/12) - 1`, so twelve months come to exactly the declared annual rate. The nominal alternative (`g/12`) gives 12.68% for a declared 12%. This is the convention §3 already discounts with. |
+| `month_count` | `anniversary_actual_days` | Whole monthly anniversaries — day clamped to the target month's length, the rule §1.2 uses for coupons — plus the elapsed fraction of the month in progress, actual days over that month's own length. |
+
+They are on the record because FR-014's "reproduces hand-computed arithmetic" is only
+checkable when the hand and the engine evaluate the *same* model. A reader who cannot tell
+which timing produced a figure cannot check it.
+
+### 24.2 Three closed forms, and no root finder
+
+```
+sum          V(t)  as above
+contribution C = (target - S * (1+i)^t) * i / ((1+i)^t - 1)
+date         t = ln((target + C/i) / (S + C/i)) / ln(1+i)
+```
+
+`C/i` is the level a fixed contribution settles at under a negative rate, and the constant
+that turns an annuity into a plain power — which is what makes the date mode a formula rather
+than a search.
+
+**Both are computed in the `expm1`/`log1p` form**: `(1+i)^t − 1` as `expm1(t·log1p(i))`, and
+the date as `log1p((target − S)·i / (S·i + C)) / log1p(i)`. Algebraically identical, and
+arithmetically not: the annuity term divides that first quantity by the rate, so recovering it
+by subtracting one from a power throws away the digits the answer then multiplies back up. The
+error would scale with `contribution / rate` instead of with the sum, and a five-thousand-hryvnia
+goal — one the declaration file accepts — would miss the project tolerance while the model was
+exactly right. It is not a tolerance and it hides no disagreement; it is the same number,
+computed the way it should be.
+
+There is no bisection, no `scipy`, and no iteration to a tolerance. An iterative solver
+converges to *a* number while the hand computation checks a different model, and the project
+tolerance quietly absorbs the difference between the two. Because the three modes are
+inversions of one function rather than three implementations, their mutual consistency is a
+property of the algebra: `tests/invariants/test_goal_mode_consistency.py` asserts it over a
+generated body of pairs, and reads the solver's syntax tree to confirm it invented no bound of
+its own.
+
+Two comparisons do need a bound — whether a plan met its target, and whether a required
+contribution came out at or below zero — because both compare a *computed* figure against a
+*declared* one. Both use the single project tolerance of §11. Comparisons between two declared
+numbers stay exact: no arithmetic separates them, so there is nothing to absorb.
+
+### 24.3 The date mode answers twice
+
+A target reached at 12.5 months is reached when the twelfth contribution has landed and the
+thirteenth has not. That is not a date. So the result carries both:
+
+* **`exact`** — the real-valued month at which the balance equals the target. This is what the
+  round trip closes on, which is what makes it the exact one.
+* **`first_reached_on`** — the first month end on which the balance is at or above the target.
+  What the owner can act on.
+
+Taking the ceiling is exact rather than a rounding: whenever a crossing is reported the
+balance is strictly increasing through it, so the first month end past the crossing *is* the
+first schedule date that gets there. Reporting only the calendar date would break the
+consistency property; reporting only the exact one answers a question nobody asked; rounding
+one into the other silently is the nearest answer the specification forbids twice.
+
+**A target already met at the evaluation date has no date to report.** It is answered as *no
+contribution needed*, with the margin. The alternatives were both worse: the mathematical
+crossing is in the past under a growing balance, and under a *shrinking* one it is the moment
+the money falls back **to** the target — a solver that reported it would tell an owner holding
+five million that he reaches ten thousand in a hundred and twenty years.
+
+### 24.4 Nothing is defaulted, and nothing is assumed
+
+A goal is evaluated against an explicitly stated starting amount and an explicitly stated
+growth assumption, both carrying provenance, and neither is declared on the goal itself. Which
+figure the assumption points at — the hurdle rate, an inflation forecast, nothing at all — is
+the owner's declaration. A missing one is a typed refusal naming it; there is no field either
+could hide in, and no rate is ever substituted.
+
+Marks on the assumption reach every solved figure, by the same mechanism §10 describes: every
+term goes through `money.scale_sourced` with the assumption's sources, **including when the
+rate is zero**, because a zero rate is still a declaration the figure rests on.
+
+### 24.5 Feasibility: met, missed, or unreachable
+
+With all three declared the answer is a verdict, and nothing declared is adjusted to produce
+it:
+
+| verdict | carries |
+| --- | --- |
+| `Met` | the margin — zero when the target is met exactly, which is *met*, not missed by a rounding hair |
+| `Missed` | **both** the amount short on the target date and the first date the target would actually arrive — which is always *later* than the target date |
+| `Unreachable` | the reason. Never a capped horizon, never an arbitrarily distant date |
+
+Reaching "unreachable" at all implies a negative assumption and a balance that moves: one
+moving at a rate of zero or more passes any target above it eventually. Within that there are
+**four** shapes, and the sign of `S·i + C` tells them apart — the same quantity the constant
+test compares against zero, so the cases partition rather than overlap. Each is tested against
+that expression rather than against a restatement of it:
+
+| `S·i + C` | Shape | What the reason says |
+|---|---|---|
+| `= 0` | The balance never moves | the contribution exactly offsets the loss, or nothing goes in and there is nothing to lose it from |
+| `< 0`, `C = 0` | Nothing goes in | the balance decays towards **nothing**; there is no ceiling worth naming |
+| `> 0` | Rising to a ceiling below the target | what goes in outweighs the loss, the two meet at `−C/i`, and the target is above that |
+| `< 0`, `C > 0` | Falling **away** from the target | the loss outweighs what goes in, so the balance recedes from a target it never approached |
+
+The last two shared one sentence until the review of 2026-08-23 read it against the second: a
+plan losing 5 600 a month while 100 goes in is not "converging on" a ceiling of 1 781, and the
+target is further away every month rather than nearer. A solver that searched forward would
+have returned the end of its window and called it a date; a message that describes the wrong
+one of these four is the same defect one layer up.
+
+**A fourth case reports no date for the opposite reason: the target was met and then lost.**
+Under a shrinking balance that starts above the target, the crossing is real, finite and in the
+future — and it is the moment the money falls *through* the target on the way down. Reporting
+it as an arrival would tell an owner he gets there on a date he is in fact leaving, so a
+crossing that is not strictly later than the target date is refused as an arrival and the
+verdict is unreachable with the shortfall and the falling-through month in its reason. It is the
+same distinction §24.3 draws at the evaluation date, applied at the date the owner asked about.
+
+A third case is reported the same way and is worth naming: a target reached only past the last
+date the calendar can express. The month count goes into the reason exactly as computed, and
+no nearer date is reported in its place.
+
+**The verdict is not a probability, and says so on its face.** `determinism_note` states that
+it is one path under one stated assumption. Shortfall probability across scenarios needs
+stochastic machinery this feature does not have, and there is no field anywhere in the result
+a likelihood could later be quietly written into.
+
+### 24.6 Nominal, with the real slot present and empty
+
+Every goal figure is nominal and labelled as such. `GoalOutcome.real` holds a
+`RealTermsUnavailable` carrying its reason, in the shape §3 set for the hurdle rate: the slot
+is a distinct type from the nominal figure, so assigning a nominal sum into it is a type error
+rather than something a test has to notice. The CPI feature fills the slot; whether a real
+figure then becomes the headline is a separate decision the owner has not taken.
+
+### 24.7 Worked example
+
+`tests/worked_examples/test_goal_arithmetic.py`. The declared annual rate is
+`1.01^12 - 1 = 0.12682503013196977`, so the monthly rate is exactly one percent:
+
+```
+S = 100 000.00, C = 10 000.00 a month, from 2026-01-31 to 2027-01-31 (12 months)
+
+growth on the opening balance = 100 000.00 * 1.1268250301319698 = 112 682.50301319698
+the twelve contributions      =  10 000.00 * 12.682503013196973 = 126 825.03013196973
+                                                                  -------------------
+                                                                  239 507.53314516676 UAH
+```
+
+Solving the contribution back from that sum and that date returns 10 000.00; solving the date
+back from that sum and that contribution returns 12 months. That is the round trip, on one
+example; the property suite runs it over a generated body.
+
+---
+
+## 25. Where to look next
 
 | question | file |
 | --- | --- |
@@ -2035,6 +2306,12 @@ text is less readable to a human reading the source. The diagram is meant to be 
 | Is there a second number-rendering rule? | `tests/contract/test_diagram_one_number_rule.py` |
 | Do the marks survive the picture? | `tests/contract/test_diagram_marks.py` |
 | Can a hostile venue name break a diagram? | `tests/unit/test_diagram_escaping.py` |
+| What does a seeded lot realise on disposal? | `tests/worked_examples/test_seeded_disposal.py` |
+| Does a guessed cost reach the tax figure? | `tests/contract/test_estimated_basis_propagates.py` |
+| Do the seeded ledgers still conserve? | `tests/invariants/test_ledger_conservation.py` |
+| Do the three goal modes agree? | `tests/invariants/test_goal_mode_consistency.py` |
+| Is the goal arithmetic right? | `tests/worked_examples/test_goal_arithmetic.py` |
+| What happens when a goal cannot be met? | `tests/unit/test_goal_feasibility.py` |
 | What is still uncovered? | `docs/REQUIRED_TESTS.md` |
 
 The product specification is `docs/reference/SIMULATOR_SPEC.md`; the engine charter and the

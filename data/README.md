@@ -16,7 +16,10 @@ Everything here is versioned, sourced, dated, and reviewed in git like code
 | `streams/` | **Per-owner** income streams: currency, amount, cadence, arrival venue, indexation (spec §4.2). |
 | `spendable/` | **Per-owner** endpoints where money counts as having come back out: base currency only, at the venues the owner actually spends from (003 FR-004). |
 | `composition/` | **Per-owner** reach policy: how many declared routes may be chained into one candidate. No default — a missing bound fails at load (004 FR-006). |
+| `seeds/` | **Per-owner** opening lots: what is already held, as units acquired on a date at a price, with the basis declared `known` or `estimated` (008 §4.8). |
+| `goals/` | **Per-owner** targets: any two of a monthly contribution, a target sum and a target date, in the base currency (008 §4.7). |
 | `tax/` | Jurisdiction rule packs with dated rate schedules (spec §4.5). |
+| `cpi/` | Consumer price index series, month on month, one file per jurisdiction. Retrieved by `scripts/fetch_cpi.py` and never hand-edited; every observation is cited and unverified until the owner checks it against the publisher (007). |
 | `scenarios/` | FX paths, discrete events, regime transitions, risk assumptions (spec §4.3.4, §4.6). |
 | `strategies/` | Named allocations, per income stream (spec §5.1). |
 | `objectives/` | Objective + constraint sets (spec §4.10.3–4.10.4). |
@@ -50,9 +53,39 @@ the whole repository refers to:
    would be worse than either.
 4. **No legal value from memory.** Tax and legal values come from a cited public
    source, entered as data. Not from an implementer, and not from an agent.
-5. **Curated vs per-user.** Everything in this directory is curated and shared.
-   Per-user data — holdings, goals, assumptions, results — lives outside it and is
-   gitignored (`data/user/`). Principle VII depends on that boundary.
+5. **No real personal data, ever — public facts and labelled synthetic fixtures only.**
+   This is the owner's own rule (2026-08-23) and it is the axis that matters. What may be
+   committed here is a **general fact about the world** — a fee, a tax rate, a published
+   inflation figure, a corridor, a venue — or a **synthetic fixture that says on its face
+   that it is one**, so that logic and arithmetic can be checked quickly. A fixture shaped
+   like the owner's real situation is fine on the same terms. What may **never** be committed
+   is a figure that describes his actual position.
+
+   That splits the tree in two, and the split is *not* the same as curated-versus-per-owner:
+
+   | Kind | Directories | Rule |
+   |---|---|---|
+   | Public facts about the world | `instruments/`, `routes/`, `channels/`, `tax/`, `cpi/`, `venues.toml`, `observation_kinds.toml` | Cited: `source`, `retrieved_on`, `verified_on` (rules 2 and 4 above). |
+   | The owner's own statements, shipped **synthetic** | `seeds/`, `goals/`, `streams/`, `spendable/`, `composition/`, `scenarios/`, `strategies/`, `objectives/` | Nothing to cite — see the next section for each one's argument. Labelled synthetic while the real figures are unstated (`SIMULATOR_SPEC.md` §11 item 3) — `seeds/` and `goals/` carry `is_synthetic` as a **required field**, so the label is readable by the tool and not only by a reader. |
+   | What a run *produces* | `data/user/`, `cache/`, `runs/` | Gitignored. Never curated, never committed, outside every gate. |
+
+   The second row is committed **because what ships in it is synthetic**, not because
+   per-owner data is committable in general. The day a file there stops being synthetic it
+   stops being committable — that is the same sentence, not a new rule.
+
+   **This is narrower than Principle VII, and deliberately.** The constitution requires
+   per-user data to be *separate from* curated data — a structural boundary, which the
+   directory split satisfies — and says nothing about whether it may be committed. An earlier
+   version of this file was stricter than the constitution, asserting that holdings and goals
+   stay outside `data/` and gitignored; feature 008 put labelled synthetic ones inside it, and
+   this rule is what the owner actually asked for. Where the two documents differ, this one is
+   the tighter of the two on content and the looser on location.
+
+   **The other half of his rule — "the data stays isolated from the core" — is currently true
+   and not yet guaranteed.** No module under `src/terezy/core/` names any declared id in code;
+   the only occurrences are in docstring prose. A contract test under `tests/contract/` will
+   turn that from an observation into a guarantee, and it lands with the review follow-up to
+   this feature. Until it does, treat the claim as reviewed rather than enforced.
 
 ## Assumptions are not observations
 
@@ -93,14 +126,26 @@ threshold, because a forgotten line must never read as a chosen policy. `max_seg
 explicit way to switch composition off and is a legal choice; `0` admits nothing at all and is
 refused as a broken registry.
 
+`seeds/` and `goals/` carry the **same exemption, and they are the sharpest case for it**.
+What the owner paid for a lot and what sum he is aiming at are his own records: an acquisition
+cost is a fact about a transaction he made, and a target is a decision. Neither is an
+observation of the world, so there is nothing for a source to vouch for. Where a cost is
+genuinely forgotten the answer is **not** an uncited number quietly accepted — the lot declares
+`basis = "estimated"` with the owner's reason, and that estimate marks the disposal's gain and
+the tax charged on it, everywhere they appear. A mark is what an unverifiable number gets in
+place of a citation. If a *market value* ever has to live in either directory it moves to a
+sourced one rather than the exemption widening; the growth assumption a goal is evaluated
+against is deliberately not declared in the goal file for the same reason (008 FR-012).
+
 The two lists are **exhaustive, and the gate is fail-closed**: every directory under
 `data/` is either scanned or exempted *by name with its reason* in the script, files at
 the data root (`venues.toml`) are scanned too, and a directory the script does not know
 is an error — never a blind spot. A gate that passes over what it never looked at would
 be fail-open in the one script whose job is the opposite.
 
-Per-owner data being *inside* `data/` is a narrower claim than it looks: `streams/`
-holds one committed, reviewed declaration of where money lands and in what currency,
-with its amounts at `0.0` because the real figures have not been stated (§11 item 3).
-Holdings, goals, results and anything else describing what the owner actually did stay
-outside this directory and gitignored, which is the boundary rule 5 above is about.
+Per-owner data being *inside* `data/` is a narrower claim than it looks. `streams/` holds one
+committed, reviewed declaration of where money lands and in what currency, with its amounts at
+`0.0` because the real figures have not been stated (§11 item 3); `seeds/` and `goals/` hold
+holdings and targets on the same footing, as labelled synthetic fixtures until real ones
+arrive. Every one of them is committed **because what ships in it is synthetic** — rule 5
+above, and the owner's own rule. None of them is a licence to commit his actual position.
