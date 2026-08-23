@@ -80,3 +80,27 @@ verified_on    = ""
   source       = "SYNTHETIC FIXTURE — invented markup, stated for the sell side in its own right rather than copied from the buy side by the engine."
   retrieved_on = "2026-08-22"
   verified_on  = ""
+
+[[channel]]
+id             = "bank_fop"
+pair           = ["UAH", "USD"]
+reference_rate = 42.0
+observed_on    = "2026-08-22"
+kind           = "bank_fee_schedule"
+source         = "SYNTHETIC FIXTURE — invented. The reference is the same one the other two channels quote against so all three are comparable; the owner's actual bank and its actual spread on a ФОП currency sale are unobserved (§11 item 1)."
+retrieved_on   = "2026-08-22"
+verified_on    = ""
+
+  [channel.buy_side]
+  markup_bps   = 100.0
+  kind         = "bank_fee_schedule"
+  source       = "SYNTHETIC FIXTURE — invented. Declared for completeness; the ФОП flow described by the owner sells dollars and does not buy them here, so this side is not on any declared leg today."
+  retrieved_on = "2026-08-22"
+  verified_on  = ""
+
+  [channel.sell_side]
+  markup_bps   = 100.0
+  kind         = "bank_fee_schedule"
+  source       = "SYNTHETIC FIXTURE — invented. This is the side the mandatory sale takes, and it is the number most worth replacing with an observed one: it is charged on the whole contract income every month."
+  retrieved_on = "2026-08-22"
+  verified_on  = ""

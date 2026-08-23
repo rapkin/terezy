@@ -19,6 +19,7 @@ Everything here is versioned, sourced, dated, and reviewed in git like code
 | `seeds/` | **Per-owner** opening lots: what is already held, as units acquired on a date at a price, with the basis declared `known` or `estimated` (008 §4.8). |
 | `goals/` | **Per-owner** targets: any two of a monthly contribution, a target sum and a target date, in the base currency (008 §4.7). |
 | `tax/` | Jurisdiction rule packs with dated rate schedules (spec §4.5). |
+| `cpi/` | Consumer price index series, month on month, one file per jurisdiction. Retrieved by `scripts/fetch_cpi.py` and never hand-edited; every observation is cited and unverified until the owner checks it against the publisher (007). |
 | `scenarios/` | FX paths, discrete events, regime transitions, risk assumptions (spec §4.3.4, §4.6). |
 | `strategies/` | Named allocations, per income stream (spec §5.1). |
 | `objectives/` | Objective + constraint sets (spec §4.10.3–4.10.4). |
@@ -64,7 +65,7 @@ the whole repository refers to:
 
    | Kind | Directories | Rule |
    |---|---|---|
-   | Public facts about the world | `instruments/`, `routes/`, `channels/`, `tax/`, `venues.toml`, `observation_kinds.toml` | Cited: `source`, `retrieved_on`, `verified_on` (rules 2 and 4 above). |
+   | Public facts about the world | `instruments/`, `routes/`, `channels/`, `tax/`, `cpi/`, `venues.toml`, `observation_kinds.toml` | Cited: `source`, `retrieved_on`, `verified_on` (rules 2 and 4 above). |
    | The owner's own statements, shipped **synthetic** | `seeds/`, `goals/`, `streams/`, `spendable/`, `composition/`, `scenarios/`, `strategies/`, `objectives/` | Nothing to cite — see the next section for each one's argument. Labelled synthetic while the real figures are unstated (`SIMULATOR_SPEC.md` §11 item 3) — `seeds/` and `goals/` carry `is_synthetic` as a **required field**, so the label is readable by the tool and not only by a reader. |
    | What a run *produces* | `data/user/`, `cache/`, `runs/` | Gitignored. Never curated, never committed, outside every gate. |
 

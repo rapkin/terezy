@@ -37,7 +37,7 @@ DATA_ROOT = REPO_ROOT / "data"
 # `channels` joined in feature 002: a two-sided rate is the most decision-relevant
 # observation in the ramp model, and an uncited premium is exactly the figure that gets
 # believed without checking.
-SOURCED_DIRS = ("tax", "instruments", "routes", "channels")
+SOURCED_DIRS = ("tax", "instruments", "routes", "channels", "cpi")
 
 # The directories exempt from the citation requirement, each BY NAME and WITH ITS REASON.
 # Together with SOURCED_DIRS this list is exhaustive: a directory under data/ that appears

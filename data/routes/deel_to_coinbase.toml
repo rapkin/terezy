@@ -1,0 +1,33 @@
+# Deel → Coinbase, in dollars. The alternative the owner has already named.
+#
+# **Declared with no exit partner, deliberately.** Nothing has been observed about how money
+# leaves Coinbase, so 002 FR-030 applies: this destination gets a one-way figure and no
+# round-trip figure, and it stays out of any round-trip ranking. That refusal is the useful
+# output here — the coverage report (003) names the missing declaration, and until someone
+# observes that corridor the honest comparison against the ФОП route cannot be made.
+#
+# SYNTHETIC FIXTURE for every number.
+
+[route]
+id          = "deel_to_coinbase"
+provider    = "Deel"
+origin      = "deel"
+destination = "coinbase"
+direction   = "inbound"
+status      = "open"
+
+  [[route.leg]]
+  index                  = 0
+  kind                   = "transfer"
+  from_venue             = "deel"
+  to_venue               = "coinbase"
+  from_ccy               = "USD"
+  to_ccy                 = "USD"
+  fee_pct                = 0.0
+  fee_fixed              = 0.0
+  latency_days           = 1
+  disruption_probability = 0.01
+  kind_of_observation    = "bank_fee_schedule"
+  source                 = "SYNTHETIC FIXTURE — invented. SIMULATOR_SPEC.md §4.2 records an open question about whether Deel money arrives at Coinbase as USD or as a stablecoin; this declaration assumes USD and that assumption is part of what an observation must settle."
+  retrieved_on           = "2026-08-23"
+  verified_on            = ""

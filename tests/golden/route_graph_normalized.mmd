@@ -1,0 +1,31 @@
+flowchart LR
+    meta["route graph · regime: normalized · mode: with-declared-figures (shows declared per-leg fees and channel premiums only -- no computed ramp cost appears on a registry graph) · staleness assessed as of 2026-08-21 · marks: SYNTHETIC"]
+    n0["venue binance · name Binance account, including its UAH peer-to-peer book (SYNTHETIC FIXTURE)"]
+    n1["venue coinbase · name Coinbase account — one of the two places Deel can send the contract income (SYNTHETIC FIXTURE) · marks: NO EXIT DECLARED · not comparison-ready"]:::noExitDeclared
+    n2["venue deel · name Deel — where the contract income lands and where the owner first controls it"]
+    n3["venue fop · name ФОП account — the sole-proprietor account, currency and hryvnia sides"]
+    n4["venue ibkr_usd · name Interactive Brokers, USD cash account (SYNTHETIC FIXTURE) · marks: NO EXIT DECLARED · not comparison-ready"]:::noExitDeclared
+    n5["venue inzhur · name Inzhur fund platform, hryvnia only (SYNTHETIC FIXTURE)"]
+    n6["venue monobank_uah · name Monobank multi-currency card — the UAH salary rail (SYNTHETIC FIXTURE)"]
+    x0["marks: NO EXIT DECLARED · nothing this regime includes leaves coinbase · so no round-trip figure exists for it"]:::noExitDeclared
+    x1["marks: NO EXIT DECLARED · nothing this regime includes leaves ibkr_usd · so no round-trip figure exists for it"]:::noExitDeclared
+    n0 -->|"route binance_p2p_to_monobank · provider Binance P2P · leg 0 fx · USD to UAH · via channel p2p · declared fee 0.00% + 0.00 USD · declared premium (sell side) -2.50 UAH per USD, applied below the reference 42.00 UAH per USD · status: open · marks: UNVERIFIED + SYNTHETIC"| n0
+    n0 -->|"route binance_p2p_to_monobank · provider Binance P2P · leg 1 transfer · UAH · declared fee 0.00% + 0.00 UAH · status: open · marks: UNVERIFIED + SYNTHETIC"| n6
+    n1 -->|"route coinbase_to_ibkr · provider Interactive Brokers · leg 0 withdrawal · USD · declared fee 0.50% + 25.00 USD · status: constrained · marks: UNVERIFIED + SYNTHETIC"| n4
+    n2 -->|"route deel_to_coinbase · provider Deel · leg 0 transfer · USD · declared fee 0.00% + 0.00 USD · status: open · marks: UNVERIFIED + SYNTHETIC"| n1
+    n2 -->|"route deel_to_fop · provider Deel · leg 0 transfer · USD · declared fee 0.00% + 0.00 USD · status: open · marks: UNVERIFIED + SYNTHETIC"| n3
+    n3 -->|"route fop_usd_to_monobank_uah · provider ФОП bank · leg 0 fx · USD to UAH · via channel bank_fop · declared fee 0.00% + 0.00 USD · declared premium (sell side) 100.00 bps, applied below the reference 42.00 UAH per USD · status: open · marks: UNVERIFIED + SYNTHETIC"| n3
+    n3 -->|"route fop_usd_to_monobank_uah · provider ФОП bank · leg 1 transfer · UAH · declared fee 0.00% + 0.00 UAH · status: open · marks: UNVERIFIED + SYNTHETIC"| n6
+    n6 -->|"route inzhur_direct · provider Inzhur · leg 0 transfer · UAH · declared fee 0.00% + 0.00 UAH · status: open · marks: UNVERIFIED + SYNTHETIC"| n5
+    n5 -->|"route inzhur_to_monobank · provider Inzhur · leg 0 withdrawal · UAH · declared fee 0.00% + 0.00 UAH · status: open · marks: UNVERIFIED + SYNTHETIC"| n6
+    n6 -->|"route monobank_to_binance_card · provider Monobank · leg 0 fx · UAH to USD · via channel card · declared fee 0.00% + 0.00 UAH · declared premium (buy side) 150.00 bps, applied above the reference 42.00 UAH per USD · status: open · marks: UNVERIFIED + SYNTHETIC"| n6
+    n6 -->|"route monobank_to_binance_card · provider Monobank · leg 1 transfer · USD · declared fee 0.00% + 0.00 USD · status: open · marks: UNVERIFIED + SYNTHETIC"| n0
+    n6 -->|"route monobank_to_binance_p2p · provider Binance P2P · leg 0 fx · UAH to USD · via channel p2p · declared fee 0.00% + 0.00 UAH · declared premium (buy side) +3.00 UAH per USD, applied above the reference 42.00 UAH per USD · status: open · marks: UNVERIFIED + SYNTHETIC"| n6
+    n6 -->|"route monobank_to_binance_p2p · provider Binance P2P · leg 1 transfer · USD · declared fee 0.00% + 0.00 USD · status: open · marks: UNVERIFIED + SYNTHETIC"| n0
+    n6 -->|"route monobank_to_binance_p2p_double · provider Binance P2P · leg 0 fx · UAH to USD · via channel p2p · declared fee 0.00% + 0.00 UAH · declared premium (buy side) +3.00 UAH per USD, applied above the reference 42.00 UAH per USD · status: open · marks: UNVERIFIED + SYNTHETIC"| n6
+    n6 -->|"route monobank_to_binance_p2p_double · provider Binance P2P · leg 1 transfer · USD · declared fee 0.00% + 0.00 USD · status: open · marks: UNVERIFIED + SYNTHETIC"| n0
+    n0 -->|"route monobank_to_binance_p2p_double · provider Binance P2P · leg 2 fx · USD to UAH · via channel p2p · declared fee 0.00% + 0.00 USD · declared premium (sell side) -2.50 UAH per USD, applied below the reference 42.00 UAH per USD · status: open · marks: UNVERIFIED + SYNTHETIC"| n0
+    n0 -->|"route monobank_to_binance_p2p_double · provider Binance P2P · leg 3 fx · UAH to USD · via channel p2p · declared fee 0.00% + 0.00 UAH · declared premium (buy side) +3.00 UAH per USD, applied above the reference 42.00 UAH per USD · status: open · marks: UNVERIFIED + SYNTHETIC"| n0
+    n1 -.->|"marks: NO EXIT DECLARED · the absent edge, drawn rather than omitted"| x0
+    n4 -.->|"marks: NO EXIT DECLARED · the absent edge, drawn rather than omitted"| x1
+    classDef noExitDeclared stroke-width: 3px

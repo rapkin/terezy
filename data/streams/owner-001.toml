@@ -50,7 +50,7 @@ owner_id   = "owner-001"
 currency   = "USD"
 amount     = 0.0
 cadence    = "monthly"
-arrives_at = "coinbase"
+arrives_at = "deel"
 
   [stream.indexation]
   policy = "none"

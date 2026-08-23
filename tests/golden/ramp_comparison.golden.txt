@@ -10,17 +10,20 @@ as_of         2026-08-21
 
 ## inputs -- a change to any of these SHOULD fail this test, on its own line
 route      binance_p2p_to_monobank            sha256:69714d24adae946eab60b3a7c9a57690edc8ea15a01fddd801804678094e5c15
-route      coinbase_to_ibkr                   sha256:0a66044e87ea407cc7c8ebea7dc2a1bec35a2126c8d8ca2f8b136e529d14d5ef
+route      coinbase_to_ibkr                   sha256:dbca38755f373165fd44e2715600d0139eeeabdd410e2684ea371bb0abd445d4
+route      deel_to_coinbase                   sha256:9e57f43b3e7a2adfb519ceb27b62e25c98064d4927464131ffae53c2665b7229
+route      deel_to_fop                        sha256:c907217ba94fcc14ff4d1e398859349be6ac07c58b7612915c40de92adcff69e
+route      fop_usd_to_monobank_uah            sha256:9d85b41b924d37db56decd922b538f9a4efccde54204d652c4d0b74bdbccef86
 route      inzhur_direct                      sha256:22ca3b7b8e22cff58185cdff9117ee851b4b378f9efaf38675716419bdaf2026
 route      inzhur_to_monobank                 sha256:b50470924c2addd55fd19c7a654273fe8296a7604ee019a68f01d67838dcbdcd
 route      monobank_to_binance_card           sha256:4835af0b2feef59bd56cfda2e43b6ad69cc0662c37fd69c6b32eb6d9a95c4c36
 route      monobank_to_binance_p2p            sha256:bbc3d7bd9c338891f1f6bdba323cb21059230ae7e5aa2cc7538419759cd7ff51
 route      monobank_to_binance_p2p_double     sha256:e23f102032c347bbbd87a396d0bdcd1393c907ab90840779c33feb48dab8e693
-file       channels/uah_usd                   sha256:f8c7d96d5387a21efff9857b9326692a07049d9ed989a8ec107771b37dd7422e
-file       streams/owner-001                  sha256:6651ba42cf373ee55559b8975a623d01b50d565dc5e1a523d156dd42ad4cbe13
+file       channels/uah_usd                   sha256:9af2c88cdb5740cd1d5c028233740e571a33d713f597ad58d603cf868b2309b5
+file       streams/owner-001                  sha256:31804f35d44753be121f9f944bcdbe2778fe9f7d100e4aecf56a0a2f4844688a
 file       spendable/owner-001                sha256:61c7032c91239c7ead90e912b644978b0f399da6da8b06cbdbb8c26c2250646c
-file       observation_kinds                  sha256:5fce57016fecf3ceb49c7e2d9ad0d3da8e450d05c3404ac836dbc3ace04321c1
-file       venues                             sha256:b0417dd2c35ca6dcefd5fc122fce8598665d9881936f138dabaff7f82c2e7850
+file       observation_kinds                  sha256:25af10b7a761b502e2b1c7e5b539ba5a860c872d0f9a4fb0c51879457b23b719
+file       venues                             sha256:4a49969b706b27bebdc4b10c8d293a1732296f083ec687824df02e659d02016c
 
 ## ranking -- lexicographic on (round trip, ceiling desc, latency)
 

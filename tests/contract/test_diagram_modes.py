@@ -1,0 +1,450 @@
+"""Two modes, named on the diagram, and a computed cost on neither.
+
+**SC-012** and **SC-009**; **FR-006** and **FR-019**.
+
+The owner asked for two selectable modes rather than one: a pure topology, and the same
+picture carrying the *declared* per-leg figures. The trap in that decision is the numberless
+picture, which reads as "zero fees" unless the diagram says which mode it is -- the same class
+of error as an unlabelled one-way figure, and the reason FR-006 puts the mode on the face of
+the diagram rather than only in the caller's head.
+
+**The second trap is the one this module spends most of its assertions on.** A *computed* ramp
+cost exists only per ``(destination x stream x route)``, which a registry graph does not name.
+Putting one on a registry graph would be feature 002's FR-008 violated in picture form -- and
+it is forbidden in the with-figures mode too, not only in the topology one, because the
+with-figures mode is where it would look like it belonged.
+
+**A figure is recognised by the shape the one rule gives it.** Every number this package puts
+on a diagram comes out of ``terezy.api.diagrams.numbers`` as a fixed two-decimal value
+(FR-022), so ``\\d+\\.\\d\\d`` finds every figure and nothing else: a leg index, a positional
+node id, a channel id like ``p2p`` and an ISO date are none of them figures and none of them
+match. That is what makes "verified over every label, not sampled" a claim this module can
+actually make.
+"""
+
+from __future__ import annotations
+
+import ast
+import inspect
+import re
+from dataclasses import replace
+from pathlib import Path
+
+import pytest
+
+from terezy.api.diagrams import Diagram, Mode, figures, graph, render_graph
+from terezy.core.routes import channels
+from terezy.core.routes.channels import Side
+from tests import diagram_registries as fixture
+from tests import source_scan
+
+pytestmark = pytest.mark.contract
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+GRAPH_MODULE = REPO_ROOT / "src" / "terezy" / "api" / "diagrams" / "graph.py"
+
+SEPARATOR = " · "
+FIGURE = re.compile(r"\d+\.\d\d")
+"""What the one number rule produces, and the only shape a figure can have (FR-022)."""
+
+FIGURE_FIELD = re.compile(
+    re.escape(SEPARATOR + figures.FIGURE_FIELD) + r'[^·"]*?(?=' + re.escape(SEPARATOR) + r'|")'
+)
+"""One declared-figure field, its separator included, as it appears inside a label."""
+
+
+def body(text: str) -> list[str]:
+    """Everything below the header and the caption.
+
+    The caption is excluded on purpose: FR-006 *requires* it to differ between modes, because
+    naming the mode on the face of the diagram is the whole point. What must not differ is
+    anything else.
+    """
+    return text.splitlines()[2:]
+
+
+def caption(text: str) -> str:
+    return text.splitlines()[1]
+
+
+def edge_labels(text: str) -> list[str]:
+    return [found.group(1) for found in re.finditer(r'\|"(.*?)"\|', text)]
+
+
+def node_labels(text: str) -> list[str]:
+    return [found.group(1) for found in re.finditer(r'^\s*\w+\["(.*?)"\]', text, re.MULTILINE)]
+
+
+def premium_of(label: str) -> str:
+    """The one declared-premium field of a label, or a loud failure if there is none."""
+    found = [field for field in label.split(SEPARATOR) if field.startswith(figures.PREMIUM_FIELD)]
+    assert len(found) == 1, (label, found)
+    return found[0]
+
+
+def figure_bearing_fields(text: str) -> list[str]:
+    """Every label field anywhere in the diagram that carries a rendered figure."""
+    return [
+        field
+        for label in [*edge_labels(text), *node_labels(text)]
+        for field in label.split(SEPARATOR)
+        if FIGURE.search(field)
+    ]
+
+
+class TestTheTwoModesDifferByFiguresAndNothingElse:
+    """SC-012's central claim, asserted as an equality rather than as a resemblance."""
+
+    def test_stripping_the_figures_reproduces_the_topology_diagram_exactly(self) -> None:
+        topology = fixture.six_state_graph(Mode.TOPOLOGY).text
+        with_figures = fixture.six_state_graph(Mode.DECLARED_FIGURES).text
+        assert body(FIGURE_FIELD.sub("", with_figures)) == body(topology)
+
+    def test_the_captions_differ_only_in_the_mode_they_name(self) -> None:
+        without_mode = [
+            SEPARATOR.join(
+                field
+                for field in caption(fixture.six_state_graph(mode).text).split(SEPARATOR)
+                if not field.startswith("mode: ")
+            )
+            for mode in Mode
+        ]
+        assert without_mode[0] == without_mode[1]
+
+    def test_the_two_modes_are_actually_different(self) -> None:
+        """If they were equal, the assertions above would hold for the wrong reason."""
+        assert fixture.six_state_graph(Mode.TOPOLOGY).text != (
+            fixture.six_state_graph(Mode.DECLARED_FIGURES).text
+        )
+
+    def test_the_topology_diagram_carries_no_figure_at_all(self) -> None:
+        """Over every label, not sampled -- the criterion says so in as many words."""
+        found = figure_bearing_fields(fixture.six_state_graph(Mode.TOPOLOGY).text)
+        assert not found, f"a topology diagram carries figures: {found}"
+
+    def test_no_module_but_one_spells_the_declared_figure_prefix(self) -> None:
+        """**L5.** SC-012's strip assertion is built from one constant, so there must be one.
+
+        Both renderers draw the same edge, and each once carried its own ``"declared fee "``
+        literal. Nothing bound them, so changing one silently diverged them -- and the strip
+        above, which knows only ``figures.FIGURE_FIELD``, would have quietly stopped covering
+        whatever the other renderer emitted.
+
+        The scan is over **every string constant** in the package rather than over one
+        composition shape, so it catches the literal however it is put together: an f-string,
+        ``+``, ``%``, ``.format``, or a bare assignment. That is possible because the prefix is
+        a whole word at the start of a string, and the one caption that legitimately talks
+        about declared figures is worded not to begin with it.
+
+        **What it cannot reach**, stated rather than implied: a prefix assembled from pieces
+        (``"decl" "ared "``), one built at run time, or one imported and then rebuilt. Those
+        are not the natural regression -- which is someone retyping the literal at a new call
+        site -- and no source scan short of executing the module would see them.
+        """
+        home = REPO_ROOT / "src" / "terezy" / "api" / "diagrams" / "figures.py"
+        offenders: dict[str, list[str]] = {}
+        for path in sorted(home.parent.rglob("*.py")):
+            if path == home:
+                continue
+            found = [
+                node.value
+                for node in ast.walk(ast.parse(source_scan.executable_source(path)))
+                if isinstance(node, ast.Constant)
+                and isinstance(node.value, str)
+                and node.value.startswith(figures.FIGURE_FIELD)
+            ]
+            if found:
+                offenders[path.name] = found
+        assert not offenders, (
+            f"a module spells the declared-figure prefix itself: {offenders}. It is defined "
+            "once in figures.py and imported, because the two diagram kinds draw the same edge "
+            "and must not disagree about what a declared figure is"
+        )
+
+    @pytest.mark.parametrize(
+        "planted",
+        [
+            'def f(x: float) -> str:\n    return f"{PREFIX}{x}"\n',
+            'def f(x: float) -> str:\n    return "{PREFIX}" + str(x)\n',
+            'def f(x: float) -> str:\n    return "{PREFIX}{}".format(x)\n',
+            'def f(x: float) -> str:\n    return "{PREFIX}%s" % x\n',
+            'FEE = "{PREFIX}fee "\n',
+        ],
+        ids=["f-string", "concatenation", "format", "percent", "assignment"],
+    )
+    def test_that_scan_catches_every_way_the_literal_gets_retyped(self, planted: str) -> None:
+        """A scan that cannot fail protects nothing, and one shape of failure is not enough."""
+        source = planted.replace("{PREFIX}", figures.FIGURE_FIELD)
+        assert any(
+            isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and node.value.startswith(figures.FIGURE_FIELD)
+            for node in ast.walk(ast.parse(source_scan.strip_prose(source)))
+        )
+
+    def test_that_scan_does_not_fire_on_prose_or_on_the_caption(self) -> None:
+        """Explaining the prefix is not repeating it, and the mode caption has to say the word.
+
+        The caption is worded so it does not *begin* with the prefix, which is what lets the
+        scan be a blanket rule instead of a shape-matcher with holes in it.
+        """
+        prose = f'"""A docstring about {figures.FIGURE_FIELD}fee fields."""\nX: int = 1\n'
+        assert not [
+            node
+            for node in ast.walk(ast.parse(source_scan.strip_prose(prose)))
+            if isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and node.value.startswith(figures.FIGURE_FIELD)
+        ]
+        note = graph._MODE_NOTE[Mode.DECLARED_FIGURES]
+        assert figures.FIGURE_FIELD in note
+        assert not note.startswith(figures.FIGURE_FIELD)
+
+    def test_the_with_figures_diagram_carries_declared_fees_with_their_provenance_state(
+        self,
+    ) -> None:
+        labels = fixture.labels_by_route(fixture.six_state_graph(Mode.DECLARED_FIGURES).text)
+        priced = labels[fixture.VERIFIED_ROUTE]
+        assert f"{figures.FEE_FIELD}1.50% + 12.50 UAH" in priced
+        assert "marks: " in priced, "a figure without its provenance state is half a figure"
+
+    def test_the_with_figures_diagram_carries_the_channel_premium_on_every_fx_leg(self) -> None:
+        """The figure that matters most, in the mode whose purpose is to show it.
+
+        Every fee on the fixture's converting leg is zero and the premium is the whole cost, so
+        a with-figures graph that showed only fees would draw that corridor as free -- the
+        mislabelled figure in picture form.
+        """
+        converting = fixture.labels_by_route(fixture.six_state_graph(Mode.DECLARED_FIGURES).text)[
+            fixture.UNVERIFIED_ROUTE
+        ]
+        assert (
+            f"{figures.PREMIUM_FIELD}(buy side) +3.00 UAH per USD, "
+            f"{figures.ABOVE} 42.00 UAH per USD" in converting
+        )
+
+    def test_the_basis_point_form_renders_as_basis_points_in_the_diagram(self) -> None:
+        """Asserted against the **rendered graph**, never against the formatting function.
+
+        Calling ``numbers.basis_points`` and checking its return value says nothing about what a
+        diagram contains -- the renderer could stop calling it altogether and such a test would
+        stay green. The rule itself is pinned in ``test_diagram_one_number_rule.py``; what is at
+        stake here is whether the diagram uses it.
+        """
+        labels = fixture.labels_by_route(fixture.graph_of(fixture.card_registry()).text)
+        assert f"{figures.PREMIUM_FIELD}(buy side) 150.00 bps, " in labels[fixture.CARD_IN_ROUTE]
+        assert "1.50%" not in labels[fixture.CARD_IN_ROUTE], (
+            "basis points render in the unit declared; converting them would be the renderer "
+            "deriving a figure, and it would erase which form the file actually used"
+        )
+
+    def test_a_leg_that_converts_nothing_carries_no_premium(self) -> None:
+        """A transfer has no channel and therefore no quote; inventing one would be a rate."""
+        transfers = fixture.labels_by_route(fixture.six_state_graph(Mode.DECLARED_FIGURES).text)[
+            fixture.VERIFIED_ROUTE
+        ]
+        assert figures.PREMIUM_FIELD not in transfers
+
+
+class TestTheDeclaredPremiumSaysWhichWayItIsApplied:
+    """**M1.** A quote without its direction is one label for two opposite corridors.
+
+    ``core.routes.channels`` declares two forms with **different sign conventions**:
+
+    * ``premium_per_unit`` is a *signed offset* -- both sides are ``reference + premium``, so
+      the sign carries the direction;
+    * ``markup_bps`` is a *cost magnitude* -- the engine adds it on the buy side and subtracts
+      it on the sell side, so the number carries no direction at all.
+
+    A label reading ``150.00 bps over reference 42.00 UAH per USD`` therefore described an edge
+    charging +1.5% and an edge charging -1.5% **identically**, and drew the sell side in the
+    opposite direction from what the engine charges. The direction phrase is the carrier: a
+    reader must be able to tell those two apart without knowing which side a leg takes, and
+    without holding two sign conventions in their head.
+    """
+
+    @staticmethod
+    def _card_labels() -> dict[str, str]:
+        return fixture.labels_by_route(fixture.graph_of(fixture.card_registry()).text)
+
+    def test_the_two_sides_of_one_basis_point_channel_do_not_render_identically(self) -> None:
+        """The regression, stated as the inequality it is."""
+        labels = self._card_labels()
+        buying = premium_of(labels[fixture.CARD_IN_ROUTE])
+        selling = premium_of(labels[fixture.CARD_OUT_ROUTE])
+        assert buying != selling, (
+            "both sides declare 150.0 bps and the engine applies them in opposite directions; "
+            "rendering the declared number alone draws two opposite corridors the same way"
+        )
+
+    def test_each_side_names_the_direction_the_engine_actually_applies(self) -> None:
+        """Buy adds the markup, sell subtracts it -- ``channels.effective_rate``'s own rule."""
+        labels = self._card_labels()
+        assert figures.ABOVE in labels[fixture.CARD_IN_ROUTE]
+        assert figures.BELOW in labels[fixture.CARD_OUT_ROUTE]
+        assert figures.BELOW not in labels[fixture.CARD_IN_ROUTE]
+        assert figures.ABOVE not in labels[fixture.CARD_OUT_ROUTE]
+
+    def test_the_direction_agrees_with_the_engines_effective_rate(self) -> None:
+        """Not asserted against a remembered convention: asserted against the core.
+
+        Getting the side backwards is the classic FX bug -- every number stays plausible while
+        every spread is inverted -- so the diagram's word and the engine's arithmetic are
+        compared here rather than both trusted.
+        """
+        quote = fixture.card_registry().channels["card"]
+        labels = self._card_labels()
+        for route_id, side, role in (
+            (fixture.CARD_IN_ROUTE, quote.buy_side, Side.BUY),
+            (fixture.CARD_OUT_ROUTE, quote.sell_side, Side.SELL),
+        ):
+            effective = channels.effective_rate(side, quote.reference_rate, role=role)
+            expected = figures.ABOVE if effective > quote.reference_rate else figures.BELOW
+            assert expected in labels[route_id], (route_id, effective)
+
+    def test_the_signed_premium_form_names_its_direction_too(self) -> None:
+        """The safe form is labelled the same way, so a reader learns one convention."""
+        labels = fixture.labels_by_route(fixture.six_state_graph(Mode.DECLARED_FIGURES).text)
+        assert figures.ABOVE in labels[fixture.UNVERIFIED_ROUTE]
+        assert "+3.00 UAH per USD" in labels[fixture.UNVERIFIED_ROUTE]
+
+    def test_the_side_taken_is_named_as_well_as_the_direction(self) -> None:
+        labels = self._card_labels()
+        assert "(buy side)" in labels[fixture.CARD_IN_ROUTE]
+        assert "(sell side)" in labels[fixture.CARD_OUT_ROUTE]
+
+    def test_a_channel_at_its_reference_says_so_rather_than_claiming_a_direction(self) -> None:
+        """A zero premium is a legal declaration meaning the channel trades at its reference.
+
+        Reporting it as "above" would invent a cost out of a number that declares there is
+        none; reporting it as "below" would invent a discount. There is a third phrase for the
+        third case, and it is the honest one.
+        """
+        registry = fixture.card_registry()
+        at_reference = replace(
+            registry.channels["card"],
+            buy_side=fixture.side(premium=0.0, source_id="card:buy:flat", kind=fixture.SLOW_KIND),
+            sell_side=fixture.side(premium=0.0, source_id="card:sell:flat", kind=fixture.SLOW_KIND),
+        )
+        flat = fixture.Registry(
+            venues=registry.venues,
+            routes=registry.routes,
+            channels={"card": at_reference},
+            regime=registry.regime,
+            kinds=registry.kinds,
+        )
+        labels = fixture.labels_by_route(fixture.graph_of(flat).text)
+        for route_id in (fixture.CARD_IN_ROUTE, fixture.CARD_OUT_ROUTE):
+            assert figures.AT in labels[route_id]
+            assert "+0.00 UAH per USD" in labels[route_id]
+            assert figures.ABOVE not in labels[route_id]
+            assert figures.BELOW not in labels[route_id]
+
+    def test_the_three_direction_phrases_are_pairwise_distinct(self) -> None:
+        """``AT`` is a real case: a zero premium means the channel trades at its reference."""
+        phrases = (figures.ABOVE, figures.BELOW, figures.AT)
+        assert len(set(phrases)) == 3
+        for phrase in phrases:
+            assert not any(phrase in other for other in phrases if other != phrase)
+
+
+class TestNoComputedRampCostReachesARegistryGraph:
+    """FR-006's prohibition, in the mode where it would look like it belonged."""
+
+    def test_every_figure_on_the_graph_is_a_declared_leg_fee(self) -> None:
+        """A computed ramp cost would have to appear as a figure, and every figure is a fee.
+
+        Checked over every label in both modes. A cost is per
+        ``(destination x stream x route)``; a registry graph names no such triple, so a
+        number here could only be a figure keyed by nothing.
+        """
+        for mode in Mode:
+            for field in figure_bearing_fields(fixture.six_state_graph(mode).text):
+                assert field.startswith(figures.FIGURE_FIELD), (
+                    f"{mode.value} carries a figure that is not a declared leg fee: {field!r}"
+                )
+
+    def test_the_registry_renderer_cannot_cost_anything(self) -> None:
+        """It imports no costing function, so there is nothing for a figure to come from.
+
+        Prose is stripped first: this module's own docstring names ``cost`` repeatedly, and
+        so does the renderer's, which explains at length why no cost may appear.
+        """
+        behaviour = source_scan.executable_source(GRAPH_MODULE)
+        for costing in ("routes.cost", "routes.ranking", "cost_one", "rank(", "results.ramp"):
+            assert costing not in behaviour, f"the registry renderer reaches for {costing}"
+
+    def test_the_registry_renderer_does_not_read_the_coverage_audit(self) -> None:
+        """research.md D6: the *no exit declared* mark is computed from the declarations.
+
+        Reading feature 003's report would make a picture depend on an audit, couple two
+        features that landed separately, and put an advisory verdict on a diagram that 003
+        says must drive nothing.
+        """
+        assert "coverage" not in source_scan.executable_source(GRAPH_MODULE)
+
+    def test_the_scan_would_notice_the_import_it_forbids(self) -> None:
+        """A scan that cannot fail protects nothing."""
+        planted = "from terezy.core.routes import coverage\n\n\nX: int = 1\n"
+        assert "coverage" in source_scan.strip_prose(planted)
+
+
+class TestEveryDiagramNamesExactlyOneRegime:
+    """SC-009 and FR-019: a merged graph existing under no regime is not producible."""
+
+    @pytest.mark.parametrize("mode", list(Mode))
+    def test_the_regime_is_named_on_the_diagram_itself(self, mode: Mode) -> None:
+        rendered = fixture.six_state_graph(mode)
+        assert isinstance(rendered, Diagram)
+        assert f"regime: {fixture.REGIME_ID}" in caption(rendered.text)
+        assert rendered.regime_id == fixture.REGIME_ID
+
+    @pytest.mark.parametrize("mode", list(Mode))
+    def test_the_mode_is_named_on_the_diagram_itself(self, mode: Mode) -> None:
+        assert f"mode: {mode.value}" in caption(fixture.six_state_graph(mode).text)
+
+    def test_a_numberless_diagram_says_why_it_has_no_numbers(self) -> None:
+        """ "No figures shown" is a different claim from "the fees are zero"."""
+        assert "an absent number is not a zero" in caption(
+            fixture.six_state_graph(Mode.TOPOLOGY).text
+        )
+
+    def test_no_argument_list_expresses_a_graph_of_every_route_at_once(self) -> None:
+        """The strongest reading of "must not be producible" is a required parameter.
+
+        A runtime check can be bypassed by the next caller who has a reason; a parameter with
+        no default, no sentinel and no overload cannot be.
+        """
+        regime = inspect.signature(render_graph).parameters["regime"]
+        assert regime.default is inspect.Parameter.empty
+        assert regime.kind is inspect.Parameter.KEYWORD_ONLY
+
+    def test_only_the_regimes_routes_are_drawn(self) -> None:
+        """A route the regime excludes exists as a declaration and not under this belief."""
+        registry = fixture.six_state_registry()
+        narrowed = fixture.Registry(
+            venues=registry.venues,
+            routes=registry.routes,
+            channels=registry.channels,
+            regime=type(registry.regime)(
+                id="narrow", route_ids=frozenset({fixture.VERIFIED_ROUTE})
+            ),
+            kinds=registry.kinds,
+        )
+        labels = fixture.labels_by_route(fixture.graph_of(narrowed).text)
+        assert set(labels) == {fixture.VERIFIED_ROUTE}
+
+
+class TestDeterminismHoldsPerMode:
+    """FR-016 applies *per mode*: same declarations and same mode, same bytes."""
+
+    @pytest.mark.parametrize("mode", list(Mode))
+    def test_two_renders_of_the_same_registry_agree_byte_for_byte(self, mode: Mode) -> None:
+        assert fixture.six_state_graph(mode).text == fixture.six_state_graph(mode).text
+
+    @pytest.mark.parametrize("mode", list(Mode))
+    def test_the_mode_record_travels_with_the_text(self, mode: Mode) -> None:
+        rendered = fixture.six_state_graph(mode)
+        assert isinstance(rendered, Diagram)
+        assert rendered.mode is mode
+        assert rendered.kind == "route_graph"
