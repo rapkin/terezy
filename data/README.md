@@ -16,6 +16,8 @@ Everything here is versioned, sourced, dated, and reviewed in git like code
 | `streams/` | **Per-owner** income streams: currency, amount, cadence, arrival venue, indexation (spec §4.2). |
 | `spendable/` | **Per-owner** endpoints where money counts as having come back out: base currency only, at the venues the owner actually spends from (003 FR-004). |
 | `composition/` | **Per-owner** reach policy: how many declared routes may be chained into one candidate. No default — a missing bound fails at load (004 FR-006). |
+| `seeds/` | **Per-owner** opening lots: what is already held, as units acquired on a date at a price, with the basis declared `known` or `estimated` (008 §4.8). |
+| `goals/` | **Per-owner** targets: any two of a monthly contribution, a target sum and a target date, in the base currency (008 §4.7). |
 | `tax/` | Jurisdiction rule packs with dated rate schedules (spec §4.5). |
 | `scenarios/` | FX paths, discrete events, regime transitions, risk assumptions (spec §4.3.4, §4.6). |
 | `strategies/` | Named allocations, per income stream (spec §5.1). |
@@ -50,9 +52,13 @@ the whole repository refers to:
    would be worse than either.
 4. **No legal value from memory.** Tax and legal values come from a cited public
    source, entered as data. Not from an implementer, and not from an agent.
-5. **Curated vs per-user.** Everything in this directory is curated and shared.
-   Per-user data — holdings, goals, assumptions, results — lives outside it and is
-   gitignored (`data/user/`). Principle VII depends on that boundary.
+5. **Curated vs per-owner.** Most of this directory is curated and shared — instruments,
+   routes, channels, tax packs, venues: public facts about the world. The per-owner
+   directories (`streams/`, `spendable/`, `composition/`, `seeds/`, `goals/`) hold one
+   person's declarations and are committed on the same footing, because the boundary
+   Principle VII draws is *curated versus per-owner*, not *committed versus not*. What stays
+   outside and gitignored is what a **run produces** rather than what a person declares:
+   results, caches and anything under `data/user/`.
 
 ## Assumptions are not observations
 
@@ -93,14 +99,32 @@ threshold, because a forgotten line must never read as a chosen policy. `max_seg
 explicit way to switch composition off and is a legal choice; `0` admits nothing at all and is
 refused as a broken registry.
 
+`seeds/` and `goals/` carry the **same exemption, and they are the sharpest case for it**.
+What the owner paid for a lot and what sum he is aiming at are his own records: an acquisition
+cost is a fact about a transaction he made, and a target is a decision. Neither is an
+observation of the world, so there is nothing for a source to vouch for. Where a cost is
+genuinely forgotten the answer is **not** an uncited number quietly accepted — the lot declares
+`basis = "estimated"` with the owner's reason, and that estimate marks the disposal's gain and
+the tax charged on it, everywhere they appear. A mark is what an unverifiable number gets in
+place of a citation. If a *market value* ever has to live in either directory it moves to a
+sourced one rather than the exemption widening; the growth assumption a goal is evaluated
+against is deliberately not declared in the goal file for the same reason (008 FR-012).
+
 The two lists are **exhaustive, and the gate is fail-closed**: every directory under
 `data/` is either scanned or exempted *by name with its reason* in the script, files at
 the data root (`venues.toml`) are scanned too, and a directory the script does not know
 is an error — never a blind spot. A gate that passes over what it never looked at would
 be fail-open in the one script whose job is the opposite.
 
-Per-owner data being *inside* `data/` is a narrower claim than it looks: `streams/`
-holds one committed, reviewed declaration of where money lands and in what currency,
-with its amounts at `0.0` because the real figures have not been stated (§11 item 3).
-Holdings, goals, results and anything else describing what the owner actually did stay
-outside this directory and gitignored, which is the boundary rule 5 above is about.
+Per-owner data being *inside* `data/` is a narrower claim than it looks, and feature 008
+widened it deliberately. `streams/` holds one committed, reviewed declaration of where money
+lands and in what currency, with its amounts at `0.0` because the real figures have not been
+stated (§11 item 3) — and `seeds/` and `goals/` now hold the owner's holdings and targets on
+the same footing, as labelled synthetic fixtures until his real figures arrive. The boundary
+that matters is **curated versus per-owner**, not committed versus not: a salary is at least as
+private as a holding and has been committed since feature 002, and this repository is designed
+to hold one person's complete financial picture under version control (008 research.md D2).
+
+`user/` stays gitignored and outside every gate: computed results, caches, and anything a run
+writes rather than a person declares. That is the part rule 5 above is about — what the owner
+*declares* is reviewed in git like code, and what the tool *produces* is not.

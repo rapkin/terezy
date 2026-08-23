@@ -261,12 +261,12 @@ feasibility union and the refusals) still lands with the solver in Phase 6.
 
 ## Phase 9: Polish & cross-cutting
 
-- [ ] T037 [P] `docs/METHODOLOGY.md`: what a seed lot is and why it needs a cost rather than a value;
+- [x] T037 [P] `docs/METHODOLOGY.md`: what a seed lot is and why it needs a cost rather than a value;
       what an estimated basis marks and how far the mark travels; the solver's three modes with their
       stated conventions and the formula; why the feasibility verdict is not a probability
-- [ ] T038 [P] `docs/REQUIRED_TESTS.md`: flip **J1** and **J2** with their test paths recorded, and
+- [x] T038 [P] `docs/REQUIRED_TESTS.md`: flip **J1** and **J2** with their test paths recorded, and
       note under "Rows a feature reinforced without closing" that C1–C3 now run over seeded ledgers
-- [ ] T039 [P] `data/README.md`: the two new per-owner directories and their exemption
+- [x] T039 [P] `data/README.md`: the two new per-owner directories and their exemption
 - [x] T040 Flip `008-seed-and-goals` to `status = "in-progress"` in `specs/features.toml` (with the
       first implementation commit; **not** to `done`)
 - [ ] T041 Run every gate from the worktree and record the numbers for the final report:

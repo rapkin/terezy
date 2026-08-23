@@ -80,8 +80,10 @@ EXEMPT_DIRS: dict[str, str] = {
         "attached to a venue lives on a leg, in data/routes/, cited (003 research.md D4)"
     ),
     "user": (
-        "gitignored per-user data -- holdings, goals, results. Never curated, never "
-        "committed, and outside this gate by the Principle VII boundary"
+        "gitignored per-user data -- what a *run produces* rather than what a person declares: "
+        "results, caches, scratch output. Never curated, never committed, and outside this gate "
+        "by the Principle VII boundary. The owner's own declarations are committed and live in "
+        "the per-owner directories above (008 research.md D2)"
     ),
     # --- feature 008: the owner's own holdings and targets ---
     "seeds": (

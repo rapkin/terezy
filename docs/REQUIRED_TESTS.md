@@ -153,8 +153,8 @@ Compliance tests for Principle II. May not be skipped without an amendment.
 
 | # | Example | Test |
 |---|---|---|
-| J1 | The three goal modes are mutually consistent: solving for date from (contribution, sum) and then for sum from (contribution, that date) returns the original sum. | `[ ]` |
-| J2 | A seed lot with a known basis produces the hand-computed gain on disposal; a basis-estimated seed marks every downstream tax figure. | `[ ]` |
+| J1 | The three goal modes are mutually consistent: solving for date from (contribution, sum) and then for sum from (contribution, that date) returns the original sum. | `[x]` `tests/invariants/test_goal_mode_consistency.py`, `tests/worked_examples/test_goal_arithmetic.py` |
+| J2 | A seed lot with a known basis produces the hand-computed gain on disposal; a basis-estimated seed marks every downstream tax figure. | `[x]` `tests/worked_examples/test_seeded_disposal.py`, `tests/contract/test_estimated_basis_propagates.py` |
 | J3 | Redemption outside an Inzhur window is refused, or executed at the stated haircut when allowed — taxed correctly either way. | `[ ]` |
 | J4 | A lock-up longer than the horizon is a feasibility error, not a silent simulation. | `[ ]` |
 | J5 | Correlated stress hits OVDP, Inzhur and UAH simultaneously, never as independent draws. | `[ ]` |
@@ -198,6 +198,15 @@ on directly, and one it reinforces along the way:
 | **G6** | Pressed on from the other side. A composed round trip exists **only** through a chain of declared exit routes (FR-012, owner decision 2026-08-22) or where the destination is itself spendable; where nothing chains, *exit cost unknown* stands, the candidate stays out of the round-trip ranking, and its one-way figure is not promoted — both directions verified in `tests/worked_examples/test_composed_exit_chain.py`. `tests/contract/test_composed_distinct.py` pins the correspondence: `RampCost.exit_path` is `None` exactly when the round trip is unknown. |
 | **H1** | The row's claim applied to composition, and the closest any feature has come to it: `tests/contract/test_composed_data_only.py` adds **one** `Route` declaration, gets a three-segment candidate that is fully costed and ranked, and asserts that no module under `core/` mentions the new venue or route at all. The box stays open because H1 asks for an instrument, a route, a tax class and a jurisdiction through the **full pipeline**, which is feature 010's scope. |
 | **B10** | Exercised again: `CompositionRefused` is a typed statement that a question could not be asked — a bound admitting nothing, an exit chain with nowhere declared to end — and it is a *different type* from an empty enumeration, which is the legitimate answer "nothing connects". `tests/invariants/test_composition_search.py` asserts both, because a caller who counts rows cannot tell them apart. |
+
+**008-seed-and-goals** closes **J1** and **J2** above. Four rows it reinforces without closing:
+
+| Row | How, and why the box does not move |
+|---|---|
+| **C1–C3** | The conservation properties now draw ledgers that **open from declared seed lots** as well as unseeded ones, and **not one of the properties changed** to accommodate them — which is the executable form of the feature's central claim that a seed is an ordinary ledger citizen. `tests/invariants/seeded_streams.py` builds them through `seeds.opening_events` rather than by hand, so the invariants cover the events the engine actually produces. The rows were already flipped by 001; this widens their inputs. |
+| **E5** | Pressed on from a new direction: the propagating mark now describes the *owner's own memory* rather than only a market observation, and it reaches the tax through the transforms that already existed rather than through a second system. `tests/contract/test_estimated_basis_propagates.py` sweeps every money field of `TaxCharge` from the dataclass, so a field added later is inside the 100% claim. The row's own test stays `tests/contract/test_provenance_propagation.py`. |
+| **B10** | Exercised again, and deliberately in the opposite direction from 003: no seeds and no goals is an **ordinary run**, not a typed empty outcome, because an absent holding cannot be mistaken for a mistyped path. `tests/contract/test_empty_seeds_and_goals.py`. The row is about insufficient data anywhere in the engine, so one feature's rule about emptiness does not close it. |
+| **H2** | Two new declarations fail at load naming file and field for every refusal in their contract, on the existing loader path: `tests/contract/test_seed_declaration_loading.py`, `tests/contract/test_goal_declaration_loading.py`. The row's own test stays `tests/contract/test_declaration_loading.py`. |
 
 ---
 
