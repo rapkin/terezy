@@ -102,8 +102,9 @@ class TestTheRatesComeFromTheClass:
         # them, for the same reason currency tagging does.
         charge = _charge(synthetic.TAXED_CLASS)
         assert isinstance(charge, TaxCharge)
-        assert is_close(charge.pit.amount, BASE.amount * synthetic.TAXED_CLASS.pit_rate)
-        assert is_close(charge.levy.amount, BASE.amount * synthetic.TAXED_CLASS.levy_rate)
+        applied = synthetic.TAXED_CLASS.rates[0]
+        assert is_close(charge.pit.amount, BASE.amount * applied.pit_rate)
+        assert is_close(charge.levy.amount, BASE.amount * applied.levy_rate)
         assert charge.pit.amount != charge.levy.amount
 
     def test_the_charge_records_the_event_it_was_charged_on(self) -> None:
@@ -148,9 +149,7 @@ class TestRefusal:
         narrow = TaxClass(
             id="coupons_only",
             applies_to=frozenset({TaxableEventKind.COUPON}),
-            pit_rate=0.18,
-            levy_rate=0.015,
-            provenance=prov.of([synthetic.TAXED_SOURCE]),
+            rates=synthetic.rates(0.18, 0.015),
         )
         outcome = _charge(narrow, kind=TaxableEventKind.DISPOSAL_GAIN)
         assert isinstance(outcome, UnresolvedTaxClass)
@@ -273,9 +272,7 @@ class TestConversionTaxabilityIsDeclaredNotHardcoded:
     CONVERSION_CLASS = TaxClass(
         id="synthetic_conversion_taxed",
         applies_to=frozenset({TaxableEventKind.CONVERSION}),
-        pit_rate=0.18,
-        levy_rate=0.05,
-        provenance=synthetic.TAXED_CLASS.provenance,
+        rates=synthetic.rates(0.18, 0.05),
     )
     """Invented rates, NOT a claim about any law: they exist to prove the engine charges
     whatever the declaration says, so the real interpretations can land later as data."""
@@ -302,7 +299,7 @@ class TestConversionTaxabilityIsDeclaredNotHardcoded:
         (charge,) = charged
         assert charge.event_sequence == self.RAMP_EVENT.sequence
         assert charge.tax_class_id == self.CONVERSION_CLASS.id
-        assert charge.provenance.sources >= self.CONVERSION_CLASS.provenance.sources
+        assert charge.provenance.sources >= synthetic.rate_provenance(self.CONVERSION_CLASS).sources
         assert is_close(charge.total.amount, 10_000.0 * (0.18 + 0.05))
 
     def test_a_kind_no_declared_class_applies_to_is_not_applicable(self) -> None:

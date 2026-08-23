@@ -14,6 +14,13 @@
 # 30/360 makes every quarter exactly 0.25 of a year, so each coupon is
 # 1000 x 0.1225 x 0.25 = 30.625 per unit -- deliberately chosen so the difference from
 # issue A's day count is visible in arithmetic a reader can do in their head.
+#
+# The issue and maturity dates moved four months later in feature 006, when tax rates
+# became dated schedules: the exempt class's cited effective date is 2026-06-30, and this
+# fixture's first coupon fell before it, so every projection of it was correctly refused
+# (FR-012). An INVENTED date was moved; the cited legal date was not, and never may be.
+# 30/360 quarters are exactly 0.25 of a year whatever the calendar says, so not one
+# hand-computed figure below or in the tests that read this file changed.
 
 [instrument]
 id           = "ovdp_synthetic_b"
@@ -25,8 +32,8 @@ is_synthetic = true
 [instrument.terms]
 face_value        = 1000.0
 coupon_rate_pct   = 12.25
-issue_date        = "2026-03-02"
-maturity_date     = "2029-03-02"
+issue_date        = "2026-07-02"
+maturity_date     = "2029-07-02"
 periodicity       = "quarterly"
 day_count         = "30/360"
 business_day_rule = "modified_following"

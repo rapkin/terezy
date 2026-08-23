@@ -93,6 +93,7 @@ from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.provenance import Provenance
 from terezy.core.results import canonical
 from terezy.core.results.project import Projection
+from terezy.core.tax.interface import TaxClass
 from terezy.data.declarations.errors import DeclarationError
 from terezy.data.declarations.resolver import Declarations
 
@@ -318,11 +319,22 @@ def input_refs(declarations: Declarations) -> tuple[InputRef, ...]:
             id=identifier,
             file=file_name(declarations.tax_class_files[identifier]),
             version=file_version(declarations.tax_class_files[identifier]),
-            unverified_sources=_unverified_ids(declared.provenance),
+            unverified_sources=_unverified_ids(_tax_class_provenance(declared)),
         )
         for identifier, declared in declarations.tax_classes.items()
     ]
     return tuple(sorted([*instruments, *tax_classes], key=lambda ref: (ref.kind, ref.id)))
+
+
+def _tax_class_provenance(declared: TaxClass) -> Provenance:
+    """Every source behind one tax class: the citation of each dated rate entry.
+
+    ⚙ Feature 006 moved the citation from the class to its entries, because two rates
+    cited by two sources are two observations. A manifest that recorded only the entry in
+    force today would call the class verified while an earlier, still-reachable entry was
+    not -- so the union is taken over the whole schedule.
+    """
+    return prov.merge_all(entry.provenance for entry in declared.rates)
 
 
 def _instrument_provenance(declaration: InstrumentDeclaration) -> Provenance:

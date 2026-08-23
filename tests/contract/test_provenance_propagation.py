@@ -89,7 +89,7 @@ Asserted literally, because the *shape* of the id is what makes a marked figure 
 back to the line of the file that declared it rather than only to a URL.
 """
 
-LOADED_EXEMPTION_SOURCE_ID = "tax/ua.toml#jurisdiction.tax_class[ua_government_bond]"
+LOADED_EXEMPTION_SOURCE_ID = "tax/ua.toml#jurisdiction.tax_class[ua_government_bond].rate[0]"
 """The loader's id for the exemption -- the zero whose citation matters most."""
 
 
@@ -121,9 +121,10 @@ def _from_code(*, verified: bool) -> Projection:
     exempt_class = TaxClass(
         id=synthetic.EXEMPT_CLASS.id,
         applies_to=synthetic.EXEMPT_CLASS.applies_to,
-        pit_rate=synthetic.EXEMPT_CLASS.pit_rate,
-        levy_rate=synthetic.EXEMPT_CLASS.levy_rate,
-        provenance=exemption_provenance,
+        rates=tuple(
+            replace(entry, provenance=exemption_provenance)
+            for entry in synthetic.EXEMPT_CLASS.rates
+        ),
     )
     declaration: InstrumentDeclaration = synthetic.declaration(
         terms=terms,

@@ -74,6 +74,7 @@ from terezy.core.scenarios.regimes import Regime, RegimeTransition
 from terezy.core.streams import streams
 from terezy.core.streams.streams import IncomeStream, Indexation
 from terezy.core.tax.interface import TaxableEventKind, TaxClass
+from terezy.core.tax.schedule import RateEntry
 from terezy.data.declarations import schema
 from terezy.data.declarations.errors import DeclarationError
 
@@ -628,43 +629,121 @@ def _tax_class(path: Path, entry: schema.TaxClassTable) -> TaxClass:
             "make it look as though it were.",
             "list the income kinds this class governs",
         )
-    sources = prov.of(
-        [
-            _source_ref(
-                path,
-                field_prefix,
-                source=entry.source,
-                retrieved_on=entry.retrieved_on,
-                verified_on=entry.verified_on,
-                kind=entry.kind,
-            )
-        ]
-    )
     return TaxClass(
         id=class_id,
         applies_to=frozenset(
             _taxable_kind(path, f"{field_prefix}.applies_to", kind) for kind in entry.applies_to
         ),
-        pit_rate=_as_fraction(
-            _non_negative(
-                path,
-                f"{field_prefix}.pit_rate_pct",
-                entry.pit_rate_pct,
-                "a negative rate would be a refund rather than a charge, which is not "
-                "what this rule models",
-            )
-        ),
-        levy_rate=_as_fraction(
-            _non_negative(
-                path,
-                f"{field_prefix}.levy_rate_pct",
-                entry.levy_rate_pct,
-                "a negative rate would be a refund rather than a charge, which is not "
-                "what this rule models",
-            )
-        ),
-        provenance=sources,
+        rates=_rate_schedule(path, entry.rate, field_prefix=field_prefix),
     )
+
+
+def _rate_schedule(
+    path: Path,
+    declared: list[schema.RateEntryTable],
+    *,
+    field_prefix: str,
+) -> tuple[RateEntry, ...]:
+    """``[[jurisdiction.tax_class.rate]]`` as the core's dated schedule, validated here.
+
+    Four checks, all at load because all four need the file's name to be actionable
+    (contracts/tax-schedule.md, loader validation table):
+
+    * **empty** -- a class with no rate cannot charge anything, and a silent zero is the
+      worst possible reading of that;
+    * **duplicate effective date** -- two rates in force at once has no meaning, so one of
+      them is a typo;
+    * **out of order** -- the schedule is left in file order rather than sorted, so that
+      the file reads as what it means and the fold is a plain scan. Sorting silently would
+      make the file's order a thing nobody has to get right, and a reviewer scanning a
+      misordered schedule would read the wrong rate as current;
+    * **negative rate** -- a refund, which this rule does not model.
+
+    The order check is the one worth being deliberate about. Sorting here was the obvious
+    alternative and it is refused: a schedule whose written order disagrees with its
+    effective order is a file a human misreads, and the load-time error is what stops that
+    file existing at all.
+    """
+    if not declared:
+        raise DeclarationError(
+            path,
+            f"{field_prefix}.rate",
+            "declares no dated rate entry, so the class can charge nothing at all. An "
+            "empty schedule is reported rather than read as an exemption: 'no rate is "
+            "declared' and 'the declared rate is zero' are opposite claims, and only the "
+            "second one has a citation behind it.",
+            "declare at least one [[jurisdiction.tax_class.rate]] with its effective_from",
+        )
+    entries: list[RateEntry] = []
+    for index, table in enumerate(declared):
+        entry_prefix = f"{field_prefix}.rate[{index}]"
+        effective_from = _parse_date(path, f"{entry_prefix}.effective_from", table.effective_from)
+        _require_text(
+            path,
+            f"{entry_prefix}.note",
+            table.note,
+            "a dated entry states in words what its citation attests about the rate and "
+            "about the date it came into force -- the date is the field a reviewer most "
+            "needs prose for, because the rate can be checked at a glance and the date "
+            "usually cannot",
+        )
+        if entries and effective_from == entries[-1].effective_from:
+            raise DeclarationError(
+                path,
+                f"{entry_prefix}.effective_from",
+                f"repeats {effective_from.isoformat()}, which the previous entry already "
+                "declares. Two rates in force on one date has no meaning, and neither "
+                "entry is preferred: whichever the lookup reached first would win by "
+                "accident of file order.",
+                "correct one of the two dates, or delete the entry that is a duplicate",
+            )
+        if entries and effective_from < entries[-1].effective_from:
+            raise DeclarationError(
+                path,
+                f"{entry_prefix}.effective_from",
+                f"is {effective_from.isoformat()}, before the previous entry's "
+                f"{entries[-1].effective_from.isoformat()}. The schedule is read in the "
+                "order it is written and is not silently sorted: a file whose order "
+                "disagrees with its dates is one a human misreads, and reordering it here "
+                "would make that file loadable.",
+                "write the entries oldest first",
+            )
+        entries.append(
+            RateEntry(
+                effective_from=effective_from,
+                pit_rate=_as_fraction(
+                    _non_negative(
+                        path,
+                        f"{entry_prefix}.pit_rate_pct",
+                        table.pit_rate_pct,
+                        "a negative rate would be a refund rather than a charge, which is "
+                        "not what this rule models",
+                    )
+                ),
+                levy_rate=_as_fraction(
+                    _non_negative(
+                        path,
+                        f"{entry_prefix}.levy_rate_pct",
+                        table.levy_rate_pct,
+                        "a negative rate would be a refund rather than a charge, which is "
+                        "not what this rule models",
+                    )
+                ),
+                provenance=prov.of(
+                    [
+                        _source_ref(
+                            path,
+                            entry_prefix,
+                            source=table.source,
+                            retrieved_on=table.retrieved_on,
+                            verified_on=table.verified_on,
+                            kind=table.kind,
+                        )
+                    ]
+                ),
+            )
+        )
+    return tuple(entries)
 
 
 def tax_classes_from_file(path: Path) -> tuple[TaxClass, ...]:

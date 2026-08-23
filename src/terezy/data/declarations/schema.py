@@ -232,8 +232,13 @@ class InstrumentFile(BaseModel):
     place."""
 
 
-class TaxClassTable(BaseModel):
-    """One ``[[jurisdiction.tax_class]]`` entry: a declared tax treatment.
+class RateEntryTable(BaseModel):
+    """One ``[[jurisdiction.tax_class.rate]]`` entry: the rates in force from a date.
+
+    ⚙ **Feature 006 moved the rates out of the class table and into these entries**, so a
+    legislated change is one entry added to a file rather than a rebuild (`data/README.md`
+    rule 3, ``SIMULATOR_SPEC.md`` §4.5.1, required test E10). The scalar pair the class
+    used to carry is gone rather than deprecated (research.md D1).
 
     Every numeric field here is an observed legal value, so the citation keys are not
     optional -- **including for a rate of zero**. The exemption is the single most
@@ -243,12 +248,16 @@ class TaxClassTable(BaseModel):
 
     model_config = STRICT
 
-    id: str
-    """Unique across every tax file."""
+    effective_from: str
+    """ISO date this entry comes into force, inclusive.
 
-    applies_to: list[str]
-    """Which income kinds this class governs. Non-empty; resolved against the core's
-    closed ``TaxableEventKind`` by the loader."""
+    **A cited legal fact, and the sharpest trap in the tax data.** It must be exactly the
+    date this entry's citation attests. Where a source establishes the current rate but
+    not the date the previous one began, no earlier entry is invented: the schedule starts
+    at the attested date, and an event before it is a typed refusal rather than a
+    defaulted rate (research.md D2, FR-012). Back-dating an entry so that "everything just
+    works" would put an invented legal fact in this file while every gate stayed green.
+    """
 
     pit_rate_pct: float
     """Personal income tax as a **percentage** of the taxable base. ``0.0`` for an
@@ -260,28 +269,18 @@ class TaxClassTable(BaseModel):
     withholding creditable against one and not the other unrepresentable."""
 
     note: str
-    """Plain-language statement of what this class claims and what it does not.
+    """What this entry claims, and **what its citation says about the date**.
 
-    Required, not optional. Every tax figure links to its rule, its source and its
-    verification date (constitution, *Documentation is part of the feature*), and the
-    note is where the rule is stated in words a reader can check the citation against.
+    Required per entry rather than only per class, because the effective date is the field
+    a reviewer most needs prose for: the rate can be checked against the source in a
+    glance, and the date it came into force usually cannot.
     """
 
     kind: str
     """An ``ObservationKind`` id -- which staleness threshold these values age under.
 
-    ⚙ **Added by feature 002 as a migration**, and required rather than optional: FR-028
-    says the threshold is per kind of value with no permissive default, so a sourced table
-    that names no kind is a table whose values could never be reported stale. Every
-    declaration in the project gained the field in one change, because a half-applied
-    requirement makes ``scripts/check_provenance.py`` red for every file that has not caught
-    up yet.
-
-    Resolved against ``data/observation_kinds.toml`` by ``check_provenance.py`` rather than
-    by the loader: the feature-001 core records this table becomes -- ``BondTerms``,
-    ``InstrumentConstraints``, ``TaxClass`` -- have no field to carry a kind, because their
-    staleness verdict is a later feature's, so a kind resolved here would be a value the
-    engine reads nowhere. The gate is blocking, so the check is enforced either way.
+    Per entry, like the citation: the entry in force before a legislated change and the
+    one after it are two observations, and they may age differently.
     """
 
     source: str
@@ -289,6 +288,41 @@ class TaxClassTable(BaseModel):
     retrieved_on: str
 
     verified_on: str
+
+
+class TaxClassTable(BaseModel):
+    """One ``[[jurisdiction.tax_class]]`` entry: a declared tax treatment.
+
+    Carries no rate and no citation of its own. Both live on the dated entries below,
+    because two rates cited by two sources are two observations with two verification
+    dates, and one mark for both would let a checked figure vouch for an unchecked one
+    (research.md D1).
+    """
+
+    model_config = STRICT
+
+    id: str
+    """Unique across every tax file."""
+
+    applies_to: list[str]
+    """Which income kinds this class governs. Non-empty; resolved against the core's
+    closed ``TaxableEventKind`` by the loader."""
+
+    note: str
+    """Plain-language statement of what this class claims and what it does not.
+
+    Required, not optional. Every tax figure links to its rule, its source and its
+    verification date (constitution, *Documentation is part of the feature*), and the
+    note is where the rule is stated in words a reader can check the citation against.
+    """
+
+    rate: list[RateEntryTable]
+    """``[[jurisdiction.tax_class.rate]]`` -- the dated schedule, in effective-date order.
+
+    Non-empty, strictly increasing and non-duplicated: all three are checked by the
+    loader, where the file and the field can be named. A class with no entry cannot charge
+    anything, and a silent zero is the worst available reading of that.
+    """
 
 
 class JurisdictionTable(BaseModel):

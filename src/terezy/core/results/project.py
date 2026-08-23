@@ -74,6 +74,7 @@ from terezy.core.results.hurdle import CashFlow, HurdleRate
 from terezy.core.results.schedule import CashFlowSchedule, ConventionsApplied
 from terezy.core.tax import registry as tax_registry
 from terezy.core.tax.interface import TaxableEventKind, TaxCharge, TaxClass, TaxContext
+from terezy.core.tax.schedule import RateUndeclaredBefore
 
 
 @dataclass(frozen=True, slots=True)
@@ -142,7 +143,7 @@ def project(
     )
 
     charged = _charge_every_taxable_event(declaration, gross_state, tax_classes)
-    if isinstance(charged, UnresolvedTaxClass):
+    if isinstance(charged, UnresolvedTaxClass | RateUndeclaredBefore):
         return charged
 
     combined, charges, taxed_by = _interleave(gross_state, charged)
@@ -244,7 +245,7 @@ def _charge_every_taxable_event(
     declaration: InstrumentDeclaration,
     state: LedgerState,
     tax_classes: Mapping[str, TaxClass],
-) -> tuple[TaxCharge, ...] | UnresolvedTaxClass:
+) -> tuple[TaxCharge, ...] | TaxFailure:
     """One charge per taxable event, keyed later by the event it was charged on.
 
     Every taxable event gets a charge, including one whose base is zero and one whose rate
@@ -301,7 +302,11 @@ def _charge_every_taxable_event(
             ),
         )
         match outcome:
-            case UnresolvedTaxClass():
+            case UnresolvedTaxClass() | RateUndeclaredBefore():
+                # ⚙ feature 006: a class can exist, cover the kind, and still have no
+                # rate in force on the event's date. Returned rather than skipped -- an
+                # uncharged event is indistinguishable from an exempt one in the ledger,
+                # and the whole point of FR-012 is that the two are opposite claims.
                 return outcome
             case TaxCharge():
                 charges.append(outcome)

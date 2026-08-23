@@ -31,8 +31,8 @@ canonical_encoding terezy-canonical-v2
 == inputs ==
 
 instrument ovdp_synthetic_a     instruments/ovdp_synthetic_a.toml        sha256:6d6fcafc9e3da360c2f2c523704b488065f253c2db5fce362b3ad72cd6b5e49e
-instrument ovdp_synthetic_b     instruments/ovdp_synthetic_b.toml        sha256:3293c9bd0a9429223cd095c27585cb5ac9da3ba07d519be1d7f2fd69341fae7f
-tax_class  ua_government_bond   tax/ua.toml                              sha256:5806064ee33fa590756f31e6a07eea88a1c12ef04434426a527864a0a5bc7b77
+instrument ovdp_synthetic_b     instruments/ovdp_synthetic_b.toml        sha256:c906f76746926972f62546671cef91da0eb031567b9ad890ab06098fa5db736d
+tax_class  ua_government_bond   tax/ua.toml                              sha256:b089dcbe2a9bb42d4f295c5ff7feb7fa2356555bd9284193b1f462d4f0306a9d
 
 == figures ==
 

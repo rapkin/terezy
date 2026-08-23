@@ -290,7 +290,10 @@ class TestTheManifestCarriesTheProvenanceOfWhatFedIt:
     def test_the_roll_up_names_every_unverified_source_behind_the_headline_figure(self) -> None:
         record = _manifest()
         assert f"instruments/{ISSUE_A}.toml#instrument.terms" in record.unverified_sources
-        assert "tax/ua.toml#jurisdiction.tax_class[ua_government_bond]" in record.unverified_sources
+        assert (
+            "tax/ua.toml#jurisdiction.tax_class[ua_government_bond].rate[0]"
+            in record.unverified_sources
+        )
         assert list(record.unverified_sources) == sorted(record.unverified_sources)
 
     def test_the_roll_up_describes_the_result_rather_than_the_directory(self) -> None:

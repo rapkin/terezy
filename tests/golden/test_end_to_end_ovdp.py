@@ -234,7 +234,17 @@ def _verified_declaration(declaration: InstrumentDeclaration) -> InstrumentDecla
 
 
 def _verified_class(declared: TaxClass) -> TaxClass:
-    return replace(declared, provenance=_verified(declared.provenance))
+    """The same class with every dated entry's sources verified, rates untouched.
+
+    ⚙ Per entry since feature 006: the citation moved off the class and onto the schedule,
+    so verifying "the class" means verifying each entry.
+    """
+    return replace(
+        declared,
+        rates=tuple(
+            replace(entry, provenance=_verified(entry.provenance)) for entry in declared.rates
+        ),
+    )
 
 
 def _verified_declarations(declarations: resolver.Declarations) -> resolver.Declarations:

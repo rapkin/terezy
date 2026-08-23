@@ -170,8 +170,8 @@ def _issue_b() -> Projection:
         ISSUE_B,
         quantity=10.0,
         cost=10_000.0,
-        purchased_on=date(2026, 3, 2),
-        horizon_end=date(2029, 3, 31),
+        purchased_on=date(2026, 7, 2),
+        horizon_end=date(2029, 7, 31),
     )
 
 
@@ -402,8 +402,8 @@ X: int = 1
             "ovdp_synthetic_c",
             quantity=10.0,
             cost=10_000.0,
-            purchased_on=date(2026, 3, 2),
-            horizon_end=date(2029, 3, 31),
+            purchased_on=date(2026, 7, 2),
+            horizon_end=date(2029, 7, 31),
         )
         coupons = [row for row in projection.schedule.rows if row.kind is EventKind.COUPON]
         assert len(coupons) == 3, "annual coupons over a three-year term"

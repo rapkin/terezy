@@ -147,11 +147,10 @@ class TestTheShippedFilesLoad:
 
     def test_the_tax_class_loads_its_zero_rates_as_fractions(self) -> None:
         classes = loader.tax_classes_from_file(TAX_UA)
-        assert len(classes) == 1
-        exempt = classes[0]
-        assert exempt.id == "ua_government_bond"
-        assert exempt.pit_rate == 0.0
-        assert exempt.levy_rate == 0.0
+        exempt = next(declared for declared in classes if declared.id == "ua_government_bond")
+        (only_entry,) = exempt.rates
+        assert only_entry.pit_rate == 0.0
+        assert only_entry.levy_rate == 0.0
         assert exempt.applies_to == frozenset(
             {TaxableEventKind.COUPON, TaxableEventKind.DISPOSAL_GAIN}
         )
@@ -166,7 +165,7 @@ class TestTheShippedFilesLoad:
         declaration = loader.instrument_from_file(INSTRUMENT_A)
         assert prov.is_unverified(declaration.terms.provenance)
         assert prov.is_unverified(declaration.constraints.provenance)
-        assert prov.is_unverified(loader.tax_classes_from_file(TAX_UA)[0].provenance)
+        assert prov.is_unverified(loader.tax_classes_from_file(TAX_UA)[0].rates[0].provenance)
 
     def test_every_source_ref_names_the_file_and_table_it_came_from(self) -> None:
         """A figure must trace back to *where* it was declared, not just to a citation.
@@ -179,8 +178,13 @@ class TestTheShippedFilesLoad:
         constraint_ids = {ref.id for ref in declaration.constraints.provenance.sources}
         assert terms_ids == {"instruments/ovdp_synthetic_a.toml#instrument.terms"}
         assert constraint_ids == {"instruments/ovdp_synthetic_a.toml#instrument.constraints"}
-        assert {ref.id for ref in loader.tax_classes_from_file(TAX_UA)[0].provenance.sources} == {
-            "tax/ua.toml#jurisdiction.tax_class[ua_government_bond]"
+        exempt = next(
+            declared
+            for declared in loader.tax_classes_from_file(TAX_UA)
+            if declared.id == "ua_government_bond"
+        )
+        assert {ref.id for ref in exempt.rates[0].provenance.sources} == {
+            "tax/ua.toml#jurisdiction.tax_class[ua_government_bond].rate[0]"
         }
 
 
@@ -320,7 +324,7 @@ class TestWrongType:
         _assert_names_file_and_field(raised.value, file=broken, field_path=field_path)
 
     def test_a_wrong_type_inside_an_array_of_tables_names_its_index(self, tmp_path: Path) -> None:
-        """``jurisdiction.tax_class[0].pit_rate_pct`` -- the index, because that is all
+        """``jurisdiction.tax_class[0].rate[0].pit_rate_pct`` -- the index, because that is all
         pydantic has.
 
         A malformed entry may not carry a usable ``id`` to name it by, so the shape
@@ -332,13 +336,13 @@ class TestWrongType:
             tmp_path,
             "ua_wrong_type.toml",
             _replace(
-                TAX_UA.read_text(encoding="utf-8"), "pit_rate_pct  = 0.0", 'pit_rate_pct  = "0"'
+                TAX_UA.read_text(encoding="utf-8"), "pit_rate_pct   = 0.0", 'pit_rate_pct   = "0"'
             ),
         )
         with pytest.raises(DeclarationError) as raised:
             loader.tax_classes_from_file(broken)
         _assert_names_file_and_field(
-            raised.value, file=broken, field_path="jurisdiction.tax_class[0].pit_rate_pct"
+            raised.value, file=broken, field_path="jurisdiction.tax_class[0].rate[0].pit_rate_pct"
         )
 
 
@@ -510,8 +514,8 @@ class TestUnresolvedTaxClassReference:
             "ua_coupon_only.toml",
             _replace(
                 TAX_UA.read_text(encoding="utf-8"),
-                'applies_to    = ["coupon", "disposal_gain"]',
-                'applies_to    = ["coupon"]',
+                'applies_to = ["coupon", "disposal_gain"]',
+                'applies_to = ["coupon"]',
             ),
         )
         with pytest.raises(DeclarationError) as raised:
@@ -530,8 +534,8 @@ class TestUnresolvedTaxClassReference:
                 "instrument.tax_classes.dividend",
             ),
             (
-                'applies_to    = ["coupon", "disposal_gain"]',
-                'applies_to    = ["coupon", "windfall"]',
+                'applies_to = ["coupon", "disposal_gain"]',
+                'applies_to = ["coupon", "windfall"]',
                 "jurisdiction.tax_class[ua_government_bond].applies_to",
             ),
         ],
@@ -664,13 +668,13 @@ class TestNonPositiveAmounts:
         ("old", "new", "field_path"),
         [
             (
-                "pit_rate_pct  = 0.0",
-                "pit_rate_pct  = -18.0",
-                "jurisdiction.tax_class[ua_government_bond].pit_rate_pct",
+                "pit_rate_pct   = 0.0",
+                "pit_rate_pct   = -18.0",
+                "jurisdiction.tax_class[ua_government_bond].rate[0].pit_rate_pct",
             ),
             (
-                'applies_to    = ["coupon", "disposal_gain"]',
-                "applies_to    = []",
+                'applies_to = ["coupon", "disposal_gain"]',
+                "applies_to = []",
                 "jurisdiction.tax_class[ua_government_bond].applies_to",
             ),
         ],
@@ -801,6 +805,162 @@ class TestAnImpossibleInstrumentIsNotALoadError:
         assert "2025-01-15" in outcome.reason
 
 
+class TestDatedRateSchedules:
+    """⚙ Feature 006: the schedule's own enforced rules, all naming file and field.
+
+    Five ways a dated schedule can be wrong, and one thing that is *not* wrong. The
+    schedule is the shape a tax rate has now (research.md D1), so every one of these is a
+    file a maintainer could plausibly write by hand, and every one of them must be caught
+    where the file can be named rather than mid-projection.
+    """
+
+    def _without_the_schedule(self) -> str:
+        """The shipped tax file with its ``[[...rate]]`` block cut off.
+
+        The caller appends ``rate = []`` to it, so the case under test is a schedule
+        declared **empty** rather than one whose key is missing. The missing key is
+        already covered by ``TestMissingRequiredField``'s rule, and the two failures are
+        different: one is a file that forgot a section, the other is a file that says, in
+        as many words, that this class has no rates.
+        """
+        text = TAX_UA.read_text(encoding="utf-8")
+        marker = "  [[jurisdiction.tax_class.rate]]"
+        assert marker in text, "the shipped fixture no longer declares a rate block"
+        return text[: text.index(marker)]
+
+    def _schedule_block(self, effective_from: str) -> str:
+        return (
+            "\n  [[jurisdiction.tax_class.rate]]\n"
+            f'  effective_from = "{effective_from}"\n'
+            "  pit_rate_pct   = 0.0\n"
+            "  levy_rate_pct  = 0.0\n"
+            '  note           = "FIXTURE -- a second entry added by a test."\n'
+            '  kind           = "tax_rule"\n'
+            '  source         = "FIXTURE -- not an observation."\n'
+            '  retrieved_on   = "2026-08-23"\n'
+            '  verified_on    = ""\n'
+        )
+
+    def test_a_class_with_no_dated_entry_is_refused(self, tmp_path: Path) -> None:
+        """A class that can charge nothing must not be readable as an exemption.
+
+        The two are opposite claims: an exemption is a cited zero, and an empty schedule
+        is the absence of any citation at all.
+        """
+        broken = _write(tmp_path, "no_rates.toml", self._without_the_schedule() + "rate = []\n")
+        with pytest.raises(DeclarationError) as raised:
+            loader.tax_classes_from_file(broken)
+        _assert_names_file_and_field(
+            raised.value,
+            file=broken,
+            field_path="jurisdiction.tax_class[ua_government_bond].rate",
+        )
+
+    def test_two_entries_with_the_same_effective_date_are_refused(self, tmp_path: Path) -> None:
+        """Two rates in force on one date has no meaning, and neither may win by order."""
+        text = TAX_UA.read_text(encoding="utf-8") + self._schedule_block("2026-06-30")
+        broken = _write(tmp_path, "duplicate_dates.toml", text)
+        with pytest.raises(DeclarationError) as raised:
+            loader.tax_classes_from_file(broken)
+        _assert_names_file_and_field(
+            raised.value,
+            file=broken,
+            field_path="jurisdiction.tax_class[ua_government_bond].rate[1].effective_from",
+        )
+
+    def test_entries_out_of_order_are_refused_rather_than_sorted(self, tmp_path: Path) -> None:
+        """Sorting silently was the obvious alternative and it is refused.
+
+        A file whose written order disagrees with its dates is one a human misreads -- and
+        the reader is the person who has to check a rate against a statute. Reordering it
+        here would make that file loadable, so the error is what stops it existing.
+        """
+        text = TAX_UA.read_text(encoding="utf-8") + self._schedule_block("2024-12-01")
+        broken = _write(tmp_path, "unsorted.toml", text)
+        with pytest.raises(DeclarationError) as raised:
+            loader.tax_classes_from_file(broken)
+        _assert_names_file_and_field(
+            raised.value,
+            file=broken,
+            field_path="jurisdiction.tax_class[ua_government_bond].rate[1].effective_from",
+        )
+
+    def test_a_negative_levy_rate_on_an_entry_is_refused(self, tmp_path: Path) -> None:
+        """A refund is not a charge, and this rule does not model one."""
+        broken = _write(
+            tmp_path,
+            "negative_levy.toml",
+            _replace(
+                TAX_UA.read_text(encoding="utf-8"), "levy_rate_pct  = 0.0", "levy_rate_pct  = -5.0"
+            ),
+        )
+        with pytest.raises(DeclarationError) as raised:
+            loader.tax_classes_from_file(broken)
+        _assert_names_file_and_field(
+            raised.value,
+            file=broken,
+            field_path="jurisdiction.tax_class[ua_government_bond].rate[0].levy_rate_pct",
+        )
+
+    def test_an_entry_with_no_citation_is_refused(self, tmp_path: Path) -> None:
+        """The citation moved onto the entry, and so did the requirement to have one."""
+        broken = _write(
+            tmp_path,
+            "uncited_entry.toml",
+            _replace(
+                TAX_UA.read_text(encoding="utf-8"), "source         =", "source         = ''  #"
+            ),
+        )
+        with pytest.raises(DeclarationError) as raised:
+            loader.tax_classes_from_file(broken)
+        _assert_names_file_and_field(
+            raised.value,
+            file=broken,
+            field_path="jurisdiction.tax_class[ua_government_bond].rate[0].source",
+        )
+
+    def test_an_entry_with_no_note_is_refused(self, tmp_path: Path) -> None:
+        """The effective date is the field a reviewer most needs prose for.
+
+        A rate can be checked against its source at a glance; the date it came into force
+        usually cannot, so an entry that explains neither is one nobody can review.
+        """
+        broken = _write(
+            tmp_path,
+            "unexplained_entry.toml",
+            _replace(
+                TAX_UA.read_text(encoding="utf-8"),
+                "note           = ",
+                'note           = ""  #',
+            ),
+        )
+        with pytest.raises(DeclarationError) as raised:
+            loader.tax_classes_from_file(broken)
+        _assert_names_file_and_field(
+            raised.value,
+            file=broken,
+            field_path="jurisdiction.tax_class[ua_government_bond].rate[0].note",
+        )
+
+    def test_a_schedule_starting_after_an_event_is_not_a_load_error(self, tmp_path: Path) -> None:
+        """The one thing here that is not the loader's business, and the reason FR-012 exists.
+
+        A schedule that does not reach back to an event is a perfectly well-formed file --
+        it is the *honest* file, when no citation supports an earlier entry. The refusal
+        belongs to the projection, which knows the event's date, and it is asserted in
+        ``tests/unit/test_schedule_refusals.py``. Catching it here would mean the loader
+        deciding which events a run is allowed to contain.
+        """
+        text = _replace(
+            TAX_UA.read_text(encoding="utf-8"),
+            'effective_from = "2026-06-30"',
+            'effective_from = "2099-01-01"',
+        )
+        loaded = loader.tax_classes_from_file(_write(tmp_path, "far_future.toml", text))
+        (declared,) = [entry for entry in loaded if entry.id == "ua_government_bond"]
+        assert declared.rates[0].effective_from == date(2099, 1, 1)
+
+
 class TestTheBatteryCoversTheContract:
     """The battery is only a proof of SC-004 if it covers every row of the table.
 
@@ -827,6 +987,7 @@ class TestTheBatteryCoversTheContract:
             "TestUnresolvedTaxClassReference",
             "TestUnknownConventionName",
             "TestNonPositiveAmounts",
+            "TestDatedRateSchedules",
             "TestMalformedFile",
             "TestNoPydanticTypeEscapes",
             "TestAnImpossibleInstrumentIsNotALoadError",
