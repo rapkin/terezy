@@ -1499,7 +1499,9 @@ rule:
 > Everything money can be moved into must have a declared way in AND a declared way out — at
 > least through one other venue — before it may appear in any comparison.
 
-Made checkable, per `(destination × income stream × regime)`:
+Matching reads the **endpoints** of a route's chain — the first leg's currency in and the last
+leg's currency out — and never its interior. Made checkable, per
+`(destination × income stream × regime)`:
 
 - **a way in** — at least one declared route with direction `inbound`, from the stream's arrival
   venue, whose first leg takes in the stream's arrival currency and whose last leg hands out the
@@ -1507,7 +1509,18 @@ Made checkable, per `(destination × income stream × regime)`:
   no route: the money is born there, and the report says **satisfied by arrival**, which is
   explicitly not the same statement as "satisfied by a route";
 - **a way out** — at least one declared route with direction `exit`, from the destination, whose
-  last leg lands on a declared **spendable endpoint**.
+  last leg lands on a declared **spendable endpoint**. A destination that *is* a declared
+  spendable endpoint needs no route: the money is already where it had to come back out to, and
+  the report says **satisfied by identity** (owner decision, 2026-08-23). That is the mirror of
+  *satisfied by arrival*, and it is reported as its own distinct sentinel for the same reason —
+  "already out" is not the claim "a declared route gets it out".
+
+The two route-free forms behave the same way in every consequence. Neither produces a deficit or
+a to-do item for the half it satisfies; neither is a route, so neither can be closed and neither
+contributes to `rests_on`; and each **supersedes** the routes it stands in for, so a spendable
+destination's declared exits are not listed as relied upon. The first reading of the rule
+required an exit route without exception, which made the hryvnia balance on the owner's own
+salary rail a hole demanding an observation of how to get money out of his own bank account.
 
 A **spendable endpoint** is a declared `(venue × currency)` pair: base currency only, at the
 venues the owner actually spends from (`data/spendable/`). Not "UAH anywhere", and not foreign
@@ -1515,7 +1528,8 @@ cash in hand. An exit ending in hryvnia at a venue the list does not name does n
 out, exactly as one ending in dollars does not.
 
 The **destination universe is derived**: every declared venue × every currency that venue
-declares it can hold. That is what makes a venue with zero routes visible as a hole the moment
+declares it can hold — including a venue that appears only as an interior leg endpoint, because
+money can sit there too. That is what makes a venue with zero routes visible as a hole the moment
 it is declared, rather than invisible until somebody tries to cost it.
 
 ### 20.2 The three deficits, and why they are three

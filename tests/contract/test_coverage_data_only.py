@@ -194,6 +194,7 @@ def test_adding_a_venue_to_the_spendable_list_flips_a_deficit_three_pair(
 
     after = _verdicts(_report_from(root))[("wise", "UAH", "salary_uah")]
     assert isinstance(after, Ready)
+    assert isinstance(after.exits, tuple), "wise is not itself a spendable endpoint"
     assert [relied.route_id for relied in after.exits] == ["wise_to_binance"]
 
 

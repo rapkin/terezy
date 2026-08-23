@@ -328,10 +328,10 @@ def test_an_orphan_exit_is_listed_as_unused_and_blocks_no_count() -> None:
                 assert all(
                     relied.route_id != "out_island_mono" for relied in deficit.observed_exits
                 )
-    # Two holes remain -- a way in to island, and a way out of mono -- and neither is the
-    # orphan. The orphan added nothing to either count.
+    # One hole remains -- a way in to island -- and it is not the orphan; the orphan added
+    # nothing to its count. ``mono`` produces no hole at all: it is the declared spendable
+    # endpoint, so its exit half is satisfied by identity (FR-002).
     assert sorted((entry.missing.direction, entry.count) for entry in block.todo) == [
-        ("exit", 1),
         ("inbound", 1),
     ]
 
@@ -340,7 +340,16 @@ def test_an_orphan_exit_is_listed_as_unused_and_blocks_no_count() -> None:
 # The counting registry, enumerated by hand
 # ---------------------------------------------------------------------------
 
-TODO_VENUES = keyed([venue("coin", USD), venue("hub", UAH), venue("mono", UAH), venue("solo", UAH)])
+TODO_VENUES = keyed(
+    [
+        venue("cash", UAH),
+        venue("coin", USD),
+        venue("hub", UAH),
+        venue("mono", UAH),
+        venue("solo", UAH),
+        venue("void", UAH),
+    ]
+)
 TODO_STREAMS = keyed([stream("contract_usd", USD, "coin"), stream("salary_uah", UAH, "mono")])
 TODO_REGISTRY: Mapping[str, Route] = keyed(
     [
@@ -373,33 +382,44 @@ TODO_REGISTRY: Mapping[str, Route] = keyed(
         route("out_solo_mono", origin="solo", destination="mono", direction="exit", from_ccy=UAH),
     ]
 )
-"""Four destinations, two streams, six corridors, and exactly four holes.
+"""Six destinations, two streams, six corridors, and exactly eight holes.
+
+⚙ **Two spendable endpoints, and that is load-bearing** (FR-007 ⚙). A missing exit's target is
+*any one of them*, so its identity is origin + direction and it stays **one** to-do item
+whatever the list's length. With a single-endpoint fixture the two readings -- one item, or one
+per candidate -- produce identical counts and nothing tells them apart; with two, a report that
+multiplied by the candidate list would report every exit count as four rather than two.
 
 | pair | verdict | why |
 |---|---|---|
+| ``(cash, UAH)`` x either | not ready | spendable, so out is satisfied by identity; **no way in** |
 | ``(coin, USD)`` x ``contract_usd`` | ready | born there; ``out_coin_mono`` reaches spendable |
 | ``(coin, USD)`` x ``salary_uah`` | ready | ``in_mono_coin`` in, ``out_coin_mono`` out |
-| ``(hub, UAH)`` x ``contract_usd`` | not ready | ``in_coin_hub`` in, **nothing out** |
-| ``(hub, UAH)`` x ``salary_uah`` | not ready | ``in_mono_hub`` in, **nothing out** |
-| ``(mono, UAH)`` x ``contract_usd`` | not ready | **no way in**, and **nothing out** |
-| ``(mono, UAH)`` x ``salary_uah`` | not ready | born there; **nothing out** |
+| ``(hub, UAH)`` x either stream | not ready | a way in from each, **nothing out** |
+| ``(mono, UAH)`` x ``contract_usd`` | not ready | out satisfied by identity; **no way in** |
+| ``(mono, UAH)`` x ``salary_uah`` | ready | born there **and** spendable: two sentinels, no route |
 | ``(solo, UAH)`` x ``contract_usd`` | not ready | **no way in**; ``out_solo_mono`` out |
 | ``(solo, UAH)`` x ``salary_uah`` | ready | ``in_mono_solo`` in, ``out_solo_mono`` out |
+| ``(void, UAH)`` x either | not ready | nothing touches it: **no way in and none out** |
 
-Four distinct missing declarations, hand-counted:
+Eight distinct missing declarations, hand-counted:
 
 | # | declaration | blocks | count |
 |---|---|---|---|
 | E1 | exit from ``hub`` in UAH | both ``hub`` pairs | **2** |
-| E2 | exit from ``mono`` in UAH | both ``mono`` pairs | **2** |
-| I1 | inbound ``coin`` USD -> ``(mono, UAH)`` | ``(mono, UAH)`` x ``contract_usd`` | **1** |
-| I2 | inbound ``coin`` USD -> ``(solo, UAH)`` | ``(solo, UAH)`` x ``contract_usd`` | **1** |
+| E2 | exit from ``void`` in UAH | both ``void`` pairs | **2** |
+| I1 | inbound ``coin`` USD -> ``(cash, UAH)`` | ``(cash, UAH)`` x ``contract_usd`` | **1** |
+| I2 | inbound ``coin`` USD -> ``(mono, UAH)`` | ``(mono, UAH)`` x ``contract_usd`` | **1** |
+| I3 | inbound ``coin`` USD -> ``(solo, UAH)`` | ``(solo, UAH)`` x ``contract_usd`` | **1** |
+| I4 | inbound ``coin`` USD -> ``(void, UAH)`` | ``(void, UAH)`` x ``contract_usd`` | **1** |
+| I5 | inbound ``mono`` UAH -> ``(cash, UAH)`` | ``(cash, UAH)`` x ``salary_uah`` | **1** |
+| I6 | inbound ``mono`` UAH -> ``(void, UAH)`` | ``(void, UAH)`` x ``salary_uah`` | **1** |
 
-``(mono, UAH) x contract_usd`` needs **both** E2 and I1, so it appears in both entries'
-``blocked`` and is marked not-alone-sufficient in both (FR-011).
+Both ``void`` pairs need **two** declarations each, so each appears in two entries and is marked
+not-alone-sufficient in both (FR-011).
 """
 
-TODO_SPENDABLE = spendable(("mono", UAH))
+TODO_SPENDABLE = spendable(("cash", UAH), ("mono", UAH))
 
 
 def _todo_block() -> RegimeCoverage:
@@ -422,19 +442,46 @@ def test_the_todo_list_is_ordered_by_blocked_pair_count_and_ties_are_reported() 
     block = _todo_block()
     assert [(e.missing.direction, e.missing.origin_venue, e.count) for e in block.todo] == [
         ("exit", "hub", 2),
-        ("exit", "mono", 2),
+        ("exit", "void", 2),
         ("inbound", "coin", 1),
         ("inbound", "coin", 1),
+        ("inbound", "coin", 1),
+        ("inbound", "coin", 1),
+        ("inbound", "mono", 1),
+        ("inbound", "mono", 1),
     ]
     for entry in block.todo:
         assert entry.count == len(entry.blocked) == blocked_count(entry)
-    assert block.ties == ((0, 1), (2, 3))
-    # The two count-1 entries differ only in their target, which is what keeps them two
+    assert block.ties == ((0, 1), (2, 3, 4, 5, 6, 7))
+    # The count-1 entries differ only in their target, which is what keeps them separate
     # observations rather than one -- and what makes the tie a real tie.
     assert {e.missing.target for e in block.todo[2:]} == {
+        Destination(venue_id="cash", currency=UAH),
         Destination(venue_id="mono", currency=UAH),
         Destination(venue_id="solo", currency=UAH),
+        Destination(venue_id="void", currency=UAH),
     }
+
+
+def test_a_missing_exits_count_does_not_multiply_by_the_spendable_list() -> None:
+    """**FR-007 ⚙.** One missing exit is one to-do item, however many endpoints would satisfy it.
+
+    The registry declares **two** spendable endpoints, so each missing exit names two
+    candidates -- and its blocked-pair count is still the number of pairs, not the number of
+    pairs times the number of ways to fix them. A report that produced one item per candidate
+    would double every exit entry here and inflate every count with it, which would then
+    reorder the whole to-do list against the missing inbounds.
+
+    Asserted against the candidate list's actual length rather than against the constant 2, so
+    the test keeps meaning what it says if the fixture gains a third endpoint.
+    """
+    block = _todo_block()
+    exits = [entry for entry in block.todo if entry.missing.direction == "exit"]
+    assert len(exits) == 2, "one item per missing exit, not one per candidate endpoint"
+    for entry in exits:
+        assert len(entry.missing.candidates) == len(TODO_SPENDABLE) == 2
+        assert entry.count == 2
+        assert entry.count == len({(p.destination, p.stream_id) for p in entry.blocked})
 
 
 def test_a_pair_missing_both_halves_counts_for_both_and_is_alone_sufficient_for_neither() -> None:
@@ -449,18 +496,26 @@ def test_a_pair_missing_both_halves_counts_for_both_and_is_alone_sufficient_for_
     block = _todo_block()
     by_key = {(e.missing.direction, e.missing.origin_venue): e for e in block.todo}
 
-    exit_from_mono = by_key[("exit", "mono")]
-    blocked = {pair.stream_id: pair for pair in exit_from_mono.blocked}
+    # ``void`` is touched by nothing, so both its pairs need a way in *and* a way out.
+    exit_from_void = by_key[("exit", "void")]
+    blocked = {pair.stream_id: pair for pair in exit_from_void.blocked}
     assert blocked["contract_usd"].alone_sufficient is False
-    assert blocked["salary_uah"].alone_sufficient is True
+    assert blocked["salary_uah"].alone_sufficient is False
 
-    inbound_to_mono = next(
+    inbound_to_void = [
         entry
         for entry in block.todo
-        if entry.missing.target == Destination(venue_id="mono", currency=UAH)
-    )
-    assert [pair.stream_id for pair in inbound_to_mono.blocked] == ["contract_usd"]
-    assert inbound_to_mono.blocked[0].alone_sufficient is False
+        if entry.missing.target == Destination(venue_id="void", currency=UAH)
+    ]
+    assert len(inbound_to_void) == 2, "one missing way in per stream, from each arrival venue"
+    for entry in inbound_to_void:
+        assert entry.count == 1
+        assert entry.blocked[0].alone_sufficient is False
+
+    # And the contrast, on the same registry: ``hub`` is reachable from both streams, so the
+    # missing exit really is the only thing either pair waits on.
+    exit_from_hub = by_key[("exit", "hub")]
+    assert all(pair.alone_sufficient for pair in exit_from_hub.blocked)
 
 
 def test_writing_the_named_inbound_declaration_and_nothing_else_flips_the_pair() -> None:
@@ -561,6 +616,11 @@ def test_a_registry_with_no_holes_states_that_there_is_nothing_to_observe() -> N
     assert all(isinstance(verdict, Ready) for verdict in block.verdicts)
     assert block.todo == ()
     assert block.ties == ()
+    # And nothing is listed as unused. Every declared exit here leaves a destination some
+    # stream can reach -- ``solo`` through ``in_mono_solo``, ``mono`` by arrival -- so an
+    # orphan listed on this registry would mean the reachability test had stopped counting
+    # arrival, which is the one term of it no route declares.
+    assert block.orphan_exits == ()
 
 
 # ---------------------------------------------------------------------------

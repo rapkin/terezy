@@ -28,9 +28,12 @@ No `on_date`, no `as_of`. Coverage is a claim about declarations, not about toda
 declared stream and every regime, `regimes[i].verdicts` contains exactly one verdict. No
 pair in the declared universe is absent, and no pair appears twice. (FR-001)
 
-**G2 — Ready means both halves are declared.** `Ready` is returned if and only if, within
-that regime, an inbound match exists (or the destination is the stream's arrival point) and
-an exit exists whose end is in `spendable`. (FR-002, FR-005)
+**G2 — Ready means both halves of the owner's rule hold.** `Ready` is returned if and only if,
+within that regime, the way in is satisfied — an inbound match exists, **or** the destination is
+the stream's arrival point — and the way out is satisfied — an exit exists whose end is in
+`spendable`, **or** the destination is *itself* in `spendable`. The two route-free forms are
+reported as distinct sentinels, `SATISFIED_BY_ARRIVAL` and `SATISFIED_BY_IDENTITY`, never as an
+empty tuple. (FR-002, FR-005; the exit-side form is the owner decision of 2026-08-23)
 
 **G3 — Deficits are distinguished.** Every `NotReady` carries at least one `Deficit`, each
 of one of three kinds. There is no undifferentiated "missing route" value. (FR-003)
@@ -93,9 +96,18 @@ Scoped, deliberately, to **costing over single declared routes as of this featur
 - For every pair marked `NotReady`, either no `FundingPath` over a declared route matches
   the stream and destination at all, or every one that does yields `ExitCostUnknown`.
 
-Feasibility refusals (`RouteUnusable`: below a minimum, above a cap, outside a window) are
-**out of scope of this agreement**. They are statements about today, and coverage is a
-statement about declarations. The property test states this at the assertion site.
+Feasibility refusals (`RouteUnusable`: below a minimum, above a cap, outside a window, a closed
+route — and, since 002's review, a closed *exit partner*, which `cost_one` reports as
+`ExitCostUnknown`) are **out of scope of this agreement**. They are statements about today, and
+coverage is a statement about declarations. The property test states this at the assertion site.
+
+**A pair that names no route is outside the agreement's domain, not in disagreement with it**
+(2026-08-23). A `FundingPath` is a `(destination, stream, route)` triple, so a pair whose way in
+is satisfied by arrival and/or whose way out is satisfied by identity gives costing nothing to
+be asked about: it yields neither a figure nor a refusal. The property partitions such pairs out
+**explicitly and asserts they are outside**, rather than skipping them, so the exclusion cannot
+absorb a real disagreement — and it asserts that both sides of the partition are non-empty, so
+it cannot pass by excluding everything.
 
 When feature 004 lands composition, costing will produce round-trip figures for pairs this
 report marks not-ready. The reconciliation is a distinct "reachable by composition only"

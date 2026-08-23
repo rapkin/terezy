@@ -34,7 +34,11 @@ checked in beside the assertion (SC-001). What it pins:
 - each of the three deficits appears, distinguished, with no bare "missing route" anywhere
   (SC-002);
 - a destination equal to a stream's arrival point reports **satisfied by arrival** and is
-  ready if and only if its exit exists (SC-012).
+  ready if and only if its exit half is satisfied (SC-012) — by a declared route, or by the
+  destination itself being a declared spendable endpoint, which reports **satisfied by
+  identity** (FR-002, owner decision 2026-08-23);
+- two of the corridors are **multi-leg**, so the endpoint rule has a chain with an interior to
+  be right about.
 
 If a pair is missing from the report, suspect the destination universe: it is venue ×
 *holdable currency*, so a venue declaring two currencies contributes two destinations, and
@@ -103,10 +107,15 @@ declared routes is refused is marked not ready (SC-009).
 
 **Read the scope before debugging a failure.** The property covers *route-existence*
 refusals — no matching route, and `ExitCostUnknown`. It does **not** cover `RouteUnusable`:
-below a minimum, above a cap, outside a window. Those are statements about today, and
-coverage is a statement about declarations (research.md D11). If this test fails with a
-`RouteUnusable`, the generator has drifted into feasibility territory — fix the generator's
-amount and dates, not the coverage rule.
+below a minimum, above a cap, outside a window, a closed route. Those are statements about
+today, and coverage is a statement about declarations (research.md D11). If this test fails
+with a `RouteUnusable`, the generator has drifted into feasibility territory — fix the
+generator's amount and dates, not the coverage rule.
+
+Nor does it cover a pair costing has **no path** to: a way in satisfied by arrival or a way out
+satisfied by identity names no route, so costing yields neither figure nor refusal. Those pairs
+are partitioned out and asserted to be outside the domain, and a further test asserts both sides
+of the partition are non-empty.
 
 ## 6. The gates
 

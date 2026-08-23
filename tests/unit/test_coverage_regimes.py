@@ -44,7 +44,7 @@ from terezy.core.results.coverage import (
 from terezy.core.routes.coverage import coverage
 from tests.coverage_registries import UAH, USD, keyed, regime, route, spendable, stream, venue
 
-VENUES = keyed([venue("mono", UAH), venue("broker", USD)])
+VENUES = keyed([venue("mono", UAH), venue("broker", USD), venue("fund", UAH)])
 STREAMS = keyed([stream("salary_uah", UAH, "mono")])
 
 IN_ROUTE = route(
@@ -63,13 +63,24 @@ OUT_ROUTE = route(
     from_ccy=USD,
     to_ccy=UAH,
 )
-ROUTES = keyed([IN_ROUTE, OUT_ROUTE])
+FUND_ROUTE = route(
+    "in_mono_fund", origin="mono", destination="fund", direction="inbound", from_ccy=UAH
+)
+"""A way in to a destination with no way out, in **both** regimes.
+
+Here so the identical-route-set case below still has something to say. ``mono`` is the declared
+spendable endpoint, so its exit half is satisfied by identity and it is never a hole; without
+``fund`` a registry whose regimes agree would have no holes at all, and the per-regime counts
+the test is about would both be zero.
+"""
+
+ROUTES = keyed([IN_ROUTE, OUT_ROUTE, FUND_ROUTE])
 SPENDABLE = spendable(("mono", UAH))
 
 REGIMES = keyed(
     [
-        regime("normalized", IN_ROUTE.id),
-        regime("wartime", IN_ROUTE.id, OUT_ROUTE.id),
+        regime("normalized", IN_ROUTE.id, FUND_ROUTE.id),
+        regime("wartime", IN_ROUTE.id, OUT_ROUTE.id, FUND_ROUTE.id),
     ]
 )
 """``wartime`` names the exit and ``normalized`` does not.
@@ -105,6 +116,7 @@ def test_a_route_in_one_regime_and_not_the_other_yields_two_different_verdicts()
 
     in_wartime = _verdict(report, "wartime", "broker")
     assert isinstance(in_wartime, Ready)
+    assert isinstance(in_wartime.exits, tuple), "broker is not itself a spendable endpoint"
     assert [relied.route_id for relied in in_wartime.exits] == [OUT_ROUTE.id]
 
     in_normalized = _verdict(report, "normalized", "broker")
@@ -120,8 +132,8 @@ def test_each_block_audits_only_its_own_route_set() -> None:
     """
     report = _report()
     by_id = {block.regime_id: block for block in report.regimes}
-    assert by_id["normalized"].route_ids == (IN_ROUTE.id,)
-    assert by_id["wartime"].route_ids == (IN_ROUTE.id, OUT_ROUTE.id)
+    assert by_id["normalized"].route_ids == ("in_mono_broker", "in_mono_fund")
+    assert by_id["wartime"].route_ids == ("in_mono_broker", "in_mono_fund", "out_broker_mono")
 
 
 def test_no_blended_verdict_and_no_summed_count_exists_anywhere() -> None:
@@ -180,8 +192,8 @@ def test_two_regimes_naming_identical_route_sets_still_produce_two_blocks() -> N
     """
     identical = keyed(
         [
-            regime("normalized", IN_ROUTE.id, OUT_ROUTE.id),
-            regime("wartime", IN_ROUTE.id, OUT_ROUTE.id),
+            regime("normalized", IN_ROUTE.id, OUT_ROUTE.id, FUND_ROUTE.id),
+            regime("wartime", IN_ROUTE.id, OUT_ROUTE.id, FUND_ROUTE.id),
         ]
     )
     report = _report(identical)

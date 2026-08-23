@@ -64,12 +64,26 @@ Derived, never declared: the product of every declared venue and its `currencies
 | `destination` | `Destination` | |
 | `stream_id` | `str` | |
 | `inbound` | `tuple[RouteRelied, ...]` \| `SATISFIED_BY_ARRIVAL` | Every matching inbound route, or the sentinel of FR-005 |
-| `exits` | `tuple[RouteRelied, ...]` | Every exit route reaching a declared spendable endpoint |
-| `rests_on` | `Literal["open", "constrained", "closed_only"]` | FR-022 / SC-015, derived per research.md D10 |
+| `exits` | `tuple[RouteRelied, ...]` \| `SATISFIED_BY_IDENTITY` | Every exit route reaching a declared spendable endpoint, or the sentinel of FR-002 ⚙ |
+| `rests_on` | `Literal["open", "constrained", "closed_only"]` | FR-022 / SC-015, derived per research.md D10. Neither sentinel is a route, so neither contributes a status and neither can be closed |
 
 `SATISFIED_BY_ARRIVAL` is a distinct sentinel value, not an empty tuple: FR-005 requires
 "satisfied by arrival" to be explicitly distinct from "satisfied by a route", and an empty
 tuple would read as "nothing relied on", which is a different claim.
+
+`SATISFIED_BY_IDENTITY` is its mirror on the exit side, added by the owner decision of
+**2026-08-23** (FR-002 ⚙): a destination that is itself a declared spendable endpoint has its
+way out satisfied without any corridor, because the money is already where it needed to come
+back out to. Same shape and same reason as the arrival sentinel — a single-member `Enum`, so
+"already spendable" can never be read as "a declared route gets the money out", and so a
+`match` over either half of the rule reads the same way.
+
+⚙ **Both sentinels supersede the routes they stand in for.** A pair satisfied by arrival does
+not list matching inbound routes, and a spendable destination does not list its declared exits:
+the verdict rests on the money's position, and nothing is *relied on*. On the arrival side that
+loses nothing real — a superseded inbound route would have to run from a venue to itself — but
+on the exit side it is a real loss, and it is taken deliberately so the two halves behave
+identically. Such an exit is still listed as an orphan where its origin is unreachable.
 
 `inbound` and `exits` list **every** match, not the first. The edge case "two inbound
 routes to one destination, only one with an exit partner" requires the partner-less inbound
@@ -79,7 +93,7 @@ to stay visible, and a ready verdict that named one route would hide it.
 
 | Field | Type | Meaning |
 |---|---|---|
-| `kind` | `Literal["no_inbound", "no_exit_declared", "exit_not_spendable"]` | The three of FR-003, read per research.md D7 |
+| `kind` | `Literal["no_inbound", "no_exit_declared", "exit_not_spendable"]` | The three of FR-003, read per research.md D7. Neither exit kind is ever produced for a destination in the spendable set (FR-002 ⚙) |
 | `missing` | `MissingDeclaration` | What to go observe |
 | `observed_exits` | `tuple[RouteRelied, ...]` | For `exit_not_spendable` only: the exits that exist and where they end. Empty otherwise |
 

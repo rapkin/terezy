@@ -165,6 +165,46 @@ means nothing carries this stream's money to this destination, which is deficit 
 """
 
 
+class SatisfiedByIdentity(Enum):
+    """The exit slot, filled by the destination **being** a declared spendable endpoint.
+
+    ⚙ **Owner decision, 2026-08-23.** FR-002 originally required a declared exit route from
+    every destination without exception, and the first implementation obeyed it literally: the
+    hryvnia balance on the owner's own salary rail came out as a hole, because no route *out*
+    of it is declared. The money is already where it needed to come back out to. Requiring a
+    way out of the place money is spent from would have made the salary rail the first finding
+    in the first real report, and it would have been wrong.
+
+    So the exit half of the owner's rule is satisfied **by identity** when the destination is
+    itself in the declared spendable set. The mirror of :class:`SatisfiedByArrival` on the
+    inbound side, and deliberately the same shape: a distinct single-member sentinel, so
+    "already spendable" is explicitly not the same claim as "a declared route gets the money
+    out", and so the two halves of the rule read the same way in the record and in a ``match``.
+
+    ⚙ **It supersedes declared exits, exactly as arrival supersedes declared inbound routes,
+    and that is a real consequence.** A spendable destination that also declares exits shows
+    this sentinel and not those routes: the verdict rests on the money already being there, and
+    nothing is *relied on*. Where those exits leave a destination no stream can reach they are
+    still listed as orphan exits; where the destination is reachable they appear nowhere in the
+    report. The two sides behave identically, which is the property worth having -- but the
+    information loss is real on this side in a way it is not on the arrival side, where a
+    superseded inbound route would have to run from a venue to itself.
+    """
+
+    SATISFIED_BY_IDENTITY = "satisfied_by_identity"
+
+
+SATISFIED_BY_IDENTITY: Final = SatisfiedByIdentity.SATISFIED_BY_IDENTITY
+"""The one member of :class:`SatisfiedByIdentity`, named for use as a value."""
+
+ExitEvidence = tuple[RouteRelied, ...] | SatisfiedByIdentity
+"""What satisfies -- or fails to satisfy -- the exit half of the owner's rule.
+
+Every declared exit reaching a spendable endpoint, or the identity sentinel. An **empty** tuple
+means nothing declared gets the money out from here, which is deficit 2 or deficit 3.
+"""
+
+
 class AnySpendableEndpoint(Enum):
     """The target of a missing **exit**: any one of the declared spendable endpoints.
 
@@ -290,16 +330,26 @@ class Ready:
     verdict naming one route would hide it behind the verdict.
     """
 
-    exits: tuple[RouteRelied, ...]
-    """Every declared exit from this destination that reaches a declared spendable endpoint.
-    Non-empty -- that is what makes the verdict ready."""
+    exits: ExitEvidence
+    """Every declared exit reaching a spendable endpoint, or :data:`SATISFIED_BY_IDENTITY`.
+
+    A **non-empty** tuple when the way out is a declared route -- that is what makes the
+    verdict ready -- and the sentinel when the destination is itself a declared spendable
+    endpoint and the money is therefore already out (FR-002, owner decision 2026-08-23). An
+    empty tuple never appears here: it would say the verdict rests on nothing, which is what a
+    not-ready pair says.
+    """
 
     rests_on: Literal["open", "constrained", "closed_only"]
     """Whether the routes this verdict relies on actually work today (FR-022, SC-015).
 
-    ``open`` -- the inbound side is satisfied by arrival or by at least one **open** route, and
-    at least one relied exit is open. ``closed_only`` -- every relied route is declared closed.
+    ``open`` -- each half is satisfied either by a sentinel (arrival, identity) or by at least
+    one **open** route. ``closed_only`` -- every relied route is declared closed.
     ``constrained`` -- everything in between.
+
+    Neither sentinel is a route, so neither can be closed and neither contributes a status: a
+    pair satisfied by arrival on one side and identity on the other rests on no route at all
+    and is ``open``, which is the honest reading -- there is nothing there to shut.
 
     Derived rather than declared, and beside the statuses it was derived from. Coverage measures
     *declaration*, because the hole it exists to surface is an unobserved corridor and the fix

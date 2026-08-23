@@ -18,12 +18,24 @@ The property covers costing's **route-existence** refusals, and only those (rese
   ``stream.arrives_at`` or ``stream.amount.currency``;
 * *``ExitCostUnknown``* -- the way in is costable and nobody has declared the way out.
 
-It does **not** cover ``RouteUnusable`` for a binding limit, a closed window or a closed route.
-Those are statements about **today**, and coverage is a statement about **declarations**
-(FR-022 ⚙) -- a closed corridor is already observed, and telling the owner to go and observe it
-would be the wrong instruction. So the generator holds amount and dates where feasibility cannot
+It does **not** cover ``RouteUnusable`` for a binding limit, a closed window or a closed route
+-- including, since 002's review, **a closed exit partner**, which ``cost_one`` now reports as
+``ExitCostUnknown`` while coverage still counts the closed exit as *declared*. Those are all
+statements about **today**, and coverage is a statement about **declarations** (FR-022 ⚙): a
+closed corridor is already observed, and telling the owner to go and observe it would be the
+wrong instruction. So the generator holds amount, dates and statuses where feasibility cannot
 bite, and every one of those scoping decisions is written out at
 ``route_graphs.coverage_registries``.
+
+**Nor does it cover a pair costing has no ``FundingPath`` for at all** -- and that exclusion
+grew on 2026-08-23. A ``FundingPath`` is a ``(destination, stream, route)`` triple, so a pair
+whose inbound half is satisfied by *arrival* and/or whose exit half is satisfied by *identity*
+has no route to name and costing produces neither a figure nor a refusal for it. It is outside
+the agreement's **domain**, not in disagreement with it: the two views are answering the same
+question about corridors, and this pair needs no corridor. The hole already existed for arrival
+(FR-005); the owner's FR-002 decision widened it to the exit side. Such pairs are partitioned
+out below **and asserted on**, rather than skipped, so the exclusion cannot quietly swallow a
+real disagreement.
 
 **If this test fails with a ``RouteUnusable``, the generator has drifted into feasibility
 territory. Fix the generator's amounts, dates and limits -- never the coverage rule.** The
@@ -118,6 +130,17 @@ def _assert_in_scope(outcomes: list[RampCost | RouteUnusable]) -> None:
             )
 
 
+def _rests_on_a_route(verdict: Ready) -> bool:
+    """Whether both halves of this ready verdict are carried by declared routes.
+
+    A verdict resting on a sentinel -- arrival on the way in, identity on the way out -- names
+    no route, so there is no ``FundingPath`` for costing to have an opinion about. Partitioning
+    on this is what keeps the agreement a claim about corridors rather than a claim costing was
+    never asked.
+    """
+    return isinstance(verdict.inbound, tuple) and isinstance(verdict.exits, tuple)
+
+
 @given(registry=coverage_registries())
 @settings(max_examples=100, deadline=None)
 def test_a_ready_pair_is_one_costing_produces_a_round_trip_for(
@@ -139,11 +162,31 @@ def test_a_ready_pair_is_one_costing_produces_a_round_trip_for(
             continue
         outcomes = _costed(registry, verdict.destination.venue_id, verdict.stream_id)
         _assert_in_scope(outcomes)
+        if not _rests_on_a_route(verdict):
+            _SENTINEL_BACKED.add((verdict.destination.venue_id, verdict.stream_id))
+            # Outside the domain, and asserted to be outside it rather than merely skipped:
+            # costing has no path to this pair, so it produces no figure. If a future
+            # generator ever makes one costable, this fails and sends the reader to the scope
+            # note above instead of letting the partition hide a real disagreement.
+            assert not _round_trips(outcomes), (
+                f"{verdict.destination.venue_id}/{verdict.stream_id} is ready on a sentinel "
+                "and costing produced a figure for it, so it is *inside* the agreement's "
+                "domain after all and the partition above is wrong."
+            )
+            continue
         assert _round_trips(outcomes), (
             f"coverage marked {verdict.destination.venue_id}/{verdict.stream_id} ready, and "
             "costing produced no round-trip figure for it over any declared route. The two "
             "views of one registry must not disagree about what is comparable (FR-018)."
         )
+        _ROUTE_BACKED.add((verdict.destination.venue_id, verdict.stream_id))
+
+
+_ROUTE_BACKED: set[tuple[str, str]] = set()
+"""Ready pairs the agreement actually constrained, accumulated across examples."""
+
+_SENTINEL_BACKED: set[tuple[str, str]] = set()
+"""Ready pairs excluded from the domain because they name no route."""
 
 
 @given(registry=coverage_registries())
@@ -212,6 +255,16 @@ def test_the_generator_reaches_both_verdicts(registry: CoverageRegistry) -> None
 
 _SEEN: set[str] = set()
 """Which verdict types the generated battery actually produced, accumulated across examples."""
+
+
+def test_the_agreement_constrained_real_pairs_and_the_exclusion_is_not_everything() -> None:
+    """The partition above is only honest if both sides of it are non-empty.
+
+    A property that excluded every ready pair would pass for the worst possible reason. Runs
+    after the two properties, which pytest orders within a file.
+    """
+    assert _ROUTE_BACKED, "the agreement never constrained a single route-backed ready pair"
+    assert _SENTINEL_BACKED, "the sentinel exclusion never fired; the note above is untested"
 
 
 def test_the_battery_produced_both_ready_and_not_ready_verdicts() -> None:

@@ -77,12 +77,14 @@ from terezy.core.results.coverage import (
     NO_EXIT_DECLARED,
     NO_INBOUND,
     SATISFIED_BY_ARRIVAL,
+    SATISFIED_BY_IDENTITY,
     AnySpendableEndpoint,
     AuditedDeclarations,
     BlockedPair,
     CoverageReport,
     Deficit,
     Destination,
+    ExitEvidence,
     InboundEvidence,
     MissingDeclaration,
     MissingTarget,
@@ -192,19 +194,29 @@ def _target_key(target: MissingTarget) -> tuple[str, str]:
             assert_never(target)
 
 
-def _missing_key(missing: MissingDeclaration) -> tuple[str, str, str, str, str]:
+def _missing_key(missing: MissingDeclaration) -> tuple[str, ...]:
     """A missing declaration's identity, in the order the to-do list breaks its ties by.
 
     **Presentation only** beyond the count (research.md D9). FR-010 forbids breaking a tie
     arbitrarily and FR-016 requires the identical report on every run, and the two are
     reconciled the way ``results.ramp.Ranking`` already reconciles them: the sequence is
     ordered so it is deterministic, and :attr:`RegimeCoverage.ties` is where the claim lives.
+
+    **Total over every field of the record**, including the candidate list, and that last part
+    is the difference between deterministic and deterministic-by-luck. A key that ignored a
+    field would leave two declarations differing only in it tied, and a tie in the key falls
+    through to the iteration order of whatever collection was being sorted -- which for a set
+    varies with ``PYTHONHASHSEED`` from one process to the next. Today the candidate list is the
+    same for every missing exit in a report, so the shorter key happened to be total; that is an
+    accident of the data rather than a property of the code, and FR-016 is a property of the
+    code.
     """
     return (
         missing.direction,
         missing.origin_venue,
         missing.origin_currency.value,
         *_target_key(missing.target),
+        *(part for endpoint in missing.candidates for part in _endpoint_key(endpoint)),
     )
 
 
@@ -345,35 +357,39 @@ def _missing_exit(
 
 
 def _rests_on(
-    inbound: InboundEvidence, exits: tuple[RouteRelied, ...]
+    inbound: InboundEvidence, exits: ExitEvidence
 ) -> Literal["open", "constrained", "closed_only"]:
     """Whether the declarations a ready verdict rests on actually work today (SC-015).
 
-    ``open`` needs both halves open: an open way in **and** an open way out. ``closed_only`` is
-    every relied route closed. Everything else is ``constrained``, which is a real third state
-    rather than a rounding of the other two -- a constrained route is costed and reported as
-    constrained by feature 002, and flattening it into either neighbour would state something
-    the declarations do not.
+    ``open`` needs both halves open. ``closed_only`` is every relied route closed. Everything
+    else is ``constrained``, which is a real third state rather than a rounding of the other
+    two -- a constrained route is costed and reported as constrained by feature 002, and
+    flattening it into either neighbour would state something the declarations do not.
 
-    **Arrival is not a route and cannot be closed.** Where the inbound half is satisfied by
-    arrival it contributes no status: the money is already there, so the verdict rests on the
-    exits alone. That is why the inbound half counts as open in the first test and contributes
-    nothing to the "every relied route is closed" test in the second -- a pair reached by
-    arrival whose only exit is closed is ``closed_only``, which is the honest reading and the
-    one an empty ``relied`` list would have got wrong.
+    **Neither sentinel is a route, so neither can be closed.** Where the inbound half is
+    satisfied by arrival the money is already there, and where the exit half is satisfied by
+    identity it is already out; in both cases that half contributes no status and cannot be the
+    thing that shut. Written as one symmetric fold over the two halves rather than as a special
+    case bolted onto the other, because the first version of this function *was* the bolted-on
+    kind and it got the arrival branch wrong: it collected no relied routes at all when the
+    inbound was a sentinel, so a pair reached by arrival whose only exit was closed reported
+    ``constrained`` instead of ``closed_only``.
 
     Derived here rather than declared, and reported beside the statuses it came from, so a
     reader can check it against them.
     """
+    relied: list[RouteRelied] = []
+    inbound_open = True
+    exit_open = True
     if isinstance(inbound, tuple):
-        relied = [*inbound, *exits]
-        inbound_open = any(relied_route.status == "open" for relied_route in inbound)
-    else:
-        relied = [*exits]
-        inbound_open = True
-    if inbound_open and any(relied_route.status == "open" for relied_route in exits):
+        relied.extend(inbound)
+        inbound_open = any(route.status == "open" for route in inbound)
+    if isinstance(exits, tuple):
+        relied.extend(exits)
+        exit_open = any(route.status == "open" for route in exits)
+    if inbound_open and exit_open:
         return "open"
-    if relied and all(relied_route.status == "closed" for relied_route in relied):
+    if relied and all(route.status == "closed" for route in relied):
         return "closed_only"
     return "constrained"
 
@@ -395,14 +411,28 @@ def _verdict(
     inbound being present would make the second observation invisible until the first had been
     made. The three kinds stay distinguished; what changed is only that kinds 2 and 3 classify
     the exit side alone.
+
+    **Each side can also be satisfied without any route.** The inbound half by *arrival*, when
+    the money is born at the destination (FR-005); the exit half by *identity*, when the
+    destination is itself a declared spendable endpoint (FR-002, owner decision 2026-08-23).
+    The two are written the same way on purpose -- consulted before the routes, reported as
+    distinct sentinels -- because they are the same kind of fact: a half of the owner's rule
+    that needs no corridor because the money is already on the right side of it.
     """
     arrival = _satisfied_by_arrival(destination, stream)
     matches = () if arrival else _inbound_matches(routes, destination, stream)
     inbound: InboundEvidence = SATISFIED_BY_ARRIVAL if arrival else matches
-    exits = _exits_from(routes, destination)
+
+    # The exit half, satisfied by identity when the destination *is* a declared spendable
+    # endpoint (FR-002, owner decision 2026-08-23). Read before the routes are consulted at
+    # all, exactly as arrival is: the money is already where it needed to come back out to, so
+    # there is nothing for a way out to do and nothing for the verdict to rest on.
+    identity = is_spendable(destination, spendable)
+    declared = () if identity else _exits_from(routes, destination)
     reaching = tuple(
-        relied for relied in exits if _lands_spendable(routes[relied.route_id], spendable)
+        relied for relied in declared if _lands_spendable(routes[relied.route_id], spendable)
     )
+    exits: ExitEvidence = SATISFIED_BY_IDENTITY if identity else reaching
 
     deficits: list[Deficit] = []
     if not arrival and not matches:
@@ -413,7 +443,12 @@ def _verdict(
                 observed_exits=(),
             )
         )
-    if not exits:
+    if identity:
+        # No exit deficit and no missing-exit to-do item is ever produced for a destination in
+        # the spendable set: there is nothing to go and observe, because the money is already
+        # somewhere it can be spent from.
+        pass
+    elif not declared:
         deficits.append(
             Deficit(
                 kind=NO_EXIT_DECLARED,
@@ -429,7 +464,7 @@ def _verdict(
                 # The exits that *do* exist, so the owner can see the corridor was already
                 # observed and why it does not count -- the difference between this and
                 # NO_EXIT_DECLARED, which is a different errand.
-                observed_exits=exits,
+                observed_exits=declared,
             )
         )
 
@@ -444,8 +479,8 @@ def _verdict(
         destination=destination,
         stream_id=stream.id,
         inbound=inbound,
-        exits=reaching,
-        rests_on=_rests_on(inbound, reaching),
+        exits=exits,
+        rests_on=_rests_on(inbound, exits),
     )
 
 
@@ -546,7 +581,7 @@ def _orphan_exits(
 
 def _regime_sets(
     regimes: Mapping[str, Regime], routes: Mapping[str, Route]
-) -> Iterator[tuple[str, str, tuple[str, ...]]]:
+) -> Iterator[tuple[str, Literal["declared", "implicit"], tuple[str, ...]]]:
     """Each regime the report covers, as ``(id, source, its route ids)``, sorted by id.
 
     With no regime declared this yields exactly one implicit block holding **every** declared
@@ -577,7 +612,7 @@ def _regime_sets(
 
 def _regime_block(
     regime_id: str,
-    source: str,
+    source: Literal["declared", "implicit"],
     route_ids: tuple[str, ...],
     *,
     routes: Mapping[str, Route],
@@ -615,7 +650,7 @@ def _regime_block(
     todo = _todo(verdicts)
     return RegimeCoverage(
         regime_id=regime_id,
-        source="implicit" if source == "implicit" else "declared",
+        source=source,
         route_ids=route_ids,
         verdicts=verdicts,
         todo=todo,
@@ -639,7 +674,12 @@ def _observations(blocks: tuple[RegimeCoverage, ...]) -> tuple[Observation, ...]
     counts = {
         (block.regime_id, entry.missing): entry.count for block in blocks for entry in block.todo
     }
-    distinct = {entry.missing for block in blocks for entry in block.todo}
+    # A ``dict`` rather than a ``set``: insertion order here is already deterministic -- blocks
+    # are sorted by regime id and each block's ``todo`` is sorted -- so the sequence handed to
+    # ``sorted`` does not depend on hash order even before the key is applied. Belt and braces
+    # with the total key above, and cheap: a set would make determinism rest entirely on the key
+    # being total, which is one thing to get wrong rather than two.
+    distinct = {entry.missing: None for block in blocks for entry in block.todo}
     return tuple(
         Observation(
             missing=missing,
