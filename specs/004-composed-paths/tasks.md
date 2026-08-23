@@ -166,7 +166,7 @@ arriving amount and cost percentages against hand-computed leg-by-leg arithmetic
       bucket **sorted by route id** (**T-5**), depth-first with a visited-venue set (**T-4**: no
       pruning by cost, no partial-cost cache, no heuristic), the declared bound as the only depth
       limit, and a typed `CompositionRefused` for a question that could not be asked.
-- [ ] T021 [US1] Extend `tests/invariants/test_cost_attribution.py` with the second axis
+- [X] T021 [US1] Extend `tests/invariants/test_cost_attribution.py` with the second axis
       (research.md D7): the segment attributions sum to the same total as the components, on
       composed candidates as on declared routes.
 
@@ -183,10 +183,10 @@ rules, because the fold never knew what a route was.
 **Independent Test**: compose a path with one unverified and one stale segment value; confirm
 every derived figure carries the mark and the verdict.
 
-- [ ] T022 [P] [US2] Write `tests/worked_examples/test_composed_pool.py` (SC-007) — two legs in
+- [X] T022 [P] [US2] Write `tests/worked_examples/test_composed_pool.py` (SC-007) — two legs in
       **different segments** naming one capacity pool consume one shared monthly headroom; the
       deployable amount equals the hand-computed joint figure, never the sum of two full limits.
-- [ ] T023 [US2] Confirm SC-006 and SC-011 hold in `tests/contract/test_composed_same_costing.py`
+- [X] T023 [US2] Confirm SC-006 and SC-011 hold in `tests/contract/test_composed_same_costing.py`
       against the real implementation, and record in the module docstring that they hold because
       the fold is unchanged rather than because new code was written for them (research.md D11).
 
@@ -233,13 +233,13 @@ question, within one regime.
 **Independent Test**: compose a path with one segment closed on the date; the candidate is
 excluded with the binding segment named and its absence visible.
 
-- [ ] T028 [US4] Write `tests/unit/test_composed_feasibility.py` (SC-008, SC-012) — a closed,
+- [X] T028 [US4] Write `tests/unit/test_composed_feasibility.py` (SC-008, SC-012) — a closed,
       disrupted or out-of-window segment excludes the candidate with the **binding segment**
       recorded and the exclusion visible in the output; an amount below a minimum anywhere along
       the chain reports the minimum, the shortfall and the segment and is never rounded up; and
       across a regime transition no candidate mixes route sets, on a registry where only a mixed
       chain would connect.
-- [ ] T029 [US4] Make it pass in `src/terezy/core/routes/cost.py`: `binding_segment` set from the
+- [X] T029 [US4] Make it pass in `src/terezy/core/routes/cost.py`: `binding_segment` set from the
       `_chain` pairing, and every segment's declared status checked in order.
 
 **Checkpoint**: US4 independently testable. **Commit.**
@@ -255,24 +255,24 @@ tension with feature 003.
 **Independent Test**: add one route declaration connecting a terminal venue onward; new composed
 candidates appear, fully costed and ranked, with no source-code change.
 
-- [ ] T030 [P] [US5] Write `tests/worked_examples/test_composed_exit_chain.py` (SC-015) — a round
+- [X] T030 [P] [US5] Write `tests/worked_examples/test_composed_exit_chain.py` (SC-015) — a round
       trip whose exit is reachable only by chaining declared exit routes, hand-computed leg by
       leg; and the other way, a destination from which nothing chains still reporting *exit cost
       unknown*, staying out of the round-trip ranking, and never promoting its one-way figure.
-- [ ] T031 [P] [US5] Write `tests/contract/test_composed_distinct.py` (SC-017, SC-018) — every
+- [X] T031 [P] [US5] Write `tests/contract/test_composed_distinct.py` (SC-017, SC-018) — every
       composed candidate in every ranking, report and recommendation is a distinct **type** shown
       segment by segment, each segment naming its declared route, verified across every reported
       candidate rather than sampled; and two distinct exit chains from one destination give two
       distinct round-trip figures, each keyed by its chain, tying when equal within tolerance.
-- [ ] T032 [P] [US5] Write `tests/contract/test_composed_data_only.py` (SC-010) — adding one route
+- [X] T032 [P] [US5] Write `tests/contract/test_composed_data_only.py` (SC-010) — adding one route
       declaration that connects a terminal venue onward makes new composed candidates appear,
       fully costed and ranked, with **zero** lines of source code changed; and a corridor broken
       by one missing segment is simply absent, never fabricated.
-- [ ] T033 [US5] Implement exit-chain enumeration in `src/terezy/core/routes/compose.py` — the
+- [X] T033 [US5] Implement exit-chain enumeration in `src/terezy/core/routes/compose.py` — the
       same function with `direction` as its parameter (research.md D9, D10), the bound applying to
       each chain separately, and a chain ending at a **declared spendable endpoint** passed in as
       a parameter rather than read out of feature 003 (research.md D13).
-- [ ] T034 [US5] Implement `EXIT_BY_IDENTITY` costing in `src/terezy/core/routes/cost.py` and
+- [X] T034 [US5] Implement `EXIT_BY_IDENTITY` costing in `src/terezy/core/routes/cost.py` and
       state at the site that a round trip costing nothing **because there is nothing to do** is a
       different claim from one whose fees cancelled.
 

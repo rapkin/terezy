@@ -59,7 +59,9 @@ from terezy.core.results.ramp import (
     RouteUnusable,
 )
 from terezy.core.routes import cost
+from terezy.core.routes import path as composed_path
 from terezy.core.routes.legs import Leg
+from tests import composed_registries as composed_fixtures
 from tests.invariants import route_graphs
 from tests.invariants.route_graphs import AS_OF, KINDS, ON_DATE, Graph
 
@@ -394,3 +396,138 @@ def test_the_disruption_probability_rides_beside_the_cost_and_never_inside_it() 
     assert isinstance(costed, RampCost)
     assert costed.one_way.fraction == 0.0
     assert costed.disruption_probability == 0.4
+
+
+# ---------------------------------------------------------------------------
+# 004-composed-paths: the second axis of the same attribution
+# ---------------------------------------------------------------------------
+#
+# FR-020 wants cost attributed to its **segment** as well as to its component, so a reader can
+# see which hop of a chain dominates and trace it to the declaration that charged. That gives
+# the invariant above a second axis rather than replacing it (research.md D7):
+#
+#     sum(components) == sum over segments of sum(that segment's components)
+#
+# Two flat mappings, each summing to the same total, and a leg cannot hide in either.
+#
+# ⚙ **Within the project tolerance rather than bit for bit**, and the reason matters more than
+# the assertion. The whole-candidate totals keep the exact addition order feature 002
+# established; the per-segment subtotals are accumulated **beside** them from the same per-leg
+# figures, never summed into them. Reconstructing the total from the subtotals would be a sum of
+# sums, whose rounding is not the rounding of one fold -- and 002's golden file records the fold.
+#
+# The generated graphs above produce one route at a time, so they exercise the one-segment case:
+# a declared route has exactly one attribution and that is **not** a special case in the code.
+# The composed case is exercised against a hand-built chain, where the expected per-segment
+# figures are arithmetic a reader can check.
+
+COMPOSED_CHAIN = composed_path.ComposedPath(
+    destination_id=composed_fixtures.BROKER,
+    stream_id=composed_fixtures.SALARY.id,
+    segments=("in_salary_to_exchange", "in_exchange_to_broker"),
+)
+
+
+def _composed(amount: float) -> RampCost:
+    world = composed_fixtures.two_hop()
+    costed = cost.cost_one(
+        COMPOSED_CHAIN,
+        Money(amount, Currency.UAH, prov.EMPTY),
+        exit_path=composed_path.ComposedExit(
+            segments=("out_broker_to_exchange", "out_exchange_to_home")
+        ),
+        routes=world.routes,
+        channels=world.channels,
+        streams=world.streams,
+        kinds=world.kinds,
+        on_date=composed_fixtures.ON_DATE,
+        as_of=composed_fixtures.AS_OF,
+    )
+    assert isinstance(costed, RampCost), costed
+    return costed
+
+
+@given(graph=route_graphs.route_graphs(), amount=route_graphs.AMOUNTS)
+@settings(max_examples=200)
+def test_the_segments_account_for_the_whole_one_way_cost(graph: Graph, amount: float) -> None:
+    """The second axis, over the same generated routes as the first (FR-020, research.md D7)."""
+    costed = _cost(graph, amount)
+    if isinstance(costed, RouteUnusable):
+        return
+    by_component = _total(costed)
+    by_segment = money.total(
+        [charge for entry in costed.one_way.by_segment for charge in entry.components.values()],
+        costed.one_way.sent.currency,
+    )
+    assert_money_close(by_component, by_segment)
+
+
+@given(graph=route_graphs.route_graphs(with_partner=True), amount=route_graphs.AMOUNTS)
+@settings(max_examples=200)
+def test_the_segments_account_for_the_whole_round_trip_cost(graph: Graph, amount: float) -> None:
+    """The same on the way back out, where the exit's segments continue the numbering."""
+    costed = _cost(graph, amount)
+    if isinstance(costed, RouteUnusable) or not isinstance(costed.round_trip, RoundTripCost):
+        return
+    round_trip = costed.round_trip
+    by_component = money.total(round_trip.components.values(), round_trip.sent.currency)
+    by_segment = money.total(
+        [charge for entry in round_trip.by_segment for charge in entry.components.values()],
+        round_trip.sent.currency,
+    )
+    assert_money_close(by_component, by_segment)
+
+
+@given(graph=route_graphs.route_graphs(), amount=route_graphs.AMOUNTS)
+@settings(max_examples=100)
+def test_a_declared_route_has_exactly_one_segment_attribution(graph: Graph, amount: float) -> None:
+    """One segment is not a special case: SC-002's "same costing function" covers attribution."""
+    costed = _cost(graph, amount)
+    if isinstance(costed, RouteUnusable):
+        return
+    assert len(costed.one_way.by_segment) == 1
+    entry = costed.one_way.by_segment[0]
+    assert entry.position == 0
+    assert entry.route_id == graph.route.id
+    assert set(entry.components) == set(costed.one_way.components)
+
+
+@given(amount=st.floats(min_value=100.0, max_value=1_000_000.0, allow_nan=False))
+@settings(max_examples=50)
+def test_a_chain_attributes_to_both_of_its_segments_and_the_axes_agree(amount: float) -> None:
+    """The composed case, where the second axis first carries information.
+
+    Two segments, both named, in chain order, and the two axes summing to one total. On a
+    declared route the segment axis is trivially the whole cost; on a chain it is the only place
+    "which hop dominates" is answerable at all (SC-014).
+    """
+    costed = _composed(amount)
+    assert [entry.position for entry in costed.one_way.by_segment] == [0, 1]
+    assert [entry.route_id for entry in costed.one_way.by_segment] == [
+        "in_salary_to_exchange",
+        "in_exchange_to_broker",
+    ]
+    by_component = _total(costed)
+    by_segment = money.total(
+        [charge for entry in costed.one_way.by_segment for charge in entry.components.values()],
+        costed.one_way.sent.currency,
+    )
+    assert_money_close(by_component, by_segment)
+
+
+@given(amount=st.floats(min_value=100.0, max_value=1_000_000.0, allow_nan=False))
+@settings(max_examples=50)
+def test_the_round_trip_numbers_the_exit_segments_on_from_the_inbound_ones(
+    amount: float,
+) -> None:
+    """One journey, one numbering. Two independent numberings would make "position 0"
+    ambiguous in a report holding both halves of a round trip."""
+    costed = _composed(amount)
+    assert isinstance(costed.round_trip, RoundTripCost)
+    assert [entry.position for entry in costed.round_trip.by_segment] == [0, 1, 2, 3]
+    assert [entry.route_id for entry in costed.round_trip.by_segment] == [
+        "in_salary_to_exchange",
+        "in_exchange_to_broker",
+        "out_broker_to_exchange",
+        "out_exchange_to_home",
+    ]

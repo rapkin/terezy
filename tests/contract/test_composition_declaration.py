@@ -302,3 +302,45 @@ def test_the_composition_directory_is_exempt_by_name_and_never_sourced() -> None
         "an exemption with no reason recorded beside it is an allowlist entry, which is the "
         "fail-open shape this gate was changed to close"
     )
+
+
+SECOND_OWNER_STREAM = """# SYNTHETIC FIXTURE -- a second owner's salary, from a contract test.
+
+[[stream]]
+id         = "salary_two"
+owner_id   = "owner-002"
+currency   = "UAH"
+amount     = 0.0
+cadence    = "monthly"
+arrives_at = "monobank_uah"
+
+  [stream.indexation]
+  policy = "none"
+"""
+"""A stream belonging to somebody else, in the same data root.
+
+It arrives where the owner's own salary does, so if it were resolved it would be enumerated
+against **this** owner's declared reach -- one person's stated policy deciding how far another
+person's money is allowed to travel, and therefore which corridors he is shown at all.
+"""
+
+
+def test_a_second_owners_streams_in_the_data_root_are_refused_not_blended(
+    tmp_path: Path,
+) -> None:
+    """Principle VII, on the side a membership check leaves open.
+
+    ``ramp_from_data_root`` globs every ``streams/*.toml``, so two owners' streams load together
+    and asking only whether the bound's owner is *among* them lets the other owner's streams be
+    enumerated against this owner's policy. The refusal names the **stream file** that does not
+    belong in this run, because the composition file is correct about itself.
+    """
+    root = _scratch_root(tmp_path)
+    foreign = root / "streams" / "owner-002.toml"
+    foreign.write_text(SECOND_OWNER_STREAM, encoding="utf-8")
+    with pytest.raises(DeclarationError) as caught:
+        _resolve(root)
+    _assert_names_file_and_field(caught.value, foreign, "owner_id")
+    assert "owner-002" in caught.value.problem
+    assert "owner-001" in caught.value.problem
+    assert "salary_two" in caught.value.problem

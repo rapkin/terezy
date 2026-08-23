@@ -42,6 +42,7 @@ from terezy.core.routes.path import (
     Candidate,
     ComposedExit,
     ComposedPath,
+    DeclaredExit,
     FundingPath,
     segments_of,
 )
@@ -288,3 +289,113 @@ class TestTheChainReportsWhatItsSegmentsDid:
     def test_latency_accumulates_across_segments(self) -> None:
         """FR-004: exactly what a declared route with the same concatenated legs would report."""
         assert _costed().latency_days == 3
+
+
+class TestTheGuardsOnAnIncoherentCandidate:
+    """A chain is assembled at query time, so this is the only place its shape can be checked.
+
+    Every one of these is a **construction error** rather than a fact about the money -- the
+    caller handed the costing function something that does not describe a journey -- so each
+    raises rather than returning a typed refusal. Reporting them as costs would invite callers
+    to keep building mismatched candidates and read the answer as a price.
+    """
+
+    def test_a_chain_whose_junction_does_not_join_is_refused(self) -> None:
+        """The venue matches and the **currency** does not: the first segment arrives in
+        dollars at the exchange and the second departs in hryvnia from it.
+
+        A junction converts nothing, charges nothing and waits for nothing, so this chain does
+        not exist -- and bridging it would be an invented leg at an invented rate (FR-002). The
+        search never emits such a pair; this guard is what catches a hand-assembled one.
+        """
+        onward = fixtures.corridor(
+            "in_exchange_uah_to_fund",
+            direction="inbound",
+            legs=(
+                fixtures.leg(
+                    index=0,
+                    from_venue=fixtures.EXCHANGE,
+                    to_venue=fixtures.FUND,
+                    from_ccy=fixtures.UAH,
+                    to_ccy=fixtures.UAH,
+                ),
+            ),
+        )
+        routes = {**fixtures.two_hop().routes, onward.id: onward}
+        with pytest.raises(ValueError, match="do not join"):
+            cost.legs_of(
+                ComposedPath(
+                    destination_id=fixtures.FUND,
+                    stream_id=fixtures.SALARY.id,
+                    segments=("in_salary_to_exchange", onward.id),
+                ),
+                routes,
+            )
+
+    def test_a_chain_naming_an_undeclared_route_is_refused(self) -> None:
+        world = fixtures.two_hop()
+        with pytest.raises(KeyError, match="unknown route"):
+            cost.legs_of(
+                ComposedPath(
+                    destination_id=fixtures.BROKER,
+                    stream_id=fixtures.SALARY.id,
+                    segments=("in_salary_to_exchange", "typo_route"),
+                ),
+                world.routes,
+            )
+
+    def test_a_chain_that_does_not_end_where_it_says_it_does_is_refused(self) -> None:
+        """The key has to be coherent: the destination on the record and the venue the last
+        segment arrives at are one fact, and two places holding it can disagree."""
+        world = fixtures.two_hop()
+        with pytest.raises(ValueError, match="names 'home' as its destination"):
+            cost.legs_of(
+                ComposedPath(
+                    destination_id=fixtures.HOME,
+                    stream_id=fixtures.SALARY.id,
+                    segments=("in_salary_to_exchange", "in_exchange_to_broker"),
+                ),
+                world.routes,
+            )
+
+
+class TestTheGuardsOnAnIncoherentExitChain:
+    """FR-022 and FR-002 on the way out, where a chain is likewise built at query time."""
+
+    def _cost(self, chain: ComposedExit | DeclaredExit) -> object:
+        world = fixtures.two_hop()
+        return cost.cost_one(
+            CHAIN,
+            AMOUNT,
+            exit_path=chain,
+            routes=world.routes,
+            channels=world.channels,
+            streams=world.streams,
+            kinds=world.kinds,
+            on_date=fixtures.ON_DATE,
+            as_of=fixtures.AS_OF,
+        )
+
+    def test_a_composed_exit_of_one_segment_is_refused(self) -> None:
+        """One declared exit route is a ``DeclaredExit``; a chain of none is not a way out at
+        all, which is ``ExitCostUnknown`` and a different claim."""
+        with pytest.raises(ValueError, match="at least two"):
+            self._cost(ComposedExit(segments=("out_broker_to_exchange",)))
+
+    def test_an_exit_chain_naming_an_undeclared_route_raises_rather_than_reporting_unknown(
+        self,
+    ) -> None:
+        """A dangling reference is refused at load precisely so it cannot become a missing
+        round trip here -- ``null`` is how a declaration says nobody has costed the exit."""
+        with pytest.raises(KeyError, match="not declared"):
+            self._cost(DeclaredExit(route_id="typo_route"))
+
+    def test_an_inbound_route_used_as_a_way_out_is_refused(self) -> None:
+        """FR-022. An observation of a corridor one way says nothing about the other way, so
+        this would invent a corridor nobody observed."""
+        with pytest.raises(ValueError, match="declared inbound"):
+            self._cost(DeclaredExit(route_id="in_exchange_to_broker"))
+
+    def test_an_exit_chain_whose_junction_does_not_join_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="do not join"):
+            self._cost(ComposedExit(segments=("out_exchange_to_home", "out_broker_to_exchange")))

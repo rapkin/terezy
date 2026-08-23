@@ -113,6 +113,27 @@ symmetric spread would let a round trip computed as twice the one way pass."""
 SALARY_VENUE = "salary_venue"
 EXCHANGE = "exchange"
 BROKER = "broker"
+WALLET = "wallet"
+FUND = "fund"
+"""A domestic pair, both hryvnia, used only by the capacity example.
+
+Two hops in **one** currency on purpose: two legs sharing a rail must declare the **same**
+monthly cap, and a cap is a ``Money`` in the leg's own currency -- so a pool shared across a
+conversion could not be expressed at all without inventing a rate for the limit. The rail this
+models is the owner's card, and a card's limit is in hryvnia.
+"""
+
+CARD_POOL = "monobank_card"
+"""The rail both segments of :func:`pooled` run over.
+
+Named rather than anonymous because it is the point: Monobank's monthly limit is one of the
+four figures ``SIMULATOR_SPEC.md`` §11 item 1 records as the reason the ramp feature exists, and
+it belongs to the **card**. Two hops that both touch the card consume **one** limit.
+"""
+
+CARD_CAP = 100_000.0
+"""The declared monthly limit on that rail. Invented, like every number here."""
+
 MIRROR = "mirror_exchange"
 """A second exchange declaring the *same terms* as the first.
 
@@ -159,6 +180,8 @@ VENUES: Mapping[str, Venue] = {
     EXCHANGE: Venue(id=EXCHANGE, name="Exchange (SYNTHETIC)", currencies=frozenset({UAH, USD})),
     BROKER: Venue(id=BROKER, name="Broker (SYNTHETIC)", currencies=frozenset({USD})),
     MIRROR: Venue(id=MIRROR, name="Mirror exchange (SYNTHETIC)", currencies=frozenset({UAH, USD})),
+    WALLET: Venue(id=WALLET, name="Wallet (SYNTHETIC)", currencies=frozenset({UAH})),
+    FUND: Venue(id=FUND, name="Fund platform (SYNTHETIC)", currencies=frozenset({UAH})),
     HOME: Venue(id=HOME, name="Home rail (SYNTHETIC)", currencies=frozenset({UAH})),
 }
 
@@ -511,3 +534,87 @@ def duplicated() -> Registry:
         BROKER_TO_EXCHANGE,
         EXCHANGE_TO_HOME,
     )
+
+
+FUND_UAH = Destination(venue_id=FUND, currency=UAH)
+
+SALARY_TO_WALLET = corridor(
+    "in_salary_to_wallet",
+    direction="inbound",
+    legs=(
+        leg(
+            index=0,
+            from_venue=SALARY_VENUE,
+            to_venue=WALLET,
+            from_ccy=UAH,
+            to_ccy=UAH,
+            monthly_cap=CARD_CAP,
+            pool=CARD_POOL,
+        ),
+    ),
+)
+
+WALLET_TO_FUND = corridor(
+    "in_wallet_to_fund",
+    direction="inbound",
+    legs=(
+        leg(
+            index=0,
+            from_venue=WALLET,
+            to_venue=FUND,
+            from_ccy=UAH,
+            to_ccy=UAH,
+            monthly_cap=CARD_CAP,
+            pool=CARD_POOL,
+        ),
+    ),
+)
+
+
+def pooled() -> Registry:
+    """Two hops that both run over the owner's card, declaring the **same** limit on it.
+
+    The shape SC-007 is about: one rail, two segments, one monthly headroom. Both legs declare
+    the same cap because two legs naming one pool must -- two numbers for one real limit means
+    at least one is wrong, and choosing either would be a guess (002 research.md D10).
+    """
+    return registry(SALARY_TO_WALLET, WALLET_TO_FUND)
+
+
+SALARY_TO_HOME = corridor(
+    "in_salary_to_home",
+    direction="inbound",
+    legs=(
+        leg(
+            index=0,
+            from_venue=SALARY_VENUE,
+            to_venue=HOME,
+            from_ccy=UAH,
+            to_ccy=UAH,
+            fee_pct=0.005,
+        ),
+    ),
+)
+"""A way in that lands on the **spendable endpoint itself**, declaring no partner route.
+
+The shape feature 003's FR-002 is about and the one `features.toml` recorded as
+`identity-exit-vs-partner-requirement`: coverage calls the pair ready by identity -- the money
+is already where it can be spent -- while 002's costing, which required a declared partner,
+refused it with `ExitCostUnknown`. Declaring **no** ``partner_route`` here is deliberate: it is
+what makes the two views disagree, and therefore what the sentinel has to reconcile.
+"""
+
+
+def stranded() -> Registry:
+    """The two-hop corridor with the last exit segment missing.
+
+    From the broker, ``out_broker_to_exchange`` runs to the exchange and stops -- and dollars at
+    an exchange are not spendable. So no chain of declared exit segments reaches a spendable
+    endpoint, 002 FR-030 stands unchanged, and the destination has no round-trip figure at all.
+    """
+    return registry(SALARY_TO_EXCHANGE, EXCHANGE_TO_BROKER, BROKER_TO_EXCHANGE)
+
+
+def spendable_destination() -> Registry:
+    """A way in that lands where the owner spends, with nothing declared to come back out."""
+    return registry(SALARY_TO_HOME)

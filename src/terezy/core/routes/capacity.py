@@ -61,14 +61,14 @@ provenance reaches the headroom computed from it.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from typing import Final, Literal
 
 from terezy.core.primitives import money
 from terezy.core.primitives.money import Money
-from terezy.core.routes.legs import Route
+from terezy.core.routes.legs import Leg, Route
 
 
 @dataclass(frozen=True, slots=True)
@@ -181,12 +181,20 @@ class PoolCapacity:
     """The most this rail carries in a calendar month, as declared."""
 
 
-def caps_of(route: Route) -> tuple[PoolCapacity, ...]:
-    """The rails this route consumes, one entry per rail, in first-declaration order.
+def caps_over(legs: Sequence[Leg], *, source_id: str) -> tuple[PoolCapacity, ...]:
+    """The rails a sequence of legs consumes, one entry per rail, in first-declaration order.
 
-    **One entry per rail and not per leg**, because the limit belongs to the rail: a route
+    **One entry per rail and not per leg**, because the limit belongs to the rail: a journey
     whose transfer leg and fx leg both run over one card consumes that card's limit once, and
     reporting it twice would invite a caller to subtract it twice.
+
+    ⚙ **It takes legs rather than a route** (004 FR-016). A composed candidate is a chain of
+    declared routes, and two legs naming one rail bind jointly whether they sit in one route or
+    in two -- because the accumulator is keyed by ``(pool, year, month)`` and has never known
+    what a route is. Handing it the concatenated legs is therefore the whole of "pools compose",
+    and reporting the card twice for a two-hop chain would produce exactly the answer 002's
+    keying decision was made to avoid: each hop receiving its own full monthly allowance.
+    ``source_id`` is what the failures below name -- a route id, or a chain's segments joined.
 
     Two failures, both raised rather than returned:
 
@@ -200,16 +208,16 @@ def caps_of(route: Route) -> tuple[PoolCapacity, ...]:
 
     Both are structural properties of a declaration, knowable with no amount and no date, so
     the resolver checks them at load where the error can name the file and the leg index
-    (research.md D6). Reaching here means that validation was bypassed, which is a programmer
-    error rather than a fact about the money -- hence a raise.
+    (002 research.md D6). Reaching here means that validation was bypassed, which is a
+    programmer error rather than a fact about the money -- hence a raise.
     """
     found: dict[str, PoolCapacity] = {}
-    for leg in route.legs:
+    for leg in legs:
         if leg.monthly_cap is None:
             continue
         if leg.capacity_pool is None:
             raise ValueError(
-                f"leg {leg.index} of route {route.id!r} declares a monthly cap of "
+                f"leg {leg.index} of {source_id!r} declares a monthly cap of "
                 f"{leg.monthly_cap.amount!r} {leg.monthly_cap.currency.value} and no "
                 "capacity_pool. A monthly limit belongs to a rail, and without a rail there "
                 "is no key to accumulate it under -- so capacity already consumed in the "
@@ -220,7 +228,7 @@ def caps_of(route: Route) -> tuple[PoolCapacity, ...]:
         seen = found.get(leg.capacity_pool)
         if seen is not None and money.compare(seen.cap, leg.monthly_cap) != 0:
             raise ValueError(
-                f"legs of route {route.id!r} disagree about the monthly cap on pool "
+                f"legs of {source_id!r} disagree about the monthly cap on pool "
                 f"{leg.capacity_pool!r}: {seen.cap.amount!r} {seen.cap.currency.value} and "
                 f"{leg.monthly_cap.amount!r} {leg.monthly_cap.currency.value} at leg "
                 f"{leg.index}. Two numbers for one real limit means at least one is wrong, "
@@ -229,6 +237,17 @@ def caps_of(route: Route) -> tuple[PoolCapacity, ...]:
         if seen is None:
             found[leg.capacity_pool] = PoolCapacity(pool=leg.capacity_pool, cap=leg.monthly_cap)
     return tuple(found.values())
+
+
+def caps_of(route: Route) -> tuple[PoolCapacity, ...]:
+    """The rails one declared route consumes. :func:`caps_over` applied to its own legs.
+
+    Kept as a named function because a route is the thing a reader has in hand, and because
+    every 002-era caller asks this question about one route. It adds nothing of its own: the
+    rule, the two refusals and the ordering are all one function down, so a chain and a route
+    cannot come to disagree about what a rail is.
+    """
+    return caps_over(route.legs, source_id=route.id)
 
 
 FallbackPolicy = Literal["hold_as_cash", "redirect", "skip"]
