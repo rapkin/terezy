@@ -123,6 +123,9 @@ class NothingToDraw:
     """What was asked for, so a caller can say which render refused."""
 
 
+# The two renderers import the records above, so their imports come *after* the definitions
+# rather than at the top of the file -- the ordinary shape for a package whose ``__init__``
+# holds the shared types its submodules build on. ``E402`` is silenced here and nowhere else.
 from terezy.api.diagrams.graph import render_graph  # noqa: E402
 from terezy.api.diagrams.path import render_path  # noqa: E402
 

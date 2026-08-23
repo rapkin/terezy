@@ -213,14 +213,20 @@ def _reported_beside_fields(result: RampCost) -> list[str]:
     ]
 
 
-def _exit_route(result: RampCost, routes: Mapping[str, Route]) -> Route | None:
-    """The declared exit route, or ``None`` when the result says none was costed.
+def _exit_route(
+    result: RampCost, routes: Mapping[str, Route]
+) -> tuple[Route, RoundTripCost] | None:
+    """The declared exit route and the figure it earned, or ``None`` for neither.
 
-    Keyed off the *result*: a ``RoundTripCost`` means an exit route was costed, and the route's
-    ``partner_route`` names which. Never a search for something that leaves the destination,
-    which would be composition -- a different feature's question with a different answer.
+    Returned together because they are one fact: a ``RoundTripCost`` means an exit route was
+    costed, and the inbound route's ``partner_route`` names which. Returning the pair is what
+    lets the caller draw both without re-narrowing the union -- a second ``isinstance`` at the
+    call site would be a second place the two could be read apart.
+
+    Keyed off the *result*, never a search for something that leaves the destination: that
+    search is composition, a different feature's question with a different answer.
     """
-    if isinstance(result.round_trip, ExitCostUnknown):
+    if not isinstance(result.round_trip, RoundTripCost):
         return None
     inbound = routes[result.path.route_id]
     if inbound.partner_route is None:
@@ -229,24 +235,24 @@ def _exit_route(result: RampCost, routes: Mapping[str, Route]) -> Route | None:
             "round trip is drawn from the declared exit route's own legs (FR-010); there is no "
             "reversal of the inbound chain to fall back on"
         )
-    return routes[inbound.partner_route]
+    return routes[inbound.partner_route], result.round_trip
 
 
 def _drawn(result: RampCost, routes: Mapping[str, Route], regime_id: str) -> Diagram:
     """The path itself, once the input has been established to be a costed result."""
     inbound = routes[result.path.route_id]
-    exit_route = _exit_route(result, routes)
+    way_out = _exit_route(result, routes)
 
     chains: list[tuple[str, Route, StalenessVerdict]] = [
         (INBOUND, inbound, result.one_way.staleness)
     ]
-    if exit_route is not None:
+    if way_out is not None:
         # The exit legs' observations are in the *round-trip* verdict: it is the merged
         # verdict over both routes, and the one-way verdict never aged them. Using the
         # one-way verdict here would report every exit leg as unassessed -- honest, but a
         # verdict that does cover them exists and this is a picture of that result.
-        assert isinstance(result.round_trip, RoundTripCost)
-        chains.append((EXIT, exit_route, result.round_trip.staleness))
+        exit_route, round_trip = way_out
+        chains.append((EXIT, exit_route, round_trip.staleness))
 
     venue_ids = sorted(
         {
