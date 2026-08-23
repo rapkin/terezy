@@ -55,6 +55,7 @@ from pathlib import Path
 
 import pytest
 
+from terezy.core.inflation import series as cpi_series
 from terezy.core.instruments.interface import (
     BondTerms,
     Holding,
@@ -63,14 +64,17 @@ from terezy.core.instruments.interface import (
 )
 from terezy.core.ledger.events import EventKind
 from terezy.core.primitives import provenance as prov
+from terezy.core.primitives import staleness
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
+from terezy.core.primitives.periods import Window
 from terezy.core.primitives.provenance import Provenance, SourceRef
-from terezy.core.results import project
+from terezy.core.primitives.rates import NominalRate, RealRate
+from terezy.core.results import hurdle, project
 from terezy.core.results.project import Projection
 from terezy.core.tax.interface import TaxClass
-from terezy.data.declarations import resolver
-from tests import synthetic
+from terezy.data.declarations import loader, resolver
+from tests import cpi_fixtures, synthetic
 
 pytestmark = pytest.mark.contract
 
@@ -78,6 +82,9 @@ UAH = Currency.UAH
 
 DATA_ROOT = Path(__file__).resolve().parents[2] / "data"
 """The curated declarations, read through the loader like any other run."""
+
+KINDS_FILE = DATA_ROOT / "observation_kinds.toml"
+"""Where the staleness thresholds are declared. Read, never assumed."""
 
 ISSUE_A = "ovdp_synthetic_a"
 """The synthetic issue whose terms are unverified because they are invented."""
@@ -520,3 +527,136 @@ def _cost_only(result: Projection) -> frozenset[SourceRef]:
     later feature's ancillary figure would break for an uninteresting reason.
     """
     return result.ledger.applied[0].amount.provenance.sources
+
+
+# ---------------------------------------------------------------------------
+# 007-cpi-real-terms: the real figure's provenance is the union of both sides
+# ---------------------------------------------------------------------------
+#
+# FR-013: *"Every real figure MUST be traceable to the CPI observations that deflated it and
+# to the nominal figure it deflates. Its provenance is the union of both sides': an unverified
+# mark or a staleness report on any CPI observation used, or on any input of the nominal
+# figure, MUST appear on the real figure and on everything derived from it."*
+#
+# The walk above cannot reach these figures: it enumerates `Money`, and a rate is a bare
+# float. So the union is asserted here, and **by count** rather than by sample (research.md
+# D6) -- a long window really does put hundreds of sources on one figure, and a test that
+# checked "some observation is in there" would pass with 411 months collapsed into one.
+#
+# Both directions are checked, because the two failures are different edits. Deflating a
+# marked figure by clean observations must not launder the mark; deflating a clean figure by
+# marked observations must add one. A transform that dropped either is top severity.
+
+
+def _deflated(
+    *,
+    nominal_verified: bool,
+    observations_verified: bool,
+    months: int = 12,
+) -> RealRate:
+    """One realized real figure, with each side's verification set independently."""
+    nominal_source = SourceRef(
+        id="synthetic:nominal",
+        citation="SYNTHETIC FIXTURE -- the nominal figure's own input.",
+        retrieved_on=date(2026, 8, 23),
+        verified_on=date(2026, 8, 23) if nominal_verified else None,
+    )
+    series = cpi_fixtures.series(
+        cpi_fixtures.run_of("2026-01", months, 101.0),
+        verified_on=date(2026, 8, 23) if observations_verified else None,
+    )
+    figure = hurdle.real_terms(
+        nominal=NominalRate(0.155),
+        nominal_provenance=prov.of([nominal_source]),
+        series=series,
+        window=Window(first="2026-01", last=series.observations[-1].period),
+        assumption=None,
+    ).realized
+    assert isinstance(figure, RealRate), figure
+    return figure
+
+
+def test_a_real_figure_carries_one_source_per_month_it_chained_plus_the_nominal_side() -> None:
+    """Asserted by count. A shared or summarised ref would collapse this to a handful."""
+    figure = _deflated(nominal_verified=True, observations_verified=True, months=24)
+
+    assert len(figure.provenance.sources) == 25
+    assert "synthetic:nominal" in {ref.id for ref in figure.provenance.sources}
+
+
+def test_every_month_of_the_window_is_individually_traceable() -> None:
+    """The count could be right with the wrong months in it; this says which months."""
+    figure = _deflated(nominal_verified=True, observations_verified=True, months=6)
+    ids = {ref.id for ref in figure.provenance.sources}
+
+    assert ids == {"synthetic:nominal", *(f"synthetic:cpi:2026-0{month}" for month in range(1, 7))}
+
+
+def test_an_unverified_observation_marks_the_real_figure() -> None:
+    """One unverified month taints the figure, however many verified ones surround it."""
+    figure = _deflated(nominal_verified=True, observations_verified=False)
+
+    assert prov.is_unverified(figure.provenance)
+
+
+def test_a_marked_nominal_figure_is_not_laundered_by_deflating_it() -> None:
+    """The other direction, and the one an implementation is likelier to get wrong.
+
+    Every observation is verified here, so a figure whose provenance were built from the CPI
+    side alone would come back clean -- and would have dropped the nominal figure's mark in a
+    change nobody would read as dropping anything.
+    """
+    figure = _deflated(nominal_verified=False, observations_verified=True)
+
+    assert prov.is_unverified(figure.provenance)
+    assert {ref.id for ref in prov.unverified_sources(figure.provenance)} == {"synthetic:nominal"}
+
+
+def test_the_mark_is_falsifiable_on_the_real_figure_too() -> None:
+    """Both sides verified means no mark. A mark that is always on carries no information."""
+    figure = _deflated(nominal_verified=True, observations_verified=True)
+
+    assert not prov.is_unverified(figure.provenance)
+
+
+def test_a_stale_observation_is_reportable_from_the_figures_own_sources() -> None:
+    """FR-013's staleness half: the verdict is derivable from what the figure carries.
+
+    Derived rather than stored, on ``RoutesInForce.decided_by``'s reasoning: two places
+    holding one fact eventually disagree. What matters is that the figure carries the
+    *sources*, so the verdict can be taken against any as-of date the run asks about.
+    """
+    figure = _deflated(nominal_verified=True, observations_verified=False, months=3)
+    kinds = {kind.id: kind for kind in loader.observation_kinds_from_file(KINDS_FILE)}
+    observations = tuple(
+        cpi_fixtures.observation(period, 101.0)
+        for period, _ in cpi_fixtures.run_of("2026-01", 3, 101.0)
+    )
+
+    verdict = cpi_series.staleness_of_observations(observations, kinds, as_of=date(2027, 1, 1))
+
+    assert staleness.any_stale(verdict)
+    assert {entry.source_id for entry in verdict.stale} <= {
+        ref.id for ref in figure.provenance.sources
+    }
+
+
+def test_the_assumed_figure_carries_the_forecasts_citation_and_the_nominal_side() -> None:
+    """An assumption is not exempt from provenance when it was read somewhere (FR-015)."""
+    nominal_source = SourceRef(
+        id="synthetic:nominal",
+        citation="SYNTHETIC FIXTURE -- the nominal figure's own input.",
+        retrieved_on=date(2026, 8, 23),
+        verified_on=None,
+    )
+    figure = hurdle.real_terms(
+        nominal=NominalRate(0.155),
+        nominal_provenance=prov.of([nominal_source]),
+        series=None,
+        window=Window(first="2026-01", last="2026-12"),
+        assumption=cpi_fixtures.forecast_assumption(0.12),
+    ).assumed
+    assert isinstance(figure, RealRate)
+
+    assert len(figure.provenance.sources) == 2
+    assert prov.is_unverified(figure.provenance)

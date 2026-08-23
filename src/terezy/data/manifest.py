@@ -94,7 +94,7 @@ from terezy.core.primitives.provenance import Provenance
 from terezy.core.results import canonical
 from terezy.core.results.project import Projection
 from terezy.data.declarations.errors import DeclarationError
-from terezy.data.declarations.resolver import Declarations
+from terezy.data.declarations.resolver import Declarations, InflationDeclarations
 
 ENCODING: Final = "terezy-canonical-v3"
 """The name of the byte encoding a digest was taken under.
@@ -123,8 +123,15 @@ Carried in the value rather than only in this constant so that a stored digest c
 compared against one taken with a different algorithm by accident.
 """
 
-InputKind = Literal["instrument", "tax_class"]
-"""What kind of declaration an :class:`InputRef` describes. A closed set, not a free string."""
+InputKind = Literal["cpi_series", "inflation_assumption", "instrument", "tax_class"]
+"""What kind of declaration an :class:`InputRef` describes. A closed set, not a free string.
+
+⚙ **Two members added by feature 007.** FR-015 requires the manifest to record *which*
+inflation declaration produced a result -- two runs differing only in their declared belief
+are two results, and a manifest that did not name the belief could not tell them apart. The
+CPI series is recorded for the same reason from the other side: a real figure is only
+reproducible if the manifest says which series deflated it and at which version.
+"""
 
 
 def encode(value: Canonical) -> bytes:
@@ -220,7 +227,7 @@ class InputRef:
     """One declaration a run was given: what it is, where it came from, which version."""
 
     kind: InputKind
-    """Whether this is an instrument or a tax class. A closed set (:data:`InputKind`)."""
+    """What sort of declaration this is. A closed set (:data:`InputKind`)."""
 
     id: str
     """The declared id, as every figure and every reference names it."""
@@ -331,6 +338,51 @@ def input_refs(declarations: Declarations) -> tuple[InputRef, ...]:
     return tuple(sorted([*instruments, *tax_classes], key=lambda ref: (ref.kind, ref.id)))
 
 
+def inflation_input_refs(declarations: InflationDeclarations) -> tuple[InputRef, ...]:
+    """Every price series and the declared belief, as manifest input references (007 FR-015).
+
+    A separate function beside :func:`input_refs` rather than more branches inside it,
+    mirroring the resolver's own split: the two declaration sets describe different runs, and
+    a projection given no CPI is a legitimate run whose manifest simply lists none of these.
+
+    **The assumption is recorded even though it carries no citation.** Its
+    ``unverified_sources`` is empty for the owner's own belief -- there is nothing to verify a
+    belief against, and an empty list here says exactly that rather than claiming it was
+    checked. What the manifest is recording is *which declaration was in force*, which is the
+    question FR-015 asks: two runs with two beliefs must be tellable apart afterwards.
+    """
+    series = [
+        InputRef(
+            kind="cpi_series",
+            id=identifier,
+            file=file_name(declarations.series_files[identifier]),
+            version=file_version(declarations.series_files[identifier]),
+            unverified_sources=_unverified_ids(
+                prov.merge_all(item.provenance for item in declared.observations)
+            ),
+        )
+        for identifier, declared in declarations.series.items()
+    ]
+    assumptions = (
+        []
+        if declarations.assumption is None or declarations.assumption_file is None
+        else [
+            InputRef(
+                kind="inflation_assumption",
+                id=declarations.assumption.id,
+                file=file_name(declarations.assumption_file),
+                version=file_version(declarations.assumption_file),
+                unverified_sources=_unverified_ids(
+                    declarations.assumption.provenance
+                    if declarations.assumption.provenance is not None
+                    else prov.EMPTY
+                ),
+            )
+        ]
+    )
+    return tuple(sorted([*series, *assumptions], key=lambda ref: (ref.kind, ref.id)))
+
+
 def _instrument_provenance(declaration: InstrumentDeclaration) -> Provenance:
     """Every source behind one instrument declaration: its terms and its constraints.
 
@@ -354,8 +406,14 @@ def of_run(
     horizon: DateRange,
     assumptions: Assumptions,
     seed: int | None,
+    inflation: InflationDeclarations | None = None,
 ) -> RunManifest:
     """The manifest of one projection: its inputs, their versions, and its digest.
+
+    ⚙ **``inflation`` records which price series and which declared belief were in force**
+    (007 FR-015). It defaults to ``None`` because a run given no CPI is a legitimate run whose
+    real-terms slot reports both absences in words; the default records nothing rather than
+    recording a default, and the result itself already says what it was not given.
 
     Every argument is required and keyword-only. There is nothing this function can
     reasonably guess: a manifest built from defaults would be a record of a run that did
@@ -380,7 +438,16 @@ def of_run(
         holding=holding,
         horizon=horizon,
         assumptions=assumptions,
-        inputs=input_refs(declarations),
+        inputs=(
+            input_refs(declarations)
+            if inflation is None
+            else tuple(
+                sorted(
+                    [*input_refs(declarations), *inflation_input_refs(inflation)],
+                    key=lambda ref: (ref.kind, ref.id),
+                )
+            )
+        ),
         seed=seed,
         result_digest=digest_of_projection(result),
         unverified_sources=_unverified_ids(result.hurdle.provenance),

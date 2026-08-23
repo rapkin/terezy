@@ -154,12 +154,12 @@ field anywhere holds a number blending the two.
 
 ### Tests for User Story 2 (write first; they must fail) ⚠️
 
-- [ ] T020 [P] [US2] `tests/contract/test_two_figures_never_blend.py` — realized and assumed
+- [x] T020 [P] [US2] `tests/contract/test_two_figures_never_blend.py` — realized and assumed
       carry different `basis` values; no reported number combines observed and assumed
       inflation; **a cited external forecast is still labelled an assumption** (G8); two runs
       differing only in the declared assumption are two results, each naming the assumption it
       used (SC-008).
-- [ ] T021 [P] [US2] Extend `tests/contract/test_provenance_propagation.py` — the real
+- [x] T021 [P] [US2] Extend `tests/contract/test_provenance_propagation.py` — the real
       figure's provenance is the **union** of the nominal figure's and every observation that
       deflated it, asserted **by count** rather than by sample (D6); an unverified observation
       marks the real figure; an unverified nominal input marks it even when every observation
@@ -167,22 +167,22 @@ field anywhere holds a number blending the two.
 
 ### Implementation for User Story 2
 
-- [ ] T022 [US2] `src/terezy/core/inflation/series.py` — `InflationAssumption`
+- [x] T022 [US2] `src/terezy/core/inflation/series.py` — `InflationAssumption`
       (`annual_rate`, `is_assumption: Literal[True]`, `rationale`, `id`, optional `provenance`
       and staleness `kind`), on `RegimeTransition`'s precedent.
-- [ ] T023 [US2] `src/terezy/core/results/hurdle.py` — `real_terms` computes the assumed
+- [x] T023 [US2] `src/terezy/core/results/hurdle.py` — `real_terms` computes the assumed
       figure from the declared assumption, independently of the realized one, and refuses with
       a named reason when no assumption was declared (G9).
-- [ ] T024 [P] [US2] `src/terezy/data/declarations/schema.py` — `InflationAssumptionTable`
+- [x] T024 [P] [US2] `src/terezy/data/declarations/schema.py` — `InflationAssumptionTable`
       and `InflationAssumptionFile`, appended under a `007-cpi-real-terms` banner.
-- [ ] T025 [US2] `src/terezy/data/declarations/loader.py` — `inflation_assumption_from_file`,
+- [x] T025 [US2] `src/terezy/data/declarations/loader.py` — `inflation_assumption_from_file`,
       appended under the same banner: percent to fraction exactly once, `is_assumption` refused
       when false, and a half-filled citation refused rather than half-read.
-- [ ] T026 [US2] `data/scenarios/inflation/owner-001.toml` — the declared owner assumption,
+- [x] T026 [US2] `data/scenarios/inflation/owner-001.toml` — the declared owner assumption,
       `is_assumption = true`, a placeholder rationale in `war_end.toml`'s own words. In a
       **subdirectory** because `scenarios/*.toml` is globbed as scenario files and does not
       recurse (the `instruments/nav/` precedent).
-- [ ] T027 [US2] `src/terezy/data/manifest.py` — `InputKind` gains `cpi_series` and
+- [x] T027 [US2] `src/terezy/data/manifest.py` — `InputKind` gains `cpi_series` and
       `inflation_assumption`, so FR-015's *"the run manifest records which declaration produced
       it"* is a recorded input rather than a claim.
 
@@ -200,7 +200,7 @@ figure reports it; declare a kind with no threshold and confirm loading fails na
 
 ### Tests for User Story 3 (write first; they must fail) ⚠️
 
-- [ ] T028 [P] [US3] `tests/unit/test_cpi_staleness.py` — stale observations produce a verdict
+- [x] T028 [P] [US3] `tests/unit/test_cpi_staleness.py` — stale observations produce a verdict
       naming the value and its threshold; fresh ones produce **no** warning; the age is measured
       from the later of verification and retrieval (002 FR-025); a kind declared with no
       threshold fails at load naming the kind; and the staleness question is kept distinct from
@@ -208,7 +208,7 @@ figure reports it; declare a kind with no threshold and confirm loading fails na
 
 ### Implementation for User Story 3
 
-- [ ] T029 [US3] `src/terezy/core/inflation/series.py` — `staleness_of_observations`, folding
+- [x] T029 [US3] `src/terezy/core/inflation/series.py` — `staleness_of_observations`, folding
       the existing `staleness.staleness_of` per observation under that observation's declared
       kind, and merging with the existing monoid rather than inventing a second path.
 
@@ -226,27 +226,27 @@ series purely as data; both load, the first drives results, and no source file i
 
 ### Tests for User Story 4 (write first; they must fail) ⚠️
 
-- [ ] T030 [P] [US4] `tests/contract/test_cpi_declaration_loading.py` — the refusal battery
+- [x] T030 [P] [US4] `tests/contract/test_cpi_declaration_loading.py` — the refusal battery
       (SC-005): malformed value, unrecognised field, missing required field, duplicate period,
       overlapping/out-of-order periods, a period inconsistent with the declared periodicity, a
       period that has not yet elapsed, a duplicated series identity, an empty series, a blank
       citation, an absent `verified_on` key. Every case names the file and the offending field
       or period, and no case substitutes a default. Plus the shipped `data/cpi/ua.toml` loading
       clean with 411 observations, 1991-08 .. 2025-10, every one unverified.
-- [ ] T031 [P] [US4] `tests/contract/test_cpi_data_only.py` — G13: a second CPI series with a
+- [x] T031 [P] [US4] `tests/contract/test_cpi_data_only.py` — G13: a second CPI series with a
       distinct identity, declared purely as data, loads and is addressable with **zero** lines
       of source changed (SC-009); nothing treats "the CPI" as a singleton; periodicity is read
       from the declaration.
 
 ### Implementation for User Story 4
 
-- [ ] T032 [US4] `src/terezy/data/declarations/schema.py` — `CpiSeriesTable`,
+- [x] T032 [US4] `src/terezy/data/declarations/schema.py` — `CpiSeriesTable`,
       `CpiObservationTable`, `CpiFile`, appended under the `007-cpi-real-terms` banner, matching
       the shape `data/cpi/ua.toml` already has.
-- [ ] T033 [US4] `src/terezy/data/declarations/loader.py` — `cpi_from_file`, appended under the
+- [x] T033 [US4] `src/terezy/data/declarations/loader.py` — `cpi_from_file`, appended under the
       banner: one `SourceRef` per observation table, every refusal in T030 raised here with the
       file and the field or period named.
-- [ ] T034 [US4] `src/terezy/data/declarations/resolver.py` — `InflationDeclarations`,
+- [x] T034 [US4] `src/terezy/data/declarations/resolver.py` — `InflationDeclarations`,
       `resolve_inflation` and `inflation_from_data_root`, appended under the banner: series
       keyed by id with a duplicated identity refused across files, plus the optional declared
       assumption and the files both came from.
