@@ -957,7 +957,12 @@ scheme written by hand:
 | string | `s<byte length>:<utf-8 bytes>;` |
 | tuple | `t<element count>:<encoded elements>;` |
 
-prefixed with the scheme's name, `terezy-canonical-v1`, and a NUL byte.
+prefixed with the scheme's name, `terezy-canonical-v2`, and a NUL byte. The version in the
+name moves whenever the canonical structure of §12.1 changes shape — v2 is v1 plus the
+event's `capacity_pool` and the ledger's capacity accumulator — so a digest recorded under
+one shape can never silently disagree with one taken under another: they visibly belong to
+different schemes. A pinned shape fingerprint in `tests/unit/test_results_canonical.py`
+fails the build if the shape moves while the name does not.
 
 **Why it is injective.** Every string carries its byte length and every tuple its element
 count, so no two different structures can produce the same bytes:

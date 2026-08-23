@@ -182,10 +182,16 @@ def _channel(
         pair=PAIR,
         reference_rate=reference,
         buy_side=ChannelSide(
-            markup_bps=None, premium_per_unit=Money(buy_premium, PAIR[0], RATE_SOURCES)
+            markup_bps=None,
+            premium_per_unit=Money(buy_premium, PAIR[0], RATE_SOURCES),
+            kind=kind,
+            provenance=RATE_SOURCES,
         ),
         sell_side=ChannelSide(
-            markup_bps=None, premium_per_unit=Money(sell_premium, PAIR[0], RATE_SOURCES)
+            markup_bps=None,
+            premium_per_unit=Money(sell_premium, PAIR[0], RATE_SOURCES),
+            kind=kind,
+            provenance=RATE_SOURCES,
         ),
         observed_on=RETRIEVED_ON,
         kind=kind,

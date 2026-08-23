@@ -32,22 +32,44 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DATA_ROOT = REPO_ROOT / "data"
 
 # Directories whose numeric values are legal, tax, fee or market observations and
-# therefore require a citation. Scenarios and objectives are the owner's own stated
-# assumptions, so they are exempt by design -- an assumption needs a label, not a source.
+# therefore require a citation.
 #
 # `channels` joined in feature 002: a two-sided rate is the most decision-relevant
 # observation in the ramp model, and an uncited premium is exactly the figure that gets
 # believed without checking.
-#
-# `streams` deliberately did **not** join, and the omission is argued rather than
-# accidental (contracts/declaration-schema.md, research.md D9): an owner's own salary is
-# not an observation needing a citation, it is a statement of fact by the only person who
-# can make it -- the same exemption `scenarios` has. That covers `income_tax_rate_pct`
-# too: it looks like a tax rate, and it is exempt because it is not a *modelled* rate.
-# The tool takes net-of-income-tax amounts as input, and the field exists only so the
-# deployable figure is not overstated; a rate the engine applies to a taxable event would
-# need a source, and a rate the owner states about his own payslip does not.
 SOURCED_DIRS = ("tax", "instruments", "routes", "channels")
+
+# The directories exempt from the citation requirement, each BY NAME and WITH ITS REASON.
+# Together with SOURCED_DIRS this list is exhaustive: a directory under data/ that appears
+# in neither is an **error**, never a blind spot. The gate used to be an allowlist, which
+# is fail-open -- the place a future rate was most likely to land (a new directory) was
+# exactly the place the gate could not see.
+EXEMPT_DIRS: dict[str, str] = {
+    "scenarios": (
+        "the owner's own stated beliefs -- regimes, transitions, event probabilities. An "
+        "assumption needs a label and a visible consequence, not a source (data/README.md)"
+    ),
+    "objectives": (
+        "the owner's own objective and constraint sets -- stated preferences, not "
+        "observations (data/README.md)"
+    ),
+    "strategies": (
+        "the owner's own named allocations -- decisions, not observations. A strategy "
+        "file that ever carries a market observation must move that value into a sourced "
+        "directory rather than widen this exemption"
+    ),
+    "streams": (
+        "an owner's own salary is a statement of fact by the only person who can make it, "
+        "income_tax_rate_pct included: the tool takes net-of-income-tax amounts as input "
+        "and the field exists only so the deployable figure is not overstated. A rate the "
+        "engine applies to a taxable event needs a source; a rate the owner states about "
+        "his own payslip does not (contracts/declaration-schema.md, data/README.md)"
+    ),
+    "user": (
+        "gitignored per-user data -- holdings, goals, results. Never curated, never "
+        "committed, and outside this gate by the Principle VII boundary"
+    ),
+}
 
 REQUIRED_WITH_SOURCE = ("source", "retrieved_on")
 
@@ -144,7 +166,12 @@ class Finding:
 
     def render(self) -> str:
         level = "error" if self.error else "warning"
-        rel = self.path.relative_to(REPO_ROOT)
+        try:
+            rel: Path | str = self.path.relative_to(REPO_ROOT)
+        except ValueError:
+            # A data root outside the repository -- a test's scratch copy. The absolute
+            # path is the honest rendering there.
+            rel = self.path
         where = f"{rel}: [{self.table}]" if self.table else f"{rel}"
         return f"{level}: {where} {self.message}"
 
@@ -353,14 +380,54 @@ def check_file(path: Path, kinds: frozenset[str]) -> list[Finding]:
     return findings
 
 
-def main() -> int:
-    if not DATA_ROOT.is_dir():
-        print(f"error: {DATA_ROOT} does not exist")  # noqa: T201
+def unknown_directories(data_root: Path) -> list[Finding]:
+    """Every directory under the data root that is neither scanned nor exempted by name.
+
+    The fail-closed rule. An allowlist alone is fail-open: a new directory holding an
+    uncited rate would pass clean until somebody remembered to list it, and a gate that
+    passes over what it never looked at is the silent default the constitution puts at top
+    severity -- in the script whose job is to prevent exactly that.
+    """
+    return [
+        Finding(
+            entry,
+            "",
+            "is a directory this gate does not know. Every directory under data/ must be "
+            "named: in SOURCED_DIRS if its numeric values are observations needing a "
+            "citation, or in EXEMPT_DIRS with the reason they do not. An unlisted "
+            "directory is an error, never a blind spot -- a gate that passes over what it "
+            "never looked at is fail-open.",
+            error=True,
+        )
+        for entry in sorted(data_root.iterdir())
+        if entry.is_dir() and entry.name not in SOURCED_DIRS and entry.name not in EXEMPT_DIRS
+    ]
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Check a data root -- the repository's by default, or the one argv names.
+
+    The optional argument exists so the gate itself is testable against a scratch copy
+    (``tests/contract/test_provenance_gate.py``); CI and the docs invoke it bare.
+    """
+    args = sys.argv[1:] if argv is None else argv
+    data_root = Path(args[0]).resolve() if args else DATA_ROOT
+    if not data_root.is_dir():
+        print(f"error: {data_root} does not exist")  # noqa: T201
         return 1
 
-    paths = sorted(path for subdir in SOURCED_DIRS for path in (DATA_ROOT / subdir).rglob("*.toml"))
+    # Root-level files are scanned too, fail-closed: venues.toml lives at the root and
+    # carries no observed numeric value today -- and it has to be *looked at* for that to
+    # mean anything. The kinds file is excluded here because declared_kinds below is its
+    # own, stricter validator (its numeric leaf is a threshold policy, not an observation).
+    root_files = sorted(path for path in data_root.glob("*.toml") if path.name != KINDS_FILE)
+    paths = (
+        sorted(path for subdir in SOURCED_DIRS for path in (data_root / subdir).rglob("*.toml"))
+        + root_files
+    )
 
-    kinds, findings = declared_kinds(DATA_ROOT / KINDS_FILE)
+    kinds, findings = declared_kinds(data_root / KINDS_FILE)
+    findings.extend(unknown_directories(data_root))
     for path in paths:
         findings.extend(check_file(path, kinds))
 
@@ -371,8 +438,8 @@ def main() -> int:
     warnings = len(findings) - errors
 
     print(  # noqa: T201
-        f"\nchecked {len(paths)} data file(s) under {', '.join(SOURCED_DIRS)}: "
-        f"{errors} error(s), {warnings} unverified value(s)"
+        f"\nchecked {len(paths)} data file(s) under {', '.join(SOURCED_DIRS)} "
+        f"and the data root: {errors} error(s), {warnings} unverified value(s)"
     )
     if not paths:
         print(  # noqa: T201

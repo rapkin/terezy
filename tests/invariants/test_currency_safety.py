@@ -136,8 +136,19 @@ def test_conversion_exists_exactly_once_and_cannot_happen_implicitly() -> None:
 
     # Exactly one conversion, under its own name. A second one -- or a differently-named
     # synonym -- would be a second place for a rate's provenance to be dropped, and the
-    # convenient one would be the one that dropped it.
-    conversion_shaped = {"convert", "in_currency", "exchange", "fx", "restate", "as_currency"}
+    # convenient one would be the one that dropped it. ``to_currency`` and ``rate`` are in
+    # the set as module-level names (they exist only as keyword parameters of ``convert``):
+    # a public name shaped like either would be a conversion by another spelling.
+    conversion_shaped = {
+        "convert",
+        "to_currency",
+        "in_currency",
+        "exchange",
+        "fx",
+        "rate",
+        "restate",
+        "as_currency",
+    }
     assert public_names & conversion_shaped == {"convert"}
 
     # It cannot be called implicitly. The target currency, the rate and the rate's sources

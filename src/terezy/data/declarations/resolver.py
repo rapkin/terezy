@@ -271,19 +271,19 @@ def from_data_root(root: Path) -> Declarations:
 # 5. **Leg chaining** (research.md D6): leg *n* ends where leg *n+1* begins, the first leg
 #    starts at the route's ``origin``, the last ends at its ``destination``.
 # 6. **``partner_route`` resolution** (FR-027): the id exists, names an ``exit`` route,
-#    starts where the inbound route ends, and finishes holding the base currency.
+#    starts where the inbound route ends -- at that venue **and in the currency the inbound
+#    delivers there** -- and finishes holding the base currency.
 # 7. **``capacity_pool`` cap agreement** across *files* (research.md D10). Two legs naming
 #    one rail must declare one cap.
 # 8. **A regime's ``route_ids``** resolve, and a regime is **partner-closed**.
 # 9. **A stream's ``arrives_at``** names a declared venue.
 #
-# ⚙ **One seam this pass cannot cover, stated rather than left to be discovered.** A
-# channel *side* declares its own ``kind``, and ``ChannelSide`` has no field to carry it --
-# the core's staleness verdict for a channel is taken from ``FxChannel.kind``. So a side
-# naming an undeclared kind is caught by ``scripts/check_provenance.py``, which reads the
-# files rather than the records and is a blocking gate, and not here. Adding a field to the
-# core record for the sake of this check would put a value in the engine that no figure
-# reads.
+# ⚙ **A channel side's ``kind`` is a record field and resolves here.** An earlier revision
+# validated a side's declared kind at load and then dropped it, so the core aged every side
+# under ``FxChannel.kind`` -- a 7-day premium under a 365-day schedule threshold, reported
+# fresh. ``ChannelSide.kind`` now carries it, the staleness verdict ages each side under it
+# (``cost._aged``), and this pass resolves it against the declared kinds exactly as it does
+# the channel's own.
 
 BASE_CURRENCY_ROLE = (
     "the base currency is the currency the owner earns and spends -- the ledger's home "
@@ -585,11 +585,11 @@ def _check_chain(route: Route, *, path: Path) -> None:
 def _check_partner(
     route: Route,
     routes: Mapping[str, Route],
+    files: Mapping[str, Path],
     *,
-    path: Path,
     base_currency: Currency,
 ) -> None:
-    """The four things a declared exit route must be (FR-027), each refused by name.
+    """The five things a declared exit route must be (FR-027), each refused by name.
 
     ``partner_route`` absent is **legal and expected**: it means nobody has costed the way
     out, and it produces ``ExitCostUnknown`` rather than a reversal or a promoted one-way
@@ -600,9 +600,14 @@ def _check_partner(
     * **A partner whose direction is not ``exit``.** An inbound route is not an exit; pairing
       two ways *in* would produce a round trip that never comes back.
     * **A partner that does not start where this route ends.** This is the sharpest of the
-      four: a pair that does not meet would load and produce a *confident round-trip figure
+      five: a pair that does not meet would load and produce a *confident round-trip figure
       for two unrelated journeys*, which is the exact class of number FR-030 exists to
       refuse.
+    * **A partner whose first leg does not take in the currency this route delivers.** The
+      seam is a currency as well as a venue: a pair meeting at the venue but not in the
+      currency could only be walked through a conversion nobody declared, at a rate nobody
+      chose -- the implicit mid-rate FR-010 forbids -- and without this check it loads and
+      then dies mid-costing as a raw currency mismatch naming neither file.
     * **A partner that does not end holding the base currency.** §4.3.3 asks for money back
       in **spendable** base currency; an exit that stops in dollars at an exchange has not
       got the money out, and an asset that cannot be liquidated into spendable base currency
@@ -610,6 +615,7 @@ def _check_partner(
     """
     if route.partner_route is None:
         return
+    path = files[route.id]
     field_path = "route.partner_route"
     partner = routes.get(route.partner_route)
     if partner is None:
@@ -645,6 +651,23 @@ def _check_partner(
             f"declare an exit route starting at {route.destination!r}, or correct one of the "
             "two endpoints",
         )
+    arrives_in = route.legs[-1].to_ccy
+    starts_in = partner.legs[0].from_ccy
+    if starts_in is not arrives_in:
+        raise DeclarationError(
+            path,
+            field_path,
+            f"names {partner.id!r} as its exit route, but leg 0 of that route (declared in "
+            f"{files[partner.id]}) takes in {starts_in.value} while this route delivers "
+            f"{arrives_in.value} at {route.destination!r}. The seam is a currency as well as "
+            "a venue: the only way to walk this pair would be a conversion nobody declared, "
+            "at a rate nobody chose -- exactly the implicit mid-rate FR-010 forbids -- and "
+            "costing it would otherwise fail mid-walk as a currency mismatch naming neither "
+            "file.",
+            f"make the exit route's first leg take in {arrives_in.value} (an fx leg with a "
+            "declared channel, where the conversion really happens), or pair this route "
+            "with an exit that starts in it",
+        )
     ends_in = partner.legs[-1].to_ccy
     if ends_in is not base_currency:
         raise DeclarationError(
@@ -672,6 +695,12 @@ def _check_pools(
     one real limit means at least one of them is wrong, and picking either silently would be
     a guess -- so the error names both files and both legs.
 
+    **One currency, checked before the amounts.** A pool whose caps disagree about the
+    currency is a sharper defect than one whose caps disagree about the number: nothing can
+    accumulate consumption across two currencies without inventing a rate, and the amount
+    comparison itself would raise a currency mismatch naming neither file. So the currency
+    rule is its own refusal, first.
+
     ``core.routes.capacity.caps_of`` refuses the same disagreement within one route and
     raises, because reaching it means this check was bypassed.
     """
@@ -686,6 +715,20 @@ def _check_pools(
                 declared[leg.capacity_pool] = (route_id, leg.index, leg.monthly_cap)
                 continue
             first_route, first_index, first_cap = seen
+            if first_cap.currency is not leg.monthly_cap.currency:
+                raise DeclarationError(
+                    files[route_id],
+                    f"route.leg[{leg.index}].monthly_cap",
+                    f"declares its cap on capacity pool {leg.capacity_pool!r} in "
+                    f"{leg.monthly_cap.currency.value}, while leg {first_index} of route "
+                    f"{first_route!r} in {files[first_route]} declares the same pool's cap "
+                    f"in {first_cap.currency.value}. One rail has one limit in one "
+                    "currency: consumption cannot accumulate across two currencies without "
+                    "inventing a rate, and even comparing the two caps would raise a "
+                    "currency mismatch naming neither file.",
+                    "declare every leg naming this pool with its cap in one currency, or "
+                    "give the legs different pools if they really consume different limits",
+                )
             if money.compare(first_cap, leg.monthly_cap) != 0:
                 raise DeclarationError(
                     files[route_id],
@@ -807,6 +850,16 @@ def _resolved_channels(
                     path,
                 )
             _check_kind(channel.kind, kinds, path=path, field_path=f"channel[{channel.id}].kind")
+            for side_name, side in (
+                ("buy_side", channel.buy_side),
+                ("sell_side", channel.sell_side),
+            ):
+                _check_kind(
+                    side.kind,
+                    kinds,
+                    path=path,
+                    field_path=f"channel[{channel.id}].{side_name}.kind",
+                )
             channels[channel.id] = channel
             files[channel.id] = path
     return channels, files
@@ -841,8 +894,8 @@ def _resolved_routes(
         files[route.id] = path
         identities[identity] = path
 
-    for route_id, route in routes.items():
-        _check_partner(route, routes, path=files[route_id], base_currency=base_currency)
+    for route in routes.values():
+        _check_partner(route, routes, files, base_currency=base_currency)
     _check_pools(routes, files)
     return routes, files
 

@@ -20,6 +20,7 @@ from datetime import date
 import pytest
 
 from terezy.core.errors import UnresolvedTaxClass
+from terezy.core.ledger import engine
 from terezy.core.ledger.events import CausationKind, CausationRef, Event, EventKind
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
@@ -236,3 +237,90 @@ class TestTheDifferenceTaxMakes:
         for row in coupons:
             assert is_close(row.tax.amount, row.gross.amount * 0.195)
             assert is_close(row.net.amount, row.gross.amount - row.tax.amount)
+
+
+class TestConversionTaxabilityIsDeclaredNotHardcoded:
+    """Whether a conversion is taxable is data, and the engine only consults it.
+
+    SIMULATOR_SPEC.md §4.2 records that a later conversion of a stablecoin arrival may
+    itself be a taxable disposal -- under a regime that is genuinely unsettled -- and asks
+    for both interpretations to be modellable (E4, §11 item 4). So no branch in the engine
+    may state that a ramp movement is never taxable: that is a legal claim from an
+    implementer's memory, which Principle I forbids. The mechanism is declarative in both
+    directions: a declared class whose ``applies_to`` covers the conversion kind charges
+    with its own provenance; a kind that **no** declared class applies to is *not
+    applicable* and produces no charge and cites nothing -- E11's distinction from an
+    exemption, whose zero cites its class.
+    """
+
+    RAMP_EVENT = Event(
+        sequence=1,
+        occurred_on=date(2026, 7, 15),
+        kind=EventKind.RAMP_MOVEMENT,
+        amount=Money(10_000.0, UAH, prov.of([COUPON_SOURCE])),
+        owner_id="owner-1",
+        caused_by=CausationRef(
+            kind=CausationKind.ROUTE_TERM,
+            id="fixture:route",
+            detail="SYNTHETIC -- a conversion arrival, for something to charge against",
+        ),
+        lot_ref=None,
+        quantity=None,
+        allocated_to=None,
+        capacity_pool=None,
+    )
+
+    CONVERSION_CLASS = TaxClass(
+        id="synthetic_conversion_taxed",
+        applies_to=frozenset({TaxableEventKind.CONVERSION}),
+        pit_rate=0.18,
+        levy_rate=0.05,
+        provenance=synthetic.TAXED_CLASS.provenance,
+    )
+    """Invented rates, NOT a claim about any law: they exist to prove the engine charges
+    whatever the declaration says, so the real interpretations can land later as data."""
+
+    def _state(self) -> engine.LedgerState:
+        return engine.fold([self.RAMP_EVENT], base_currency=UAH, consumption_method="fifo")
+
+    def test_a_declaration_mapping_the_conversion_kind_produces_a_charge(self) -> None:
+        # The treatment is data: map the kind to a declared class and a ramp movement is
+        # charged under it, carrying that class's provenance -- the branch that keeps the
+        # USDC both-interpretations scenario expressible without an engine edit.
+        declaration = synthetic.declaration(
+            tax_classes={
+                TaxableEventKind.COUPON: synthetic.EXEMPT_CLASS.id,
+                TaxableEventKind.DISPOSAL_GAIN: synthetic.EXEMPT_CLASS.id,
+                TaxableEventKind.CONVERSION: self.CONVERSION_CLASS.id,
+            }
+        )
+        pack = {**synthetic.TAX_PACK, self.CONVERSION_CLASS.id: self.CONVERSION_CLASS}
+        charged = project._charge_every_taxable_event(  # private, by design: see resolver precedent
+            declaration, self._state(), pack
+        )
+        assert isinstance(charged, tuple)
+        (charge,) = charged
+        assert charge.event_sequence == self.RAMP_EVENT.sequence
+        assert charge.tax_class_id == self.CONVERSION_CLASS.id
+        assert charge.provenance.sources >= self.CONVERSION_CLASS.provenance.sources
+        assert is_close(charge.total.amount, 10_000.0 * (0.18 + 0.05))
+
+    def test_a_kind_no_declared_class_applies_to_is_not_applicable(self) -> None:
+        # No class in this pack applies to the conversion kind, so the event is not
+        # applicable: no charge, and nothing cited -- and NOT an unresolved reference,
+        # because the pack itself declares that nothing speaks about this kind.
+        charged = project._charge_every_taxable_event(
+            synthetic.declaration(), self._state(), synthetic.TAX_PACK
+        )
+        assert charged == ()
+
+    def test_a_kind_a_class_does_apply_to_still_requires_the_instrument_to_map_it(
+        self,
+    ) -> None:
+        # The honesty rule stays: once the pack declares a class applying to the kind,
+        # an instrument producing such an event without declaring its treatment is an
+        # unresolved reference, never silently untaxed.
+        pack = {**synthetic.TAX_PACK, self.CONVERSION_CLASS.id: self.CONVERSION_CLASS}
+        charged = project._charge_every_taxable_event(synthetic.declaration(), self._state(), pack)
+        assert isinstance(charged, UnresolvedTaxClass)
+        assert "conversion" in charged.reason

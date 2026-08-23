@@ -794,9 +794,14 @@ def _hand_built_cost(*, buy_premium: float = 3.0) -> RampCost:
         buy_side=ChannelSide(
             markup_bps=None,
             premium_per_unit=Money(buy_premium, Currency.UAH, FIXTURE_SOURCE),
+            kind="p2p_premium",
+            provenance=FIXTURE_SOURCE,
         ),
         sell_side=ChannelSide(
-            markup_bps=None, premium_per_unit=Money(-2.5, Currency.UAH, FIXTURE_SOURCE)
+            markup_bps=None,
+            premium_per_unit=Money(-2.5, Currency.UAH, FIXTURE_SOURCE),
+            kind="p2p_premium",
+            provenance=FIXTURE_SOURCE,
         ),
         observed_on=date(2026, 8, 22),
         kind="p2p_premium",

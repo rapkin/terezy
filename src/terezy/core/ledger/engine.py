@@ -41,7 +41,7 @@ from datetime import date
 from terezy.core.ledger import accounts, lots
 from terezy.core.ledger import events as ev
 from terezy.core.ledger.accounts import CashBalance
-from terezy.core.ledger.events import Event
+from terezy.core.ledger.events import Event, EventKind
 from terezy.core.ledger.lots import Disposal, Position
 from terezy.core.primitives import money
 from terezy.core.primitives.currency import Currency
@@ -146,10 +146,9 @@ def apply(state: LedgerState, event: Event, *, fees: Iterable[Event]) -> LedgerS
     place an account comes into existence, so C1's "every currency that moved has an
     account" holds by construction rather than by remembering to pre-create them.
 
-    An event naming a ``capacity_pool`` also consumes that rail's monthly capacity. The
-    **magnitude** is what is accumulated, not the signed amount: a rail's limit is on the
-    money put through it, and a transfer out and a transfer in of the same size both used the
-    rail. The month comes from ``occurred_on``, which is data.
+    An event naming a ``capacity_pool`` also consumes that rail's monthly capacity, per the
+    two-rule accounting :func:`_consumed` states and defends. The month comes from
+    ``occurred_on``, which is data.
     """
     ev.check_shape(event)
     currency = event.amount.currency
@@ -181,13 +180,32 @@ def _consumed(
     A separate function so that the ``None`` case is one branch in one place rather than a
     conditional expression inside the state constructor: an event that names no pool is the
     ordinary case, and the accumulator it is given back is the same object.
+
+    **Two rules, one target: consumption equals what the rail actually carried.**
+
+    * A **movement** consumes its magnitude. A rail's limit is on the money put through it,
+      and a transfer out and a transfer in of the same size both used the rail.
+    * A **fee** consumes its signed charge -- the negation of the event's amount, since a
+      fee line records a charge as a negative amount. The fee came out of the money that
+      crossed, so together with its movement it accounts for the whole amount sent
+      (``routes.execute``'s contract: what the rail carried is the whole of ``sent``).
+
+    The sign on the fee rule is the point, and summing magnitudes instead was a defect:
+    a *negative* cost component -- a channel legally trading below its reference -- makes
+    the departure larger than ``sent`` and the fee line a credit, and magnitudes counted
+    both. 100 000 sent through a discount channel consumed |105 000| + |5 000| = 110 000,
+    so headroom went falsely negative and fallbacks fired despite room (FR-015, FR-012).
     """
     if event.capacity_pool is None:
         return used
+    if event.kind is EventKind.FEE:
+        consumed = money.scale(event.amount, -1.0)
+    else:
+        consumed = money.scale(event.amount, -1.0 if event.amount.amount < 0.0 else 1.0)
     return cap.record(
         used,
         pool=event.capacity_pool,
-        amount=money.scale(event.amount, -1.0 if event.amount.amount < 0.0 else 1.0),
+        amount=consumed,
         on_date=event.occurred_on,
     )
 

@@ -396,6 +396,45 @@ class TestARouteWithNoDeclaredExitIsCostedButNotRanked:
         assert len(ranked.not_comparable) == 1
 
 
+class TestAClosedExitPartnerKeepsTheRouteOutOfTheRanking:
+    """FR-014, FR-030: an inbound whose declared exit is closed is visibly not ranked.
+
+    A closed exit means there is no usable way out on the date, so there is no honest
+    round-trip figure -- and without one the candidate is not comparison-ready. What matters
+    here is *visibility*: the candidate lands in ``not_comparable`` with a reason naming the
+    partner and its status, never silently dropped and never ranked on a round trip through
+    a route that carries nothing.
+    """
+
+    def _with_closed_exit(self, route_id: str, **kwargs: object) -> Candidate:
+        path, routes = _candidate(route_id, **kwargs)  # type: ignore[arg-type]
+        exit_id = f"{route_id}__exit"
+        return path, {**routes, exit_id: dataclasses.replace(routes[exit_id], status="closed")}
+
+    def test_it_lands_in_not_comparable_with_the_partner_and_status_named(self) -> None:
+        ranked = _ranking(
+            _candidate("healthy", fee_pct=0.02),
+            self._with_closed_exit("way_out_shut", fee_pct=0.0),
+        )
+        assert _ids(ranked) == ["healthy"]
+        assert recommended_cost(ranked).path.route_id == "healthy"
+        (orphan,) = ranked.not_comparable
+        assert orphan.path.route_id == "way_out_shut"
+        assert isinstance(orphan.round_trip, ExitCostUnknown)
+        assert "way_out_shut__exit" in orphan.round_trip.reason
+        assert "closed" in orphan.round_trip.reason
+
+    def test_it_is_not_an_exclusion_because_the_way_in_still_carries(self) -> None:
+        # The inbound route works and its one-way figure is real; what is missing is a
+        # usable way out. Reported in the not-comparable field, not among the refusals.
+        ranked = _ranking(
+            _candidate("healthy", fee_pct=0.02),
+            self._with_closed_exit("way_out_shut"),
+        )
+        assert ranked.excluded == ()
+        assert len(ranked.not_comparable) == 1
+
+
 class TestNothingIsSilentlyDropped:
     """Every candidate lands in exactly one of the three fields, always."""
 

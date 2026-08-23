@@ -234,13 +234,16 @@ Each maps to a requirement and to a case in `tests/contract/test_route_declarati
 | `channel` set on a non-`fx` leg, or missing on an `fx` leg | Error | FR-011 |
 | Both or neither of `markup_bps` / `premium_per_unit` on a side | Error | FR-010 |
 | A channel side missing entirely | Error — no mid-rate is ever synthesised | FR-010 |
+| ⚙ A side whose effective rate on its declared reference is zero or below (`premium_per_unit <= -reference`, or `markup_bps >= 10000` on the sell side) | Error naming the offset and the reference. A side that pays away the whole reference is not a rate; without the check the file loads and the first costing divides by zero. A negative premium stays legal while the effective rate stays positive | FR-010 |
 | `disruption_probability` outside `[0, 1]` | Error | FR-026 |
 | Negative `fee_pct`, `fee_fixed`, or `latency_days` | Error | FR-024 |
 | `partner_route` naming a route that does not exist | Error. `null` is legal; a dangling id is not | FR-027 |
 | `partner_route` whose `direction` is not `exit` | Error — an inbound route is not an exit | FR-027 |
 | ⚙ Exit route whose `origin` is not the inbound route's `destination` | Error. A pair that does not meet would load and produce a **confident round-trip figure for two unrelated journeys** — the exact class of number FR-030 exists to refuse | FR-027 |
+| ⚙ Exit route whose first leg does not take in the currency the inbound route delivers | Error naming both files. The seam is a currency as well as a venue: a pair meeting only at the venue could only be walked through a conversion nobody declared, and without the check it loads and dies mid-costing as a raw currency mismatch naming neither file | FR-027, FR-010 |
 | ⚙ Exit route whose `destination` does not hold the base currency | Error. "Getting money back into **spendable** base currency" is what §4.3.3 asks for; an exit ending in a third currency at an exchange has not got the money out | FR-027 |
 | ⚙ Two legs naming one `capacity_pool` with different `monthly_cap` values | Error naming both files. Two numbers for one real limit means at least one is wrong, and choosing either would be a guess | FR-015 |
+| ⚙ Two legs naming one `capacity_pool` with caps in different **currencies** | Error naming both files and the pool. One rail has one limit in one currency; consumption cannot accumulate across two without inventing a rate, and the amount comparison itself would otherwise die as a raw currency mismatch naming neither file | FR-015, FR-007 |
 | ⚙ A fallback policy of `place_on_deposit` | Error naming the feature that will bring it. The core's `DEFERRED_POLICIES` key is `place_on_deposit`; this table said `deposit`, and an alias was **not** added — two spellings for one policy is the duplication this project removes everywhere else. Any other spelling gets the unknown-policy error listing the three that work. This feature adds no instruments, and treating it as "hold as cash" would be a substituted default | FR-013 |
 | A stream's `arrives_at` naming an unknown venue | Error | FR-024 |
 | Malformed TOML | Error naming the file | FR-024 |
