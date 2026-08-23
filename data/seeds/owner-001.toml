@@ -1,0 +1,51 @@
+# SYNTHETIC FIXTURE. These are not the owner's holdings.
+#
+# His real figures are unstated (`SIMULATOR_SPEC.md` §11 item 3) and will replace this file
+# when they arrive. Nothing below describes a position anyone holds, and no figure computed
+# from it may be quoted as if it did (008 FR-025).
+#
+# **Per-owner data, not curated.** Beside `data/streams/`, `data/spendable/` and
+# `data/composition/`, on the boundary Principle VII draws: instruments, routes and tax packs
+# are shared public facts about the world, while what this person holds is his life. Putting
+# both in one directory would make the boundary a matter of reading field names.
+#
+# **NO CITATION KEYS, and their absence is the design.** What the owner paid for a lot is his
+# own record, not an observation of the world — there is nothing for a source to vouch for.
+# It is the same exemption `objectives`, `strategies`, `streams` and `spendable` already
+# carry, and `scripts/check_provenance.py` names this directory in `EXEMPT_DIRS` with that
+# reason written out. If a *market value* ever has to live here it moves to a sourced
+# directory rather than the exemption widening to cover it.
+#
+# **A seed is a cost, never a current value** (§4.8). "I hold 100 units worth X today" cannot
+# produce a disposal gain at all: the tax engine needs lots, and a lot is units acquired on a
+# date at a price. Where the price is genuinely forgotten, `basis = "estimated"` says so and
+# the estimate marks every figure derived from it — the gain, the tax on it, and everything
+# containing either.
+#
+# **`cost` is in the base currency, always** (008 FR-010). There is deliberately no
+# `currency` key: converting a foreign-currency basis needs a rate on the acquisition date,
+# which arrives with the FX features, and an assumed rate under a tax figure is exactly the
+# confident wrongness this project exists to remove.
+
+[owner]
+id = "owner-001"
+
+# A lot whose cost the owner knows: he has the confirmation from the purchase.
+[[seed]]
+instrument_id = "ovdp_synthetic_a"
+quantity      = 10.0
+acquired_on   = "2026-03-14"
+cost          = 9_800.0
+basis         = "known"
+
+# A lot whose cost he does not. The estimate is accepted and marked: a disposal of this lot
+# yields a gain that says it rests on a guess, and so does the tax charged on that gain.
+# `reason` is required here and forbidden above — a reason on a known basis means one of the
+# two fields is wrong, and guessing which would be the loader inventing a declaration.
+[[seed]]
+instrument_id = "ovdp_synthetic_b"
+quantity      = 5.0
+acquired_on   = "2026-04-02"
+cost          = 5_400.0
+basis         = "estimated"
+reason        = "bought across several weeks; the cabinet shows units, not the prices paid"

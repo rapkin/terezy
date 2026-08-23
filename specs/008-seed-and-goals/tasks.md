@@ -132,24 +132,24 @@ estimated one's gain, tax and every derived figure are marked and the known one'
 
 ### Tests for User Story 5a (write first)
 
-- [ ] T014 [P] [US5] SC-004: the whole seed refusal battery in
+- [x] T014 [P] [US5] SC-004: the whole seed refusal battery in
       `tests/contract/test_seed_declaration_loading.py` — missing cost, missing/unknown `basis`,
       `estimated` without `reason`, `known` with one, unknown instrument, unrecognised field,
       a `currency` key (FR-010 is structural: there is no field to state one in), zero and negative
       quantity, negative cost, malformed date, bad TOML, missing file
-- [ ] T015 [P] [US5] SC-007: every loaded seed lot carries `owner_id`, and the shipped file says
+- [x] T015 [P] [US5] SC-007: every loaded seed lot carries `owner_id`, and the shipped file says
       `SYNTHETIC FIXTURE` — in `tests/contract/test_owner_scoping.py`
 
 ### Implementation for User Story 5a
 
-- [ ] T016 [US5] `SeedTable` / `SeedFile` appended under an `008-seed-and-goals` banner in
+- [x] T016 [US5] `SeedTable` / `SeedFile` appended under an `008-seed-and-goals` banner in
       `src/terezy/data/declarations/schema.py`
-- [ ] T017 [US5] `seeds_from_file` appended under the same banner in
+- [x] T017 [US5] `seeds_from_file` appended under the same banner in
       `src/terezy/data/declarations/loader.py`: base currency by declaration (FR-010), lot ids from
       the file position, `prov.EMPTY` for a known basis and the estimated mark for an estimated one
-- [ ] T018 [P] [US5] `data/seeds/owner-001.toml` — SYNTHETIC FIXTURE, one known-basis and one
+- [x] T018 [P] [US5] `data/seeds/owner-001.toml` — SYNTHETIC FIXTURE, one known-basis and one
       estimated-basis lot, header stating the Principle VII boundary and why there are no citations
-- [ ] T019 [US5] `data/seeds/` in `EXEMPT_DIRS` of `scripts/check_provenance.py` **with its reason**
+- [x] T019 [US5] `data/seeds/` in `EXEMPT_DIRS` of `scripts/check_provenance.py` **with its reason**
       — the owner's own records, the exemption `objectives` and `strategies` already carry
 
 **Checkpoint**: `uv run python scripts/check_provenance.py` clean with the new directory. Commit.
@@ -221,33 +221,39 @@ and "no contribution needed" instead of a negative instruction.
 
 **Goal**: goals are per-owner declared data; a run with no seeds and no goals is an ordinary run.
 
+⚙ **Landed with Phase 5 rather than after Phase 7.** The goal loader needs the `Goal` record,
+and the resolver reads both per-owner directories in one pass -- splitting them across two
+commits would have meant a resolver that knew about half the boundary. So `Goal` was defined
+early in `core/results/goal.py` and the rest of that module (the outcome, the conventions, the
+feasibility union and the refusals) still lands with the solver in Phase 6.
+
 ### Tests for User Story 5b (write first)
 
-- [ ] T029 [P] [US5] SC-004: the goal refusal battery in
+- [x] T029 [P] [US5] SC-004: the goal refusal battery in
       `tests/contract/test_goal_declaration_loading.py` — fewer than two variables, a duplicate id,
       an unrecognised field, a malformed date, a negative contribution, a non-positive target, an
       unknown currency, and a non-base currency refused as not yet modelled
-- [ ] T030 [P] [US5] SC-008 / FR-024 / G16 / D9: `tests/contract/test_empty_seeds_and_goals.py` — no
+- [x] T030 [P] [US5] SC-008 / FR-024 / G16 / D9: `tests/contract/test_empty_seeds_and_goals.py` — no
       seeds and no goals runs normally with empty positions and no goal section; **not** a refusal,
       deliberately unlike feature 003's empty-dimension outcome
-- [ ] T031 [US5] SC-007: extend `tests/contract/test_owner_scoping.py` — every goal carries
+- [x] T031 [US5] SC-007: extend `tests/contract/test_owner_scoping.py` — every goal carries
       `owner_id`, the two files' owners must agree, and resolving them modifies no curated file
       (compare the curated tree before and after)
 
 ### Implementation for User Story 5b
 
-- [ ] T032 [US5] `GoalTable` / `GoalFile` appended to the `008-seed-and-goals` banner in
+- [x] T032 [US5] `GoalTable` / `GoalFile` appended to the `008-seed-and-goals` banner in
       `src/terezy/data/declarations/schema.py`
-- [ ] T033 [US5] `goals_from_file` appended to the banner in
+- [x] T033 [US5] `goals_from_file` appended to the banner in
       `src/terezy/data/declarations/loader.py`
-- [ ] T034 [US5] `SeedAndGoalDeclarations`, `resolve_seeds_and_goals` and
+- [x] T034 [US5] `SeedAndGoalDeclarations`, `resolve_seeds_and_goals` and
       `seeds_and_goals_from_data_root` appended under an `008-seed-and-goals` banner in
       `src/terezy/data/declarations/resolver.py`: instrument references resolved, the base-currency
       refusal, the two owners checked against each other, at most one file per directory, and an
       empty or absent directory accepted as an ordinary run
-- [ ] T035 [P] [US5] `data/goals/owner-001.toml` — SYNTHETIC FIXTURE, one goal declaring exactly two
+- [x] T035 [P] [US5] `data/goals/owner-001.toml` — SYNTHETIC FIXTURE, one goal declaring exactly two
       of the three variables
-- [ ] T036 [US5] `data/goals/` in `EXEMPT_DIRS` of `scripts/check_provenance.py` with its reason
+- [x] T036 [US5] `data/goals/` in `EXEMPT_DIRS` of `scripts/check_provenance.py` with its reason
 
 **Checkpoint**: all ten success criteria have a named test. Commit.
 

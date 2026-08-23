@@ -59,6 +59,8 @@ from terezy.core.instruments.interface import (
     InstrumentConstraints,
     InstrumentDeclaration,
 )
+from terezy.core.ledger import seeds
+from terezy.core.ledger.seeds import SeedLot
 from terezy.core.primitives import conventions
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
@@ -67,6 +69,7 @@ from terezy.core.primitives.provenance import Provenance, SourceRef
 from terezy.core.primitives.staleness import ObservationKind
 from terezy.core.results.composed import SegmentBound
 from terezy.core.results.coverage import SpendableEndpoint
+from terezy.core.results.goal import Goal
 from terezy.core.routes import capacity, legs
 from terezy.core.routes.channels import ChannelSide, FxChannel, Side, effective_rate
 from terezy.core.routes.legs import Leg, Route
@@ -2123,3 +2126,318 @@ def composition_from_file(path: Path) -> tuple[str, SegmentBound]:
             "chain that many",
         )
     return owner_id, SegmentBound(max_segments=file.composition.max_segments)
+
+
+# ---------------------------------------------------------------------------
+# 008-seed-and-goals: the owner's opening lots, and what the money is for
+# ---------------------------------------------------------------------------
+#
+# Same four responsibilities -- read, shape, meaning, construct -- and the same difference
+# `spendable` and `composition` already have: **no citation is read and none is expected.**
+# What the owner paid for a lot and what sum he is aiming at are his own records, not
+# observations of the world, so there is nothing for a source to vouch for. Both directories
+# are named in `EXEMPT_DIRS` of `scripts/check_provenance.py` **with their reason recorded**,
+# which is the one way a directory is permitted to be out of scope under a fail-closed gate.
+#
+# **The refusals that are this feature's own** are the two the honesty mechanism rests on:
+#
+# * `basis` must be `known` or `estimated`, with no default. A cost whose reliability nobody
+#   stated would produce a confidently unmarked tax figure, which is the defect class this
+#   project exists to remove (FR-006).
+# * `estimated` requires `reason` and `known` forbids it. The loader cannot know which of the
+#   two lines is wrong, and either guess is a declaration it invented: ignoring the reason
+#   drops something the owner wrote, and marking the figure contradicts what he said (FR-008).
+#
+# **Provenance is attached here, and it is the only place it could be.** A known basis rests
+# on no cited source -- `prov.EMPTY`, the reading `data/streams/` already has for an owner's
+# own salary -- while an estimated one carries the mark `core.ledger.seeds.basis_estimated`
+# builds, so the guess follows the cost into the gain and the tax without anything downstream
+# having to remember (FR-007).
+#
+# What is *not* here, because it needs a second file or a run: whether the instrument exists
+# (the resolver holds every declaration), whether the goal's currency is the run's base
+# currency (`spendable`'s precedent -- a base currency is a property of the run), and whether
+# the acquisition date is consistent with the instrument's issue date. The last of those is
+# deliberately **not** a load error at all: it is a well-formed declaration of an impossible
+# history, and the engine reports it as a typed `InconsistentTerms` -- the same division this
+# module already draws for a maturity on or before its issue date.
+
+SEED_TABLE: Final = "seed"
+"""Root array of a seed file, and the prefix of every field path in one."""
+
+GOAL_TABLE: Final = "goal"
+"""Root array of a goal file."""
+
+BASIS_KNOWN: Final = "known"
+"""The declared word for a cost the owner is sure of."""
+
+BASIS_ESTIMATED: Final = "estimated"
+"""The declared word for a cost he is not. Requires a reason; produces a propagating mark."""
+
+_GOAL_VARIABLES: Final = ("monthly_contribution", "target_sum", "target_date")
+"""The three, in declaration order. Any two fix the third (FR-011)."""
+
+_VARIABLES_A_GOAL_NEEDS: Final = 2
+"""Named so the check below reads as the rule it is rather than as a magic number."""
+
+
+def _owner_of(path: Path, table: schema.OwnerTable, *, what: str) -> str:
+    """The owner a per-owner file belongs to, non-empty.
+
+    Shared by the two loaders below rather than written twice: it is one claim -- whose file
+    this is -- and two copies would eventually disagree about whether the id may be blank.
+    """
+    return _require_text(
+        path,
+        f"{OWNER_TABLE}.id",
+        table.id,
+        f"{what} is one person's declaration about his own life, and every record built from "
+        "it carries him from the first commit (Principle VII)",
+    )
+
+
+def _basis(path: Path, entry: schema.SeedTable, *, field_prefix: str) -> seeds.Basis:
+    """``known`` or ``estimated``, with the reason rule the two words imply.
+
+    The pairing is checked here rather than in the shape validation because pydantic can see
+    one field at a time: "``reason`` is required for one value of ``basis`` and forbidden for
+    the other" is a statement about two fields, and the message has to be able to say which
+    of the two the author probably meant.
+    """
+    declared = entry.basis
+    if declared not in (BASIS_KNOWN, BASIS_ESTIMATED):
+        raise DeclarationError(
+            path,
+            f"{field_prefix}.basis",
+            f"declares {declared!r}, which is neither {BASIS_KNOWN!r} nor {BASIS_ESTIMATED!r}. "
+            "There is no third kind of basis and no default: a cost whose reliability nobody "
+            "stated would produce a tax figure that looks as confident as a documented one.",
+            f"write {BASIS_KNOWN!r} if you know what these units cost, or {BASIS_ESTIMATED!r} "
+            "with a reason if you are stating it from memory",
+        )
+    if declared == BASIS_KNOWN:
+        if entry.reason is not None:
+            raise DeclarationError(
+                path,
+                f"{field_prefix}.reason",
+                f"is declared beside a {BASIS_KNOWN!r} basis. A reason explains why a cost is "
+                "a guess, so one of the two lines is wrong -- and the loader cannot tell "
+                "which. Ignoring the reason would drop something you wrote; marking the "
+                "figure would contradict what you said.",
+                f"delete the reason, or change the basis to {BASIS_ESTIMATED!r}",
+            )
+        return seeds.KNOWN
+    if entry.reason is None:
+        raise DeclarationError(
+            path,
+            f"{field_prefix}.reason",
+            f"is absent beside an {BASIS_ESTIMATED!r} basis. The mark this estimate puts on "
+            "every figure derived from the lot -- the gain, the tax on it, everything "
+            "containing either -- has to state why the cost is a guess (FR-008).",
+            "write what makes the cost uncertain, in your own words",
+        )
+    return seeds.basis_estimated(
+        declared_at=source_id(path, f"{SEED_TABLE}[{_position_of(field_prefix)}]"),
+        reason=_require_text(
+            path,
+            f"{field_prefix}.reason",
+            entry.reason,
+            "an empty reason is not a reason: a mark that cannot say what it rests on is a "
+            "taint flag rather than provenance",
+        ),
+        estimated_for=_parse_date(path, f"{field_prefix}.acquired_on", entry.acquired_on),
+    )
+
+
+def _position_of(field_prefix: str) -> str:
+    """The entry index out of a field prefix like ``seed[1]``.
+
+    The declaration reference and the field prefix must name the same entry, so the index is
+    read back from the prefix rather than passed a second time: two parameters carrying one
+    fact are two places for it to disagree.
+    """
+    return field_prefix.removeprefix(f"{SEED_TABLE}[").removesuffix("]")
+
+
+def seeds_from_file(path: Path, *, base_currency: Currency) -> tuple[str, tuple[SeedLot, ...]]:
+    """One ``data/seeds/<owner>.toml`` as its owner id and the lots it declares.
+
+    Returns the owner beside the lots rather than folding him into the file record, on
+    ``spendable_from_file``'s precedent -- though each lot *does* carry him, because a lot
+    outlives the file it was read from and "whose holding is this" must still be answerable
+    when it does.
+
+    ``base_currency`` is required and keyword-only because the file states no currency and
+    must not: a declared cost is in the base currency by FR-010, and the base currency is a
+    property of the run rather than of the holding. Passing it in is what keeps this loader
+    from hard-wiring hryvnia into the one place a second jurisdiction would have to change.
+
+    Lot ids come from the entry's position -- ``seed-0``, ``seed-1`` -- rather than being
+    declared. Two purchases of one instrument on one date are legitimate and must be two lots,
+    so identity cannot be derived from ``(instrument, date)``; and asking the owner to invent
+    an id would be a field with nothing to say.
+    """
+    document = read_document(path)
+    file = _validate(schema.SeedFile, document, path)
+    owner_id = _owner_of(path, file.owner, what="a declaration of what he already holds")
+    declared: list[SeedLot] = []
+    for position, entry in enumerate(file.seed):
+        field_prefix = f"{SEED_TABLE}[{position}]"
+        basis = _basis(path, entry, field_prefix=field_prefix)
+        declared.append(
+            SeedLot(
+                owner_id=owner_id,
+                lot_id=f"{SEED_TABLE}-{position}",
+                declared_at=source_id(path, field_prefix),
+                instrument_id=_require_text(
+                    path,
+                    f"{field_prefix}.instrument_id",
+                    entry.instrument_id,
+                    "a lot is a holding *of* something, and the something is checked against "
+                    "the curated instrument declarations (FR-005)",
+                ),
+                quantity=_positive(
+                    path,
+                    f"{field_prefix}.quantity",
+                    entry.quantity,
+                    "a lot may not exist at zero or below: an empty lot would keep an "
+                    "acquisition date alive that holds nothing and would take its turn in the "
+                    "consumption order",
+                ),
+                acquired_on=_parse_date(path, f"{field_prefix}.acquired_on", entry.acquired_on),
+                cost=Money(
+                    _non_negative(
+                        path,
+                        f"{field_prefix}.cost",
+                        entry.cost,
+                        "a rebate is not a basis. Zero is a real declaration -- a holding that "
+                        "genuinely cost nothing -- and is accepted; what is refused is the "
+                        "field being absent, because a zero nobody wrote would make every "
+                        "later disposal compute the wrong gain (FR-006)",
+                    ),
+                    base_currency,
+                    _basis_provenance(basis),
+                ),
+                basis=basis,
+            )
+        )
+    return owner_id, tuple(declared)
+
+
+def _basis_provenance(basis: seeds.Basis) -> Provenance:
+    """What the declared cost rests on: nothing, or the owner's own estimate.
+
+    A known cost gets ``prov.EMPTY`` -- the reading ``data/streams/`` already has for a salary:
+    an owner's own record is not an observation, so there is no source to cite and nothing to
+    mark. An estimated one carries the mark, which is how the guess reaches the tax.
+
+    This is one of the two places in the project entitled to hand ``Money`` its provenance, and
+    it is the whole of FR-007's mechanism: attach it here and every transform downstream
+    carries it, because none of them can drop it.
+    """
+    match basis:
+        case seeds.BasisKnown():
+            return prov.EMPTY
+        case seeds.BasisEstimated():
+            return prov.of([basis.mark])
+
+
+def goals_from_file(path: Path) -> tuple[str, tuple[Goal, ...]]:
+    """One ``data/goals/<owner>.toml`` as its owner id and the targets it declares.
+
+    No ``base_currency`` argument, unlike :func:`seeds_from_file`, and the asymmetry is the
+    declarations': a goal *states* its currency (FR-016 keeps the field so the multi-currency
+    case stays open) while a seed's cost has no currency field at all. Whether the stated
+    currency is the run's base currency is therefore a question for the resolver, exactly as
+    it is for the spendable list.
+
+    **Fewer than two of the three variables is refused here, naming what is missing** (FR-011).
+    It is a property of one entry read in isolation, so it belongs to the loader; and the
+    message lists the absent fields rather than saying "declare more", because the whole point
+    is that the tool will not choose which one to invent.
+    """
+    document = read_document(path)
+    file = _validate(schema.GoalFile, document, path)
+    owner_id = _owner_of(path, file.owner, what="a declaration of what his money is for")
+    declared: list[Goal] = []
+    seen: dict[str, int] = {}
+    for position, entry in enumerate(file.goal):
+        field_prefix = f"{GOAL_TABLE}[{position}]"
+        goal_id = _require_text(
+            path,
+            f"{field_prefix}.id",
+            entry.id,
+            "a goal is reported against by id, and an unnamed target cannot be reported "
+            "against at all",
+        )
+        if goal_id in seen:
+            raise DeclarationError(
+                path,
+                f"{field_prefix}.id",
+                f"declares the goal id {goal_id!r} for the second time; entry {seen[goal_id]} "
+                "of this file already declares it. The two are not merged and neither is "
+                "preferred: two targets with one name cannot be told apart, so neither could "
+                "be reported on.",
+                "rename one of the two goals, or delete the one that is a duplicate",
+            )
+        seen[goal_id] = position
+        currency = _currency(path, f"{field_prefix}.currency", entry.currency)
+        _require_two_variables(path, entry, field_prefix=field_prefix)
+        declared.append(
+            Goal(
+                owner_id=owner_id,
+                id=goal_id,
+                currency=currency,
+                monthly_contribution=None
+                if entry.monthly_contribution is None
+                else Money(
+                    _non_negative(
+                        path,
+                        f"{field_prefix}.monthly_contribution",
+                        entry.monthly_contribution,
+                        "a withdrawal is not a contribution. Zero is a real declaration -- a "
+                        "goal reached out of growth on the starting amount alone -- and is "
+                        "accepted",
+                    ),
+                    currency,
+                    prov.EMPTY,
+                ),
+                target_sum=None
+                if entry.target_sum is None
+                else Money(
+                    _positive(
+                        path,
+                        f"{field_prefix}.target_sum",
+                        entry.target_sum,
+                        "a target of zero is not something to aim at and a negative one is not "
+                        "a target",
+                    ),
+                    currency,
+                    prov.EMPTY,
+                ),
+                target_date=_optional_date(path, f"{field_prefix}.target_date", entry.target_date),
+            )
+        )
+    return owner_id, tuple(declared)
+
+
+def _require_two_variables(path: Path, entry: schema.GoalTable, *, field_prefix: str) -> None:
+    """FR-011: any two of the three fix the third, and fewer than two fixes nothing.
+
+    The absent ones are named in the message. A goal declaring only a target sum could be
+    completed by inventing a contribution or by inventing a date, and either would be the tool
+    answering a question the owner did not ask -- so it says which two fields it found nothing
+    in and stops.
+    """
+    missing = [name for name in _GOAL_VARIABLES if getattr(entry, name) is None]
+    if len(_GOAL_VARIABLES) - len(missing) >= _VARIABLES_A_GOAL_NEEDS:
+        return
+    raise DeclarationError(
+        path,
+        field_prefix,
+        f"declares fewer than two of {list(_GOAL_VARIABLES)}: nothing is declared for "
+        f"{missing}. Any two fix the third, and fewer than two fix nothing -- filling one in "
+        "would be the tool inventing the plan rather than solving it.",
+        "declare two of monthly_contribution, target_sum and target_date -- or all three, "
+        "which asks whether they are consistent",
+    )
