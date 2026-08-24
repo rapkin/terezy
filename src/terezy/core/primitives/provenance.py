@@ -64,6 +64,31 @@ class SourceRef:
     that "nobody has verified this" is a recorded state rather than an oversight.
     """
 
+    kind: str = ""
+    """The ``ObservationKind`` this citation's table declared, or ``""`` for a source built
+    in code rather than loaded from a declaration.
+
+    **Why it is here and not only on the declaring record.** Most sourced tables have a core
+    record with somewhere to put it -- a leg's ``kind_of_observation``, a channel's ``kind``,
+    a CPI observation's ``kind``. Feature 001's ``BondTerms``, ``InstrumentConstraints`` and
+    ``TaxClass`` do not, and neither does any of a fund's, so their declared thresholds were
+    validated at load and dropped. A figure derived from them could then never be aged: by the
+    time a provenance has been merged across five tables, the record that knew each kind is
+    gone. That is the half of FR-019 that was silently missing -- the mark propagated and the
+    staleness verdict could not.
+
+    ``""`` means *this source names no threshold*, which is the strict reading and not a
+    permissive one: :func:`terezy.core.primitives.staleness.staleness_of_sources` does not age
+    it and does not list it in ``assessed``, so "nobody could check this" stays distinguishable
+    from "checked and current". The loader stamps every citation it reads, at the one function
+    every one of them passes through.
+
+    That the empty string is not a hiding place is a claim about **whether every citation
+    carrying a figure is stamped**, which is a property of a whole run rather than of this
+    field, and it is asserted where a run exists to look at: a contract test unstamps the
+    loader and requires the guards to fail. Nothing here can promise it.
+    """
+
 
 @dataclass(frozen=True, slots=True)
 class Provenance:

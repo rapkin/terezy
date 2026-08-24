@@ -353,13 +353,13 @@ class RampCost:
     whether to trust the figure beside it. It is the same shape :attr:`ceiling` (the tightest
     declared cap) and :attr:`disruption_probability` (the largest single leg) already take.
 
-    ⚙ **It describes the way in only.** A constrained *exit* segment leaves this ``open`` on a
-    record whose headline number is the round trip, and that is a stated gap rather than a
-    decision: ``status`` is 002's field about the inbound route, widening it to the round trip
-    would change what it means for every declared route that already carries one, and the
-    honest fix is a second field for the way out rather than a quiet redefinition of this one.
-    A closed exit segment is *not* affected -- it yields ``ExitCostUnknown`` naming the route,
-    so the round-trip slot says so in words."""
+    ⚙ **It describes the way in only, and that is now a decision rather than a gap.** A
+    constrained *exit* segment leaves this ``open`` on a record whose headline number is the
+    round trip. Widening this field would change what it means for every declared route that
+    already carries one, so feature 010 took the fix this note used to name as the honest one:
+    :attr:`WayOutCost.status`, a second field for the way out, below in this module. A tuple's
+    outcome reports the pair. A closed exit segment is *not* affected either way -- it yields
+    ``ExitCostUnknown`` naming the route, so the round-trip slot says so in words."""
 
     disruption_probability: float
     """The largest single-leg probability that this route stops working, in ``[0, 1]``.
@@ -553,3 +553,128 @@ def recommended_cost(ranking: Ranking) -> RampCost:
     :attr:`Ranking.costed`, because that case is :class:`NothingComparable`.
     """
     return ranking.costed[ranking.recommended]
+
+
+# ---------------------------------------------------------------------------
+# 010-full-tuple: the way out, costed from what the instrument actually released
+# ---------------------------------------------------------------------------
+#
+# :class:`RoundTripCost` costs the way out **from what the inbound chain delivered**, because
+# in feature 002 nothing was ever bought: the money arrived at a venue and the same money came
+# back. Once something *is* bought, the amount travelling the way out is whatever the holding
+# released -- a coupon, a distribution, a redemption -- on the date it released it, and that is
+# neither the arriving amount nor a fraction of it. A fixed fee does not scale, so applying
+# 002's round-trip *fraction* to a different amount would be a fabricated figure that looks
+# exactly like a real one.
+#
+# So there is a third cost record, and it is **unrelated to the other two** for the reason the
+# module docstring gives about the first two: the three are field-for-field similar, which is
+# precisely why nothing weaker than distinct types would stop one standing in for another.
+
+
+@dataclass(frozen=True, slots=True)
+class WayOutCost:
+    """What it costs to get one dated amount **out**: from where it was released to a spendable
+    endpoint.
+
+    Unrelated to :class:`OneWayCost` and :class:`RoundTripCost` by design. See the section
+    comment above.
+    """
+
+    path: Candidate
+    """The way out as a journey: which spendable endpoint, funded from which stream, by which
+    declared exit routes.
+
+    **Keyed by the whole triple, exactly as every other cost in this module is** (FR-008). It
+    is the same rule from the other end of the round trip: the way out of an instrument bought
+    from the dollar contract income and the way out of one bought from the hryvnia salary are
+    two figures, because the stream is part of what a cost *is*. A way-out cost keyed by the
+    destination alone would blend them, and the blend would look entirely reasonable.
+
+    Never a way *in*, despite the type: a :class:`~terezy.core.routes.path.Candidate` is how
+    this project spells "a destination, a stream and one or more declared routes", and the
+    routes named here are the exit chain's. Which direction they run is a property of the
+    declarations, which the loader refuses to mix (FR-022).
+    """
+
+    sent: Money
+    """What left the venue the instrument released it at, in that venue's currency."""
+
+    arrived: Money
+    """What reached the spendable endpoint, in the endpoint's currency.
+
+    **May be zero or negative** where the fees exceed the amount, and is reported that way:
+    a small distribution can genuinely cost more than itself to repatriate, and that is a
+    finding rather than an error state.
+    """
+
+    components: Mapping[CostComponent, Money]
+    """The charge, split by term, in :attr:`sent`'s currency. Every member present, zero where
+    it does not apply, for :attr:`OneWayCost.components`' reason."""
+
+    fraction: float
+    """Cost as a fraction of :attr:`sent`. **Not capped**, in either direction."""
+
+    spreads_over_reference: tuple[float, ...]
+    """One rate-space spread per converting leg, parallel to :attr:`channels_applied`. Not the
+    cost -- see :attr:`OneWayCost.spreads_over_reference`."""
+
+    channels_applied: tuple[str, ...]
+    """Which channel each ``fx`` leg used, in leg order. Empty for a chain that converts
+    nothing, and empty for an exit by identity, which has no legs at all."""
+
+    provenance: Provenance
+    """The union of every declared value behind this figure."""
+
+    staleness: StalenessVerdict
+    """Which of those observations have aged past their kind's threshold."""
+
+    by_segment: tuple[SegmentAttribution, ...]
+    """The same charge, split by segment, numbered from zero within this way out.
+
+    From zero rather than continuing an inbound chain's numbering, because this is its own
+    journey: it starts where the instrument released the money and on the date it released it,
+    which may be years after and somewhere other than where the way in ended.
+    """
+
+    latency_days: int
+    """Summed over the chain's legs, and **inside the span the comparable rate is measured
+    over** (010 FR-015).
+
+    Carried on the cost rather than reported beside it, unlike
+    :attr:`RampCost.latency_days`, and the difference is the owner's decision of 2026-08-22:
+    waiting is a cost. A figure that reaches a spendable endpoint three days later is worth
+    less than the same figure today, and the only way for a money-weighted return to say so is
+    for the arrival date to move.
+    """
+
+    status: RouteStatus
+    """The declared status of the way out: **the most constrained any segment declares**.
+
+    :attr:`RampCost.status`'s counterpart, and the field whose absence that one's own docstring
+    records as a stated gap -- *a constrained exit segment leaves this ``open`` on a record
+    whose headline number is the round trip*. It is a second field rather than a widening of
+    the inbound one, exactly as that docstring says the honest fix would be.
+
+    ``closed`` never reaches here: ``cost_exit`` refuses such a chain with the binding segment
+    recorded. ``open`` for an exit by identity, which walks no route to be constrained.
+    """
+
+    disruption_probability: float
+    """The **largest single leg's** declared probability on the way out, never compounded.
+
+    :attr:`RampCost.disruption_probability`'s counterpart and its reasoning unchanged:
+    multiplying independent-looking probabilities across legs would invent a joint
+    distribution nobody declared.
+    """
+
+    ceiling: Money | None
+    """The tightest declared monthly cap on any leg of the way out, in :attr:`sent`'s
+    currency, or ``None`` when no leg declares one.
+
+    :attr:`RampCost.ceiling`'s twin, and here for the same reason FR-016 gives: *feasibility
+    applies on the way in **and the way out***. A cap is reported rather than refused --
+    that decision belongs to the caller and to ``routes.capacity``, not to the costing -- and
+    a caller that reads it nowhere is a caller that will repatriate past it in silence.
+    ``None`` for an exit by identity, which walks no leg and so meets no cap.
+    """

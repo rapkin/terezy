@@ -88,8 +88,14 @@ all three terms and is the shape everything is supposed to use."""
 ROUTE_NAMES = frozenset({"route", "route_id", "routes", "path"})
 """What counts as naming the route."""
 
-COST_RETURNS = frozenset({"RampCost", "OneWayCost", "RoundTripCost", "Ranking"})
-"""Return types that make a function a costing function, whatever it is called."""
+COST_RETURNS = frozenset({"RampCost", "OneWayCost", "RoundTripCost", "Ranking", "WayOutCost"})
+"""Return types that make a function a costing function, whatever it is called.
+
+⚙ ``WayOutCost`` joined with feature 010. It is the third labelled cost record, produced by
+``cost.cost_exit`` from what an instrument released rather than from what a ramp delivered, and
+leaving it out would have meant the scan's reach was narrower than the requirement it guards --
+which is the shape of gap that lets a guard pass while the rule is broken.
+"""
 
 PATH_NAMES = frozenset({"path", "paths"})
 """Parameters that can carry the triple.
@@ -179,12 +185,41 @@ def _takes_the_triple(target: Any) -> bool:
     is a bare venue id: a ``str`` still fails, which is the property this function exists for.
     """
     signature = inspect.signature(target)
-    return any(
+    names = frozenset(signature.parameters)
+    if any(
         any(
             key in str(signature.parameters[name].annotation)
             for key in ("FundingPath", "Candidate", "Journey")
         )
-        for name in frozenset(signature.parameters) & PATH_NAMES
+        for name in names & PATH_NAMES
+    ):
+        return True
+    return _names_a_way_out(signature)
+
+
+WAY_OUT_NAMES = frozenset({"chain", "exit_path", "route_out"})
+"""Parameters that can carry the way out. ``chain`` is ``cost.cost_exit``'s."""
+
+
+def _names_a_way_out(signature: inspect.Signature) -> bool:
+    """Whether this signature spells the triple as a *way out* rather than as a way in.
+
+    ⚙ **Feature 010's addition, and it admits three terms rather than relaxing to two.** A way
+    out is not reached from a stream's venue, so there is no ``FundingPath`` to hand it: what
+    names the journey is the declared exit chain (the route), ``departing_from`` (where the
+    money actually is -- the anchor that makes it a journey rather than a wish), and
+    ``stream_id`` (which income funded the holding it is leaving). All three are required
+    below, so a way-out costing function that dropped the stream -- the term §4.3.1's finding
+    lives in, and the one a hurried caller drops first -- still fails this scan.
+    """
+    names = frozenset(signature.parameters)
+    return bool(
+        names & STREAM_NAMES
+        and "departing_from" in names
+        and any(
+            "ExitChain" in str(signature.parameters[name].annotation)
+            for name in names & WAY_OUT_NAMES
+        )
     )
 
 

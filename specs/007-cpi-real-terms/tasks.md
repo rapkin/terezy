@@ -287,7 +287,7 @@ anything lands on `main`. One was a blocker; the rest were concrete and confirme
 
 - [x] T041 **Blocker.** `core/inflation/series.py`'s two verdict functions had **no production
       call sites** — `real_terms` took no `as_of`, `RealRate` had no field for a verdict — while
-      US3 scenario 1, `contracts/deflation.md` G10 and `METHODOLOGY` §23.6 all asserted that a
+      US3 scenario 1, `contracts/deflation.md` G10 and `METHODOLOGY` §27.6 all asserted that a
       real figure reports its staleness. Implemented: `staleness.Ageing`, `RealRate.staleness`,
       `Deflation.ageing`, `project(ageing=...)`, merged over the CPI side and the nominal side.
 - [x] T042 Hoist the no-elapsed-month guard from `_realized` into `real_terms`, where it covers

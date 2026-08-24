@@ -2879,9 +2879,263 @@ The convention is declared as the one that applies the cited date exactly as cit
 `following` would assert that the law grants an extension — a second legal fact nobody has
 attested. When it is found, one field changes and no source does.
 
+## 29. The full tuple: an instrument bought through a route, and what comes back
+
+Every section above computes one term of the constitution's unit of analysis. This one is the
+join, and the question it makes answerable is `SIMULATOR_SPEC.md` §8's first: *does anything
+beat 15.5% tax-free OVDP, after every other option's fees, taxes and access costs?*
+
+### 29.1 The unit of analysis, and why the key is all five terms
+
+```
+(instrument) x (funding route in) x (tax treatment) x (exit route out) x (risk class)
+```
+
+A tuple's outcome is keyed by every one of them. The same instrument funded from the hryvnia
+salary and from the dollar contract income is **two tuples with two outcomes** — that is the
+product's whole thesis, and it is only true if the key says so. There is no record shaped to
+hold "the outcome of holding MilTech", which is what makes the prohibition structural rather
+than a rule to remember.
+
+The risk class is **declared and never scored**. Scoring it needs a model nobody has declared,
+and an unscored label is honest where a computed number would not be.
+
+### 29.2 The three seams, and what a mismatch refuses
+
+```
+the tuple's stream  ==  the stream the way in is costed from
+stream --[ way in ]--> (venue, currency)  ==  where the purchase happens
+where the proceeds land  ==  (venue, currency) --[ way out ]--> a spendable endpoint
+```
+
+The last two are checked on **venue and currency**, and a mismatch is a typed refusal naming
+both sides. The venue half is the one nothing else guards: two hryvnia venues are identical to
+a currency check, and a way in landing at the wrong one funds a purchase with money that never
+got there.
+
+The first has no venue in it and is the easiest to miss for exactly that reason. A funding
+candidate carries its own stream and the way in is costed from *that* one; the tuple's own is
+what resolves the stream, keys the way out and appears in every report. Two fields, one fact.
+A tuple funded on paper from the dollar contract income and costed over the free domestic
+hryvnia route produced complete, plausible figures and no refusal at all.
+
+Feature 004 shipped an exit chain anchored at neither end. Money moved between venues for
+free and the record still read as a coherent three-hop journey — an arriving amount in one
+currency beside a cost fraction computed in another. Bridging any of these seams would be an
+invented leg at an invented rate, and it is the most tempting fabrication in the feature
+because the declarations look adjacent.
+
+### 29.3 The purchase is made with what arrived
+
+```
+sent        10 000.00 UAH
+way in      1% + 50.00 flat        ->  150.00
+arrived                                9 850.00
+increments  floor(9 850 / 1 000)   ->  9 units at 1 000.00  =  9 000.00
+undeployed                             850.00, at the purchase venue
+```
+
+Nine units, not ten. Buying with the **departing** amount is the defect this rule exists to
+prevent: a plausible schedule, one unit too large, and every figure downstream of it wrong.
+
+The increment is declared or it does not exist. A bond declares `min_unit` and is bought in
+whole increments of it; a fund declares none, so its arriving amount buys exactly what it
+buys. Rounding a fund's purchase to whole certificates would be inventing a term.
+
+A **declared monthly ceiling refuses, on both sides of the round trip** (FR-016: the rules
+apply on the way in *and the way out*). On the way in the ceiling is compared against the
+amount sent; on the way out against each dated amount the instrument released, so a cap that
+carries every coupon and refuses the redemption says which release bound. Not deployed or
+repatriated up to the cap: reporting what the rail would not carry needs the owner's declared
+fallback policy and the month's consumed capacity, neither of which a tuple carries, and
+partial deployment is deferred (FR-018, owner decision 2026-08-22). A per-transaction
+`leg.maximum` is the other refusal on each side and says something else — *this route cannot
+carry this movement at all* — and the two are distinguishable because the remedies are: split
+the movement, or wait for the month.
+
+⚙ **One movement against the ceiling, not a month's worth against it.** Several releases can
+fall in one month and share one rail's allowance; summing them is the capacity accumulator's
+job (FR-012, FR-015) and a tuple carries no accumulator, so the check fires only where a
+single movement alone exceeds the cap. Stated because a check that reports less than
+everything is honest and a check that pretends otherwise is not.
+
+The remainder is **reported with its amount and its venue**, and it is outside the amount that
+reaches the endpoint: bringing it home would need a date nobody declared, and sweeping it into
+the purchase would spend money the owner did not agree to spend.
+
+It is also **netted off the outlay the rate is measured against** — 10 000 − 850 = 9 150 here —
+rather than left in the series. The remainder is cash at the purchase venue, not money lost,
+and discounting the arrivals back to the whole 10 000 would price it as a total loss: on the
+shipped registry that is the difference between a 16% sovereign bond and a reported −7%,
+produced by nothing more than a unit price that does not divide the arriving amount. The
+netting assumes the remainder is recoverable at par, which is not free — it sits behind the
+same exit the holding does — and that assumption is one of the outcome's own `excludes`.
+
+### 29.4 What goes home, and when
+
+Once something is bought, what travels the way out is no longer the arriving amount. It is
+whatever the holding released — a coupon, a distribution, a redemption — **on the date it
+released it**, netted per date, each release charged what the declared exit chain charges.
+
+The netting is per date because a fixed exit fee is charged per movement: a date on which the
+holding pays twice — a coupon and a principal instalment on one schedule — is one journey home
+and one fee, and repatriating each line separately would pay the flat charge twice for money
+that travelled once.
+
+**What travels is net of the tax charged on it, and the figure comes from the charge rather
+than from the charge's ledger event.** §28.1 made a `TAX_CHARGE` an assessment memo that moves
+nothing, so adding up the events alone would send the gross coupon home: the amount would stay
+right and the rate would quietly become a **pre-tax** rate on a record that says it is net of
+tax. It is read out of the recorded charges, paired to the taxed event by its sequence number
+— the same reading, out of the same place, that a schedule row takes for its `net`
+column (`core/results/schedule.py`).
+
+⚙ **The charge is netted where it accrued, and the payment date is not modelled here.** Since
+§28.1 the liability leaves cash on a declared deadline in a later year, and reaching that date
+needs `data/tax/timing/` plus the filing decisions and unsettled positions that assemble the
+year — none of which a tuple's declared sets carry. So the outflow is dated **earlier than it
+is due**, and the error runs one way: the money leaves sooner, so the rate is understated
+rather than flattered. Deferring it to a date nobody declared would be the other kind of guess,
+and dropping it would be the pre-tax rate above.
+
+**Why not one round-trip fraction.** A fixed fee does not scale.
+
+```
+10.00 flat on a 691.77 coupon        ->  1.45%
+10.00 flat on a 9 703.23 redemption  ->  0.10%
+```
+
+One fraction cannot price both, so 002's round-trip percentage — measured on the amount a ramp
+delivered — is the wrong number for every release that is not exactly that size.
+
+A date that nets **negative** is refused rather than absorbed into a later receipt: money
+would have to travel *to* the instrument along a route nobody costed, and netting it forward
+would move a real outflow to a date it did not happen on.
+
+A release larger than the way out's **declared monthly ceiling** is refused too, naming the
+date it was released on — see §29.3, where the same rule is stated for the way in. That is the
+half of FR-016 a reader who comes here for "what goes home, and when" would otherwise meet
+nothing about: the answer for such a release is that it does not go home, and the tuple says
+so instead of reporting an amount the rail would not have carried.
+
+### 29.5 The two figures, and where the rate refuses
+
+Every outcome carries **both**: the amount that reaches a spendable endpoint, and the rate it
+implies. Reporting one invites a reader to derive the other under an assumption the tool never
+made, and the assumption available here is reinvestment.
+
+The rate is the internal rate of return of the arrivals **on their own dates** against the
+money actually invested (§29.3), measured with the instrument's declared day-count convention — the same convention that sized
+its flows, and the same root find that produces feature 001's benchmark (§3.2). Ramp latency
+and settlement latency sit **inside** the span, because waiting is a cost (owner decision,
+2026-08-22). The consequence is worth stating: the shipped domestic pair costs exactly nothing
+and still returns a little less than 001's contractual yield, because it declares one day in
+and three days out.
+
+The rate is a **typed absence** rather than a figure in three cases, and the amount is
+unaffected in all three:
+
+* the amounts the series is built from — what left, what stayed behind undeployed, what came
+  back — are **not all in one currency**. A dollar outflow against hryvnia inflows is not a
+  rate of anything, and valuing one in the other needs a reference rate on a date, which is
+  feature 011. A channel rate is not one: a channel is a market you transact in, and the rate
+  that values an outlay against a return is a reference;
+* the round trip returned nothing;
+* an arrival is negative, because the repatriation charges exceeded what was released. A
+  series that is not one payment out followed by receipts has no single internal rate of
+  return, and extrapolating past the bracket would invent one.
+
+Such a tuple is **not comparison-ready**: it is reported, and kept out of the ranking, exactly
+as 002 keeps a candidate with no round-trip figure out of one.
+
+### 29.6 Where an instrument is reached
+
+`data/access/` declares, per instrument, what a tuple needs and the instrument's own
+declaration does not state: **where it is bought**, **where its proceeds land**, **what one
+unit costs at that venue**, and its **declared risk class**.
+
+The first two are the seam anchors of §29.2 — without them the join could check only the
+currency. The third is a venue quote, cited like any other observation and **aged like one**:
+it names the `ObservationKind` it ages under, and a stale quote surfaces on every tuple sized
+from it. A bond states a face value, which is what it *repays*, and sizing a purchase from it
+would be assuming par in code. A fund states its own net asset value and entry markup, so a
+price here is **refused** — one price in two files is one fact in two places, and the day
+either is updated the figures would rest on whichever the code happened to read.
+
+⚙ **Why not four more keys on the instrument declaration.** Every field here is a property of
+the **option** — this instrument, reached this way — and not of the security: all four change
+if the same instrument is reached elsewhere, while the instrument's file states what the paper
+carries.
+
+That shape is **not yet declarable**, and saying otherwise would be arguing from a capability
+the code does not have: access entries are keyed by instrument id, a second row for one
+instrument is refused at load, and choosing between two rows would need a venue term on the
+tuple. What the separate file buys is that the day a second venue is declared, the change is
+one file and the instrument's terms are untouched. Building the key for a venue nobody has
+declared would be speculation.
+
+### 29.6a What the outcome says about the routes it rests on
+
+Both declared ways carry a **status** and a **disruption probability**, and both reach the
+outcome: the most constrained status either declares, the largest single leg's probability
+across the two, and which side is constrained. Never compounded — multiplying two
+independent-looking probabilities would invent a joint distribution nobody declared — and
+never one-sided, because a status describing the way in alone on a record whose headline
+number is a round trip is a half-truth.
+
+A `closed` route never appears here: it is refused before anything is costed.
+
+### 29.7 One horizon, and no reinvestment
+
+A comparison states its horizon **once** and evaluates every tuple over it. Comparing a
+two-year instrument over two years against a twenty-year one over twenty answers two different
+questions.
+
+An instrument that **cannot span** the horizon is infeasible for that comparison, with the
+binding term named, rather than truncated to whatever span it can manage: a return measured
+over a period the money could not have been withdrawn in is a rate for a holding nobody could
+have had.
+
+An instrument that **terminates early** needs a declared continuation assumption, and there is
+exactly one: the proceeds sit as cash. It is a required argument with no default anywhere.
+*Reinvest on stated terms* needs terms — a rate, an instrument, an entry cost, a tax treatment
+— and none of them is declared.
+
+⚙ It changes no figure, and that is worth stating rather than hiding. The rate is a return
+over dated flows and cash earns nothing, so holding proceeds to the horizon moves neither an
+arrival nor a date. It is recorded on every outcome that rests on it because *reinvest* would
+move both, and a reader comparing two instruments over one horizon is entitled to know which
+of the two answers he is being given.
+
+### 29.8 The benchmark is one of the things it benchmarks
+
+The hurdle in a comparison is the OVDP evaluated as a tuple through its declared domestic
+routes, by the same function as everything it is ranked against, and the comparison holds its
+**index** rather than a copy. A benchmark computed beside the comparison can drift from what
+it benchmarks, and the drift is invisible because both figures look reasonable.
+
+Two outcomes within the project tolerance (§11) are a **tie**, including a tie with the
+hurdle — which is what makes *nothing beats the hurdle* sayable when it is true by a whisker.
+
+### 29.9 Worked example
+
+`tests/worked_examples/test_full_round_trip.py` works one round trip out in full: the way in,
+the purchase, four coupons, five recorded zero tax charges, the redemption, and four separate
+repatriations, with both conservation identities checked.
+
+```
+10 000.00  =  9 000.00 (bought) + 150.00 (way in) + 850.00 (undeployed)
+11 790.00  =  11 691.05 (reached) + 98.95 (way out)
+```
+
+The rate is 14.44%, measured against the 9 150.00 actually invested. The two wrong
+denominators are worth naming because each looks reasonable: the whole 10 000.00 gives 8.96%
+and prices the stranded 850.00 as a loss, and the 9 000.00 of paper gives 15.50% and forgets
+the ramp.
+
 ---
 
-## 29. Where to look next
+## 30. Where to look next
 
 | question | file |
 | --- | --- |
@@ -2940,6 +3194,11 @@ attested. When it is found, one field changes and no source does.
 | What does a CPI gap do to a real figure? | `tests/unit/test_cpi_coverage.py` |
 | Can an assumption be mistaken for an observation? | `tests/contract/test_two_figures_never_blend.py` |
 | Does a stale price index reach the real figure? | `tests/unit/test_cpi_staleness.py` |
+| What does a whole tuple cost, end to end? | `tests/worked_examples/test_full_round_trip.py` |
+| Are all three seams really anchored? | `tests/unit/test_chaining_refusals.py` |
+| Is the benchmark the same figure it ranks? | `tests/contract/test_the_hurdle_is_a_tuple.py` |
+| Is a new instrument, route, tax class and jurisdiction data-only? | `tests/contract/test_h1_data_only.py` |
+| Does the ramp difference reach the holding? | `tests/unit/test_two_streams_two_outcomes.py` |
 | What is still uncovered? | `docs/REQUIRED_TESTS.md` |
 
 The product specification is `docs/reference/SIMULATOR_SPEC.md`; the engine charter and the

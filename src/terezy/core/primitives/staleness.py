@@ -252,6 +252,49 @@ def staleness_of(
     )
 
 
+def staleness_of_sources(
+    provenance: Provenance,
+    kinds: Mapping[str, ObservationKind],
+    *,
+    as_of: date,
+) -> StalenessVerdict:
+    """Age every source in a merged provenance under **its own** declared kind.
+
+    :func:`staleness_of`'s sibling, and the distinction is which of the two knows the kind.
+    ``staleness_of`` is for a caller holding **one declaring record** whose own field names the
+    threshold for the whole table -- a leg, a channel, a venue quote -- and it is the right
+    call there because a table may cite several sources under one kind.
+
+    This one is for a **derived figure** whose provenance has already been merged across
+    several tables. By then no record is in hand, and none of the records behind a figure like
+    a tuple's outcome -- a bond's terms, a tax class's rate entries, a fund's net asset value
+    -- carries a kind of its own. The kind rides on the citation instead
+    (:attr:`~terezy.core.primitives.provenance.SourceRef.kind`), which is the only thing that
+    survives the merge.
+
+    **This function ages what it is given and can say nothing about what it is not.** Whether
+    a caller passed the provenance of every table its figure rests on is that caller's
+    property to assert, against the declarations rather than against the provenance it built
+    -- two sides from one source prove only that source self-consistent. It is asserted for
+    the join in ``tests/contract/test_marks_survive_the_join.py``, and the two tables that
+    were missing when nobody did are why the sentence is here.
+
+    A source whose kind is empty is **not aged and not listed in** :attr:`assessed`. That is
+    the strict reading: it says nobody could check this rather than claiming it is current,
+    which is the same distinction :data:`UNASSESSED` exists to preserve. Every citation the
+    loader reads is stamped, so an empty kind means a source built in code.
+    """
+    aged = [
+        (source, _verdict_for(source, kind_for(kinds, source.kind), as_of=as_of))
+        for source in provenance.sources
+        if source.kind
+    ]
+    return StalenessVerdict(
+        assessed=tuple(sorted(source.id for source, _ in aged)),
+        stale=tuple(sorted((v for _, v in aged if v is not None), key=lambda s: s.source_id)),
+    )
+
+
 def merge(left: StalenessVerdict, right: StalenessVerdict) -> StalenessVerdict:
     """Union two verdicts. Associative, commutative, with :data:`UNASSESSED` as identity.
 

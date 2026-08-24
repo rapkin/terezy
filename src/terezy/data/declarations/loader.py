@@ -60,6 +60,7 @@ from terezy.core.inflation.series import (
     Periodicity,
 )
 from terezy.core.instruments import registry as instrument_registry
+from terezy.core.instruments.access import InstrumentAccess, VenueQuote
 from terezy.core.instruments.fund import (
     CapEntry,
     DeclaredYield,
@@ -386,7 +387,8 @@ def _source_ref(
     source: str,
     retrieved_on: str,
     verified_on: str,
-    kind: str | None,
+    kind: str,
+    check_kind: bool = True,
 ) -> SourceRef:
     """One table's citation, as the core's ``SourceRef``.
 
@@ -394,23 +396,22 @@ def _source_ref(
     non-empty, and an empty ``verified_on`` becomes ``None`` -- the unverified mark that
     FR-015 propagates through every figure derived from this table.
 
-    ⚙ **``kind`` is checked here and carried nowhere**, for the tables whose core record has
-    no field for it -- feature 001's ``BondTerms``, ``InstrumentConstraints`` and
-    ``TaxClass``. The field is required in the file (FR-028: no sourced table ages under a
-    threshold nobody named), and it is checked non-empty at the one place every citation
-    passes through, so the check cannot be forgotten at a new call site. Resolution against
-    ``data/observation_kinds.toml`` is ``scripts/check_provenance.py``'s, which reads the
-    files rather than the records; see :class:`terezy.data.declarations.schema.BondTermsTable`
-    for why a kind resolved into these records would be a value nothing reads.
+    ⚙ **``kind`` is now carried as well as checked, and that reversed a decision.** It used to
+    be validated here and dropped, on the reading that a kind resolved into feature 001's
+    ``BondTerms``, ``InstrumentConstraints`` and ``TaxClass`` would be "a value nothing
+    reads". Feature 010 made it a value something reads: a tuple's outcome is derived from
+    those tables, FR-019 requires staleness to propagate from **every** declared value in
+    every part, and by the time a provenance has been merged across five tables the record
+    that knew each kind is gone. Carrying it on the citation is what lets a merged provenance
+    be aged at all -- see :attr:`terezy.core.primitives.provenance.SourceRef.kind`.
 
-    The parameter is **required and may be ``None``**, with no default, on the precedent
-    ``DeclarationError.remedy`` sets: a default would make "no kind check" the thing that
-    happens when nobody thought about it, which is the shape of mistake this project keeps
-    finding. ``None`` is passed only where the table's kind is checked at the record field it
-    becomes -- a leg's ``kind_of_observation``, a channel's ``kind`` -- because the error
-    there can name the field the file actually uses.
+    ``check_kind=False`` says the non-empty check happens at the record field this kind
+    becomes -- a leg's ``kind_of_observation``, a channel's ``kind``, an access price's -- so
+    that the error names the field the file actually uses. It suppresses the *check* and never
+    the carrying: a kind checked elsewhere is still stamped here, because a source that
+    reached the core without one could never be aged.
     """
-    if kind is not None:
+    if check_kind:
         _require_text(
             path,
             f"{table}.kind",
@@ -421,6 +422,7 @@ def _source_ref(
         )
     return SourceRef(
         id=source_id(path, table),
+        kind=kind,
         citation=_require_text(
             path,
             f"{table}.source",
@@ -1159,7 +1161,8 @@ def _channel_side(
         # the record so the staleness verdict ages the side under it (FR-028) -- not
         # validated here and dropped, which would leave the side ageing under the
         # channel's kind.
-        kind=None,
+        kind=table.kind,
+        check_kind=False,
     )
     sources = prov.of([ref])
     kind = _require_text(
@@ -1362,7 +1365,8 @@ def _channel(path: Path, entry: schema.ChannelTable) -> FxChannel:
         retrieved_on=entry.retrieved_on,
         verified_on=entry.verified_on,
         # Checked below, at ``FxChannel.kind``, where the message names ``channel[id].kind``.
-        kind=None,
+        kind=entry.kind,
+        check_kind=False,
     )
     return FxChannel(
         id=channel_id,
@@ -1484,7 +1488,8 @@ def _leg(path: Path, table: schema.LegTable, *, position: int) -> Leg:
         verified_on=table.verified_on,
         # Checked below, at ``Leg.kind_of_observation``: a leg's ``kind`` is the *leg* kind,
         # so the message has to name the field the file actually uses.
-        kind=None,
+        kind=table.kind_of_observation,
+        check_kind=False,
     )
     sources = prov.of([ref])
     return Leg(
@@ -3764,4 +3769,150 @@ def _unsettled_switch(
             "this belief with a citation",
         ),
         declared_at=f"{path.parent.name}/{path.name}#{field_prefix}",
+    )
+
+
+# ---------------------------------------------------------------------------
+# 010-full-tuple: how an instrument is reached
+# ---------------------------------------------------------------------------
+#
+# Same four responsibilities in the same order -- read, shape, meaning, construct -- and the
+# same rule that no pydantic type crosses this line.
+#
+# What is checked here is everything true of one file read in isolation: the list is
+# non-empty, ids and labels are not blank, a duplicate ``instrument_id`` within the file is
+# refused, the price is positive and its currency is one this engine models, and the citation
+# is complete.
+#
+# What is **not** here, because each needs a second file: whether the instrument exists,
+# whether the venues exist and can hold its currency, whether the quote's currency is the
+# instrument's own, and whether this kind of instrument is entitled to declare a price at all.
+# Four relations, and all four live in the resolver where the whole set is in hand and both
+# files can be named.
+
+ACCESS_TABLE: Final = "access"
+"""Root array of an access file, and the prefix of every field path in one."""
+
+
+def access_from_file(path: Path) -> tuple[InstrumentAccess, ...]:
+    """One ``data/access/<name>.toml`` as the access declarations it makes.
+
+    A tuple rather than a mapping: the resolver keys them, because a duplicate *across* files
+    is its question and reporting it needs both file names.
+    """
+    file = _validate(schema.AccessFile, read_document(path), path)
+    if not file.access:
+        raise DeclarationError(
+            path,
+            ACCESS_TABLE,
+            "declares no access entries. An empty list is reported rather than read as 'no "
+            "instrument can be reached': every tuple naming an instrument would refuse for a "
+            "missing declaration, and a comparison emptied by a forgotten line looks exactly "
+            "like one emptied by a genuine gap in the registry.",
+            "declare at least one [[access]] entry, or delete the file",
+        )
+    declared: list[InstrumentAccess] = []
+    seen: dict[str, int] = {}
+    for position, entry in enumerate(file.access):
+        prefix = f"{ACCESS_TABLE}[{position}]"
+        instrument_id = _require_text(
+            path,
+            f"{prefix}.instrument_id",
+            entry.instrument_id,
+            "an access declaration says how one named instrument is reached, and it is "
+            "resolved against the declared instruments",
+        )
+        if instrument_id in seen:
+            raise DeclarationError(
+                path,
+                f"{prefix}.instrument_id",
+                f"declares how {instrument_id!r} is reached for the second time; entry "
+                f"{seen[instrument_id]} of this file already does. The two are not merged and "
+                "neither wins: an instrument reached two ways is two declarations only once "
+                "there is a term to tell them apart, and until then a repeated id is a file "
+                "that was edited twice.",
+                "delete the duplicate entry",
+            )
+        seen[instrument_id] = position
+        declared.append(
+            InstrumentAccess(
+                instrument_id=instrument_id,
+                bought_at=_require_text(
+                    path,
+                    f"{prefix}.bought_at",
+                    entry.bought_at,
+                    "the purchase happens at a named venue, and that venue is the far end the "
+                    "funding route has to reach (FR-004)",
+                ),
+                proceeds_to=_require_text(
+                    path,
+                    f"{prefix}.proceeds_to",
+                    entry.proceeds_to,
+                    "the instrument's proceeds land at a named venue, and that venue is where "
+                    "the exit route has to depart from (FR-004)",
+                ),
+                quote=_access_price(path, prefix, entry.price),
+                risk_class=_require_text(
+                    path,
+                    f"{prefix}.risk_class",
+                    entry.risk_class,
+                    "the risk class is the fifth term of the unit of analysis and is carried "
+                    "into every outcome; it is declared and never scored",
+                ),
+            )
+        )
+    return tuple(declared)
+
+
+def _access_price(
+    path: Path, prefix: str, declared: schema.AccessPriceTable | None
+) -> VenueQuote | None:
+    """The declared unit quote and the kind it ages under, or ``None`` where the table is absent.
+
+    ``None`` is the *statement* that this instrument prices itself, and it is returned here
+    without judgement: whether this kind of instrument is entitled to make that statement is a
+    relation between two files and belongs to the resolver.
+
+    ``check_kind=False`` is passed to :func:`_source_ref` because the kind is also carried
+    into the record and checked at the field it becomes -- the same reading a leg's
+    ``kind_of_observation`` gets, and the reason the error below names ``[access.price].kind``
+    rather than a table. The citation is stamped with it either way, and *resolving* the name
+    against the declared kinds is the resolver's, which reads a second file to do it.
+    """
+    if declared is None:
+        return None
+    field = f"{prefix}.price"
+    return VenueQuote(
+        price=Money(
+            _positive(
+                path,
+                f"{field}.per_unit",
+                declared.per_unit,
+                "a unit costs something. A price of zero or below would make a purchase "
+                "acquire unlimited units from any amount, and every figure downstream of it "
+                "meaningless rather than merely large",
+            ),
+            _currency(path, f"{field}.currency", declared.currency),
+            prov.of(
+                [
+                    _source_ref(
+                        path,
+                        field,
+                        source=declared.source,
+                        retrieved_on=declared.retrieved_on,
+                        verified_on=declared.verified_on,
+                        # Checked below, at ``VenueQuote.kind``, naming ``[access.price].kind``.
+                        kind=declared.kind,
+                        check_kind=False,
+                    )
+                ]
+            ),
+        ),
+        kind=_require_text(
+            path,
+            f"{field}.kind",
+            declared.kind,
+            "a venue quote ages under a declared threshold, and there is no default one "
+            "(FR-028): a price whose kind nobody named could never be reported stale",
+        ),
     )

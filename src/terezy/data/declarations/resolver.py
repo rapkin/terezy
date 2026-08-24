@@ -39,6 +39,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from terezy.core.decision.tuple_outcome import Registries
 from terezy.core.instruments import registry as instrument_registry
 from terezy.core.primitives import money
 from terezy.core.routes.venues import can_hold
@@ -50,6 +51,7 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from collections.abc import Mapping, Sequence
 
     from terezy.core.inflation.series import CpiSeries, InflationAssumption
+    from terezy.core.instruments.access import InstrumentAccess
     from terezy.core.instruments.fund import FundDeclaration
     from terezy.core.instruments.interface import InstrumentDeclaration
     from terezy.core.ledger.seeds import SeedLot
@@ -333,12 +335,18 @@ def from_data_root(root: Path) -> Declarations:
 # 8. **A regime's ``route_ids``** resolve, and a regime is **partner-closed**.
 # 9. **A stream's ``arrives_at``** names a declared venue.
 #
-# ⚙ **A channel side's ``kind`` is a record field and resolves here.** An earlier revision
-# validated a side's declared kind at load and then dropped it, so the core aged every side
-# under ``FxChannel.kind`` -- a 7-day premium under a 365-day schedule threshold, reported
-# fresh. ``ChannelSide.kind`` now carries it, the staleness verdict ages each side under it
-# (``cost._aged``), and this pass resolves it against the declared kinds exactly as it does
-# the channel's own.
+# ⚙ **Every declared kind resolves here, and the rule has been learned twice.** An earlier
+# revision validated a channel *side's* kind at load and then dropped it, so the core aged
+# every side under ``FxChannel.kind`` -- a 7-day premium under a 365-day schedule threshold,
+# reported fresh. Feature 010 then shipped ``[access.price].kind`` carried into the record and
+# resolved nowhere: a typo loaded clean, resolved clean, and raised ``KeyError`` out of the
+# pure core, whose message calls that a programmer error. A data-file typo is not one.
+#
+# Because the same shape appeared twice, the third guard is a **scan rather than a field**:
+# ``tests/contract/test_access_declaration_loading.py`` walks every ``SourceRef`` reachable
+# from the resolved registries and requires each to carry a kind that this file's registry
+# declares. A new declaration kind whose citation nobody resolves fails there, whether or not
+# anybody remembered to add a line to the list above.
 
 BASE_CURRENCY_ROLE = (
     "the base currency is the currency the owner earns and spends -- the ledger's home "
@@ -2227,3 +2235,267 @@ def tax_positions_from_data_root(
         )
     filing, positions = loader.tax_positions_from_file(declared[0])
     return filing, positions, declared[0]
+
+
+# ---------------------------------------------------------------------------
+# 010-full-tuple: how an instrument is reached, and the whole set the join needs
+# ---------------------------------------------------------------------------
+#
+# Four relations a per-file validator structurally cannot check, and they are the whole of
+# this section:
+#
+# 1. **The instrument exists** -- of either declaration kind, because a fund and a bond share
+#    one id space.
+# 2. **The venues exist and can hold the instrument's currency**, which is `_check_venue`
+#    unchanged. Money cannot sit where its currency cannot, and a purchase venue that cannot
+#    hold what the instrument trades in is a seam nobody can cross.
+# 3. **The quote's currency is the instrument's own.** The price states its currency so the
+#    file reads on its own; the two are then checked against each other, on `_check_partner`'s
+#    precedent, because a file that can state something wrong is a file whose disagreement can
+#    be reported.
+# 4. **A price is declared exactly where the instrument states none.** A fund prices from its
+#    own declared NAV and entry markup; a bond declares a face value, which is what it repays,
+#    and no purchase price at all. Both halves are refused: a missing bond price would leave a
+#    purchase unsizable from an arriving amount, and a fund price here would be a second place
+#    for one fact -- the two disagreeing the day one of them is updated, with nothing to say
+#    which the figures used.
+#
+# ⚙ **This is also the first place the instrument side and the route side of the registry meet
+# in one record.** `Declarations` (instruments, funds, tax) and `RampDeclarations` (venues,
+# routes, channels, streams, kinds) have never known about each other, because until now
+# nothing needed both: a projection had no route and a route bought nothing. The join needs
+# every one of them at once, so `TupleDeclarations` composes rather than widens -- the same
+# "a record beside X rather than more fields on X" the five records above already take.
+
+ACCESS_DIR = "access"
+"""Where access declarations live under a data root. Cited; in `SOURCED_DIRS`.
+
+Its one observed value is a venue's unit quote, in `[access.price]`, which carries the four
+citation keys every other sourced table does. The rest of an entry -- two venue ids, an
+instrument id and a risk-class label -- is references and statements, and cites nothing, the
+same reading `[instrument.tax_classes]` and `data/venues.toml` already carry.
+"""
+
+
+@dataclass(frozen=True, slots=True)
+class TupleDeclarations:
+    """Every declaration the join needs, in one place, resolved against each other.
+
+    ⚙ **It composes the existing records rather than flattening them.** Reaching a route
+    through `coverage.ramp.routes` is two attributes longer than a flat field would be, and it
+    is what keeps one fact in one place: the venue set the access declarations were checked
+    against is literally the venue set the routes were checked against, rather than a copy
+    that can drift.
+    """
+
+    instruments: Declarations
+    """The instrument, fund and tax-class declarations -- `from_data_root`'s output."""
+
+    coverage: CoverageDeclarations
+    """The routes, venues, channels, streams, kinds, regimes and spendable endpoints --
+    `coverage_from_data_root`'s output, which already nests `RampDeclarations`."""
+
+    access: Mapping[str, InstrumentAccess]
+    """How each instrument is reached, keyed by instrument id."""
+
+    access_files: Mapping[str, Path]
+    """Which file declared each entry, so a later failure can still name it."""
+
+    registries: Registries
+    """The same set again, flattened into the record the pure core takes.
+
+    Built here rather than by every caller: assembling nine mappings by hand at each call site
+    is nine chances to pass the wrong one, and the core must not learn how to read a data root
+    to avoid that.
+    """
+
+
+def _access_instrument_currency(
+    entry: InstrumentAccess,
+    *,
+    instruments: Mapping[str, InstrumentDeclaration],
+    funds: Mapping[str, FundDeclaration],
+    path: Path,
+    field_prefix: str,
+) -> tuple[Currency, bool]:
+    """The declared currency of the instrument an entry names, and whether it self-prices.
+
+    Both answers come from the same lookup, deliberately: they are two readings of *which
+    declaration this is*, and computing them separately would let an entry be checked against
+    one declaration's currency and another's pricing.
+    """
+    fund = funds.get(entry.instrument_id)
+    if fund is not None:
+        return fund.unit_currency, True
+    declared = instruments.get(entry.instrument_id)
+    if declared is not None:
+        return declared.currency, False
+    raise DeclarationError(
+        path,
+        f"{field_prefix}.instrument_id",
+        f"says how {entry.instrument_id!r} is reached, and no declaration under "
+        f"{INSTRUMENTS_DIR}/ declares it. An access entry for an instrument nobody declared "
+        "describes a journey to nothing, and it is refused here rather than surfacing later "
+        "as a tuple that refuses for a reason naming the wrong file. Declared instruments: "
+        f"{sorted([*instruments, *funds])}.",
+        "name a declared instrument, or add the instrument declaration",
+    )
+
+
+def _check_access(
+    entry: InstrumentAccess,
+    *,
+    position: int,
+    instruments: Mapping[str, InstrumentDeclaration],
+    funds: Mapping[str, FundDeclaration],
+    venues: Mapping[str, Venue],
+    kinds: Mapping[str, ObservationKind],
+    path: Path,
+) -> None:
+    """One access entry against the instruments, the venues, the kinds and its own pricing."""
+    prefix = f"{loader.ACCESS_TABLE}[{position}]"
+    currency, self_priced = _access_instrument_currency(
+        entry, instruments=instruments, funds=funds, path=path, field_prefix=prefix
+    )
+    for field, venue_id in (("bought_at", entry.bought_at), ("proceeds_to", entry.proceeds_to)):
+        _check_venue(venue_id, currency, venues, path=path, field_path=f"{prefix}.{field}")
+    if entry.quote is not None:
+        _check_kind(entry.quote.kind, kinds, path=path, field_path=f"{prefix}.price.kind")
+    _check_access_price(
+        entry, currency=currency, self_priced=self_priced, path=path, field_prefix=prefix
+    )
+
+
+def _check_access_price(
+    entry: InstrumentAccess,
+    *,
+    currency: Currency,
+    self_priced: bool,
+    path: Path,
+    field_prefix: str,
+) -> None:
+    """A price is declared exactly where the instrument states none, and in its currency."""
+    quote = entry.quote
+    price = None if quote is None else quote.price
+    if self_priced and price is not None:
+        raise DeclarationError(
+            path,
+            f"{field_prefix}.price",
+            f"quotes a unit price for {entry.instrument_id!r}, which declares its own net "
+            "asset value and its own entry markup. The quote is refused rather than preferred "
+            "or ignored: one price in two files is one fact in two places, and the day either "
+            "is updated the figures would rest on whichever the code happened to read, with "
+            "nothing in the output to say which.",
+            "delete the [access.price] table; the fund's own declaration prices it",
+        )
+    if not self_priced and price is None:
+        raise DeclarationError(
+            path,
+            field_prefix,
+            f"declares how {entry.instrument_id!r} is reached but quotes no unit price, and "
+            "that instrument's own declaration states none either -- a face value is what a "
+            "bond repays, not what it costs. Without a price an arriving amount cannot be "
+            "turned into units at all, and assuming par would be putting a market fact into "
+            "code where nobody declared it.",
+            "add an [access.price] table quoting what one unit costs at that venue",
+        )
+    if price is not None and price.currency is not currency:
+        raise DeclarationError(
+            path,
+            f"{field_prefix}.price.currency",
+            f"quotes {entry.instrument_id!r} in {price.currency.value}, and that instrument "
+            f"is declared in {currency.value}. The two are refused rather than converted: "
+            "there is no rate here, and inventing one would size every purchase of this "
+            "instrument at a number nobody declared.",
+            f"quote the price in {currency.value}, or correct the instrument's currency",
+        )
+
+
+def _resolved_access(
+    files: Sequence[Path],
+    *,
+    instruments: Mapping[str, InstrumentDeclaration],
+    funds: Mapping[str, FundDeclaration],
+    venues: Mapping[str, Venue],
+    kinds: Mapping[str, ObservationKind],
+) -> tuple[dict[str, InstrumentAccess], dict[str, Path]]:
+    """Every access declaration by instrument id, checked, refusing two files that collide."""
+    access: dict[str, InstrumentAccess] = {}
+    declaring: dict[str, Path] = {}
+    for path in files:
+        for position, entry in enumerate(loader.access_from_file(path)):
+            if entry.instrument_id in access:
+                raise _refuse_duplicate(
+                    "access declaration",
+                    entry.instrument_id,
+                    f"{loader.ACCESS_TABLE}[{position}].instrument_id",
+                    declaring[entry.instrument_id],
+                    path,
+                )
+            _check_access(
+                entry,
+                position=position,
+                instruments=instruments,
+                funds=funds,
+                venues=venues,
+                kinds=kinds,
+                path=path,
+            )
+            access[entry.instrument_id] = entry
+            declaring[entry.instrument_id] = path
+    return access, declaring
+
+
+def tuple_from_data_root(
+    root: Path, *, base_currency: Currency, scenario_id: str | None
+) -> TupleDeclarations:
+    """Every declaration a tuple evaluation needs, under one data root.
+
+    The instrument side and the route side are resolved by the two entry points that already
+    own them, and then the access declarations are checked against both. Nothing here
+    re-parses a file either of them read.
+
+    An empty ``access/`` directory is an **error**, on ``composition``'s precedent rather than
+    ``cpi``'s: an absent CPI series makes every real figure say so in words, whereas an absent
+    access set makes every tuple in the comparison refuse for a missing declaration -- and a
+    comparison emptied by a forgotten directory looks exactly like one emptied by a genuine
+    gap in the registry.
+    """
+    instruments = from_data_root(root)
+    covered = coverage_from_data_root(root, base_currency=base_currency, scenario_id=scenario_id)
+    files = sorted((root / ACCESS_DIR).glob("*.toml"))
+    if not files:
+        raise DeclarationError(
+            root / ACCESS_DIR,
+            "",
+            "contains no *.toml declarations, so nothing says where any instrument is bought "
+            "or where its proceeds land. It is reported rather than read as an empty world: "
+            "every tuple would refuse for a missing declaration, and a comparison emptied by "
+            "a mistyped path is indistinguishable from one emptied by a real gap.",
+            "check the data root, or declare how each instrument is reached",
+        )
+    access, declaring = _resolved_access(
+        files,
+        instruments=instruments.instruments,
+        funds=instruments.funds,
+        venues=covered.ramp.venues,
+        kinds=covered.ramp.kinds,
+    )
+    return TupleDeclarations(
+        instruments=instruments,
+        coverage=covered,
+        access=access,
+        access_files=declaring,
+        registries=Registries(
+            instruments=instruments.instruments,
+            funds=instruments.funds,
+            tax_classes=instruments.tax_classes,
+            access=access,
+            routes=covered.ramp.routes,
+            channels=covered.ramp.channels,
+            streams=covered.ramp.streams,
+            kinds=covered.ramp.kinds,
+            spendable=covered.spendable,
+            base_currency=covered.ramp.base_currency,
+        ),
+    )

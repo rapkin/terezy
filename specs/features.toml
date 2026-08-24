@@ -69,7 +69,7 @@ why    = "loss offset and carryforward (E2), average/specific lot methods (E6), 
 
 [[feature]]
 id     = "010-full-tuple"
-status = "spec"
+status = "done"
 needs  = ["002-ramp-cost", "006-inzhur-instruments"]
 why    = "connect ramp to instrument purchases: net-of-access-cost comparison (§8 q1) and the H1 data-only full-pipeline test"
 

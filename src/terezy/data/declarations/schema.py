@@ -1796,3 +1796,111 @@ class TaxPositionsFile(BaseModel):
     model_config = STRICT
 
     tax_positions: TaxPositionsTable
+
+
+# ---------------------------------------------------------------------------
+# 010-full-tuple: how an instrument is reached
+# ---------------------------------------------------------------------------
+#
+# Same three settings and the same standing rule: ``STRICT`` everywhere, and **zero field
+# defaults** except where TOML's lack of a null leaves an omitted key as the only way to say
+# "nothing is declared here" -- which here is exactly one field, ``price``, feeding a core
+# field that is itself ``Money | None``.
+#
+# ⚙ **A separate file rather than four keys on the instrument declaration.** Every field here
+# is a property of the **option** -- this instrument, reached this way -- rather than of the
+# security: where it is bought, where its proceeds land, what a unit costs *at that venue*,
+# and how risky reaching it that way is. Today the resolver enforces **one row per
+# instrument**, so one instrument at two venues is not yet declarable; what the separate file
+# buys is that it becomes declarable here, in one file, without touching the terms the paper
+# carries. Keying by (instrument, venue) now would also need a venue term on the tuple, and
+# building it for a second venue nobody has declared would be speculation.
+#
+# ⚙ **``[[access]]`` itself carries no numeric leaf and therefore no citation**, deliberately.
+# A venue id, an instrument id and a risk-class label are references and statements, not
+# observations -- the same reading ``[instrument.tax_classes]`` and ``data/venues.toml``
+# already carry. The one observed value, the unit price, is a *venue quote* and lives in its
+# own ``[access.price]`` table with its own four citation keys, exactly as ``[instrument.nav]``
+# does.
+
+
+class AccessPriceTable(BaseModel):
+    """``[access.price]`` -- what one unit costs at the venue the instrument is bought from."""
+
+    model_config = STRICT
+
+    per_unit: float
+    """The price of one unit. Strictly positive.
+
+    A **quote**, not a term of the paper: a bond's declaration states the face value it
+    repays, which is a different number the moment it trades away from par, and sizing a
+    purchase from the face value would be assuming par in code where nobody declared it.
+    """
+
+    currency: str
+    """What the quote is in. Stated rather than inherited from the instrument, and then
+    **checked against** the instrument's own declared currency by the resolver.
+
+    Two declarations of one fact, on purpose and on ``_check_partner``'s precedent: a price
+    that silently adopted whatever currency the instrument named would be unreadable on its
+    own -- ``per_unit = 1000.0`` of what? -- and a file that can state something wrong is a
+    file whose disagreement can be reported. One that cannot is a file whose author's
+    intention is unrecoverable.
+    """
+
+    kind: str
+    """The ``ObservationKind`` this quote ages under. A price goes out of date faster than a
+    coupon rate does, which is the whole reason the threshold is declared per kind."""
+
+    source: str
+    """Non-empty. A price with no citation is the thing Principle I forbids."""
+
+    retrieved_on: str
+    """ISO date the quote was read."""
+
+    verified_on: str
+    """Present, empty where nobody has checked it. See the module docstring on why the key may
+    not be omitted."""
+
+
+class AccessTable(BaseModel):
+    """One ``[[access]]`` entry: how one declared instrument is reached."""
+
+    model_config = STRICT
+
+    instrument_id: str
+    """The declared instrument -- of either kind. Resolved by the resolver against both
+    registries, because a fund and a bond share an id space and an entry naming neither is a
+    typo the reader must be told about."""
+
+    bought_at: str
+    """The venue the purchase happens at. Resolved against ``data/venues.toml``, and required
+    to be able to hold the instrument's currency."""
+
+    proceeds_to: str
+    """The venue the instrument's proceeds land at. Resolved the same way, and declared
+    separately from :attr:`bought_at` rather than assumed equal to it."""
+
+    risk_class: str
+    """The declared risk class of this option. Non-empty, carried into every outcome, and
+    scored nowhere."""
+
+    price: AccessPriceTable | None = None
+    """The unit quote, or omitted where the instrument declares its own price.
+
+    **The one omittable field in this model**, and the one default in it: TOML has no null, so
+    an omitted table is the only way to say *this instrument prices itself*. Which kinds may
+    omit it is not a matter of taste and is not checked here -- it is a relation between this
+    file and the instrument's own, so the resolver decides it and can name both files.
+    """
+
+
+class AccessFile(BaseModel):
+    """A whole ``data/access/<name>.toml``: one or more access declarations."""
+
+    model_config = STRICT
+
+    access: list[AccessTable]
+    """Non-empty, checked by the loader. A file declaring nothing is a file somebody started
+    and did not finish, and reading it as "no instrument is reachable" would turn every tuple
+    in the comparison into a refusal built out of a forgotten line."""

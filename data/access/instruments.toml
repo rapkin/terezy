@@ -1,0 +1,94 @@
+# How each declared instrument is reached: the terms a tuple needs that the instrument's own
+# declaration does not state.
+#
+# **Why this file exists.** Feature 010 joins a costed route to a purchase, and two of the
+# join's seams are positional: the way in must end **where and in the currency** the purchase
+# happens, and the
+# instrument's proceeds must land **where and in the currency** the way out departs from. An
+# instrument declaration carries a currency and no venue, so without this file both seams
+# could be checked on currency alone — and a way in that ends in the right currency at the
+# wrong venue is money teleporting between venues for free, with the record still reading as a
+# coherent journey. Feature 004 shipped exactly that defect once.
+#
+# **Why it is not four more keys on `data/instruments/*.toml`.** Everything declared here is a
+# property of the **option** — this instrument, reached this way — and not of the security.
+# The venue that sells it, the venue its proceeds land at, the price *at that venue*, and how
+# risky reaching it that way is: none of them is a term of the paper, and all of them change
+# if the same instrument is reached somewhere else.
+#
+# Today that shape is **not yet declarable**: entries are keyed by instrument id and a second
+# row for one instrument is refused at load, because selecting between two rows would need a
+# venue term the tuple does not have. What this file buys is that the day a second venue is
+# declared, the change is here and the instrument's own terms are untouched.
+#
+# **What carries a citation and what does not.** A venue id, an instrument id and a
+# risk-class label are references and statements — there is nothing here for a source to vouch
+# for, the same reading `[instrument.tax_classes]` and `data/venues.toml` already carry. The
+# one observed value is `[access.price]`, a **venue quote**, and it carries the four citation
+# keys every other sourced table does. `data/access/` is therefore in `SOURCED_DIRS`.
+#
+# **A price is declared exactly where the instrument states none.** A collective-investment
+# fund prices from its own declared NAV plus the entry markup its liquidity mode charges, so a
+# `[access.price]` table on one is refused at load — one price in two files is one fact in two
+# places. A fixed-income declaration states a face value, which is what it *repays*; sizing a
+# purchase from it would be assuming par in code where nobody declared it, so a bond must
+# quote a price here and one that omits it is refused too.
+#
+# **The risk classes are labels the owner has not yet stated, and nothing computes from them.**
+# They are carried into every outcome so the fifth term of Principle VI's tuple is visible, and
+# they are **scored nowhere**: there is no risk model in this project and an unscored declared
+# label is honest where a computed score would not be. The words below are descriptive
+# placeholders in the owner's own vocabulary-to-be; changing one changes no figure.
+
+# --- the two synthetic OVDP issues ------------------------------------------------------
+
+[[access]]
+instrument_id = "ovdp_synthetic_a"
+bought_at     = "inzhur"
+proceeds_to   = "inzhur"
+risk_class    = "sovereign_debt"
+
+  [access.price]
+  per_unit     = 1000.0
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "SYNTHETIC FIXTURE — the price implied by this fixture's own header, which states that issue A is 'bought at par'. Par is its declared face value of 1000.0 UAH. Not a quote observed at any venue, and not a claim about any real issue."
+  retrieved_on = "2026-08-23"
+  verified_on  = ""
+
+[[access]]
+instrument_id = "ovdp_synthetic_b"
+bought_at     = "inzhur"
+proceeds_to   = "inzhur"
+risk_class    = "sovereign_debt"
+
+  [access.price]
+  per_unit     = 1000.0
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "SYNTHETIC FIXTURE — par, on issue A's reading, so that the two fixtures differ in their conventions and their minimum ticket rather than in their price. Not observed anywhere."
+  retrieved_on = "2026-08-23"
+  verified_on  = ""
+
+# --- the funds, which price themselves ---------------------------------------------------
+#
+# No [access.price] on any of the three: each declares its own net asset value per unit and
+# its own entry markup, and `core.instruments.fund.entry_price_for` is what the join buys at.
+
+[[access]]
+instrument_id = "inzhur_reit"
+bought_at     = "inzhur"
+proceeds_to   = "inzhur"
+risk_class    = "real_estate_fund"
+
+[[access]]
+instrument_id = "inzhur_miltech"
+bought_at     = "inzhur"
+proceeds_to   = "inzhur"
+risk_class    = "venture_fund"
+
+[[access]]
+instrument_id = "synthetic_fund_c"
+bought_at     = "inzhur"
+proceeds_to   = "inzhur"
+risk_class    = "synthetic_fixture"

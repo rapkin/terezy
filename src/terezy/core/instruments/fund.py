@@ -506,9 +506,27 @@ def retained_share(declaration: FundDeclaration) -> float:
 
 def purchase_price_per_unit(declaration: FundDeclaration, plan: ExecutionPlan) -> Money:
     """NAV plus the declared entry markup. The price actually paid per unit."""
+    return _marked_up(declaration, plan.entry_markup)
+
+
+def entry_price_for(declaration: FundDeclaration, mode: LiquidityMode) -> Money:
+    """The same price, resolved from the assumed mode rather than from a built plan.
+
+    ⚙ **Added by feature 010, and it delegates rather than repeating.** The join has to size a
+    purchase from an arriving amount *before* there is an execution plan -- the plan is built
+    inside the projection, which cannot start until the quantity is known -- and the one thing
+    it must not do is compute the markup itself. Two functions over one body means the price
+    the join buys at and the price the projection records cannot differ, which is a property a
+    test can assert with a single equality rather than a comparison of two arithmetics.
+    """
+    return _marked_up(declaration, entry_markup_for(declaration, mode))
+
+
+def _marked_up(declaration: FundDeclaration, markup: float) -> Money:
+    """NAV scaled by one markup. The single body both entry-price functions call."""
     return money.scale_sourced(
         declaration.nav_per_unit,
-        1.0 + plan.entry_markup,
+        1.0 + markup,
         declaration.spread.provenance,
     )
 

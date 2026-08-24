@@ -58,6 +58,7 @@ from terezy.core.results.ramp import (
     RoundTripCost,
     RouteUnusable,
     SegmentAttribution,
+    WayOutCost,
     recommended_cost,
 )
 from terezy.core.routes import cost, ranking
@@ -293,6 +294,16 @@ class TestACostFigureLivesOnlyInALabelledRecord:
         # ``one_way`` or ``round_trip``, so the label still travels with the figure. The next
         # test is what turns that sentence into a check -- without it, this list would be an
         # allowlist and the exemption would be the hole.
+        #
+        # ⚙ ``WayOutCost`` joined it with feature 010, and it **is** a third labelled record --
+        # the first since this module was written. FR-002 names two labels because in feature
+        # 002 nothing was ever bought: money went to a venue and the same money came back, so
+        # every figure was one way or round trip. Once something is bought, what travels home
+        # is what the holding *released*, on the date it released it, and that is a third
+        # journey with a third price. It is given its own type for the same reason the first
+        # two are unrelated types: the three are field-for-field similar, so nothing weaker
+        # than distinct identities stops one standing in for another -- and a round-trip
+        # fraction applied to a coupon is exactly the substitution that would look right.
         carriers = {
             name
             for name, record in _records()
@@ -302,6 +313,7 @@ class TestACostFigureLivesOnlyInALabelledRecord:
             "terezy.core.results.ramp.OneWayCost",
             "terezy.core.results.ramp.RoundTripCost",
             "terezy.core.results.ramp.SegmentAttribution",
+            "terezy.core.results.ramp.WayOutCost",
         }
 
     def test_every_unlabelled_cost_carrier_is_reachable_only_through_a_label(self) -> None:
@@ -309,9 +321,9 @@ class TestACostFigureLivesOnlyInALabelledRecord:
         # record carrying a cost figure that is neither labelled itself nor a field of a
         # labelled record would be a price a reader could reach without ever passing the words
         # "one way" or "round trip" (FR-002).
-        labelled = {OneWayCost.__name__, RoundTripCost.__name__}
+        labelled = {OneWayCost.__name__, RoundTripCost.__name__, WayOutCost.__name__}
         held: set[str] = set()
-        for record in (OneWayCost, RoundTripCost):
+        for record in (OneWayCost, RoundTripCost, WayOutCost):
             for field in dataclasses.fields(record):
                 held.update(re.findall(r"[A-Z]\w+", str(field.type)))
         unreachable = [

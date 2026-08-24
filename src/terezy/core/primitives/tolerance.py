@@ -35,9 +35,12 @@ noisy: it appears in the diff, next to a justification. Writing ``pytest.approx`
 from __future__ import annotations
 
 import math
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
 from terezy.core.primitives.money import Money
+
+if TYPE_CHECKING:  # pragma: no cover -- typing only
+    from collections.abc import Sequence
 
 TOLERANCE: Final[float] = 1e-9
 """The project tolerance: relative and absolute, both ``1e-9``.
@@ -85,3 +88,38 @@ def assert_money_close(left: Money, right: Money, *, tolerance: float = TOLERANC
             f"{abs(left.amount - right.amount)!r}, which exceeds the tolerance "
             f"{tolerance!r}"
         )
+
+
+def tied_groups(ordered: Sequence[float]) -> tuple[tuple[int, ...], ...]:
+    """Groups of indices whose values agree within the project tolerance, over a sorted run.
+
+    **Anchored, not chained.** Tolerance equality is not transitive -- ``a ~ b`` and ``b ~ c``
+    does not give ``a ~ c`` -- so a rule has to be picked, and chaining neighbour to neighbour
+    would let a band of arbitrary width become one tie as entries accumulate. That is the
+    tolerance absorbing a real difference, which is the defect this module's own docstring
+    warns about. Comparing each member against the group's **first** bounds every reported tie
+    at one tolerance wide.
+
+    Requires the sequence to be ordered, so tied entries are adjacent and one pass suffices.
+    Groups of one are not ties and are not reported.
+
+    ⚙ **One copy, and it is here rather than in either caller.** This loop lived twice -- once
+    over round-trip costs and once over tuple returns -- and two implementations of "what
+    counts as a tie" that drifted apart would report a strict winner in one comparison and a
+    tie in the other, over the same two numbers. It sits beside :data:`TOLERANCE` because the
+    rule *is* the tolerance rule; the callers supply the figures they order by.
+    """
+    groups: list[tuple[int, ...]] = []
+    current: list[int] = []
+    anchor: float | None = None
+    for index, value in enumerate(ordered):
+        if anchor is not None and is_close(value, anchor):
+            current.append(index)
+            continue
+        if len(current) > 1:
+            groups.append(tuple(current))
+        anchor = value
+        current = [index]
+    if len(current) > 1:
+        groups.append(tuple(current))
+    return tuple(groups)

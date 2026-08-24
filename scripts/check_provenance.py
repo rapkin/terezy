@@ -37,7 +37,14 @@ DATA_ROOT = REPO_ROOT / "data"
 # `channels` joined in feature 002: a two-sided rate is the most decision-relevant
 # observation in the ramp model, and an uncited premium is exactly the figure that gets
 # believed without checking.
-SOURCED_DIRS = ("tax", "instruments", "routes", "channels", "cpi")
+#
+# `access` joined in feature 010. Most of an `[[access]]` entry is references — an instrument
+# id, two venue ids, a risk-class label — and cites nothing, which the numeric-leaf heuristic
+# below gets right on its own. Its one observed value is `[access.price]`, the price of one
+# unit at the venue the instrument is bought from, and that is a market quote: exactly the kind
+# of figure that gets believed without checking, and the number every purchase in a comparison
+# is sized by.
+SOURCED_DIRS = ("tax", "instruments", "routes", "channels", "cpi", "access")
 
 # The directories exempt from the citation requirement, each BY NAME and WITH ITS REASON.
 # Together with SOURCED_DIRS this list is exhaustive: a directory under data/ that appears
