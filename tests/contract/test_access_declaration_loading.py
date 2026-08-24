@@ -16,13 +16,16 @@ code happened to read.
 
 from __future__ import annotations
 
+import dataclasses
 import shutil
+from collections.abc import Iterable, Iterator, Mapping
 from pathlib import Path
 from typing import Final
 
 import pytest
 
 from terezy.core.primitives.currency import Currency
+from terezy.core.primitives.provenance import SourceRef
 from terezy.data.declarations import loader, resolver
 from terezy.data.declarations.errors import DeclarationError
 from tests import tuple_registries as fixtures
@@ -228,3 +231,53 @@ class TestWhatNeedsASecondFile:
         with pytest.raises(DeclarationError) as caught:
             resolver.tuple_from_data_root(root, base_currency=Currency.UAH, scenario_id=None)
         assert "access" in str(caught.value.file)
+
+
+class TestEveryCitationInTheResolvedRegistriesAgesUnderADeclaredKind:
+    """The scan, because this is the third time one kind was validated and then not resolved.
+
+    ``ChannelSide.kind`` was the first -- an earlier revision aged every side under the
+    channel's threshold, a seven-day premium under a 365-day one, reported fresh. The access
+    price was the second: it loaded clean, *resolved* clean, and then raised ``KeyError`` out
+    of the pure core from ``staleness.kind_for``, whose own message says reaching it means
+    validation was bypassed and calls that a programmer error. A data-file typo is not one.
+
+    A third point fix would have left the fourth open, so this walks the resolved registries
+    instead of naming fields: every ``SourceRef`` reachable from any declaration must carry a
+    kind, and every kind must be one ``data/observation_kinds.toml`` declares. A new
+    declaration kind whose citation is stamped and not resolved fails here, and so does one
+    whose citation is not stamped at all.
+
+    ``scripts/check_provenance.py`` checks something adjacent and cannot replace this: it
+    reads the repository's own data files, and a runtime data root is not those.
+    """
+
+    def _sources(self, value: object, seen: set[int]) -> Iterator[SourceRef]:
+        """Every ``SourceRef`` reachable from a value, without naming a single field."""
+        if id(value) in seen:
+            return
+        seen.add(id(value))
+        if isinstance(value, SourceRef):
+            yield value
+        elif isinstance(value, str | bytes):
+            return
+        elif dataclasses.is_dataclass(value) and not isinstance(value, type):
+            for field in dataclasses.fields(value):
+                yield from self._sources(getattr(value, field.name), seen)
+        elif isinstance(value, Mapping):
+            for item in value.values():
+                yield from self._sources(item, seen)
+        elif isinstance(value, Iterable):
+            for item in value:
+                yield from self._sources(item, seen)
+
+    def test_every_source_carries_a_kind_and_every_kind_is_declared(self) -> None:
+        registries = fixtures.shipped()
+        found = list(self._sources(registries, set()))
+        assert len(found) > 20, "the walk reached almost nothing, so it proves almost nothing"
+        unstamped = sorted({source.id for source in found if not source.kind})
+        assert not unstamped, f"citations reaching the core with no staleness kind: {unstamped}"
+        undeclared = sorted(
+            {source.kind for source in found if source.kind not in registries.kinds}
+        )
+        assert not undeclared, f"kinds no declaration file declares: {undeclared}"

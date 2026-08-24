@@ -3466,7 +3466,8 @@ def _access_price(
     ``check_kind=False`` is passed to :func:`_source_ref` because the kind is also carried
     into the record and checked at the field it becomes -- the same reading a leg's
     ``kind_of_observation`` gets, and the reason the error below names ``[access.price].kind``
-    rather than a table. The citation is stamped with it either way.
+    rather than a table. The citation is stamped with it either way, and *resolving* the name
+    against the declared kinds is the resolver's, which reads a second file to do it.
     """
     if declared is None:
         return None

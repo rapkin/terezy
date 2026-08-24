@@ -333,12 +333,18 @@ def from_data_root(root: Path) -> Declarations:
 # 8. **A regime's ``route_ids``** resolve, and a regime is **partner-closed**.
 # 9. **A stream's ``arrives_at``** names a declared venue.
 #
-# ⚙ **A channel side's ``kind`` is a record field and resolves here.** An earlier revision
-# validated a side's declared kind at load and then dropped it, so the core aged every side
-# under ``FxChannel.kind`` -- a 7-day premium under a 365-day schedule threshold, reported
-# fresh. ``ChannelSide.kind`` now carries it, the staleness verdict ages each side under it
-# (``cost._aged``), and this pass resolves it against the declared kinds exactly as it does
-# the channel's own.
+# ⚙ **Every declared kind resolves here, and the rule has been learned twice.** An earlier
+# revision validated a channel *side's* kind at load and then dropped it, so the core aged
+# every side under ``FxChannel.kind`` -- a 7-day premium under a 365-day schedule threshold,
+# reported fresh. Feature 010 then shipped ``[access.price].kind`` carried into the record and
+# resolved nowhere: a typo loaded clean, resolved clean, and raised ``KeyError`` out of the
+# pure core, whose message calls that a programmer error. A data-file typo is not one.
+#
+# Because the same shape appeared twice, the third guard is a **scan rather than a field**:
+# ``tests/contract/test_access_declaration_loading.py`` walks every ``SourceRef`` reachable
+# from the resolved registries and requires each to carry a kind that this file's registry
+# declares. A new declaration kind whose citation nobody resolves fails there, whether or not
+# anybody remembered to add a line to the list above.
 
 BASE_CURRENCY_ROLE = (
     "the base currency is the currency the owner earns and spends -- the ledger's home "
@@ -2215,15 +2221,18 @@ def _check_access(
     instruments: Mapping[str, InstrumentDeclaration],
     funds: Mapping[str, FundDeclaration],
     venues: Mapping[str, Venue],
+    kinds: Mapping[str, ObservationKind],
     path: Path,
 ) -> None:
-    """One access entry against the instruments, the venues and the instrument's own pricing."""
+    """One access entry against the instruments, the venues, the kinds and its own pricing."""
     prefix = f"{loader.ACCESS_TABLE}[{position}]"
     currency, self_priced = _access_instrument_currency(
         entry, instruments=instruments, funds=funds, path=path, field_prefix=prefix
     )
     for field, venue_id in (("bought_at", entry.bought_at), ("proceeds_to", entry.proceeds_to)):
         _check_venue(venue_id, currency, venues, path=path, field_path=f"{prefix}.{field}")
+    if entry.quote is not None:
+        _check_kind(entry.quote.kind, kinds, path=path, field_path=f"{prefix}.price.kind")
     _check_access_price(
         entry, currency=currency, self_priced=self_priced, path=path, field_prefix=prefix
     )
@@ -2280,6 +2289,7 @@ def _resolved_access(
     instruments: Mapping[str, InstrumentDeclaration],
     funds: Mapping[str, FundDeclaration],
     venues: Mapping[str, Venue],
+    kinds: Mapping[str, ObservationKind],
 ) -> tuple[dict[str, InstrumentAccess], dict[str, Path]]:
     """Every access declaration by instrument id, checked, refusing two files that collide."""
     access: dict[str, InstrumentAccess] = {}
@@ -2300,6 +2310,7 @@ def _resolved_access(
                 instruments=instruments,
                 funds=funds,
                 venues=venues,
+                kinds=kinds,
                 path=path,
             )
             access[entry.instrument_id] = entry
@@ -2340,6 +2351,7 @@ def tuple_from_data_root(
         instruments=instruments.instruments,
         funds=instruments.funds,
         venues=covered.ramp.venues,
+        kinds=covered.ramp.kinds,
     )
     return TupleDeclarations(
         instruments=instruments,
