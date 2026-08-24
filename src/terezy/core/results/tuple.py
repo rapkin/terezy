@@ -857,10 +857,14 @@ class InstrumentDemandsCash:
     move a real outflow to a date it did not happen on and quietly improve the rate.
 
     Unreachable while every declared class charges a **fraction** of the income it taxes: the
-    charge is netted on that income's own date, so the date still nets positive. Rates summing
-    to 100% or more make it reachable, which is a property of the declared rates rather than
-    of the arithmetic -- and is why the guard exists rather than an assertion that it cannot
-    happen.
+    charge is netted on that income's own date, so the date nets to zero at worst.
+
+    ⚙ **Strictly above 100%, and not at it.** At exactly 100% the date nets to zero,
+    ``_released_by_date`` drops it, and the holding simply sends nothing home on it -- which
+    ``tests/unit/test_rate_and_horizon_boundaries.py`` pins from both sides, at 50+50 for the
+    dropped date and at 90+90 for this refusal. Which side of the boundary the declared rates
+    fall on is a property of the rates rather than of the arithmetic, and is why this is a
+    guard rather than an assertion that it cannot happen.
     """
 
     instrument_id: str

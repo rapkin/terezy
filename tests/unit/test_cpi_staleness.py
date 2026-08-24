@@ -220,7 +220,7 @@ def test_a_stale_series_can_still_cover_a_window_completely() -> None:
 # figure, and for one review round it did not: `staleness_of_observations` and
 # `staleness_of_assumption` had zero production call sites, `real_terms` took no `as_of`, and
 # `RealRate` had no field to carry a verdict -- while US3 scenario 1, `contracts/deflation.md`
-# G10 and `METHODOLOGY` §23.6 all said it worked. A requirement unmet while three documents
+# G10 and `METHODOLOGY` §27.6 all said it worked. A requirement unmet while three documents
 # assert it is met is worse than the gap.
 #
 # So these derive an actual figure and look at what it carries, at both levels: straight

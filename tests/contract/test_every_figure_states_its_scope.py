@@ -21,20 +21,25 @@ reader decides which kind of thing it is.
 from __future__ import annotations
 
 import dataclasses
+from collections.abc import Callable
+from datetime import date
 from typing import Final, get_args
 
 import pytest
 
 from terezy.core.decision.tuple_outcome import evaluate
+from terezy.core.instruments.fund import ExchangeRateAssumption
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.rates import NominalRate
 from terezy.core.primitives.tolerance import is_close
+from terezy.core.results.fund import FundAssumptions
 from terezy.core.results.hurdle import EXCLUDES as HURDLE_EXCLUDES
 from terezy.core.results.tuple import (
     ACCOUNTS_FOR,
     EXCLUDES,
     Part,
     RateNotComparable,
+    Tuple,
     TupleOutcome,
 )
 from tests import tuple_registries as fixtures
@@ -121,20 +126,56 @@ def _outcome(
     return outcome
 
 
-def _fund_outcome(registries: fixtures.Registries) -> TupleOutcome:
-    """The shipped fund's own outcome: the other projection kind the join has to handle."""
+def _fund_outcome(candidate: Tuple, horizon: fixtures.DateRange) -> TupleOutcome:
+    """One shipped fund's outcome: the other projection kind the join has to handle."""
     outcome = evaluate(
-        fixtures.fund_tuple(
-            fixtures.MILTECH, exit_on=fixtures.MILTECH_EXIT, yield_point=fixtures.MILTECH_POINT
-        ),
+        candidate,
         amount=fixtures.AMOUNT,
-        horizon=fixtures.DateRange(start=fixtures.ISSUE_DATE, end=fixtures.HORIZON_END),
+        horizon=horizon,
         as_of=fixtures.AS_OF,
         continuation=fixtures.HOLD_AS_CASH,
-        registries=registries,
+        registries=fixtures.shipped(),
     )
     assert isinstance(outcome, TupleOutcome), outcome
     return outcome
+
+
+def _miltech() -> TupleOutcome:
+    """MilTech: one taxed disposal gain on the exit date, and nothing before it."""
+    return _fund_outcome(
+        fixtures.fund_tuple(
+            fixtures.MILTECH, exit_on=fixtures.MILTECH_EXIT, yield_point=fixtures.MILTECH_POINT
+        ),
+        fixtures.DateRange(start=fixtures.ISSUE_DATE, end=fixtures.HORIZON_END),
+    )
+
+
+def _reit() -> TupleOutcome:
+    """The REIT over a year of taxed monthly distributions, plus the disposal that ends it.
+
+    ``exchange_rate`` because the REIT's payout is **pegged** and a pegged fund may not be
+    projected without an owner-stated rate -- the same construct
+    ``tests/contract/test_fund_data_only.py`` attaches, and for the same declared reason. The
+    window starts after 2026-06-30, the effective date `ua_ci_fund_distribution` is dated
+    from, so the distribution class actually charges rather than refusing as pre-schedule.
+    """
+    candidate = fixtures.fund_tuple(fixtures.REIT, exit_on=date(2027, 6, 30))
+    terms = candidate.exit_terms
+    assert isinstance(terms, FundAssumptions)
+    return _fund_outcome(
+        dataclasses.replace(
+            candidate,
+            exit_terms=dataclasses.replace(
+                terms,
+                exchange_rate=ExchangeRateAssumption(
+                    uah_per_unit=42.0,
+                    is_assumption=True,
+                    rationale="TEST -- an owner-stated rate, for a payout that is pegged.",
+                ),
+            ),
+        ),
+        fixtures.DateRange(start=date(2026, 7, 1), end=date(2027, 6, 30)),
+    )
 
 
 class TestWhatFeatureOneExcludedThisFeatureAccountsFor:
@@ -160,31 +201,48 @@ class TestWhatFeatureOneExcludedThisFeatureAccountsFor:
         # Principle I exists to prevent.
         assert any("tax" in item for item in _outcome().accounts_for)
 
-    def test_a_taxed_fund_sends_home_what_is_left_after_the_charge(self) -> None:
+    @pytest.mark.parametrize(
+        ("name", "build", "least_charges"),
+        [
+            # Both taxable event kinds a fund produces, because they are charged by different
+            # declared classes and reach the netting through different code: MilTech's single
+            # `disposal_gain` on the exit date under `ua_investment_profit`, and the REIT's
+            # year of monthly `distribution` charges under `ua_ci_fund_distribution` plus the
+            # disposal that ends it. The second is the multi-charge shape -- a draft of this
+            # suite recorded it as unreachable without new data, and it is reachable over the
+            # shipped registry.
+            ("miltech", _miltech, 1),
+            ("reit", _reit, 10),
+        ],
+    )
+    def test_a_taxed_fund_sends_home_what_is_left_after_the_charge(
+        self, name: str, build: Callable[[], TupleOutcome], least_charges: int
+    ) -> None:
         # The clause above checked against behaviour rather than against itself, on the second
         # projection kind -- `tests/contract/test_h1_data_only.py` does it for a bond. Over the
-        # **shipped** registry and not a rigged one: only the bond's class is exempt, and the
-        # fund's disposal gain is charged at the declared `ua_investment_profit` rates. An
-        # earlier draft passed those same rates in through a fixture, which did nothing except
-        # hide that this is the shipped behaviour.
+        # **shipped** registry and not a rigged one: only the bond's class is exempt, and both
+        # of these funds are charged at rates `data/tax/ua.toml` declares. An earlier draft
+        # passed those same rates in through a fixture, which did nothing except hide that
+        # this is the shipped behaviour.
         #
         # Since feature 009 a TAX_CHARGE is an assessment memo that moves nothing, so a join
         # summing the ledger's events alone sends the **gross** proceeds home: every part line
         # still reads correctly and only the arrivals say the rate went pre-tax.
-        outcome = _fund_outcome(fixtures.shipped())
+        outcome = build()
         lifecycle = next(line.amount for line in outcome.parts if line.part == "lifecycle")
         charged = next(line.amount for line in outcome.parts if line.part == "tax")
         released = sum(arrival.released.amount for arrival in outcome.arrivals)
         assert charged.amount < 0.0
-        assert is_close(released, lifecycle.amount + charged.amount)
-        assert not is_close(released, lifecycle.amount)
-
-    # ⚙ **A stated gap, 2026-08-24.** This fund reaches the netting in its simplest shape:
-    # one arrival, one charge, on one date. The multi-charge case and two taxable events
-    # sharing a date are covered on the bond side only, and no fund whose *distributions* are
-    # taxed is declared anywhere, so the fund path's per-date grouping is exercised by a
-    # single-element group. Closing it needs a declared fund with a taxed distribution class,
-    # which is data rather than a test.
+        assert is_close(released, lifecycle.amount + charged.amount), name
+        assert not is_close(released, lifecycle.amount), name
+        # The count is the half that says which shape was exercised: the identity above holds
+        # just as well over one charge, so without it the multi-charge case could quietly
+        # collapse back to the single one and nothing here would notice.
+        assert len({arrival.released_on for arrival in outcome.arrivals}) >= least_charges, name
+        # ⚙ **A stated gap, 2026-08-24, and it is narrower than the counts above suggest.**
+        # Two taxable events sharing **one date** are exercised on the bond side only: no
+        # shipped fund pays twice on one day, so every group the fund path nets over has a
+        # single member. It is the grouping that is untested here, not the netting.
 
     def test_it_states_that_waiting_is_inside_the_span(self) -> None:
         # The owner's decision of 2026-08-22, on the record's face: a reader comparing this

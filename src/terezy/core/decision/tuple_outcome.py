@@ -1254,12 +1254,14 @@ def _released_by_date(projected: Projection | FundProjection) -> tuple[tuple[dat
     and the error runs one way: the money leaves sooner, so the rate is understated rather
     than flattered. Deferring it to a date nobody declared would be the other kind of guess.
 
-    ⚙ **The direction claim is about the dates, and the base the way out charges on is a
-    separate question it does not cover.** Netting here also shrinks what a percentage exit
-    fee applies to. That is the right base under this model -- the tax is a domestic liability
-    settled in the base currency and never travels the way out, so charging a repatriation fee
-    on it would invent a journey. Under the other reading it would flatter by
-    ``fee_pct x tax``, which is why the choice is stated rather than left to the arithmetic.
+    ⚙ **The direction claim above is about the dates only, and the base a percentage exit fee
+    charges on is a separate axis where the choice runs the other way.** Netting here shrinks
+    that base, so an arrival is ``(gross - tax) x (1 - pct)`` where charging the fee on the
+    gross would give ``gross x (1 - pct) - tax`` -- **higher by exactly ``pct x tax``**. This
+    is the flattering side of that comparison, and it is taken on correctness rather than on
+    conservatism: the tax is a domestic liability settled in the base currency and never
+    travels the way out, so charging a repatriation fee on it would invent a journey. Stated
+    because the two claims point opposite ways and a reader is owed both.
     """
     ledger = projected.ledger
     currency = ledger.base_currency
@@ -1279,6 +1281,12 @@ def _released_by_date(projected: Projection | FundProjection) -> tuple[tuple[dat
                 "correctly. Both projections renumber their charges onto the combined stream "
                 "before folding it, so reaching here means that renumbering was skipped."
             )
+        # ⚙ **Which drop this catches, and which it cannot.** It catches a charge naming an
+        # event that is not in the ledger. It does not catch *two* charges on one event: both
+        # chargers key their pairing by `event_sequence` in a dict, so the second would
+        # already have replaced the first before `charges` was built, and the loss happens
+        # upstream of anything here. Not reachable today -- each charger walks the events once
+        # -- and recorded because it is the same shape as the drop above, on the same field.
         by_date.setdefault(taxed, []).append(money.scale(charge.total, -1.0))
     netted = ((on, money.total(amounts, currency)) for on, amounts in sorted(by_date.items()))
     return tuple((on, amount) for on, amount in netted if amount.amount != 0.0)
@@ -1312,12 +1320,13 @@ _RELEASE_KINDS: Final[frozenset[EventKind]] = frozenset(
 )
 """The event kinds that are the instrument paying the owner, for the ``lifecycle`` line.
 
-A closed set naming what a *holding produces*, and it is narrower than the ledger's
-``CASH_ONLY_KINDS`` for a different reason than that set is drawn for: that one is the kinds
-that touch no holding, this one is the kinds that are a receipt. A fee is a charge rather than
-a receipt, and a tax charge is neither -- since feature 009 it moves nothing at all, and what
-it assessed reaches the ``tax`` line from the charge rather than from the event. Each has a
-line of its own.
+A closed set naming what a *holding produces*, and **distinct from** the ledger's
+``CASH_ONLY_KINDS`` rather than narrower: the two overlap and neither contains the other,
+because a redemption is a receipt that also closes a lot. The sets are drawn on different
+axes -- that one is the kinds that touch no holding, this one is the kinds that are a receipt.
+A fee is a charge rather than a receipt, and a tax charge is neither: since feature 009 it
+moves nothing at all, and what it assessed reaches the ``tax`` line from the charge rather
+than from the event. Each has a line of its own.
 """
 
 
