@@ -29,9 +29,12 @@ what makes a failure diagnosable: ``git diff`` on this file says which coupon mo
 how much, and the causation lines say what the engine thought it was doing. Amounts are
 rendered with ``repr``, which for a float64 is exact and round-trippable, so the readable
 half is **stricter** than the digest rather than the same claim written out: ``repr``
-distinguishes ``-0.0`` from ``0.0`` and ``canonical.of_number`` deliberately does not. The
-one negative zero in this artefact is therefore pinned by the rendering alone, and it is a
-pin on how a figure prints -- nothing computed depends on the sign of a zero.
+distinguishes ``-0.0`` from ``0.0`` and ``canonical.of_number`` normalises it via
+``(value + 0.0).hex()``. The negative zeroes in this artefact -- one per ``TAX_CHARGE``, since
+that is the whole of what ``tax.year.memo_amount`` produces -- are therefore pinned by the
+rendering alone, and that is a pin on how a figure prints: nothing computed depends on the
+sign of a zero. The count is asserted below rather than stated here, because a count in prose
+is the first thing to go stale.
 
 Both halves live in **one** file and the test compares the whole text, so the digest cannot
 drift away from the rendering it describes.
@@ -103,7 +106,7 @@ from terezy.core.instruments.interface import (
     Holding,
     InstrumentDeclaration,
 )
-from terezy.core.ledger import lots
+from terezy.core.ledger import canonical, lots
 from terezy.core.ledger.accounts import CashBalance
 from terezy.core.ledger.engine import LedgerState
 from terezy.core.ledger.events import Event, EventKind
@@ -485,9 +488,10 @@ HEADER: Final = (
     "#",
     "# Every amount is repr of a float64: exact and round-trippable, so this rendering is",
     "# STRICTER than the digest at the foot of the file, not merely as strict -- repr tells",
-    "# -0.0 from 0.0 and the digest deliberately does not. A -0.0 below is pinned by this",
-    "# text alone: a pin on how a figure prints, not a guard on any figure. Provenance and",
-    "# the code version are deliberately absent; the declaration files' digests are present.",
+    "# -0.0 from 0.0 and the digest normalises it away. Each tax_charge below therefore",
+    "# carries a -0.0 pinned by this text alone: a pin on how a figure prints, not a guard",
+    "# on any figure. Provenance and the code version are deliberately absent; the",
+    "# declaration files' digests are present.",
     "#",
     "# THE TERMS PROJECTED HERE ARE SYNTHETIC AND UNVERIFIED. No figure below describes a",
     "# bond anyone can buy, and none of them accounts for funding-route cost or exit cost.",
@@ -718,6 +722,22 @@ class TestTheArtefactAgreesWithTheHandComputedSchedule:
         assert len(result.charges) == COUPON_COUNT + 1, "four coupons and the redemption"
         for charge in result.charges:
             assert charge.provenance.sources, "the zero cites the exemption it applied"
+
+    def test_every_negative_zero_in_the_artefact_is_a_charge_memo_and_nothing_else(self) -> None:
+        """Finding the count rather than claiming it, and saying what the sign is worth.
+
+        ``repr`` tells ``-0.0`` from ``0.0`` and ``canonical.of_number`` does not, so these
+        are pinned by the rendered text and by nothing else. There is one per ``TAX_CHARGE``:
+        ``memo_amount`` scales the charge by ``-0.0`` to keep it on the outflow side of the
+        account at no magnitude, and no other figure in the run produces one. That the digest
+        is indifferent to all five is the other half of the claim.
+        """
+        recorded = GOLDEN_FILE.read_text(encoding="utf-8")
+        rendered = [line for line in recorded.splitlines() if "-0.0 UAH" in line]
+
+        assert len(rendered) == COUPON_COUNT + 1, rendered
+        assert all("amount -0.0 UAH" in line for line in rendered)
+        assert canonical.of_number(-0.0) == canonical.of_number(0.0)
 
     def test_the_two_return_figures_agree_because_and_only_because_tax_is_zero(self) -> None:
         """FR-005: two figures, never one -- and the fact that they coincide here is a

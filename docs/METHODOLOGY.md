@@ -78,7 +78,8 @@ the core contains no conversion function); the date the tax liability is actuall
 which the model now has and this figure deliberately does not — the hurdle rate places a
 charge at **accrual**, because what a holding earns is a claim about the paper and when the
 money leaves is a fact about the owner's tax year (§28.1); loss offset against **other
-income**, which the law does not allow anyway (§28.2); and public holidays, which are
+income** — which пп. 170.2.1 ПКУ forecloses, since the result of investment operations is
+accounted for «окремо від інших доходів і витрат»; and public holidays, which are
 uncited domain knowledge and therefore data this repository does not yet hold (see §2.3).
 
 ---

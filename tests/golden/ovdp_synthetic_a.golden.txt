@@ -10,9 +10,10 @@
 #
 # Every amount is repr of a float64: exact and round-trippable, so this rendering is
 # STRICTER than the digest at the foot of the file, not merely as strict -- repr tells
-# -0.0 from 0.0 and the digest deliberately does not. A -0.0 below is pinned by this
-# text alone: a pin on how a figure prints, not a guard on any figure. Provenance and
-# the code version are deliberately absent; the declaration files' digests are present.
+# -0.0 from 0.0 and the digest normalises it away. Each tax_charge below therefore
+# carries a -0.0 pinned by this text alone: a pin on how a figure prints, not a guard
+# on any figure. Provenance and the code version are deliberately absent; the
+# declaration files' digests are present.
 #
 # THE TERMS PROJECTED HERE ARE SYNTHETIC AND UNVERIFIED. No figure below describes a
 # bond anyone can buy, and none of them accounts for funding-route cost or exit cost.

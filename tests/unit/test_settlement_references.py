@@ -77,8 +77,23 @@ def _event(sequence: int, on: date, kind: EventKind, amount: float, **extra: obj
     )
 
 
-def _events() -> tuple[Event, ...]:
-    """Two lots bought together, sold two years apart, so two years each owe something."""
+def _events(*, trailing: bool = False) -> tuple[Event, ...]:
+    """Two lots bought together, sold two years apart, so two years each owe something.
+
+    ``trailing`` adds two later cash events, which is what makes the double-application hazard
+    below *live*: with them the 2029 disposal's new number is itself an old number.
+    """
+    return _core_events() + (_trailing_events() if trailing else ())
+
+
+def _trailing_events() -> tuple[Event, ...]:
+    return (
+        _event(6, date(2030, 1, 5), EventKind.CASH_DEPOSIT, 10.00),
+        _event(7, date(2031, 1, 5), EventKind.CASH_DEPOSIT, 10.00),
+    )
+
+
+def _core_events() -> tuple[Event, ...]:
     return (
         _event(1, date(2026, 1, 5), EventKind.CASH_DEPOSIT, 100_000.00),
         _event(
@@ -147,9 +162,9 @@ def _statements() -> tuple[tax_year.AnnualStatement, ...]:
     return built
 
 
-def _settled() -> settlement.Settlement:
+def _settled(*, trailing: bool = False) -> settlement.Settlement:
     outcome = settlement.settle(
-        _events(),
+        _events(trailing=trailing),
         _statements(),
         owner_id=OWNER,
         base_currency=UAH,
@@ -251,6 +266,21 @@ class TestTheRenumberingIsHandedBackForEverythingElse:
 
     def test_the_map_says_where_each_original_event_went(self) -> None:
         assert _settled().renumbered == {1: 1, 2: 2, 3: 3, 4: 4, 5: 6}
+
+    def test_the_map_is_applied_once_and_applying_it_twice_moves_a_right_reference_wrong(
+        self,
+    ) -> None:
+        """The hazard the type cannot express, pinned so it is a known cost and not a surprise.
+
+        Both sides are ``int``. Where the stream continues past an inserted payment, an event's
+        **new** number is also some other event's **old** number, so a second application walks
+        the reference on again -- silently, and to a real event rather than to an error.
+        """
+        moved = _settled(trailing=True).renumbered
+        once = moved[5]
+
+        assert once in moved, "the fixture must be one where a new number is also an old one"
+        assert moved[once] != once, "otherwise applying twice would be harmlessly idempotent"
 
     def test_a_schedule_pairing_moved_by_the_map_still_names_its_own_event(self) -> None:
         """``ChargedOn`` pairs a taxed event with the memo recorded against it, and both

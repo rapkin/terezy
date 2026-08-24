@@ -424,8 +424,9 @@ def test_selecting_more_units_than_the_lots_hold_is_refused_at_the_selection_too
 
 
 @pytest.mark.parametrize("method", [lots.FIFO, lots.LIFO, lots.AVERAGE_COST, lots.SPECIFIC_LOT])
+@pytest.mark.parametrize("named_lot", [None, "lot-1"], ids=["unnamed", "named"])
 def test_selecting_from_a_position_holding_nothing_is_refused_under_every_method(
-    method: str,
+    method: str, named_lot: str | None
 ) -> None:
     """The gap the size comparison alone leaves open, at exactly one tolerance.
 
@@ -433,9 +434,14 @@ def test_selecting_from_a_position_holding_nothing_is_refused_under_every_method
     and each method then failed its own way: FIFO returned a selection of no lots at all --
     the short selection the guard exists to prevent -- and average cost divided by zero, an
     untyped failure in an engine whose rule is that failure is explicit.
+
+    **With and without a named lot**, because the two take different routes through the module
+    and only one of them is where the defect was. Naming a lot under FIFO, LIFO or average
+    cost is refused by ``_refuse_naming`` before any selection runs, so the named case alone
+    would have proved the conflict rule and left the guard untested for three methods of four.
     """
     with pytest.raises(LedgerInvariantError, match="no basis to consume"):
-        lots.basis_consumed((), TOLERANCE, method=method, named_lot="lot-1")
+        lots.basis_consumed((), TOLERANCE, method=method, named_lot=named_lot)
 
 
 def _lot(lot_id: str, *, quantity: float, cost: float) -> lots.Lot:

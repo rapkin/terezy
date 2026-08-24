@@ -127,6 +127,12 @@ class Settlement:
     :attr:`statements` is moved by this map already. Anything else a caller is still holding
     that points into the pre-settlement stream -- a ``schedule.ChargedOn``, a schedule row --
     has to be moved by it too, or it points at the wrong event.
+
+    **Apply it exactly once.** Both sides are ``int`` and nothing in the type tells the two
+    spaces apart, so a new sequence number can also be an old one -- and a second application
+    then moves a reference that was already right, quietly, onto a third event. That is why
+    :attr:`statements` is handed back moved rather than left to the caller to move: the one
+    holder this module knows about cannot be double-moved by accident.
     """
 
 

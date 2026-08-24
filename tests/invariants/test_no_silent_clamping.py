@@ -66,6 +66,22 @@ pytestmark = pytest.mark.invariant
 OWNER = route_graphs.OWNER_ID
 ON_DATE = date(2026, 8, 21)
 
+DEPOSITED: float = 20_000.00
+PURCHASE_COST: float = 10_000.00
+SOLD_ON: date = date(2027, 5, 4)
+WITHDRAWN_ON: date = date(2027, 12, 20)
+TAX_HORIZON: date = date(2028, 12, 31)
+
+PROCEEDS_MIN: float = 1_000.00
+PROCEEDS_MAX: float = 60_000.00
+"""Straddling ``PURCHASE_COST``, so the draw includes loss years as well as gain years."""
+
+COVER_MIN: float = 0.0
+COVER_MAX: float = 2.0
+"""Multiples of the liability left in the account on the due date. Straddling 1.0, which is
+the shortfall boundary -- so half the strategy space is short and the boundary is where
+Hypothesis shrinks towards rather than out at the edge of one axis."""
+
 
 def _uah(amount: float) -> Money:
     return Money(amount, Currency.UAH, prov.EMPTY)
@@ -289,29 +305,40 @@ class TestNoTaxSettlementIsEverShavedToWhatTheCashAllows:
     hand-picked withdrawal sits on one side of the boundary and passes forever; generated ones
     walk across it.
 
-    The withdrawal is drawn as a **fraction of what is actually there**, so the balance is
-    non-negative on every date before the due date whatever is drawn. Otherwise "no balance
-    ever goes negative" would fail for a reason with nothing to do with tax -- an unfunded
-    withdrawal overdraws by construction, which is a feasibility question and not a clamp.
+    The scenario is **parametrised by the boundary itself**: ``cover`` says how many times the
+    liability is left in the account on the due date, so ``cover < 1`` is short by
+    construction and ``cover > 1`` is not. Drawing a withdrawal fraction instead put the
+    boundary at 0.89 of one axis and left the property drawing a shortfall 4.6% of the time --
+    a property that samples the interesting half once in twenty runs is nearly a property that
+    never does. What is withdrawn is still bounded by what is there, so the balance is
+    non-negative on every date before the due date whatever is drawn; otherwise "no balance
+    ever goes negative" would fail for a reason with nothing to do with tax.
     """
 
-    def test_both_outcomes_are_reachable_in_this_scenario(self) -> None:
-        """A property that only ever saw one branch would pass for the wrong reason."""
-        withdrawing_everything = _settle_tax(proceeds=30_000.00, withdrawn=1.0)
-        withdrawing_nothing = _settle_tax(proceeds=30_000.00, withdrawn=0.0)
+    def test_the_strategy_straddles_both_boundaries_that_matter(self) -> None:
+        """Reachability asserted **through the strategy's own bounds**, not beside them.
 
-        assert isinstance(withdrawing_everything, tax_settlement.InsufficientCashForTax)
-        assert isinstance(withdrawing_nothing, tax_settlement.Settlement)
-        assert len(withdrawing_nothing.payments) == 1
+        A hard-coded pair of inputs would stay green while a narrowed strategy quietly stopped
+        drawing shortfalls. These are the same constants the ``@given`` below is built from, so
+        narrowing either range fails here first and says which boundary was lost.
+        """
+        assert COVER_MIN < 1.0 < COVER_MAX, "the shortfall boundary is at cover == 1"
+        assert PROCEEDS_MIN < PURCHASE_COST < PROCEEDS_MAX, "a loss year and a gain year"
+
+        assert isinstance(
+            _settle_tax(proceeds=PROCEEDS_MAX, cover=COVER_MIN),
+            tax_settlement.InsufficientCashForTax,
+        )
+        settled = _settle_tax(proceeds=PROCEEDS_MAX, cover=COVER_MAX)
+        assert isinstance(settled, tax_settlement.Settlement)
+        assert len(settled.payments) == 1
 
     @given(
-        proceeds=st.floats(min_value=1_000.0, max_value=60_000.0, allow_nan=False),
-        withdrawn=st.floats(min_value=0.0, max_value=1.0, allow_nan=False),
+        proceeds=st.floats(min_value=PROCEEDS_MIN, max_value=PROCEEDS_MAX, allow_nan=False),
+        cover=st.floats(min_value=COVER_MIN, max_value=COVER_MAX, allow_nan=False),
     )
-    def test_nothing_is_overdrawn_paid_in_part_or_sold(
-        self, proceeds: float, withdrawn: float
-    ) -> None:
-        outcome = _settle_tax(proceeds=proceeds, withdrawn=withdrawn)
+    def test_nothing_is_overdrawn_paid_in_part_or_sold(self, proceeds: float, cover: float) -> None:
+        outcome = _settle_tax(proceeds=proceeds, cover=cover)
 
         if isinstance(outcome, tax_settlement.InsufficientCashForTax):
             assert outcome.shortfall.amount > 0.0
@@ -391,12 +418,6 @@ class TestTheShapeOfTheDefectIsAbsentFromTheSource:
 # withdrawal before the payment date. The tax year, the deadline and the rates come from the
 # synthetic fixture pack, so no figure here could be mistaken for a Ukrainian liability.
 
-DEPOSITED: float = 20_000.00
-PURCHASE_COST: float = 10_000.00
-SOLD_ON: date = date(2027, 5, 4)
-WITHDRAWN_ON: date = date(2027, 12, 20)
-TAX_HORIZON: date = date(2028, 12, 31)
-
 
 def _tax_events(*, proceeds: float, withdrawal: float) -> tuple[Event, ...]:
     source = prov.of([tax_years.FIXTURE_SOURCE])
@@ -439,10 +460,19 @@ def _tax_events(*, proceeds: float, withdrawal: float) -> tuple[Event, ...]:
 
 
 def _settle_tax(
-    *, proceeds: float, withdrawn: float
+    *, proceeds: float, cover: float
 ) -> tax_settlement.Settlement | tax_settlement.SettlementRefused:
-    """Assess the disposal's year and settle it, withdrawing a share of the cash beforehand."""
-    withdrawal = withdrawn * (DEPOSITED - PURCHASE_COST + proceeds)
+    """Assess the disposal's year and settle it, leaving ``cover`` liabilities in the account.
+
+    The liability is recomputed here to *size the withdrawal*, never to check one: what the
+    engine assesses is asserted against hand arithmetic in
+    ``tests/worked_examples/test_tax_payment.py``. Sizing it this way is what puts the
+    shortfall boundary in the middle of the strategy instead of at the end of an axis.
+    """
+    available = DEPOSITED - PURCHASE_COST + proceeds
+    gain = proceeds - PURCHASE_COST
+    liability = (tax_years.PIT_RATE + tax_years.LEVY_RATE) * gain if gain > 0.0 else 0.0
+    withdrawal = available - cover * liability
     events = _tax_events(proceeds=proceeds, withdrawal=withdrawal)
     state = engine.fold(
         events, base_currency=Currency.UAH, consumption_method=lots.LotMethod.FIFO.value
