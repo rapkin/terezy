@@ -1,0 +1,1764 @@
+# Inzhur's published assets, as observed. GENERATED — do not edit by hand.
+#
+# Written by scripts/fetch_inzhur.py. Re-run it instead of editing, and read the
+# diff: a figure that moved is the point of keeping this file.
+#
+# THIS IS AN OBSERVATION FILE, NOT A DECLARATION. Nothing here is wired into the
+# engine. It exists so a declaration under data/instruments/ can be checked against
+# what the platform actually publishes, and so the check has a date on it.
+#
+# Every verified_on is empty and must stay empty until a human compares the value
+# against the source. A downloaded number is not a checked number.
+
+retrieved_on = "2026-08-24"
+endpoint     = "https://www.inzhur.reit/_api/assets"
+
+[[observation]]
+id     = "ocean-plaza"
+slug   = "ocean-plaza"
+title  = "Inzhur Ocean"
+asset_type = "fund"
+status = "completed"
+buy                  = 4088.78
+sell                 = 4088.78
+available_quantity   = 0
+kind         = "venue_terms"
+source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, the JSON behind its offer pages. Retrieved 2026-08-24 by scripts/fetch_inzhur.py. Prices, yields, ISINs, maturities and payment schedules are the platform's own published figures for instruments it sells; treat them as a seller's quotation rather than as an independent valuation. Every stated_yield is the issuer's FORECAST ABOUT ITSELF, carried verbatim and never computed from here."
+retrieved_on = "2026-08-24"
+verified_on  = ""
+
+[[observation]]
+id     = "inzhur-reit"
+slug   = "inzhur-reit"
+title  = "Inzhur REIT"
+asset_type = "fund"
+status = "active"
+stated_yield = "від 9,5% річних у USD"
+buy                  = 11.1075
+sell                 = 11.0965
+nav                  = 10.9975
+available_quantity   = 2486917
+entry_markup_pct     = 1.000227
+exit_discount_pct    = -0.900205
+kind         = "venue_terms"
+source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, the JSON behind its offer pages. Retrieved 2026-08-24 by scripts/fetch_inzhur.py. Prices, yields, ISINs, maturities and payment schedules are the platform's own published figures for instruments it sells; treat them as a seller's quotation rather than as an independent valuation. Every stated_yield is the issuer's FORECAST ABOUT ITSELF, carried verbatim and never computed from here."
+retrieved_on = "2026-08-24"
+verified_on  = ""
+
+[[observation]]
+id     = "inzhur-energy"
+slug   = "inzhur-energy"
+title  = "Inzhur Energy"
+asset_type = "fund"
+status = "active"
+stated_yield = "15% у USD"
+buy                  = 6654.8999
+sell                 = 6648.3109
+nav                  = 6589.0098
+available_quantity   = 0
+entry_markup_pct     = 1.0
+exit_discount_pct    = -0.9
+kind         = "venue_terms"
+source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, the JSON behind its offer pages. Retrieved 2026-08-24 by scripts/fetch_inzhur.py. Prices, yields, ISINs, maturities and payment schedules are the platform's own published figures for instruments it sells; treat them as a seller's quotation rather than as an independent valuation. Every stated_yield is the issuer's FORECAST ABOUT ITSELF, carried verbatim and never computed from here."
+retrieved_on = "2026-08-24"
+verified_on  = ""
+
+[[observation]]
+id     = "inzhur-miltech"
+slug   = "inzhur-miltech"
+title  = "Inzhur MilTech"
+asset_type = "fund"
+status = "active"
+stated_yield = "25-29% річних в UAH \\nза три роки"
+buy                  = 1006.9654
+sell                 = 1001.9306
+nav                  = 1006.9654
+available_quantity   = 1147044
+entry_markup_pct     = 0.0
+exit_discount_pct    = 0.499997
+kind         = "venue_terms"
+source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, the JSON behind its offer pages. Retrieved 2026-08-24 by scripts/fetch_inzhur.py. Prices, yields, ISINs, maturities and payment schedules are the platform's own published figures for instruments it sells; treat them as a seller's quotation rather than as an independent valuation. Every stated_yield is the issuer's FORECAST ABOUT ITSELF, carried verbatim and never computed from here."
+retrieved_on = "2026-08-24"
+verified_on  = ""
+
+[[observation]]
+id     = "UA4000230262"
+slug   = "ovdp"
+title  = "Державні облігації України"
+asset_type = "bond"
+status = "completed"
+isin   = "UA4000230262"
+matures_on = "2026-01-28"
+buy                  = 1087.61
+sell                 = 1087.58
+return_rate_buy_pct  = 13.25
+return_rate_sell_pct = 14.0
+available_quantity   = 0
+kind         = "venue_terms"
+source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, the JSON behind its offer pages. Retrieved 2026-08-24 by scripts/fetch_inzhur.py. Prices, yields, ISINs, maturities and payment schedules are the platform's own published figures for instruments it sells; treat them as a seller's quotation rather than as an independent valuation. Every stated_yield is the issuer's FORECAST ABOUT ITSELF, carried verbatim and never computed from here."
+retrieved_on = "2026-08-24"
+verified_on  = ""
+  [[observation.payment]]
+  date         = "2025-07-30"
+  amount       = 8800.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000230262, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-01-28"
+  amount       = 8800.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000230262, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-01-28"
+  amount       = 100000.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000230262, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[observation]]
+id     = "UA4000233696"
+slug   = "ovdp"
+title  = "Державні облігації України"
+asset_type = "bond"
+status = "completed"
+isin   = "UA4000233696"
+matures_on = "2026-02-04"
+buy                  = 1075.04
+sell                 = 1075.03
+return_rate_buy_pct  = 14.0
+return_rate_sell_pct = 14.1
+available_quantity   = 0
+kind         = "venue_terms"
+source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, the JSON behind its offer pages. Retrieved 2026-08-24 by scripts/fetch_inzhur.py. Prices, yields, ISINs, maturities and payment schedules are the platform's own published figures for instruments it sells; treat them as a seller's quotation rather than as an independent valuation. Every stated_yield is the issuer's FORECAST ABOUT ITSELF, carried verbatim and never computed from here."
+retrieved_on = "2026-08-24"
+verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-02-03"
+  amount       = 7545.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000233696, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-02-03"
+  amount       = 100000.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000233696, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[observation]]
+id     = "UA4000235378"
+slug   = "ovdp"
+title  = "Державні облігації України"
+asset_type = "bond"
+status = "completed"
+isin   = "UA4000235378"
+matures_on = "2026-08-19"
+buy                  = 1081.23
+sell                 = 1081.22
+return_rate_buy_pct  = 14.15
+return_rate_sell_pct = 14.6
+available_quantity   = 0
+kind         = "venue_terms"
+source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, the JSON behind its offer pages. Retrieved 2026-08-24 by scripts/fetch_inzhur.py. Prices, yields, ISINs, maturities and payment schedules are the platform's own published figures for instruments it sells; treat them as a seller's quotation rather than as an independent valuation. Every stated_yield is the issuer's FORECAST ABOUT ITSELF, carried verbatim and never computed from here."
+retrieved_on = "2026-08-24"
+verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-02-17"
+  amount       = 8165.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000235378, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-08-18"
+  amount       = 8165.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000235378, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-08-18"
+  amount       = 100000.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000235378, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[observation]]
+id     = "UA4000234413"
+slug   = "ovdp"
+title  = "Державні облігації України"
+asset_type = "bond"
+status = "active"
+isin   = "UA4000234413"
+matures_on = "2027-01-13"
+buy                  = 1025.59
+sell                 = 1023.33
+return_rate_buy_pct  = 14.4
+return_rate_sell_pct = 15.0
+available_quantity   = 4702
+kind         = "venue_terms"
+source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, the JSON behind its offer pages. Retrieved 2026-08-24 by scripts/fetch_inzhur.py. Prices, yields, ISINs, maturities and payment schedules are the platform's own published figures for instruments it sells; treat them as a seller's quotation rather than as an independent valuation. Every stated_yield is the issuer's FORECAST ABOUT ITSELF, carried verbatim and never computed from here."
+retrieved_on = "2026-08-24"
+verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-01-13"
+  amount       = 8305.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000234413, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-07-14"
+  amount       = 8305.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000234413, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-01-12"
+  amount       = 8305.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000234413, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-01-12"
+  amount       = 100000.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000234413, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[observation]]
+id     = "UA4000234223"
+slug   = "ovdp"
+title  = "Державні облігації України"
+asset_type = "bond"
+status = "active"
+isin   = "UA4000234223"
+matures_on = "2027-06-09"
+buy                  = 1042.77
+sell                 = 1040.73
+return_rate_buy_pct  = 15.4
+return_rate_sell_pct = 15.7
+available_quantity   = 4978
+kind         = "venue_terms"
+source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, the JSON behind its offer pages. Retrieved 2026-08-24 by scripts/fetch_inzhur.py. Prices, yields, ISINs, maturities and payment schedules are the platform's own published figures for instruments it sells; treat them as a seller's quotation rather than as an independent valuation. Every stated_yield is the issuer's FORECAST ABOUT ITSELF, carried verbatim and never computed from here."
+retrieved_on = "2026-08-24"
+verified_on  = ""
+  [[observation.payment]]
+  date         = "2025-12-09"
+  amount       = 8100.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000234223, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-06-09"
+  amount       = 8100.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000234223, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-12-08"
+  amount       = 8100.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000234223, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-06-08"
+  amount       = 8100.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000234223, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-06-08"
+  amount       = 100000.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000234223, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[observation]]
+id     = "UA4000233712"
+slug   = "ovdp"
+title  = "Державні облігації України"
+asset_type = "bond"
+status = "active"
+isin   = "UA4000233712"
+matures_on = "2027-11-03"
+buy                  = 1064.1
+sell                 = 1062.6
+return_rate_buy_pct  = 15.65
+return_rate_sell_pct = 15.8
+available_quantity   = 0
+kind         = "venue_terms"
+source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, the JSON behind its offer pages. Retrieved 2026-08-24 by scripts/fetch_inzhur.py. Prices, yields, ISINs, maturities and payment schedules are the platform's own published figures for instruments it sells; treat them as a seller's quotation rather than as an independent valuation. Every stated_yield is the issuer's FORECAST ABOUT ITSELF, carried verbatim and never computed from here."
+retrieved_on = "2026-08-24"
+verified_on  = ""
+  [[observation.payment]]
+  date         = "2025-11-04"
+  amount       = 8230.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000233712, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-05-05"
+  amount       = 8230.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000233712, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-11-03"
+  amount       = 8230.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000233712, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-05-04"
+  amount       = 8230.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000233712, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-11-02"
+  amount       = 8230.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000233712, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-11-02"
+  amount       = 100000.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000233712, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[observation]]
+id     = "UA4000235196"
+slug   = "ovdp"
+title  = "Державні облігації України"
+asset_type = "bond"
+status = "active"
+isin   = "UA4000235196"
+matures_on = "2028-04-12"
+buy                  = 1096.92
+sell                 = 1092.94
+return_rate_buy_pct  = 16.05
+return_rate_sell_pct = 16.35
+available_quantity   = 1439
+kind         = "venue_terms"
+source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, the JSON behind its offer pages. Retrieved 2026-08-24 by scripts/fetch_inzhur.py. Prices, yields, ISINs, maturities and payment schedules are the platform's own published figures for instruments it sells; treat them as a seller's quotation rather than as an independent valuation. Every stated_yield is the issuer's FORECAST ABOUT ITSELF, carried verbatim and never computed from here."
+retrieved_on = "2026-08-24"
+verified_on  = ""
+  [[observation.payment]]
+  date         = "2025-10-14"
+  amount       = 8900.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000235196, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-04-14"
+  amount       = 8900.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000235196, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-10-13"
+  amount       = 8900.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000235196, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-04-13"
+  amount       = 8900.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000235196, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-10-12"
+  amount       = 8900.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000235196, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2028-04-11"
+  amount       = 8900.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000235196, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2028-04-11"
+  amount       = 100000.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000235196, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[observation]]
+id     = "UA4000229264"
+slug   = "ovdp"
+title  = "Державні облігації України"
+asset_type = "bond"
+status = "completed"
+isin   = "UA4000229264"
+matures_on = "2025-10-15"
+buy                  = 1088.62
+sell                 = 1088.6
+return_rate_buy_pct  = 12.75
+return_rate_sell_pct = 13.5
+available_quantity   = 0
+kind         = "venue_terms"
+source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, the JSON behind its offer pages. Retrieved 2026-08-24 by scripts/fetch_inzhur.py. Prices, yields, ISINs, maturities and payment schedules are the platform's own published figures for instruments it sells; treat them as a seller's quotation rather than as an independent valuation. Every stated_yield is the issuer's FORECAST ABOUT ITSELF, carried verbatim and never computed from here."
+retrieved_on = "2026-08-24"
+verified_on  = ""
+  [[observation.payment]]
+  date         = "2025-04-16"
+  amount       = 8900.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000229264, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2025-10-15"
+  amount       = 8900.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000229264, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2025-10-15"
+  amount       = 100000.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000229264, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[observation]]
+id     = "UA4000234215"
+slug   = "ovdp"
+title  = "Державні облігації України"
+asset_type = "bond"
+status = "completed"
+isin   = "UA4000234215"
+matures_on = "2026-06-24"
+buy                  = 1075.08
+sell                 = 1075.07
+return_rate_buy_pct  = 14.1
+return_rate_sell_pct = 14.5
+available_quantity   = 14473
+kind         = "venue_terms"
+source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, the JSON behind its offer pages. Retrieved 2026-08-24 by scripts/fetch_inzhur.py. Prices, yields, ISINs, maturities and payment schedules are the platform's own published figures for instruments it sells; treat them as a seller's quotation rather than as an independent valuation. Every stated_yield is the issuer's FORECAST ABOUT ITSELF, carried verbatim and never computed from here."
+retrieved_on = "2026-08-24"
+verified_on  = ""
+  [[observation.payment]]
+  date         = "2025-06-25"
+  amount       = 7550.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000234215, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2025-12-24"
+  amount       = 7550.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000234215, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-06-24"
+  amount       = 7550.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000234215, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-06-24"
+  amount       = 100000.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000234215, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[observation]]
+id     = "UA4000232599"
+slug   = "ovdp"
+title  = "Державні облігації України"
+asset_type = "bond"
+status = "completed"
+isin   = "UA4000232599"
+matures_on = "2025-10-01"
+buy                  = 1072.88
+sell                 = 1072.85
+return_rate_buy_pct  = 12.75
+return_rate_sell_pct = 13.75
+available_quantity   = 0
+kind         = "venue_terms"
+source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, the JSON behind its offer pages. Retrieved 2026-08-24 by scripts/fetch_inzhur.py. Prices, yields, ISINs, maturities and payment schedules are the platform's own published figures for instruments it sells; treat them as a seller's quotation rather than as an independent valuation. Every stated_yield is the issuer's FORECAST ABOUT ITSELF, carried verbatim and never computed from here."
+retrieved_on = "2026-08-24"
+verified_on  = ""
+  [[observation.payment]]
+  date         = "2025-10-01"
+  amount       = 7325.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000232599, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2025-10-01"
+  amount       = 100000.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000232599, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[observation]]
+id     = "UA4000235782"
+slug   = "ovdp"
+title  = "Державні облігації України"
+asset_type = "bond"
+status = "active"
+isin   = "UA4000235782"
+matures_on = "2028-11-29"
+buy                  = 1076.68
+sell                 = 1073.17
+return_rate_buy_pct  = 16.45
+return_rate_sell_pct = 16.65
+available_quantity   = 0
+kind         = "venue_terms"
+source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, the JSON behind its offer pages. Retrieved 2026-08-24 by scripts/fetch_inzhur.py. Prices, yields, ISINs, maturities and payment schedules are the platform's own published figures for instruments it sells; treat them as a seller's quotation rather than as an independent valuation. Every stated_yield is the issuer's FORECAST ABOUT ITSELF, carried verbatim and never computed from here."
+retrieved_on = "2026-08-24"
+verified_on  = ""
+  [[observation.payment]]
+  date         = "2025-12-03"
+  amount       = 8900.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000235782, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-06-03"
+  amount       = 8900.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000235782, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-12-02"
+  amount       = 8900.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000235782, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-06-03"
+  amount       = 8900.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000235782, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-12-01"
+  amount       = 8900.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000235782, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2028-05-31"
+  amount       = 8900.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000235782, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2028-11-29"
+  amount       = 8900.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000235782, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2028-11-29"
+  amount       = 100000.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000235782, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[observation]]
+id     = "UA4000233332"
+slug   = "ovdp"
+title  = "Державні облігації України"
+asset_type = "bond"
+status = "completed"
+isin   = "UA4000233332"
+matures_on = "2026-04-29"
+buy                  = 1075.58
+sell                 = 1075.57
+return_rate_buy_pct  = 14.25
+return_rate_sell_pct = 14.75
+available_quantity   = 0
+kind         = "venue_terms"
+source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, the JSON behind its offer pages. Retrieved 2026-08-24 by scripts/fetch_inzhur.py. Prices, yields, ISINs, maturities and payment schedules are the platform's own published figures for instruments it sells; treat them as a seller's quotation rather than as an independent valuation. Every stated_yield is the issuer's FORECAST ABOUT ITSELF, carried verbatim and never computed from here."
+retrieved_on = "2026-08-24"
+verified_on  = ""
+  [[observation.payment]]
+  date         = "2025-04-30"
+  amount       = 7600.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000233332, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2025-10-29"
+  amount       = 7600.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000233332, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-04-29"
+  amount       = 7600.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000233332, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-04-29"
+  amount       = 100000.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000233332, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[observation]]
+id     = "UA4000236228"
+slug   = "ovdp"
+title  = "Державні облігації України"
+asset_type = "bond"
+status = "active"
+isin   = "UA4000236228"
+matures_on = "2027-03-10"
+buy                  = 1089.32
+sell                 = 1087.89
+return_rate_buy_pct  = 15.4
+return_rate_sell_pct = 15.7
+available_quantity   = 0
+kind         = "venue_terms"
+source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, the JSON behind its offer pages. Retrieved 2026-08-24 by scripts/fetch_inzhur.py. Prices, yields, ISINs, maturities and payment schedules are the platform's own published figures for instruments it sells; treat them as a seller's quotation rather than as an independent valuation. Every stated_yield is the issuer's FORECAST ABOUT ITSELF, carried verbatim and never computed from here."
+retrieved_on = "2026-08-24"
+verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-03-10"
+  amount       = 8550.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000236228, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-09-08"
+  amount       = 8550.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000236228, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-03-09"
+  amount       = 8550.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000236228, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-03-09"
+  amount       = 100000.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000236228, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[observation]]
+id     = "UA4000237556"
+slug   = "ovdp"
+title  = "Державні облігації України"
+asset_type = "bond"
+status = "active"
+isin   = "UA4000237556"
+matures_on = "2028-11-15"
+buy                  = 1084.37
+sell                 = 1079.53
+return_rate_buy_pct  = 16.37
+return_rate_sell_pct = 16.65
+available_quantity   = 8519
+kind         = "venue_terms"
+source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, the JSON behind its offer pages. Retrieved 2026-08-24 by scripts/fetch_inzhur.py. Prices, yields, ISINs, maturities and payment schedules are the platform's own published figures for instruments it sells; treat them as a seller's quotation rather than as an independent valuation. Every stated_yield is the issuer's FORECAST ABOUT ITSELF, carried verbatim and never computed from here."
+retrieved_on = "2026-08-24"
+verified_on  = ""
+  [[observation.payment]]
+  date         = "2025-11-18"
+  amount       = 8900.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000237556, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-05-19"
+  amount       = 8900.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000237556, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-11-17"
+  amount       = 8900.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000237556, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-05-18"
+  amount       = 8900.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000237556, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-11-16"
+  amount       = 8900.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000237556, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2028-05-16"
+  amount       = 8900.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000237556, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2028-11-14"
+  amount       = 8900.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000237556, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2028-11-14"
+  amount       = 100000.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000237556, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[observation]]
+id     = "UA4000237416"
+slug   = "ovdp"
+title  = "Державні облігації України"
+asset_type = "bond"
+status = "active"
+isin   = "UA4000237416"
+matures_on = "2026-11-18"
+buy                  = 1046.49
+sell                 = 1045.66
+return_rate_buy_pct  = 14.3
+return_rate_sell_pct = 14.65
+available_quantity   = 5111
+kind         = "venue_terms"
+source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, the JSON behind its offer pages. Retrieved 2026-08-24 by scripts/fetch_inzhur.py. Prices, yields, ISINs, maturities and payment schedules are the platform's own published figures for instruments it sells; treat them as a seller's quotation rather than as an independent valuation. Every stated_yield is the issuer's FORECAST ABOUT ITSELF, carried verbatim and never computed from here."
+retrieved_on = "2026-08-24"
+verified_on  = ""
+  [[observation.payment]]
+  date         = "2025-11-18"
+  amount       = 8175.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000237416, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-05-19"
+  amount       = 8175.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000237416, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-11-17"
+  amount       = 8175.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000237416, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-11-17"
+  amount       = 100000.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000237416, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[observation]]
+id     = "UA4000230809"
+slug   = "ovdp"
+title  = "Державні облігації України"
+asset_type = "bond"
+status = "completed"
+isin   = "UA4000230809"
+matures_on = "2026-03-18"
+buy                  = 1084.58
+sell                 = 1084.58
+return_rate_buy_pct  = 14.1
+return_rate_sell_pct = 14.25
+available_quantity   = 0
+kind         = "venue_terms"
+source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, the JSON behind its offer pages. Retrieved 2026-08-24 by scripts/fetch_inzhur.py. Prices, yields, ISINs, maturities and payment schedules are the platform's own published figures for instruments it sells; treat them as a seller's quotation rather than as an independent valuation. Every stated_yield is the issuer's FORECAST ABOUT ITSELF, carried verbatim and never computed from here."
+retrieved_on = "2026-08-24"
+verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-03-17"
+  amount       = 8500.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000230809, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-03-17"
+  amount       = 100000.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000230809, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[observation]]
+id     = "UA4000236624"
+slug   = "ovdp"
+title  = "Державні облігації України"
+asset_type = "bond"
+status = "active"
+isin   = "UA4000236624"
+matures_on = "2026-10-14"
+buy                  = 1060.56
+sell                 = 1060.12
+return_rate_buy_pct  = 14.3
+return_rate_sell_pct = 14.6
+available_quantity   = 0
+kind         = "venue_terms"
+source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, the JSON behind its offer pages. Retrieved 2026-08-24 by scripts/fetch_inzhur.py. Prices, yields, ISINs, maturities and payment schedules are the platform's own published figures for instruments it sells; treat them as a seller's quotation rather than as an independent valuation. Every stated_yield is the issuer's FORECAST ABOUT ITSELF, carried verbatim and never computed from here."
+retrieved_on = "2026-08-24"
+verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-04-14"
+  amount       = 8175.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000236624, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-10-13"
+  amount       = 8175.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000236624, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-10-13"
+  amount       = 100000.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000236624, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[observation]]
+id     = "UA4000237804"
+slug   = "ovdp"
+title  = "Державні облігації України"
+asset_type = "bond"
+status = "active"
+isin   = "UA4000237804"
+matures_on = "2028-03-22"
+buy                  = 1101.03
+sell                 = 1097.83
+return_rate_buy_pct  = 16.05
+return_rate_sell_pct = 16.3
+available_quantity   = 0
+kind         = "venue_terms"
+source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, the JSON behind its offer pages. Retrieved 2026-08-24 by scripts/fetch_inzhur.py. Prices, yields, ISINs, maturities and payment schedules are the platform's own published figures for instruments it sells; treat them as a seller's quotation rather than as an independent valuation. Every stated_yield is the issuer's FORECAST ABOUT ITSELF, carried verbatim and never computed from here."
+retrieved_on = "2026-08-24"
+verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-03-24"
+  amount       = 8750.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000237804, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-09-22"
+  amount       = 8750.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000237804, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-03-23"
+  amount       = 8750.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000237804, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-09-21"
+  amount       = 8750.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000237804, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2028-03-21"
+  amount       = 8750.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000237804, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2028-03-21"
+  amount       = 100000.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000237804, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[observation]]
+id     = "UA4000238281"
+slug   = "ovdp"
+title  = "Державні облігації України"
+asset_type = "bond"
+status = "active"
+isin   = "UA4000238281"
+matures_on = "2026-12-16"
+buy                  = 1033.03
+sell                 = 1033.03
+return_rate_buy_pct  = 15.1
+return_rate_sell_pct = 15.1
+available_quantity   = 0
+kind         = "venue_terms"
+source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, the JSON behind its offer pages. Retrieved 2026-08-24 by scripts/fetch_inzhur.py. Prices, yields, ISINs, maturities and payment schedules are the platform's own published figures for instruments it sells; treat them as a seller's quotation rather than as an independent valuation. Every stated_yield is the issuer's FORECAST ABOUT ITSELF, carried verbatim and never computed from here."
+retrieved_on = "2026-08-24"
+verified_on  = ""
+  [[observation.payment]]
+  date         = "2025-12-16"
+  amount       = 8175.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000238281, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-06-16"
+  amount       = 8175.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000238281, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-12-15"
+  amount       = 8175.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000238281, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-12-15"
+  amount       = 100000.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000238281, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[observation]]
+id     = "UA4000238968"
+slug   = "ovdp"
+title  = "Державні облігації України"
+asset_type = "bond"
+status = "active"
+isin   = "UA4000238968"
+matures_on = "2029-03-07"
+buy                  = 1113.04
+sell                 = 1113.04
+return_rate_buy_pct  = 16.5
+return_rate_sell_pct = 16.5
+available_quantity   = 0
+kind         = "venue_terms"
+source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, the JSON behind its offer pages. Retrieved 2026-08-24 by scripts/fetch_inzhur.py. Prices, yields, ISINs, maturities and payment schedules are the platform's own published figures for instruments it sells; treat them as a seller's quotation rather than as an independent valuation. Every stated_yield is the issuer's FORECAST ABOUT ITSELF, carried verbatim and never computed from here."
+retrieved_on = "2026-08-24"
+verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-03-10"
+  amount       = 8740.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000238968, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-09-08"
+  amount       = 8740.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000238968, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-03-09"
+  amount       = 8740.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000238968, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-09-07"
+  amount       = 8740.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000238968, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2028-03-07"
+  amount       = 8740.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000238968, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2028-09-05"
+  amount       = 8740.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000238968, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2029-03-06"
+  amount       = 8740.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000238968, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2029-03-06"
+  amount       = 100000.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000238968, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[observation]]
+id     = "UA4000238976"
+slug   = "ovdp"
+title  = "Державні облігації України"
+asset_type = "bond"
+status = "active"
+isin   = "UA4000238976"
+matures_on = "2027-03-24"
+buy                  = 1069.04
+sell                 = 1069.04
+return_rate_buy_pct  = 15.55
+return_rate_sell_pct = 15.55
+available_quantity   = 0
+kind         = "venue_terms"
+source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, the JSON behind its offer pages. Retrieved 2026-08-24 by scripts/fetch_inzhur.py. Prices, yields, ISINs, maturities and payment schedules are the platform's own published figures for instruments it sells; treat them as a seller's quotation rather than as an independent valuation. Every stated_yield is the issuer's FORECAST ABOUT ITSELF, carried verbatim and never computed from here."
+retrieved_on = "2026-08-24"
+verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-03-24"
+  amount       = 7840.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000238976, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-09-22"
+  amount       = 7840.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000238976, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-03-23"
+  amount       = 7840.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000238976, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-03-23"
+  amount       = 100000.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000238976, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[observation]]
+id     = "UA4000236475"
+slug   = "ovdp"
+title  = "Державні облігації України"
+asset_type = "bond"
+status = "active"
+isin   = "UA4000236475"
+matures_on = "2028-09-27"
+buy                  = 1107.18
+sell                 = 1107.18
+return_rate_buy_pct  = 16.3
+return_rate_sell_pct = 16.3
+available_quantity   = 0
+kind         = "venue_terms"
+source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, the JSON behind its offer pages. Retrieved 2026-08-24 by scripts/fetch_inzhur.py. Prices, yields, ISINs, maturities and payment schedules are the platform's own published figures for instruments it sells; treat them as a seller's quotation rather than as an independent valuation. Every stated_yield is the issuer's FORECAST ABOUT ITSELF, carried verbatim and never computed from here."
+retrieved_on = "2026-08-24"
+verified_on  = ""
+  [[observation.payment]]
+  date         = "2025-09-30"
+  amount       = 8885.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000236475, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-03-31"
+  amount       = 8885.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000236475, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-09-29"
+  amount       = 8885.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000236475, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-03-30"
+  amount       = 8885.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000236475, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-09-28"
+  amount       = 8885.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000236475, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2028-03-28"
+  amount       = 8885.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000236475, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2028-09-26"
+  amount       = 8885.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000236475, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2028-09-26"
+  amount       = 100000.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000236475, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[observation]]
+id     = "UA4000238992"
+slug   = "ovdp"
+title  = "Державні облігації України"
+asset_type = "bond"
+status = "active"
+isin   = "UA4000238992"
+matures_on = "2029-04-25"
+buy                  = 1058.12
+sell                 = 1053.42
+return_rate_buy_pct  = 16.51
+return_rate_sell_pct = 16.75
+available_quantity   = 23583
+kind         = "venue_terms"
+source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, the JSON behind its offer pages. Retrieved 2026-08-24 by scripts/fetch_inzhur.py. Prices, yields, ISINs, maturities and payment schedules are the platform's own published figures for instruments it sells; treat them as a seller's quotation rather than as an independent valuation. Every stated_yield is the issuer's FORECAST ABOUT ITSELF, carried verbatim and never computed from here."
+retrieved_on = "2026-08-24"
+verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-04-28"
+  amount       = 8080.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000238992, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-10-27"
+  amount       = 8080.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000238992, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-04-27"
+  amount       = 8080.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000238992, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-10-26"
+  amount       = 8080.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000238992, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2028-04-25"
+  amount       = 8080.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000238992, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2028-10-24"
+  amount       = 8080.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000238992, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2029-04-24"
+  amount       = 8080.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000238992, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2029-04-24"
+  amount       = 100000.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000238992, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[observation]]
+id     = "UA4000239008"
+slug   = "ovdp"
+title  = "Державні облігації України"
+asset_type = "bond"
+status = "active"
+isin   = "UA4000239008"
+matures_on = "2028-06-14"
+buy                  = 1033.76
+sell                 = 1028.09
+return_rate_buy_pct  = 16.1
+return_rate_sell_pct = 16.5
+available_quantity   = 0
+kind         = "venue_terms"
+source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, the JSON behind its offer pages. Retrieved 2026-08-24 by scripts/fetch_inzhur.py. Prices, yields, ISINs, maturities and payment schedules are the platform's own published figures for instruments it sells; treat them as a seller's quotation rather than as an independent valuation. Every stated_yield is the issuer's FORECAST ABOUT ITSELF, carried verbatim and never computed from here."
+retrieved_on = "2026-08-24"
+verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-06-16"
+  amount       = 7890.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000239008, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-12-15"
+  amount       = 7890.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000239008, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-06-15"
+  amount       = 7890.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000239008, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-12-14"
+  amount       = 7890.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000239008, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2028-06-13"
+  amount       = 7890.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000239008, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2028-06-13"
+  amount       = 100000.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000239008, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[observation]]
+id     = "UA4000239016"
+slug   = "ovdp"
+title  = "Державні облігації України"
+asset_type = "bond"
+status = "active"
+isin   = "UA4000239016"
+matures_on = "2027-07-21"
+buy                  = 1015.39
+sell                 = 1015.39
+return_rate_buy_pct  = 15.5
+return_rate_sell_pct = 15.5
+available_quantity   = 90275
+kind         = "venue_terms"
+source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, the JSON behind its offer pages. Retrieved 2026-08-24 by scripts/fetch_inzhur.py. Prices, yields, ISINs, maturities and payment schedules are the platform's own published figures for instruments it sells; treat them as a seller's quotation rather than as an independent valuation. Every stated_yield is the issuer's FORECAST ABOUT ITSELF, carried verbatim and never computed from here."
+retrieved_on = "2026-08-24"
+verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-07-22"
+  amount       = 7575.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000239016, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-01-20"
+  amount       = 7575.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000239016, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-07-21"
+  amount       = 7575.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000239016, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-07-21"
+  amount       = 100000.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000239016, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[observation]]
+id     = "UA4000239040"
+slug   = "ovdp"
+title  = "Державні облігації України"
+asset_type = "bond"
+status = "active"
+isin   = "UA4000239040"
+matures_on = "2028-04-26"
+buy                  = 1055.91
+sell                 = 1051.27
+return_rate_buy_pct  = 16.1
+return_rate_sell_pct = 16.45
+available_quantity   = 25104
+kind         = "venue_terms"
+source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, the JSON behind its offer pages. Retrieved 2026-08-24 by scripts/fetch_inzhur.py. Prices, yields, ISINs, maturities and payment schedules are the platform's own published figures for instruments it sells; treat them as a seller's quotation rather than as an independent valuation. Every stated_yield is the issuer's FORECAST ABOUT ITSELF, carried verbatim and never computed from here."
+retrieved_on = "2026-08-24"
+verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-10-28"
+  amount       = 7925.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000239040, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-04-28"
+  amount       = 7925.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000239040, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-10-27"
+  amount       = 7925.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000239040, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2028-04-26"
+  amount       = 7925.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000239040, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2028-04-26"
+  amount       = 100000.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000239040, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[observation]]
+id     = "UA4000207518"
+slug   = "ovdp"
+title  = "Державні облігації України"
+asset_type = "bond"
+status = "active"
+isin   = "UA4000207518"
+matures_on = "2027-05-26"
+buy                  = 989.47
+sell                 = 986.66
+return_rate_buy_pct  = 15.3
+return_rate_sell_pct = 15.75
+available_quantity   = 2778
+kind         = "venue_terms"
+source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, the JSON behind its offer pages. Retrieved 2026-08-24 by scripts/fetch_inzhur.py. Prices, yields, ISINs, maturities and payment schedules are the platform's own published figures for instruments it sells; treat them as a seller's quotation rather than as an independent valuation. Every stated_yield is the issuer's FORECAST ABOUT ITSELF, carried verbatim and never computed from here."
+retrieved_on = "2026-08-24"
+verified_on  = ""
+  [[observation.payment]]
+  date         = "2025-11-26"
+  amount       = 4895.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000207518, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-05-27"
+  amount       = 4895.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000207518, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-11-25"
+  amount       = 4895.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000207518, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-05-26"
+  amount       = 4895.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000207518, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-05-26"
+  amount       = 100000.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000207518, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[observation]]
+id     = "UA4000239081"
+slug   = "ovdp"
+title  = "Державні облігації України"
+asset_type = "bond"
+status = "active"
+isin   = "UA4000239081"
+matures_on = "2030-02-20"
+buy                  = 1085.0
+sell                 = 1078.09
+return_rate_buy_pct  = 17.01
+return_rate_sell_pct = 17.3
+available_quantity   = 6039
+kind         = "venue_terms"
+source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, the JSON behind its offer pages. Retrieved 2026-08-24 by scripts/fetch_inzhur.py. Prices, yields, ISINs, maturities and payment schedules are the platform's own published figures for instruments it sells; treat them as a seller's quotation rather than as an independent valuation. Every stated_yield is the issuer's FORECAST ABOUT ITSELF, carried verbatim and never computed from here."
+retrieved_on = "2026-08-24"
+verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-08-26"
+  amount       = 8220.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000239081, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-02-24"
+  amount       = 8220.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000239081, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-08-25"
+  amount       = 8220.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000239081, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2028-02-23"
+  amount       = 8220.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000239081, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2028-08-23"
+  amount       = 8220.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000239081, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2029-02-21"
+  amount       = 8220.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000239081, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2029-08-22"
+  amount       = 8220.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000239081, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2030-02-20"
+  amount       = 8220.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000239081, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2030-02-20"
+  amount       = 100000.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000239081, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[observation]]
+id     = "UA4000230270"
+slug   = "ovdp"
+title  = "Державні облігації України"
+asset_type = "bond"
+status = "active"
+isin   = "UA4000230270"
+matures_on = "2027-07-07"
+buy                  = 1052.81
+sell                 = 1049.8
+return_rate_buy_pct  = 15.35
+return_rate_sell_pct = 15.75
+available_quantity   = 2861
+kind         = "venue_terms"
+source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, the JSON behind its offer pages. Retrieved 2026-08-24 by scripts/fetch_inzhur.py. Prices, yields, ISINs, maturities and payment schedules are the platform's own published figures for instruments it sells; treat them as a seller's quotation rather than as an independent valuation. Every stated_yield is the issuer's FORECAST ABOUT ITSELF, carried verbatim and never computed from here."
+retrieved_on = "2026-08-24"
+verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-01-06"
+  amount       = 9250.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000230270, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-07-07"
+  amount       = 9250.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000230270, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-07-07"
+  amount       = 100000.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000230270, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[observation]]
+id     = "UA4000231195"
+slug   = "ovdp"
+title  = "Державні облігації України"
+asset_type = "bond"
+status = "active"
+isin   = "UA4000231195"
+matures_on = "2027-08-25"
+buy                  = 1110.24
+sell                 = 1107.43
+return_rate_buy_pct  = 15.47
+return_rate_sell_pct = 15.8
+available_quantity   = 3909
+kind         = "venue_terms"
+source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, the JSON behind its offer pages. Retrieved 2026-08-24 by scripts/fetch_inzhur.py. Prices, yields, ISINs, maturities and payment schedules are the platform's own published figures for instruments it sells; treat them as a seller's quotation rather than as an independent valuation. Every stated_yield is the issuer's FORECAST ABOUT ITSELF, carried verbatim and never computed from here."
+retrieved_on = "2026-08-24"
+verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-08-26"
+  amount       = 8750.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000231195, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-02-24"
+  amount       = 8750.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000231195, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-08-25"
+  amount       = 8750.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000231195, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-08-25"
+  amount       = 100000.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000231195, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[observation]]
+id     = "UA4000235865"
+slug   = "ovdp"
+title  = "Державні облігації України"
+asset_type = "bond"
+status = "active"
+isin   = "UA4000235865"
+matures_on = "2026-09-16"
+buy                  = 1072.16
+sell                 = 1071.96
+return_rate_buy_pct  = 14.2
+return_rate_sell_pct = 14.5
+available_quantity   = 0
+kind         = "venue_terms"
+source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, the JSON behind its offer pages. Retrieved 2026-08-24 by scripts/fetch_inzhur.py. Prices, yields, ISINs, maturities and payment schedules are the platform's own published figures for instruments it sells; treat them as a seller's quotation rather than as an independent valuation. Every stated_yield is the issuer's FORECAST ABOUT ITSELF, carried verbatim and never computed from here."
+retrieved_on = "2026-08-24"
+verified_on  = ""
+  [[observation.payment]]
+  date         = "2025-09-17"
+  amount       = 8175.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000235865, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-03-18"
+  amount       = 8175.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000235865, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-09-16"
+  amount       = 8175.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000235865, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2026-09-15"
+  amount       = 100000.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000235865, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[observation]]
+id     = "UA4000239107"
+slug   = "ovdp"
+title  = "Державні облігації України"
+asset_type = "bond"
+status = "active"
+isin   = "UA4000239107"
+matures_on = "2029-02-07"
+buy                  = 1008.12
+sell                 = 1002.66
+return_rate_buy_pct  = 16.6
+return_rate_sell_pct = 16.9
+available_quantity   = 14658
+kind         = "venue_terms"
+source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, the JSON behind its offer pages. Retrieved 2026-08-24 by scripts/fetch_inzhur.py. Prices, yields, ISINs, maturities and payment schedules are the platform's own published figures for instruments it sells; treat them as a seller's quotation rather than as an independent valuation. Every stated_yield is the issuer's FORECAST ABOUT ITSELF, carried verbatim and never computed from here."
+retrieved_on = "2026-08-24"
+verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-02-10"
+  amount       = 8035.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000239107, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2027-08-11"
+  amount       = 8035.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000239107, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2028-02-09"
+  amount       = 8035.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000239107, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2028-08-09"
+  amount       = 8035.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000239107, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2029-02-07"
+  amount       = 8035.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000239107, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+  [[observation.payment]]
+  date         = "2029-02-07"
+  amount       = 100000.0
+  kind         = "bond_terms"
+  source       = "https://www.inzhur.reit/_api/assets — payment schedule published for UA4000239107, retrieved 2026-08-24. The issuer's own stated schedule; see the file header for what that is and is not."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[observation]]
+id     = "zhytniy"
+slug   = "zhytniy"
+title  = "Inzhur Житній"
+asset_type = "fund"
+status = "completed"
+buy                  = 1021.45
+sell                 = 1021.45
+available_quantity   = 0
+kind         = "venue_terms"
+source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, the JSON behind its offer pages. Retrieved 2026-08-24 by scripts/fetch_inzhur.py. Prices, yields, ISINs, maturities and payment schedules are the platform's own published figures for instruments it sells; treat them as a seller's quotation rather than as an independent valuation. Every stated_yield is the issuer's FORECAST ABOUT ITSELF, carried verbatim and never computed from here."
+retrieved_on = "2026-08-24"
+verified_on  = ""

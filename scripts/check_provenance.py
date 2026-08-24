@@ -44,7 +44,7 @@ DATA_ROOT = REPO_ROOT / "data"
 # unit at the venue the instrument is bought from, and that is a market quote: exactly the kind
 # of figure that gets believed without checking, and the number every purchase in a comparison
 # is sized by.
-SOURCED_DIRS = ("tax", "instruments", "routes", "channels", "cpi", "access")
+SOURCED_DIRS = ("tax", "instruments", "routes", "channels", "cpi", "access", "observations")
 
 # The directories exempt from the citation requirement, each BY NAME and WITH ITS REASON.
 # Together with SOURCED_DIRS this list is exhaustive: a directory under data/ that appears
