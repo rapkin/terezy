@@ -49,7 +49,7 @@ Tracked as **E5** in ``docs/REQUIRED_TESTS.md``. Closes FR-015 and SC-005.
 from __future__ import annotations
 
 import dataclasses
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import replace
 from datetime import date
 from pathlib import Path
@@ -874,16 +874,29 @@ def test_the_assumed_figure_carries_the_forecasts_citation_and_the_nominal_side(
 
 
 def _amounts_within(name: str, value: object) -> Iterator[tuple[str, Money]]:
-    """Every ``Money`` reachable from one field, including inside tuples of tuples.
+    """Every ``Money`` reachable from one field, through containers and nested records alike.
 
     Descending rather than testing ``isinstance(value, Money)`` at the top level: a field can
     be a *container* of amounts -- ``CarryforwardState.origins`` is ``(origin year, amount)``
     pairs -- and a sweep that only looked one level down would silently exclude it while
     claiming to cover the record.
+
+    **Every shape, not the one shape that exists today.** A walk that handled tuples alone
+    would make the claim above true of ``origins`` and false of a list, a mapping, a set or a
+    nested record, and the next field added would decide which by accident. ``Money`` is
+    matched before the dataclass branch because it is one.
     """
     if isinstance(value, Money):
         yield name, value
-    elif isinstance(value, tuple):
+    elif dataclasses.is_dataclass(value) and not isinstance(value, type):
+        for field in dataclasses.fields(value):
+            yield from _amounts_within(f"{name}.{field.name}", getattr(value, field.name))
+    elif isinstance(value, Mapping):
+        for key, item in value.items():
+            yield from _amounts_within(f"{name}[{key!r}]", item)
+    elif isinstance(value, str | bytes):
+        return
+    elif isinstance(value, Iterable):
         for index, item in enumerate(value):
             yield from _amounts_within(f"{name}[{index}]", item)
 
@@ -1140,6 +1153,35 @@ def test_the_sweep_reaches_amounts_held_inside_a_container() -> None:
     }
 
     assert any(name.startswith("carryforward.origins[") for name in swept), sorted(swept)
+
+
+@dataclasses.dataclass(frozen=True)
+class _Nested:
+    """A record inside a record, for the shape check below and nothing else."""
+
+    held: Money
+
+
+def test_the_walk_reaches_every_shape_a_field_could_be_rather_than_the_one_that_exists() -> None:
+    """The claim ``_statement_amounts`` makes is about *fields added later*, so it is about
+    shapes that do not exist yet. A walk covering only the shape in front of it would make
+    that claim false the first time somebody used a list.
+    """
+    one = Money(1.0, Currency.UAH, prov.EMPTY)
+    shapes: dict[str, object] = {
+        "bare": one,
+        "tuple": (one,),
+        "pairs": ((2026, one),),
+        "list": [one],
+        "mapping": {"a": one},
+        "frozenset": frozenset({one}),
+        "record": _Nested(held=one),
+        "record_in_tuple": (_Nested(held=one),),
+    }
+
+    for label, value in shapes.items():
+        assert [amount for _, amount in _amounts_within(label, value)] == [one], label
+    assert list(_amounts_within("text", "165.1.2")) == [], "a string is not a container here"
 
 
 def test_no_money_a_statement_carries_rests_on_nothing_at_all() -> None:

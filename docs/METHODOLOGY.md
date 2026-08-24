@@ -2366,6 +2366,15 @@ being taken rather than the shortcut: the OVDP exemption moved from a review dat
 2020-05-23 because the Tax Code's own commencements were retrieved, not because a run wanted
 it to.
 
+**What 2020-05-23 refuses is not nothing.** Before that date ОВДП income was PIT-exempt and
+still bore the military levy at 1.5%: пп. 1.7 п. 16-1 підрозділу 10 розділу XX exempted
+untaxed income from the levy *except* the incomes at пп. 165.1.2, 165.1.18 and 165.1.52, and
+Закон № 466-IX struck that exception. So a 2019 coupon is a real event with a real pair of
+rates — and the model **refuses it rather than charging it**, because the 1.5% levy's own
+commencement could not be retrieved and an entry nobody can date is an entry nobody can check.
+Refusing a knowable event is the cost of the rule; charging it at a rate whose start date was
+guessed is the thing the rule exists to prevent.
+
 ### 25.3 Provenance is per entry
 
 Not per class. The rate before a legislated change and the rate after it were read from

@@ -543,9 +543,14 @@ class AnnualStatement:
     **A bare date, and there is nothing to hang a mark on.** There is no dated-value wrapper
     here the way :class:`~terezy.core.primitives.money.Money` is an amount carrying its own
     sources, so the timing rule's ``verified_on`` cannot ride on this field. It rides on the
-    money instead: the rule's provenance is unioned into every amount this statement carries,
-    so an unverified deadline marks the liability and the payment that settles it rather than
-    quietly marking nothing (``tests/contract/test_provenance_propagation.py``).
+    money instead: the rule's provenance is unioned into every amount the **year** computes --
+    the liability, the netted base, the carryforward, and the payment that settles them -- so
+    an unverified deadline is visible rather than silent
+    (``tests/contract/test_provenance_propagation.py``).
+
+    Not into :attr:`charges`, deliberately. Those amounts were computed per event by
+    ``tax.flat_rate`` before any year existed, and a coupon's charge does not rest on the
+    deadline the year is eventually paid on. Marking them would say it did.
     """
 
     unsettled: tuple[UnsettledSwitch, ...]
@@ -1242,6 +1247,12 @@ def _under(declared: Provenance, currency: Currency, carried: _Carried) -> tuple
     The balance carried in is re-marked for the same reason. It is reported *on this statement*,
     computed under these declared rules, and the first year's opening zero rests on nothing at
     all -- so without this it would arrive unmarked and leave unmarked.
+
+    :attr:`_Carried.origins` is **not** re-marked, and does not need to be: it opens as an
+    empty tuple, so there is no unmarked zero in it to leak, and every entry added later is a
+    loss derived from a ``netted`` that already carries the year's rules. The amounts inside it
+    are therefore marked by derivation rather than by this function -- which is why the sweep
+    that checks them has to descend into containers to see them at all.
     """
     return (
         money.also_resting_on(money.zero(currency), declared),

@@ -1,16 +1,35 @@
 # Contract: the tax year, the payment, and the four methods
 
-**Feature**: `009-tax-depth` | **Modules**: `terezy.core.tax.year`, `terezy.core.tax.lots`
+**Feature**: `009-tax-depth` | **Modules**: `terezy.core.tax.year`,
+`terezy.core.results.tax_year`, `terezy.core.ledger.lots`
 
 ## Signatures
 
+As built. The three departures from the drafted shape are argued in
+[research.md](../research.md) D10 and in the note below.
+
 ```python
-def statements(events, *, rules, filing, method, switches) -> tuple[AnnualStatement, ...] | TaxYearRefused
-def payment_events(statements, *, rules) -> tuple[Event, ...] | InsufficientCashForTax
-def basis_consumed(lots, quantity, *, method, named_lot=None) -> BasisConsumed | LotRefusal
+def statements(state, charges, *, rules, tax_classes, filing, switches
+               ) -> tuple[AnnualStatement, ...] | TaxYearRefused
+def settle(events, statements, *, owner_id, base_currency, method, horizon_end
+           ) -> Settlement | SettlementRefused
+def basis_consumed(lots, quantity, *, method, named_lot=None) -> Selection | LotRefusal
 ```
 
-Pure. No clock. `method` and `filing` are required with no default.
+Pure. No clock. `filing` and `switches` are required with no default.
+
+**`statements` takes no basis method.** It reads `state.consumption_method` — the field that
+decided which lots each disposal actually drew on — so the label on a figure and the
+arithmetic behind it cannot disagree. That is not a default appearing: the name is still
+required, one layer up, by `engine.opening`. **`settle` does take one**, because it folds the
+raw stream before it has looked at the statements and must fold when there are none; it
+refuses where the method it folds under is not the one the statements were assessed on.
+
+**`statements` takes the charges beside the ledger** rather than deriving them, because a
+charge is produced together with its event by `tax.flat_rate` and re-deriving it here would be
+a second answer to a question already answered. `tax_classes` comes with them: the year needs
+the *rates* in force to charge a netted base, and a charge carries the provenance of its dated
+entry rather than the entry itself.
 
 ## Guarantees
 
@@ -59,8 +78,12 @@ definition of the investment asset. (FR-023)
 
 **G14 — Every figure under an unsettled switch is labelled with it.** (SC-012)
 
-**G15 — 001's exempt behaviour is bit-identical.** Per-event zero charges still recorded, no
-payment event from a year of exclusively exempt income, golden unchanged. (FR-026, SC-009)
+**G15 — 001's exempt results are bit-identical.** Per-event zero charges still recorded, no
+payment event from a year of exclusively exempt income, and every figure, schedule row, charge
+and ledger line in the golden artefact unchanged — its `== digest ==` has not moved. The
+artefact's `== inputs ==` sha256 lines did move, deliberately and for reasons outside the
+engine: upgrading the OVDP citation to the primary text changed `data/tax/ua.toml`, and
+`canonical.py` excludes provenance from the digest by design. (FR-026, SC-009)
 
 ## The boundary
 

@@ -732,11 +732,18 @@ class TestTheArtefactAgreesWithTheHandComputedSchedule:
         account at no magnitude, and no other figure in the run produces one. That the digest
         is indifferent to all five is the other half of the claim.
         """
-        recorded = GOLDEN_FILE.read_text(encoding="utf-8")
-        rendered = [line for line in recorded.splitlines() if "-0.0 UAH" in line]
+        lines = GOLDEN_FILE.read_text(encoding="utf-8").splitlines()
+        # The rendering puts an event's kind on its header line and its amount on the next,
+        # so the kind a `-0.0` belongs to is the header immediately above it.
+        rendered = [
+            (lines[index - 1].split()[-1], line)
+            for index, line in enumerate(lines)
+            if "-0.0 UAH" in line
+        ]
 
         assert len(rendered) == COUPON_COUNT + 1, rendered
-        assert all("amount -0.0 UAH" in line for line in rendered)
+        assert all("amount -0.0 UAH" in line for _, line in rendered)
+        assert {kind for kind, _ in rendered} == {EventKind.TAX_CHARGE.value}, rendered
         assert canonical.of_number(-0.0) == canonical.of_number(0.0)
 
     def test_the_two_return_figures_agree_because_and_only_because_tax_is_zero(self) -> None:

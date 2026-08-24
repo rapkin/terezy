@@ -435,10 +435,12 @@ def test_selecting_from_a_position_holding_nothing_is_refused_under_every_method
     the short selection the guard exists to prevent -- and average cost divided by zero, an
     untyped failure in an engine whose rule is that failure is explicit.
 
-    **With and without a named lot**, because the two take different routes through the module
-    and only one of them is where the defect was. Naming a lot under FIFO, LIFO or average
-    cost is refused by ``_refuse_naming`` before any selection runs, so the named case alone
-    would have proved the conflict rule and left the guard untested for three methods of four.
+    **With and without a named lot**, and what that axis buys is the *order* of two checks
+    rather than a second defect. The guard runs before ``selection_for`` is reached, so
+    ``_refuse_naming`` never sees these calls and all eight parametrisations hit the same
+    branch. That is the claim: an empty position is refused for being empty under every
+    method, including the three where naming a lot is separately a conflict -- so the refusal
+    a caller reads names the real problem rather than the one it happened to trip first.
     """
     with pytest.raises(LedgerInvariantError, match="no basis to consume"):
         lots.basis_consumed((), TOLERANCE, method=method, named_lot=named_lot)
