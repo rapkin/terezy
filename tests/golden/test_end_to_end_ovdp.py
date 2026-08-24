@@ -28,7 +28,13 @@ tax charge, and the whole folded ledger including each event's causation string.
 what makes a failure diagnosable: ``git diff`` on this file says which coupon moved and by
 how much, and the causation lines say what the engine thought it was doing. Amounts are
 rendered with ``repr``, which for a float64 is exact and round-trippable, so the readable
-half is no weaker than the digest -- it is the same claim, written out.
+half is **stricter** than the digest rather than the same claim written out: ``repr``
+distinguishes ``-0.0`` from ``0.0`` and ``canonical.of_number`` normalises it via
+``(value + 0.0).hex()``. The negative zeroes in this artefact -- one per ``TAX_CHARGE``, since
+that is the whole of what ``tax.year.memo_amount`` produces -- are therefore pinned by the
+rendering alone, and that is a pin on how a figure prints: nothing computed depends on the
+sign of a zero. The count is asserted below rather than stated here, because a count in prose
+is the first thing to go stale.
 
 Both halves live in **one** file and the test compares the whole text, so the digest cannot
 drift away from the rendering it describes.
@@ -100,6 +106,7 @@ from terezy.core.instruments.interface import (
     Holding,
     InstrumentDeclaration,
 )
+from terezy.core.ledger import canonical, lots
 from terezy.core.ledger.accounts import CashBalance
 from terezy.core.ledger.engine import LedgerState
 from terezy.core.ledger.events import Event, EventKind
@@ -111,8 +118,10 @@ from terezy.core.primitives.provenance import Provenance, SourceRef
 from terezy.core.primitives.rates import RealRate, RealTermsUnavailable
 from terezy.core.primitives.tolerance import assert_money_close, is_close
 from terezy.core.results import project
+from terezy.core.results import tax_year as settlement
 from terezy.core.results.project import Projection
 from terezy.core.results.schedule import CashFlowRow
+from terezy.core.tax import year as tax_year
 from terezy.core.tax.interface import TaxCharge, TaxClass
 from terezy.data import manifest
 from terezy.data.declarations import resolver
@@ -285,10 +294,11 @@ def _verified_declarations(declarations: resolver.Declarations) -> resolver.Decl
 
 # --- the rendering --------------------------------------------------------------------
 #
-# Every amount goes through ``repr``, which round-trips a float64 exactly, so the readable
-# half of the artefact is as strict as the digest. Nothing here renders provenance: see
-# the module docstring for why that exclusion is deliberate and where the mark is asserted
-# instead.
+# Every amount goes through ``repr``, which round-trips a float64 exactly -- and also
+# distinguishes ``-0.0`` from ``0.0``, which the digest deliberately does not, so the readable
+# half is stricter than the digest rather than equal to it. Nothing here renders provenance:
+# see the module docstring for why that exclusion is deliberate and where the mark is
+# asserted instead.
 
 
 def _money(value: Money) -> str:
@@ -477,8 +487,11 @@ HEADER: Final = (
     "# then read the diff and say in the commit message why each changed line is intended.",
     "#",
     "# Every amount is repr of a float64: exact and round-trippable, so this rendering is",
-    "# as strict as the digest at the foot of the file. Provenance and the code version are",
-    "# deliberately absent; the declaration files' digests are deliberately present.",
+    "# STRICTER than the digest at the foot of the file, not merely as strict -- repr tells",
+    "# -0.0 from 0.0 and the digest normalises it away. Each tax_charge below therefore",
+    "# carries a -0.0 pinned by this text alone: a pin on how a figure prints, not a guard",
+    "# on any figure. Provenance and the code version are deliberately absent; the",
+    "# declaration files' digests are present.",
     "#",
     "# THE TERMS PROJECTED HERE ARE SYNTHETIC AND UNVERIFIED. No figure below describes a",
     "# bond anyone can buy, and none of them accounts for funding-route cost or exit cost.",
@@ -710,6 +723,29 @@ class TestTheArtefactAgreesWithTheHandComputedSchedule:
         for charge in result.charges:
             assert charge.provenance.sources, "the zero cites the exemption it applied"
 
+    def test_every_negative_zero_in_the_artefact_is_a_charge_memo_and_nothing_else(self) -> None:
+        """Finding the count rather than claiming it, and saying what the sign is worth.
+
+        ``repr`` tells ``-0.0`` from ``0.0`` and ``canonical.of_number`` does not, so these
+        are pinned by the rendered text and by nothing else. There is one per ``TAX_CHARGE``:
+        ``memo_amount`` scales the charge by ``-0.0`` to keep it on the outflow side of the
+        account at no magnitude, and no other figure in the run produces one. That the digest
+        is indifferent to all five is the other half of the claim.
+        """
+        lines = GOLDEN_FILE.read_text(encoding="utf-8").splitlines()
+        # The rendering puts an event's kind on its header line and its amount on the next,
+        # so the kind a `-0.0` belongs to is the header immediately above it.
+        rendered = [
+            (lines[index - 1].split()[-1], line)
+            for index, line in enumerate(lines)
+            if "-0.0 UAH" in line
+        ]
+
+        assert len(rendered) == COUPON_COUNT + 1, rendered
+        assert all("amount -0.0 UAH" in line for _, line in rendered)
+        assert {kind for kind, _ in rendered} == {EventKind.TAX_CHARGE.value}, rendered
+        assert canonical.of_number(-0.0) == canonical.of_number(0.0)
+
     def test_the_two_return_figures_agree_because_and_only_because_tax_is_zero(self) -> None:
         """FR-005: two figures, never one -- and the fact that they coincide here is a
         property of the exemption, not of the code that computes them."""
@@ -801,6 +837,92 @@ class TestFillingTheRealSlotChangedNothingNominal:
         assert with_cpi.hurdle.accounts_for == without.hurdle.accounts_for
         assert with_cpi.hurdle.provenance == without.hurdle.provenance
         assert with_cpi.hurdle.real != without.hurdle.real
+
+
+class TestTaxDepthChangedNothingAboutTheExemptPath:
+    """009 FR-026 and SC-009, as three claims rather than one artefact comparison.
+
+    Feature 009 stopped a tax charge from moving cash and gave the ledger a payment event.
+    Neither may touch a year of exclusively exempt income, and the artefact comparison above
+    already says so -- as one assertion over 230 lines, which tells a reader that *something*
+    moved rather than *what*. These pin the two claims that matter separately, because they
+    are separate: a statement of zero still exists, and **no cash moves for it**. Both are
+    asserted below, against the shipped declarations rather than against a fixture.
+    """
+
+    def test_no_tax_charge_in_the_exempt_run_moves_any_cash(self) -> None:
+        """Every charge is recorded, and every one of them settles nothing."""
+        result, _ = _run()
+
+        charges = [event for event in result.ledger.applied if event.kind is EventKind.TAX_CHARGE]
+        assert len(charges) == COUPON_COUNT + 1, "one per coupon, plus the redemption"
+        assert all(event.amount.amount == 0.0 for event in charges)
+
+    def test_a_year_of_exclusively_exempt_income_produces_no_payment_event(self) -> None:
+        """SC-009. A zero liability is settled by nothing at all, so no cash leaves.
+
+        This is the assertion that would catch the exempt path growing a behaviour it should
+        not have: a payment event of zero would be indistinguishable from a payment in the
+        totals, and it would put a date in the ledger on which nothing happened.
+        """
+        result, _ = _run()
+
+        assert not [event for event in result.ledger.applied if event.kind is EventKind.TAX_PAYMENT]
+
+    def test_a_year_of_exclusively_exempt_income_is_assessed_at_zero_and_settles_nothing(
+        self,
+    ) -> None:
+        """SC-009's other half, against the **shipped** declarations rather than a fixture.
+
+        The statement exists and says zero *citing the exemption* -- a missing statement and a
+        statement saying zero are different claims, and only the second one says the year was
+        looked at (FR-006). And no cash moves for it, which is why this artefact cannot.
+        """
+        result, declarations = _run()
+        rules = resolver.tax_rules_from_data_root(DATA_ROOT, declarations)["ua"]
+        positions = resolver.tax_positions_from_data_root(DATA_ROOT)
+        assert positions is not None
+        filing, switches, _ = positions
+
+        assessed = tax_year.statements(
+            result.ledger,
+            result.charges,
+            rules=rules,
+            tax_classes=declarations.tax_classes,
+            filing=filing,
+            switches=switches,
+        )
+        assert isinstance(assessed, tuple), assessed
+        assert [statement.tax_year for statement in assessed] == [2026, 2027, 2028]
+        for statement in assessed:
+            assert statement.zero_because is tax_year.ZeroReason.EXEMPT
+            assert tax_year.liability_total(statement.liability).amount == 0.0
+            assert statement.treatment is tax_year.Treatment.OUTSIDE
+
+        settled = settlement.settle(
+            result.ledger.applied,
+            assessed,
+            owner_id=OWNER_ID,
+            base_currency=UAH,
+            method=lots.LotMethod.FIFO,
+            horizon_end=date(2030, 1, 1),
+        )
+        assert isinstance(settled, settlement.Settlement), settled
+        assert settled.payments == ()
+        assert settled.outstanding == ()
+        assert settled.stream == result.ledger.applied
+
+    def test_the_exempt_zeroes_still_cite_the_exemption_that_produced_them(self) -> None:
+        """A memo at zero cash is still evidence: ``memo_amount`` keeps the charge's sources.
+
+        Building the amount with ``money.zero`` instead would have dropped the citation, and
+        an uncited zero is indistinguishable from a rule that never ran (E11).
+        """
+        result, _ = _run()
+
+        for event in result.ledger.applied:
+            if event.kind is EventKind.TAX_CHARGE:
+                assert event.amount.provenance.sources
 
 
 class TestTheRealSlotSaysWhatItCanAndRefusesWhatItCannot:

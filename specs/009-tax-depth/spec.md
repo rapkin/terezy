@@ -603,6 +603,17 @@ and verify the payment events and netting move with it, with no source change.
   excluded from the levy's exception list by Закон № 466-IX since 23.05.2020 —
   stronger than the PwC summary currently cited. Recorded here for the
   implementation to upgrade the citation; no data file is edited by this spec.
+
+  ⚙ **Corrected during implementation (2026-08-24), in the same spirit as the
+  пп. 170.2.10 correction below.** пп. 165.1.52 is *«інвестиційний прибуток від
+  операцій»* — the **disposal gain only**. Coupon interest on state securities is a
+  different subparagraph, **пп. 165.1.2** (*«проценти, що нараховані на державні
+  цінні папери»*), and `ua_government_bond` charges coupons as well as disposals, so
+  citing 165.1.52 alone would have cited a provision about investment profit for
+  interest income. Both provisions took their present shape under Закон № 1797-VIII
+  від 21.12.2016 (п. 74 розділу I), in force **1 January 2017**. The levy point is
+  right and sharper than stated: the struck fragment was a carve-out *from* the levy
+  exemption, so until 23.05.2020 ОВДП income bore the levy despite being PIT-exempt.
 - **One owner, no delivery surface.** As in 001: results are produced and asserted
   by the test suite; presentation of annual statements is a later feature, except
   where a requirement above says a figure must be *reported* — which binds the

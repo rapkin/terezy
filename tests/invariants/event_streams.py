@@ -27,6 +27,15 @@ unverified one, and both. E5's propagation assertions belong to a later phase, b
 generating streams that are sometimes unverified means the ledger is exercised against
 marked money from the start rather than having the mark bolted on later.
 
+⚙ **Feature 009 split the tax operations in two, and changed nothing else.** A
+``TAX_CHARGE`` is now an assessment that moves no money, so the generator draws it at zero
+cash; a ``TAX_PAYMENT`` is the money actually leaving on a declared due date, so the
+generator draws that too, from zero upwards. The point of drawing both is the claim 008
+made for seeds and 009 makes for payments: a payment is an **ordinary ledger citizen**, and
+the way to test that is to feed the conservation and traceability properties that already
+exist a body of ledgers containing payments and change not one of them. If a property fails
+only for those ledgers, the event is wrong -- never the invariant (009 research.md D2).
+
 **Every disposal carries a fee line**, drawn from zero upwards and allocated to that
 disposal by sequence number. Feature 001 charges no fees -- route and exit costs are
 outside the hurdle-rate figure by construction -- so without this the third term of C3's
@@ -44,6 +53,7 @@ from datetime import date, timedelta
 from hypothesis import strategies as st
 
 from terezy.core.ledger.events import CausationKind, CausationRef, Event, EventKind, LotRef
+from terezy.core.ledger.lots import SELECTION_FNS, SPECIFIC_LOT
 from terezy.core.primitives import provenance
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
@@ -94,12 +104,25 @@ class Stream:
     events: tuple[Event, ...]
     currency: Currency
     instrument_id: str
+    method: str
+    """The basis method this stream is valid under, drawn with it.
+
+    ⚙ **Feature 009 (SC-006).** The method is part of the stream rather than fixed by the
+    suite because two of the four constrain what a *valid* stream looks like: under
+    specific-lot a disposal must name a lot and may not exceed that lot's own units. Folding
+    every stream under one method would have left three of the four untested by the
+    conservation properties, and average cost -- which consumes a share of every lot rather
+    than draining them in order -- is the one most likely to break basis conservation.
+    """
 
 
 _QUANTITIES = st.integers(min_value=1, max_value=1_000)
 _UNIT_PRICES = st.integers(min_value=1, max_value=2_000)
 _CASH_AMOUNTS = st.integers(min_value=1, max_value=100_000)
-_TAX_AMOUNTS = st.integers(min_value=0, max_value=50_000)
+_TAX_PAYMENTS = st.integers(min_value=0, max_value=50_000)
+"""What a settled year takes out of cash. Zero is drawn as often as anything else: a year
+assessed at nothing produces no payment at all in production, and a zero-amount payment is
+the boundary a generator should still put through the fold."""
 _FEE_AMOUNTS = st.integers(min_value=0, max_value=500)
 
 
@@ -112,6 +135,7 @@ def event_streams(draw: st.DrawFn, currency: Currency = Currency.UAH) -> Stream:
     the engine relies on: the fold order is the sequence, never the order the collection
     happened to arrive in.
     """
+    method = draw(st.sampled_from(sorted(SELECTION_FNS)))
     opening = draw(st.integers(min_value=10_000, max_value=1_000_000))
     first_day = draw(st.dates(min_value=date(2024, 1, 1), max_value=date(2026, 1, 1)))
     gaps = draw(st.lists(st.integers(min_value=0, max_value=120), min_size=1, max_size=8))
@@ -134,12 +158,15 @@ def event_streams(draw: st.DrawFn, currency: Currency = Currency.UAH) -> Stream:
     on = first_day
     held = 0
     lots_created = 0
+    open_lots: dict[str, int] = {}
+    """Units remaining per open lot, maintained for specific-lot, where a disposal may not
+    exceed the units of the lot it names. The other three are constrained by the total."""
 
     for gap in gaps:
         on = on + timedelta(days=gap)
         sequence = len(events)
         prov = draw(st.sampled_from(PROVENANCE_POOL))
-        operations = ["buy", "coupon", "tax"]
+        operations = ["buy", "coupon", "assess", "pay_tax"]
         if held > 0:
             operations.append("redeem")
         operation = draw(st.sampled_from(operations))
@@ -149,6 +176,7 @@ def event_streams(draw: st.DrawFn, currency: Currency = Currency.UAH) -> Stream:
             cost = quantity * draw(_UNIT_PRICES)
             lots_created += 1
             held += quantity
+            open_lots[f"lot-{lots_created}"] = quantity
             events.append(
                 Event(
                     sequence=sequence,
@@ -178,13 +206,28 @@ def event_streams(draw: st.DrawFn, currency: Currency = Currency.UAH) -> Stream:
                     capacity_pool=None,
                 )
             )
-        elif operation == "tax":
+        elif operation == "assess":
             events.append(
                 Event(
                     sequence=sequence,
                     occurred_on=on,
                     kind=EventKind.TAX_CHARGE,
-                    amount=Money(-float(draw(_TAX_AMOUNTS)), currency, prov),
+                    amount=Money(-0.0, currency, prov),
+                    owner_id=OWNER,
+                    caused_by=_RULE,
+                    lot_ref=None,
+                    quantity=None,
+                    allocated_to=None,
+                    capacity_pool=None,
+                )
+            )
+        elif operation == "pay_tax":
+            events.append(
+                Event(
+                    sequence=sequence,
+                    occurred_on=on,
+                    kind=EventKind.TAX_PAYMENT,
+                    amount=Money(-float(draw(_TAX_PAYMENTS)), currency, prov),
                     owner_id=OWNER,
                     caused_by=_RULE,
                     lot_ref=None,
@@ -194,7 +237,16 @@ def event_streams(draw: st.DrawFn, currency: Currency = Currency.UAH) -> Stream:
                 )
             )
         else:
-            quantity = draw(st.integers(min_value=1, max_value=held))
+            if method == SPECIFIC_LOT:
+                lot_id = draw(st.sampled_from(sorted(open_lots)))
+                quantity = draw(st.integers(min_value=1, max_value=open_lots[lot_id]))
+                open_lots[lot_id] -= quantity
+                if open_lots[lot_id] == 0:
+                    del open_lots[lot_id]
+                named: str | None = lot_id
+            else:
+                quantity = draw(st.integers(min_value=1, max_value=held))
+                named = None
             held -= quantity
             proceeds = quantity * draw(_UNIT_PRICES)
             disposal_sequence = sequence + 1
@@ -220,11 +272,11 @@ def event_streams(draw: st.DrawFn, currency: Currency = Currency.UAH) -> Stream:
                     amount=Money(float(proceeds), currency, prov),
                     owner_id=OWNER,
                     caused_by=_TERM,
-                    lot_ref=LotRef(instrument_id=INSTRUMENT, lot_id=None),
+                    lot_ref=LotRef(instrument_id=INSTRUMENT, lot_id=named),
                     quantity=float(quantity),
                     allocated_to=None,
                     capacity_pool=None,
                 )
             )
 
-    return Stream(events=tuple(events), currency=currency, instrument_id=INSTRUMENT)
+    return Stream(events=tuple(events), currency=currency, instrument_id=INSTRUMENT, method=method)

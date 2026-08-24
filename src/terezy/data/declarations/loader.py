@@ -78,7 +78,7 @@ from terezy.core.instruments.interface import (
     InstrumentConstraints,
     InstrumentDeclaration,
 )
-from terezy.core.ledger import seeds
+from terezy.core.ledger import lots, seeds
 from terezy.core.ledger.seeds import SeedLot
 from terezy.core.primitives import conventions, periods
 from terezy.core.primitives import provenance as prov
@@ -96,6 +96,7 @@ from terezy.core.routes.venues import Venue
 from terezy.core.scenarios.regimes import Regime, RegimeTransition
 from terezy.core.streams import streams
 from terezy.core.streams.streams import IncomeStream, Indexation
+from terezy.core.tax import year as tax_year
 from terezy.core.tax.interface import TaxableEventKind, TaxClass
 from terezy.core.tax.schedule import RateEntry
 from terezy.data.declarations import schema
@@ -3354,4 +3355,413 @@ def inflation_assumption_from_file(path: Path) -> tuple[str, InflationAssumption
             provenance=provenance,
             kind=kind,
         ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# 009-tax-depth: the assessment rules, and the owner's positions on them
+# ---------------------------------------------------------------------------
+#
+# Two loaders, split by what the file *is*. `data/tax/timing/` is cited law and every table
+# carrying a number needs a citation; `data/scenarios/tax/` is the owner's own statements and
+# needs none, on the exemption `data/scenarios/` already carries.
+#
+# Every closed set below is resolved against the core's own enums rather than re-listed here,
+# so a value the engine cannot act on fails at load naming the file, the field, and what would
+# have worked.
+
+TIMING_TABLE: Final = "timing"
+"""Root table of an assessment-rules file, and the prefix of every field path in one."""
+
+POSITIONS_TABLE: Final = "tax_positions"
+"""Root table of an owner's tax-positions file."""
+
+_MONTHS_IN_YEAR: Final = 12
+_SHORTEST_MONTH: Final = 28
+"""The day of a recurring deadline is capped at 28 so that no declared deadline can fail to
+exist in some year. A 30 April deadline is fine and a 30 February one is not a deadline."""
+
+
+def _closed_value[T](
+    path: Path,
+    field_path: str,
+    value: str,
+    members: Mapping[str, T],
+    what: str,
+) -> T:
+    """One member of a closed set the core defines, or a failure listing the set.
+
+    The mapping is built from the core's own enum at each call site, so this cannot drift from
+    what the engine can act on: a member added to the enum is offered here without an edit.
+    """
+    if value not in members:
+        raise DeclarationError(
+            path,
+            field_path,
+            f"is {value!r}, which is not a {what} this engine implements.",
+            f"use one of: {', '.join(sorted(members))}",
+        )
+    return members[value]
+
+
+def _annual_date(path: Path, field_prefix: str, month: int, day: int) -> tax_year.AnnualDate:
+    """A recurring deadline: a month and a day, checked so it exists in every year."""
+    if not 1 <= month <= _MONTHS_IN_YEAR:
+        raise DeclarationError(
+            path,
+            f"{field_prefix}_month",
+            f"is {month!r}, which is not a month.",
+            "declare a month from 1 to 12",
+        )
+    if not 1 <= day <= _SHORTEST_MONTH:
+        raise DeclarationError(
+            path,
+            f"{field_prefix}_day",
+            f"is {day!r}. A deadline is capped at the 28th so that it exists in every month "
+            "of every year: a 30 February deadline is not a deadline, and a rule that "
+            "silently moved it would be inventing one.",
+            "declare a day from 1 to 28",
+        )
+    return tax_year.AnnualDate(month=month, day=day)
+
+
+def _timing_category(
+    path: Path, entry: schema.TimingCategoryTable
+) -> tuple[tax_year.IncomeCategory, tax_year.TimingRule]:
+    """One ``[[timing.category]]`` as the two records it declares: how it nets, and when."""
+    field_prefix = f"{TIMING_TABLE}.category[{entry.id}]"
+    identifier = _require_text(
+        path,
+        f"{field_prefix}.id",
+        entry.id,
+        "a category is referred to by id from every tax class that belongs to it",
+    )
+    _require_text(
+        path,
+        f"{field_prefix}.note",
+        entry.note,
+        "a category states in words what it claims, so a reader can check the citation "
+        "against the claim",
+    )
+    sources = prov.of(
+        [
+            _source_ref(
+                path,
+                field_prefix,
+                source=entry.source,
+                retrieved_on=entry.retrieved_on,
+                verified_on=entry.verified_on,
+                kind=entry.kind,
+            )
+        ]
+    )
+    category = tax_year.IncomeCategory(
+        id=identifier,
+        treatment=_closed_value(
+            path,
+            f"{field_prefix}.treatment",
+            entry.treatment,
+            {member.value: member for member in tax_year.Treatment},
+            "netting treatment",
+        ),
+        carryforward=_closed_value(
+            path,
+            f"{field_prefix}.carryforward",
+            entry.carryforward,
+            {member.value: member for member in tax_year.Carryforward},
+            "carryforward rule",
+        ),
+        note=entry.note,
+        provenance=sources,
+    )
+    rule = tax_year.TimingRule(
+        category_id=identifier,
+        settlement=_closed_value(
+            path,
+            f"{field_prefix}.settlement",
+            entry.settlement,
+            {member.value: member for member in tax_year.SettlementBehaviour},
+            "settlement behaviour",
+        ),
+        declare_by=_annual_date(
+            path, f"{field_prefix}.declare_by", entry.declare_by_month, entry.declare_by_day
+        ),
+        pay_by=_annual_date(path, f"{field_prefix}.pay_by", entry.pay_by_month, entry.pay_by_day),
+        non_business_day_rule=_known(
+            path,
+            f"{field_prefix}.non_business_day_rule",
+            entry.non_business_day_rule,
+            conventions.BUSINESS_DAY_FNS,
+            "business-day convention",
+        ),
+        note=entry.note,
+        provenance=sources,
+    )
+    return category, rule
+
+
+def _lot_method(path: Path, entry: schema.LotMethodTable) -> tax_year.MethodStanding:
+    """One ``[[timing.lot_method]]`` as the finding it records about the law."""
+    field_prefix = f"{TIMING_TABLE}.lot_method[{entry.method}]"
+    return tax_year.MethodStanding(
+        method=_closed_value(
+            path,
+            f"{field_prefix}.method",
+            entry.method,
+            {member.value: member for member in lots.LotMethod},
+            "basis method",
+        ),
+        verdict=_closed_value(
+            path,
+            f"{field_prefix}.verdict",
+            entry.verdict,
+            {member.value: member for member in tax_year.MethodVerdict},
+            "legal-standing verdict",
+        ),
+        what_the_law_says=_require_text(
+            path,
+            f"{field_prefix}.what_the_law_says",
+            entry.what_the_law_says,
+            "a verdict about the law is unreadable without the finding in words -- and a "
+            "figure produced under this method carries it to the reader",
+        ),
+        provenance=prov.of(
+            [
+                _source_ref(
+                    path,
+                    field_prefix,
+                    source=entry.source,
+                    retrieved_on=entry.retrieved_on,
+                    verified_on=entry.verified_on,
+                    kind=entry.kind,
+                )
+            ]
+        ),
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class TimingDeclaration:
+    """One ``data/tax/timing/<jurisdiction>.toml``, before the class references are resolved.
+
+    The class-to-category mapping is carried as declared text rather than resolved here,
+    because resolving it needs every rate pack parsed first -- the same boundary an
+    instrument's ``tax_classes`` sits on.
+    """
+
+    jurisdiction_id: str
+    tax_currency: Currency
+    categories: tuple[tax_year.IncomeCategory, ...]
+    timing: tuple[tax_year.TimingRule, ...]
+    methods: tuple[tax_year.MethodStanding, ...]
+    category_of_class: Mapping[str, str]
+
+
+def timing_from_file(path: Path) -> TimingDeclaration:
+    """One assessment-rules file, validated as far as one file can be."""
+    document = read_document(path)
+    table = _validate(schema.TimingFile, document, path).timing
+    jurisdiction = _require_text(
+        path,
+        f"{TIMING_TABLE}.jurisdiction",
+        table.jurisdiction,
+        "the rules belong to a jurisdiction, and the rate pack they govern names the same one",
+    )
+    currency = _currency(path, f"{TIMING_TABLE}.tax_currency", table.tax_currency)
+    if not table.category:
+        raise DeclarationError(
+            path,
+            f"{TIMING_TABLE}.category",
+            "declares no income category, so no tax class in this jurisdiction could be "
+            "assessed at all.",
+            "declare at least one [[timing.category]]",
+        )
+    built = [_timing_category(path, entry) for entry in table.category]
+    categories = tuple(category for category, _ in built)
+    _no_duplicates(path, f"{TIMING_TABLE}.category", [category.id for category in categories])
+    methods = tuple(_lot_method(path, entry) for entry in table.lot_method)
+    _no_duplicates(
+        path,
+        f"{TIMING_TABLE}.lot_method",
+        [standing.method.value for standing in methods],
+    )
+    declared = {category.id for category in categories}
+    mapping: dict[str, str] = {}
+    for index, entry in enumerate(table.class_):
+        field_prefix = f"{TIMING_TABLE}.class[{index}]"
+        if entry.category not in declared:
+            raise DeclarationError(
+                path,
+                f"{field_prefix}.category",
+                f"names the income category {entry.category!r}, which this file does not "
+                "declare. A class mapped to a category nobody defined could not be netted, "
+                "charged per event, or excluded -- three different answers.",
+                "declare it as a [[timing.category]], or use one of: "
+                f"{', '.join(sorted(declared))}",
+            )
+        if entry.tax_class in mapping:
+            raise DeclarationError(
+                path,
+                f"{field_prefix}.tax_class",
+                f"maps {entry.tax_class!r} to a second category. One class belongs to one "
+                "category: whichever mapping the lookup reached first would win by accident "
+                "of file order.",
+                "delete one of the two entries",
+            )
+        mapping[entry.tax_class] = entry.category
+    return TimingDeclaration(
+        jurisdiction_id=jurisdiction,
+        tax_currency=currency,
+        categories=categories,
+        timing=tuple(rule for _, rule in built),
+        methods=methods,
+        category_of_class=mapping,
+    )
+
+
+def _no_duplicates(path: Path, field_path: str, identifiers: list[str]) -> None:
+    """Every id in one list appears once, or a failure naming the repeat.
+
+    Collapsing a duplicate silently would leave whichever entry loaded second in force, and
+    the file would read as though the first one were.
+    """
+    seen: set[str] = set()
+    for identifier in identifiers:
+        if identifier in seen:
+            raise DeclarationError(
+                path,
+                field_path,
+                f"declares {identifier!r} more than once.",
+                "delete the duplicate entry",
+            )
+        seen.add(identifier)
+
+
+def tax_positions_from_file(
+    path: Path,
+) -> tuple[tax_year.FilingDecisions, tax_year.UnsettledPositions]:
+    """One ``data/scenarios/tax/<owner>.toml``: what was filed, and the two positions taken.
+
+    No citation is required and none is accepted: whether a declaration was filed is a fact
+    only the owner can state, and a position on an unsettled reading is a belief.
+    ``is_assumption = true`` is what each carries where an observation carries a source.
+    """
+    document = read_document(path)
+    table = _validate(schema.TaxPositionsFile, document, path).tax_positions
+    owner = _require_text(
+        path,
+        f"{POSITIONS_TABLE}.owner_id",
+        table.owner_id,
+        "a tax position is one person's declaration about his own returns, and every figure "
+        "built from it carries him (Principle VII)",
+    )
+    by_year: dict[int, bool] = {}
+    for index, entry in enumerate(table.filing):
+        field_prefix = f"{POSITIONS_TABLE}.filing[{index}]"
+        if entry.year in by_year:
+            raise DeclarationError(
+                path,
+                f"{field_prefix}.year",
+                f"declares the {entry.year} filing decision twice.",
+                "delete the duplicate entry",
+            )
+        _require_text(
+            path,
+            f"{field_prefix}.note",
+            entry.note,
+            "a filing decision states in words what it rests on -- a record, or a fixture",
+        )
+        by_year[entry.year] = entry.filed
+    return (
+        tax_year.FilingDecisions(
+            owner_id=owner,
+            declared_at=f"{path.parent.name}/{path.name}#{POSITIONS_TABLE}.filing",
+            by_year=by_year,
+        ),
+        tax_year.UnsettledPositions(
+            chain=tax_year.ChainContinuity(
+                position=_closed_value(
+                    path,
+                    f"{POSITIONS_TABLE}.carryforward_chain.position",
+                    table.carryforward_chain.position,
+                    {member.value: member for member in tax_year.ChainPosition},
+                    "carryforward-chain position",
+                ),
+                switch=_unsettled_switch(
+                    path,
+                    "carryforward_chain",
+                    question=table.carryforward_chain.question,
+                    position=table.carryforward_chain.position,
+                    rationale=table.carryforward_chain.rationale,
+                    resolution_path=table.carryforward_chain.resolution_path,
+                    is_assumption=table.carryforward_chain.is_assumption,
+                ),
+            ),
+            method=tax_year.SelfDeclarantMethod(
+                method=_closed_value(
+                    path,
+                    f"{POSITIONS_TABLE}.self_declarant_method.method",
+                    table.self_declarant_method.method,
+                    {member.value: member for member in lots.LotMethod},
+                    "basis method",
+                ),
+                switch=_unsettled_switch(
+                    path,
+                    "self_declarant_method",
+                    question=table.self_declarant_method.question,
+                    position=table.self_declarant_method.method,
+                    rationale=table.self_declarant_method.rationale,
+                    resolution_path=table.self_declarant_method.resolution_path,
+                    is_assumption=table.self_declarant_method.is_assumption,
+                ),
+            ),
+        ),
+    )
+
+
+def _unsettled_switch(
+    path: Path,
+    table_name: str,
+    *,
+    question: str,
+    position: str,
+    rationale: str,
+    resolution_path: str,
+    is_assumption: bool,
+) -> tax_year.UnsettledSwitch:
+    """One declared position on a question no source answers, with its label.
+
+    ``is_assumption`` must be true. The field is not decoration: it is what this record
+    carries where an observation carries a citation, and a position declared as anything else
+    would be presented as a finding by every figure that rests on it.
+    """
+    field_prefix = f"{POSITIONS_TABLE}.{table_name}"
+    if not is_assumption:
+        raise DeclarationError(
+            path,
+            f"{field_prefix}.is_assumption",
+            "is false. A position on a question no source answers is an assumption by "
+            "definition: declaring it otherwise would let a belief render as a finding on "
+            "every figure it touches.",
+            "set is_assumption = true, or find a citation and declare the rule instead",
+        )
+    for name, value in (("question", question), ("rationale", rationale)):
+        _require_text(
+            path,
+            f"{field_prefix}.{name}",
+            value,
+            "an unsettled position is only usable by a reader who can see what was open and "
+            "why this branch was taken",
+        )
+    return tax_year.UnsettledSwitch(
+        question=question,
+        position=position,
+        resolution_path=_require_text(
+            path,
+            f"{field_prefix}.resolution_path",
+            resolution_path,
+            "a label nobody can retire is a permanent one; the path is what would replace "
+            "this belief with a citation",
+        ),
+        declared_at=f"{path.parent.name}/{path.name}#{field_prefix}",
     )

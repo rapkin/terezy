@@ -42,6 +42,7 @@ from typing import TYPE_CHECKING
 from terezy.core.instruments import registry as instrument_registry
 from terezy.core.primitives import money
 from terezy.core.routes.venues import can_hold
+from terezy.core.tax.year import AssessmentRules
 from terezy.data.declarations import loader
 from terezy.data.declarations.errors import DeclarationError
 
@@ -63,6 +64,7 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.routes.venues import Venue
     from terezy.core.scenarios.regimes import Regime
     from terezy.core.streams.streams import IncomeStream
+    from terezy.core.tax import year as tax_year
     from terezy.core.tax.interface import TaxClass
     from terezy.data.declarations.loader import ScenarioDeclaration
 
@@ -2099,3 +2101,129 @@ def inflation_from_data_root(root: Path) -> InflationDeclarations:
         assumption=assumption,
         assumption_file=assumption_file,
     )
+
+
+# ---------------------------------------------------------------------------
+# 009-tax-depth: the assessment rules, and the owner's positions on them
+# ---------------------------------------------------------------------------
+#
+# Two relations a per-file validator structurally cannot check:
+#
+# **A class mapped to a category that no rate pack declares.** Whether the class exists is a
+# fact about another file, and reading the dangling reference as "no rules apply" would be the
+# silent default this layer exists to prevent -- a class with rates and no category cannot be
+# assessed at all.
+#
+# **Two files declaring one jurisdiction's rules.** Each is valid alone; together, whichever
+# loaded second would win by directory order and every liability would rest on the other one.
+#
+# ⚙ **Absent rules are a load failure here, unlike an absent CPI series.** A tax year cannot be
+# assessed at all without them -- there is no figure to come back typed-unavailable, because
+# there is no figure. That is `composition`'s reading rather than `cpi`'s.
+
+TAX_TIMING_DIR = "tax/timing"
+"""Where the assessment rules live under a data root.
+
+**A subdirectory of `tax/`, and the nesting is load-bearing.** `from_data_root` globs
+`tax/*.toml` and validates every match as a rate pack, and `glob` does not recurse -- so these
+files keep the directory's *citation requirement* (`scripts/check_provenance.py` uses `rglob`)
+without being read as rate packs.
+"""
+
+TAX_POSITIONS_DIR = "scenarios/tax"
+"""Where the owner's filing decisions and unsettled positions live.
+
+A subdirectory of `scenarios/` for the reason `scenarios/inflation/` is one: it keeps the
+citation exemption a belief needs without pretending to be a scenario document.
+"""
+
+
+def tax_rules_from_data_root(
+    root: Path, declarations: Declarations
+) -> Mapping[str, AssessmentRules]:
+    """Every jurisdiction's assessment rules, with their class references resolved.
+
+    Keyed by jurisdiction id. ``declarations`` is passed in rather than re-read so that the
+    class references resolve against **the same** rate packs the run will charge with: reading
+    the files twice would let a reference resolve here and fail at the charge, or the reverse.
+    """
+    files = sorted((root / TAX_TIMING_DIR).glob("*.toml"))
+    if not files:
+        raise DeclarationError(
+            root / TAX_TIMING_DIR,
+            "",
+            "holds no assessment rules, so no tax year could be assembled: there would be no "
+            "declared category, no declared deadline, and no declared finding about any basis "
+            "method. Reported here rather than at the first assessment, which would blame "
+            "whichever holding happened to be projected first.",
+            "declare data/tax/timing/<jurisdiction>.toml",
+        )
+    built: dict[str, AssessmentRules] = {}
+    declaring: dict[str, Path] = {}
+    for path in files:
+        declared = loader.timing_from_file(path)
+        if declared.jurisdiction_id in built:
+            raise DeclarationError(
+                path,
+                f"{loader.TIMING_TABLE}.jurisdiction",
+                f"declares rules for {declared.jurisdiction_id!r}, which "
+                f"{declaring[declared.jurisdiction_id].name} already declares. Two rule sets "
+                "cannot govern one jurisdiction: whichever loaded second would win by "
+                "directory order, and every liability would rest on the other one.",
+                f"merge {declaring[declared.jurisdiction_id].name} and {path.name}",
+            )
+        _check_timing_classes(path, declared, declarations)
+        built[declared.jurisdiction_id] = AssessmentRules(
+            jurisdiction_id=declared.jurisdiction_id,
+            tax_currency=declared.tax_currency,
+            categories={category.id: category for category in declared.categories},
+            category_of_class=declared.category_of_class,
+            timing={rule.category_id: rule for rule in declared.timing},
+            methods={standing.method: standing for standing in declared.methods},
+        )
+        declaring[declared.jurisdiction_id] = path
+    return built
+
+
+def _check_timing_classes(
+    path: Path, declared: loader.TimingDeclaration, declarations: Declarations
+) -> None:
+    """Every class the rules map to a category is a class some rate pack declares."""
+    for class_id in sorted(declared.category_of_class):
+        if class_id not in declarations.tax_classes:
+            raise DeclarationError(
+                path,
+                f"{loader.TIMING_TABLE}.class",
+                f"maps the tax class {class_id!r} to an income category, and no data/tax file "
+                "declares that class. A category for a class that does not exist governs "
+                "nothing, and the reference would look satisfied.",
+                f"declare {class_id!r} in a data/tax file, or correct the reference",
+            )
+
+
+def tax_positions_from_data_root(
+    root: Path,
+) -> tuple[tax_year.FilingDecisions, tax_year.UnsettledPositions, Path] | None:
+    """The owner's filing decisions and unsettled positions, or ``None`` if none are declared.
+
+    ``None`` rather than a failure: a run that never reaches a taxable year needs none, and the
+    refusals that *do* need them name the year or the question they were reached at, which is
+    more useful than a load error naming a directory. A second file is refused by name, on
+    003's precedent for the spendable list -- two sets of positions cannot both be in force,
+    and choosing between them would state the owner's belief for him.
+    """
+    declared = sorted((root / TAX_POSITIONS_DIR).glob("*.toml"))
+    if not declared:
+        return None
+    if len(declared) > 1:
+        raise DeclarationError(
+            root / TAX_POSITIONS_DIR,
+            "",
+            f"holds {len(declared)} sets of tax positions "
+            f"({', '.join(path.name for path in declared)}), and one run rests on one set. "
+            "They are not merged and neither is preferred: two positions on an unsettled "
+            "question are two runs, each naming what it assumed.",
+            "keep one file, and run the alternative position as a separate run",
+        )
+    filing, positions = loader.tax_positions_from_file(declared[0])
+    return filing, positions, declared[0]

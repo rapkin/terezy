@@ -48,7 +48,8 @@ Tracked as **E5** in ``docs/REQUIRED_TESTS.md``. Closes FR-015 and SC-005.
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Mapping
+import dataclasses
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import replace
 from datetime import date
 from pathlib import Path
@@ -64,7 +65,8 @@ from terezy.core.instruments.interface import (
     InstrumentConstraints,
     InstrumentDeclaration,
 )
-from terezy.core.ledger.events import EventKind
+from terezy.core.ledger import engine, lots
+from terezy.core.ledger.events import CausationKind, CausationRef, Event, EventKind, LotRef
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives import staleness
 from terezy.core.primitives.currency import Currency
@@ -74,11 +76,14 @@ from terezy.core.primitives.provenance import Provenance, SourceRef
 from terezy.core.primitives.rates import NominalRate, RealRate
 from terezy.core.results import fund as fund_results
 from terezy.core.results import hurdle, project
+from terezy.core.results import tax_year as settlement
 from terezy.core.results.fund import FundAssumptions, FundProjection
 from terezy.core.results.project import Projection
-from terezy.core.tax.interface import TaxClass
+from terezy.core.tax import flat_rate
+from terezy.core.tax import year as tax_year
+from terezy.core.tax.interface import TaxableEventKind, TaxCharge, TaxClass, TaxContext
 from terezy.data.declarations import loader, resolver
-from tests import cpi_fixtures, synthetic
+from tests import cpi_fixtures, synthetic, tax_years
 
 pytestmark = pytest.mark.contract
 
@@ -856,3 +861,339 @@ def test_the_assumed_figure_carries_the_forecasts_citation_and_the_nominal_side(
 
     assert len(figure.provenance.sources) == 2
     assert prov.is_unverified(figure.provenance)
+
+
+# ---------------------------------------------------------------------------
+# 009-tax-depth: an unverified legal value marks the year it assembles
+# ---------------------------------------------------------------------------
+#
+# FR-027 and SC-008. The declared deadlines, the netting treatment, the carryforward rule and
+# every finding about a basis method are legal values with empty `verified_on`, and a figure
+# resting on one of them says so. The sweep below takes the money fields off the records
+# themselves, so a field added later is inside the claim rather than outside it.
+
+
+def _amounts_within(name: str, value: object) -> Iterator[tuple[str, Money]]:
+    """Every ``Money`` reachable from one field, through containers and nested records alike.
+
+    Descending rather than testing ``isinstance(value, Money)`` at the top level: a field can
+    be a *container* of amounts -- ``CarryforwardState.origins`` is ``(origin year, amount)``
+    pairs -- and a sweep that only looked one level down would silently exclude it while
+    claiming to cover the record.
+
+    **Every shape, not the one shape that exists today.** A walk that handled tuples alone
+    would make the claim above true of ``origins`` and false of a list, a mapping, a set or a
+    nested record, and the next field added would decide which by accident. ``Money`` is
+    matched before the dataclass branch because it is one.
+    """
+    if isinstance(value, Money):
+        yield name, value
+    elif dataclasses.is_dataclass(value) and not isinstance(value, type):
+        for field in dataclasses.fields(value):
+            yield from _amounts_within(f"{name}.{field.name}", getattr(value, field.name))
+    elif isinstance(value, Mapping):
+        for key, item in value.items():
+            yield from _amounts_within(f"{name}[{key!r}]", item)
+    elif isinstance(value, str | bytes):
+        return
+    elif isinstance(value, Iterable):
+        for index, item in enumerate(value):
+            yield from _amounts_within(f"{name}[{index}]", item)
+
+
+def _statement_amounts(statement: tax_year.AnnualStatement) -> Iterator[tuple[str, Money]]:
+    """Every ``Money`` a statement computes for itself, named by where it sits.
+
+    Swept from the dataclasses rather than listed, on the same reasoning the projection sweep
+    above gives: a field added to a liability or a carryforward next year is inside this claim
+    without anybody remembering to add it, container-valued fields included.
+
+    ``charges`` is deliberately outside the scope. Those amounts are feature 001's, computed by
+    ``tax.flat_rate`` before any year existed and resting on their own rate entries; the claim
+    here is about the figures the *year* produces from a declared assessment rule.
+    """
+    for field in dataclasses.fields(statement.liability):
+        yield from _amounts_within(
+            f"liability.{field.name}", getattr(statement.liability, field.name)
+        )
+    yield "netted_base", statement.netted_base
+    if statement.carryforward is not None:
+        for field in dataclasses.fields(statement.carryforward):
+            yield from _amounts_within(
+                f"carryforward.{field.name}", getattr(statement.carryforward, field.name)
+            )
+
+
+def _assessed_under(rules: tax_year.AssessmentRules) -> tuple[tax_year.AnnualStatement, ...]:
+    """The loss-then-gain fixture assessed under one set of rules."""
+    events = _tax_year_events()
+    state = engine.fold(
+        events, base_currency=Currency.UAH, consumption_method=lots.LotMethod.FIFO.value
+    )
+    charges = []
+    for disposal in state.disposals:
+        charge = flat_rate.charge(
+            next(event for event in events if event.sequence == disposal.sequence),
+            tax_years.TAXED_CLASS,
+            TaxContext(
+                instrument_id="fixture",
+                taxable_event=TaxableEventKind.DISPOSAL_GAIN,
+                taxable_base=disposal.realised_gain_base_ccy,
+                charged_for_year=disposal.occurred_on.year,
+            ),
+        )
+        assert isinstance(charge, TaxCharge), charge
+        charges.append(charge)
+    built = tax_year.statements(
+        state,
+        tuple(charges),
+        rules=rules,
+        tax_classes=tax_years.TAX_PACK,
+        filing=tax_years.filing(y2025=True, y2026=True),
+        switches=tax_years.positions(),
+    )
+    assert isinstance(built, tuple), built
+    return built
+
+
+def _tax_year_events() -> tuple[Event, ...]:
+    term = CausationRef(kind=CausationKind.INSTRUMENT_TERM, id="fixture:term", detail="fixture")
+    source = prov.of([tax_years.FIXTURE_SOURCE])
+
+    def event(sequence: int, on: date, kind: EventKind, amount: float, **extra: object) -> Event:
+        return Event(
+            sequence=sequence,
+            occurred_on=on,
+            kind=kind,
+            amount=Money(amount, Currency.UAH, source),
+            owner_id="owner-1",
+            caused_by=term,
+            lot_ref=extra.get("lot_ref"),  # type: ignore[arg-type]
+            quantity=extra.get("quantity"),  # type: ignore[arg-type]
+            allocated_to=None,
+            capacity_pool=None,
+        )
+
+    return (
+        event(1, date(2025, 1, 5), EventKind.CASH_DEPOSIT, 40_000.0),
+        event(
+            2,
+            date(2025, 1, 5),
+            EventKind.PURCHASE,
+            -10_000.0,
+            lot_ref=LotRef(instrument_id="fixture", lot_id="lot-a"),
+            quantity=100.0,
+        ),
+        event(
+            3,
+            date(2025, 1, 6),
+            EventKind.PURCHASE,
+            -10_000.0,
+            lot_ref=LotRef(instrument_id="fixture", lot_id="lot-b"),
+            quantity=100.0,
+        ),
+        event(
+            4,
+            date(2025, 6, 10),
+            EventKind.PRINCIPAL_REPAYMENT,
+            7_000.0,
+            lot_ref=LotRef(instrument_id="fixture", lot_id=None),
+            quantity=100.0,
+        ),
+        event(
+            5,
+            date(2026, 9, 15),
+            EventKind.PRINCIPAL_REPAYMENT,
+            18_000.0,
+            lot_ref=LotRef(instrument_id="fixture", lot_id=None),
+            quantity=100.0,
+        ),
+        # A year with no investment operation at all, so the sweep covers the quiet-year
+        # branch as well as the loss and gain ones. Its whole statement is built out of
+        # zeroes, which is exactly where an unverified rule used to stop reaching.
+        event(6, date(2027, 4, 1), EventKind.CASH_DEPOSIT, 100.0),
+    )
+
+
+def _unverified_rules() -> tax_year.AssessmentRules:
+    """The fixture rules with one legal value -- the netting category -- left unchecked."""
+    verified = tax_years.rules()
+    category = verified.categories[tax_years.INVESTMENT]
+    return dataclasses.replace(
+        verified,
+        categories={
+            **verified.categories,
+            tax_years.INVESTMENT: dataclasses.replace(
+                category, provenance=prov.of([tax_years.UNVERIFIED_SOURCE])
+            ),
+        },
+    )
+
+
+def _unverified_timing() -> tax_year.AssessmentRules:
+    """The fixture rules with one legal value -- the payment deadline -- left unchecked."""
+    verified = tax_years.rules()
+    rule = verified.timing[tax_years.INVESTMENT]
+    return dataclasses.replace(
+        verified,
+        timing={
+            **verified.timing,
+            tax_years.INVESTMENT: dataclasses.replace(
+                rule, provenance=prov.of([tax_years.UNVERIFIED_SOURCE])
+            ),
+        },
+    )
+
+
+def _settled_under(rules: tax_year.AssessmentRules) -> settlement.Settlement:
+    """The same fixture assessed and then paid, so the sweep reaches the cash that left."""
+    outcome = settlement.settle(
+        _tax_year_events(),
+        _assessed_under(rules),
+        owner_id="owner-1",
+        base_currency=Currency.UAH,
+        method=lots.LotMethod.FIFO,
+        horizon_end=date(2028, 12, 31),
+    )
+    assert isinstance(outcome, settlement.Settlement), outcome
+    return outcome
+
+
+def test_an_unverified_assessment_rule_marks_every_figure_of_the_year_it_governs() -> None:
+    """SC-008's 100%: the sweep is over the records' own fields, not a list somebody kept.
+
+    The rule left unchecked is the netting treatment, and the base is what it is *because*
+    that rule says the year's operations net -- so a mark that reached ``rests_on`` and
+    stopped there would leave the liability, the netted base and the carryforward looking
+    checked while the input behind all three was not.
+    """
+    marked = 0
+    for statement in _assessed_under(_unverified_rules()):
+        if statement.category != tax_years.INVESTMENT:
+            continue
+        assert prov.is_unverified(statement.liability.rests_on), statement.tax_year
+        for name, amount in _statement_amounts(statement):
+            assert prov.is_unverified(amount.provenance), f"{statement.tax_year} {name}"
+            marked += 1
+    assert marked, "the sweep found no figure to be about"
+
+
+def test_the_unverified_rule_reaches_the_payment_that_settles_the_year() -> None:
+    """FR-027 names payment events, and they are the last figure in the chain.
+
+    A run whose statements are marked and whose ``TAX_PAYMENT`` is not would put an unmarked
+    amount in the ledger -- the one place a reader looks to see what actually left.
+    """
+    settled = _settled_under(_unverified_rules())
+
+    assert settled.payments, "the fixture must owe something for this to be about anything"
+    for payment in settled.payments:
+        assert prov.is_unverified(payment.amount.provenance), payment.tax_year
+    paid = [event for event in settled.stream if event.kind is EventKind.TAX_PAYMENT]
+    assert len(paid) == len(settled.payments)
+    for event in paid:
+        assert prov.is_unverified(event.amount.provenance), event.sequence
+
+
+def test_an_unverified_deadline_marks_the_money_even_though_it_cannot_mark_the_date() -> None:
+    """The omission a ``date`` forces, made visible instead of left silent.
+
+    ``AnnualStatement.due_on`` and ``TaxPayment.due_on`` are bare dates, and there is no
+    dated-value wrapper here the way ``Money`` is an amount carrying its sources -- so a date
+    has nowhere to hold a mark. The timing rule's own ``verified_on`` therefore has to travel
+    on the amounts, and this is the assertion that it does: leave the *deadline* unchecked and
+    the liability and the payment say so.
+    """
+    settled = _settled_under(_unverified_timing())
+
+    assert settled.payments
+    for statement in settled.statements:
+        assert statement.due_on is not None
+        for name, amount in _statement_amounts(statement):
+            assert prov.is_unverified(amount.provenance), f"{statement.tax_year} {name}"
+    for payment in settled.payments:
+        assert prov.is_unverified(payment.amount.provenance), payment.tax_year
+
+
+def test_the_mark_is_falsifiable_on_a_tax_year_too() -> None:
+    """The same assessment with everything checked is unmarked, so the tests above can fail."""
+    settled = _settled_under(tax_years.rules())
+
+    for statement in settled.statements:
+        assert not prov.is_unverified(statement.liability.rests_on), statement.tax_year
+        for name, amount in _statement_amounts(statement):
+            assert not prov.is_unverified(amount.provenance), f"{statement.tax_year} {name}"
+    assert settled.payments
+    for payment in settled.payments:
+        assert not prov.is_unverified(payment.amount.provenance), payment.tax_year
+
+
+def test_the_unverified_rule_is_named_on_the_figure_rather_than_merely_flagged() -> None:
+    """A mark that cannot say which input it rests on is a taint flag: cheap and useless."""
+    marked = [
+        statement
+        for statement in _assessed_under(_unverified_rules())
+        if statement.category == tax_years.INVESTMENT
+    ]
+
+    for statement in marked:
+        assert tax_years.UNVERIFIED_SOURCE in statement.liability.rests_on.sources
+
+
+def test_the_sweep_reaches_amounts_held_inside_a_container() -> None:
+    """Otherwise "every field is inside this claim" is false for any container of ``Money``.
+
+    ``CarryforwardState.origins`` is ``(origin year, amount)`` pairs, and it is already such a
+    field. A sweep testing ``isinstance(value, Money)`` at the top level skips it in silence.
+    """
+    swept = {
+        name
+        for statement in _assessed_under(tax_years.rules())
+        for name, _ in _statement_amounts(statement)
+    }
+
+    assert any(name.startswith("carryforward.origins[") for name in swept), sorted(swept)
+
+
+@dataclasses.dataclass(frozen=True)
+class _Nested:
+    """A record inside a record, for the shape check below and nothing else."""
+
+    held: Money
+
+
+def test_the_walk_reaches_every_shape_a_field_could_be_rather_than_the_one_that_exists() -> None:
+    """The claim ``_statement_amounts`` makes is about *fields added later*, so it is about
+    shapes that do not exist yet. A walk covering only the shape in front of it would make
+    that claim false the first time somebody used a list.
+    """
+    one = Money(1.0, Currency.UAH, prov.EMPTY)
+    shapes: dict[str, object] = {
+        "bare": one,
+        "tuple": (one,),
+        "pairs": ((2026, one),),
+        "list": [one],
+        "mapping": {"a": one},
+        "frozenset": frozenset({one}),
+        "record": _Nested(held=one),
+        "record_in_tuple": (_Nested(held=one),),
+    }
+
+    for label, value in shapes.items():
+        assert [amount for _, amount in _amounts_within(label, value)] == [one], label
+    assert list(_amounts_within("text", "165.1.2")) == [], "a string is not a container here"
+
+
+def test_no_money_a_statement_carries_rests_on_nothing_at_all() -> None:
+    """A figure with empty provenance would be an amount that admits no origin.
+
+    **Zeroes included, and they are the point.** ``money.zero`` rests on nothing because the
+    additive identity is not an observation -- but a *statement's* zero is: a base of zero is
+    the clamp the statute puts on a negative annual result, and a carryforward of zero is what
+    the declared rule says the year leaves behind. A zero that cannot cite the rule that
+    produced it is indistinguishable from a rule that never ran, which is the reading
+    ``money.scale_sourced`` was written to forbid.
+    """
+    for statement in _assessed_under(tax_years.rules()):
+        for name, amount in _statement_amounts(statement):
+            assert amount.provenance.sources, f"{statement.tax_year} {name}"

@@ -178,6 +178,23 @@ def scale_sourced(amount: Money, factor: float, sources: Provenance) -> Money:
     )
 
 
+def also_resting_on(amount: Money, sources: Provenance) -> Money:
+    """The same amount, additionally resting on inputs that decided it without scaling it.
+
+    Some declared inputs change a figure without appearing in its arithmetic. A netting
+    treatment is why a year's gains and losses were summed into one base at all; a declared
+    deadline is why the resulting liability is the one that falls due. Neither is a factor, so
+    neither can travel through :func:`scale_sourced` -- and without a way to union them in, an
+    unverified *rule* would mark whatever record happens to carry a ``Provenance`` field while
+    the money it governs went out unmarked.
+
+    The amount is returned bit-identical: no multiplication, no addition, nothing that could
+    move a last bit. Only the sources grow, and like every function here this one can add a
+    source and never remove one, so the mark stays monotone.
+    """
+    return Money(amount.amount, amount.currency, prov.merge(amount.provenance, sources))
+
+
 def convert(amount: Money, *, to_currency: Currency, rate: float, sources: Provenance) -> Money:
     """Restate an amount in another currency at a dated rate, unioning the rate's sources.
 

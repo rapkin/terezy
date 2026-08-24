@@ -36,7 +36,7 @@ from terezy.core.ledger import accounts, canonical, engine, events, lots
 from terezy.core.primitives import money, provenance
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
-from terezy.core.primitives.tolerance import assert_money_close
+from terezy.core.primitives.tolerance import TOLERANCE, assert_money_close
 
 OWNER = "owner-001"
 INSTRUMENT = "ovdp-synthetic-a"
@@ -171,20 +171,67 @@ def test_a_lot_opening_event_may_not_increase_cash() -> None:
         events.check_shape(event)
 
 
-def test_a_disposal_may_not_name_a_specific_lot() -> None:
-    """Specific-lot selection is refused rather than ignored.
+def test_a_disposal_may_name_a_lot_and_the_shape_rules_allow_it() -> None:
+    """⚙ Feature 009: naming a lot is a specific-lot request, not a malformed event.
 
-    Ignoring the naming would consume lots by the configured method instead, which is a
-    different basis and therefore a different tax -- computed silently, from an instruction
-    the caller believed had been followed. E6 in ``docs/REQUIRED_TESTS.md`` is where
-    specific-lot selection arrives; until then this is a refusal.
+    Whether the naming is *honoured* depends on the run's method, which ``check_shape`` does
+    not know -- so the conflict is refused where the method is known, in
+    ``lots.basis_consumed``, and asserted in this module under the lot tests below.
     """
     event = replace(
         _redemption(1, proceeds=600.0, quantity=5.0),
         lot_ref=events.LotRef(instrument_id=INSTRUMENT, lot_id="lot-1"),
     )
-    with pytest.raises(LedgerInvariantError, match="Specific-lot selection is not implemented"):
+
+    events.check_shape(event)
+
+
+def test_a_tax_charge_may_not_move_cash() -> None:
+    """FR-001, and defect B5's structural cure: an assessment settles nothing.
+
+    ⚙ **Feature 009.** This is the check that makes "no tax is deducted at event time" a
+    property of the ledger rather than a discipline in two result modules. Both of them --
+    ``results.project`` and ``results.fund`` -- used to give the charge event the negated
+    charge as its cash effect, and it was invisible only because every class in the shipped
+    registry was exempt, so the deduction happened to be zero. With this rule in place a
+    stream that deducts tax at trade time cannot be folded by any caller, including one
+    written later.
+    """
+    event = _event(1, events.EventKind.TAX_CHARGE, -90.0, day=2)
+    with pytest.raises(LedgerInvariantError, match="A charge is an assessment"):
         events.check_shape(event)
+
+
+def test_a_tax_charge_of_either_signed_zero_is_accepted() -> None:
+    """The sign of a zero says nothing about the money, and the check tests the magnitude.
+
+    ``-0.0`` is what ``tax.year.memo_amount`` produces -- a charge recorded on the outflow
+    side at no magnitude -- and ``0.0`` is what a hand-built fixture is likely to write. Both
+    are the same claim, and a rule that admitted one and refused the other would be a rule
+    about floating-point representation rather than about tax.
+    """
+    events.check_shape(_event(1, events.EventKind.TAX_CHARGE, -0.0, day=2))
+    events.check_shape(_event(2, events.EventKind.TAX_CHARGE, 0.0, day=2))
+
+
+def test_a_tax_payment_may_not_credit_the_account() -> None:
+    """Settling a liability takes money out; this feature models no refund (FR-011)."""
+    event = _event(1, events.EventKind.TAX_PAYMENT, 90.0, day=2)
+    with pytest.raises(LedgerInvariantError, match="sign was lost upstream"):
+        events.check_shape(event)
+
+
+def test_a_tax_payment_takes_money_out_and_touches_no_holding() -> None:
+    """The ordinary case, folded: cash down by the liability, positions untouched."""
+    stream = [
+        _deposit(0),
+        _purchase(1, "lot-1", cost=1_000.0, quantity=10.0, day=2),
+        _event(2, events.EventKind.TAX_PAYMENT, -230.0, day=3),
+    ]
+    state = _fold(stream)
+    assert_money_close(state.accounts[Currency.UAH].balance, _uah(98_770.0))
+    assert state.positions[INSTRUMENT].quantity == 10.0
+    assert state.disposals == ()
 
 
 def test_a_disposal_of_nothing_is_refused() -> None:
@@ -286,7 +333,129 @@ def test_a_fee_allocated_outside_the_stream_is_refused() -> None:
 def test_an_unknown_consumption_method_is_refused_with_the_known_ones_named() -> None:
     """There is no default method: the choice changes the tax."""
     with pytest.raises(LedgerInvariantError, match="unknown lot consumption method 'average'"):
-        lots.consumption_order("average")
+        lots.selection_for("average")
+
+
+def test_the_four_known_methods_are_named_in_the_refusal() -> None:
+    """FR-020: a reader of the failure learns what would have worked."""
+    with pytest.raises(LedgerInvariantError, match=r"average_cost.*fifo.*lifo.*specific_lot"):
+        lots.selection_for("weighted")
+
+
+def test_a_specific_lot_disposal_that_names_nothing_is_refused() -> None:
+    """FR-021: no fallback ordering, because the method exists so the owner chooses."""
+    refusal = lots.basis_consumed(
+        (_lot("lot-1", quantity=10.0, cost=1_000.0),), 5.0, method=lots.SPECIFIC_LOT
+    )
+
+    assert isinstance(refusal, lots.LotNotNamed), refusal
+    assert "names none" in refusal.reason
+
+
+def test_a_named_lot_that_does_not_exist_is_refused_with_the_shortfall() -> None:
+    refusal = lots.basis_consumed(
+        (_lot("lot-1", quantity=10.0, cost=1_000.0),),
+        5.0,
+        method=lots.SPECIFIC_LOT,
+        named_lot="lot-9",
+    )
+
+    assert isinstance(refusal, lots.NamedLotUnavailable), refusal
+    assert refusal.lot_id == "lot-9"
+    assert refusal.available == 0.0
+    assert refusal.requested == 5.0
+
+
+def test_a_named_lot_holding_too_few_units_is_refused_rather_than_topped_up() -> None:
+    refusal = lots.basis_consumed(
+        (_lot("lot-1", quantity=10.0, cost=1_000.0), _lot("lot-2", quantity=50.0, cost=5_000.0)),
+        40.0,
+        method=lots.SPECIFIC_LOT,
+        named_lot="lot-1",
+    )
+
+    assert isinstance(refusal, lots.NamedLotUnavailable), refusal
+    assert refusal.available == 10.0
+    assert refusal.requested == 40.0
+
+
+def test_naming_a_lot_under_any_other_method_is_a_conflict() -> None:
+    """FR-022. Ignoring the name would tax a basis the caller did not ask for."""
+    for method in (lots.FIFO, lots.LIFO, lots.AVERAGE_COST):
+        refusal = lots.basis_consumed(
+            (_lot("lot-1", quantity=10.0, cost=1_000.0),),
+            5.0,
+            method=method,
+            named_lot="lot-1",
+        )
+
+        assert isinstance(refusal, lots.LotNamedUnderWrongMethod), refusal
+        assert refusal.method.value == method
+
+
+def test_a_conflict_reaching_the_fold_stops_it_with_the_refusal_s_own_words() -> None:
+    """A stream that contradicts the run's method is one this engine cannot fold."""
+    stream = [
+        _deposit(0),
+        _purchase(1, "lot-1", cost=1_000.0, quantity=10.0, day=2),
+        replace(
+            _redemption(2, proceeds=600.0, quantity=5.0),
+            lot_ref=events.LotRef(instrument_id=INSTRUMENT, lot_id="lot-1"),
+        ),
+    ]
+    with pytest.raises(LedgerInvariantError, match="selects lots by rule rather than by name"):
+        _fold(stream)
+
+
+def test_selecting_more_units_than_the_lots_hold_is_refused_at_the_selection_too() -> None:
+    """The public selection may not answer a question the lots cannot support.
+
+    ``consume`` refuses the same thing against the position's own accumulated quantity; this
+    one guards the lots. Without it a direct caller would get a short selection under FIFO and
+    a fraction above one under average cost -- a wrong answer rather than a refusal.
+    """
+    held = (_lot("lot-1", quantity=10.0, cost=1_000.0),)
+    for method in (lots.FIFO, lots.LIFO, lots.AVERAGE_COST):
+        with pytest.raises(LedgerInvariantError, match="never paid"):
+            lots.basis_consumed(held, 40.0, method=method)
+
+    with pytest.raises(LedgerInvariantError, match="not a disposal"):
+        lots.basis_consumed(held, 0.0, method=lots.FIFO)
+
+
+@pytest.mark.parametrize("method", [lots.FIFO, lots.LIFO, lots.AVERAGE_COST, lots.SPECIFIC_LOT])
+@pytest.mark.parametrize("named_lot", [None, "lot-1"], ids=["unnamed", "named"])
+def test_selecting_from_a_position_holding_nothing_is_refused_under_every_method(
+    method: str, named_lot: str | None
+) -> None:
+    """The gap the size comparison alone leaves open, at exactly one tolerance.
+
+    ``quantity > held + TOLERANCE`` is false for a request of ``1e-9`` against nothing held,
+    and each method then failed its own way: FIFO returned a selection of no lots at all --
+    the short selection the guard exists to prevent -- and average cost divided by zero, an
+    untyped failure in an engine whose rule is that failure is explicit.
+
+    **With and without a named lot**, and what that axis buys is the *order* of two checks
+    rather than a second defect. The guard runs before ``selection_for`` is reached, so
+    ``_refuse_naming`` never sees these calls and all eight parametrisations hit the same
+    branch. That is the claim: an empty position is refused for being empty under every
+    method, including the three where naming a lot is separately a conflict -- so the refusal
+    a caller reads names the real problem rather than the one it happened to trip first.
+    """
+    with pytest.raises(LedgerInvariantError, match="no basis to consume"):
+        lots.basis_consumed((), TOLERANCE, method=method, named_lot=named_lot)
+
+
+def _lot(lot_id: str, *, quantity: float, cost: float) -> lots.Lot:
+    return lots.Lot(
+        lot_id=lot_id,
+        instrument_id=INSTRUMENT,
+        acquired_on=date(2026, 1, 1),
+        quantity=quantity,
+        cost_trade_ccy=_uah(cost),
+        cost_base_ccy=_uah(cost),
+        fx_rate_used=None,
+    )
 
 
 def test_the_engine_refuses_an_unknown_method_before_folding_anything() -> None:
@@ -477,13 +646,17 @@ def test_an_empty_stream_folds_to_an_empty_ledger_and_no_history() -> None:
 def test_history_snapshots_after_the_last_event_of_each_date() -> None:
     """Two events on one date give one snapshot, holding both.
 
-    An end-of-day balance is what FR-009 is about. A snapshot taken between a coupon and
-    the tax charged on it would show a balance that never existed at the close of any day.
+    An end-of-day balance is what FR-009 is about. A snapshot taken between a coupon and a
+    payment made the same day would show a balance that never existed at the close of any
+    day.
+
+    ⚙ The second event is a ``TAX_PAYMENT`` since feature 009: a ``TAX_CHARGE`` moves no
+    cash any more, so it could no longer make the point this test is about.
     """
     stream = [
         _deposit(0, day=1),
         _event(1, events.EventKind.COUPON, 500.0, day=5),
-        _event(2, events.EventKind.TAX_CHARGE, -90.0, day=5),
+        _event(2, events.EventKind.TAX_PAYMENT, -90.0, day=5),
     ]
     snapshots = engine.history(stream, base_currency=Currency.UAH, consumption_method=lots.FIFO)
     assert [state.as_of for state in snapshots] == [date(2026, 1, 1), date(2026, 1, 5)]

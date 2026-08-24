@@ -74,8 +74,9 @@ from terezy.core.primitives.staleness import Ageing
 from terezy.core.results import hurdle as hurdle_figures
 from terezy.core.results import schedule as schedule_rows
 from terezy.core.results.hurdle import CashFlow, HurdleRate
-from terezy.core.results.schedule import CashFlowSchedule, ConventionsApplied
+from terezy.core.results.schedule import CashFlowSchedule, ChargedOn, ConventionsApplied
 from terezy.core.tax import registry as tax_registry
+from terezy.core.tax import year as tax_year
 from terezy.core.tax.interface import TaxableEventKind, TaxCharge, TaxClass, TaxContext
 from terezy.core.tax.schedule import RateUndeclaredBefore
 
@@ -203,7 +204,12 @@ def project(
         charges=charges,
         hurdle=hurdle_figures.of_flows(
             contractual=_flows(contractual_events, holding, year_fraction),
-            received=_flows(state.applied, holding, year_fraction),
+            received=_flows(
+                state.applied,
+                holding,
+                year_fraction,
+                assessed={charged.tax_event: charged.amount for charged in taxed_by.values()},
+            ),
             total_tax=money.total([charge.total for charge in charges], base_currency),
             provenance=prov.merge(
                 prov.merge_all(event.amount.provenance for event in state.applied),
@@ -283,6 +289,8 @@ def _flows(
     events: Sequence[Event],
     holding: Holding,
     year_fraction: conventions.DayCountFn,
+    *,
+    assessed: Mapping[int, Money] | None = None,
 ) -> tuple[CashFlow, ...]:
     """Ledger events as ``(years from purchase, signed amount)`` pairs for a root find.
 
@@ -290,11 +298,37 @@ def _flows(
     date -- the same convention that sized the coupons. A separate hard-coded 365 here
     would let the yield disagree with the schedule it was computed from, in a way that
     would look like a rounding difference and would not be one.
+
+    ⚙ **``assessed`` is what keeps the cash-flow return an after-tax figure** (009). A tax
+    charge no longer debits the account, so a series taken from the ledger's own amounts would
+    silently become a **pre-tax** series while the field still called itself net of tax. The
+    mapping supplies, per **charge-event** sequence -- the memo's own, not the taxed event's --
+    what that event assessed, and it is the same ``taxed_by`` pairing the schedule uses, so
+    the two cannot disagree about which line a charge belongs to.
+
+    **Accrual rather than payment, deliberately.** This figure annualises the return of the
+    *paper*: what the holding earns and what the tax on it costs. When that tax is settled is
+    a fact about the owner's tax year rather than about the instrument. Accrual is also the
+    conservative of the two readings -- paying earlier is worse -- and it keeps the series
+    term-for-term identical to the one 001 recorded.
     """
+    charged = assessed or {}
     return tuple(
-        (year_fraction(holding.purchased_on, event.occurred_on), event.amount.amount)
+        (
+            year_fraction(holding.purchased_on, event.occurred_on),
+            _flow_amount(event, charged),
+        )
         for event in events
     )
+
+
+def _flow_amount(event: Event, assessed: Mapping[int, Money]) -> float:
+    """One event's contribution to a return series: its cash, or the tax it assessed.
+
+    A charge event contributes the negated charge rather than its own (zero) amount.
+    """
+    charge = assessed.get(event.sequence)
+    return event.amount.amount if charge is None else -charge.amount
 
 
 def _charge_every_taxable_event(
@@ -415,13 +449,15 @@ def _taxable_kind(kind: EventKind) -> TaxableEventKind | None:
             | EventKind.REINVESTMENT
             | EventKind.CASH_DEPOSIT
             | EventKind.TAX_CHARGE
+            | EventKind.TAX_PAYMENT
             | EventKind.FEE
         ):
             # Mechanics, not tax policy: a purchase and a reinvestment are money going
             # out, a deposit arrives from outside the modelled system, a fee is a cost,
-            # and a tax charge is the output of this very process. Listed explicitly
-            # rather than falling through, because the ``assert_never`` below is what
-            # makes "nobody thought about this kind" a type error.
+            # and a tax charge is the output of this very process. ⚙ A tax *payment* is
+            # the settlement of that output (009): taxing it would tax the tax. Listed
+            # explicitly rather than falling through, because the ``assert_never`` below
+            # is what makes "nobody thought about this kind" a type error.
             return None
         case _:  # pragma: no cover -- mypy proves this unreachable
             assert_never(kind)
@@ -463,19 +499,23 @@ def _taxable_base(event: Event, kind: TaxableEventKind, state: LedgerState) -> M
 def _interleave(
     gross_state: LedgerState,
     charges: Sequence[TaxCharge],
-) -> tuple[tuple[Event, ...], tuple[TaxCharge, ...], Mapping[int, int]]:
+) -> tuple[tuple[Event, ...], tuple[TaxCharge, ...], Mapping[int, ChargedOn]]:
     """Weave each charge in behind the event it taxes, renumbering the whole stream.
 
     Returns the combined stream, the charges carrying their new event sequence numbers,
-    and the mapping from a taxed event to the tax event charged on it. The mapping is
+    and the mapping from a taxed event to the assessment recorded against it. The mapping is
     built here, by the code that creates both sides of it, rather than reconstructed later
     from dates -- an inferred pairing would be a guess, and it would break the first time
     two taxable events shared a date.
+
+    ⚙ **Feature 009 put the charged amount in the mapping** rather than leaving the schedule
+    to read it off the tax event: a charge no longer moves cash, so the memo event's amount
+    is zero and a schedule reading it would report no tax at all.
     """
     by_gross_sequence = {charge.event_sequence: charge for charge in charges}
     combined: list[Event] = []
     renumbered: list[TaxCharge] = []
-    taxed_by: dict[int, int] = {}
+    taxed_by: dict[int, ChargedOn] = {}
     for event in gross_state.applied:
         taxed = replace(event, sequence=len(combined) + 1)
         combined.append(taxed)
@@ -485,28 +525,29 @@ def _interleave(
         moved = replace(charge, event_sequence=taxed.sequence)
         renumbered.append(moved)
         combined.append(_tax_event(taxed, moved, sequence=len(combined) + 1))
-        taxed_by[taxed.sequence] = combined[-1].sequence
+        taxed_by[taxed.sequence] = ChargedOn(tax_event=combined[-1].sequence, amount=moved.total)
     return tuple(combined), tuple(renumbered), taxed_by
 
 
 def _tax_event(taxed: Event, charge: TaxCharge, *, sequence: int) -> Event:
-    """The ledger line for one charge: cash out, on the date the income arrived.
+    """The ledger line for one charge: an assessment recorded, and no cash moved.
 
-    Dated with the income it taxes rather than with a payment date. When the liability is
-    actually settled is a timing question this feature does not model, and dating the
-    charge to an invented payment date would put a fabricated date in the audit trail.
-    ``charged_for_year`` on the charge records the year the liability accrues to, which is
-    the fact a later feature needs.
+    Dated with the income it taxes rather than with a payment date, because that is the date
+    the liability *accrued*; ``charged_for_year`` records the year it accrues to.
 
-    A charge of zero still becomes an event. It moves no cash, and it is the record that
-    the exemption was applied -- traceable to its class and its citation like any other
-    figure (FR-003, C6).
+    ⚙ **Feature 009 took the cash out of this line** (research.md D1). It used to debit the
+    account by the charge on the day the income arrived, which is defect B5. The amount is now
+    :func:`terezy.core.tax.year.memo_amount` -- the charge's own money at no magnitude, so the
+    citation still travels -- and the liability leaves cash as a ``TAX_PAYMENT`` later.
+
+    A charge of zero still becomes an event: it is the record that the exemption was applied,
+    traceable to its class and its citation like any other figure (FR-003, C6).
     """
     return Event(
         sequence=sequence,
         occurred_on=taxed.occurred_on,
         kind=EventKind.TAX_CHARGE,
-        amount=money.scale(charge.total, -1.0),
+        amount=tax_year.memo_amount(charge.total),
         owner_id=taxed.owner_id,
         caused_by=CausationRef(
             kind=CausationKind.TAX_RULE,

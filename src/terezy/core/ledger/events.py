@@ -80,7 +80,20 @@ class EventKind(Enum):
     """
 
     TAX_CHARGE = "tax_charge"
-    """Tax assessed and paid. A zero charge is still a charge and still an event."""
+    """Tax **assessed**, and nothing else. A zero charge is still a charge and still an event.
+
+    ⚙ **Feature 009 took the cash out of this kind, and that is defect B5's structural
+    cure.** The predecessor deducted tax from the portfolio at the moment of the trade; this
+    engine did the same in miniature, giving the charge event the negated charge as its cash
+    effect -- invisible while every shipped class was exempt and wrong the moment one was
+    not. A charge is now an *assessment memo*: it records what was charged, on which base,
+    under which rule, accruing to which year, and it moves no money at all. What money does
+    is a :attr:`TAX_PAYMENT`, dated by the declared due-date rule in the following year.
+
+    The rule is enforced, not merely intended: :func:`check_shape` refuses a charge event
+    whose amount is anything but zero, so "tax deducted at event time" is unrepresentable in
+    a foldable stream rather than discouraged in a docstring (FR-001).
+    """
 
     FEE = "fee"
     """An explicit cost line. See the module docstring on ``allocated_to``."""
@@ -105,6 +118,23 @@ class EventKind(Enum):
     than what was put in. The kind reaches the canonical form and every rendered
     schedule, so a name that described the wrong contract would be a wrong label on a
     real figure.
+    """
+
+    TAX_PAYMENT = "tax_payment"
+    """The money leaving to settle one annual tax statement, on its declared due date.
+
+    ⚙ **Added by feature 009**, and the other half of what :attr:`TAX_CHARGE` stopped doing.
+    A charge accrues to a tax year; the year's charges are assembled afterwards; and the
+    liability is settled *from cash* on the date the declared timing rule names -- a date that
+    is data, never a constant here.
+
+    **An ordinary ledger citizen**, on the precedent feature 008 set for a declared seed: it
+    goes through the same fold and is counted by every conservation property without one of
+    them being taught it exists. If a property fails only for ledgers containing a payment,
+    the event is wrong -- not the invariant (009 research.md D2).
+
+    Distinct from :attr:`FEE`, which is a cost of transacting allocated to the disposal it
+    belongs to; a payment settles an assessment that names it, and consumes no units.
     """
 
     RAMP_MOVEMENT = "ramp_movement"
@@ -205,11 +235,12 @@ class LotRef:
     lot_id: str | None
     """The lot opened by this event, or ``None`` where no single lot is named.
 
-    Set on a lot-opening event, where it is the identity of the lot being created. On a
-    disposal it is ``None``: which lots are consumed is decided by the configured
-    selection method, not by the event. A disposal that *does* name a lot is asking for
-    specific-lot selection, which this feature does not implement -- and is refused
-    loudly rather than having the naming quietly ignored.
+    Set on a lot-opening event, where it is the identity of the lot being created.
+
+    On a disposal it is the lot the disposal **chose**, or ``None`` where the configured
+    method chooses instead. ⚙ Feature 009 made the first case real: naming a lot asks for
+    specific-lot selection, and ``lots.basis_consumed`` refuses the naming under any other
+    method rather than ignoring it, because ignoring it would tax a different basis.
     """
 
 
@@ -298,6 +329,7 @@ CASH_ONLY_KINDS: Final[frozenset[EventKind]] = frozenset(
         EventKind.COUPON,
         EventKind.DISTRIBUTION,
         EventKind.TAX_CHARGE,
+        EventKind.TAX_PAYMENT,
         EventKind.FEE,
         EventKind.RAMP_MOVEMENT,
     }
@@ -376,11 +408,16 @@ def check_shape(event: Event) -> None:
             _check_opening(event)
         case EventKind.PRINCIPAL_REPAYMENT | EventKind.REDEMPTION:
             _check_closing(event)
+        case EventKind.TAX_CHARGE:
+            _check_cash_only(event)
+            _check_assesses_without_settling(event)
+        case EventKind.TAX_PAYMENT:
+            _check_cash_only(event)
+            _check_settles(event)
         case (
             EventKind.CASH_DEPOSIT
             | EventKind.COUPON
             | EventKind.DISTRIBUTION
-            | EventKind.TAX_CHARGE
             | EventKind.FEE
             | EventKind.RAMP_MOVEMENT
         ):
@@ -410,14 +447,9 @@ def _check_opening(event: Event) -> None:
 
 
 def _check_closing(event: Event) -> None:
-    ref = lot_ref_of(event)
-    if ref.lot_id is not None:
-        raise LedgerInvariantError(
-            f"event {event.sequence} disposes of lot {ref.lot_id!r} specifically. "
-            "Specific-lot selection is not implemented in this feature -- the configured "
-            "consumption method decides which lots are consumed. The naming is refused "
-            "rather than ignored, because ignoring it would tax the wrong basis."
-        )
+    # Raises where a disposal names no holding at all; a *named lot* is a specific-lot
+    # request, refused where the method is known rather than here (``lots.basis_consumed``).
+    lot_ref_of(event)
     if quantity_of(event) <= 0.0:
         raise LedgerInvariantError(
             f"event {event.sequence} disposes of {event.quantity!r} units. A disposal of "
@@ -428,6 +460,47 @@ def _check_closing(event: Event) -> None:
             f"event {event.sequence} disposes of units and reduces cash by "
             f"{abs(event.amount.amount)!r} {event.amount.currency.value}. Proceeds are "
             "an inflow; a cost of disposal is a fee event allocated to it."
+        )
+
+
+def _check_assesses_without_settling(event: Event) -> None:
+    """A tax charge records an assessment and moves no money. Defect B5, made unrepresentable.
+
+    ⚙ **Feature 009.** The check is the cure: a rule that lives only in a docstring is one the
+    next tax path forgets, and with this here a stream that deducts tax at trade time cannot
+    be folded at all -- by any caller, including one written after this comment (FR-001).
+
+    The zero is compared as a magnitude, so both ``0.0`` and ``-0.0`` pass: the sign of a zero
+    carries no information about the money.
+    """
+    if event.amount.amount != 0.0:
+        raise LedgerInvariantError(
+            f"tax charge event {event.sequence} moves "
+            f"{event.amount.amount!r} {event.amount.currency.value}. A charge is an "
+            "assessment, not a settlement: gross amounts land in the ledger and the charge "
+            "is recorded beside them, and the liability leaves cash as a tax_payment on the "
+            "declared due date in the following year (FR-001). Deducting tax at the moment "
+            "of the taxable event is the predecessor's defect B5, and it is refused here "
+            "rather than trusted to a docstring."
+        )
+
+
+def _check_settles(event: Event) -> None:
+    """A tax payment takes money out, or it is a payment of nothing.
+
+    ⚙ **Feature 009.** A positive amount would be a refund, which nothing here models
+    (FR-011), and a payment event that could credit the account would let a wrongly-signed
+    liability *add* cash while every conservation property stayed green.
+
+    Zero is allowed and is not a hole: a year that owes nothing produces no payment event at
+    all, and that rule lives in one place rather than two (FR-006).
+    """
+    if event.amount.amount > 0.0:
+        raise LedgerInvariantError(
+            f"tax payment event {event.sequence} increases cash by "
+            f"{event.amount.amount!r} {event.amount.currency.value}. Settling a tax "
+            "liability takes money out; a refund is not modelled in this feature, so a "
+            "positive amount here means a sign was lost upstream."
         )
 
 
