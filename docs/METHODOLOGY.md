@@ -2849,11 +2849,16 @@ price here is **refused** — one price in two files is one fact in two places, 
 either is updated the figures would rest on whichever the code happened to read.
 
 ⚙ **Why not four more keys on the instrument declaration.** Every field here is a property of
-the **option** — this instrument, reached this way — and not of the security. One instrument
-reachable at two venues is two access rows against one instrument file: two purchase venues,
-two quotes, two risk readings, and one set of terms the paper actually carries. Folding these
-into the instrument's own declaration would make that shape unrepresentable and would need a
-scheme for a price per venue on a record that is not keyed by one.
+the **option** — this instrument, reached this way — and not of the security: all four change
+if the same instrument is reached elsewhere, while the instrument's file states what the paper
+carries.
+
+That shape is **not yet declarable**, and saying otherwise would be arguing from a capability
+the code does not have: access entries are keyed by instrument id, a second row for one
+instrument is refused at load, and choosing between two rows would need a venue term on the
+tuple. What the separate file buys is that the day a second venue is declared, the change is
+one file and the instrument's terms are untouched. Building the key for a venue nobody has
+declared would be speculation.
 
 ### 28.6a What the outcome says about the routes it rests on
 

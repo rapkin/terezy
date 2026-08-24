@@ -22,9 +22,19 @@ Two findings from Phase 0 reading are recorded here because they change the task
   price is a venue quote, so it lands in the same access declaration.
 
 Both are declared in a **new** `data/access/` directory rather than by widening
-`data/instruments/*.toml`, for a reason that is not taste: the golden result file records the
-sha256 of every instrument declaration, so a key added to a shipped instrument file moves a
-golden this feature must not move. The long-term home is recorded in METHODOLOGY.
+`data/instruments/*.toml`, because every field they add is a property of the **option** —
+this instrument, reached this way — rather than of the security: the venue that sells it, the
+venue its proceeds land at, the price *at that venue* and how risky reaching it that way is
+all change if the same instrument is reached elsewhere, while the instrument's own file states
+what the paper carries.
+
+⚙ **Corrected 2026-08-24.** This paragraph first gave a different reason: that a key added to
+a shipped instrument file would move the sha256 the golden records, "a golden this feature
+must not move". That is the reading constitution **1.2.0** now forbids by name — *a golden
+file is evidence, never a freeze*; an input digest is a witness, not a term, and correcting an
+input is supposed to move it. It was also the last of five sites still carrying it, the other
+four having been rewritten while this one was missed. METHODOLOGY §28.6 records no long-term
+home either: the seam is where it belongs.
 
 ---
 

@@ -28,11 +28,18 @@ declared, and a mismatch is refused naming both sides.
 
 ⚙ **Why a separate declaration rather than four keys on the instrument file.** The argument
 the risk class makes above is the argument for all of them, and it does not need a second
-one: every field here is a property of the **option** rather than of the security. One
-instrument reachable at two venues is two access rows against one instrument file -- two
-purchase venues, two quotes, two risk readings, and one set of terms the paper actually
-carries. Folding them into the instrument declaration would make that shape unrepresentable
-and would have to invent a scheme for a price per venue on a record that is not keyed by one.
+one: every field here is a property of the **option** rather than of the security. The venue
+that sells it, the venue its proceeds land at, the price *at that venue* and how risky
+reaching it that way is are all things that change if the same instrument is reached
+elsewhere, while the instrument's own file states what the paper carries.
+
+**Today that is one row per instrument, and the resolver enforces it.** The registry is keyed
+by instrument id and a second row for the same id is refused at load. So this record does not
+yet *express* one instrument at two venues -- selecting between two rows would need a venue
+term on :class:`~terezy.core.results.tuple.Tuple`, which nothing has. What the seam buys is
+that the shape becomes declarable when a second venue is declared, in one file, without
+touching the instrument's terms. Building the key for a venue nobody has declared would be
+speculation, which is the opposite of what this project does.
 
 No behaviour, per owner decision D-E. The record is data; whether it resolves against the
 declared venues and instruments is the resolver's question, where the file and the field can

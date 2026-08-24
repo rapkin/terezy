@@ -1630,9 +1630,11 @@ class InflationAssumptionFile(BaseModel):
 # ⚙ **A separate file rather than four keys on the instrument declaration.** Every field here
 # is a property of the **option** -- this instrument, reached this way -- rather than of the
 # security: where it is bought, where its proceeds land, what a unit costs *at that venue*,
-# and how risky reaching it that way is. One instrument reachable at two venues is two rows
-# here against one instrument file, and folding these keys into the instrument declaration
-# would make that shape unrepresentable.
+# and how risky reaching it that way is. Today the resolver enforces **one row per
+# instrument**, so one instrument at two venues is not yet declarable; what the separate file
+# buys is that it becomes declarable here, in one file, without touching the terms the paper
+# carries. Keying by (instrument, venue) now would also need a venue term on the tuple, and
+# building it for a second venue nobody has declared would be speculation.
 #
 # ⚙ **``[[access]]`` itself carries no numeric leaf and therefore no citation**, deliberately.
 # A venue id, an instrument id and a risk-class label are references and statements, not

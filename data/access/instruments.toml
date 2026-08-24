@@ -14,9 +14,12 @@
 # property of the **option** — this instrument, reached this way — and not of the security.
 # The venue that sells it, the venue its proceeds land at, the price *at that venue*, and how
 # risky reaching it that way is: none of them is a term of the paper, and all of them change
-# if the same instrument is reached somewhere else. One instrument at two venues is two rows
-# here against one instrument file, which is a shape four more keys on the instrument
-# declaration could not hold.
+# if the same instrument is reached somewhere else.
+#
+# Today that shape is **not yet declarable**: entries are keyed by instrument id and a second
+# row for one instrument is refused at load, because selecting between two rows would need a
+# venue term the tuple does not have. What this file buys is that the day a second venue is
+# declared, the change is here and the instrument's own terms are untouched.
 #
 # **What carries a citation and what does not.** A venue id, an instrument id and a
 # risk-class label are references and statements — there is nothing here for a source to vouch
