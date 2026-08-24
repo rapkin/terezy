@@ -509,7 +509,7 @@ class RouteInUnusable:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
-class MonthlyCapExceeded:
+class RouteInCapExceeded:
     """The way in declares a monthly ceiling below the amount, and the excess has nowhere to go.
 
     **Distinct from :class:`RouteInUnusable` because the two bind for different reasons and
@@ -549,6 +549,46 @@ class MonthlyCapExceeded:
 
     excess: Money
     """``requested - ceiling``: what the rail will not carry this month."""
+
+    reason: str
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class WayOutCapExceeded:
+    """A monthly ceiling on the way out, below what the instrument released on one date.
+
+    :class:`RouteInCapExceeded`'s twin, and a separate record for the reason
+    :class:`WayOutUnusable` is one: the remedies differ, and a cap that carries every coupon
+    while refusing the redemption is a real and non-obvious finding rather than a variant of
+    the inbound case. Only this record can say **which release** could not go home, which is
+    the first thing a reader needs and the thing the inbound record has no field for.
+
+    ⚙ **It checks one movement against the ceiling, not a month's worth against it.** Several
+    releases can fall in one month and share one rail's allowance; adding them up is the
+    capacity accumulator's job (FR-012, FR-015), and a tuple carries no accumulator. So this
+    is the *loosest* honest check -- it fires only where a single release alone exceeds the
+    cap -- and the gap is stated rather than left to be discovered: two coupons of 700.00 in
+    one month against a 1 000.00 cap still pass here. Narrowing it needs the accumulator, and
+    inventing a month's consumption would be worse than reporting less than everything.
+    """
+
+    path: Candidate
+    """Which way out declares the ceiling, and from which stream (FR-008)."""
+
+    released_on: date
+    """The date of the release that could not be carried. :class:`WayOutUnusable` carries the
+    same field for the same reason: "the way out will not carry it" is unactionable until a
+    reader knows *which* movement, and the answer decides whether the remedy is a different
+    exit or a different exit date."""
+
+    ceiling: Money
+    """The tightest monthly cap any leg of the way out declares, in the released currency."""
+
+    requested: Money
+    """What the instrument released on that date, net per date."""
+
+    excess: Money
+    """``requested - ceiling``: what the rail will not carry that month."""
 
     reason: str
 
@@ -768,7 +808,8 @@ TupleRefused = (
     | SeamDoesNotChain
     | FundedFromAnotherStream
     | RouteInUnusable
-    | MonthlyCapExceeded
+    | RouteInCapExceeded
+    | WayOutCapExceeded
     | WayOutUnusable
     | NoExitRouteDeclared
     | NoExitTermsDeclared
@@ -781,13 +822,13 @@ TupleRefused = (
     | TaxCurrencyConversionUnavailable
     | InstrumentDemandsCash
 )
-"""The sixteen ways a tuple honestly produces no outcome. Match exhaustively.
+"""The seventeen ways a tuple honestly produces no outcome. Match exhaustively.
 
 Never a partial outcome and never an empty one. A ``case _:`` arm the type checker proves
 unreachable means a new member becomes an error at every site that must handle it.
 
 The count is asserted rather than left to rot: ``tests/unit/test_tuple_refusals.py`` compares
-it against ``get_args``, so a seventeenth member fails a test instead of quietly making
+it against ``get_args``, so an eighteenth member fails a test instead of quietly making
 this sentence false.
 """
 

@@ -1438,6 +1438,7 @@ def _way_out(path: Candidate, sent: Money, walk: _Walk) -> WayOutCost:
         staleness=walk.staleness,
         by_segment=walk.segments,
         latency_days=walk.latency_days,
+        ceiling=walk.ceiling,
     )
 
 

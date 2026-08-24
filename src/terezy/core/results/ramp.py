@@ -647,3 +647,14 @@ class WayOutCost:
     less than the same figure today, and the only way for a money-weighted return to say so is
     for the arrival date to move.
     """
+
+    ceiling: Money | None
+    """The tightest declared monthly cap on any leg of the way out, in :attr:`sent`'s
+    currency, or ``None`` when no leg declares one.
+
+    :attr:`RampCost.ceiling`'s twin, and here for the same reason FR-016 gives: *feasibility
+    applies on the way in **and the way out***. A cap is reported rather than refused --
+    that decision belongs to the caller and to ``routes.capacity``, not to the costing -- and
+    a caller that reads it nowhere is a caller that will repatriate past it in silence.
+    ``None`` for an exit by identity, which walks no leg and so meets no cap.
+    """

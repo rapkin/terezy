@@ -117,7 +117,11 @@ One dated release, costed from where it was released to a spendable endpoint. Un
 | `arrived` | `Money` | What reached the endpoint. May be zero or negative |
 | `components` | `Mapping[CostComponent, Money]` | Every member present, zero where it does not apply |
 | `fraction` | `float` | Not capped, in either direction |
+| `spreads_over_reference` | `tuple[float, ...]` | One rate-space spread per converting leg — §4.3.1's own figure, not the cost |
+| `channels_applied` | `tuple[str, ...]` | Which channel each `fx` leg used, in leg order |
+| `by_segment` | `tuple[SegmentAttribution, ...]` | The same charge split by segment, numbered from zero within this way out |
 | `latency_days` | `int` | On the figure, because it moves the arrival date |
+| `ceiling` | `Money \| None` | `RampCost.ceiling`'s twin. FR-016 applies on the way out too, and a caller that reads it nowhere repatriates past it in silence |
 | `provenance`, `staleness` | | Carried like every other cost |
 
 ### `Comparison`
@@ -142,7 +146,7 @@ Returned *instead of* a `Comparison` where the benchmark itself refused or produ
 Carries `refusal`, `scored` (the other outcomes, in **candidate order** — deliberately not
 ranked), `refused`, `not_comparable` and `reason`.
 
-## Refusals — sixteen, and the count is asserted
+## Refusals — seventeen, and the count is asserted
 
 | Record | When |
 |---|---|
@@ -150,7 +154,8 @@ ranked), `refused`, `not_comparable` and `reason`.
 | `SeamDoesNotChain` | A venue/currency seam, naming **both sides** (FR-004) |
 | `FundedFromAnotherStream` | The tuple's stream and its way in's stream disagree (FR-010) |
 | `RouteInUnusable` | 002's feasibility on the way in, carried whole -- a per-transaction `leg.maximum`, a closed route (FR-016) |
-| `MonthlyCapExceeded` | The way in's declared monthly ceiling is below the amount. Distinct from the above: the rail carries this much *a month*, and the remedy is to wait rather than to split (FR-016, FR-018) |
+| `RouteInCapExceeded` | The way in's declared monthly ceiling is below the amount. Distinct from the above: the rail carries this much *a month*, and the remedy is to wait rather than to split (FR-016, FR-018) |
+| `WayOutCapExceeded` | The same on the way out, naming **which dated release** could not go home (FR-016, FR-018) |
 | `WayOutUnusable` | The way out will not carry what was released, on the date it was |
 | `NoExitRouteDeclared` | Inherits 002 FR-030's treatment (FR-007) |
 | `NoExitTermsDeclared` | The instrument side of the same gap (FR-008) |

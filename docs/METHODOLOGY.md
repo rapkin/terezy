@@ -2751,13 +2751,22 @@ The increment is declared or it does not exist. A bond declares `min_unit` and i
 whole increments of it; a fund declares none, so its arriving amount buys exactly what it
 buys. Rounding a fund's purchase to whole certificates would be inventing a term.
 
-A **declared monthly ceiling below the amount refuses**, naming the ceiling and the excess.
-Not deployed up to the cap: reporting what the rail would not carry needs the owner's declared
+A **declared monthly ceiling refuses, on both sides of the round trip** (FR-016: the rules
+apply on the way in *and the way out*). On the way in the ceiling is compared against the
+amount sent; on the way out against each dated amount the instrument released, so a cap that
+carries every coupon and refuses the redemption says which release bound. Not deployed or
+repatriated up to the cap: reporting what the rail would not carry needs the owner's declared
 fallback policy and the month's consumed capacity, neither of which a tuple carries, and
 partial deployment is deferred (FR-018, owner decision 2026-08-22). A per-transaction
-`leg.maximum` is the other refusal and says something else — *this route cannot carry this
-movement at all* — and the two are distinguishable because the remedies are: split the
-movement, or wait for the month.
+`leg.maximum` is the other refusal on each side and says something else — *this route cannot
+carry this movement at all* — and the two are distinguishable because the remedies are: split
+the movement, or wait for the month.
+
+⚙ **One movement against the ceiling, not a month's worth against it.** Several releases can
+fall in one month and share one rail's allowance; summing them is the capacity accumulator's
+job (FR-012, FR-015) and a tuple carries no accumulator, so the check fires only where a
+single movement alone exceeds the cap. Stated because a check that reports less than
+everything is honest and a check that pretends otherwise is not.
 
 The remainder is **reported with its amount and its venue**, and it is outside the amount that
 reaches the endpoint: bringing it home would need a date nobody declared, and sweeping it into

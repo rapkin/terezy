@@ -1,8 +1,8 @@
-"""SC-010 and FR-016: below the minimum, fees over the amount, a remainder, and a cap.
+"""SC-010 and FR-016: below the minimum, fees over the amount, a remainder, and the caps.
 
 Five shapes of "this does not work" -- SC-010's three, the increment that binds where the
-ticket does not, and the declared monthly ceiling -- and the failure mode they share is the
-flattering one:
+ticket does not, and the declared monthly ceiling **on both sides of the round trip** -- and
+the failure mode they share is the flattering one:
 rounding the amount up to the minimum spends money the owner did not agree to spend, rounding
 it down reports a return on a holding that was never bought, and clamping a negative arriving
 amount to zero makes money vanish with no diagnostic -- which is the predecessor's B13 defect
@@ -29,10 +29,12 @@ from terezy.core.results.tuple import (
     BelowMinimumTicket,
     BuysNoWholeUnit,
     InstrumentRefused,
-    MonthlyCapExceeded,
+    RouteInCapExceeded,
     RouteInUnusable,
     Tuple,
     TupleOutcome,
+    WayOutCapExceeded,
+    WayOutUnusable,
 )
 from tests import tuple_registries as fixtures
 
@@ -256,7 +258,7 @@ class TestTheDeclaredMonthlyCeilingAndThePerTransactionMaximum:
     def test_a_monthly_ceiling_below_the_amount_refuses_naming_the_excess(self) -> None:
         #   ceiling 5 000.00, requested 10 000.00, excess 5 000.00
         refusal = self._limited(monthly_cap=Money(5_000.0, UAH, prov.EMPTY))
-        assert isinstance(refusal, MonthlyCapExceeded), refusal
+        assert isinstance(refusal, RouteInCapExceeded), refusal
         assert_money_close(refusal.ceiling, Money(5_000.0, UAH, prov.EMPTY))
         assert_money_close(refusal.requested, Money(10_000.0, UAH, prov.EMPTY))
         assert_money_close(refusal.excess, Money(5_000.0, UAH, prov.EMPTY))
@@ -269,7 +271,7 @@ class TestTheDeclaredMonthlyCeilingAndThePerTransactionMaximum:
         # "this refuses" without "and here is why nobody split it" reads as a missing feature
         # rather than as a decision somebody took on a date.
         refusal = self._limited(monthly_cap=Money(5_000.0, UAH, prov.EMPTY))
-        assert isinstance(refusal, MonthlyCapExceeded)
+        assert isinstance(refusal, RouteInCapExceeded)
         assert "FR-018" in refusal.reason
         assert "2026-08-22" in refusal.reason
 
@@ -295,3 +297,57 @@ class TestTheDeclaredMonthlyCeilingAndThePerTransactionMaximum:
         # most the rail carries, not the most it carries minus one.
         outcome = self._limited(monthly_cap=Money(10_000.0, UAH, prov.EMPTY))
         assert isinstance(outcome, TupleOutcome), outcome
+
+
+class TestTheSameTwoLimitsOnTheWayOut:
+    """FR-016 says the feasibility rules apply on the way in **and the way out**.
+
+    The inbound pair above was fixed while this one still shipped: a 1.00 hryvnia monthly cap
+    on the declared exit route produced a **complete outcome** reporting 13 100.00 reaching
+    the endpoint. Identical defect, identical severity, mirrored -- and it survived because
+    the inbound case was closed without asking what its sibling did.
+    """
+
+    def _limited(self, **limit: Money) -> object:
+        return _evaluate(
+            fixtures.with_leg(fixtures.shipped(), fixtures.DOMESTIC_OUT, **limit),
+            fixtures.hurdle_tuple(),
+            10_000.0,
+        )
+
+    def test_a_monthly_ceiling_below_a_release_refuses_naming_it(self) -> None:
+        # The first coupon of ten units of issue A is 775.00, well over a 1.00 ceiling.
+        refusal = self._limited(monthly_cap=Money(1.0, UAH, prov.EMPTY))
+        assert isinstance(refusal, WayOutCapExceeded), refusal
+        assert_money_close(refusal.ceiling, Money(1.0, UAH, prov.EMPTY))
+        assert refusal.released_on == date(2026, 7, 15)
+        assert_money_close(refusal.excess, Money(refusal.requested.amount - 1.0, UAH, prov.EMPTY))
+        assert "FR-018" in refusal.reason
+        assert "2026-08-22" in refusal.reason
+
+    def test_it_names_the_release_that_could_not_go_home(self) -> None:
+        # The field the inbound record has no room for, and the first thing a reader needs: a
+        # way out that carries every coupon and refuses the redemption is a different finding
+        # from one that carries nothing, and only the date tells them apart. A ceiling of
+        # 5 000.00 clears all four coupons and binds on the 10 775.00 redemption.
+        refusal = self._limited(monthly_cap=Money(5_000.0, UAH, prov.EMPTY))
+        assert isinstance(refusal, WayOutCapExceeded), refusal
+        assert refusal.released_on == date(2028, 1, 17)
+        assert refusal.requested.amount > 10_000.0
+
+    def test_a_per_transaction_maximum_is_the_other_refusal_here_too(self) -> None:
+        refusal = self._limited(maximum=Money(1.0, UAH, prov.EMPTY))
+        assert isinstance(refusal, WayOutUnusable), refusal
+        assert refusal.refused.binding_constraint == "leg.maximum"
+
+    def test_neither_limit_ever_yields_a_figure(self) -> None:
+        # What shipped: `reaches = 13 100.00` under a 1.00 cap, with nothing on the record to
+        # say the rail would not have carried a penny of it.
+        for field in ("monthly_cap", "maximum"):
+            outcome = self._limited(**{field: Money(1.0, UAH, prov.EMPTY)})
+            assert not isinstance(outcome, TupleOutcome), (field, outcome)
+
+    def test_a_ceiling_above_every_release_passes(self) -> None:
+        outcome = self._limited(monthly_cap=Money(100_000.0, UAH, prov.EMPTY))
+        assert isinstance(outcome, TupleOutcome), outcome
+        assert_money_close(outcome.reaches, Money(13_100.0, UAH, prov.EMPTY))

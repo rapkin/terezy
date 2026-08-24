@@ -120,13 +120,13 @@ from terezy.core.results.tuple import (
     FundedFromAnotherStream,
     InstrumentDemandsCash,
     InstrumentRefused,
-    MonthlyCapExceeded,
     NoExitRouteDeclared,
     NoExitTermsDeclared,
     Part,
     PartContribution,
     PlanDoesNotFitInstrument,
     RateNotComparable,
+    RouteInCapExceeded,
     RouteInUnusable,
     SeamDoesNotChain,
     TaxCurrencyConversionUnavailable,
@@ -135,6 +135,7 @@ from terezy.core.results.tuple import (
     TupleRefused,
     TwoFiguresNotOne,
     UndeployedCash,
+    WayOutCapExceeded,
     WayOutUnusable,
 )
 from terezy.core.routes import cost
@@ -323,7 +324,7 @@ def _route_in(
 
 def _over_the_monthly_cap(
     path: Candidate, ceiling: Money | None, amount: Money
-) -> MonthlyCapExceeded | None:
+) -> RouteInCapExceeded | None:
     """Refuse an amount larger than the tightest monthly cap the way in declares (FR-016).
 
     ``cost_one`` reports the ceiling rather than refusing, and that is right one layer down:
@@ -337,7 +338,7 @@ def _over_the_monthly_cap(
     """
     if ceiling is None or money.compare(amount, ceiling) <= 0:
         return None
-    return MonthlyCapExceeded(
+    return RouteInCapExceeded(
         path=path,
         ceiling=ceiling,
         requested=amount,
@@ -1134,6 +1135,9 @@ def _repatriate(
                     f"{released_on.isoformat()}: {way_out.reason}"
                 ),
             )
+        capped = _over_the_way_out_cap(way_out, released, released_on)
+        if capped is not None:
+            return capped
         charged.append(
             (
                 Arrival(
@@ -1146,6 +1150,44 @@ def _repatriate(
             )
         )
     return tuple(charged)
+
+
+def _over_the_way_out_cap(
+    way_out: WayOutCost, released: Money, released_on: date
+) -> WayOutCapExceeded | None:
+    """Refuse a release larger than the tightest monthly cap the way out declares (FR-016).
+
+    The way in's rule (:func:`_over_the_monthly_cap`) applied where FR-016 says it also
+    applies. ``cost_exit`` reports the ceiling for ``cost_one``'s reason -- a cap is a fact
+    about the rail and what happens to the excess is the owner's declared fallback -- and a
+    caller that reads it nowhere repatriates past it in silence, which is what shipped: a
+    1.00 hryvnia monthly cap on the shipped exit route produced a complete outcome reporting
+    13 100.00 reaching the endpoint.
+
+    Per release rather than per month, deliberately and with the gap stated on
+    :class:`~terezy.core.results.tuple.WayOutCapExceeded`.
+    """
+    if way_out.ceiling is None or money.compare(released, way_out.ceiling) <= 0:
+        return None
+    ceiling = way_out.ceiling
+    return WayOutCapExceeded(
+        path=way_out.path,
+        released_on=released_on,
+        ceiling=ceiling,
+        requested=released,
+        excess=money.sub(released, ceiling),
+        reason=(
+            f"the way out declares a monthly ceiling of {ceiling.amount!r} "
+            f"{ceiling.currency.value} and the holding released {released.amount!r} on "
+            f"{released_on.isoformat()}, so {money.sub(released, ceiling).amount!r} of it "
+            "cannot come home that month. The tuple is refused rather than repatriated up to "
+            "the ceiling: splitting a release across months is the same deferred partial "
+            "deployment as on the way in (FR-018, owner decision 2026-08-22), and reporting "
+            "the remainder needs a declared fallback policy and the month's consumed "
+            "capacity, neither of which a tuple carries. Declare a way out that carries it, "
+            "or exit on a date whose release fits."
+        ),
+    )
 
 
 def _released_by_date(projected: Projection | FundProjection) -> tuple[tuple[date, Money], ...]:

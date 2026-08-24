@@ -99,12 +99,14 @@ remainder the purchase could not deploy. (FR-015, FR-003)
 **G11 — One horizon for every tuple in a comparison**, with early termination reported and
 **no reinvestment assumed**. (FR-025)
 
-**G12 — Feasibility is 002's, unchanged**, on the way in and the way out. Below-minimum is
-infeasible and named; a remainder is reported with its amount and its venue. An amount over
-the way in's declared **monthly ceiling** refuses with its own record, naming the ceiling and
-the excess and saying that partial deployment is deferred (FR-018, owner decision
-2026-08-22) — distinct from a per-transaction maximum, which 002 refuses for a different
-reason. (FR-016, FR-017, FR-018)
+**G12 — Feasibility is 002's, unchanged, on the way in *and the way out*.** Below-minimum is
+infeasible and named; a remainder is reported with its amount and its venue. An amount over a
+declared **monthly ceiling** refuses with its own record on each side — `RouteInCapExceeded`
+against what is sent, `WayOutCapExceeded` against each dated release, naming which one — and
+each says that partial deployment is deferred (FR-018, owner decision 2026-08-22). Both are
+distinct from a per-transaction maximum, which 002 refuses for a different reason. The check
+is one movement against the ceiling rather than a month's worth against it; the accumulator
+that would narrow it is the same machinery partial deployment needs. (FR-016, FR-017, FR-018)
 
 **G13 — Marks survive the join.** An unverified value in any part marks the outcome, and
 staleness is merged from every part that ages one — the way in, each way-out charge, and the

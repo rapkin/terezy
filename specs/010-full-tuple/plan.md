@@ -155,10 +155,18 @@ feature 002's fallback reporting — the excess reported with date, amount and r
 silently deployed — and the tuple's outcome is computed on what the route actually allowed
 through."* The join did none of that, and what it did instead was worse than not doing it:
 
-| limit on the way in, 5 000.00 against a 10 000.00 outlay | before | after |
+| limit, 5 000.00 in against a 10 000.00 outlay / 1.00 out against the releases | before | after |
 |---|---|---|
-| `leg.maximum` (per transaction) | `RouteInUnusable` | unchanged |
-| `leg.monthly_cap` (per rail, per month) | **a complete outcome: ten units bought, 13 100.00 home** | `MonthlyCapExceeded` |
+| `leg.maximum` on the way in (per transaction) | `RouteInUnusable` | unchanged |
+| `leg.monthly_cap` on the way in (per rail, per month) | **a complete outcome: ten units bought, 13 100.00 home** | `RouteInCapExceeded` |
+| `leg.maximum` on the way out | `WayOutUnusable` | unchanged |
+| `leg.monthly_cap` on the way out | **a complete outcome: 13 100.00 home** | `WayOutCapExceeded` |
+
+The way out was missed in the first pass and found by the next review, which is the finding
+worth keeping: the inbound case was closed without asking what its sibling did, and FR-016
+names both sides in one sentence. `WayOutCost` had no `ceiling` field at all, so there was
+nothing for `_repatriate` to read — the accumulator in `routes.cost` had been computing it for
+every leg of every walk, inbound and outbound alike, and only the inbound result carried it.
 
 `cost_one` deliberately does not refuse a monthly cap — `routes.capacity` says so in as many
 words, because refusing would deploy nothing where the honest answer is to deploy the cap —
@@ -172,10 +180,17 @@ policy and its `redirect_to`, which no `Tuple` names, and the month's consumed c
 `Registries` does not hold; picking one — holding the excess as cash — is the substituted
 default `routes.capacity` refuses by name, and it would also silently answer a second question
 nobody has decided, whether the excess nets off the outlay the way an undeployed remainder now
-does. So the tuple refuses, naming the ceiling, the amount and the excess, and saying in its
-own message that partial deployment is deferred and when that was decided. It invents nothing,
-and when a planning feature brings staggered entry the refusal becomes a split rather than
-something to unwind.
+does. So the tuple refuses, naming the ceiling, the amount and the excess — and on the way out
+the release date too — and saying in its own message that partial deployment is deferred and
+when that was decided. It invents nothing, and when a planning feature brings staggered entry
+the refusal becomes a split rather than something to unwind.
+
+**A narrower gap remains and is stated rather than left to be found.** The check compares one
+movement against the ceiling, not a month's worth: several releases falling in one month share
+one rail's allowance, and summing them is the capacity accumulator's job (FR-012, FR-015),
+which a tuple does not carry. Two coupons of 700.00 in one month against a 1 000.00 cap
+therefore still pass. Closing that needs the accumulator threaded through `evaluate`, which is
+the same feature partial deployment needs.
 
 ## Complexity Tracking
 

@@ -161,12 +161,12 @@ class TestTheTwoExitGapsAreDistinguishable:
         assert isinstance(refusal, NoExitTermsDeclared), refusal
         assert refusal.instrument_id == fixtures.REIT
 
-    def test_the_union_has_the_sixteen_members_its_docstring_counts(self) -> None:
+    def test_the_union_has_the_seventeen_members_its_docstring_counts(self) -> None:
         # A count in prose that nothing checks is a count that goes stale on the next commit,
-        # and this one already did twice -- written as fourteen, deleted as though it were
-        # wrong, restored as fifteen, and moved to sixteen by the very next refusal. It is a
-        # number with a test under it now, which is the only reason the last move was noticed.
-        assert len(get_args(TupleRefused)) == 16
+        # and this one has moved three times -- written as fourteen, deleted as though it were
+        # wrong, restored as fifteen, then sixteen and seventeen as two cap refusals landed.
+        # Every move after the first was caught by this line and by nothing else.
+        assert len(get_args(TupleRefused)) == 17
 
     def test_the_two_are_separate_members_of_the_refusal_union(self) -> None:
         # The mechanism behind the distinction, stated so a later refactor cannot collapse
