@@ -150,16 +150,24 @@ def _miltech() -> TupleOutcome:
     )
 
 
-def _reit() -> TupleOutcome:
+ON_A_PAYMENT_DAY: Final = date(2027, 6, 10)
+"""Exit on one of the REIT's own distribution days, so that date carries **two** taxable
+payments and two charges. Every distribution falls on a 10th."""
+
+ON_A_QUIET_DAY: Final = date(2027, 6, 30)
+"""Exit at month end, which is not a payment day, so every payment has a date to itself."""
+
+
+def _reit(exit_on: date) -> TupleOutcome:
     """The REIT over a year of taxed monthly distributions, plus the disposal that ends it.
 
     ``exchange_rate`` because the REIT's payout is **pegged** and a pegged fund may not be
     projected without an owner-stated rate -- the same construct
     ``tests/contract/test_fund_data_only.py`` attaches, and for the same declared reason. The
-    window starts after 2026-06-30, the effective date `ua_ci_fund_distribution` is dated
+    window starts after 2026-06-30, the effective date ``ua_ci_fund_distribution`` is dated
     from, so the distribution class actually charges rather than refusing as pre-schedule.
     """
-    candidate = fixtures.fund_tuple(fixtures.REIT, exit_on=date(2027, 6, 30))
+    candidate = fixtures.fund_tuple(fixtures.REIT, exit_on=exit_on)
     terms = candidate.exit_terms
     assert isinstance(terms, FundAssumptions)
     return _fund_outcome(
@@ -202,21 +210,20 @@ class TestWhatFeatureOneExcludedThisFeatureAccountsFor:
         assert any("tax" in item for item in _outcome().accounts_for)
 
     @pytest.mark.parametrize(
-        ("name", "build", "least_charges"),
+        ("name", "build", "least_dates"),
         [
-            # Both taxable event kinds a fund produces, because they are charged by different
-            # declared classes and reach the netting through different code: MilTech's single
-            # `disposal_gain` on the exit date under `ua_investment_profit`, and the REIT's
-            # year of monthly `distribution` charges under `ua_ci_fund_distribution` plus the
-            # disposal that ends it. The second is the multi-charge shape -- a draft of this
-            # suite recorded it as unreachable without new data, and it is reachable over the
-            # shipped registry.
+            # Both taxable event kinds a fund produces, because different declared classes
+            # charge them: MilTech's single `disposal_gain` on the exit date under
+            # `ua_investment_profit`, and the REIT's year of monthly `distribution` charges
+            # under `ua_ci_fund_distribution` plus the disposal that ends it. The second is
+            # the multi-charge shape -- a draft of this suite recorded it as unreachable
+            # without new data, and it is reachable over the shipped registry.
             ("miltech", _miltech, 1),
-            ("reit", _reit, 10),
+            ("reit", lambda: _reit(ON_A_QUIET_DAY), 11),
         ],
     )
     def test_a_taxed_fund_sends_home_what_is_left_after_the_charge(
-        self, name: str, build: Callable[[], TupleOutcome], least_charges: int
+        self, name: str, build: Callable[[], TupleOutcome], least_dates: int
     ) -> None:
         # The clause above checked against behaviour rather than against itself, on the second
         # projection kind -- `tests/contract/test_h1_data_only.py` does it for a bond. Over the
@@ -235,14 +242,39 @@ class TestWhatFeatureOneExcludedThisFeatureAccountsFor:
         assert charged.amount < 0.0
         assert is_close(released, lifecycle.amount + charged.amount), name
         assert not is_close(released, lifecycle.amount), name
-        # The count is the half that says which shape was exercised: the identity above holds
-        # just as well over one charge, so without it the multi-charge case could quietly
-        # collapse back to the single one and nothing here would notice.
-        assert len({arrival.released_on for arrival in outcome.arrivals}) >= least_charges, name
-        # ⚙ **A stated gap, 2026-08-24, and it is narrower than the counts above suggest.**
-        # Two taxable events sharing **one date** are exercised on the bond side only: no
-        # shipped fund pays twice on one day, so every group the fund path nets over has a
-        # single member. It is the grouping that is untested here, not the netting.
+        # Dates, not charges -- the two coincide here and the difference is the subject of the
+        # test below. The count says which shape was exercised: the identity above holds just
+        # as well over one charge, so without it the multi-charge case could quietly collapse
+        # back to the single one and nothing here would notice.
+        assert len({arrival.released_on for arrival in outcome.arrivals}) >= least_dates, name
+
+    def test_two_payments_on_one_date_go_home_as_one_arrival(self) -> None:
+        # Per-date netting, which is the whole reason `_released_by_date` groups: a date the
+        # holding pays twice on is one journey home and one flat fee, not two. Reached by
+        # moving the exit onto one of the REIT's own distribution days -- nothing rigged, the
+        # shipped registry, and the only difference from the case above is the date.
+        #
+        # The eleven payments are the same either way. Exiting on a quiet day gives each its
+        # own arrival; exiting on a payment day merges two into one whose amount is exactly
+        # their sum, so the identity holds per date and not only in total.
+        quiet = _reit(ON_A_QUIET_DAY)
+        shared = _reit(ON_A_PAYMENT_DAY)
+        assert len(quiet.arrivals) == 11
+        assert len(shared.arrivals) == 10
+
+        merged = [a for a in shared.arrivals if a.released_on == ON_A_PAYMENT_DAY]
+        assert len(merged) == 1
+        separate = [
+            arrival.released.amount
+            for arrival in quiet.arrivals
+            if arrival.released_on in (ON_A_PAYMENT_DAY, ON_A_QUIET_DAY)
+        ]
+        assert len(separate) == 2
+        assert is_close(merged[0].released.amount, sum(separate))
+        assert is_close(
+            sum(arrival.released.amount for arrival in shared.arrivals),
+            sum(arrival.released.amount for arrival in quiet.arrivals),
+        )
 
     def test_it_states_that_waiting_is_inside_the_span(self) -> None:
         # The owner's decision of 2026-08-22, on the record's face: a reader comparing this

@@ -17,16 +17,24 @@ questions the law does not answer", and read plausibly. Widening to `specs/` cau
 a `§23.6` in 007 that had dangled since 007's own section moved. The widened scan then still
 missed `tests/unit/test_cpi_staleness.py`, which carried the **same sentence** as the 007 line
 and the same dead `§23.6`: one copy fixed, one live, because the scan stopped at markdown in
-three directories. It now reads markdown and Python under `docs/`, `data/`, `specs/`,
-`tests/`, `scripts/` and `src/` -- including this file, which the previous scope left as a
-check that could not see itself.
+three directories. It now reads markdown and Python under `docs/`, `data/`,
+`specs/`, `tests/`, `scripts/` and `src/`.
 
 A reference that *resolves to the wrong section* is the failure this exists to make
-impossible, and a partial scope is what lets one survive. Two shapes it would report as
-unresolved that are not defects, neither of them present today: a task line planning a section
-that has not been written yet (`specs/009-tax-depth/tasks.md` has exactly that shape and
-passes only because §28 now exists), and a reference quoted as history. Neither is worth a
-suppression mechanism until one fires.
+impossible, and a partial scope is what lets one survive. So the scope's own limits, measured
+2026-08-24 rather than assumed:
+
+- **`data/` is 31 TOML files and one markdown**, and only the markdown is read. The curated
+  legal prose lives in TOML `source` and `note` strings. None of them cites a section today,
+  which is why the suffix list is not widened -- but the tree is covered in name only.
+- **This file is in the walk and matches nothing** -- zero, measured. Its own section
+  references, the dead `§23.6` it quotes as history included, are never preceded by the word
+  METHODOLOGY, so the pattern does not see them. It reads itself in the sense that costs
+  nothing and catches nothing; do not mistake that for the check being self-checking.
+- **Two shapes would be reported that are not defects**, neither present today: a task line
+  planning a section not yet written (`specs/009-tax-depth/tasks.md` has exactly that shape
+  and passes only because §28 now exists), and a reference quoted as history. Not worth a
+  suppression mechanism until one fires.
 
 `SIMULATOR_SPEC.md`'s own section numbers appear in this prose too and collide numerically
 with METHODOLOGY's, so they are listed rather than guessed at.
@@ -42,22 +50,35 @@ sections = {m.group(1) for m in re.finditer(r"^## (\d+)\.", text, re.M)}
 subs = {m.group(1) for m in re.finditer(r"^### (\d+\.\d+)", text, re.M)}
 known = sections | subs | SPEC_REFS
 bad = sorted({m.group(1) for m in re.finditer(r"§(\d+(?:\.\d+)?)", text)} - known)
-# Every file that cites a METHODOLOGY section: prose in `docs/` and `data/`, design and task
-# records in `specs/`, and docstrings and comments in `tests/`, `scripts/` and `src/`. A
-# directory list rather than anything cleverer -- it is the repository's own top level, minus
-# what holds no prose.
-#
-# The `.md` and the backticks are all optional and the backticks come in ones and twos,
-# because markdown writes `METHODOLOGY.md` and reStructuredText writes ``METHODOLOGY``; every
-# one of those spellings is in the tree, which is why the pattern is loose rather than tidy.
+# A directory list, not anything cleverer: the repository's top level minus what holds no
+# prose. Measured 2026-08-24 -- every one of the 20 citing files in the tree is a `.md` or a
+# `.py` under one of these six.
 CITED_IN = ("docs", "data", "specs", "tests", "scripts", "src")
+
+# Six spellings, counted in the tree on 2026-08-24 -- 29 references in 20 files:
+#
+#     `docs/METHODOLOGY.md` §   12     ``docs/METHODOLOGY.md`` §    1
+#     ``METHODOLOGY`` §          6     METHODOLOGY §                6
+#     `METHODOLOGY` §            2     docs/METHODOLOGY.md §        2
+#
+# So the backticks are **optional**, which is the part that earns the looseness: eight
+# references carry none, and requiring at least one drops the count to 21. They come in ones
+# and twos because markdown writes them singly and reStructuredText doubles them. Requiring
+# the two sides to *match* would cost nothing today -- also 29 -- and is not imposed only
+# because nothing would be gained by it.
 REFERENCE = re.compile(r"`{0,2}METHODOLOGY(?:\.md)?`{0,2} §(\d+(?:\.\d+)?)")
+
+# `docs/reference/` is read-only input material (`CLAUDE.md`), and it holds the predecessor's
+# own `METHODOLOGY.md`. A reference added there would be checked against this document's
+# numbering rather than that one's, and could not be fixed if it fired. It cites no section
+# today; it is excluded so that stays true by construction rather than by luck.
+SKIP = (pathlib.Path("docs/METHODOLOGY.md"), pathlib.Path("docs/reference"))
 CITING = sorted(
     path
     for directory in CITED_IN
     for suffix in ("*.md", "*.py")
     for path in pathlib.Path(directory).rglob(suffix)
-    if path != pathlib.Path("docs/METHODOLOGY.md")
+    if not any(path == skip or skip in path.parents for skip in SKIP)
 )
 badx = []
 for other in CITING:

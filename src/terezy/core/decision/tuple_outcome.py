@@ -1254,14 +1254,13 @@ def _released_by_date(projected: Projection | FundProjection) -> tuple[tuple[dat
     and the error runs one way: the money leaves sooner, so the rate is understated rather
     than flattered. Deferring it to a date nobody declared would be the other kind of guess.
 
-    ⚙ **The direction claim above is about the dates only, and the base a percentage exit fee
-    charges on is a separate axis where the choice runs the other way.** Netting here shrinks
-    that base, so an arrival is ``(gross - tax) x (1 - pct)`` where charging the fee on the
-    gross would give ``gross x (1 - pct) - tax`` -- **higher by exactly ``pct x tax``**. This
-    is the flattering side of that comparison, and it is taken on correctness rather than on
-    conservatism: the tax is a domestic liability settled in the base currency and never
-    travels the way out, so charging a repatriation fee on it would invent a journey. Stated
-    because the two claims point opposite ways and a reader is owed both.
+    ⚙ **The direction claim above is about the dates only. On the base a percentage exit fee
+    charges, the choice here is the *flattering* one.** Netting shrinks that base, so an
+    arrival is ``(gross - tax) x (1 - pct)``, which exceeds the ``gross x (1 - pct) - tax`` of
+    charging the fee on the gross by exactly ``pct x tax``. It is taken on correctness rather
+    than on conservatism: the tax is a domestic liability settled in the base currency and
+    never travels the way out, so charging a repatriation fee on it would invent a journey.
+    Stated because the two claims point opposite ways and a reader is owed both.
     """
     ledger = projected.ledger
     currency = ledger.base_currency
