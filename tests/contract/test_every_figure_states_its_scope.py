@@ -62,6 +62,9 @@ CLASSIFIED: Final[frozenset[str]] = frozenset(
         # The key, all five terms of it.
         "key",
         "risk_class",
+        # How usable the declared ways are -- the field a reader scans to decide whether to
+        # trust the figures beside it.
+        "routes",
         # Marks travel with every figure; they are not figures.
         "provenance",
         "staleness",
@@ -70,14 +73,16 @@ CLASSIFIED: Final[frozenset[str]] = frozenset(
 """Every field of :class:`TupleOutcome`, classified. See the module docstring on why closed."""
 
 
-def _outcome(sent: float | None = None) -> TupleOutcome:
+def _outcome(
+    sent: float | None = None, *, registries: fixtures.Registries | None = None
+) -> TupleOutcome:
     outcome = evaluate(
         fixtures.hurdle_tuple(),
         amount=fixtures.AMOUNT if sent is None else fixtures.Money(sent, fixtures.UAH, prov.EMPTY),
         horizon=fixtures.DateRange(start=fixtures.ISSUE_DATE, end=fixtures.HORIZON_END),
         as_of=fixtures.AS_OF,
         continuation=fixtures.HOLD_AS_CASH,
-        registries=fixtures.shipped(),
+        registries=registries or fixtures.shipped(),
     )
     assert isinstance(outcome, TupleOutcome), outcome
     return outcome
@@ -145,6 +150,44 @@ class TestAScopeStatementIsCheckedAgainstTheBehaviourItDescribes:
         assert isinstance(left_over, NominalRate)
         assert isinstance(deployed, NominalRate)
         assert left_over.value == deployed.value
+
+    def test_a_constrained_way_names_itself_on_the_outcome(self) -> None:
+        # `RampCost` says eight things about a way in; four reach the outcome and two more are
+        # dropped with a recorded reason. These two were dropped in silence, so a route the
+        # owner declared *constrained* produced a figure with nothing on its face saying so --
+        # and `RampCost.status`'s own docstring calls it "the field a reader scans to decide
+        # whether to trust the figure beside it". Both sides, because a status about the way
+        # in alone on a round-trip figure is a half-truth.
+        for route_id, side in (
+            (fixtures.DOMESTIC_IN, "route_in"),
+            (fixtures.DOMESTIC_OUT, "route_out"),
+        ):
+            outcome = _outcome(
+                registries=fixtures.with_route(fixtures.shipped(), route_id, status="constrained")
+            )
+            assert outcome.routes.status == "constrained", side
+            assert outcome.routes.constrained == (side,), side
+
+    def test_an_unconstrained_round_trip_says_that_instead(self) -> None:
+        # Otherwise the field above would be one that always warns, which is one nobody reads.
+        outcome = _outcome()
+        assert outcome.routes.status == "open"
+        assert outcome.routes.constrained == ()
+
+    def test_the_disruption_probability_is_the_largest_single_leg_on_either_way(self) -> None:
+        # The second field dropped in silence. Both shipped domestic legs declare 1%, and the
+        # figure is the largest of them rather than their product: multiplying two
+        # independent-looking probabilities would invent a joint distribution nobody declared.
+        # Raising one leg to 5% moves it and raising the other does not, which is what says
+        # the maximum is a maximum and not a coincidence of equal inputs.
+        assert _outcome().routes.disruption_probability == 0.01
+        for route_id in (fixtures.DOMESTIC_IN, fixtures.DOMESTIC_OUT):
+            raised = _outcome(
+                registries=fixtures.with_leg(
+                    fixtures.shipped(), route_id, disruption_probability=0.05
+                )
+            )
+            assert raised.routes.disruption_probability == 0.05, route_id
 
     def test_the_latency_clause_is_true_of_the_span(self) -> None:
         # `accounts_for` says settlement latency is inside the span the rate is measured over.

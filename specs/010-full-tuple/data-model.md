@@ -66,6 +66,7 @@ kind can never be reported stale and a kind with no price is nothing at all.
 | `span` | `DateRange` | First outlay to last arrival — what the rate is a rate over |
 | `horizon` | `DateRange` | The **one** horizon of the comparison (FR-025) |
 | `undeployed` | `UndeployedCash \| None` | Money that made the trip and bought nothing |
+| `routes` | `RouteStanding` | The declared status and disruption probability of **both** ways — the two `RampCost` fields that used to be dropped in silence |
 | `risk_class` | `str` | Carried from the access declaration |
 | `rests_on` | `tuple[str, ...]` | The stated assumptions, in words, sorted |
 | `accounts_for` | `frozenset[str]` | Stated on every figure |
@@ -76,6 +77,11 @@ kind can never be reported stale and a kind with no price is nothing at all.
 **Both figures, always** (research.md D8): the amount is what can be spent, the rate is what
 compares across horizons, and reporting one invites deriving the other under an assumption
 the tool did not make.
+
+**Every field of `RampCost` and `WayOutCost` either reaches the outcome or has a recorded
+reason.** `round_trip` is about a different journey — this tuple's way out starts where the
+*instrument* releases its proceeds, not where the inbound chain ended — and `exit_path` is the
+inbound record's, not this tuple's. Those two are dropped and say so. Nothing else is.
 
 **The rate's denominator is `outlay` less `undeployed`** — the money actually invested. The
 remainder is cash at the purchase venue, not money lost, and leaving it in the series prices
@@ -121,6 +127,8 @@ One dated release, costed from where it was released to a spendable endpoint. Un
 | `channels_applied` | `tuple[str, ...]` | Which channel each `fx` leg used, in leg order |
 | `by_segment` | `tuple[SegmentAttribution, ...]` | The same charge split by segment, numbered from zero within this way out |
 | `latency_days` | `int` | On the figure, because it moves the arrival date |
+| `status` | `RouteStatus` | The most constrained segment's — `RampCost.status`'s counterpart, whose absence that field's own docstring recorded as a gap |
+| `disruption_probability` | `float` | The largest single leg's, never compounded |
 | `ceiling` | `Money \| None` | `RampCost.ceiling`'s twin. FR-016 applies on the way out too, and a caller that reads it nowhere repatriates past it in silence |
 | `provenance`, `staleness` | | Carried like every other cost |
 

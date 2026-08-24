@@ -648,6 +648,26 @@ class WayOutCost:
     for the arrival date to move.
     """
 
+    status: RouteStatus
+    """The declared status of the way out: **the most constrained any segment declares**.
+
+    :attr:`RampCost.status`'s counterpart, and the field whose absence that one's own docstring
+    records as a stated gap -- *a constrained exit segment leaves this ``open`` on a record
+    whose headline number is the round trip*. It is a second field rather than a widening of
+    the inbound one, exactly as that docstring says the honest fix would be.
+
+    ``closed`` never reaches here: ``cost_exit`` refuses such a chain with the binding segment
+    recorded. ``open`` for an exit by identity, which walks no route to be constrained.
+    """
+
+    disruption_probability: float
+    """The **largest single leg's** declared probability on the way out, never compounded.
+
+    :attr:`RampCost.disruption_probability`'s counterpart and its reasoning unchanged:
+    multiplying independent-looking probabilities across legs would invent a joint
+    distribution nobody declared.
+    """
+
     ceiling: Money | None
     """The tightest declared monthly cap on any leg of the way out, in :attr:`sent`'s
     currency, or ``None`` when no leg declares one.

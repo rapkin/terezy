@@ -1423,8 +1423,15 @@ def _way_out_key(resolved: tuple[Route, ...], *, stream_id: str) -> Candidate:
     return ComposedPath(destination_id=destination, stream_id=stream_id, segments=ids)
 
 
-def _way_out(path: Candidate, sent: Money, walk: _Walk) -> WayOutCost:
-    """The figure, from the same three parts a one-way and a round-trip figure come from."""
+def _way_out(
+    path: Candidate, sent: Money, walk: _Walk, *, status: RouteStatus = "open"
+) -> WayOutCost:
+    """The figure, from the same three parts a one-way and a round-trip figure come from.
+
+    ``status`` defaults to ``open`` for the one caller that walks no leg at all -- an exit by
+    identity, where the money is already somewhere the owner spends and there is no route to
+    be constrained. Every other caller passes :func:`_status_of` over the resolved chain.
+    """
     components, fraction, provenance = _figure(sent, walk)
     return WayOutCost(
         path=path,
@@ -1439,6 +1446,8 @@ def _way_out(path: Candidate, sent: Money, walk: _Walk) -> WayOutCost:
         by_segment=walk.segments,
         latency_days=walk.latency_days,
         ceiling=walk.ceiling,
+        status=status,
+        disruption_probability=walk.disruption,
     )
 
 
@@ -1539,4 +1548,4 @@ def cost_exit(
     )
     if isinstance(walked, RouteUnusable):
         return walked
-    return _way_out(keyed_by, amount, walked)
+    return _way_out(keyed_by, amount, walked, status=_status_of(resolved))

@@ -76,7 +76,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from datetime import date, timedelta
-from typing import TYPE_CHECKING, Final, assert_never
+from typing import TYPE_CHECKING, Final, Literal, assert_never
 
 from terezy.core.errors import InconsistentTerms, LedgerInvariantError
 from terezy.core.instruments import fund as fund_terms
@@ -128,6 +128,7 @@ from terezy.core.results.tuple import (
     RateNotComparable,
     RouteInCapExceeded,
     RouteInUnusable,
+    RouteStanding,
     SeamDoesNotChain,
     TaxCurrencyConversionUnavailable,
     Tuple,
@@ -140,6 +141,7 @@ from terezy.core.results.tuple import (
 )
 from terezy.core.routes import cost
 from terezy.core.routes.cost import Junction
+from terezy.core.routes.legs import RouteStatus
 from terezy.core.routes.path import (
     EXIT_BY_IDENTITY,
     Candidate,
@@ -261,6 +263,14 @@ class _Routed:
 
     one_way: OneWayCost
     latency_days: int
+    status: RouteStatus
+    """The way in's declared status. Carried rather than re-derived: ``cost_one`` already
+    took the most constrained of the chain's segments, and a second reading of the same
+    declarations is a second answer waiting to disagree."""
+
+    disruption: float
+    """The way in's largest single-leg disruption probability, from the same figure."""
+
     proceeds_at: Junction
     chain: ExitChain
 
@@ -304,12 +314,17 @@ def _route_in(
                 f"{costed.reason}"
             ),
         )
-    capped = _over_the_monthly_cap(tuple_.route_in, costed.ceiling, amount)
-    if capped is not None:
-        return capped
     seam_in = _seam_in(tuple_, prepared, costed.one_way.arrived)
     if seam_in is not None:
         return seam_in
+    # After the seam, not before, and the order is a decision rather than a habit: a seam
+    # mismatch says the tuple is impossible at **any** amount in any month, while a cap says
+    # it is impossible at *this* amount *this* month. Reporting the cap first hands the owner
+    # a remedy that reads as actionable -- send at most the ceiling -- and sending less would
+    # then reveal a seam the first refusal had concealed.
+    capped = _over_the_monthly_cap(tuple_.route_in, costed.ceiling, amount)
+    if capped is not None:
+        return capped
     proceeds_at: Junction = (prepared.access.proceeds_to, prepared.currency.value)
     way_out = _way_out_chain(tuple_, prepared, proceeds_at, registries)
     if not isinstance(way_out, ExitChain):
@@ -317,6 +332,8 @@ def _route_in(
     return _Routed(
         one_way=costed.one_way,
         latency_days=costed.latency_days,
+        status=costed.status,
+        disruption=costed.disruption_probability,
         proceeds_at=proceeds_at,
         chain=way_out,
     )
@@ -395,6 +412,7 @@ def _hold(
         way_out_costs=tuple(charged for _, charged in repatriated),
         endpoint_currency=_endpoint_currency(routed.chain, prepared, registries),
         undeployed=bought.undeployed,
+        routed=routed,
         horizon=horizon,
         continuation=continuation,
         kinds=registries.kinds,
@@ -1255,6 +1273,7 @@ def _assemble(
     way_out_costs: tuple[WayOutCost, ...],
     endpoint_currency: Currency,
     undeployed: UndeployedCash | None,
+    routed: _Routed,
     horizon: DateRange,
     continuation: ContinuationAssumption,
     kinds: Mapping[str, ObservationKind],
@@ -1299,6 +1318,7 @@ def _assemble(
         span=span,
         horizon=horizon,
         undeployed=undeployed,
+        routes=_standing(routed, way_out_costs),
         risk_class=prepared.access.risk_class,
         rests_on=_rests_on(
             prepared, projected, span=span, horizon=horizon, continuation=continuation
@@ -1319,6 +1339,31 @@ def _assemble(
                 stale.staleness_of_sources(provenance, kinds, as_of=as_of),
             ]
         ),
+    )
+
+
+def _standing(routed: _Routed, way_out_costs: tuple[WayOutCost, ...]) -> RouteStanding:
+    """How usable both declared ways are, from the figures the costing already returned.
+
+    Both, and never one: a status describing the way in alone on a record whose headline
+    number is a round trip is the half-truth ``RampCost.status`` records about itself.
+
+    A holding that released nothing has no way-out cost to read, and then the way out's
+    standing is genuinely unknown rather than open -- but such a tuple has no rate either and
+    is reported as not comparable, so there is no figure here for a reader to over-trust.
+    """
+    out_status = {charged.status for charged in way_out_costs}
+    constrained: list[Literal["route_in", "route_out"]] = []
+    if routed.status == "constrained":
+        constrained.append("route_in")
+    if "constrained" in out_status:
+        constrained.append("route_out")
+    return RouteStanding(
+        status="constrained" if constrained else "open",
+        disruption_probability=max(
+            [routed.disruption, *(charged.disruption_probability for charged in way_out_costs)]
+        ),
+        constrained=tuple(constrained),
     )
 
 

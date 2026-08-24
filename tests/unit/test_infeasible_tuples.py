@@ -31,6 +31,7 @@ from terezy.core.results.tuple import (
     InstrumentRefused,
     RouteInCapExceeded,
     RouteInUnusable,
+    SeamDoesNotChain,
     Tuple,
     TupleOutcome,
     WayOutCapExceeded,
@@ -291,6 +292,23 @@ class TestTheDeclaredMonthlyCeilingAndThePerTransactionMaximum:
         for field in ("monthly_cap", "maximum"):
             outcome = self._limited(**{field: Money(5_000.0, UAH, prov.EMPTY)})
             assert not isinstance(outcome, TupleOutcome), (field, outcome)
+
+    def test_a_broken_seam_is_reported_before_the_cap(self) -> None:
+        # A seam mismatch says the tuple is impossible at **any** amount in any month; a cap
+        # says it is impossible at this amount this month. Reporting the cap first would hand
+        # the owner a remedy that reads as actionable -- send at most the ceiling -- and
+        # sending less would then reveal a seam the first refusal had concealed.
+        registries = fixtures.with_access(
+            fixtures.with_leg(
+                fixtures.shipped(),
+                fixtures.DOMESTIC_IN,
+                monthly_cap=Money(5_000.0, UAH, prov.EMPTY),
+            ),
+            fixtures.OVDP,
+            bought_at="monobank_uah",
+        )
+        refusal = _evaluate(registries, fixtures.hurdle_tuple(), 10_000.0)
+        assert isinstance(refusal, SeamDoesNotChain), refusal
 
     def test_an_amount_at_the_ceiling_passes(self) -> None:
         # Strictly above, so a cap the amount exactly meets is not a refusal. A ceiling is the

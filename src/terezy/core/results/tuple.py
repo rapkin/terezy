@@ -45,6 +45,7 @@ from terezy.core.primitives.rates import NominalRate
 from terezy.core.primitives.staleness import StalenessVerdict
 from terezy.core.results.fund import FundAssumptions
 from terezy.core.results.ramp import ExitCostUnknown, RouteUnusable
+from terezy.core.routes.legs import RouteStatus
 from terezy.core.routes.path import Candidate, ExitChoice
 
 InstrumentPlan = Assumptions | FundAssumptions
@@ -227,6 +228,40 @@ as identifiers, because they are meant to be shown.
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
+class RouteStanding:
+    """How usable the two declared routes are, on the outcome's own face.
+
+    ``RampCost`` reports eight things about a way in and a tuple's outcome uses four of them:
+    the key, the one-way cost, the latency and the ceiling. Two more are dropped with a reason
+    -- the round-trip figure is about a different journey, and the inbound record's exit path
+    is not this tuple's. **These two were dropped with no reason recorded anywhere**, which is
+    how a `constrained` way in came to produce an outcome with nothing on its face saying so
+    -- and ``RampCost.status``'s own docstring calls that "the field a reader scans to decide
+    whether to trust the figure beside it".
+
+    Both directions, because a status that described the way in only would put a half-truth on
+    a record whose headline number is a round trip -- the gap ``RampCost.status`` records
+    about itself, repeated one layer up rather than closed.
+    """
+
+    status: RouteStatus
+    """The most constrained status either way declares. ``closed`` never appears: such a route
+    is refused before anything is costed."""
+
+    disruption_probability: float
+    """The largest single leg's declared probability across both ways, never compounded --
+    multiplying them would invent a joint distribution nobody declared."""
+
+    constrained: tuple[Literal["route_in", "route_out"], ...]
+    """Which ways are constrained, in journey order, or empty.
+
+    The remedies differ and the figure does not say which applies: a constrained way in is
+    answered by funding the purchase differently, a constrained way out by declaring another
+    exit. Naming the side is what turns a warning into an action.
+    """
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class TupleOutcome:
     """One tuple's whole round trip: what reaches the endpoint, and what every term took."""
 
@@ -304,6 +339,9 @@ class TupleOutcome:
     zero being unreported -- and it is exactly what a whole-unit purchase of an exact multiple
     produces.
     """
+
+    routes: RouteStanding
+    """How usable the declared ways in and out are. See :class:`RouteStanding`."""
 
     risk_class: str
     """The declared risk class of this option, carried from the access declaration.

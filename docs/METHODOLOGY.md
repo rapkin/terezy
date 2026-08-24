@@ -2855,6 +2855,17 @@ two quotes, two risk readings, and one set of terms the paper actually carries. 
 into the instrument's own declaration would make that shape unrepresentable and would need a
 scheme for a price per venue on a record that is not keyed by one.
 
+### 28.6a What the outcome says about the routes it rests on
+
+Both declared ways carry a **status** and a **disruption probability**, and both reach the
+outcome: the most constrained status either declares, the largest single leg's probability
+across the two, and which side is constrained. Never compounded — multiplying two
+independent-looking probabilities would invent a joint distribution nobody declared — and
+never one-sided, because a status describing the way in alone on a record whose headline
+number is a round trip is a half-truth.
+
+A `closed` route never appears here: it is refused before anything is costed.
+
 ### 28.7 One horizon, and no reinvestment
 
 A comparison states its horizon **once** and evaluates every tuple over it. Comparing a
