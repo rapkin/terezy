@@ -107,19 +107,20 @@ levy larger than the PIT's own base, which no reader would catch from the total 
 Per-event zero charges continue to be recorded, and a year of exclusively exempt income
 produces **no payment event**.
 
-⚙ The artefact itself moved twice, deliberately and for reasons outside the engine, both of
-them the OVDP citation upgrade (spec.md, Assumptions): the first pass replaced the secondary
-source, the second corrected it — пп. 165.1.52 does not cover the coupon — and dated the entry
-off the amending laws. Each pass changes only the `== inputs ==` sha256 lines of the files
-edited. `canonical.py` excludes provenance from the digest by design, so the `== digest ==`
-line and every figure are untouched by both.
+⚙ The artefact's `== inputs ==` sha256 lines moved several times, once per correction to the
+OVDP citation (spec.md, Assumptions) — the secondary source replaced, then the coupon's own
+provision found, then the levy strike's pinpoint, then the scope of what the guard checks.
+Each was regenerated deliberately with its diff quoted in the commit that made it, which is
+what the constitution's *"a golden file is evidence, never a freeze"* (Principle V) requires
+of an input correction. No `== digest ==` line and no figure moved in any of them.
 
 **Rationale.** FR-026, SC-009. A year with a zero liability still produces a statement
 (FR-006) — an annual statement saying zero is a different claim from no statement at all —
 but zero owed generates no payment, so no cash moves and the golden cannot move.
 
-**State the expected diff before regenerating anything.** If the golden moves, the exempt
-path grew a behaviour it should not have.
+**State the expected diff before regenerating anything.** If a *result* moves, the exempt path
+grew a behaviour it should not have. An input digest moving is a different event and is
+governed by Principle V, not by this decision.
 
 ## D10 — Where the code lives
 

@@ -81,9 +81,9 @@ definition of the investment asset. (FR-023)
 **G15 — 001's exempt results are bit-identical.** Per-event zero charges still recorded, no
 payment event from a year of exclusively exempt income, and every figure, schedule row, charge
 and ledger line in the golden artefact unchanged — its `== digest ==` has not moved. The
-artefact's `== inputs ==` sha256 lines did move, deliberately and for reasons outside the
-engine: upgrading the OVDP citation to the primary text changed `data/tax/ua.toml`, and
-`canonical.py` excludes provenance from the digest by design. (FR-026, SC-009)
+artefact's `== inputs ==` sha256 lines did move, once per correction to the OVDP citation, and
+that is the correct outcome rather than an exception to this guarantee: see Principle V, *"a
+golden file is evidence, never a freeze"*. (FR-026, SC-009)
 
 ## The boundary
 
