@@ -57,6 +57,7 @@ renders marked.
 
 | Document | Role |
 |---|---|
+| [`docs/DIRECTION.md`](docs/DIRECTION.md) | **Where this is going.** The one idea, what it will refuse to become, what is worth borrowing, and what nobody has decided yet. |
 | [`.specify/memory/constitution.md`](.specify/memory/constitution.md) | **Governance.** Seven principles, the architecture constraints, and the quality gates. Supersedes other conventions in this repo. |
 | [`docs/reference/SIMULATOR_SPEC.md`](docs/reference/SIMULATOR_SPEC.md) | **Product specification.** What the tool is for, what it models, what it must answer. |
 | [`docs/reference/REWRITE_BRIEF.md`](docs/reference/REWRITE_BRIEF.md) | **Engine charter and audit** of the predecessor: 12 behaviours to preserve, 18 confirmed defects, the ledger design. |
