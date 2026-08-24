@@ -75,10 +75,10 @@ why    = "connect ramp to instrument purchases: net-of-access-cost comparison (�
 
 [[feature]]
 id     = "011-official-rate"
-status = "drafted"
+status = "spec"
 needs  = ["002-ramp-cost"]
 why    = "the tax-currency role (Principle VI) has never had machinery: 011's per-kind staleness threshold follows 002's FR-028 and lands in the same `data/observation_kinds.toml`, and 011's central prohibition — the official rate never prices a leg, a channel rate never strikes a tax base — is the rule 002 already wrote at `core/routes/legs.py::channel_for` and `data/declarations/resolver.py::_check_channel`, which 011 must leave standing"
-note   = "one open [NEEDS CLARIFICATION] (FR-011): the citable primary text of the NBU rule for a date no rate is published for. Not a blocker — the specified default in its absence is a refusal — but it must reach /speckit-clarify before planning"
+note   = "no open clarifications. One owner verification task -- the clause naming which official rate governs a day the NBU does not set one -- and FR-017 ships its refusal live, so the gap is in the output rather than only in prose. Declaring the rule is NOT a data-only change: it is written in working days and public holidays, so it needs the declared-working-day-calendar future entry below (FR-018). The citation, the retrieval record and what the paraphrase lost are in the spec's owner verification task 1; nothing is repeated here."
 
 [[feature]]
 id     = "012-fop-group-3"
@@ -118,6 +118,12 @@ note  = "paying a tax liability late under statutory interest, as an alternative
 id    = "fx-tax-asymmetry-f1"
 after = ["002-ramp-cost"]
 note  = "flat-in-USD posts taxable UAH gain; needs a taxable foreign instrument + dated official rates"
+
+[[future]]
+id    = "declared-working-day-calendar"
+after = ["011-official-rate"]
+note  = "011 FR-011 lets a rate series declare a cited non-publication-day rule and forbids the engine from knowing what a weekend is. The Ukrainian rule -- пункт 10 розділу III of the Положення that Постанова Правління НБУ від 10.12.2019 № 148 approves -- is written entirely in working days, pre-holiday days, weekends and holidays, and пункт 11 adds the Cabinet's power to move working days. So it cannot be declared without a DECLARED, CITED working-day and holiday calendar: a new kind of declaration with its own jurisdiction, provenance and amendment history -- a feature, not a data entry. The calendar-free encoding 'latest observation on or before the event date' is refused by 011 itself, since it cannot distinguish a weekend from a gap in the series. What CAN be declared without a calendar is an explicitly enumerated per-date mapping, which is what 011 SC-015 exercises. Until this lands, 011 FR-017 ships the Ukrainian series with no rule and every non-publication date refuses. The quotation, the amendment markers and which абзаци are № 148's own words are in 011's owner verification task 1 and are deliberately not copied here -- the copy that was here collapsed a distinction the task gets right. Recorded 2026-08-25 during the 011/012 review; deliberately not built."
+
 
 [[future]]
 id    = "provider-automation"

@@ -2,13 +2,18 @@
 
 **Feature Directory**: `specs/011-official-rate`
 
-**Feature Branch**: `spec/011-012-fop` (spec-writing worktree; squash-lands per `specs/README.md`)
+**Feature Branch**: `spec/011-012-rev` (spec-writing worktree; squash-lands per `specs/README.md`)
 
 **Created**: 2026-08-23
 
-**Status**: Draft — **one open `[NEEDS CLARIFICATION]`** (FR-011, the non-publication-day
-rule). Everything else is settled; the open item narrows behaviour rather than blocking
-it, because the specified default in its absence is a refusal.
+**Status**: Ready for planning — clarifications resolved 2026-08-23. One **owner
+verification task** is open: the Ukrainian non-publication-day rule. The behaviour in its
+absence is fully specified (FR-010, FR-011) and this feature ships it live (FR-017). The
+rule's text was located on 2026-08-24 after the earlier attempts failed, and reading it on
+2026-08-25 showed that **declaring it is not a data-only change**: пункт 10 is written in
+working days and public holidays, which nothing in this system can declare. FR-018 records
+that as what it is — a declared calendar, a feature-sized question — and the refusal stands
+meanwhile.
 
 **Input**: The official rate — the third currency role, which has been declared since the
 first commit and has never had any machinery behind it. Official rates enter as declared,
@@ -252,7 +257,9 @@ file edited.
 - **An event on a weekend or a public holiday** — the publisher does not publish that day.
   Either the series declares a cited non-publication-day rule and the output states which
   date's rate was applied, or the request refuses naming the date. There is no third
-  behaviour, and the engine never decides for itself what a weekend is (FR-011).
+  behaviour, and the engine never decides for itself what a weekend is (FR-011). For the
+  Ukrainian series this is the refusal, and stays the refusal: its rule is written in
+  working days and cannot be declared until a calendar can be (FR-018).
 - **A date inside a gap in an otherwise continuous series** — a refusal naming the date,
   identical in shape to the weekend case; the engine cannot tell the two apart and must not
   try.
@@ -349,24 +356,24 @@ file edited.
   missing CPI month is a gap (007 FR-004).
 - **FR-011**: A series MAY declare a **non-publication-day rule** — a statement of which
   declared observation governs a date the publisher does not publish for — and that rule
-  MUST be declared data carrying its own citation, never engine logic. The engine MUST NOT
+  MUST be declared data carrying its own citation, never engine logic. **A paraphrase is not
+  a citation and MUST NOT enter as one**: the citation MUST name a text that was read, and
+  agreement between secondary sources restating a rule is not a substitute for it. ⚙ Not a
+  style rule — the paraphrase this feature was offered turned out to merge two provisions
+  the primary text keeps apart ("Owner verification tasks" quotes both). The engine MUST NOT
   contain any notion of a weekend, a public holiday or a banking calendar. Where a series
   declares no such rule, FR-010's refusal stands: the absence of a rule is not permission to
   choose one. Where a rule does apply, the output MUST state **which observation's date**
   supplied the rate alongside the event's own date, so a Friday rate applied to a Sunday
   event is visible rather than implied.
 
-  [NEEDS CLARIFICATION: the Ukrainian rule's citable primary text. Search results
-  consistently paraphrase it as *"the rate set on the last business day before a weekend or
-  holiday applies through those days"*, and the governing instrument appears to be the NBU
-  Board Resolution on setting the official hryvnia exchange rate (No. 148 of 10 December
-  2019, referenced by name on `bank.gov.ua`), but no primary text could be retrieved:
-  `bank.gov.ua` returns HTTP 403 to retrieval and `zakon.rada.gov.ua` renders its statute
-  text client-side. **What resolves it**: the owner supplying, or confirming, the specific
-  clause that states which rate governs a day the National Bank does not set one, together
-  with a URL the value can be re-read from. Until then the UA series declares **no**
-  non-publication-day rule and every non-publication date refuses under FR-010 — which is
-  the honest state, not a degraded one.]
+  ⚙ The Ukrainian rule's **content** is an owner verification task, not an open
+  clarification: FR-010 and the sentence above specify the behaviour in the rule's absence
+  completely. But the content turned out not to be the only thing missing — the retrieved
+  text is written in working days and holidays, which nothing here can declare, so FR-018
+  states plainly that declaring it is a feature and not a data entry. See "Owner
+  verification tasks", which also records what retrieving it has already cost, so nobody
+  spends the attempts twice.
 
 **The prohibition, in both directions**
 
@@ -400,6 +407,38 @@ file edited.
   invisible in the result: a hryvnia figure gives no hint of which dollar amount and which
   date produced it.
 
+**What ships**
+
+- **FR-017**: This feature MUST ship with the Ukrainian series declaring **no**
+  non-publication-day rule, so every date the National Bank does not publish for refuses
+  under FR-010 from the first run. ⚙ A gap recorded only in a specification is a gap nobody
+  meets; a gap that refuses is one the first run reports, to the person who can close it.
+  This is the project's standing pattern — a declared absence with a visible consequence —
+  and it is why the missing rule needs no placeholder.
+- **FR-018**: **Declaring the Ukrainian rule is not a data-only change, and MUST NOT be
+  planned as one.** Its text was retrieved on 2026-08-24 and reading it settled the
+  question the other way: пункт 10 розділу III is expressed entirely in terms this system
+  has no vocabulary for — *«останній робочий день тижня»*, *«передсвятковий день»*,
+  *«вихідні або святкові дні»*, *«перший післясвятковий робочий день»* — and пункт 11 of the
+  same розділ adds a fifth, the Cabinet's power to move working days. FR-011 forbids the
+  engine from containing any notion of a weekend, a public holiday or a banking calendar,
+  and it is right to; but that leaves the rule undeclarable, because **no entity in this
+  feature supplies a working-day and holiday calendar** and the rule cannot be evaluated
+  without one.
+
+  The one encoding that avoids a calendar — *the latest observation on or before the event
+  date* — MUST NOT be adopted as a substitute. It cannot distinguish a weekend from a gap in
+  the series, which this feature's own edge cases say the engine cannot tell apart and must
+  not try, and adopting it would make FR-010's refusal unreachable for exactly the dates
+  FR-010 exists to refuse.
+
+  What closing FR-011 for Ukraine actually needs is a **declared, cited working-day and
+  holiday calendar** — a new kind of declaration, whose own provenance, jurisdiction and
+  amendment history are a feature's worth of question, not a data entry. This feature MUST
+  NOT design it. It is recorded as `specs/features.toml`'s `[[future]]` entry
+  `declared-working-day-calendar`, and until it lands FR-017's refusal is what the Ukrainian
+  series does.
+
 ### Key Entities
 
 - **Official-rate series** — a declared, identified sequence of single-sided rate
@@ -413,7 +452,8 @@ file edited.
   never defaulted, and reported on every figure it scaled.
 - **Non-publication-day rule** — a declared, cited statement of which observation governs a
   date the publisher does not publish for. Data with a citation; absent it, the date
-  refuses.
+  refuses. A rule whose text is written in working days or public holidays cannot be
+  declared against the entities in this list, which is FR-018's subject.
 - **Official-rate staleness kind** — the declared threshold governing when rate
   observations count as stale, following 002's per-kind pattern; its own kind, no permissive
   default.
@@ -472,6 +512,25 @@ file edited.
   definition, the date-selection rule, and a worked example — in the same change that
   implements it, verified by that change's own diff rather than by a follow-up. (FR-016 and
   the constitution's documentation clause)
+- **SC-014**: With no non-publication-day rule declared for the Ukrainian series, an event
+  dated on a date that series does not cover refuses — so the missing rule is something a
+  run reports, not something only this specification says. (FR-011, FR-017)
+- **SC-015**: A **synthetic** series declaring a non-publication-day rule expressible
+  without a calendar produces FR-011's applied-date output — the observation's date beside
+  the event's — with zero source lines changed. The claim tested is that the declared-rule
+  path exists and reports what it applied; it is deliberately **not** a claim about the
+  Ukrainian rule, which FR-018 records as needing a declared calendar this feature does not
+  build. ⚙ **Such a rule exists and the criterion is satisfiable**, which is worth one
+  sentence because a planner reading FR-018 could otherwise conclude no calendar-free form
+  is possible and skip the criterion. FR-011 defines the rule as *a statement of which
+  declared observation governs a date the publisher does not publish for*, and an
+  **explicitly enumerated mapping — this date's rate governs that date, listed** — is such a
+  statement, needs no calendar, and is what a synthetic series declares here. What FR-018
+  rules out is deriving the mapping from a rule written in working days; it does not rule
+  out declaring the mapping. ⚙ Stated as two criteria because the earlier single one
+  asserted both at once and the second half was false: a test written against it would have
+  had to either build the calendar or pass by pretending пункт 10 says something simpler
+  than it does. (FR-011, FR-018)
 
 ## Assumptions
 
@@ -506,14 +565,95 @@ file edited.
 
 ## Clarifications resolved
 
-Two questions were raised while writing this specification. One was resolvable from the
-repository's own recorded decisions and is recorded here as settled; one is not resolvable
-without the owner and is carried as FR-011's `[NEEDS CLARIFICATION]`.
+Two questions were raised while writing this specification, and both are resolved. The
+first was answerable from the repository's own recorded decisions. The second was answered
+by re-reading what it was actually asking: a behaviour was never in doubt, only a value.
 
 | # | Question | Decision | Where it landed |
 |---|---|---|---|
 | 1 | Is the official rate a kind of `FxChannel` — a one-sided channel with a zero spread — or a separate thing? | **A separate thing, and the separation is the feature.** A channel is a market you transact in and decides an amount received; an official rate is a legal reference you never transact at and decides a tax base. Declaring the official rate as a channel would make the single most valuable finding in `SIMULATOR_SPEC.md` §4.4 inexpressible, because the two numbers it contrasts would be the same number. Settled by the constitution's own three-roles clause and by the two refusals already written into `legs.py` and `resolver.py`. | FR-003, FR-012, FR-013, SC-008; the whole "Why this feature exists" section |
-| 2 | What governs an event dated on a day the publisher does not publish for? | **Open.** The *shape* is settled — a declared, cited, per-series rule or a refusal, never engine logic and never a weekend the engine knows about — and the default in the rule's absence is the refusal. The *content* of the Ukrainian rule is not settled and is not guessable. | FR-011, and its `[NEEDS CLARIFICATION]` |
+| 2 | What governs an event dated on a day the publisher does not publish for? | **Resolved: this was never a clarification.** The *shape* is settled — a declared, cited, per-series rule or a refusal, never engine logic and never a weekend the engine knows about — and so is the *behaviour* when no rule is declared: FR-010's refusal stands, and FR-017 ships it live. What was missing was the rule's **content**; retrieving it on 2026-08-24 showed that the content is not all that is missing, because пункт 10 is written in working days and holidays and nothing here can declare one. Carried as owner verification task 1 for the reading, and FR-018 for the calendar. | FR-010, FR-011, FR-017, FR-018, SC-014, SC-015 |
+
+## Owner verification tasks
+
+One value is retrieved but not verified. It is recorded as a task, never filled with a
+guess; until it closes — and until FR-018's calendar exists — FR-017's refusal is what the
+feature does.
+
+1. **The owner's own reading of the clause stating which official rate governs a day the
+   National Bank does not set one.** The clause is **пункт 10 розділу III** of the
+   *Положення про встановлення офіційного курсу гривні до іноземних валют та розрахунку
+   довідкового значення курсу гривні до долара США й облікової ціни банківських металів*,
+   **затверджене Постановою Правління Національного банку України від 10.12.2019 № 148**.
+   It is a point of the Положення, not of the Постанова: the Постанова has seven points and
+   its п. 7 is its own commencement, *«Постанова набирає чинності з 27 грудня 2019 року»*.
+   Served on 2026-08-24 and re-read 2026-08-25 at
+   <https://zakon.rada.gov.ua/laws/show/v0148500-19/print>:
+
+   > Офіційний курс гривні до СПЗ та іноземних валют … починають діяти наступного робочого
+   > дня після дня встановлення/розрахунку.
+   >
+   > Офіційний курс гривні до СПЗ та іноземних валют та облікова ціна банківських металів,
+   > установлений/розрахована:
+   >
+   > 1) на останній робочий день тижня або на передсвятковий день, діють протягом наступних
+   > вихідних або святкових днів;
+   >
+   > 2) в останній робочий день тижня або в передсвятковий день, починають діяти в перший
+   > робочий день наступного тижня або в перший післясвятковий робочий день.
+
+   ⚙ **Which of those words are № 148's, and which are not.** The page marks абзац перший
+   *«{Абзац перший пункту 10 розділу III в редакції Постанови Національного банку № 36 від
+   24.03.2025}»* and абзац другий *«{Абзац другий … із змінами, внесеними згідно з
+   Постановою Національного банку № 36 від 24.03.2025}»*, and records that a fifth абзац was
+   *виключено* by the same Постанова. **Підпункти 1) and 2) carry no marker at all**, so
+   they are № 148's own text — and they are precisely the part that answers FR-011. The
+   answer survives the amendment; the citation as this specification first wrote it did not.
+   Anything citing this rule must therefore name three things: the Положення, Постанова
+   № 148 that approved it, and **Постанова Національного банку № 36 від 24.03.2025** for the
+   current wording of абзаци перший and другий.
+
+   ⚙ Feature 012 carries a verification task specifically for the
+   consolidated-versus-amending-text risk, and it is how Закон № 4835-IX was found. This
+   citation is the one that needed the same read and did not have it until 2026-08-25. The
+   general lesson is cheap to state and was expensive twice: **read the consolidated text,
+   and read the amendment markers under the provision you are quoting.**
+
+   ⚙ **What the retrieval cost, and the form that works.** Three routes were tried on
+   2026-08-23 and all three failed: `bank.gov.ua` returns **HTTP 403** to automated
+   retrieval; the NBU methodology PDF search engines surface —
+   `.../Oficial_reference_rates_2019-12-27_method.pdf` — is a **dead link, HTTP 404**; and
+   `zakon.rada.gov.ua` was recorded as serving only a table of contents. That third entry
+   was **too broad, and it cost this feature a citation it could have had**.
+
+   For the next retriever, in one line: **`https://zakon.rada.gov.ua/laws/show/<id>/print`,
+   with `curl --compressed`.** That form served the full text of every document tried on
+   2026-08-24 and 2026-08-25, this one included, and the compression flag is not optional —
+   the consolidated Податковий кодекс (`2755-17/print`) arrives gzip-encoded and is
+   unreadable without it.
+
+   ⚙ Two things this specification previously advised are **false, and were re-tested on
+   2026-08-25**. `/go/<id>` is not a different view: it is an HTTP **302 redirect to
+   `/laws/show/<id>`**, so the two forms return byte-identical responses and choosing
+   between them is choosing the same URL twice. And the *«Відбувається форматування
+   тексту!»* shell is not a length effect: this Постанова is ~33k characters of text and its
+   `/laws/show/` view serves the shell, while № 4015-IX is ~54k and serves in full. Whatever
+   selects the shell, document length is not it — which is why the rule above is *always*
+   `/print`, and never `/print` only when the document looks long.
+
+   ⚙ **What the paraphrase lost.** Secondary sources restate the rule as *"the rate set on
+   the last business day applies through the following non-working days and the first
+   working day"*, one sentence covering what пункт 10 splits into two підпункти: a rate set
+   **на** the last working day governs the weekend, and a rate set **в** the last working day
+   governs the first working day after it. Whether the merged sentence reaches the same
+   answer is precisely what a reader cannot settle from the paraphrase — which is why
+   FR-011's prohibition kept it out.
+
+   ⚙ This is **not** an UNSETTLED question in the sense feature 009 uses the word
+   (`specs/009-tax-depth/spec.md`, "Legal grounding"). Nothing about the law is in dispute
+   and no reading competes with another, so there is nothing for a labelled scenario switch
+   to be a switch between. What was missing was a retrievable text; what is missing now is
+   the owner's verification of it, and the interim behaviour is the same refusal.
 
 ## Required tests this feature relates to
 
@@ -543,10 +683,12 @@ without the owner and is carried as FR-011's `[NEEDS CLARIFICATION]`.
 
 ## Out of scope
 
-Named explicitly so the plan does not drift into them: the display-currency switch and all
-of required tests F2, F3 and F4's presentation behaviour; converting historical series for
-charts; any FX forecast, path or scenario (`SIMULATOR_SPEC.md` §4.4's "UAH paths are
-scenarios, never forecasts" belongs to whichever feature introduces one); the fetch script
+Named explicitly so the plan does not drift into them: the declared working-day and holiday
+calendar FR-018 records, and therefore the Ukrainian non-publication-day rule itself; the
+display-currency switch and all of required tests F2, F3 and F4's presentation behaviour;
+converting historical series for charts; any FX forecast, path or scenario
+(`SIMULATOR_SPEC.md` §4.4's "UAH paths are scenarios, never forecasts" belongs to whichever
+feature introduces one); the fetch script
 and the `Provider` interface generally, already recorded as the `provider-automation`
 `[[future]]` entry; a foreign-currency-denominated instrument and therefore F1 itself; the
 FX gain or loss as a named attribution line; any change to how route legs, channels or
