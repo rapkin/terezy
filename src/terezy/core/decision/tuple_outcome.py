@@ -864,27 +864,48 @@ def _acquire(prepared: _Prepared, path: Candidate, arrived: Money) -> _Acquisiti
             ),
         )
     spent = money.scale(price, quantity)
-    remainder = money.sub(arrived, spent)
     return _Acquisition(
         quantity=quantity,
         price=price,
         cost=spent,
-        undeployed=(
-            None
-            if remainder.amount == 0.0
-            else UndeployedCash(
-                amount=remainder,
-                venue_id=prepared.access.bought_at,
-                reason=(
-                    f"{prepared.declared.id!r} is bought in increments of {increment!r} "
-                    f"unit(s) at {price.amount!r} {price.currency.value} each, so "
-                    f"{remainder.amount!r} of what arrived bought nothing. It is money that "
-                    "made the trip and is sitting where the purchase was made: it is not in "
-                    "the amount that reaches a spendable endpoint, because bringing it home "
-                    "would need a date nobody declared, and the rate is measured on what was "
-                    "actually invested rather than charging it as a loss."
-                ),
-            )
+        undeployed=_undeployed(prepared, price, increment, money.sub(arrived, spent)),
+    )
+
+
+def _undeployed(
+    prepared: _Prepared, price: Money, increment: float, remainder: Money
+) -> UndeployedCash | None:
+    """What the purchase could not deploy, or ``None`` where there is no such thing.
+
+    **A declaration with no increment leaves no remainder, by construction.** ``increment ==
+    0.0`` is :func:`_min_unit`'s statement that none is declared, and then the arriving amount
+    buys exactly what it buys -- so there is nothing left over to report, and a figure here
+    would be a category error rather than a small number. What ``price * (arrived / price)``
+    leaves behind in binary floating point is not money: the shipped MilTech fund at a net
+    asset value of 1006.97 and an arriving 1007.00 produced ``-1.14e-13``, a **negative**
+    "money that made the trip in and bought nothing" -- a state
+    :class:`~terezy.core.results.tuple.UndeployedCash` forbids in its own words, which
+    :func:`_rate` then subtracted to make the invested amount exceed the outlay, under a
+    sentence reading "bought in increments of 0.0 unit(s)".
+
+    Where an increment **is** declared the same arithmetic can land a hair either side of
+    zero, so the comparison is the imported tolerance rather than ``== 0.0`` -- the same
+    tolerance :func:`_whole_increments` uses two lines earlier, for the same reason and now in
+    both directions.
+    """
+    if increment == 0.0 or is_close(remainder.amount, 0.0):
+        return None
+    return UndeployedCash(
+        amount=remainder,
+        venue_id=prepared.access.bought_at,
+        reason=(
+            f"{prepared.declared.id!r} is bought in increments of {increment!r} "
+            f"unit(s) at {price.amount!r} {price.currency.value} each, so "
+            f"{remainder.amount!r} of what arrived bought nothing. It is money that "
+            "made the trip and is sitting where the purchase was made: it is not in "
+            "the amount that reaches a spendable endpoint, because bringing it home "
+            "would need a date nobody declared, and the rate is measured on what was "
+            "actually invested rather than charging it as a loss."
         ),
     )
 
@@ -1591,13 +1612,15 @@ def _rate(
     # not at another: the difference is a fact about what the data allows, and the refusal's
     # own reason names the stranded amount and its currency so a reader can see which.
     #
-    # It is unreachable today, and by two guards rather than by the shipped data:
-    # `_foreign_tax_currency` refuses a foreign instrument that declares tax classes, and the
-    # projection refuses one that does not the moment it pays income of a kind no class
-    # covers. Only an `InstrumentDeclaration` declares a `min_unit`, so only a bond can leave
-    # a remainder at all. Both halves are pinned in
-    # `tests/unit/test_rate_and_horizon_boundaries.py`, so a later feature that opens either
-    # one fails a test rather than discovering this branch by accident.
+    # It is unreachable today, and by construction rather than by the shipped data. A
+    # remainder needs a declared increment, and only an `InstrumentDeclaration` declares one:
+    # `_undeployed` returns nothing at all where none is (which is a rule about this engine,
+    # not about arithmetic, and is pinned in `tests/unit/test_infeasible_tuples.py`). A
+    # foreign *bond* is then closed twice over -- `_foreign_tax_currency` refuses one that
+    # declares tax classes, and the projection refuses one that does not the moment it pays
+    # income of a kind no class covers -- and both halves are pinned in
+    # `tests/unit/test_rate_and_horizon_boundaries.py`. A later feature that opens any of the
+    # three fails a test rather than discovering this branch by accident.
     currencies = {outlay.currency, endpoint} | (set() if stranded is None else {stranded.currency})
     if len(currencies) > 1:
         stayed = (

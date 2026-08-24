@@ -20,6 +20,8 @@ from dataclasses import replace
 from datetime import date
 from typing import Final
 
+import pytest
+
 from terezy.core.decision.tuple_outcome import Registries, evaluate
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.money import Money
@@ -224,6 +226,52 @@ class TestARemainderTheIncrementCannotDeploy:
         outcome = _evaluate(_registries(), fixtures.hurdle_tuple(), 10_000.0)
         assert isinstance(outcome, TupleOutcome), outcome
         assert outcome.undeployed is None
+
+
+class TestADeclarationWithNoIncrementLeavesNoRemainderAtAll:
+    """A fund's arriving amount buys exactly what it buys, so there is nothing left over.
+
+    Not "a very small remainder": a remainder is what a **declared increment** leaves behind,
+    and a declaration that names none has no such quantity. What ``price * (arrived / price)``
+    leaves in binary floating point is not money -- and it shipped as money, at the shipped
+    fund's own net asset value:
+
+        undeployed.amount = -1.1368683772161603e-13 UAH
+        reason: bought in increments of 0.0 unit(s) ...
+
+    A **negative** "money that made the trip in and bought nothing" is a state the record
+    forbids in its own words, and the rate then subtracted it and made the invested amount
+    exceed the outlay. The sentence even quoted `0.0` as the increment, which is the sentinel
+    for *no increment declared*.
+    """
+
+    def _fund_outcome(self, amount: float) -> TupleOutcome:
+        outcome = evaluate(
+            fixtures.fund_tuple(
+                fixtures.MILTECH,
+                exit_on=fixtures.MILTECH_EXIT,
+                yield_point=fixtures.MILTECH_POINT,
+            ),
+            amount=Money(amount, UAH, prov.EMPTY),
+            horizon=fixtures.DateRange(start=fixtures.ISSUE_DATE, end=fixtures.HORIZON_END),
+            as_of=fixtures.AS_OF,
+            continuation=fixtures.HOLD_AS_CASH,
+            registries=fixtures.shipped(),
+        )
+        assert isinstance(outcome, TupleOutcome), outcome
+        return outcome
+
+    @pytest.mark.parametrize("amount", [1_007.0, 1_006.97, 5_000.0, 10_000.0, 33_333.33])
+    def test_no_amount_leaves_a_residue(self, amount: float) -> None:
+        # 1 007.00 against a net asset value of 1 006.97 is the case that shipped one.
+        assert self._fund_outcome(amount).undeployed is None
+
+    def test_the_rate_is_measured_on_the_whole_outlay(self) -> None:
+        # The consequence, and the reason a residue was worse than untidy: `_rate` nets the
+        # remainder off, so a negative one made the money invested exceed the money sent.
+        outcome = self._fund_outcome(1_007.0)
+        assert outcome.undeployed is None
+        assert_money_close(outcome.outlay, Money(1_007.0, UAH, prov.EMPTY))
 
 
 class TestAnAmountThatWillNotBuyOneIncrement:
