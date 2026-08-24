@@ -1,7 +1,8 @@
-"""SC-010: below the minimum, fees over the amount, and a remainder -- each reported honestly.
+"""SC-010 and FR-016: below the minimum, fees over the amount, a remainder, and a cap.
 
-Four shapes of "this does not work" -- SC-010's three, and the increment that binds where the
-ticket does not -- and the failure mode they share is the flattering one:
+Five shapes of "this does not work" -- SC-010's three, the increment that binds where the
+ticket does not, and the declared monthly ceiling -- and the failure mode they share is the
+flattering one:
 rounding the amount up to the minimum spends money the owner did not agree to spend, rounding
 it down reports a return on a holding that was never bought, and clamping a negative arriving
 amount to zero makes money vanish with no diagnostic -- which is the predecessor's B13 defect
@@ -28,6 +29,8 @@ from terezy.core.results.tuple import (
     BelowMinimumTicket,
     BuysNoWholeUnit,
     InstrumentRefused,
+    MonthlyCapExceeded,
+    RouteInUnusable,
     Tuple,
     TupleOutcome,
 )
@@ -230,3 +233,65 @@ class TestAnAmountThatWillNotBuyOneIncrement:
         )
         assert isinstance(refusal, InstrumentRefused), refusal
         assert "min_ticket" in refusal.reason or "5000.0" in refusal.reason
+
+
+class TestTheDeclaredMonthlyCeilingAndThePerTransactionMaximum:
+    """FR-016: two limits, two reasons, two refusals -- and the pair is the test.
+
+    They are tested together because the defect they exist to prevent was found by comparing
+    them and by nothing else. A ``leg.maximum`` of 5 000.00 against a 10 000.00 outlay refused;
+    a ``leg.monthly_cap`` of 5 000.00 against the same outlay produced a **complete outcome**
+    that bought ten units and reported 13 100.00 coming home. Nothing looked wrong: there was
+    no refusal to read and no figure out of place. Either case alone still passes with the
+    other broken, which is how the silent one survived a whole feature.
+    """
+
+    def _limited(self, **limit: Money) -> object:
+        return _evaluate(
+            fixtures.with_leg(fixtures.shipped(), fixtures.DOMESTIC_IN, **limit),
+            fixtures.hurdle_tuple(),
+            10_000.0,
+        )
+
+    def test_a_monthly_ceiling_below_the_amount_refuses_naming_the_excess(self) -> None:
+        #   ceiling 5 000.00, requested 10 000.00, excess 5 000.00
+        refusal = self._limited(monthly_cap=Money(5_000.0, UAH, prov.EMPTY))
+        assert isinstance(refusal, MonthlyCapExceeded), refusal
+        assert_money_close(refusal.ceiling, Money(5_000.0, UAH, prov.EMPTY))
+        assert_money_close(refusal.requested, Money(10_000.0, UAH, prov.EMPTY))
+        assert_money_close(refusal.excess, Money(5_000.0, UAH, prov.EMPTY))
+        assert refusal.path == fixtures.hurdle_tuple().route_in
+
+    def test_the_refusal_says_partial_deployment_is_deferred_and_when_that_was_decided(
+        self,
+    ) -> None:
+        # The deferral belongs in the output a reader meets, not only in the specification:
+        # "this refuses" without "and here is why nobody split it" reads as a missing feature
+        # rather than as a decision somebody took on a date.
+        refusal = self._limited(monthly_cap=Money(5_000.0, UAH, prov.EMPTY))
+        assert isinstance(refusal, MonthlyCapExceeded)
+        assert "FR-018" in refusal.reason
+        assert "2026-08-22" in refusal.reason
+
+    def test_a_per_transaction_maximum_is_the_other_refusal_entirely(self) -> None:
+        # 002's own, carried whole. A maximum says this route cannot carry this movement at
+        # all; a monthly cap says this rail carries this much a month and the rest waits. The
+        # remedies differ -- split the movement, or wait for the month -- so a reader who
+        # could not tell them apart would be given the wrong advice.
+        refusal = self._limited(maximum=Money(5_000.0, UAH, prov.EMPTY))
+        assert isinstance(refusal, RouteInUnusable), refusal
+        assert refusal.refused.binding_constraint == "leg.maximum"
+
+    def test_neither_limit_ever_yields_a_figure(self) -> None:
+        # The whole point. The cap case used to produce a complete, plausible outcome for a
+        # purchase the rail would not have carried -- Principle VI's highest severity, with
+        # nothing in the output to notice.
+        for field in ("monthly_cap", "maximum"):
+            outcome = self._limited(**{field: Money(5_000.0, UAH, prov.EMPTY)})
+            assert not isinstance(outcome, TupleOutcome), (field, outcome)
+
+    def test_an_amount_at_the_ceiling_passes(self) -> None:
+        # Strictly above, so a cap the amount exactly meets is not a refusal. A ceiling is the
+        # most the rail carries, not the most it carries minus one.
+        outcome = self._limited(monthly_cap=Money(10_000.0, UAH, prov.EMPTY))
+        assert isinstance(outcome, TupleOutcome), outcome

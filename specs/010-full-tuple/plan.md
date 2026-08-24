@@ -149,6 +149,34 @@ asserts the equality over the edited pair and, separately, that the shipped pair
 days of it and nothing else — the amounts are equal at the project tolerance and only the
 dates moved.
 
+**FR-018's second half is contradicted, and the tuple refuses instead** (owner decision,
+2026-08-24). The requirement says an amount exceeding a route's monthly cap *"is handled by
+feature 002's fallback reporting — the excess reported with date, amount and reason, never
+silently deployed — and the tuple's outcome is computed on what the route actually allowed
+through."* The join did none of that, and what it did instead was worse than not doing it:
+
+| limit on the way in, 5 000.00 against a 10 000.00 outlay | before | after |
+|---|---|---|
+| `leg.maximum` (per transaction) | `RouteInUnusable` | unchanged |
+| `leg.monthly_cap` (per rail, per month) | **a complete outcome: ten units bought, 13 100.00 home** | `MonthlyCapExceeded` |
+
+`cost_one` deliberately does not refuse a monthly cap — `routes.capacity` says so in as many
+words, because refusing would deploy nothing where the honest answer is to deploy the cap —
+so it reports `RampCost.ceiling` and leaves the decision to its caller. The join read that
+field nowhere. A declared cap was therefore invisible: no refusal, no fallback line, no
+binding constraint named, and a figure that looked entirely reasonable. That is Principle
+VI's *silent execution of an infeasible plan*, at its stated severity.
+
+The literal reading cannot be honoured today. `capacity.deploy` needs a declared fallback
+policy and its `redirect_to`, which no `Tuple` names, and the month's consumed capacity, which
+`Registries` does not hold; picking one — holding the excess as cash — is the substituted
+default `routes.capacity` refuses by name, and it would also silently answer a second question
+nobody has decided, whether the excess nets off the outlay the way an undeployed remainder now
+does. So the tuple refuses, naming the ceiling, the amount and the excess, and saying in its
+own message that partial deployment is deferred and when that was decided. It invents nothing,
+and when a planning feature brings staggered entry the refusal becomes a split rather than
+something to unwind.
+
 ## Complexity Tracking
 
 | Added complexity | Why | Alternative rejected because |

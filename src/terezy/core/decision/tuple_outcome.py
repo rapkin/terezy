@@ -120,6 +120,7 @@ from terezy.core.results.tuple import (
     FundedFromAnotherStream,
     InstrumentDemandsCash,
     InstrumentRefused,
+    MonthlyCapExceeded,
     NoExitRouteDeclared,
     NoExitTermsDeclared,
     Part,
@@ -302,6 +303,9 @@ def _route_in(
                 f"{costed.reason}"
             ),
         )
+    capped = _over_the_monthly_cap(tuple_.route_in, costed.ceiling, amount)
+    if capped is not None:
+        return capped
     seam_in = _seam_in(tuple_, prepared, costed.one_way.arrived)
     if seam_in is not None:
         return seam_in
@@ -314,6 +318,40 @@ def _route_in(
         latency_days=costed.latency_days,
         proceeds_at=proceeds_at,
         chain=way_out,
+    )
+
+
+def _over_the_monthly_cap(
+    path: Candidate, ceiling: Money | None, amount: Money
+) -> MonthlyCapExceeded | None:
+    """Refuse an amount larger than the tightest monthly cap the way in declares (FR-016).
+
+    ``cost_one`` reports the ceiling rather than refusing, and that is right one layer down:
+    a cap is a fact about the rail, and what to do with the excess is the owner's declared
+    fallback (``routes.capacity``). It is read **here** because a tuple has nowhere to put an
+    excess -- an acquisition is one dated purchase event (FR-018) -- and reading it nowhere is
+    what let a 5 000.00 cap deploy 10 000.00 and report ten units bought.
+
+    The deferral goes in the refusal's own words rather than only in the specification,
+    because the refusal is what a reader actually meets.
+    """
+    if ceiling is None or money.compare(amount, ceiling) <= 0:
+        return None
+    return MonthlyCapExceeded(
+        path=path,
+        ceiling=ceiling,
+        requested=amount,
+        excess=money.sub(amount, ceiling),
+        reason=(
+            f"the way in declares a monthly ceiling of {ceiling.amount!r} "
+            f"{ceiling.currency.value} and {amount.amount!r} was asked for, so "
+            f"{money.sub(amount, ceiling).amount!r} of it cannot pass this month. The tuple "
+            "is refused rather than deployed up to the ceiling: partial deployment is "
+            "deferred (FR-018, owner decision 2026-08-22), and reporting the excess needs a "
+            "declared fallback policy and the month's consumed capacity, neither of which a "
+            "tuple carries. Choosing one here would execute a plan the owner did not write. "
+            "Send at most the ceiling, or declare the staggered entry a later feature brings."
+        ),
     )
 
 

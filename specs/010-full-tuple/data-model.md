@@ -142,14 +142,15 @@ Returned *instead of* a `Comparison` where the benchmark itself refused or produ
 Carries `refusal`, `scored` (the other outcomes, in **candidate order** — deliberately not
 ranked), `refused`, `not_comparable` and `reason`.
 
-## Refusals — fifteen, and the count is asserted
+## Refusals — sixteen, and the count is asserted
 
 | Record | When |
 |---|---|
 | `DeclarationMissing` | Which part, and which declaration (FR-006) |
 | `SeamDoesNotChain` | A venue/currency seam, naming **both sides** (FR-004) |
 | `FundedFromAnotherStream` | The tuple's stream and its way in's stream disagree (FR-010) |
-| `RouteInUnusable` | 002's feasibility on the way in, carried whole (FR-016) |
+| `RouteInUnusable` | 002's feasibility on the way in, carried whole -- a per-transaction `leg.maximum`, a closed route (FR-016) |
+| `MonthlyCapExceeded` | The way in's declared monthly ceiling is below the amount. Distinct from the above: the rail carries this much *a month*, and the remedy is to wait rather than to split (FR-016, FR-018) |
 | `WayOutUnusable` | The way out will not carry what was released, on the date it was |
 | `NoExitRouteDeclared` | Inherits 002 FR-030's treatment (FR-007) |
 | `NoExitTermsDeclared` | The instrument side of the same gap (FR-008) |
@@ -170,6 +171,8 @@ ranked), `refused`, `not_comparable` and `reason`.
 - **No display currency** of any kind (FR-024).
 - **No partial deployment.** FR-018 defers it (owner decision, 2026-08-22), so there is no
   record for a split acquisition and no `PartiallyDeployable`: an acquisition is **one dated
-  purchase event**. An earlier draft of this file listed one; it was never built.
+  purchase event**. An earlier draft of this file listed one; it was never built. An amount
+  over a declared monthly ceiling therefore **refuses** — see `plan.md`'s departures list for
+  why deploying up to the cap could not be done honestly here.
 - **No special case that makes H1 pass.** A data-only addition needing an engine edit is a
   recorded defect in the abstraction, and fixing the abstraction is in scope (FR-023).

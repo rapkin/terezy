@@ -2751,6 +2751,14 @@ The increment is declared or it does not exist. A bond declares `min_unit` and i
 whole increments of it; a fund declares none, so its arriving amount buys exactly what it
 buys. Rounding a fund's purchase to whole certificates would be inventing a term.
 
+A **declared monthly ceiling below the amount refuses**, naming the ceiling and the excess.
+Not deployed up to the cap: reporting what the rail would not carry needs the owner's declared
+fallback policy and the month's consumed capacity, neither of which a tuple carries, and
+partial deployment is deferred (FR-018, owner decision 2026-08-22). A per-transaction
+`leg.maximum` is the other refusal and says something else — *this route cannot carry this
+movement at all* — and the two are distinguishable because the remedies are: split the
+movement, or wait for the month.
+
 The remainder is **reported with its amount and its venue**, and it is outside the amount that
 reaches the endpoint: bringing it home would need a date nobody declared, and sweeping it into
 the purchase would spend money the owner did not agree to spend.

@@ -509,6 +509,51 @@ class RouteInUnusable:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
+class MonthlyCapExceeded:
+    """The way in declares a monthly ceiling below the amount, and the excess has nowhere to go.
+
+    **Distinct from :class:`RouteInUnusable` because the two bind for different reasons and
+    the reader has to know which.** A per-transaction ``leg.maximum`` says *this route cannot
+    carry this movement at all*, and 002 refuses it inside ``cost_one``. A ``leg.monthly_cap``
+    says *this rail carries this much a month*, which 002 deliberately does **not** treat as a
+    refusal: ``routes.capacity`` reports the ceiling and decides what fits, because refusing
+    would deploy nothing where the honest answer is to deploy the cap and report the rest.
+
+    Deploying the cap is what this feature cannot honestly do. FR-018 defers partial
+    deployment (owner decision, 2026-08-22), and the machinery that would report the excess
+    needs two things a tuple does not carry: a declared fallback policy with its
+    ``redirect_to``, and the month's consumed capacity. Choosing one -- holding the excess as
+    cash, say -- is the substituted default ``routes.capacity`` refuses by name.
+
+    So the tuple refuses, naming the ceiling and the excess. It is the one answer that invents
+    nothing, and it is temporary by construction: when a planning feature brings staggered
+    entry this becomes a split rather than something to unwind.
+
+    ⚙ **What it replaces is worse than a wrong refusal.** Before this record existed the join
+    read ``RampCost.ceiling`` nowhere at all: a 5 000.00 monthly cap against a 10 000.00 outlay
+    produced a complete outcome that bought ten units and reported 13 100.00 coming home, with
+    no refusal, no fallback line and no binding constraint named anywhere -- the silent
+    execution of an infeasible plan that Principle VI puts at the highest severity.
+    """
+
+    path: Candidate
+    """Which way in declares the ceiling, and from which stream (FR-008)."""
+
+    ceiling: Money
+    """The tightest monthly cap any leg of the way in declares, in the sending currency."""
+
+    requested: Money
+    """What the caller asked to send. ``ceiling``/``requested``/``excess`` rather than
+    ``cap``/``amount``/``over``: it is the vocabulary ``capacity.Deployment`` and
+    ``BelowMinimumTicket`` already use for the same shape of statement."""
+
+    excess: Money
+    """``requested - ceiling``: what the rail will not carry this month."""
+
+    reason: str
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class WayOutUnusable:
     """The way out will not carry what the instrument released, on the date it released it.
 
@@ -723,6 +768,7 @@ TupleRefused = (
     | SeamDoesNotChain
     | FundedFromAnotherStream
     | RouteInUnusable
+    | MonthlyCapExceeded
     | WayOutUnusable
     | NoExitRouteDeclared
     | NoExitTermsDeclared
@@ -735,14 +781,14 @@ TupleRefused = (
     | TaxCurrencyConversionUnavailable
     | InstrumentDemandsCash
 )
-"""The fifteen ways a tuple honestly produces no outcome. Match exhaustively.
+"""The sixteen ways a tuple honestly produces no outcome. Match exhaustively.
 
 Never a partial outcome and never an empty one. A ``case _:`` arm the type checker proves
 unreachable means a new member becomes an error at every site that must handle it.
 
 The count is asserted rather than left to rot: ``tests/unit/test_tuple_refusals.py`` compares
-it against ``get_args``, so a sixteenth member fails a test instead of quietly making this
-sentence false.
+it against ``get_args``, so a seventeenth member fails a test instead of quietly making
+this sentence false.
 """
 
 
