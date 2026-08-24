@@ -66,12 +66,18 @@ declared, so a prefix on it is a namespace rather than a second field: every mar
 builds is ``basis-estimated:<declaration reference>``, and :func:`is_basis_estimated` is the
 one place that reads it.
 
-**Why not a ``kind`` field on ``SourceRef``.** Because the two marks must propagate *by the
-same rule* (FR-007), and they do that by being the same type. Adding a discriminating field
-to the shared record would touch every construction site in the project for the benefit of
-one caller, and the field would then need a value at each of them -- which is a default with
-extra steps. The mark is distinguishable on inspection, which is what FR-008 asks for, and
-indistinguishable to ``merge``, which is what FR-007 asks for.
+**Why not a field on ``SourceRef`` saying which of the two marks this is.** Because they must
+propagate *by the same rule* (FR-007), and they do that by being the same type. A
+discriminating field would touch every construction site in the project for the benefit of one
+caller, and would then need a value at each of them -- a default with extra steps. The mark is
+distinguishable on inspection, which is what FR-008 asks for, and indistinguishable to
+``merge``, which is what FR-007 asks for.
+
+⚙ ``SourceRef`` *does* carry a ``kind``, added by feature 010, and it is a different thing:
+the ``ObservationKind`` the citation's table declared, which is what lets a merged provenance
+be aged at all. It discriminates nothing about this mark, and the argument above is unchanged
+by it -- but a reader who met the old heading concluded the record had no ``kind`` field, so
+the heading says which kind it is talking about.
 """
 
 

@@ -1391,10 +1391,9 @@ def _standing(routed: _Routed, way_out_costs: tuple[WayOutCost, ...]) -> RouteSt
 def _declaration_provenance(prepared: _Prepared) -> Provenance:
     """The declared tables the **join itself** read, which no projection propagates.
 
-    A projection's provenance covers the tables *it* consulted, and there are three the join
+    A projection's provenance covers the tables *it* consulted, and there are two the join
     consults that it never sees:
 
-    * the venue quote, which the join sized the purchase from and which no lifecycle touches;
     * ``[instrument.constraints]`` -- the minimum ticket and the buyable increment, which
       decide how many units were bought and therefore every figure downstream. This feature is
       what made them load-bearing: before :func:`_acquire` nothing sized a purchase from them,
@@ -1414,9 +1413,14 @@ def _declaration_provenance(prepared: _Prepared) -> Provenance:
     ``tests/contract/test_marks_survive_the_join.py`` partitions every sourced table of the
     declarations a tuple names into those that reach the outcome and those classified as
     unable to move one.
+
+    **The venue quote is not here either, and that is not an omission.** The join did size the
+    purchase from it, and the purchase event the projection recorded carries the amount it
+    produced -- so the quote's citation arrives through :func:`_projection_provenance`
+    already. Merging it a second time changed no outcome, which is how a duplicate is
+    recognised.
     """
-    quote = prepared.access.quote
-    tables = [prov.EMPTY if quote is None else quote.price.provenance]
+    tables: list[Provenance] = []
     match prepared.declared:
         case InstrumentDeclaration():
             tables.append(prepared.declared.constraints.provenance)

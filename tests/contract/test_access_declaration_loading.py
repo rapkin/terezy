@@ -223,6 +223,27 @@ class TestWhatNeedsASecondFile:
         assert refusal.file.name == "instruments.toml"
         assert "extra.toml" in refusal.problem
 
+    def test_a_price_naming_an_undeclared_kind_is_refused_at_load(self, tmp_path: Path) -> None:
+        # The refusal that had no test. Without it a typo loaded clean, resolved clean, and
+        # surfaced as a `KeyError` out of the pure core from a guard whose message calls that
+        # a programmer error -- and deleting the resolver's check left every test green.
+        #
+        # It replaces a shipped entry rather than adding one, because a second entry for the
+        # same instrument is refused first and the file would never reach the kind check.
+        root = tmp_path / "data"
+        shutil.copytree(fixtures.DATA_ROOT, root)
+        path = root / "access" / "instruments.toml"
+        path.write_text(
+            path.read_text(encoding="utf-8").replace(
+                'kind         = "venue_terms"', 'kind         = "venue_termz"', 1
+            ),
+            encoding="utf-8",
+        )
+        with pytest.raises(DeclarationError) as caught:
+            resolver.tuple_from_data_root(root, base_currency=Currency.UAH, scenario_id=None)
+        assert caught.value.field_path == "access[0].price.kind"
+        assert "venue_terms" in caught.value.problem, "an unknown kind is usually a typo"
+
     def test_an_empty_access_directory_is_refused(self, tmp_path: Path) -> None:
         root = tmp_path / "data"
         shutil.copytree(fixtures.DATA_ROOT, root)
@@ -233,23 +254,26 @@ class TestWhatNeedsASecondFile:
         assert "access" in str(caught.value.file)
 
 
-class TestEveryCitationInTheResolvedRegistriesAgesUnderADeclaredKind:
-    """The scan, because this is the third time one kind was validated and then not resolved.
+class TestEveryCitationInTheResolvedRegistriesCarriesAKind:
+    """The scan: no citation may reach the core without the threshold it ages under.
 
-    ``ChannelSide.kind`` was the first -- an earlier revision aged every side under the
-    channel's threshold, a seven-day premium under a 365-day one, reported fresh. The access
-    price was the second: it loaded clean, *resolved* clean, and then raised ``KeyError`` out
-    of the pure core from ``staleness.kind_for``, whose own message says reaching it means
-    validation was bypassed and calls that a programmer error. A data-file typo is not one.
+    **Resolution is not what this checks**, and an earlier version of this docstring said it
+    was, on the reasoning that ``scripts/check_provenance.py`` "reads the repository's own
+    data files and a runtime data root is not those". It reads the same files this does --
+    ``fixtures.shipped()`` resolves ``REPO_ROOT / "data"`` -- and it already resolves every
+    sourced table's kind against ``observation_kinds.toml``, with ``access`` added to its
+    ``SOURCED_DIRS`` by this feature. A second check of one fact over one set of files is a
+    second place for it to drift. Resolution is covered where a *wrong* kind can be planted:
+    the load-time refusals above and in ``test_route_declaration_loading.py``, one per call
+    site.
 
-    A third point fix would have left the fourth open, so this walks the resolved registries
-    instead of naming fields: every ``SourceRef`` reachable from any declaration must carry a
-    kind, and every kind must be one ``data/observation_kinds.toml`` declares. A new
-    declaration kind whose citation is stamped and not resolved fails here, and so does one
-    whose citation is not stamped at all.
-
-    ``scripts/check_provenance.py`` checks something adjacent and cannot replace this: it
-    reads the repository's own data files, and a runtime data root is not those.
+    What is genuinely new is **stamping**. A kind can be declared, resolved and still not
+    reach the record built from it -- which is exactly what happened to feature 001's terms,
+    its constraints, the tax rates and every table of a fund's, whose thresholds were
+    validated at load and dropped. Nothing in the data files can see that, because the defect
+    is on the way out of the loader rather than in what it read. So this walks the resolved
+    registries and requires every ``SourceRef`` to carry a kind: a citation the loader forgets
+    to stamp fails here, and it is unaged and silent everywhere else.
     """
 
     def _sources(self, value: object, seen: set[int]) -> Iterator[SourceRef]:
@@ -271,13 +295,9 @@ class TestEveryCitationInTheResolvedRegistriesAgesUnderADeclaredKind:
             for item in value:
                 yield from self._sources(item, seen)
 
-    def test_every_source_carries_a_kind_and_every_kind_is_declared(self) -> None:
+    def test_every_source_carries_a_kind(self) -> None:
         registries = fixtures.shipped()
         found = list(self._sources(registries, set()))
         assert len(found) > 20, "the walk reached almost nothing, so it proves almost nothing"
         unstamped = sorted({source.id for source in found if not source.kind})
         assert not unstamped, f"citations reaching the core with no staleness kind: {unstamped}"
-        undeclared = sorted(
-            {source.kind for source in found if source.kind not in registries.kinds}
-        )
-        assert not undeclared, f"kinds no declaration file declares: {undeclared}"

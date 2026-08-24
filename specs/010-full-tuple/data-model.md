@@ -32,7 +32,9 @@ unrepresentable, as 002 FR-008 and 004 FR-011 already require.
 
 **The risk class is not a field here.** It is declared per option in `data/access/`, carried
 onto the outcome and scored nowhere (research.md D9) — a property of *this instrument reached
-this way*, which is what makes an instrument at two venues two rows and one instrument file.
+this way* rather than of the security, which is why it belongs with the other three terms the
+access declaration holds. What that shape *admits* later, and does not express today, is set
+out under `InstrumentAccess` below.
 
 `Tuple.stream_id` and `route_in.stream_id` are two spellings of one fact and are **checked
 against each other** before anything is costed; see `FundedFromAnotherStream`.
@@ -81,10 +83,21 @@ kind can never be reported stale and a kind with no price is nothing at all.
 compares across horizons, and reporting one invites deriving the other under an assumption
 the tool did not make.
 
-**Every field of `RampCost` and `WayOutCost` either reaches the outcome or has a recorded
-reason.** `round_trip` is about a different journey — this tuple's way out starts where the
-*instrument* releases its proceeds, not where the inbound chain ended — and `exit_path` is the
-inbound record's, not this tuple's. Those two are dropped and say so. Nothing else is.
+**Every field of `RampCost` either reaches the outcome or has a recorded reason.**
+`round_trip` is about a different journey — this tuple's way out starts where the *instrument*
+releases its proceeds, not where the inbound chain ended — and `exit_path` is the inbound
+record's, not this tuple's. Those two are dropped and say so.
+
+**Five fields of a `WayOutCost` reach nowhere, symmetrically with a `OneWayCost`'s**, and this
+is the reason rather than an omission: `path`, `fraction`, `spreads_over_reference`,
+`channels_applied` and `by_segment` are the *cost record's* attribution of one movement, and a
+tuple's outcome reports its own attribution — six parts, in journey order, each naming the
+call that produced it. A round trip's way-out charges arrive there summed into `ramp_out`,
+with the same five facts available on the `WayOutCost` a reader can go and re-cost. Carrying
+them per release would put a second, finer attribution on the outcome that nothing reads and
+that would disagree with the first the moment either changed. What is *not* symmetrical is
+`status`, `disruption_probability` and `ceiling`: those say whether the figure can be trusted
+or produced at all, and all three are carried.
 
 **The rate's denominator is `outlay` less `undeployed`** — the money actually invested. The
 remainder is cash at the purchase venue, not money lost, and leaving it in the series prices

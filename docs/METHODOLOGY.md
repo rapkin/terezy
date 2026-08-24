@@ -2804,6 +2804,12 @@ A date that nets **negative** is refused rather than absorbed into a later recei
 would have to travel *to* the instrument along a route nobody costed, and netting it forward
 would move a real outflow to a date it did not happen on.
 
+A release larger than the way out's **declared monthly ceiling** is refused too, naming the
+date it was released on — see §28.3, where the same rule is stated for the way in. That is the
+half of FR-016 a reader who comes here for "what goes home, and when" would otherwise meet
+nothing about: the answer for such a release is that it does not go home, and the tuple says
+so instead of reporting an amount the rail would not have carried.
+
 ### 28.5 The two figures, and where the rate refuses
 
 Every outcome carries **both**: the amount that reaches a spendable endpoint, and the rate it

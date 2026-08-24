@@ -249,8 +249,19 @@ class RouteStanding:
     is refused before anything is costed."""
 
     disruption_probability: float
-    """The largest single leg's declared probability across both ways, never compounded --
-    multiplying them would invent a joint distribution nobody declared."""
+    """The largest single leg's declared probability, never compounded across legs.
+
+    **A lower bound, and it has to be read as one.** ``RampCost``'s own field says so in as
+    many words -- the honest reading of 5% is *at least 5%* -- and this is the field a reader
+    actually meets, on the outcome's face, so the reading belongs here rather than two records
+    away. Multiplying independent-looking per-leg probabilities would invent a joint
+    distribution nobody declared, and the largest is the weakest claim the declarations
+    support.
+
+    Across **both** ways where the holding released something, and the way in's alone where it
+    released nothing: there is then no way-out cost to read a figure off. Such a tuple has no
+    rate either, so no ranked figure rests on the narrower reading.
+    """
 
     constrained: tuple[Literal["route_in", "route_out"], ...]
     """Which ways are constrained, in journey order, or empty.

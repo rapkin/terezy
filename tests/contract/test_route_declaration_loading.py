@@ -502,6 +502,24 @@ class TestUndeclaredObservationKind:
             _resolve(root)
         assert raised.value.field_path == "channel[p2p].kind"
 
+    def test_a_channel_side_naming_an_unknown_kind_is_refused(self, tmp_path: Path) -> None:
+        # A **side's** own kind, which is a different check on a different field: a side ages
+        # under its own threshold, and a premium aged under the channel's schedule threshold
+        # would read fresh long after its own had passed. The resolver has checked this since
+        # that defect was found, and until now nothing failed if the check were deleted --
+        # which is how the identical hole in the access price got through the round that was
+        # supposed to close this class.
+        root = _root(tmp_path)
+        _edit(
+            root / "channels" / "uah_usd.toml",
+            '  kind             = "p2p_premium"',
+            '  kind             = "p2p_premiums"',
+        )
+        with pytest.raises(DeclarationError) as raised:
+            _resolve(root)
+        assert raised.value.field_path == "channel[p2p].buy_side.kind"
+        assert "p2p_premium" in raised.value.problem
+
 
 class TestDuplicateIdentifiers:
     """Row: a duplicate route id, and a duplicate ``(provider x currency path x venue)``."""

@@ -1190,8 +1190,9 @@ def _status_of(resolved: tuple[Route, ...]) -> RouteStatus:
     segment's status, or the last, would let a constrained corridor hide behind an open one --
     and the status is what a reader scans to decide whether to trust the figure beside it.
 
-    ``closed`` never reaches here: :func:`cost_one` excludes such a candidate with the binding
-    segment recorded, before anything is costed (FR-014, FR-015).
+    ``closed`` never reaches here from either caller: :func:`cost_one` excludes such a
+    candidate before anything is costed, and :func:`cost_exit` refuses a closed exit route the
+    same way, each with the binding segment recorded (FR-014, FR-015).
     """
     return "constrained" if any(route.status == "constrained" for route in resolved) else "open"
 

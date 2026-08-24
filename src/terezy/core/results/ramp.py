@@ -353,13 +353,13 @@ class RampCost:
     whether to trust the figure beside it. It is the same shape :attr:`ceiling` (the tightest
     declared cap) and :attr:`disruption_probability` (the largest single leg) already take.
 
-    ⚙ **It describes the way in only.** A constrained *exit* segment leaves this ``open`` on a
-    record whose headline number is the round trip, and that is a stated gap rather than a
-    decision: ``status`` is 002's field about the inbound route, widening it to the round trip
-    would change what it means for every declared route that already carries one, and the
-    honest fix is a second field for the way out rather than a quiet redefinition of this one.
-    A closed exit segment is *not* affected -- it yields ``ExitCostUnknown`` naming the route,
-    so the round-trip slot says so in words."""
+    ⚙ **It describes the way in only, and that is now a decision rather than a gap.** A
+    constrained *exit* segment leaves this ``open`` on a record whose headline number is the
+    round trip. Widening this field would change what it means for every declared route that
+    already carries one, so feature 010 took the fix this note used to name as the honest one:
+    :attr:`WayOutCost.status`, a second field for the way out, below in this module. A tuple's
+    outcome reports the pair. A closed exit segment is *not* affected either way -- it yields
+    ``ExitCostUnknown`` naming the route, so the round-trip slot says so in words."""
 
     disruption_probability: float
     """The largest single-leg probability that this route stops working, in ``[0, 1]``.
