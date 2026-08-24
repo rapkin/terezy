@@ -1175,9 +1175,18 @@ class TestTheRegistryRefusesAnUncoveredEvent:
 
         Truthiness on ``provenance.sources`` cannot catch that, and did not: it passes with
         165.1.52 alone and it passes with both provisions replaced by an invented number. So
-        the assertion is that the citation the charges actually carry **names the provision
-        for each kind the class declares itself to apply to** -- which also fails if a third
-        kind is added to ``applies_to`` and nobody finds the provision that exempts it.
+        the assertion is that the citation the charges actually carry **names every provision
+        this test expects**, one per kind the class declares itself to apply to -- which also
+        fails if a third kind is added to ``applies_to`` and nobody finds the provision that
+        exempts it.
+
+        **What it does not check is which provision goes with which kind**, and there is
+        nowhere in the file for that to live: the class has one rate entry, one ``source``
+        string and two kinds, so a citation naming both numbers against the wrong kinds passes
+        here. The association is this test's own, in :data:`EXEMPTION_PROVISIONS`; the data
+        cannot contradict it, only omit a number, which is the defect that happened. Splitting
+        the citation per kind would need a per-kind provenance the record has no field for --
+        if that field ever arrives, this is where the check belongs.
         """
         (declared,) = [
             entry for entry in loader.tax_classes_from_file(TAX_UA) if entry.id == GOVERNMENT_BOND

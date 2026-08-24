@@ -2366,8 +2366,9 @@ being taken rather than the shortcut: the OVDP exemption moved from a review dat
 2020-05-23 because the Tax Code's own commencements were retrieved, not because a run wanted
 it to.
 
-**What 2020-05-23 refuses is not nothing.** Before that date ОВДП income was PIT-exempt and
-still bore the military levy at 1.5%: пп. 1.7 п. 16-1 підрозділу 10 розділу XX exempted
+**What 2020-05-23 refuses is not nothing.** Between 2017-01-01 and that date — the window in
+which both subparagraphs already read as they do now — ОВДП income was PIT-exempt and still
+bore the military levy at 1.5%: пп. 1.7 п. 16-1 підрозділу 10 розділу XX exempted
 untaxed income from the levy *except* the incomes at пп. 165.1.2, 165.1.18 and 165.1.52, and
 Закон № 466-IX struck that exception. So a 2019 coupon is a real event with a real pair of
 rates — and the model **refuses it rather than charging it**, because the 1.5% levy's own
