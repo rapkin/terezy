@@ -107,10 +107,12 @@ levy larger than the PIT's own base, which no reader would catch from the total 
 Per-event zero charges continue to be recorded, and a year of exclusively exempt income
 produces **no payment event**.
 
-⚙ The artefact itself moved once, deliberately and for a reason outside the engine: upgrading
-the OVDP citation to the primary text (spec.md, Assumptions) changes the `== inputs ==`
-sha256 of `data/tax/ua.toml`. `canonical.py` excludes provenance from the digest by design, so
-the `== digest ==` line and every figure are untouched.
+⚙ The artefact itself moved twice, deliberately and for reasons outside the engine, both of
+them the OVDP citation upgrade (spec.md, Assumptions): the first pass replaced the secondary
+source, the second corrected it — пп. 165.1.52 does not cover the coupon — and dated the entry
+off the amending laws. Each pass changes only the `== inputs ==` sha256 lines of the files
+edited. `canonical.py` excludes provenance from the digest by design, so the `== digest ==`
+line and every figure are untouched by both.
 
 **Rationale.** FR-026, SC-009. A year with a zero liability still produces a statement
 (FR-006) — an annual statement saying zero is a different claim from no statement at all —

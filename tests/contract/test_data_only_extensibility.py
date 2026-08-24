@@ -79,13 +79,13 @@ ISSUE_B = "ovdp_synthetic_b"
 # therefore not this holding's, and eleven remain:
 #     306.25 x 11 = 3368.75 of interest over the life of the holding.
 #
-# ⚙ The purchase is dated four months after issue rather than on it because the exemption's
-# citation reaches back only to 2026-06-30 (`data/tax/ua.toml`), so the 2026-06-02 coupon
-# has no rate in force and a holding bought at issue is refused. That refusal is asserted
-# on purpose in `tests/contract/test_declaration_loading.py`; here the subject is a
-# *complete* result from a second declared instrument, so the holding starts inside the
-# window the citation covers. The declaration's own dates were left alone: moving invented
-# terms to dodge a refusal would hide the thing the refusal exists to show.
+# ⚙ The purchase is dated four months after issue rather than on it for a reason that has
+# since gone away: the exemption's citation used to reach back only to 2026-06-30, so the
+# 2026-06-02 coupon had no rate in force and a holding bought at issue was refused. Feature
+# 009 retrieved the real commencement and the coupon is now covered (`data/tax/ua.toml`).
+# The date is kept because eleven coupons is what the arithmetic above is written for, and
+# because the subject here is a *complete* result from a second declared instrument rather
+# than the coverage of any particular date.
 B_COUPON = 306.25
 B_COUPON_COUNT = 11
 B_TOTAL_INTEREST = 3368.75

@@ -59,13 +59,16 @@ holds two files, `ovdp_synthetic_a.toml` and `ovdp_synthetic_b.toml`. Every term
 describes a bond anyone can buy, and none may be quoted as if it did.**
 
 **The tax exemption is cited but unverified.** `data/tax/ua.toml` declares the
-`ua_government_bond` class with a PIT rate of 0% and a military levy of 0%. Both zeroes now
-cite the primary text — пп. 165.1.52 ПКУ for the PIT exemption, and Закон № 466-IX taking
-ОВДП out of the levy's exception list from 23.05.2020 — rather than a foreign summary of it.
-Cited is still not verified: nobody has checked either against the Tax Code themselves, so
-`verified_on` is empty and every figure derived from the class renders marked. The date the
-entry comes into force is a separate question and rests on a weaker citation still; the
-entry's own note says which citation does what. See §11.
+`ua_government_bond` class with a PIT rate of 0% and a military levy of 0%. The zeroes cite
+the primary text, and it takes **two provisions** because the class covers two income kinds:
+the coupon is exempt under **пп. 165.1.2 ПКУ** («проценти, що нараховані на державні цінні
+папери») and the disposal gain under **пп. 165.1.52** («інвестиційний прибуток від операцій»).
+Citing 165.1.52 for a coupon would cite a rule about investment profit for interest income.
+The levy reaches neither, but only since **23.05.2020**: until Закон № 466-IX struck it, a
+carve-out in пп. 1.7 п. 16-1 підрозділу 10 розділу XX excluded exactly these incomes from the
+levy exemption, so ОВДП income bore the levy despite being PIT-exempt. Cited is still not
+verified: nobody has checked any of it against the Tax Code on the owner's behalf, so
+`verified_on` is empty and every figure derived from the class renders marked. See §11.
 
 **Also absent, deliberately rather than by oversight:** accrued interest settled at
 purchase; sale on the secondary market before maturity, and the thin-market haircut that
@@ -2349,11 +2352,18 @@ an entry so that "everything just works" — would put an invented legal fact in
 while every gate stayed green, which is the one mistake in this area that no test can catch
 after the fact. **A schedule that never refuses is a schedule someone back-dated.**
 
-Every entry in `data/tax/ua.toml` is currently dated **2026-06-30**, because that is the
-"Last reviewed" date printed on the cited source and the earliest date at which it attests
-each rate was in force. None of the three classes has a legislated commencement date behind
-it, and each entry's `note` says so in as many words. An event dated before 2026-06-30 stops
-the run; the remedy is a citation for an earlier entry, never a widened date.
+The three entries in `data/tax/ua.toml` are dated **differently, and each one's `note` says
+which rule dated it**. `ua_government_bond` starts **2020-05-23** and `ua_investment_profit`
+**2024-12-01**: both are legislated commencements read off the amending laws themselves.
+`ua_ci_fund_distribution` still starts **2026-06-30**, which is not a commencement at all but
+the "Last reviewed" date printed on a secondary page — the 9% PIT half has no retrievable
+commencement, so the entry takes the earliest date its own citation attests and says so.
+
+An event before its class's earliest entry stops the run. The remedy is a citation that
+reaches further back, never a widened date — and 009 is the worked example of that remedy
+being taken rather than the shortcut: the OVDP exemption moved from a review date to
+2020-05-23 because the Tax Code's own commencements were retrieved, not because a run wanted
+it to.
 
 ### 25.3 Provenance is per entry
 

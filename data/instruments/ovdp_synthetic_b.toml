@@ -15,18 +15,16 @@
 # 1000 x 0.1225 x 0.25 = 30.625 per unit -- deliberately chosen so the difference from
 # issue A's day count is visible in arithmetic a reader can do in their head.
 #
-# ⚙ **This issue cannot be projected from its own issue date, and that is deliberate.**
-# Its first coupon falls 2026-06-02, before the earliest entry the `ua_government_bond`
-# exemption's citation reaches (2026-06-30, see `data/tax/ua.toml`), so a holding bought at
-# issue is refused with a typed `RateUndeclaredBefore` rather than charged at a rate nobody
-# cited. It is the repository's checked-in example of FR-012 firing on shipped data
-# (`tests/contract/test_declaration_loading.py::TestTheShippedRegistryRefusesAnUncoveredEvent`),
-# and a holding bought from 2026-07-02 projects completely. Issue A escapes only because
-# its first *taxable* event is its 2026-07-15 coupon — a purchase is not taxable.
-#
-# The remedy is a citation that reaches further back, never an edit to these dates: they
-# are invented, but moving them to dodge a refusal would hide the one thing the refusal
-# exists to show.
+# ⚙ **This issue used to be unprojectable from its own issue date, and no longer is.**
+# Its first coupon falls 2026-06-02, and the `ua_government_bond` exemption used to reach
+# back only to 2026-06-30 — a date taken off a secondary page because the Tax Code's own
+# commencement had not been retrieved — so a holding bought at issue was refused with a
+# typed `RateUndeclaredBefore`. Feature 009 retrieved the commencement (2020-05-23, see
+# `data/tax/ua.toml`), which is the remedy that was always the right one: a citation that
+# reaches further back, never an edit to these invented dates. The coupon is now charged
+# at the declared exemption — zero, citing the provision — and both facts are asserted in
+# `tests/contract/test_declaration_loading.py::TestTheRegistryRefusesAnUncoveredEvent`,
+# which watches the refusal on a copy of the data root with that one field pushed forward.
 
 [instrument]
 id           = "ovdp_synthetic_b"
