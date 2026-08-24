@@ -2854,6 +2854,14 @@ both are unioned into the amounts explicitly. That is also the only way an unver
 *deadline* can be seen at all: `due_on` is a `date`, and a date carries no provenance here, so
 the rule's mark shows up on the liability and on the payment that settles it instead.
 
+**Zeroes included, and they were the hole.** A loss year's base and a quiet year's whole
+statement are built out of zeroes, and `money.zero` rests on nothing by construction — so a
+year that owed nothing used to report a `rests_on` saying *unverified* beside four amounts
+saying nothing at all. A statement's zero is not the additive identity: a base of zero is the
+clamp the statute puts on a negative annual result, and a carryforward of zero is what the
+declared rule says the year leaves behind. Both cite the rule that produced them, and the
+sweep that checks it no longer skips zeroes.
+
 One value has no source: **how a payment deadline falling on a non-business day is treated**.
 The convention is declared as the one that applies the cited date exactly as cited, because
 `following` would assert that the law grants an extension — a second legal fact nobody has

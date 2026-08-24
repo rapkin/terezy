@@ -873,23 +873,42 @@ def test_the_assumed_figure_carries_the_forecasts_citation_and_the_nominal_side(
 # themselves, so a field added later is inside the claim rather than outside it.
 
 
+def _amounts_within(name: str, value: object) -> Iterator[tuple[str, Money]]:
+    """Every ``Money`` reachable from one field, including inside tuples of tuples.
+
+    Descending rather than testing ``isinstance(value, Money)`` at the top level: a field can
+    be a *container* of amounts -- ``CarryforwardState.origins`` is ``(origin year, amount)``
+    pairs -- and a sweep that only looked one level down would silently exclude it while
+    claiming to cover the record.
+    """
+    if isinstance(value, Money):
+        yield name, value
+    elif isinstance(value, tuple):
+        for index, item in enumerate(value):
+            yield from _amounts_within(f"{name}[{index}]", item)
+
+
 def _statement_amounts(statement: tax_year.AnnualStatement) -> Iterator[tuple[str, Money]]:
-    """Every ``Money`` a statement carries, named by where it sits.
+    """Every ``Money`` a statement computes for itself, named by where it sits.
 
     Swept from the dataclasses rather than listed, on the same reasoning the projection sweep
     above gives: a field added to a liability or a carryforward next year is inside this claim
-    without anybody remembering to add it.
+    without anybody remembering to add it, container-valued fields included.
+
+    ``charges`` is deliberately outside the scope. Those amounts are feature 001's, computed by
+    ``tax.flat_rate`` before any year existed and resting on their own rate entries; the claim
+    here is about the figures the *year* produces from a declared assessment rule.
     """
     for field in dataclasses.fields(statement.liability):
-        value = getattr(statement.liability, field.name)
-        if isinstance(value, Money):
-            yield f"liability.{field.name}", value
+        yield from _amounts_within(
+            f"liability.{field.name}", getattr(statement.liability, field.name)
+        )
     yield "netted_base", statement.netted_base
     if statement.carryforward is not None:
         for field in dataclasses.fields(statement.carryforward):
-            value = getattr(statement.carryforward, field.name)
-            if isinstance(value, Money):
-                yield f"carryforward.{field.name}", value
+            yield from _amounts_within(
+                f"carryforward.{field.name}", getattr(statement.carryforward, field.name)
+            )
 
 
 def _assessed_under(rules: tax_year.AssessmentRules) -> tuple[tax_year.AnnualStatement, ...]:
@@ -977,6 +996,10 @@ def _tax_year_events() -> tuple[Event, ...]:
             lot_ref=LotRef(instrument_id="fixture", lot_id=None),
             quantity=100.0,
         ),
+        # A year with no investment operation at all, so the sweep covers the quiet-year
+        # branch as well as the loss and gain ones. Its whole statement is built out of
+        # zeroes, which is exactly where an unverified rule used to stop reaching.
+        event(6, date(2027, 4, 1), EventKind.CASH_DEPOSIT, 100.0),
     )
 
 
@@ -1038,11 +1061,9 @@ def test_an_unverified_assessment_rule_marks_every_figure_of_the_year_it_governs
             continue
         assert prov.is_unverified(statement.liability.rests_on), statement.tax_year
         for name, amount in _statement_amounts(statement):
-            if amount.amount == 0.0:
-                continue
             assert prov.is_unverified(amount.provenance), f"{statement.tax_year} {name}"
             marked += 1
-    assert marked, "the sweep found no non-zero figure to be about"
+    assert marked, "the sweep found no figure to be about"
 
 
 def test_the_unverified_rule_reaches_the_payment_that_settles_the_year() -> None:
@@ -1077,8 +1098,6 @@ def test_an_unverified_deadline_marks_the_money_even_though_it_cannot_mark_the_d
     for statement in settled.statements:
         assert statement.due_on is not None
         for name, amount in _statement_amounts(statement):
-            if amount.amount == 0.0:
-                continue
             assert prov.is_unverified(amount.provenance), f"{statement.tax_year} {name}"
     for payment in settled.payments:
         assert prov.is_unverified(payment.amount.provenance), payment.tax_year
@@ -1109,14 +1128,31 @@ def test_the_unverified_rule_is_named_on_the_figure_rather_than_merely_flagged()
         assert tax_years.UNVERIFIED_SOURCE in statement.liability.rests_on.sources
 
 
+def test_the_sweep_reaches_amounts_held_inside_a_container() -> None:
+    """Otherwise "every field is inside this claim" is false for any container of ``Money``.
+
+    ``CarryforwardState.origins`` is ``(origin year, amount)`` pairs, and it is already such a
+    field. A sweep testing ``isinstance(value, Money)`` at the top level skips it in silence.
+    """
+    swept = {
+        name
+        for statement in _assessed_under(tax_years.rules())
+        for name, _ in _statement_amounts(statement)
+    }
+
+    assert any(name.startswith("carryforward.origins[") for name in swept), sorted(swept)
+
+
 def test_no_money_a_statement_carries_rests_on_nothing_at_all() -> None:
     """A figure with empty provenance would be an amount that admits no origin.
 
-    Zeroes are the exception and are named: the additive identity of a sum rests on no
-    observation, which is the one legitimate use of empty provenance (``money.zero``).
+    **Zeroes included, and they are the point.** ``money.zero`` rests on nothing because the
+    additive identity is not an observation -- but a *statement's* zero is: a base of zero is
+    the clamp the statute puts on a negative annual result, and a carryforward of zero is what
+    the declared rule says the year leaves behind. A zero that cannot cite the rule that
+    produced it is indistinguishable from a rule that never ran, which is the reading
+    ``money.scale_sourced`` was written to forbid.
     """
     for statement in _assessed_under(tax_years.rules()):
         for name, amount in _statement_amounts(statement):
-            if amount.amount == 0.0:
-                continue
             assert amount.provenance.sources, f"{statement.tax_year} {name}"

@@ -22,7 +22,7 @@ would owe" is not expressible here -- see :class:`AssessedLiability` (FR-024).
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 from enum import Enum
 from typing import Final
@@ -1153,7 +1153,7 @@ def _netting_year(
     Step 3 is the only clamp in the feature, and it is the clamp the statute makes: a negative
     annual result means a zero base and no levy, with the loss preserved rather than swallowed.
     """
-    zero = money.zero(currency)
+    zero, carried = _under(declared, currency, carried)
     if not items:
         # A year in which this category saw nothing. The balance passes through untouched and
         # no filing decision is needed: the duty attaches to years with investment operations
@@ -1194,9 +1194,10 @@ def _netting_year(
         return single
 
     # See ``_per_event_year``: the mark on a declared rule rides on the money, because the
-    # money is what a reader is handed. Attaching it to ``netted`` is enough for the whole
-    # year -- the base, both lines, the carryforward and the payment are all derived from it
-    # by ``money`` functions, and every one of those unions provenance (FR-027).
+    # money is what a reader is handed. ``_under`` has already put ``declared`` on this year's
+    # zero and on the balance carried into it, so every figure below either derives from one
+    # of those by a ``money`` function -- each of which unions provenance -- or from ``netted``
+    # here (FR-027).
     netted = money.also_resting_on(money.total([item.result for item in items], currency), declared)
     claimable = available if filed else zero
     outcome = _apply_carryforward(
@@ -1230,7 +1231,7 @@ def _netting_year(
     )
     state = CarryforwardState(
         filed=filed,
-        brought_in=carried.balance,
+        brought_in=carried.balance,  # already under ``declared``: see ``_under``
         applied=outcome.applied,
         created=outcome.created,
         forfeited=money.add(forfeited_by_chain, outcome.forfeited),
@@ -1258,6 +1259,31 @@ def _netting_year(
         shadow=outcome.shadow_after,
         cost_to_date=cost_to_date,
         last_operations_year_filed=filed,
+    )
+
+
+def _under(declared: Provenance, currency: Currency, carried: _Carried) -> tuple[Money, _Carried]:
+    """This year's zero and its opening balances, all resting on the rules that produced them.
+
+    A zero here is **not** the additive identity ``money.zero`` stands for. A base of zero is a
+    figure the statute produced -- the clamp пп. 170.2.6 puts on a negative annual result -- and
+    a carryforward of zero is what a declared carryforward rule says the year leaves behind.
+    Leaving those as bare zeroes was how an unverified rule marked a loss year's ``rests_on``
+    and none of its amounts: the loss branches return ``base``, ``applied`` and ``forfeited``
+    straight from the zero, and a quiet year is built out of nothing else.
+
+    The balance carried in is re-marked for the same reason. It is reported *on this statement*,
+    computed under these declared rules, and the first year's opening zero rests on nothing at
+    all -- so without this it would arrive unmarked and leave unmarked.
+    """
+    return (
+        money.also_resting_on(money.zero(currency), declared),
+        replace(
+            carried,
+            balance=money.also_resting_on(carried.balance, declared),
+            shadow=money.also_resting_on(carried.shadow, declared),
+            cost_to_date=money.also_resting_on(carried.cost_to_date, declared),
+        ),
     )
 
 
