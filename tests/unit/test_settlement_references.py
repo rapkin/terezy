@@ -274,7 +274,7 @@ class TestAnAllocationPointingForwardIsRefusedRatherThanRenumbered:
             _event(3, date(2026, 1, 7), EventKind.COUPON, 500.00),
         )
 
-        with pytest.raises(LedgerInvariantError, match="allocated to event 3, which comes after"):
+        with pytest.raises(LedgerInvariantError, match="it comes later in this stream"):
             settlement.settle(
                 stream,
                 (),

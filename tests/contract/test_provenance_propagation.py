@@ -1065,10 +1065,11 @@ def test_the_unverified_rule_reaches_the_payment_that_settles_the_year() -> None
 def test_an_unverified_deadline_marks_the_money_even_though_it_cannot_mark_the_date() -> None:
     """The omission a ``date`` forces, made visible instead of left silent.
 
-    ``AnnualStatement.due_on`` and ``TaxPayment.due_on`` are bare dates and nothing in this
-    codebase lets a date carry a mark -- ``Money`` is the only record with provenance. So the
-    timing rule's own ``verified_on`` has to travel on the amounts, and this is the assertion
-    that it does: leave the *deadline* unchecked and the liability and the payment say so.
+    ``AnnualStatement.due_on`` and ``TaxPayment.due_on`` are bare dates, and there is no
+    dated-value wrapper here the way ``Money`` is an amount carrying its sources -- so a date
+    has nowhere to hold a mark. The timing rule's own ``verified_on`` therefore has to travel
+    on the amounts, and this is the assertion that it does: leave the *deadline* unchecked and
+    the liability and the payment say so.
     """
     settled = _settled_under(_unverified_timing())
 

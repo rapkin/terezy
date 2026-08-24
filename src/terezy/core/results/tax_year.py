@@ -45,8 +45,9 @@ class TaxPayment:
     """From the declared timing rule and its non-business-day convention -- never computed by
     the engine, and never today's date.
 
-    A bare ``date``, because only ``Money`` carries provenance in this codebase: the rule's
-    own ``verified_on`` cannot ride here, so it rides on :attr:`amount` instead.
+    A bare ``date``, with nothing to hang a mark on: there is no dated-value wrapper the way
+    ``Money`` is an amount carrying its sources, so the rule's own ``verified_on`` rides on
+    :attr:`amount` instead.
     """
 
     amount: Money
@@ -385,21 +386,20 @@ def _moved(event: Event, moved: dict[int, int], *, sequence: int) -> Event:
     """One event at its new sequence number, with its fee allocation following it.
 
     The mapping is filled as the stream is walked, so it holds only events already emitted.
-    A fee allocated to an event further down the stream is therefore not resolvable here, and
-    is refused by name rather than by ``KeyError``: a fee that names a later event is a stream
-    that is not the history it claims to be, and nothing upstream checks the direction --
-    ``allocated_fees`` checks membership and ``in_sequence`` checks the order, and neither is
-    a statement about which way an allocation points.
+    An allocation this walk cannot resolve is refused by name rather than by ``KeyError``, and
+    nothing upstream would have caught it: ``allocated_fees`` checks that the target is in the
+    stream and ``in_sequence`` checks that the dates ascend, and neither is a statement about
+    which way an allocation points.
     """
     moved[event.sequence] = sequence
     target = None if event.allocated_to is None else moved.get(event.allocated_to)
     if event.allocated_to is not None and target is None:
         raise LedgerInvariantError(
-            f"fee event {event.sequence} is allocated to event {event.allocated_to}, which "
-            "comes after it in the stream. A fee is a cost of something that has already "
-            "happened, so an allocation points backwards; one pointing forwards means the "
-            "stream is not the history it claims to be, and renumbering it would silently "
-            "move the allocation onto whichever event inherits that number."
+            f"fee event {event.sequence} is allocated to event {event.allocated_to}, which is "
+            "not among the events already emitted -- it comes later in this stream, or it is "
+            "not in this stream at all. A fee is a cost of something that has already "
+            "happened, so an allocation points backwards; renumbering one that does not would "
+            "silently move it onto whichever event inherits that number."
         )
     return replace(event, sequence=sequence, allocated_to=target)
 

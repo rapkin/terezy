@@ -59,18 +59,24 @@ holds two files, `ovdp_synthetic_a.toml` and `ovdp_synthetic_b.toml`. Every term
 describes a bond anyone can buy, and none may be quoted as if it did.**
 
 **The tax exemption is cited but unverified.** `data/tax/ua.toml` declares the
-`ua_government_bond` class with a PIT rate of 0% and a military levy of 0%, cited to a
-secondary source (PwC's tax summaries) and **not** checked against the Tax Code of
-Ukraine. Its `verified_on` is empty, so every figure derived from it renders marked. See
-§11.
+`ua_government_bond` class with a PIT rate of 0% and a military levy of 0%. Both zeroes now
+cite the primary text — пп. 165.1.52 ПКУ for the PIT exemption, and Закон № 466-IX taking
+ОВДП out of the levy's exception list from 23.05.2020 — rather than a foreign summary of it.
+Cited is still not verified: nobody has checked either against the Tax Code themselves, so
+`verified_on` is empty and every figure derived from the class renders marked. The date the
+entry comes into force is a separate question and rests on a weaker citation still; the
+entry's own note says which citation does what. See §11.
 
 **Also absent, deliberately rather than by oversight:** accrued interest settled at
 purchase; sale on the secondary market before maturity, and the thin-market haircut that
 would apply to one; restructuring and default; pricing future purchases off a yield curve
 instead of a single declared yield; any exchange rate at all (there is one currency, and
-the core contains no conversion function); the date the tax liability is actually settled;
-loss offset against other income; and public holidays, which are uncited domain knowledge
-and therefore data this repository does not yet hold (see §2.3).
+the core contains no conversion function); the date the tax liability is actually settled,
+which the model now has and this figure deliberately does not — the hurdle rate places a
+charge at **accrual**, because what a holding earns is a claim about the paper and when the
+money leaves is a fact about the owner's tax year (§28.1); loss offset against **other
+income**, which the law does not allow anyway (§28.2); and public holidays, which are
+uncited domain knowledge and therefore data this repository does not yet hold (see §2.3).
 
 ---
 
@@ -2774,6 +2780,12 @@ The consequence is structural rather than editorial: `AssessedLiability` cannot 
 without a `LotMethod` and the declared `MethodStanding` that says what backs it, and there is
 no field holding a bare total. "The tax you would owe" is not expressible.
 
+**And the label is checked, not stamped.** The method a year is assessed under has to be the
+one the ledger's disposals were actually consumed by, and the settlement has to fold under the
+method the statements were assessed on. Where either disagrees the run refuses and names both
+sides: an assessment labelled LIFO over a FIFO gain is not a wrong word, it is a different tax
+on the same trade.
+
 The four, on one three-lot position selling 150 of 400 units for 37 500.00
 (`tests/worked_examples/test_four_lot_methods.py`):
 
@@ -2824,6 +2836,13 @@ overstate the outcome by exactly the tax.
 carryforward rule, the deadlines and settlement behaviour, and what the sources say about each
 basis method. Every table carrying a number is cited and every `verified_on` is empty, so
 every figure resting on one renders marked.
+
+**The mark travels on the money**, not only on the record that holds the rule. A netting
+treatment is why the year's operations were summed into one base at all, and a deadline is why
+the resulting liability falls due when it does — neither is a factor in any multiplication, so
+both are unioned into the amounts explicitly. That is also the only way an unverified
+*deadline* can be seen at all: `due_on` is a `date`, and a date carries no provenance here, so
+the rule's mark shows up on the liability and on the payment that settles it instead.
 
 One value has no source: **how a payment deadline falling on a non-business day is treated**.
 The convention is declared as the one that applies the cited date exactly as cited, because

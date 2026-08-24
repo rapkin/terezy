@@ -47,12 +47,11 @@ negative. A charge is recorded on the outflow side of the account (it is a debt 
 recognised, never a receipt), and multiplying by ``-0.0`` keeps the recorded amount on that
 side while making its magnitude nothing.
 
-**The sign is a cosmetic pin, not a regression guard.** ``canonical.of_number`` normalises
-``-0.0`` before hashing, every comparison in this engine is ``==``/``<``/``>``, and
-``money.total`` starts from ``+0.0``, so the sign changes no figure, no digest and no ranking.
-The single place it survives is the ``repr`` in 001's golden rendering. Flipping it would
-therefore move that artefact while proving nothing had changed -- which is a reason to leave
-it alone, and not a claim that anything rests on it.
+**The sign is a cosmetic pin, not a regression guard.** A signed zero carries no information
+about an amount, and ``canonical.of_number`` normalises it away before hashing -- so the only
+place it can be seen at all is a ``repr`` in 001's golden rendering, whose own header says as
+much. Flipping it would move that artefact while proving nothing had changed, which is a
+reason to leave it alone and not a claim that anything rests on it.
 """
 
 
@@ -540,11 +539,11 @@ class AnnualStatement:
     convention. ``None`` only for a withheld-at-source class, where there is no later date
     because there is no later payment.
 
-    **A bare date, because a date cannot carry a mark here.** ``Money`` is the only record in
-    this codebase that carries :class:`~terezy.core.primitives.provenance.Provenance`, so the
-    timing rule's own ``verified_on`` cannot ride on this field. It rides on the money
-    instead: the rule's provenance is unioned into every amount this statement carries, so an
-    unverified deadline marks the liability and the payment that settles it rather than
+    **A bare date, and there is nothing to hang a mark on.** There is no dated-value wrapper
+    here the way :class:`~terezy.core.primitives.money.Money` is an amount carrying its own
+    sources, so the timing rule's ``verified_on`` cannot ride on this field. It rides on the
+    money instead: the rule's provenance is unioned into every amount this statement carries,
+    so an unverified deadline marks the liability and the payment that settles it rather than
     quietly marking nothing (``tests/contract/test_provenance_propagation.py``).
     """
 
