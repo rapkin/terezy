@@ -142,7 +142,6 @@ def _settled(*, withdrawal: float) -> settlement.Settlement | settlement.Settlem
         rules=tax_years.rules(),
         tax_classes=tax_years.TAX_PACK,
         filing=tax_years.filing(y2027=True),
-        method=LotMethod.FIFO,
         switches=tax_years.positions(),
     )
     assert isinstance(statements, tuple), statements
@@ -272,7 +271,6 @@ class TestAWithheldAtSourceClassRefusesRatherThanSelfAssessing:
             rules=withheld,
             tax_classes=tax_years.TAX_PACK,
             filing=tax_years.filing(y2027=True),
-            method=LotMethod.FIFO,
             switches=tax_years.positions(),
         )
         assert isinstance(statements, tuple), statements

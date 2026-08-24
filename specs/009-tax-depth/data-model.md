@@ -45,7 +45,7 @@ from while leaving the citation behind, and no second copy to drift from the fir
 | `pit` | `Money` | |
 | `levy` | `Money` | Assessed on the **same netted base** as the PIT (FR-017) |
 | `base` | `Money` | The netted, carryforward-reduced figure both rates were applied to |
-| `method` | `LotMethod` | The method the ledger's disposals were consumed by, checked against `LedgerState.consumption_method` rather than stamped |
+| `method` | `LotMethod` | The method the ledger's disposals were consumed by, **read from** `LedgerState.consumption_method` rather than taken as an argument |
 | `standing` | `MethodStanding` | What the law is found to say about that method |
 | `rests_on` | `Provenance` | The rate entries, the timing rule, the category, the standing |
 
@@ -106,7 +106,7 @@ whole timing rule, not only the due date).
 | `DueDateRuleUndeclared` | A taxable event with no declared rule (FR-005) |
 | `FilingStatusUndeclared` | The loss-year branch not stated (FR-014) |
 | `MethodUndeclared` | A disposal with no method named (FR-024) |
-| `MethodDisagreesWithLedger` | The method a year is assessed under is not the one its disposals were consumed by (FR-024) |
+| `MethodDisagreesWithStatements` | A settlement folds under a method the statements it is paying were not assessed under (FR-024). There is no counterpart on the assessment: `statements` reads the ledger's own method rather than taking one, so the disagreement is unrepresentable there |
 | `LotNotNamed` | Specific-lot without a named lot (FR-021) |
 | `LotNamedUnderWrongMethod` | A lot named under any other method (FR-022) |
 | `InsufficientCashForTax` | Shortfall, date and statement named; nothing sold (FR-009, D7) |

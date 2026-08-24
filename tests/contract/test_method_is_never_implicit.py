@@ -5,11 +5,11 @@ individual, they give **different numbers** on the same trades, and nothing sett
 single figure called "the tax you would owe" would therefore be more confident than its
 inputs, where the input is an unanswered legal question.
 
-So the claims under test are about the **types** and about the **check**: no record this
-feature emits can be built holding a liability without the method that produced it, no name is
-a method until it has been checked against the closed set, and the method a figure is labelled
-with is the one the ledger's disposals were actually consumed by -- refused by name where it
-is not, because a label nothing checks is not a label.
+So the claims under test are about the **types**: no record this feature emits can be built
+holding a liability without the method that produced it, no name is a method until it has been
+checked against the closed set, and the method a figure is labelled with is read off the
+ledger it was assessed from rather than passed in beside it -- which is how a label that
+nothing checks is prevented rather than detected.
 """
 
 from __future__ import annotations
@@ -118,7 +118,6 @@ class TestAStandingIsDeclaredRatherThanCompiledIn:
             rules=_rules_without_standings(),
             tax_classes={},
             filing=tax_year.FilingDecisions(owner_id="owner-1", declared_at="test", by_year={}),
-            method=LotMethod.FIFO,
             switches=tax_year.UnsettledPositions(chain=None, method=None),
         )
 
@@ -141,35 +140,45 @@ class TestAStandingIsDeclaredRatherThanCompiledIn:
             assert standing.what_the_law_says, standing.method
 
 
-class TestAMethodIsCheckedAgainstTheLedgerItAssesses:
-    """A label nothing checks is not a label. FR-024 is about the figure, not the argument."""
+class TestAFigureIsLabelledWithTheMethodItsLedgerUsed:
+    """FR-024 is about the figure, not about an argument -- so there is no argument.
+
+    ``statements`` reads the method off ``LedgerState.consumption_method``, the field that
+    actually decided which lots each disposal drew on. A second argument saying the same thing
+    could say it differently, and did: the label was a stamp until this round.
+    """
 
     def test_the_two_methods_would_genuinely_produce_different_tax(self) -> None:
-        """The premise: a mismatch is a wrong number, not a wrong word."""
+        """The premise, worth pinning: a mislabel would be a wrong number, not a wrong word."""
         assert _gain_under(LotMethod.FIFO) == FIFO_GAIN
         assert _gain_under(LotMethod.LIFO) == LIFO_GAIN
         assert _gain_under(LotMethod.FIFO) != _gain_under(LotMethod.LIFO)
 
-    def test_assessing_under_a_method_the_ledger_did_not_consume_by_is_refused(self) -> None:
-        state = _folded(LotMethod.FIFO)
+    @pytest.mark.parametrize("method", [LotMethod.FIFO, LotMethod.LIFO])
+    def test_the_year_is_labelled_and_charged_by_the_ledgers_own_method(
+        self, method: LotMethod
+    ) -> None:
+        """One fold, one method, one label -- and the base is that method's own gain.
 
-        outcome = _assess(state, method=LotMethod.LIFO)
-
-        assert isinstance(outcome, tax_year.MethodDisagreesWithLedger), outcome
-        assert outcome.assessed_under is LotMethod.LIFO
-        assert outcome.ledger_folded_under == LotMethod.FIFO.value
-
-    def test_the_matching_method_assesses_the_ledgers_own_gain(self) -> None:
-        """The falsifying half: the refusal is about disagreement, not about assessing."""
-        assessed = _assess(_folded(LotMethod.FIFO), method=LotMethod.FIFO)
+        The label is not asserted against the argument that produced the ledger but against
+        the hand-computed gain the two methods differ by, so a label that came from anywhere
+        else would have to coincide with the arithmetic to pass.
+        """
+        assessed = _assess(_folded(method))
 
         assert isinstance(assessed, tuple), assessed
         year = next(item for item in assessed if item.tax_year == SOLD_ON.year)
-        assert year.liability.method is LotMethod.FIFO
-        assert year.liability.base.amount == FIFO_GAIN
+        assert year.liability.method is method
+        assert year.liability.base.amount == (FIFO_GAIN if method is LotMethod.FIFO else LIFO_GAIN)
 
     def test_settling_under_a_method_the_statements_were_not_assessed_on_is_refused(self) -> None:
-        assessed = _assess(_folded(LotMethod.FIFO), method=LotMethod.FIFO)
+        """``settle`` keeps its argument, and earns it.
+
+        It folds the raw stream before it has looked at the statements, and must fold when
+        there are none -- so there is nothing to derive from. It also catches what no type
+        could: a caller can assemble one sequence out of two assessments under two methods.
+        """
+        assessed = _assess(_folded(LotMethod.FIFO))
         assert isinstance(assessed, tuple), assessed
 
         outcome = settlement.settle(
@@ -263,7 +272,7 @@ def _gain_under(method: LotMethod) -> float:
 
 
 def _assess(
-    state: LedgerState, *, method: LotMethod
+    state: LedgerState,
 ) -> tuple[tax_year.AnnualStatement, ...] | tax_year.TaxYearRefused:
     charged = flat_rate.charge(
         _events()[3],
@@ -282,6 +291,5 @@ def _assess(
         rules=tax_years.rules(),
         tax_classes=tax_years.TAX_PACK,
         filing=tax_years.filing(y2027=True),
-        method=method,
         switches=tax_years.positions(),
     )

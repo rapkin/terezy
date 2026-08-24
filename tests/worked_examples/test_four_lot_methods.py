@@ -173,7 +173,6 @@ def _statement(method: LotMethod) -> tax_year.AnnualStatement:
         rules=tax_years.rules(),
         tax_classes=tax_years.TAX_PACK,
         filing=tax_years.filing(y2026=True),
-        method=method,
         switches=tax_years.positions(),
     )
     assert isinstance(built, tuple), built

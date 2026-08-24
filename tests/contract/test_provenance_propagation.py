@@ -937,7 +937,6 @@ def _assessed_under(rules: tax_year.AssessmentRules) -> tuple[tax_year.AnnualSta
         rules=rules,
         tax_classes=tax_years.TAX_PACK,
         filing=tax_years.filing(y2025=True, y2026=True),
-        method=lots.LotMethod.FIFO,
         switches=tax_years.positions(),
     )
     assert isinstance(built, tuple), built

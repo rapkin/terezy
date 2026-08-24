@@ -222,7 +222,6 @@ def _statements(
         rules=tax_years.rules(),
         tax_classes=tax_years.TAX_PACK,
         filing=tax_years.filing(y2025=filed_2025, y2026=True),
-        method=LotMethod.FIFO,
         switches=tax_years.positions(),
     )
     assert isinstance(built, tuple), built

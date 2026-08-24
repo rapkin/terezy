@@ -566,7 +566,6 @@ def _assess(
         rules=rules if rules is not None else tax_years.rules(),
         tax_classes=tax_years.TAX_PACK,
         filing=filing if filing is not None else tax_years.filing(y2027=True),
-        method=LotMethod.FIFO,
         switches=tax_years.positions(),
     )
 
@@ -586,7 +585,6 @@ def _settled(*, pay_by: tuple[int, int]) -> settlement.Settlement:
         ),
         tax_classes=tax_years.TAX_PACK,
         filing=tax_years.filing(y2027=True),
-        method=LotMethod.FIFO,
         switches=tax_years.positions(),
     )
     assert isinstance(statements, tuple), statements

@@ -494,7 +494,6 @@ def _settle_tax(
         rules=tax_years.rules(),
         tax_classes=tax_years.TAX_PACK,
         filing=tax_years.filing(y2027=True),
-        method=lots.LotMethod.FIFO,
         switches=tax_years.positions(),
     )
     assert isinstance(assessed, tuple), assessed

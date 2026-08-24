@@ -883,7 +883,6 @@ class TestTaxDepthChangedNothingAboutTheExemptPath:
             rules=rules,
             tax_classes=declarations.tax_classes,
             filing=filing,
-            method=lots.LotMethod.FIFO,
             switches=switches,
         )
         assert isinstance(assessed, tuple), assessed

@@ -2791,11 +2791,12 @@ The consequence is structural rather than editorial: `AssessedLiability` cannot 
 without a `LotMethod` and the declared `MethodStanding` that says what backs it, and there is
 no field holding a bare total. "The tax you would owe" is not expressible.
 
-**And the label is checked, not stamped.** The method a year is assessed under has to be the
-one the ledger's disposals were actually consumed by, and the settlement has to fold under the
-method the statements were assessed on. Where either disagrees the run refuses and names both
-sides: an assessment labelled LIFO over a FIFO gain is not a wrong word, it is a different tax
-on the same trade.
+**And the label is not a stamp.** An assessment takes no method: it reads the one the ledger
+was folded under, which is the field that actually decided which lots each disposal drew on,
+so there is no second value to disagree with it. Settling a year does still take one — it
+folds the stream before it has looked at the statements, and must fold when there are none —
+so there the run refuses and names both sides. An assessment labelled LIFO over a FIFO gain is
+not a wrong word, it is a different tax on the same trade.
 
 The four, on one three-lot position selling 150 of 400 units for 37 500.00
 (`tests/worked_examples/test_four_lot_methods.py`):

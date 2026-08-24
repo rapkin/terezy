@@ -166,7 +166,6 @@ def _statements() -> tuple[tax_year.AnnualStatement, ...]:
         rules=tax_years.rules(),
         tax_classes=tax_years.TAX_PACK,
         filing=tax_years.filing(y2027=True),
-        method=LotMethod.FIFO,
         switches=tax_years.positions(),
     )
     assert isinstance(built, tuple), built
@@ -274,29 +273,19 @@ class TestTheYearIsAssembledAfterwards:
         assert quiet.zero_because is tax_year.ZeroReason.NO_TAXABLE_EVENTS
         assert_money_close(tax_year.liability_total(quiet.liability), _uah(0.0))
 
-    def test_a_liability_cannot_name_a_method_the_ledger_did_not_consume_by(self) -> None:
-        """FR-024, checked rather than stamped.
+    def test_every_liability_names_the_method_the_ledger_consumed_by(self) -> None:
+        """FR-024. True by construction now, and written down for that reason.
 
-        The label on every figure is read back against ``LedgerState.consumption_method`` --
-        the field that actually decided which lots the disposal drew on -- and assessing the
-        same ledger under another method is refused by name rather than relabelled.
+        ``statements`` takes no method: it reads ``LedgerState.consumption_method``, so this
+        is a tautology restating what the code guarantees rather than a claim about something
+        that could drift. It stays because the guarantee is the requirement, and a reader
+        arriving at ``AssessedLiability.method`` should find where it comes from.
         """
         state = _gross_ledger()
+
         for statement in _statements():
             assert statement.liability.method.value == state.consumption_method
             assert statement.liability.standing.method.value == state.consumption_method
-
-        relabelled = tax_year.statements(
-            state,
-            (_charge(state),),
-            rules=tax_years.rules(),
-            tax_classes=tax_years.TAX_PACK,
-            filing=tax_years.filing(y2027=True),
-            method=LotMethod.LIFO,
-            switches=tax_years.positions(),
-        )
-
-        assert isinstance(relabelled, tax_year.MethodDisagreesWithLedger), relabelled
 
 
 class TestTheMoneyLeavesOnTheDeclaredDate:

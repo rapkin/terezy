@@ -28,6 +28,7 @@ from enum import Enum
 from typing import Final
 
 from terezy.core.errors import LedgerInvariantError
+from terezy.core.ledger import lots
 from terezy.core.ledger.engine import LedgerState
 from terezy.core.ledger.lots import LotMethod
 from terezy.core.primitives import conventions, money
@@ -398,9 +399,9 @@ class AssessedLiability:
     method: LotMethod
     """Which basis method produced the disposals behind the base.
 
-    Not a stamp. :func:`statements` refuses a method that is not the one the ledger's
-    disposals were consumed under (:class:`MethodDisagreesWithLedger`), so this names the
-    arithmetic that actually ran rather than the argument that happened to be passed.
+    Not a stamp: :func:`statements` takes no method and reads
+    ``LedgerState.consumption_method``, so this is the method the fold actually consumed by
+    and there is no argument it could disagree with.
     """
 
     standing: MethodStanding
@@ -607,25 +608,6 @@ class MethodStandingUndeclared:
 
 
 @dataclass(frozen=True, slots=True)
-class MethodDisagreesWithLedger:
-    """The method a year is assessed under is not the one its disposals were consumed by.
-
-    The two are separate arguments to two separate functions -- ``engine.opening`` takes the
-    consumption method, :func:`statements` takes the assessing one -- and only the first one
-    decides which lots a disposal actually drew on. Left unchecked, the second is a label:
-    ``AssessedLiability.method`` would say LIFO over a FIFO gain, which is not a rounding
-    difference but a different tax on the same trade, and FR-024 exists precisely so a figure
-    cannot hide its basis convention.
-
-    Both are named because the fix is one or the other, and which one is the caller's to know.
-    """
-
-    assessed_under: LotMethod
-    ledger_folded_under: str
-    reason: str
-
-
-@dataclass(frozen=True, slots=True)
 class RateChangedWithinTaxYear:
     """A netting year's items fall under two different dated rate entries.
 
@@ -681,7 +663,6 @@ TaxYearRefused = (
     | FilingStatusUndeclared
     | UnsettledPositionUndeclared
     | MethodStandingUndeclared
-    | MethodDisagreesWithLedger
     | RateChangedWithinTaxYear
     | CategoryTaxedByTwoClasses
     | TaxCurrencyConversionUnavailable
@@ -707,7 +688,6 @@ def statements(
     rules: AssessmentRules,
     tax_classes: Mapping[str, TaxClass],
     filing: FilingDecisions,
-    method: LotMethod,
     switches: UnsettledPositions,
 ) -> tuple[AnnualStatement, ...] | TaxYearRefused:
     """Fold a ledger's charges into one statement per ``(tax year x income category)``.
@@ -720,22 +700,24 @@ def statements(
     the charges arrive already recorded beside their events, and this function only reads
     them. That is defect B5 cured by shape rather than by care (research.md D1).
 
-    **Every keyword is required and none has a default.** The method, the filing decisions and
-    the unsettled positions are each a choice that changes the number, and a default for any
-    of them would be this tool taking a position on the owner's behalf.
+    **Every keyword is required and none has a default.** The filing decisions and the
+    unsettled positions are each a choice that changes the number, and a default for either
+    would be this tool taking a position on the owner's behalf.
 
     Years run from the first to the last event in the ledger, so a year in which a category
     saw nothing still produces a statement saying so -- FR-006's third distinguishable zero,
     and the difference between "nothing was owed" and "nobody looked".
 
-    **The method is checked against the ledger before anything is assessed.** ``state`` was
-    folded under one method and ``method`` labels every figure produced here; where they
-    differ the label would be false, so the assessment refuses rather than stamping it.
+    **The basis method is read off the ledger and is not an argument.** It is the method
+    ``state`` was folded under that decided which lots every disposal drew on, so it is the
+    only method these figures could honestly be labelled with -- and a second argument saying
+    the same thing is a second place for it to be said differently. There is still no default:
+    ``engine.opening`` required the name, and it is still required, one layer up (FR-024).
     """
-    basis = _basis_for(state, rules=rules, method=method, switches=switches)
+    basis = _basis_for(state, rules=rules, switches=switches)
     if not isinstance(basis, tuple):
         return basis
-    standing, method_switch = basis
+    method, standing, method_switch = basis
 
     grouped = _items(state, charges, rules)
     if isinstance(grouped, CategoryUndeclared | TaxCurrencyConversionUnavailable):
@@ -778,30 +760,15 @@ def _basis_for(
     state: LedgerState,
     *,
     rules: AssessmentRules,
-    method: LotMethod,
     switches: UnsettledPositions,
-) -> tuple[MethodStanding, UnsettledSwitch | None] | TaxYearRefused:
-    """Everything about the basis method a year needs before any figure exists.
+) -> tuple[LotMethod, MethodStanding, UnsettledSwitch | None] | TaxYearRefused:
+    """The basis method this ledger was folded under, and everything a year needs about it.
 
-    Three questions, answered together because a figure cannot be produced until all three
-    are: is this the method the ledger actually consumed by, what does the law say about it,
-    and does a figure under it rest on an unanswered question.
+    ``lots.method_named`` rather than a second argument: the name in the state has already
+    passed ``engine.opening``'s check, so it is a method here by construction and an unknown
+    one would be a state this engine could not have produced.
     """
-    if method.value != state.consumption_method:
-        return MethodDisagreesWithLedger(
-            assessed_under=method,
-            ledger_folded_under=state.consumption_method,
-            reason=(
-                f"this assessment is asked to label its figures {method.value!r} and the "
-                f"ledger it reads consumed its lots by {state.consumption_method!r}. The "
-                "ledger's method is the one that decided which lots each disposal drew on, "
-                "so the realised gains here are that method's and no other's -- labelling "
-                "them with a second method would put a basis convention on a figure that was "
-                "never computed under it, which is a different tax on the same trade "
-                "(FR-024). Fold the ledger under the method you mean to assess under, or "
-                "assess under the method the ledger was folded with."
-            ),
-        )
+    method = lots.method_named(state.consumption_method)
     standing = rules.methods.get(method)
     if standing is None:
         return MethodStandingUndeclared(
@@ -817,7 +784,7 @@ def _basis_for(
     switch = _method_switch(standing, switches)
     if isinstance(switch, UnsettledPositionUndeclared):
         return switch
-    return standing, switch
+    return method, standing, switch
 
 
 def _method_switch(

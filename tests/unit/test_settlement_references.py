@@ -155,7 +155,6 @@ def _statements() -> tuple[tax_year.AnnualStatement, ...]:
         rules=tax_years.rules(),
         tax_classes=tax_years.TAX_PACK,
         filing=tax_years.filing(y2027=True, y2029=True),
-        method=LotMethod.FIFO,
         switches=tax_years.positions(),
     )
     assert isinstance(built, tuple), built
