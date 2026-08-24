@@ -1551,6 +1551,24 @@ def _rate(
     # One guard for one rule: the three amounts the series is built out of -- what left, what
     # stayed behind, what came back -- have to be in one currency, because a money-weighted
     # return over two of them is not a rate of anything.
+    #
+    # ⚙ **The third amount makes this turn on divisibility, and that is right rather than
+    # inconsistent.** A hryvnia stream buying a dollar instrument and coming home in hryvnia
+    # is a perfectly good single-currency series -- money left in UAH, money returned in UAH,
+    # and the two conversions are costs inside it -- so it has a rate and refusing it would
+    # throw away an honest figure. The moment the unit price does not divide the arriving
+    # amount, a *dollar* remainder has to be netted off a *hryvnia* outlay, and that needs the
+    # reference rate feature 011 will bring. So the same tuple has a rate at one amount and
+    # not at another: the difference is a fact about what the data allows, and the refusal's
+    # own reason names the stranded amount and its currency so a reader can see which.
+    #
+    # It is unreachable today, and by two guards rather than by the shipped data:
+    # `_foreign_tax_currency` refuses a foreign instrument that declares tax classes, and the
+    # projection refuses one that does not the moment it pays income of a kind no class
+    # covers. Only an `InstrumentDeclaration` declares a `min_unit`, so only a bond can leave
+    # a remainder at all. Both halves are pinned in
+    # `tests/unit/test_rate_and_horizon_boundaries.py`, so a later feature that opens either
+    # one fails a test rather than discovering this branch by accident.
     currencies = {outlay.currency, endpoint} | (set() if stranded is None else {stranded.currency})
     if len(currencies) > 1:
         stayed = (

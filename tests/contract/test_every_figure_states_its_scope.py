@@ -73,16 +73,48 @@ CLASSIFIED: Final[frozenset[str]] = frozenset(
 """Every field of :class:`TupleOutcome`, classified. See the module docstring on why closed."""
 
 
+FLAT_FEE_ROUTE: Final = "test_flat_fee_in"
+
+
 def _outcome(
-    sent: float | None = None, *, registries: fixtures.Registries | None = None
+    sent: float | None = None,
+    *,
+    registries: fixtures.Registries | None = None,
+    flat: float | None = None,
 ) -> TupleOutcome:
+    """One tuple's outcome, optionally over a way in charging a flat fee and nothing else.
+
+    ``flat`` exists so a test can tell the outlay and the arriving amount apart. Over the
+    shipped domestic route they are one number, and a claim about which of them a figure rests
+    on cannot be checked against a pair that agrees.
+    """
+    resolved = registries or fixtures.shipped()
+    candidate = fixtures.hurdle_tuple()
+    if flat is not None:
+        resolved = fixtures.with_new_route(
+            resolved,
+            fixtures.route(
+                FLAT_FEE_ROUTE,
+                origin="monobank_uah",
+                destination="inzhur",
+                direction="inbound",
+                partner=fixtures.DOMESTIC_OUT,
+                fee_fixed=flat,
+            ),
+        )
+        candidate = fixtures.replace(
+            candidate,
+            route_in=fixtures.FundingPath(
+                destination_id="inzhur", stream_id=fixtures.SALARY, route_id=FLAT_FEE_ROUTE
+            ),
+        )
     outcome = evaluate(
-        fixtures.hurdle_tuple(),
+        candidate,
         amount=fixtures.AMOUNT if sent is None else fixtures.Money(sent, fixtures.UAH, prov.EMPTY),
         horizon=fixtures.DateRange(start=fixtures.ISSUE_DATE, end=fixtures.HORIZON_END),
         as_of=fixtures.AS_OF,
         continuation=fixtures.HOLD_AS_CASH,
-        registries=registries or fixtures.shipped(),
+        registries=resolved,
     )
     assert isinstance(outcome, TupleOutcome), outcome
     return outcome
@@ -136,20 +168,32 @@ class TestAScopeStatementIsCheckedAgainstTheBehaviourItDescribes:
     """
 
     def test_the_undeployed_clause_is_true_of_the_rate(self) -> None:
-        # 10 500.00 over the shipped domestic route arrives whole and buys ten units at par,
-        # stranding 500.00 at `inzhur`. The clause says the rate is measured on the money
-        # actually invested; if it is, this rate is the rate of the 10 000.00 purchase that
-        # buys exactly the same ten units, to the last digit.
-        stranded = _outcome(10_500.0)
-        exact = _outcome()
+        # The clause says the rate is measured on **the money actually invested**. Two things
+        # have to hold for that to be more than a phrase, and the second needs a way in that
+        # charges: over the shipped free route the outlay and the arriving amount are one
+        # number, and "netted off the outlay" is then indistinguishable from "measured on what
+        # arrived". So every run below crosses a flat-fee route.
+        #
+        #   100.00 flat, 10 100.00 sent -> 10 000.00 arrives -> 10 units, nothing over
+        #   100.00 flat, 10 500.00 sent -> 10 400.00 arrives -> 10 units, 400.00 over
+        #   500.00 flat, 10 500.00 sent -> 10 000.00 arrives -> 10 units, nothing over
+        #
+        # A remainder must move the figure by nothing (first against second: same money
+        # invested, same holding), and what left the stream must move it (first against third:
+        # same arriving amount, same holding, 400.00 more spent to get there).
+        exact = _outcome(10_100.0, flat=100.0)
+        stranded = _outcome(10_500.0, flat=100.0)
+        dearer = _outcome(10_500.0, flat=500.0)
         clause = next(item for item in stranded.excludes if "undeployed" in item)
         assert "money actually invested" in clause
         assert stranded.undeployed is not None
         assert exact.undeployed is None
-        left_over, deployed = stranded.implied_rate, exact.implied_rate
-        assert isinstance(left_over, NominalRate)
-        assert isinstance(deployed, NominalRate)
-        assert left_over.value == deployed.value
+        assert dearer.undeployed is None
+        rates = [outcome.implied_rate for outcome in (exact, stranded, dearer)]
+        assert all(isinstance(rate, NominalRate) for rate in rates)
+        values = [rate.value for rate in rates if isinstance(rate, NominalRate)]
+        assert values[0] == values[1]
+        assert values[2] < values[0]
 
     def test_a_constrained_way_names_itself_on_the_outcome(self) -> None:
         # `RampCost` says eight things about a way in; four reach the outcome and two more are

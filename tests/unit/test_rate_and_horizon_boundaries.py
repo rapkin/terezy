@@ -46,6 +46,7 @@ from terezy.core.results.tuple import (
     TupleOutcome,
     WayOutUnusable,
 )
+from terezy.core.routes.legs import Route
 from terezy.core.routes.path import DeclaredExit, FundingPath
 from terezy.core.tax.schedule import RateEntry
 from tests import tuple_registries as fixtures
@@ -361,3 +362,113 @@ class TestTheOtherWaysAPartRefuses:
         assert isinstance(outcome, TupleOutcome), outcome
         assert all(arrival.arrived_on == arrival.released_on for arrival in outcome.arrivals)
         assert next(line.amount for line in outcome.parts if line.part == "ramp_out").amount == 0.0
+
+
+class TestAForeignInstrumentIsClosedByTwoGuardsAndNotByTheShippedData:
+    """Why the rate's three-currency case has no test: it has no way in.
+
+    The rate is refused where what left, what stayed behind undeployed and what came back are
+    not all in one currency. The third amount is reachable only from a *bond* -- nothing else
+    declares a ``min_unit``, so nothing else leaves a remainder -- and a foreign-currency bond
+    is closed twice over. Both halves are asserted here rather than described, because "this
+    branch is unreachable" is precisely the claim that quietly stops being true: a later
+    feature that brings the official rate, or that lets an instrument declare an exempt kind
+    without a class, opens it, and it should fail a test on the way rather than surface as a
+    rate that appears at one amount and vanishes at another.
+    """
+
+    def _foreign(self, *, declares_tax: bool) -> Registries:
+        """The shipped bond redeclared in dollars, bought and sold at a dollar venue."""
+        registries = fixtures.shipped()
+        declared = registries.instruments[fixtures.OVDP]
+        registries = fixtures.replace(
+            registries,
+            instruments={
+                **registries.instruments,
+                fixtures.OVDP: fixtures.replace(
+                    declared,
+                    currency=Currency.USD,
+                    tax_classes=declared.tax_classes if declares_tax else {},
+                    terms=fixtures.replace(
+                        declared.terms,
+                        face_value=fixtures.replace(
+                            declared.terms.face_value, currency=Currency.USD
+                        ),
+                    ),
+                    constraints=fixtures.replace(
+                        declared.constraints,
+                        min_ticket=fixtures.replace(
+                            declared.constraints.min_ticket, currency=Currency.USD
+                        ),
+                    ),
+                ),
+            },
+        )
+        registries = fixtures.with_access(
+            registries,
+            fixtures.OVDP,
+            bought_at="binance",
+            proceeds_to="binance",
+            quote=fixtures.VenueQuote(
+                price=Money(1_000.0, Currency.USD, prov.EMPTY), kind="venue_terms"
+            ),
+        )
+        for route_id, origin, destination, sending, receiving, direction in (
+            ("test_uah_to_binance", "monobank_uah", "binance", UAH, Currency.USD, "inbound"),
+            ("test_binance_to_uah", "binance", "monobank_uah", Currency.USD, UAH, "exit"),
+        ):
+            leg = fixtures.replace(
+                fixtures.transfer_leg(from_venue=origin, to_venue=destination, currency=sending),
+                kind="fx",
+                to_ccy=receiving,
+                channel="p2p",
+                kind_of_observation="p2p_premium",
+            )
+            registries = fixtures.with_new_route(
+                registries,
+                Route(
+                    id=route_id,
+                    provider="TEST FIXTURE",
+                    origin=origin,
+                    destination=destination,
+                    direction="exit" if direction == "exit" else "inbound",
+                    partner_route=None,
+                    status="open",
+                    legs=(leg,),
+                ),
+            )
+        return registries
+
+    def _tuple(self) -> Tuple:
+        return Tuple(
+            instrument_id=fixtures.OVDP,
+            stream_id=fixtures.SALARY,
+            route_in=FundingPath(
+                destination_id="binance",
+                stream_id=fixtures.SALARY,
+                route_id="test_uah_to_binance",
+            ),
+            exit_terms=fixtures.HOLD_TO_MATURITY,
+            route_out=DeclaredExit(route_id="test_binance_to_uah"),
+        )
+
+    def test_one_that_declares_tax_classes_refuses_for_the_official_rate(self) -> None:
+        refusal = _evaluated(
+            self._foreign(declares_tax=True),
+            self._tuple(),
+            amount=Money(500_000.0, UAH, prov.EMPTY),
+        )
+        assert isinstance(refusal, TaxCurrencyConversionUnavailable), refusal
+
+    def test_one_that_declares_none_refuses_for_the_missing_class(self) -> None:
+        # The other side of the same door: dropping the tax classes to get past the guard
+        # above walks into the projection's, which will not treat a missing rule as an
+        # exemption. Between them there is no foreign bond, so no dollar remainder, so no
+        # three-currency series.
+        refusal = _evaluated(
+            self._foreign(declares_tax=False),
+            self._tuple(),
+            amount=Money(500_000.0, UAH, prov.EMPTY),
+        )
+        assert isinstance(refusal, InstrumentRefused), refusal
+        assert "no tax class" in refusal.reason

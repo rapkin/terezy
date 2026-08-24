@@ -153,27 +153,58 @@ class TestARemainderTheIncrementCannotDeploy:
         assert isinstance(one_unit, TupleOutcome)
         assert is_close(outcome.reaches.amount, one_unit.reaches.amount)
 
+    def _rate_over_flat_fee(self, flat: float, sent: float) -> float:
+        """The rate of one purchase over a way in charging a flat fee and nothing else.
+
+        A **flat** fee rather than a percentage: it keeps ``outlay`` and ``arrived`` different
+        numbers -- which a free route does not, and which is what the two tests below turn on
+        -- while leaving two amounts that buy the same units with the same money invested.
+        """
+        outcome = _evaluate(_registries(flat=flat), _via_flat_fee(), sent)
+        assert isinstance(outcome, TupleOutcome), outcome
+        rate = outcome.implied_rate
+        assert isinstance(rate, NominalRate)
+        return rate.value
+
     def test_the_remainder_moves_the_rate_by_nothing(self) -> None:
-        # **Two rates, compared** -- because the interesting question about a remainder is not
-        # whether the word appears in a scope statement, it is what the figure does.
+        # **Two rates, compared**, and over a way in that *charges* -- because on a free route
+        # the outlay and the arriving amount are the same number, and then "netted off the
+        # outlay" and "measured on what arrived" cannot be told apart. This test used to run
+        # on one, and its name was a claim its arithmetic could not make.
         #
-        # 1 500.00 and 1 000.00 over a route that charges nothing both buy exactly one unit of
-        # issue A at 1 000.00, so both holdings are the same holding and both return the same
-        # arrivals on the same dates. The rate is therefore identical, and it is identical
-        # because the 500.00 sitting at `inzhur` is netted off the outlay rather than
-        # discounted as a loss: charging it as one makes these two figures 23 percentage
-        # points apart and reports a 16% sovereign bond at -7%.
-        remainder = _evaluate(_registries(), fixtures.hurdle_tuple(), 1_500.0)
-        exact = _evaluate(_registries(), fixtures.hurdle_tuple(), 1_000.0)
-        assert isinstance(remainder, TupleOutcome)
-        assert isinstance(exact, TupleOutcome)
-        assert remainder.undeployed is not None
+        #   100.00 flat, 10 100.00 sent -> 10 000.00 arrives -> 10 units, nothing left over
+        #   100.00 flat, 10 500.00 sent -> 10 400.00 arrives -> 10 units, 400.00 left over
+        #
+        # Both hold the same ten units of issue A and return the same arrivals on the same
+        # dates, and both invested 10 100.00: the 400.00 sitting at `inzhur` is netted off the
+        # outlay rather than discounted as a loss. Charging it as one puts these two figures
+        # percentage points apart and reports a 16% sovereign bond well below its coupon.
+        exact = _evaluate(_registries(flat=100.0), _via_flat_fee(), 10_100.0)
+        remainder = _evaluate(_registries(flat=100.0), _via_flat_fee(), 10_500.0)
+        assert isinstance(exact, TupleOutcome), exact
+        assert isinstance(remainder, TupleOutcome), remainder
         assert exact.undeployed is None
-        stranded, deployed = remainder.implied_rate, exact.implied_rate
-        assert isinstance(stranded, NominalRate)
-        assert isinstance(deployed, NominalRate)
-        assert is_close(stranded.value, deployed.value)
-        assert stranded.value > 0.15
+        assert remainder.undeployed is not None
+        assert_money_close(remainder.undeployed.amount, Money(400.0, UAH, prov.EMPTY))
+        assert is_close(
+            self._rate_over_flat_fee(100.0, 10_500.0), self._rate_over_flat_fee(100.0, 10_100.0)
+        )
+
+    def test_the_denominator_is_the_outlay_and_not_what_arrived(self) -> None:
+        # The discriminator, with no present-value arithmetic in it: two purchases whose
+        # **arriving** amounts are identical and whose outlays are not.
+        #
+        #   100.00 flat, 10 100.00 sent -> 10 000.00 arrives -> 10 units
+        #   500.00 flat, 10 500.00 sent -> 10 000.00 arrives -> 10 units
+        #
+        # Same holding, same arrivals, same dates. A rate measured on what arrived would
+        # report one figure for both and hide a 400.00 fee completely; measured on what left
+        # the stream, the dearer way in returns less, which is the sentence this project
+        # exists to be able to write.
+        cheap = self._rate_over_flat_fee(100.0, 10_100.0)
+        dear = self._rate_over_flat_fee(500.0, 10_500.0)
+        assert not is_close(cheap, dear)
+        assert dear < cheap
 
     def test_the_assumption_the_netting_makes_is_on_the_outcomes_face(self) -> None:
         # Netting the remainder off the outlay assumes it is recoverable at par, and it is

@@ -431,7 +431,11 @@ class RateNotComparable:
 
     A remainder the purchase could not deploy joins that first case when it is in a third
     currency, because it is netted off the outlay: three amounts, and a rate is a rate only
-    over one currency.
+    over one currency. **That case turns on divisibility**, which is a fact about the data
+    rather than an inconsistency: a hryvnia outlay buying a dollar instrument and coming home
+    in hryvnia is one currency out and one back and has a perfectly good rate, and only a
+    remainder the unit price left behind puts a third currency in the series. It is
+    unreachable today for the reasons ``decision.tuple_outcome._rate`` records.
 
     The other case is a series with no rate to find: a round trip that returned nothing, or
     whose repatriation charges exceeded what was released. Reported rather than approximated,
