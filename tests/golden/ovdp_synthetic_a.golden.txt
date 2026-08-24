@@ -48,9 +48,9 @@ instrument           ovdp_synthetic_a             instruments/ovdp_synthetic_a.t
 instrument           ovdp_synthetic_b             instruments/ovdp_synthetic_b.toml        sha256:fa433d052d2ca1525e597b8050cf2565f69e2a233dd51150e7a9601add8822a9
 tax_class            synthetic_fund_disposal      tax/synthetic_fixture.toml               sha256:d0e3848a8f82e3cabf8d8e9a1c7b5c76e288883a240c744a813c379743f27d12
 tax_class            synthetic_fund_payout        tax/synthetic_fixture.toml               sha256:d0e3848a8f82e3cabf8d8e9a1c7b5c76e288883a240c744a813c379743f27d12
-tax_class            ua_ci_fund_distribution      tax/ua.toml                              sha256:03f31e1f135a6ff31e9e227da0e5dfc2ce48305f23ff9d781f50837e2bc7891f
-tax_class            ua_government_bond           tax/ua.toml                              sha256:03f31e1f135a6ff31e9e227da0e5dfc2ce48305f23ff9d781f50837e2bc7891f
-tax_class            ua_investment_profit         tax/ua.toml                              sha256:03f31e1f135a6ff31e9e227da0e5dfc2ce48305f23ff9d781f50837e2bc7891f
+tax_class            ua_ci_fund_distribution      tax/ua.toml                              sha256:bb79bed252752573c2366d56b1fe45107db34696e8ad75b0c0eda523391296b0
+tax_class            ua_government_bond           tax/ua.toml                              sha256:bb79bed252752573c2366d56b1fe45107db34696e8ad75b0c0eda523391296b0
+tax_class            ua_investment_profit         tax/ua.toml                              sha256:bb79bed252752573c2366d56b1fe45107db34696e8ad75b0c0eda523391296b0
 
 == figures ==
 

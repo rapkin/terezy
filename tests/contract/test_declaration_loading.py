@@ -28,9 +28,11 @@ in the data layer.
 
 from __future__ import annotations
 
+import re
 import shutil
 from datetime import date, timedelta
 from pathlib import Path
+from typing import Final
 
 import pydantic
 import pytest
@@ -41,6 +43,7 @@ from terezy.core.ledger.events import EventKind
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
+from terezy.core.primitives.provenance import Provenance
 from terezy.core.results import project
 from terezy.core.results.project import Projection
 from terezy.core.tax.interface import TaxableEventKind
@@ -65,6 +68,34 @@ def _is_comment(line: str) -> bool:
     the file valid and the test asserting an error that never came.
     """
     return line.lstrip().startswith("#")
+
+
+GOVERNMENT_BOND: Final = "ua_government_bond"
+
+COUPON: Final = TaxableEventKind.COUPON
+
+EXEMPTION_PROVISIONS: Final = {
+    COUPON: "165.1.2",
+    TaxableEventKind.DISPOSAL_GAIN: "165.1.52",
+}
+"""Which subparagraph of the ПКУ exempts each kind of ОВДП income.
+
+Two, and the distinction is the point. пп. 165.1.52 is «інвестиційний прибуток від операцій»
+-- a disposal. Interest accrued on state securities is пп. 165.1.2, a different provision
+about a different thing, and a class that charges coupons needs it named.
+"""
+
+_PROVISION: Final = re.compile(r"\b\d+\.\d+\.\d+(?:\.\d+)?\b")
+
+
+def _provisions_behind(sources: Provenance) -> set[str]:
+    """Every dotted provision number a figure's citations name.
+
+    Extracted rather than substring-matched so that a citation naming 165.1.52 cannot satisfy
+    a test looking for 165.1.2 by accident, and so that a citation that named neither would
+    have to *invent* a number to pass rather than merely be vague.
+    """
+    return {found for source in sources.sources for found in _PROVISION.findall(source.citation)}
 
 
 def _replace(text: str, old: str, new: str) -> str:
@@ -1132,7 +1163,31 @@ class TestTheRegistryRefusesAnUncoveredEvent:
         ]
         assert len(charged) == 1, outcome.charges
         assert charged[0].total.amount == 0.0
-        assert charged[0].total.provenance.sources
+        assert _provisions_behind(charged[0].provenance) >= {EXEMPTION_PROVISIONS[COUPON]}
+
+    def test_the_exemption_names_a_provision_for_every_kind_of_income_it_covers(self) -> None:
+        """The regression guard for the one thing this feature got wrong twice.
+
+        ``ua_government_bond`` charges **two** kinds of income and they rest on **two**
+        different subparagraphs: пп. 165.1.2 for the coupon, пп. 165.1.52 for the disposal
+        gain. For one round the entry cited 165.1.52 for both -- a provision about investment
+        profit standing behind four of the five charges in the checked-in golden run.
+
+        Truthiness on ``provenance.sources`` cannot catch that, and did not: it passes with
+        165.1.52 alone and it passes with both provisions replaced by an invented number. So
+        the assertion is that the citation the charges actually carry **names the provision
+        for each kind the class declares itself to apply to** -- which also fails if a third
+        kind is added to ``applies_to`` and nobody finds the provision that exempts it.
+        """
+        (declared,) = [
+            entry for entry in loader.tax_classes_from_file(TAX_UA) if entry.id == GOVERNMENT_BOND
+        ]
+        (rate,) = declared.rates
+
+        assert declared.applies_to == frozenset(EXEMPTION_PROVISIONS), declared.applies_to
+        named = _provisions_behind(rate.provenance)
+        for kind, provision in sorted(EXEMPTION_PROVISIONS.items(), key=lambda pair: pair[0].value):
+            assert provision in named, (kind.value, provision, named)
 
     def test_issue_a_is_covered_by_fifteen_days_and_that_margin_is_deliberate(self) -> None:
         """Four checked-in runs of issue A depend on this margin. It was luck; make it a claim.
