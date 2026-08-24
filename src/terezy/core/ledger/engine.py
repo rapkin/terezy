@@ -121,7 +121,7 @@ def opening(base_currency: Currency, consumption_method: str) -> LedgerState:
     misconfigured method fails when the run starts instead of halfway through a projection
     that has already produced figures.
     """
-    lots.consumption_order(consumption_method)
+    lots.selection_for(consumption_method)
     return LedgerState(
         as_of=None,
         base_currency=base_currency,

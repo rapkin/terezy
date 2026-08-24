@@ -45,21 +45,42 @@ from hypothesis import strategies as st
 
 import terezy.core.results
 import terezy.core.routes
-from terezy.core.ledger import engine
-from terezy.core.ledger.events import EventKind
+from terezy.core.ledger import engine, lots
+from terezy.core.ledger.events import CausationKind, CausationRef, Event, EventKind, LotRef
 from terezy.core.primitives import money
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.tolerance import assert_money_close, is_close
+from terezy.core.results import tax_year as tax_settlement
 from terezy.core.results.ramp import RampCost, RouteUnusable
 from terezy.core.routes import capacity, cost, execute
+from terezy.core.tax import flat_rate
+from terezy.core.tax import year as tax_year
+from terezy.core.tax.interface import TaxableEventKind, TaxCharge, TaxContext
+from tests import tax_years
 from tests.invariants import route_graphs
 
 pytestmark = pytest.mark.invariant
 
 OWNER = route_graphs.OWNER_ID
 ON_DATE = date(2026, 8, 21)
+
+DEPOSITED: float = 20_000.00
+PURCHASE_COST: float = 10_000.00
+SOLD_ON: date = date(2027, 5, 4)
+WITHDRAWN_ON: date = date(2027, 12, 20)
+TAX_HORIZON: date = date(2028, 12, 31)
+
+PROCEEDS_MIN: float = 1_000.00
+PROCEEDS_MAX: float = 60_000.00
+"""Straddling ``PURCHASE_COST``, so the draw includes loss years as well as gain years."""
+
+COVER_MIN: float = 0.0
+COVER_MAX: float = 2.0
+"""Multiples of the liability left in the account on the due date. Straddling 1.0, which is
+the shortfall boundary -- so half the strategy space is short and the boundary is where
+Hypothesis shrinks towards rather than out at the edge of one axis."""
 
 
 def _uah(amount: float) -> Money:
@@ -274,6 +295,69 @@ class TestAnOverrunHeadroomIsReportedNegativeRatherThanZero:
         assert is_close(outcome.requested.amount, outcome.deployed.amount + displaced)
 
 
+class TestNoTaxSettlementIsEverShavedToWhatTheCashAllows:
+    """SC-004 over generated scenarios: the three ways a due date could be made to fit.
+
+    A tax bill that lands in a month with no cash is the boundary this feature exists to
+    surface, and it is a boundary that **moves** -- with the gain, with the rate, with what was
+    withdrawn before the date. Three comfortable answers sit on it, each a clamp in a different
+    disguise: overdraw the balance, pay part of it, or sell something to cover the rest. A
+    hand-picked withdrawal sits on one side of the boundary and passes forever; generated ones
+    walk across it.
+
+    The scenario is **parametrised by the boundary itself**: ``cover`` says how many times the
+    liability is left in the account on the due date, so ``cover < 1`` is short by
+    construction and ``cover > 1`` is not. Drawing a withdrawal fraction instead put the
+    boundary at 0.89 of one axis and left the property drawing a shortfall 4.6% of the time --
+    a property that samples the interesting half once in twenty runs is nearly a property that
+    never does. What is withdrawn is still bounded by what is there, so the balance is
+    non-negative on every date before the due date whatever is drawn; otherwise "no balance
+    ever goes negative" would fail for a reason with nothing to do with tax.
+    """
+
+    def test_the_strategy_straddles_both_boundaries_that_matter(self) -> None:
+        """Reachability asserted **through the strategy's own bounds**, not beside them.
+
+        A hard-coded pair of inputs would stay green while a narrowed strategy quietly stopped
+        drawing shortfalls. These are the same constants the ``@given`` below is built from, so
+        narrowing either range fails here first and says which boundary was lost.
+        """
+        assert COVER_MIN < 1.0 < COVER_MAX, "the shortfall boundary is at cover == 1"
+        assert PROCEEDS_MIN < PURCHASE_COST < PROCEEDS_MAX, "a loss year and a gain year"
+
+        assert isinstance(
+            _settle_tax(proceeds=PROCEEDS_MAX, cover=COVER_MIN),
+            tax_settlement.InsufficientCashForTax,
+        )
+        settled = _settle_tax(proceeds=PROCEEDS_MAX, cover=COVER_MAX)
+        assert isinstance(settled, tax_settlement.Settlement)
+        assert len(settled.payments) == 1
+
+    @given(
+        proceeds=st.floats(min_value=PROCEEDS_MIN, max_value=PROCEEDS_MAX, allow_nan=False),
+        cover=st.floats(min_value=COVER_MIN, max_value=COVER_MAX, allow_nan=False),
+    )
+    def test_nothing_is_overdrawn_paid_in_part_or_sold(self, proceeds: float, cover: float) -> None:
+        outcome = _settle_tax(proceeds=proceeds, cover=cover)
+
+        if isinstance(outcome, tax_settlement.InsufficientCashForTax):
+            assert outcome.shortfall.amount > 0.0
+            assert outcome.available.amount >= 0.0
+            assert not _payments_in(outcome.ledger)
+            assert _declared_disposals_only(outcome.ledger)
+            assert _never_negative(outcome.ledger)
+            return
+
+        assert isinstance(outcome, tax_settlement.Settlement), outcome
+        assert _declared_disposals_only(outcome.ledger)
+        assert _never_negative(outcome.ledger)
+        # Whatever is paid is paid whole: the event's magnitude is the liability the statement
+        # carries, never what happened to be in the account.
+        for payment in outcome.payments:
+            paid = next(event for event in outcome.stream if event.sequence == payment.sequence)
+            assert_money_close(money.scale(paid.amount, -1.0), payment.amount)
+
+
 class TestTheShapeOfTheDefectIsAbsentFromTheSource:
     """A scan, because a property test only fails on inputs it happens to draw."""
 
@@ -326,3 +410,114 @@ class TestTheShapeOfTheDefectIsAbsentFromTheSource:
         assert self._clamps("arrived = max(gross - fee, 0.0)") == ["max(..., 0)"]
         assert self._clamps("loss = abs(sent - arrived)") == ["abs"]
         assert self._clamps("worst = max(first, second)") == []
+
+
+# --- one taxable year settled from cash, sized by the strategy above ----------------------
+#
+# Deliberately the smallest scenario that can be short: a funded purchase, one disposal, and a
+# withdrawal before the payment date. The tax year, the deadline and the rates come from the
+# synthetic fixture pack, so no figure here could be mistaken for a Ukrainian liability.
+
+
+def _tax_events(*, proceeds: float, withdrawal: float) -> tuple[Event, ...]:
+    source = prov.of([tax_years.FIXTURE_SOURCE])
+    term = CausationRef(kind=CausationKind.INSTRUMENT_TERM, id="fixture:terms", detail="fixture")
+
+    def event(sequence: int, on: date, kind: EventKind, amount: float, **extra: object) -> Event:
+        return Event(
+            sequence=sequence,
+            occurred_on=on,
+            kind=kind,
+            amount=Money(amount, Currency.UAH, source),
+            owner_id=OWNER,
+            caused_by=term,
+            lot_ref=extra.get("lot_ref"),  # type: ignore[arg-type]
+            quantity=extra.get("quantity"),  # type: ignore[arg-type]
+            allocated_to=None,
+            capacity_pool=None,
+        )
+
+    return (
+        event(1, date(2026, 3, 2), EventKind.CASH_DEPOSIT, DEPOSITED),
+        event(
+            2,
+            date(2026, 3, 2),
+            EventKind.PURCHASE,
+            -PURCHASE_COST,
+            lot_ref=LotRef(instrument_id="fixture_taxable_a", lot_id="lot-a"),
+            quantity=100.0,
+        ),
+        event(
+            3,
+            SOLD_ON,
+            EventKind.PRINCIPAL_REPAYMENT,
+            proceeds,
+            lot_ref=LotRef(instrument_id="fixture_taxable_a", lot_id=None),
+            quantity=100.0,
+        ),
+        event(4, WITHDRAWN_ON, EventKind.RAMP_MOVEMENT, -withdrawal),
+    )
+
+
+def _settle_tax(
+    *, proceeds: float, cover: float
+) -> tax_settlement.Settlement | tax_settlement.SettlementRefused:
+    """Assess the disposal's year and settle it, leaving ``cover`` liabilities in the account.
+
+    The liability is recomputed here to *size the withdrawal*, never to check one: what the
+    engine assesses is asserted against hand arithmetic in
+    ``tests/worked_examples/test_tax_payment.py``. Sizing it this way is what puts the
+    shortfall boundary in the middle of the strategy instead of at the end of an axis.
+    """
+    available = DEPOSITED - PURCHASE_COST + proceeds
+    gain = proceeds - PURCHASE_COST
+    liability = (tax_years.PIT_RATE + tax_years.LEVY_RATE) * gain if gain > 0.0 else 0.0
+    withdrawal = available - cover * liability
+    events = _tax_events(proceeds=proceeds, withdrawal=withdrawal)
+    state = engine.fold(
+        events, base_currency=Currency.UAH, consumption_method=lots.LotMethod.FIFO.value
+    )
+    charged = flat_rate.charge(
+        events[2],
+        tax_years.TAXED_CLASS,
+        TaxContext(
+            instrument_id="fixture_taxable_a",
+            taxable_event=TaxableEventKind.DISPOSAL_GAIN,
+            taxable_base=state.disposals[0].realised_gain_base_ccy,
+            charged_for_year=SOLD_ON.year,
+        ),
+    )
+    assert isinstance(charged, TaxCharge), charged
+    assessed = tax_year.statements(
+        state,
+        (charged,),
+        rules=tax_years.rules(),
+        tax_classes=tax_years.TAX_PACK,
+        filing=tax_years.filing(y2027=True),
+        switches=tax_years.positions(),
+    )
+    assert isinstance(assessed, tuple), assessed
+    return tax_settlement.settle(
+        events,
+        assessed,
+        owner_id=OWNER,
+        base_currency=Currency.UAH,
+        method=lots.LotMethod.FIFO,
+        horizon_end=TAX_HORIZON,
+    )
+
+
+def _payments_in(state: engine.LedgerState) -> list[Event]:
+    return [event for event in state.applied if event.kind is EventKind.TAX_PAYMENT]
+
+
+def _declared_disposals_only(state: engine.LedgerState) -> bool:
+    """FR-010: the only disposal in the ledger is the one the scenario declared."""
+    return [disposal.sequence for disposal in state.disposals] == [3]
+
+
+def _never_negative(state: engine.LedgerState) -> bool:
+    history = engine.history(
+        state.applied, base_currency=Currency.UAH, consumption_method=lots.LotMethod.FIFO.value
+    )
+    return all(snapshot.accounts[Currency.UAH].balance.amount >= 0.0 for snapshot in history)

@@ -1,0 +1,76 @@
+# The owner's own tax positions: what he filed, and where he stands on the open questions.
+#
+# **Everything in this file is a statement by the owner, and that is what it carries instead
+# of a citation.** `data/scenarios/` is exempt from the provenance requirement by design (see
+# `data/README.md`, 002 research.md D8): whether a declaration was filed is a fact only the
+# owner can state, and a position on an unsettled reading of the law is a belief. Neither has
+# a publisher. Never present anything here as though it were observed.
+#
+# **A subdirectory**, like `scenarios/inflation/`: `data/scenarios/*.toml` is globbed and
+# validated as scenario documents (regimes and transitions), and `glob` does not recurse.
+#
+# **SYNTHETIC.** The filing years below describe nobody's actual returns. What ships in this
+# directory is labelled synthetic while the real figures are unstated (`SIMULATOR_SPEC.md`
+# §11 item 3, `data/README.md` rule 5).
+
+[tax_positions]
+owner_id      = "owner-001"
+is_synthetic  = true
+
+# ---------------------------------------------------------------------------
+# Was the declaration for each year filed?
+# ---------------------------------------------------------------------------
+#
+# There is NO DEFAULT and no inference. A year with investment operations and no entry here
+# stops the run naming the year, because "the tool assumed you filed" and "the tool assumed
+# you did not" are different wrong answers and each silently changes the after-tax ranking
+# (009 FR-014). Filing an annual return is a duty for every year with investment operations
+# (пп. 170.2.1 ПКУ) — which is a statement about the law, not a prediction about the owner.
+
+[[tax_positions.filing]]
+year  = 2024
+filed = true
+note  = "SYNTHETIC. Replace with the owner's own record."
+
+[[tax_positions.filing]]
+year  = 2025
+filed = true
+note  = "SYNTHETIC."
+
+[[tax_positions.filing]]
+year  = 2026
+filed = true
+note  = "SYNTHETIC."
+
+[[tax_positions.filing]]
+year  = 2027
+filed = true
+note  = "SYNTHETIC."
+
+[[tax_positions.filing]]
+year  = 2028
+filed = true
+note  = "SYNTHETIC."
+
+# ---------------------------------------------------------------------------
+# The two questions no source answers
+# ---------------------------------------------------------------------------
+#
+# Each is an explicit, defaultless switch. Every figure produced under one is labelled with
+# it, and each records an individual tax consultation (art. 52 PKU) as the citation that will
+# one day retire it. A position taken here is a BELIEF with a visible consequence, which is
+# what `data/scenarios/` is for — putting it in code would make it look like a rule.
+
+[tax_positions.carryforward_chain]
+position        = "chain_broken_forfeits"
+question        = "whether an investment loss survives a year whose declaration was missed"
+rationale       = "Form Ф1 mechanically pulls the loss from the immediately previous year's declaration, and no ДПС ruling was found on restoring a broken chain by an уточнююча декларація. This position takes the reading the form's own mechanics suggest, and it is the more conservative of the two: it claims less relief. It is a BELIEF, not a finding."
+resolution_path = "an individual tax consultation under art. 52 PKU, requested on the specific facts"
+is_assumption   = true
+
+[tax_positions.self_declarant_method]
+method          = "average_cost"
+question        = "which source-backed basis method governs a self-declaring individual"
+rationale       = "Two sources point two ways and give different numbers on the same trades: ДПС/ЗІР guidance recognises a proportional (average-cost) reading of the packet for a self-declarant, and Методика МФУ № 1484 п. 3.3 prescribes FIFO where a TAX AGENT computes. A fund redeeming its own securities is not a tax agent, so this position takes the guidance addressed to the self-declarant. It is a BELIEF, not a finding, and every figure produced under either source-backed method is labelled with it."
+resolution_path = "an individual tax consultation under art. 52 PKU, requested on the specific facts"
+is_assumption   = true

@@ -349,6 +349,25 @@ class TestItRunsTheFullPipelineAndAppearsInTheComparison:
         assert outcome.risk_class == RISK_CLASS
         assert outcome.rests_on
 
+    def test_what_went_home_is_net_of_the_charge_and_not_the_gross(self, tmp_path: Path) -> None:
+        # The claim `ACCOUNTS_FOR` makes -- "tax on every taxable event over the holding's
+        # life" -- checked against the arrivals rather than against the part line, because a
+        # part line saying the tax was charged is not evidence that anything was net of it.
+        #
+        # Feature 009 made a TAX_CHARGE an assessment memo that moves nothing, so summing the
+        # ledger's events alone sends the gross home: the amount stays right, the rate silently
+        # becomes pre-tax, and every part line still reads correctly. Only this identity says
+        # so, and it fails by exactly the charge if the netting is read off the memo.
+        outcome = next(
+            item for item in _comparison(tmp_path).ranked if item.key.instrument_id == INSTRUMENT
+        )
+        lifecycle = next(line.amount for line in outcome.parts if line.part == "lifecycle")
+        charged = next(line.amount for line in outcome.parts if line.part == "tax")
+        released = sum(arrival.released.amount for arrival in outcome.arrivals)
+        assert charged.amount < 0.0
+        assert is_close(released, lifecycle.amount + charged.amount)
+        assert not is_close(released, lifecycle.amount)
+
     def test_the_new_jurisdictions_rates_actually_charged(self, tmp_path: Path) -> None:
         # The tax class is not decoration, and a sign check would not say so: a rate of
         # 0.001% is also negative. Both of the new jurisdiction's classes are pinned by one

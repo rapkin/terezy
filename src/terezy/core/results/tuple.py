@@ -218,6 +218,9 @@ EXCLUDES: Final[frozenset[str]] = frozenset(
         "invested, and the remainder is reported at the venue it is sitting at, with no "
         "figure for what getting it back would cost",
         "public holidays (weekends are observed; no holiday calendar is modelled)",
+        "when the tax is paid: the charge is netted on the date the income accrued, not on "
+        "the declared deadline in a later year, so the money leaves sooner here than it does "
+        "in life and the rate is understated rather than flattered",
     }
 )
 """What a tuple outcome still does not account for, in the output's own words (FR-014).
@@ -840,14 +843,13 @@ class TaxCurrencyConversionUnavailable:
 class InstrumentDemandsCash:
     """On some date the holding takes more out than it puts in, and nothing routes money back.
 
-    A tax charge landing on a date with no income to pay it from is the shape of this: the
-    money would have to travel *in* along a route nobody costed for it, on a date nobody
+    A tax charge landing on a date with too little income to pay it from is the shape of this:
+    the money would have to travel *in* along a route nobody costed for it, on a date nobody
     planned. It is refused rather than netted against a later receipt, because netting would
     move a real outflow to a date it did not happen on and quietly improve the rate.
 
-    Unreachable for every instrument shipped today -- a charge is recorded on the same date as
-    the income it taxes and is a fraction of it -- and it exists because that is a property of
-    the current tax rules rather than of the arithmetic.
+    Unreachable for every instrument shipped today -- every declared class is exempt -- and it
+    exists because that is a property of the current tax rules rather than of the arithmetic.
     """
 
     instrument_id: str

@@ -1127,10 +1127,10 @@ def _repatriate(
 ) -> tuple[tuple[Arrival, WayOutCost], ...] | TupleRefused:
     """Every net amount the holding released, sent home along the declared way out.
 
-    Netted **by date** rather than event by event, because a tax charge is recorded on the
-    same date as the income it taxes and immediately after it: repatriating the gross coupon
-    and then the negative charge would send money out and back on one day, and charge the way
-    out's fees on both halves. What travels is what the owner actually has that day.
+    Netted **by date** rather than event by event, because the way out charges a flat fee per
+    movement: a date on which the holding pays twice is one journey home and one fee, and
+    repatriating each line separately would charge the flat part twice for money that
+    travelled once. What travels is what the owner actually has that day.
 
     A date that nets **negative** is refused rather than absorbed into a later receipt. It
     would mean money travelling *in* along a route nobody costed, on a date nobody planned,
@@ -1230,21 +1230,42 @@ def _over_the_way_out_cap(
 
 
 def _released_by_date(projected: Projection | FundProjection) -> tuple[tuple[date, Money], ...]:
-    """The holding's net cash effect per date, in date order, purchase excluded.
+    """The holding's net-of-tax cash effect per date, in date order, purchase excluded.
 
     The purchase is excluded because the join already paid for it: it is the arriving amount
     turned into units, and it is reported as the ``entry`` part. Every other event is a real
     movement between the owner and the instrument, and dates that net to exactly zero are
     dropped -- there is nothing to send home, and sending nothing would still be charged a
     fixed fee by an exit chain that declares one.
+
+    ⚙ **The tax comes from the charge, not from the charge event's amount** (feature 009).
+    A ``TAX_CHARGE`` is an assessment memo that moves nothing -- ``tax_year.memo_amount``, the
+    charge's own money at no magnitude -- so summing the events alone would send the **gross**
+    coupon home and report a pre-tax amount and a pre-tax rate on a record whose
+    :data:`~terezy.core.results.tuple.ACCOUNTS_FOR` says it is net of tax. That is the same
+    defect ``results.schedule`` names for the reader-facing rows, and it is read the same way
+    out of the same place: ``charges``, paired to the taxed event by its own sequence number.
+
+    ⚙ **It is netted on the date the income accrued, and the settlement date is not modelled
+    here.** Since 009 the liability leaves cash as a ``TAX_PAYMENT`` on a declared deadline in
+    a later year, and that deadline lives in ``data/tax/timing/`` with the filing decisions
+    that assemble the year -- none of which a :class:`Registries` carries. So this dates the
+    outflow **earlier than it is due**, exactly as ``results.schedule``'s ``net`` column does,
+    and the error runs one way: the money leaves sooner, so the rate is understated rather
+    than flattered. Deferring it to a date nobody declared would be the other kind of guess.
     """
     ledger = projected.ledger
     currency = ledger.base_currency
+    taxed_on = {event.sequence: event.occurred_on for event in ledger.applied}
     by_date: dict[date, list[Money]] = {}
     for event in ledger.applied:
         if event.kind is EventKind.PURCHASE:
             continue
         by_date.setdefault(event.occurred_on, []).append(event.amount)
+    for charge in projected.charges:
+        by_date.setdefault(taxed_on[charge.event_sequence], []).append(
+            money.scale(charge.total, -1.0)
+        )
     netted = ((on, money.total(amounts, currency)) for on, amounts in sorted(by_date.items()))
     return tuple((on, amount) for on, amount in netted if amount.amount != 0.0)
 

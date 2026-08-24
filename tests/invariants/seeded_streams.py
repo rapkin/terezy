@@ -135,7 +135,12 @@ def seeded_event_streams(draw: st.DrawFn, currency: Currency = Currency.UAH) -> 
     assert isinstance(opened, tuple), f"the generator drew a seed the engine refused: {opened!r}"
 
     shifted = tuple(_shift(event, by=len(opened)) for event in base.events)
-    return Stream(events=(*opened, *shifted), currency=currency, instrument_id=INSTRUMENT)
+    return Stream(
+        events=(*opened, *shifted),
+        currency=currency,
+        instrument_id=INSTRUMENT,
+        method=base.method,
+    )
 
 
 def _shift(event: Event, *, by: int) -> Event:

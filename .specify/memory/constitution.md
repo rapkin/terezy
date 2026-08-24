@@ -1,6 +1,14 @@
 <!--
 Sync Impact Report
 ==================
+Version change: 1.1.0 → 1.2.0 (2026-08-24)
+Rationale: MINOR — guidance materially expanded. Principle V gains "a golden file is
+evidence, never a freeze": a golden's authority is over results, and its recorded input
+digests are witnesses rather than terms, so correcting an input is supposed to move them.
+Added because the inverse reading was found three times in three days (006, 009, 010),
+each time by review and never by a gate — a golden that does not move is a green build.
+No principle was removed or redefined.
+
 Version change: 1.0.0 → 1.1.0 (2026-08-21)
 Rationale: MINOR — new guidance added. A functional-style clause was added to
 Engineering Standards (owner decision D-E). No principle was removed or
@@ -147,6 +155,23 @@ Every financial rule lands with at least one of:
   arithmetic, so a human can verify the engine rather than trust it;
 - a **property-based invariant** over generated inputs; or
 - a **golden result file** for an end-to-end run on the offline snapshot.
+
+**A golden file is evidence, never a freeze.** Its recorded input digests exist so a run
+that changed can say *which* input changed. It follows that correcting an input is
+*supposed* to move them, and that regenerating deliberately — with the diff read and the
+changed lines quoted in the commit message — is the correct response rather than a thing to
+be avoided. Declining to fix a citation, add a declared field or correct a value because a
+golden would move inverts the artefact: the evidence becomes a constraint on the input, and
+the file stops recording what a run does and starts dictating what the run may be given.
+A golden's authority is over **results**; an input digest is a witness, not a term.
+
+*Rationale: this shape appeared three times in three days — a research decision that turned
+a golden into a constraint on a date (006), a data model shaped around not disturbing an
+instrument digest (010), and a cited legal source left unimproved (009). In the last two the
+digest of results would not have moved at all: the canonical encoding excludes provenance
+by design, precisely so that filling in a `verified_on` later cannot disturb a figure. Every
+instance was caught by expensive review and none by a gate — because a golden that does not
+move is a green build.*
 
 The acceptance tests enumerated in `SIMULATOR_SPEC.md` §9 and `REWRITE_BRIEF.md` §7
 are the standing definition of done. They are not aspirational: a feature they name
@@ -318,4 +343,4 @@ skipped, marked expected-to-fail, or deleted without an amendment.
 **Runtime guidance.** Day-to-day development guidance for coding agents lives in
 `CLAUDE.md`, which is subordinate to this document and may not contradict it.
 
-**Version**: 1.1.0 | **Ratified**: 2026-08-21 | **Last Amended**: 2026-08-21
+**Version**: 1.2.0 | **Ratified**: 2026-08-21 | **Last Amended**: 2026-08-24

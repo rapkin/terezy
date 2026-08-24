@@ -9,6 +9,12 @@ passed in rather than inferred from dates: an inferred pairing is a guess, and i
 lying the moment two taxable events share a date -- which in this feature they do, since
 the final coupon and the redemption are both paid on the adjusted maturity date.
 
+⚙ **Feature 009 put the charged amount in the pairing.** A charge event moves no cash any
+more -- it is an assessment memo, and the money leaves on the declared due date in the
+following year -- so a row that read its tax off the memo's amount would report zero on
+every line. :class:`~terezy.core.results.schedule.ChargedOn` therefore carries both halves:
+which event recorded the assessment, and what it assessed.
+
 **A tax event that nothing claims raises rather than being dropped.** FR-008 says a figure
 that cannot be traced may not be reported, and silently omitting the row would understate
 the tax while leaving every total looking tidy -- the quiet kind of wrong this project
@@ -67,7 +73,7 @@ def test_an_unclaimed_tax_event_is_refused_rather_than_dropped() -> None:
             lot_ref=LotRef(instrument_id="x", lot_id="x@1"),
             quantity=1.0,
         ),
-        _event(2, EventKind.TAX_CHARGE, -10.0),
+        _event(2, EventKind.TAX_CHARGE, -0.0),
     )
     state = engine.fold(stream, base_currency=UAH, consumption_method="fifo")
     with pytest.raises(LedgerInvariantError, match="not charged against any event"):
@@ -86,12 +92,17 @@ def test_a_tax_charge_lands_on_the_row_of_the_event_it_taxed() -> None:
             quantity=1.0,
         ),
         _event(2, EventKind.COUPON, 100.0),
-        _event(3, EventKind.TAX_CHARGE, -20.0),
+        _event(3, EventKind.TAX_CHARGE, -0.0),
         _event(4, EventKind.COUPON, 50.0),
-        _event(5, EventKind.TAX_CHARGE, -5.0),
+        _event(5, EventKind.TAX_CHARGE, -0.0),
     )
     state = engine.fold(stream, base_currency=UAH, consumption_method="fifo")
-    rows = schedule.of_ledger(state, conventions=CONVENTIONS, taxed_by={2: 3, 4: 5}).rows
+    # The memos moved nothing; what each assessed travels in the pairing beside them.
+    pairing = {
+        2: schedule.ChargedOn(tax_event=3, amount=Money(20.0, UAH, prov.EMPTY)),
+        4: schedule.ChargedOn(tax_event=5, amount=Money(5.0, UAH, prov.EMPTY)),
+    }
+    rows = schedule.of_ledger(state, conventions=CONVENTIONS, taxed_by=pairing).rows
     assert [row.sequence for row in rows] == [1, 2, 4]
     assert_money_close(rows[1].tax, Money(20.0, UAH, prov.EMPTY))
     assert_money_close(rows[1].net, Money(80.0, UAH, prov.EMPTY))

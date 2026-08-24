@@ -149,13 +149,18 @@ class TestWhatFeatureOneExcludedThisFeatureAccountsFor:
         # nothing else in the output would tell them so.
         assert any("latency" in item for item in _outcome().accounts_for)
 
-    def test_it_states_the_four_things_it_still_leaves_out(self) -> None:
+    def test_it_states_the_five_things_it_still_leaves_out(self) -> None:
         outcome = _outcome()
-        assert len(outcome.excludes) == 4
+        assert len(outcome.excludes) == 5
         assert any("inflation" in item for item in outcome.excludes)
         assert any("risk class" in item for item in outcome.excludes)
         assert any("undeployed" in item for item in outcome.excludes)
         assert any("holidays" in item for item in outcome.excludes)
+        # The fifth arrived with feature 009, which took the cash out of a tax charge: the
+        # charge is still netted where it accrued, and the deadline that would date it lives
+        # in declarations a tuple does not carry. It says which way the approximation errs,
+        # because "approximate" without a direction is not a statement a reader can use.
+        assert any("when the tax is paid" in item for item in outcome.excludes)
 
 
 class TestAScopeStatementIsCheckedAgainstTheBehaviourItDescribes:

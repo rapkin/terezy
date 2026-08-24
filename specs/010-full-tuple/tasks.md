@@ -33,7 +33,7 @@ a shipped instrument file would move the sha256 the golden records, "a golden th
 must not move". That is the reading constitution **1.2.0** now forbids by name — *a golden
 file is evidence, never a freeze*; an input digest is a witness, not a term, and correcting an
 input is supposed to move it. It was also the last of five sites still carrying it, the other
-four having been rewritten while this one was missed. METHODOLOGY §28.6 records no long-term
+four having been rewritten while this one was missed. METHODOLOGY §29.6 records no long-term
 home either: the seam is where it belongs.
 
 ---
@@ -113,8 +113,8 @@ home either: the seam is where it belongs.
 
 ## Phase 9 — documentation and the ledger of what is covered
 
-- [x] **T080** `docs/METHODOLOGY.md` §28, `data/README.md`'s directory table, and §28
-      "Where to look next" renumbered to §29.
+- [x] **T080** `docs/METHODOLOGY.md` §29, `data/README.md`'s directory table, and the
+      "Where to look next" section renumbered to §30.
 - [x] **T081** `docs/REQUIRED_TESTS.md` — H1 flipped with its path, plus the reinforcement
       table for the rows this feature strengthens without closing.
 - [x] **T082** `specs/features.toml` — `010-full-tuple` to `in-progress` (the landing change

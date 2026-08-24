@@ -1,0 +1,154 @@
+# Ukraine: how a tax year is assembled, when it is declared, and when it is paid.
+#
+# The companion to `../ua.toml`, which declares the *rates*. This file declares everything
+# else the assessment of a year needs and the engine may not know on its own: which income
+# category a class belongs to, whether that category nets, what a loss in it does, on what
+# date the money leaves, and what the sources say about each basis method.
+#
+# **A subdirectory, deliberately.** `data/tax/*.toml` is globbed and validated as rate packs;
+# `glob` does not recurse, so this file keeps the directory's citation requirement without
+# pretending to be a rate pack. The same reading `data/instruments/nav/` already carries.
+#
+# `verified_on` is empty throughout: nothing here has been checked against a primary source
+# by the owner. Everything derived from it renders marked (FR-027).
+#
+# ---------------------------------------------------------------------------
+# ONE VALUE IN THIS FILE IS NOT RESEARCHED, AND IT SAYS SO
+# ---------------------------------------------------------------------------
+#
+# `non_business_day_rule`. No source in hand attests how a *payment* deadline falling on a
+# weekend or holiday is treated — the spec's research pass did not reach it, and the tool may
+# not invent a legal rule. `none` — the engine's name for leaving the date where the deadline
+# put it — is declared for a specific reason: it applies the cited deadline exactly as cited
+# and adds no claim of its own. `following` would assert that the law grants an extension,
+# which is a second legal fact nobody has attested. When the rule is found, changing this one
+# field moves every payment event and no source changes.
+#
+# It is unresearched for ALL THREE categories, and each one's `note` says so, because the note
+# is the half that travels: it becomes `TimingRule.note` and reaches a reader beside the
+# figure, while this header stays in the file. A gap flagged only where the file is opened is
+# a gap nobody downstream is told about.
+
+[timing]
+jurisdiction = "ua"
+tax_currency = "UAH"
+
+# ---------------------------------------------------------------------------
+# The income categories: how a year of each is put together
+# ---------------------------------------------------------------------------
+
+[[timing.category]]
+id                    = "investment_profit"
+treatment             = "nets"
+carryforward          = "unlimited"
+settlement            = "self_assessed"
+declare_by_month      = 5
+declare_by_day        = 1
+pay_by_month          = 8
+pay_by_day            = 1
+non_business_day_rule = "none"
+note                  = "Investment operations. The year's gains and losses net to one result before any rate applies (пп. 170.2.1 ПКУ keeps investment-profit accounting «окремо від інших доходів і витрат»), and a negative result carries into the following years until fully absorbed, with no time limit (пп. 170.2.6, абзац третій). The carry is conditional on filing a declaration for the loss year, which is why the filing decision is a per-run input and not a property of this file. Self-assessed: the fund redeeming its own securities is not a tax agent, so the individual declares. NON_BUSINESS_DAY_RULE IS NOT RESEARCHED — see the header."
+kind                  = "tax_rule"
+source                = "https://zakon.rada.gov.ua/laws/show/2755-17 — Податковий кодекс України, пп. 170.2.1 (separate accounting), пп. 170.2.6 абз. 3 (the carryforward, «до його повного погашення»); accessed 2026-08-22 by the research pass recorded in specs/009-tax-depth/spec.md. Deadlines (declare by 1 May, pay by 1 August of the following year) from https://yankiv.com/opodatkuvannya-investytsiy-ukraina-pdfo-vijskovyj-zbir-ovdp/, listed in SIMULATOR_SPEC.md §12 and tabulated in §4.5."
+retrieved_on          = "2026-08-23"
+verified_on           = ""
+
+[[timing.category]]
+id                    = "isi_distribution"
+treatment             = "per_event"
+carryforward          = "none"
+settlement            = "self_assessed"
+declare_by_month      = 5
+declare_by_day        = 1
+pay_by_month          = 8
+pay_by_day            = 1
+non_business_day_rule = "none"
+note                  = "Distributions from a collective-investment institution are a separate kind of passive income (пп. 167.5.4 ПКУ), outside the investment-profit calculation entirely: nothing nets, and an investment loss never reduces them. Each payout is charged on its own, at the rate in force on its own date — which is also what keeps a class whose rate changes mid-year computable, where a netting category would have to refuse. NON_BUSINESS_DAY_RULE IS NOT RESEARCHED — see the header."
+kind                  = "tax_rule"
+source                = "https://zakon.rada.gov.ua/laws/show/2755-17 — Податковий кодекс України, пп. 167.5.4 (9% on dividends from collective-investment institutions and non-payers of CIT); accessed 2026-08-22. Deadlines as for investment_profit above."
+retrieved_on          = "2026-08-23"
+verified_on           = ""
+
+[[timing.category]]
+id                    = "exempt_securities"
+treatment             = "outside"
+carryforward          = "none"
+settlement            = "self_assessed"
+declare_by_month      = 5
+declare_by_day        = 1
+pay_by_month          = 8
+pay_by_day            = 1
+non_business_day_rule = "none"
+note                  = "Income from OVDP is exempt, and the two halves stand outside the investment-profit calculation for DIFFERENT reasons. The DISPOSAL GAIN (пп. 165.1.52) is taken out of it explicitly: пп. 170.2.8 «б» names 165.1.52, and that subpoint's last paragraph excludes BOTH sides — «платник податку не включає до розрахунку загального фінансового результату операцій з інвестиційними активами суму доходів ТА ВИТРАТ на придбання таких інвестиційних активів» (see also пп. 164.2.9). COUPON INTEREST (пп. 165.1.2) was never inside that calculation at all: п. 170.2 is about operations with investment assets, and interest is not one — so nothing had to take it out. The consequence that must be modelled is the unwelcome half — an exempt loss buys no tax shield. Zero is charged per event and cited there; the deadlines are declared because a category with no timing rule cannot be assessed at all, and they never produce a payment because nothing is ever owed. NON_BUSINESS_DAY_RULE IS NOT RESEARCHED — see the header."
+kind                  = "tax_rule"
+source                = "https://zakon.rada.gov.ua/laws/show/2755-17 — Податковий кодекс України, пп. 165.1.2 (the coupon exemption) and пп. 165.1.52 (the disposal-gain exemption); пп. 170.2.8 «б» together with that subpoint's last paragraph, and пп. 164.2.9, for the DISPOSAL side being outside the investment-profit calculation on both income and costs. Accessed 2026-08-22; the exemption subparagraphs and пп. 170.2.8 re-read on 2026-08-24 (see data/tax/ua.toml for why the coupon needed its own provision)."
+retrieved_on          = "2026-08-23"
+verified_on           = ""
+
+# ---------------------------------------------------------------------------
+# Which category each declared tax class belongs to
+# ---------------------------------------------------------------------------
+#
+# References, not observations: the rates are cited where they are declared, in `../ua.toml`.
+# A class named here that no rate pack declares is a load-time failure naming this file.
+
+[[timing.class]]
+tax_class = "ua_investment_profit"
+category  = "investment_profit"
+note      = "Investment profit on a disposal — the gain on selling a security or redeeming collective-investment units."
+
+[[timing.class]]
+tax_class = "ua_ci_fund_distribution"
+category  = "isi_distribution"
+note      = "An Inzhur payout: a share of what the fund earned, not a gain on a disposal."
+
+[[timing.class]]
+tax_class = "ua_government_bond"
+category  = "exempt_securities"
+note      = "OVDP coupon and disposal. Outside the investment-profit calculation on both sides."
+
+# ---------------------------------------------------------------------------
+# What the law says about each basis method
+# ---------------------------------------------------------------------------
+#
+# All four are computable. What differs is what backs them, and no figure this engine emits
+# may hide which method produced it. THE VERDICTS BELOW ARE WHY: for a self-declaring
+# individual two sources point two ways and give different numbers, and nothing settles which
+# governs — so no figure may be labelled "the tax you would owe" until an individual tax
+# consultation (art. 52 PKU) answers it.
+
+[[timing.lot_method]]
+method            = "average_cost"
+verdict           = "self_declarant_guidance"
+what_the_law_says = "ДПС/ЗІР guidance recognises the costs of a disposal «пропорційно до частки такого реалізованого активу» — a proportional, i.e. average-cost, reading over the whole packet of identical securities that пп. 170.2.7 ПКУ defines the investment asset to be. INTERPRETED: guidance and form mechanics, one inference deep."
+kind              = "tax_rule"
+source            = "ДПС/ЗІР guidance on investment profit, read together with пп. 170.2.7 ПКУ (https://zakon.rada.gov.ua/laws/show/2755-17), per the research pass recorded in specs/009-tax-depth/spec.md FR-024; accessed 2026-08-22."
+retrieved_on      = "2026-08-23"
+verified_on       = ""
+
+[[timing.lot_method]]
+method            = "fifo"
+verdict           = "tax_agent_methodology"
+what_the_law_says = "Методика визначення інвестиційного прибутку, затверджена МФУ № 1484 (реєстр. z0100-12), п. 3.3, prescribes FIFO where a TAX AGENT computes the tax. SETTLED for the agent case, and silent about a self-declaring individual — which is exactly the gap: a fund redeeming its own securities is not a tax agent."
+kind              = "tax_rule"
+source            = "Методика МФУ № 1484, реєстр. z0100-12, п. 3.3, per the research pass recorded in specs/009-tax-depth/spec.md FR-024; accessed 2026-08-22."
+retrieved_on      = "2026-08-23"
+verified_on       = ""
+
+[[timing.lot_method]]
+method            = "lifo"
+verdict           = "no_source"
+what_the_law_says = "No source found prescribes or recognises LIFO for a Ukrainian individual. The ПКУ prescribes no method at all — SETTLED BY ABSENCE in п. 170.2 — so this remains computable as a what-if and may never be presented as the liability."
+kind              = "tax_rule"
+source            = "Absence of any prescription in п. 170.2 ПКУ (https://zakon.rada.gov.ua/laws/show/2755-17), accessed 2026-08-22; recorded in specs/009-tax-depth/spec.md FR-024."
+retrieved_on      = "2026-08-23"
+verified_on       = ""
+
+[[timing.lot_method]]
+method            = "specific_lot"
+verdict           = "no_source"
+what_the_law_says = "No source found lets a Ukrainian individual nominate the lot a disposal consumes. Computable as a what-if — useful for asking what a chosen acquisition would cost — and never the liability. The taxpayer's freedom to choose a method at all is UNSETTLED and awaits an individual tax consultation (art. 52 PKU)."
+kind              = "tax_rule"
+source            = "Absence of any prescription in п. 170.2 ПКУ (https://zakon.rada.gov.ua/laws/show/2755-17), accessed 2026-08-22; recorded in specs/009-tax-depth/spec.md FR-024."
+retrieved_on      = "2026-08-23"
+verified_on       = ""

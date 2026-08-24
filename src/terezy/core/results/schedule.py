@@ -15,6 +15,14 @@ and therefore knows. Matching them by date adjacency would be a guess dressed as
 trail -- the same reason a fee's allocation is a stored field rather than a heuristic --
 and it would start lying the moment two taxable events shared a date.
 
+⚙ **Feature 009: the row's tax comes from the charge, not from the charge event's cash.**
+It used to be read off the tax event's amount, which worked only while a charge deducted
+cash at event time -- the predecessor's defect B5, cured in 009 by making a charge an
+assessment memo that moves nothing. Reading a magnitude off that memo now would report zero
+tax on every row, which is exactly the wrong answer in the case this schedule exists for. So
+:class:`ChargedOn` carries both halves of the pairing: which event recorded the assessment,
+and what it assessed. One mapping rather than two, because two could disagree about a row.
+
 A tax event nobody claims is refused rather than dropped. A tax figure that cannot be
 traced to the event it was charged on may not be reported at all (FR-008), and silently
 omitting it would understate the tax while leaving the arithmetic looking tidy.
@@ -107,22 +115,37 @@ class CashFlowSchedule:
     """The lines, in the ledger's own order -- ascending sequence, ascending date."""
 
 
+@dataclass(frozen=True, slots=True)
+class ChargedOn:
+    """What one taxed event was charged, and which assessment memo recorded it.
+
+    ⚙ **Feature 009.** Both halves travel together so a row cannot report one event's
+    traceability beside another's figure. See the module docstring for why the amount is no
+    longer readable off the memo event itself.
+    """
+
+    tax_event: int
+    """The sequence number of the ``TAX_CHARGE`` event that recorded the assessment."""
+
+    amount: Money
+    """What was charged, as a **positive magnitude**, carrying the charge's own sources."""
+
+
 def of_ledger(
     state: LedgerState,
     *,
     conventions: ConventionsApplied,
-    taxed_by: Mapping[int, int],
+    taxed_by: Mapping[int, ChargedOn],
 ) -> CashFlowSchedule:
     """Build the schedule a folded ledger implies.
 
-    ``taxed_by`` maps the sequence number of a taxed event to the sequence number of the
-    tax event charged on it. It is required rather than defaulted: an empty default would
-    silently produce a schedule where every net equals its gross, which is exactly what an
-    exempt holding looks like -- so the bug would be invisible in the one case this
-    feature cares most about.
+    ``taxed_by`` maps the sequence number of a taxed event to the assessment recorded
+    against it. It is required rather than defaulted: an empty default would silently
+    produce a schedule where every net equals its gross, which is exactly what an exempt
+    holding looks like -- so the bug would be invisible in the one case this feature cares
+    most about.
     """
-    by_sequence = {event.sequence: event for event in state.applied}
-    claimed = set(taxed_by.values())
+    claimed = {charged.tax_event for charged in taxed_by.values()}
     for event in state.applied:
         if event.kind is EventKind.TAX_CHARGE and event.sequence not in claimed:
             raise LedgerInvariantError(
@@ -134,7 +157,7 @@ def of_ledger(
             )
 
     rows = [
-        _row(event, by_sequence, taxed_by, conventions)
+        _row(event, taxed_by, conventions)
         for event in state.applied
         if event.kind is not EventKind.TAX_CHARGE
     ]
@@ -143,19 +166,15 @@ def of_ledger(
 
 def _row(
     event: Event,
-    by_sequence: Mapping[int, Event],
-    taxed_by: Mapping[int, int],
+    taxed_by: Mapping[int, ChargedOn],
     conventions: ConventionsApplied,
 ) -> CashFlowRow:
     """One row: the event's own amount, and the tax event charged against it."""
-    tax_sequence = taxed_by.get(event.sequence)
-    if tax_sequence is None:
-        # No tax rule ran on this line -- a purchase, or a reinvestment. The zero rests
-        # on no source, which is the one legitimate use of empty provenance and is a
-        # different claim from a zero *charge* that cites an exemption.
-        charged = money.zero(event.amount.currency)
-    else:
-        charged = money.scale(by_sequence[tax_sequence].amount, -1.0)
+    assessed = taxed_by.get(event.sequence)
+    # No tax rule ran on an unassessed line -- a purchase, or a reinvestment. Its zero rests
+    # on no source, which is the one legitimate use of empty provenance and is a different
+    # claim from a zero *charge* that cites an exemption.
+    charged = money.zero(event.amount.currency) if assessed is None else assessed.amount
     return CashFlowRow(
         sequence=event.sequence,
         occurred_on=event.occurred_on,

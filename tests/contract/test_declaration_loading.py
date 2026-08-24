@@ -28,17 +28,22 @@ in the data layer.
 
 from __future__ import annotations
 
+import re
+import shutil
 from datetime import date, timedelta
 from pathlib import Path
+from typing import Final
 
 import pydantic
 import pytest
 
 from terezy.core.errors import InconsistentTerms
 from terezy.core.instruments.interface import Assumptions, DateRange, Holding
+from terezy.core.ledger.events import EventKind
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
+from terezy.core.primitives.provenance import Provenance
 from terezy.core.results import project
 from terezy.core.results.project import Projection
 from terezy.core.tax.interface import TaxableEventKind
@@ -63,6 +68,34 @@ def _is_comment(line: str) -> bool:
     the file valid and the test asserting an error that never came.
     """
     return line.lstrip().startswith("#")
+
+
+GOVERNMENT_BOND: Final = "ua_government_bond"
+
+COUPON: Final = TaxableEventKind.COUPON
+
+EXEMPTION_PROVISIONS: Final = {
+    COUPON: "165.1.2",
+    TaxableEventKind.DISPOSAL_GAIN: "165.1.52",
+}
+"""Which subparagraph of the ПКУ exempts each kind of ОВДП income.
+
+Two, and the distinction is the point. пп. 165.1.52 is «інвестиційний прибуток від операцій»
+-- a disposal. Interest accrued on state securities is пп. 165.1.2, a different provision
+about a different thing, and a class that charges coupons needs it named.
+"""
+
+_PROVISION: Final = re.compile(r"\b\d+\.\d+\.\d+(?:\.\d+)?\b")
+
+
+def _provisions_behind(sources: Provenance) -> set[str]:
+    """Every dotted provision number a figure's citations name.
+
+    Extracted rather than substring-matched so that a citation naming 165.1.52 cannot satisfy
+    a test looking for 165.1.2 by accident, and so that a citation that named neither would
+    have to *invent* a number to pass rather than merely be vague.
+    """
+    return {found for source in sources.sources for found in _PROVISION.findall(source.citation)}
 
 
 def _replace(text: str, old: str, new: str) -> str:
@@ -1015,7 +1048,7 @@ class TestDatedRateSchedules:
         """
         text = _replace(
             TAX_UA.read_text(encoding="utf-8"),
-            'effective_from = "2026-06-30"',
+            'effective_from = "2020-05-23"',
             'effective_from = "2099-01-01"',
         )
         loaded = loader.tax_classes_from_file(_write(tmp_path, "far_future.toml", text))
@@ -1023,23 +1056,40 @@ class TestDatedRateSchedules:
         assert declared.rates[0].effective_from == date(2099, 1, 1)
 
 
-class TestTheShippedRegistryRefusesAnUncoveredEvent:
-    """FR-012 firing on **shipped** data, through the real registry. Nothing is mutated here.
+class TestTheRegistryRefusesAnUncoveredEvent:
+    """FR-012 through the real loader, resolver and projection, end to end.
 
-    Every other refusal in this module is a deliberately broken file written to a scratch
-    directory. This one is the repository as it stands: `ovdp_synthetic_b` pays its first
-    coupon on 2026-06-02, and the citation behind `ua_government_bond` reaches back only to
-    2026-06-30, so a holding bought at issue has an event no declared rate covers.
+    ⚙ **This used to run on the shipped repository as it stood, and no longer can.**
+    `ovdp_synthetic_b` pays its first coupon on 2026-06-02, and `ua_government_bond` used to
+    reach back only to 2026-06-30 -- a citation-currency date taken off a secondary page,
+    because the Tax Code's own commencement had not been retrieved. Feature 009 retrieved it
+    (пп. 165.1.2 and пп. 165.1.52 from 2017-01-01; the levy carve-out struck by № 466-IX from
+    2020-05-23), so widening the date stopped being the invented legal fact D2 forbids and
+    became the fact. The shipped registry now covers that coupon, and the last test below is
+    what says so.
 
-    **Why that state is kept rather than fixed.** The obvious tidy-up is to move the
-    fixture's invented issue date, and it was tried and reverted: it makes every gate green
-    while removing the only place a reader can watch the refusal happen on real data. The
-    other tidy-up — widening the exemption's effective date — is the invented legal fact D2
-    forbids. So the refusal stays, and this test is what stops it being "fixed" by accident.
+    **What must not be lost with it is the demonstration.** So the refusal is watched on a
+    copy of the shipped data root with exactly one field changed -- still the real loader,
+    the real resolver and the real projection, not a hand-built class. A refusal the wiring
+    could swallow is worse than no refusal at all, and that is a property of the wiring
+    rather than of any particular date.
     """
 
-    def _projected(self, purchased_on: date) -> object:
-        declarations = resolver.from_data_root(DATA_ROOT)
+    @staticmethod
+    def _root_with_the_exemption_pushed_to(tmp_path: Path, earliest: str) -> Path:
+        root = tmp_path / "data"
+        shutil.copytree(DATA_ROOT, root)
+        patched = _replace(
+            TAX_UA.read_text(encoding="utf-8"),
+            'effective_from = "2020-05-23"',
+            f'effective_from = "{earliest}"',
+        )
+        (root / "tax" / "ua.toml").write_text(patched, encoding="utf-8")
+        return root
+
+    @staticmethod
+    def _projected(root: Path, purchased_on: date) -> object:
+        declarations = resolver.from_data_root(root)
         return project.project(
             declarations.instruments["ovdp_synthetic_b"],
             Holding(
@@ -1054,30 +1104,99 @@ class TestTheShippedRegistryRefusesAnUncoveredEvent:
             tax_classes=declarations.tax_classes,
         )
 
-    def test_a_holding_bought_at_issue_is_refused_naming_the_class_and_the_date(self) -> None:
-        outcome = self._projected(date(2026, 3, 2))
+    def test_a_holding_bought_at_issue_is_refused_naming_the_class_and_the_date(
+        self, tmp_path: Path
+    ) -> None:
+        root = self._root_with_the_exemption_pushed_to(tmp_path, "2026-06-30")
+        outcome = self._projected(root, date(2026, 3, 2))
+
         assert isinstance(outcome, RateUndeclaredBefore), outcome
         assert outcome.tax_class_id == "ua_government_bond"
         assert outcome.event_date == date(2026, 6, 2)
         assert outcome.earliest_declared == date(2026, 6, 30)
 
-    def test_the_refusal_says_what_a_reader_would_have_to_go_and_find(self) -> None:
-        outcome = self._projected(date(2026, 3, 2))
+    def test_the_refusal_says_what_a_reader_would_have_to_go_and_find(self, tmp_path: Path) -> None:
+        root = self._root_with_the_exemption_pushed_to(tmp_path, "2026-06-30")
+        outcome = self._projected(root, date(2026, 3, 2))
+
         assert isinstance(outcome, RateUndeclaredBefore)
         assert "cited legal fact" in outcome.reason
         assert "dated entry" in outcome.reason
 
-    def test_nothing_is_charged_at_the_earliest_rate_instead(self) -> None:
+    def test_nothing_is_charged_at_the_earliest_rate_instead(self, tmp_path: Path) -> None:
         """The failure this forecloses: a zero that looks like the exemption applying."""
-        outcome = self._projected(date(2026, 3, 2))
+        root = self._root_with_the_exemption_pushed_to(tmp_path, "2026-06-30")
+        outcome = self._projected(root, date(2026, 3, 2))
+
         assert not hasattr(outcome, "charges")
         assert not hasattr(outcome, "hurdle")
 
-    def test_a_holding_bought_inside_the_covered_window_projects_completely(self) -> None:
+    def test_a_holding_bought_inside_the_covered_window_projects_completely(
+        self, tmp_path: Path
+    ) -> None:
         """So the refusal is about the date and not about the declaration being broken."""
-        outcome = self._projected(date(2026, 7, 2))
+        root = self._root_with_the_exemption_pushed_to(tmp_path, "2026-06-30")
+        outcome = self._projected(root, date(2026, 7, 2))
+
         assert isinstance(outcome, Projection), outcome
         assert outcome.hurdle.total_tax.amount == 0.0
+
+    def test_the_shipped_registry_now_covers_that_coupon_and_charges_a_cited_zero(self) -> None:
+        """The other side of the same fact, on the repository as it stands.
+
+        A coupon that used to have no rate in force is now charged at the declared exemption
+        -- zero, citing the provision that grants it. The distinction the whole refusal exists
+        to protect is that this zero *cites a rule*, where the refusal cited none.
+        """
+        outcome = self._projected(DATA_ROOT, date(2026, 3, 2))
+
+        assert isinstance(outcome, Projection), outcome
+        assert outcome.hurdle.total_tax.amount == 0.0
+        coupons = [
+            event
+            for event in outcome.ledger.applied
+            if event.occurred_on == date(2026, 6, 2) and event.kind is EventKind.COUPON
+        ]
+        assert len(coupons) == 1, outcome.ledger.applied
+        charged = [
+            charge for charge in outcome.charges if charge.event_sequence == coupons[0].sequence
+        ]
+        assert len(charged) == 1, outcome.charges
+        assert charged[0].total.amount == 0.0
+        assert _provisions_behind(charged[0].provenance) >= {EXEMPTION_PROVISIONS[COUPON]}
+
+    def test_the_exemption_names_a_provision_for_every_kind_of_income_it_covers(self) -> None:
+        """The regression guard for the one thing this feature got wrong twice.
+
+        ``ua_government_bond`` charges **two** kinds of income and they rest on **two**
+        different subparagraphs: пп. 165.1.2 for the coupon, пп. 165.1.52 for the disposal
+        gain. For one round the entry cited 165.1.52 for both -- a provision about investment
+        profit standing behind four of the five charges in the checked-in golden run.
+
+        Truthiness on ``provenance.sources`` cannot catch that, and did not: it passes with
+        165.1.52 alone and it passes with both provisions replaced by an invented number. So
+        the assertion is that the citation the charges actually carry **names every provision
+        this test expects**, one per kind the class declares itself to apply to -- which also
+        fails if a third kind is added to ``applies_to`` and nobody finds the provision that
+        exempts it.
+
+        **What it does not check is which provision goes with which kind**, and there is
+        nowhere in the file for that to live: the class has one rate entry, one ``source``
+        string and two kinds, so a citation naming both numbers against the wrong kinds passes
+        here. The association is this test's own, in :data:`EXEMPTION_PROVISIONS`; the data
+        cannot contradict it, only omit a number, which is the defect that happened. Splitting
+        the citation per kind would need a per-kind provenance the record has no field for --
+        if that field ever arrives, this is where the check belongs.
+        """
+        (declared,) = [
+            entry for entry in loader.tax_classes_from_file(TAX_UA) if entry.id == GOVERNMENT_BOND
+        ]
+        (rate,) = declared.rates
+
+        assert declared.applies_to == frozenset(EXEMPTION_PROVISIONS), declared.applies_to
+        named = _provisions_behind(rate.provenance)
+        for kind, provision in sorted(EXEMPTION_PROVISIONS.items(), key=lambda pair: pair[0].value):
+            assert provision in named, (kind.value, provision, named)
 
     def test_issue_a_is_covered_by_fifteen_days_and_that_margin_is_deliberate(self) -> None:
         """Four checked-in runs of issue A depend on this margin. It was luck; make it a claim.
@@ -1138,7 +1257,7 @@ class TestTheBatteryCoversTheContract:
             "TestUnknownConventionName",
             "TestNonPositiveAmounts",
             "TestDatedRateSchedules",
-            "TestTheShippedRegistryRefusesAnUncoveredEvent",
+            "TestTheRegistryRefusesAnUncoveredEvent",
             "TestMalformedFile",
             "TestNoPydanticTypeEscapes",
             "TestAnImpossibleInstrumentIsNotALoadError",
