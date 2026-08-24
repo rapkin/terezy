@@ -26,7 +26,7 @@ from terezy.core.primitives import staleness as stale
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance, SourceRef
 from terezy.core.primitives.staleness import ObservationKind
-from terezy.core.results.tuple import Comparison, TupleOutcome
+from terezy.core.results.tuple import Comparison, Tuple, TupleOutcome
 from terezy.core.routes.legs import Leg, Route
 from tests import tuple_registries as fixtures
 
@@ -92,6 +92,8 @@ def _registries(
     unverified_part: str | None,
     stale_route_in: bool = False,
     stale_price: bool = False,
+    stale_instrument: bool = False,
+    stale_nav: bool = False,
 ) -> Registries:
     """The shipped registry with everything verified except the named part.
 
@@ -114,11 +116,30 @@ def _registries(
             verified=unverified_part != part,
             retrieved_on=VERY_OLD if stale_route_in and part == "route in" else None,
         )
+    if stale_nav:
+        fund = registries.funds[fixtures.MILTECH]
+        registries = replace(
+            registries,
+            funds={
+                **registries.funds,
+                fixtures.MILTECH: replace(
+                    fund,
+                    nav_per_unit=replace(
+                        fund.nav_per_unit,
+                        provenance=prov.of(
+                            _aged(source) for source in fund.nav_per_unit.provenance.sources
+                        ),
+                    ),
+                ),
+            },
+        )
     declared = registries.instruments[fixtures.OVDP]
     instrument_verified = unverified_part != "instrument"
     terms = replace(
         declared.terms,
-        provenance=_all_verified(declared.terms.provenance)
+        provenance=prov.of(_aged(source) for source in declared.terms.provenance.sources)
+        if stale_instrument
+        else _all_verified(declared.terms.provenance)
         if instrument_verified
         else declared.terms.provenance,
         face_value=replace(
@@ -181,9 +202,16 @@ def _registries(
     )
 
 
-def _outcome(registries: Registries) -> TupleOutcome:
+def _fund() -> Tuple:
+    """A MilTech tuple: the other declaration kind, and the one whose NAV nothing aged."""
+    return fixtures.fund_tuple(
+        fixtures.MILTECH, exit_on=fixtures.MILTECH_EXIT, yield_point=fixtures.MILTECH_POINT
+    )
+
+
+def _outcome(registries: Registries, candidate: Tuple | None = None) -> TupleOutcome:
     outcome = evaluate(
-        fixtures.hurdle_tuple(),
+        candidate if candidate is not None else fixtures.hurdle_tuple(),
         amount=fixtures.AMOUNT,
         horizon=fixtures.DateRange(start=fixtures.ISSUE_DATE, end=fixtures.HORIZON_END),
         as_of=fixtures.AS_OF,
@@ -232,7 +260,15 @@ class TestOneUnverifiedValueInEachPartMarksTheOutcome:
 
 
 class TestStalenessSurfacesOnTheOutcome:
-    """FR-019's other half, and 002's FR-025/FR-028 rules unchanged."""
+    """FR-019's other half, and 002's FR-025/FR-028 rules unchanged.
+
+    This half held for **two of the four parts** for a whole feature while the provenance half
+    held for all four, and the shape of the gap is worth keeping: a mark is a property of a
+    citation and survives being merged, while a staleness threshold was a property of a
+    *record* and did not. By the time a tuple's provenance is a union across five tables, no
+    record is in hand -- so the bond's terms, its constraints, the tax pack's rates and every
+    table of a fund's declaration reached the outcome unaged, and nothing said so.
+    """
 
     def test_a_value_aged_past_its_kinds_threshold_is_reported_stale(self) -> None:
         # The way in's legs are retrieved in 2020 and the question is asked in 2026, which is
@@ -255,6 +291,46 @@ class TestStalenessSurfacesOnTheOutcome:
         outcome = _outcome(_registries(unverified_part=None))
         assert outcome.staleness.assessed
         assert not stale.any_stale(outcome.staleness)
+
+    def test_every_source_behind_the_outcome_was_aged(self) -> None:
+        # SC-007's second clause, as a **partition** rather than a sample: the sources the
+        # verdict says it aged are exactly the sources the figure rests on. This is what was
+        # false for two parts of four -- the bond's terms, its constraints, the tax rates and
+        # every table of a fund's declaration reached `provenance` and reached `assessed`
+        # nowhere, because no core record of theirs named a kind and nothing carried it.
+        #
+        # It is also the guard on `SourceRef.kind`'s empty default: a citation the loader
+        # forgot to stamp would show up here as a source nobody could age, which is exactly
+        # the silent permissive default FR-028 forbids.
+        for candidate in (fixtures.hurdle_tuple(), _fund()):
+            outcome = _outcome(_registries(unverified_part=None), candidate)
+            behind = {source.id for source in outcome.provenance.sources}
+            assert behind
+            assert behind == set(outcome.staleness.assessed), candidate.instrument_id
+
+    def test_a_stale_bond_term_reaches_the_outcome(self) -> None:
+        # The coupon rate and the face value size every flow in the schedule. Before the kind
+        # travelled with the citation there was no way to age them at all: `[instrument.terms]`
+        # declares a threshold, the loader validated it, and `BondTerms` had nowhere to put it.
+        registries = _registries(unverified_part=None, stale_instrument=True)
+        outcome = _outcome(registries)
+        assert stale.any_stale(outcome.staleness)
+        assert any(
+            item.source_id.startswith("instruments/ovdp_synthetic_a")
+            for item in outcome.staleness.stale
+        )
+
+    def test_a_stale_fund_nav_reaches_the_outcome(self) -> None:
+        # The number the whole outcome is sized from. `project_fund` takes no ageing argument
+        # and never has; the join ages the sources the projection rests on instead, which is
+        # the only place that can see all of them at once.
+        registries = _registries(unverified_part=None, stale_nav=True)
+        outcome = _outcome(registries, _fund())
+        assert stale.any_stale(outcome.staleness)
+        assert any(
+            item.source_id.startswith("instruments/inzhur_miltech")
+            for item in outcome.staleness.stale
+        )
 
     def test_the_venue_quote_is_aged_too_and_not_merely_carried(self) -> None:
         # The value this feature added, and the one with no earlier owner to age it: the

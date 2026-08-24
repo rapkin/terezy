@@ -1270,6 +1270,14 @@ def _assemble(
     and that is :attr:`~terezy.core.results.tuple.TupleOutcome.reaches`.
     """
     reaches = money.total([arrival.amount for arrival in arrivals], endpoint_currency)
+    provenance = prov.merge_all(
+        [
+            one_way.provenance,
+            *(charged.provenance for charged in way_out_costs),
+            _projection_provenance(projected),
+            _quote_provenance(prepared),
+        ]
+    )
     span = DateRange(
         start=horizon.start,
         end=max((arrival.arrived_on for arrival in arrivals), default=horizon.start),
@@ -1297,41 +1305,32 @@ def _assemble(
         ),
         accounts_for=ACCOUNTS_FOR,
         excludes=EXCLUDES,
-        provenance=prov.merge_all(
-            [
-                one_way.provenance,
-                *(charged.provenance for charged in way_out_costs),
-                _projection_provenance(projected),
-            ]
-        ),
+        provenance=provenance,
+        # The costing's own verdicts, plus every source behind the outcome aged under the
+        # kind its own citation declares. The third is not a tidier restatement of the first
+        # two: it is the only thing that reaches the instrument's terms, its constraints, the
+        # tax pack's rates and a fund's tables, none of whose core records names a kind and
+        # none of which any other call ages (FR-019). Merging is a union at the strictest
+        # reading, so a source both of them reach arrives once.
         staleness=stale.merge_all(
             [
                 one_way.staleness,
                 *(charged.staleness for charged in way_out_costs),
-                _quote_staleness(prepared, kinds=kinds, as_of=as_of),
+                stale.staleness_of_sources(provenance, kinds, as_of=as_of),
             ]
         ),
     )
 
 
-def _quote_staleness(
-    prepared: _Prepared, *, kinds: Mapping[str, ObservationKind], as_of: date
-) -> stale.StalenessVerdict:
-    """The venue quote, aged against the kind its own declaration names (FR-019).
+def _quote_provenance(prepared: _Prepared) -> Provenance:
+    """The venue quote's citation, or nothing where the instrument prices itself.
 
-    Aged here rather than left to the projection, because no projection sees it: a bond's
-    lifecycle is sized from its face value, and the quote is what the *join* sized the
-    purchase from. It is the one declared value this feature added, and a figure resting on a
-    price nobody has looked at since 2019 is exactly what a per-kind threshold exists to say.
-
-    :data:`~terezy.core.primitives.staleness.UNASSESSED` where the instrument prices itself:
-    there is no quote to age, and the fund's own declared values are aged by the call that
-    owns them.
+    Reaches the outcome through the purchase event anyway -- the join sized it from this
+    price -- and is merged here as well so that the union does not depend on a projection
+    having propagated it. ``prov.merge`` is a set union, so arriving twice is arriving once.
     """
     quote = prepared.access.quote
-    if quote is None:
-        return stale.UNASSESSED
-    return stale.staleness_of(quote.price.provenance, kinds, kind=quote.kind, as_of=as_of)
+    return prov.EMPTY if quote is None else quote.price.provenance
 
 
 def _parts(

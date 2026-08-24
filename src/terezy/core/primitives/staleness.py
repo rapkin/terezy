@@ -252,6 +252,43 @@ def staleness_of(
     )
 
 
+def staleness_of_sources(
+    provenance: Provenance,
+    kinds: Mapping[str, ObservationKind],
+    *,
+    as_of: date,
+) -> StalenessVerdict:
+    """Age every source in a merged provenance under **its own** declared kind.
+
+    :func:`staleness_of`'s sibling, and the distinction is which of the two knows the kind.
+    ``staleness_of`` is for a caller holding **one declaring record** whose own field names the
+    threshold for the whole table -- a leg, a channel, a venue quote -- and it is the right
+    call there because a table may cite several sources under one kind.
+
+    This one is for a **derived figure** whose provenance has already been merged across
+    several tables. By then no record is in hand: a tuple's outcome rests on the bond's terms,
+    its constraints, the tax pack's rates and every table of a fund's declaration, and none of
+    those core records carries a kind. The kind rides on the citation instead
+    (:attr:`~terezy.core.primitives.provenance.SourceRef.kind`), which is the only thing that
+    survives the merge -- and without it FR-019's staleness half was unreachable for two of a
+    tuple's four parts while its provenance half worked perfectly.
+
+    A source whose kind is empty is **not aged and not listed in** :attr:`assessed`. That is
+    the strict reading: it says nobody could check this rather than claiming it is current,
+    which is the same distinction :data:`UNASSESSED` exists to preserve. Every citation the
+    loader reads is stamped, so an empty kind means a source built in code.
+    """
+    aged = [
+        (source, _verdict_for(source, kind_for(kinds, source.kind), as_of=as_of))
+        for source in provenance.sources
+        if source.kind
+    ]
+    return StalenessVerdict(
+        assessed=tuple(sorted(source.id for source, _ in aged)),
+        stale=tuple(sorted((v for _, v in aged if v is not None), key=lambda s: s.source_id)),
+    )
+
+
 def merge(left: StalenessVerdict, right: StalenessVerdict) -> StalenessVerdict:
     """Union two verdicts. Associative, commutative, with :data:`UNASSESSED` as identity.
 

@@ -386,7 +386,8 @@ def _source_ref(
     source: str,
     retrieved_on: str,
     verified_on: str,
-    kind: str | None,
+    kind: str,
+    check_kind: bool = True,
 ) -> SourceRef:
     """One table's citation, as the core's ``SourceRef``.
 
@@ -394,23 +395,22 @@ def _source_ref(
     non-empty, and an empty ``verified_on`` becomes ``None`` -- the unverified mark that
     FR-015 propagates through every figure derived from this table.
 
-    ⚙ **``kind`` is checked here and carried nowhere**, for the tables whose core record has
-    no field for it -- feature 001's ``BondTerms``, ``InstrumentConstraints`` and
-    ``TaxClass``. The field is required in the file (FR-028: no sourced table ages under a
-    threshold nobody named), and it is checked non-empty at the one place every citation
-    passes through, so the check cannot be forgotten at a new call site. Resolution against
-    ``data/observation_kinds.toml`` is ``scripts/check_provenance.py``'s, which reads the
-    files rather than the records; see :class:`terezy.data.declarations.schema.BondTermsTable`
-    for why a kind resolved into these records would be a value nothing reads.
+    ⚙ **``kind`` is now carried as well as checked, and that reversed a decision.** It used to
+    be validated here and dropped, on the reading that a kind resolved into feature 001's
+    ``BondTerms``, ``InstrumentConstraints`` and ``TaxClass`` would be "a value nothing
+    reads". Feature 010 made it a value something reads: a tuple's outcome is derived from
+    those tables, FR-019 requires staleness to propagate from **every** declared value in
+    every part, and by the time a provenance has been merged across five tables the record
+    that knew each kind is gone. Carrying it on the citation is what lets a merged provenance
+    be aged at all -- see :attr:`terezy.core.primitives.provenance.SourceRef.kind`.
 
-    The parameter is **required and may be ``None``**, with no default, on the precedent
-    ``DeclarationError.remedy`` sets: a default would make "no kind check" the thing that
-    happens when nobody thought about it, which is the shape of mistake this project keeps
-    finding. ``None`` is passed only where the table's kind is checked at the record field it
-    becomes -- a leg's ``kind_of_observation``, a channel's ``kind`` -- because the error
-    there can name the field the file actually uses.
+    ``check_kind=False`` says the non-empty check happens at the record field this kind
+    becomes -- a leg's ``kind_of_observation``, a channel's ``kind``, an access price's -- so
+    that the error names the field the file actually uses. It suppresses the *check* and never
+    the carrying: a kind checked elsewhere is still stamped here, because a source that
+    reached the core without one could never be aged.
     """
-    if kind is not None:
+    if check_kind:
         _require_text(
             path,
             f"{table}.kind",
@@ -421,6 +421,7 @@ def _source_ref(
         )
     return SourceRef(
         id=source_id(path, table),
+        kind=kind,
         citation=_require_text(
             path,
             f"{table}.source",
@@ -1159,7 +1160,8 @@ def _channel_side(
         # the record so the staleness verdict ages the side under it (FR-028) -- not
         # validated here and dropped, which would leave the side ageing under the
         # channel's kind.
-        kind=None,
+        kind=table.kind,
+        check_kind=False,
     )
     sources = prov.of([ref])
     kind = _require_text(
@@ -1362,7 +1364,8 @@ def _channel(path: Path, entry: schema.ChannelTable) -> FxChannel:
         retrieved_on=entry.retrieved_on,
         verified_on=entry.verified_on,
         # Checked below, at ``FxChannel.kind``, where the message names ``channel[id].kind``.
-        kind=None,
+        kind=entry.kind,
+        check_kind=False,
     )
     return FxChannel(
         id=channel_id,
@@ -1484,7 +1487,8 @@ def _leg(path: Path, table: schema.LegTable, *, position: int) -> Leg:
         verified_on=table.verified_on,
         # Checked below, at ``Leg.kind_of_observation``: a leg's ``kind`` is the *leg* kind,
         # so the message has to name the field the file actually uses.
-        kind=None,
+        kind=table.kind_of_observation,
+        check_kind=False,
     )
     sources = prov.of([ref])
     return Leg(
@@ -3459,9 +3463,10 @@ def _access_price(
     without judgement: whether this kind of instrument is entitled to make that statement is a
     relation between two files and belongs to the resolver.
 
-    ``kind=None`` is passed to :func:`_source_ref` because the kind is carried into the record
-    and checked at the field it becomes -- the same reading a leg's ``kind_of_observation``
-    gets, and the reason the error below can name ``[access.price].kind`` rather than a table.
+    ``check_kind=False`` is passed to :func:`_source_ref` because the kind is also carried
+    into the record and checked at the field it becomes -- the same reading a leg's
+    ``kind_of_observation`` gets, and the reason the error below names ``[access.price].kind``
+    rather than a table. The citation is stamped with it either way.
     """
     if declared is None:
         return None
@@ -3485,7 +3490,9 @@ def _access_price(
                         source=declared.source,
                         retrieved_on=declared.retrieved_on,
                         verified_on=declared.verified_on,
-                        kind=None,
+                        # Checked below, at ``VenueQuote.kind``, naming ``[access.price].kind``.
+                        kind=declared.kind,
+                        check_kind=False,
                     )
                 ]
             ),
