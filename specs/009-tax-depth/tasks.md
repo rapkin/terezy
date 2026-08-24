@@ -178,7 +178,7 @@ events and netting move with it, with no source change.
 ## Phase 8: Polish & cross-cutting
 
 - [X] T051 [P] Add `docs/METHODOLOGY.md` §28: how a year is assessed, why no tax is deducted at event time, the four methods with their legal standing, why none is labelled the liability, and the worked arithmetic of the carryforward
-- [X] T052 [P] Add the new questions to `docs/METHODOLOGY.md` §29's "where to look next" table
+- [X] T052 [P] Add the new questions to `docs/METHODOLOGY.md` §30's "where to look next" table
 - [X] T053 Flip **E2** and **E6** in `docs/REQUIRED_TESTS.md` with their test paths, and annotate **E7** as partially closed with the forced-sale deferral stated
 - [X] T054 Record the forced-sale and late-payment-interest deferrals as `[[future]]` entries in `specs/features.toml`
 - [X] T055 Run every gate — ruff, mypy, lint-imports, check_provenance, check_methodology_refs, `pytest --cov`, `pytest -m "contract or invariant"` — and record the delta from T001's baseline

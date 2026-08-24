@@ -37,7 +37,6 @@ from terezy.core.results.tuple import (
     RateNotComparable,
     TupleOutcome,
 )
-from terezy.core.tax.schedule import RateEntry
 from tests import tuple_registries as fixtures
 
 pytestmark = pytest.mark.contract
@@ -122,28 +121,6 @@ def _outcome(
     return outcome
 
 
-def _taxed(registries: fixtures.Registries, *, pit: float, levy: float) -> fixtures.Registries:
-    """Every declared class given real rates, since every shipped one is exempt."""
-    return dataclasses.replace(
-        registries,
-        tax_classes={
-            class_id: dataclasses.replace(
-                declared,
-                rates=tuple(
-                    RateEntry(
-                        effective_from=entry.effective_from,
-                        pit_rate=pit,
-                        levy_rate=levy,
-                        provenance=entry.provenance,
-                    )
-                    for entry in declared.rates
-                ),
-            )
-            for class_id, declared in registries.tax_classes.items()
-        },
-    )
-
-
 def _fund_outcome(registries: fixtures.Registries) -> TupleOutcome:
     """The shipped fund's own outcome: the other projection kind the join has to handle."""
     outcome = evaluate(
@@ -185,19 +162,29 @@ class TestWhatFeatureOneExcludedThisFeatureAccountsFor:
 
     def test_a_taxed_fund_sends_home_what_is_left_after_the_charge(self) -> None:
         # The clause above checked against behaviour rather than against itself, on the second
-        # projection kind -- `tests/contract/test_h1_data_only.py` does it for a bond. Every
-        # shipped class is exempt, so only a registry taxed here reaches the arithmetic at all.
+        # projection kind -- `tests/contract/test_h1_data_only.py` does it for a bond. Over the
+        # **shipped** registry and not a rigged one: only the bond's class is exempt, and the
+        # fund's disposal gain is charged at the declared `ua_investment_profit` rates. An
+        # earlier draft passed those same rates in through a fixture, which did nothing except
+        # hide that this is the shipped behaviour.
         #
         # Since feature 009 a TAX_CHARGE is an assessment memo that moves nothing, so a join
-        # summing the ledger's events alone sends the **gross** distribution home: every part
-        # line still reads correctly and only the arrivals say the rate went pre-tax.
-        outcome = _fund_outcome(_taxed(fixtures.shipped(), pit=0.18, levy=0.05))
+        # summing the ledger's events alone sends the **gross** proceeds home: every part line
+        # still reads correctly and only the arrivals say the rate went pre-tax.
+        outcome = _fund_outcome(fixtures.shipped())
         lifecycle = next(line.amount for line in outcome.parts if line.part == "lifecycle")
         charged = next(line.amount for line in outcome.parts if line.part == "tax")
         released = sum(arrival.released.amount for arrival in outcome.arrivals)
         assert charged.amount < 0.0
         assert is_close(released, lifecycle.amount + charged.amount)
         assert not is_close(released, lifecycle.amount)
+
+    # ⚙ **A stated gap, 2026-08-24.** This fund reaches the netting in its simplest shape:
+    # one arrival, one charge, on one date. The multi-charge case and two taxable events
+    # sharing a date are covered on the bond side only, and no fund whose *distributions* are
+    # taxed is declared anywhere, so the fund path's per-date grouping is exercised by a
+    # single-element group. Closing it needs a declared fund with a taxed distribution class,
+    # which is data rather than a test.
 
     def test_it_states_that_waiting_is_inside_the_span(self) -> None:
         # The owner's decision of 2026-08-22, on the record's face: a reader comparing this

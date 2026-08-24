@@ -1253,6 +1253,13 @@ def _released_by_date(projected: Projection | FundProjection) -> tuple[tuple[dat
     outflow **earlier than it is due**, exactly as ``results.schedule``'s ``net`` column does,
     and the error runs one way: the money leaves sooner, so the rate is understated rather
     than flattered. Deferring it to a date nobody declared would be the other kind of guess.
+
+    ⚙ **The direction claim is about the dates, and the base the way out charges on is a
+    separate question it does not cover.** Netting here also shrinks what a percentage exit
+    fee applies to. That is the right base under this model -- the tax is a domestic liability
+    settled in the base currency and never travels the way out, so charging a repatriation fee
+    on it would invent a journey. Under the other reading it would flatter by
+    ``fee_pct x tax``, which is why the choice is stated rather than left to the arithmetic.
     """
     ledger = projected.ledger
     currency = ledger.base_currency
@@ -1263,9 +1270,16 @@ def _released_by_date(projected: Projection | FundProjection) -> tuple[tuple[dat
             continue
         by_date.setdefault(event.occurred_on, []).append(event.amount)
     for charge in projected.charges:
-        by_date.setdefault(taxed_on[charge.event_sequence], []).append(
-            money.scale(charge.total, -1.0)
-        )
+        taxed = taxed_on.get(charge.event_sequence)
+        if taxed is None:  # pragma: no cover -- both projections renumber before they fold
+            raise LedgerInvariantError(
+                f"tax charge on event {charge.event_sequence} names no event in this ledger, "
+                "so there is no date to net it on. Dropping it would send the gross amount "
+                "home and understate nothing visibly -- every part line would still read "
+                "correctly. Both projections renumber their charges onto the combined stream "
+                "before folding it, so reaching here means that renumbering was skipped."
+            )
+        by_date.setdefault(taxed, []).append(money.scale(charge.total, -1.0))
     netted = ((on, money.total(amounts, currency)) for on, amounts in sorted(by_date.items()))
     return tuple((on, amount) for on, amount in netted if amount.amount != 0.0)
 
@@ -1298,9 +1312,12 @@ _RELEASE_KINDS: Final[frozenset[EventKind]] = frozenset(
 )
 """The event kinds that are the instrument paying the owner, for the ``lifecycle`` line.
 
-A closed set naming what a *holding produces*, distinct from the cash-only set the ledger
-uses: a tax charge is cash and is not a payment by the instrument, and a fee is a charge
-rather than a receipt. Both have lines of their own.
+A closed set naming what a *holding produces*, and it is narrower than the ledger's
+``CASH_ONLY_KINDS`` for a different reason than that set is drawn for: that one is the kinds
+that touch no holding, this one is the kinds that are a receipt. A fee is a charge rather than
+a receipt, and a tax charge is neither -- since feature 009 it moves nothing at all, and what
+it assessed reaches the ``tax`` line from the charge rather than from the event. Each has a
+line of its own.
 """
 
 

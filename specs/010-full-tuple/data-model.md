@@ -42,7 +42,7 @@ against each other** before anything is costed; see `FundedFromAnotherStream`.
 ### `InstrumentAccess`, `core/instruments/access.py`
 
 The declaration kind this feature had to add: nothing else in `data/` says *where* an
-instrument is bought (FR-023, `docs/METHODOLOGY.md` §28.6). Keyed by instrument id, one row
+instrument is bought (FR-023, `docs/METHODOLOGY.md` §29.6). Keyed by instrument id, one row
 each — a second row for one instrument is refused at load, so *one instrument at two venues*
 is a shape the seam **admits later** rather than one it expresses today; expressing it would
 also need a venue term on `Tuple`.

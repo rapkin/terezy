@@ -155,7 +155,15 @@ class Arrival:
     """
 
     released: Money
-    """What the instrument released, at the venue it released it at."""
+    """What the instrument released on this date **net of the tax charged on it**, at the
+    venue it released it at.
+
+    Net rather than gross, and the field says so because two contract tests now assert
+    ``released == lifecycle + tax`` against it. Read as gross it would look like the
+    ``lifecycle`` part line, and the two differ by exactly the charge on every taxed holding.
+    The gross figure is that part line; this is what actually travelled the way out, which is
+    what the way out's fee was charged on.
+    """
 
     amount: Money
     """What arrived, in the endpoint's currency, net of the way out's charge."""
@@ -848,8 +856,11 @@ class InstrumentDemandsCash:
     planned. It is refused rather than netted against a later receipt, because netting would
     move a real outflow to a date it did not happen on and quietly improve the rate.
 
-    Unreachable for every instrument shipped today -- every declared class is exempt -- and it
-    exists because that is a property of the current tax rules rather than of the arithmetic.
+    Unreachable while every declared class charges a **fraction** of the income it taxes: the
+    charge is netted on that income's own date, so the date still nets positive. Rates summing
+    to 100% or more make it reachable, which is a property of the declared rates rather than
+    of the arithmetic -- and is why the guard exists rather than an assertion that it cannot
+    happen.
     """
 
     instrument_id: str
