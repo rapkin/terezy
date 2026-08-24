@@ -266,12 +266,18 @@ def staleness_of_sources(
     call there because a table may cite several sources under one kind.
 
     This one is for a **derived figure** whose provenance has already been merged across
-    several tables. By then no record is in hand: a tuple's outcome rests on the bond's terms,
-    its constraints, the tax pack's rates and every table of a fund's declaration, and none of
-    those core records carries a kind. The kind rides on the citation instead
+    several tables. By then no record is in hand, and none of the records behind a figure like
+    a tuple's outcome -- a bond's terms, a tax class's rate entries, a fund's net asset value
+    -- carries a kind of its own. The kind rides on the citation instead
     (:attr:`~terezy.core.primitives.provenance.SourceRef.kind`), which is the only thing that
-    survives the merge -- and without it FR-019's staleness half was unreachable for two of a
-    tuple's four parts while its provenance half worked perfectly.
+    survives the merge.
+
+    **This function ages what it is given and can say nothing about what it is not.** Whether
+    a caller passed the provenance of every table its figure rests on is that caller's
+    property to assert, against the declarations rather than against the provenance it built
+    -- two sides from one source prove only that source self-consistent. It is asserted for
+    the join in ``tests/contract/test_marks_survive_the_join.py``, and the two tables that
+    were missing when nobody did are why the sentence is here.
 
     A source whose kind is empty is **not aged and not listed in** :attr:`assessed`. That is
     the strict reading: it says nobody could check this rather than claiming it is current,

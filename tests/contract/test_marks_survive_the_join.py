@@ -13,6 +13,8 @@ every value in this repository is unverified today.
 
 from __future__ import annotations
 
+import dataclasses
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import replace
 from datetime import date
 from typing import Final
@@ -21,6 +23,8 @@ import pytest
 
 from terezy.core.decision.compare import compare
 from terezy.core.decision.tuple_outcome import Registries, evaluate
+from terezy.core.instruments.fund import FundDeclaration
+from terezy.core.instruments.interface import InstrumentDeclaration
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives import staleness as stale
 from terezy.core.primitives.money import Money
@@ -51,6 +55,17 @@ def _verified(source: SourceRef, *, retrieved_on: date | None = None) -> SourceR
 
 def _all_verified(provenance: Provenance) -> Provenance:
     return prov.of(_verified(source) for source in provenance.sources)
+
+
+def _verified_unless(provenance: Provenance, *, verified: bool) -> Provenance:
+    """Verified, unless this is the part under test.
+
+    ``[instrument.constraints]`` used to be verified **unconditionally** here, outside the
+    switch, and that line was dead in the way that matters: it made the instrument part's
+    unverified case pass while one of that part's two tables was always clean. It was also
+    the evidence -- a fixture nobody could make dirty is a fixture nothing is checking.
+    """
+    return _all_verified(provenance) if verified else provenance
 
 
 def _aged(source: SourceRef) -> SourceRef:
@@ -175,10 +190,15 @@ def _registries(
                 terms=terms,
                 constraints=replace(
                     declared.constraints,
-                    provenance=_all_verified(declared.constraints.provenance),
+                    provenance=_verified_unless(
+                        declared.constraints.provenance, verified=instrument_verified
+                    ),
                     min_ticket=replace(
                         declared.constraints.min_ticket,
-                        provenance=_all_verified(declared.constraints.min_ticket.provenance),
+                        provenance=_verified_unless(
+                            declared.constraints.min_ticket.provenance,
+                            verified=instrument_verified,
+                        ),
                     ),
                 ),
             ),
@@ -292,16 +312,15 @@ class TestStalenessSurfacesOnTheOutcome:
         assert outcome.staleness.assessed
         assert not stale.any_stale(outcome.staleness)
 
-    def test_every_source_behind_the_outcome_was_aged(self) -> None:
-        # SC-007's second clause, as a **partition** rather than a sample: the sources the
-        # verdict says it aged are exactly the sources the figure rests on. This is what was
-        # false for two parts of four -- the bond's terms, its constraints, the tax rates and
-        # every table of a fund's declaration reached `provenance` and reached `assessed`
-        # nowhere, because no core record of theirs named a kind and nothing carried it.
+    def test_every_source_the_outcome_carries_was_aged(self) -> None:
+        # The guard on `SourceRef.kind`'s empty default: a citation the loader forgot to stamp
+        # shows up here as a source nobody could age, which is the silent permissive default
+        # FR-028 forbids.
         #
-        # It is also the guard on `SourceRef.kind`'s empty default: a citation the loader
-        # forgot to stamp would show up here as a source nobody could age, which is exactly
-        # the silent permissive default FR-028 forbids.
+        # It proves nothing about **completeness**, and an earlier version of this test
+        # claimed it did -- both of its sides came from `provenance`, so it could only ever
+        # show that one set self-consistent. Completeness is the class below, whose two sides
+        # come from different places.
         for candidate in (fixtures.hurdle_tuple(), _fund()):
             outcome = _outcome(_registries(unverified_part=None), candidate)
             behind = {source.id for source in outcome.provenance.sources}
@@ -384,3 +403,103 @@ class TestTheJoinDoesNotLaunderAMoneyValue:
         for line in outcome.parts:
             assert isinstance(line.amount, Money)
             assert line.amount.currency is not None
+
+
+CANNOT_MOVE_A_FIGURE: Final[frozenset[str]] = frozenset(
+    {
+        # Recorded context for the declared yield, and nothing accrues from it
+        # (`instruments.fund`, owner decision B). It reaches `rests_on` as words.
+        "instrument.fee_fact",
+    }
+)
+"""Sourced tables a tuple's outcome deliberately does **not** rest on.
+
+Closed, and named one by one with the reason, because the alternative is a subtraction
+nobody has to justify. A sourced table added to a declaration fails the partition below until
+somebody decides which side of this line it is on -- which is the friction that would have
+caught `[instrument.constraints]` on the commit that made it load-bearing.
+"""
+
+
+class TestEveryDeclaredTableTheTupleReadReachesTheOutcome:
+    """FR-019's completeness half, partitioned against a **second** source of truth.
+
+    The two sides are derived differently on purpose. One is `TupleOutcome.provenance`. The
+    other is a walk over the declarations the tuple *names* -- its instrument, its access
+    entry, the tax classes that instrument references, and the routes at both ends -- reached
+    through the registry rather than through anything the join produced. A guard whose two
+    sides come from one place can only ever prove that place self-consistent, and the version
+    of it that did exactly that is what let two load-bearing tables go unmarked:
+
+    * `[instrument.constraints]`, whose minimum ticket and buyable increment decide how many
+      units were bought and therefore every figure. **This feature made them load-bearing** --
+      nothing sized a purchase from them before `_acquire` -- and nothing marked them;
+    * a fund's `[instrument.liquidity.*]`, whose settlement delay moves the arrival date and
+      the rate: 0 to 30 business days moves the shipped MilTech tuple from 0.17578 to 0.16553.
+
+    A years-stale minimum ticket was therefore invisible on the outcome, which is the
+    top-severity shape -- a figure resting on an input nobody has checked, saying nothing.
+    """
+
+    def _sources(self, value: object, seen: set[int]) -> Iterator[SourceRef]:
+        """Every citation reachable from a declaration, without naming a single field."""
+        if id(value) in seen:
+            return
+        seen.add(id(value))
+        if isinstance(value, SourceRef):
+            yield value
+        elif isinstance(value, str | bytes):
+            return
+        elif dataclasses.is_dataclass(value) and not isinstance(value, type):
+            for field in dataclasses.fields(value):
+                yield from self._sources(getattr(value, field.name), seen)
+        elif isinstance(value, Mapping):
+            for item in value.values():
+                yield from self._sources(item, seen)
+        elif isinstance(value, Iterable):
+            for item in value:
+                yield from self._sources(item, seen)
+
+    def _declared(self, registries: Registries, candidate: Tuple) -> set[str]:
+        """Every sourced table of every declaration this tuple names, read off the registry."""
+        fund = registries.funds.get(candidate.instrument_id)
+        instrument: FundDeclaration | InstrumentDeclaration = (
+            fund if fund is not None else registries.instruments[candidate.instrument_id]
+        )
+        named: list[object] = [
+            instrument,
+            registries.access[candidate.instrument_id],
+            *(registries.tax_classes[class_id] for class_id in instrument.tax_classes.values()),
+            registries.routes[fixtures.DOMESTIC_IN],
+            registries.routes[fixtures.DOMESTIC_OUT],
+        ]
+        seen: set[int] = set()
+        return {source.id for item in named for source in self._sources(item, seen)}
+
+    @pytest.mark.parametrize("candidate", [fixtures.hurdle_tuple(), _fund()], ids=["bond", "fund"])
+    def test_the_declared_tables_partition_into_carried_and_classified(
+        self, candidate: Tuple
+    ) -> None:
+        registries = _registries(unverified_part=None)
+        declared = self._declared(registries, candidate)
+        carried = {source.id for source in _outcome(registries, candidate).provenance.sources}
+        assert declared, "the walk reached no declaration, so it proves nothing"
+        missing = sorted(
+            table
+            for table in declared - carried
+            if not any(excused in table for excused in CANNOT_MOVE_A_FIGURE)
+        )
+        assert not missing, (
+            f"declared tables the outcome rests on and does not carry: {missing}. Either merge "
+            "their provenance in `_assemble`, or classify them in CANNOT_MOVE_A_FIGURE with "
+            "the reason no figure can move when they change."
+        )
+
+    @pytest.mark.parametrize("candidate", [fixtures.hurdle_tuple(), _fund()], ids=["bond", "fund"])
+    def test_the_classification_is_not_a_blanket(self, candidate: Tuple) -> None:
+        # The other half: an excuse list that excused everything would make the partition
+        # vacuous. Most of what a tuple names has to be carried, and here it is all but one.
+        registries = _registries(unverified_part=None)
+        declared = self._declared(registries, candidate)
+        carried = {source.id for source in _outcome(registries, candidate).provenance.sources}
+        assert len(declared & carried) >= len(declared) - 2

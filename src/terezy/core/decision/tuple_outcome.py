@@ -1294,7 +1294,7 @@ def _assemble(
             one_way.provenance,
             *(charged.provenance for charged in way_out_costs),
             _projection_provenance(projected),
-            _quote_provenance(prepared),
+            _declaration_provenance(prepared),
         ]
     )
     span = DateRange(
@@ -1367,15 +1367,44 @@ def _standing(routed: _Routed, way_out_costs: tuple[WayOutCost, ...]) -> RouteSt
     )
 
 
-def _quote_provenance(prepared: _Prepared) -> Provenance:
-    """The venue quote's citation, or nothing where the instrument prices itself.
+def _declaration_provenance(prepared: _Prepared) -> Provenance:
+    """The declared tables the **join itself** read, which no projection propagates.
 
-    Reaches the outcome through the purchase event anyway -- the join sized it from this
-    price -- and is merged here as well so that the union does not depend on a projection
-    having propagated it. ``prov.merge`` is a set union, so arriving twice is arriving once.
+    A projection's provenance covers the tables *it* consulted, and there are three the join
+    consults that it never sees:
+
+    * the venue quote, which the join sized the purchase from and which no lifecycle touches;
+    * ``[instrument.constraints]`` -- the minimum ticket and the buyable increment, which
+      decide how many units were bought and therefore every figure downstream. This feature is
+      what made them load-bearing: before :func:`_acquire` nothing sized a purchase from them,
+      which is exactly why they were the table left out;
+    * a fund's :class:`~terezy.core.instruments.fund.LiquidityTerms`, **both tables**. The
+      settlement delay moves the arrival date and therefore the rate -- 0 to 30 business days
+      moves the shipped MilTech tuple from 0.17578 to 0.16553 -- and which of the two supplies
+      it depends on the run: the assumed mode picks one, and the termination path reads the
+      legal one whatever the mode. The join cannot tell which fired without re-deciding the
+      exit, so it marks the pair. A mark present where it need not be costs a reader nothing;
+      one absent where it belongs is Principle I's defect.
+
+    **Not everything a declaration cites.** ``fee_context`` is recorded context for the
+    declared yield and nothing accrues from it (``instruments.fund``, owner decision B), so it
+    moves no figure and claiming a figure rests on it would make the mark mean less. The line
+    is *can this table move a number*, and it is asserted rather than left to judgement:
+    ``tests/contract/test_marks_survive_the_join.py`` partitions every sourced table of the
+    declarations a tuple names into those that reach the outcome and those classified as
+    unable to move one.
     """
     quote = prepared.access.quote
-    return prov.EMPTY if quote is None else quote.price.provenance
+    tables = [prov.EMPTY if quote is None else quote.price.provenance]
+    match prepared.declared:
+        case InstrumentDeclaration():
+            tables.append(prepared.declared.constraints.provenance)
+        case FundDeclaration():
+            tables.append(prepared.declared.liquidity.legal.provenance)
+            tables.append(prepared.declared.liquidity.practice.provenance)
+        case _:  # pragma: no cover -- mypy proves this unreachable
+            assert_never(prepared.declared)
+    return prov.merge_all(tables)
 
 
 def _parts(
