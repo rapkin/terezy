@@ -56,9 +56,10 @@ kind.
 **It refuses where those amounts are not all in one currency**, and that is reachable in the
 shipped registry rather than a theoretical case: the dollar contract income reaching a hryvnia
 fund produces a dollar outflow and hryvnia inflows, and an internal rate of return over the
-two is not a rate of anything. Valuing one in the other needs a reference rate on a date,
-which is feature 011 and does not exist -- and a channel rate is not one: a channel is a
-market you transact in, and the rate that values an outlay against a return is a reference. So
+two is not a rate of anything. Valuing one in the other needs a rate that values one currency
+in another **for a return**, and nothing declares one: a channel rate is a transaction price,
+and the official rate feature 011 brought is a legal reference for what an income was worth --
+reusing either to score a return conflates a role rather than filling this one. So
 the **amount** is reported and the **rate** is a typed absence naming what is missing, on
 ``RealTermsUnavailable``'s precedent, and the comparison keeps such a tuple out of the ranking
 while showing it (002's ``Ranking.not_comparable``, unchanged).
@@ -200,8 +201,10 @@ class Registries:
     base_currency: Currency
     """The currency tax is assessed in (Principle VI's tax role).
 
-    Read for exactly one thing: refusing a taxable event in another currency, because the
-    official rate that would strike the base in this one is feature 011 and does not exist.
+    Read for exactly one thing: refusing a taxable instrument declared in another currency.
+    Not for want of an official rate -- feature 011 built that -- but because the projection
+    below holds a holding under one currency and sums its charges in it. See
+    :class:`~terezy.core.results.tuple.TaxCurrencyConversionUnavailable`.
     """
 
 
@@ -582,7 +585,7 @@ def _unresolved_class(
 def _foreign_tax_currency(
     declared: Declared, currency: Currency, base_currency: Currency
 ) -> TaxCurrencyConversionUnavailable | None:
-    """A taxable instrument in a currency the tax is not assessed in refuses (FR-024).
+    """A taxable instrument in a currency the projection cannot hold its tax in (FR-024).
 
     Checked before anything is computed, because the alternative is a projection that charged
     a hryvnia rate against a dollar base and produced a plausible number. It is unreachable in
@@ -595,12 +598,14 @@ def _foreign_tax_currency(
         instrument_id=declared.id,
         instrument_currency=currency.value,
         tax_currency=base_currency.value,
-        missing="the official rate for a date (feature 011-official-rate)",
+        missing="a holding and its tax in two currencies (fx-tax-asymmetry-f1)",
         reason=(
             f"{declared.id!r} is declared in {currency.value} and declares taxable income, "
-            f"but tax is assessed in {base_currency.value} at the official rate on the "
-            "transaction date (Principle VI's tax role). That machinery does not exist yet, "
-            "so the tax term of this tuple cannot be struck. It is refused rather than "
+            f"but tax is assessed in {base_currency.value} (Principle VI's tax role). The "
+            "rate that strikes such a base exists and is applied at assessment; what does not "
+            "is a projection holding a position in one currency and its charges in another, "
+            "and a per-lot basis carried in both so a realised gain can be struck leg by leg. "
+            "Both are specs/features.toml's fx-tax-asymmetry-f1. Refused rather than "
             "converted at a channel rate: a channel is a market you transact in and the "
             "official rate is a legal reference you never transact at, and substituting one "
             "for the other would compute a real tax liability at a price nobody was charged."
@@ -1657,10 +1662,11 @@ def _rate(
     # is a perfectly good single-currency series -- money left in UAH, money returned in UAH,
     # and the two conversions are costs inside it -- so it has a rate and refusing it would
     # throw away an honest figure. The moment the unit price does not divide the arriving
-    # amount, a *dollar* remainder has to be netted off a *hryvnia* outlay, and that needs the
-    # reference rate feature 011 will bring. So the same tuple has a rate at one amount and
-    # not at another: the difference is a fact about what the data allows, and the refusal's
-    # own reason names the stranded amount and its currency so a reader can see which.
+    # amount, a *dollar* remainder has to be netted off a *hryvnia* outlay, and that needs a
+    # declared valuation rate, which nothing supplies. So the same tuple has a rate at one
+    # amount and not at another: the difference is a fact about what the data allows, and the
+    # refusal's own reason names the stranded amount and its currency so a reader can see
+    # which.
     #
     # It is unreachable today, and by construction rather than by the shipped data. A
     # remainder needs a declared increment, and only an `InstrumentDeclaration` declares one:
@@ -1685,13 +1691,13 @@ def _rate(
             reason=(
                 f"the outlay is {outlay.currency.value} and what comes back is "
                 f"{endpoint.value}{stayed}. A money-weighted return over two currencies is "
-                "not a rate of anything, and valuing one of them in the other needs a "
-                "reference rate on a date. A channel rate is not one: a channel is a market "
-                "you transact in, and using its price to value an outlay against a return "
-                "would put a transaction price where a valuation belongs. The amount that "
-                "reaches a spendable endpoint is unaffected and is reported."
+                "not a rate of anything, and valuing one of them in the other needs a rate "
+                "that values a currency for a return. Neither rate this system has is one: a "
+                "channel rate is a transaction price, and the official rate is what the law "
+                "says an income was worth. The amount that reaches a spendable endpoint is "
+                "unaffected and is reported."
             ),
-            missing="the official rate for a date (feature 011-official-rate)",
+            missing="a declared valuation rate for a date",
         )
     invested = outlay if stranded is None else money.sub(outlay, stranded)
     received = money.total([arrival.amount for arrival in arrivals], endpoint)

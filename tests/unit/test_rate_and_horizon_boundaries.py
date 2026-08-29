@@ -8,14 +8,18 @@ already take, applied to the two things this feature computes.
   It is reachable in the shipped registry, not a theoretical case: dollar contract income
   reaching a hryvnia fund produces a dollar outflow and hryvnia inflows, and an internal rate
   of return over the two is not a rate of anything. Valuing the outlay needs a reference rate
-  on a date, which is feature 011 -- and a channel rate is not one.
+  that values one currency in another for a return, and nothing declares one -- neither a
+  channel rate, which is a transaction price, nor the official rate, which is what the law
+  says an income was worth.
 * **No span the instrument can cover.** FR-025's second consequence: an instrument that cannot
   reach the comparison's horizon is infeasible **for that comparison**, with the binding term
   named, rather than silently truncated to whatever span it can manage.
-* **No tax base this engine can strike.** FR-024: tax is assessed in the base currency at the
-  official rate on the transaction date, and that machinery does not exist. The refusal names
-  it. It must never be satisfied with a channel rate: a channel is a market you transact in,
-  and the official rate is a legal reference you never transact at.
+* **No tax base this projection can hold.** FR-024: tax is assessed in the base currency, and
+  feature 011 built the rate that strikes such a base at assessment. What is still missing is
+  a projection that holds a position in one currency and its charges in another, and a per-lot
+  basis in both so a realised gain is struck leg by leg -- ``fx-tax-asymmetry-f1``. The
+  refusal names that, and must never be satisfied with a channel rate: a channel is a market
+  you transact in, and the official rate is a legal reference you never transact at.
 * **No conventional series.** A round trip whose repatriation charges exceed everything it
   released has no single internal rate of return, and extrapolating one past the bracket
   would invent a figure.
@@ -143,7 +147,7 @@ class TestATupleFundedInOneCurrencyAndSpentInAnother:
     def test_the_rate_is_a_typed_absence_naming_what_is_missing(self) -> None:
         rate = self._outcome().implied_rate
         assert isinstance(rate, RateNotComparable)
-        assert "011" in rate.missing
+        assert "valuation rate" in rate.missing
         assert "USD" in rate.reason
         assert "UAH" in rate.reason
 
@@ -279,7 +283,7 @@ class TestATaxBaseInTheWrongCurrency:
         assert isinstance(refusal, TaxCurrencyConversionUnavailable), refusal
         assert refusal.instrument_currency == "USD"
         assert refusal.tax_currency == "UAH"
-        assert "011" in refusal.missing
+        assert "fx-tax-asymmetry-f1" in refusal.missing
         assert "channel rate" in refusal.reason
 
 
@@ -372,9 +376,10 @@ class TestAForeignInstrumentIsClosedByTwoGuardsAndNotByTheShippedData:
     declares a ``min_unit``, so nothing else leaves a remainder -- and a foreign-currency bond
     is closed twice over. Both halves are asserted here rather than described, because "this
     branch is unreachable" is precisely the claim that quietly stops being true: a later
-    feature that brings the official rate, or that lets an instrument declare an exempt kind
-    without a class, opens it, and it should fail a test on the way rather than surface as a
-    rate that appears at one amount and vanishes at another.
+    feature that lets a projection hold a position and its tax in two currencies, or that lets
+    an instrument declare an exempt kind without a class, opens it, and it should fail a test
+    on the way rather than surface as a rate that appears at one amount and vanishes at
+    another.
     """
 
     def _foreign(self, *, declares_tax: bool) -> Registries:
@@ -452,7 +457,7 @@ class TestAForeignInstrumentIsClosedByTwoGuardsAndNotByTheShippedData:
             route_out=DeclaredExit(route_id="test_binance_to_uah"),
         )
 
-    def test_one_that_declares_tax_classes_refuses_for_the_official_rate(self) -> None:
+    def test_one_that_declares_tax_classes_refuses_for_the_two_currency_holding(self) -> None:
         refusal = _evaluated(
             self._foreign(declares_tax=True),
             self._tuple(),
