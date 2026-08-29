@@ -1116,9 +1116,14 @@ def venues_from_file(path: Path) -> tuple[Venue, ...]:
 def _non_empty_list[T](path: Path, field_path: str, values: list[T], why: str) -> list[T]:
     """A declared list that may not be empty, checked where the field can be named.
 
-    Generic because the three callers -- a venue's currencies, a regime's routes, a
-    scenario's transitions -- fail for the same reason in three different files, and one
-    message shape keeps them saying it the same way.
+    Generic because its callers fail for the same reason in different files -- an empty list
+    of a venue's currencies, of a regime's routes, of the two currencies a quote is between --
+    and one message shape keeps them saying it the same way.
+
+    ⚙ **The callers are deliberately not enumerated.** They were, the list said three, and
+    there were six by the time anybody re-read it -- two of them added by the feature that
+    found the discrepancy. A count in prose beside a function nothing counts is a claim that
+    goes stale in silence.
     """
     if not values:
         raise DeclarationError(

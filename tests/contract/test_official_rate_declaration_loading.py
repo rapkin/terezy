@@ -387,12 +387,10 @@ class TestTheRelationsOneFileCannotSee:
         assert "ua_nbu_usd" in str(caught.value)
 
     def test_a_rule_naming_an_undeclared_staleness_kind_is_refused(self, tmp_path: Path) -> None:
-        """The one sourced table in this feature the provenance gate structurally cannot see.
+        """A rule table's kind is checked by the resolver, because nothing else can.
 
-        `check_provenance.py` recognises a sourced table by its numeric leaves, and
-        `[non_publication_rule]` has none — it is a citation and a list of dates. Unchecked,
-        a misspelt kind loads and then raises from `staleness.kind_for` when a figure it
-        marked is aged: a crash at report time for a file refusable by name at load.
+        Why nothing else can is `resolver.official_rates_from_data_root`'s docstring; this
+        asserts that the check exists and names both the offending kind and the alternatives.
         """
         root = tmp_path / "data" / "official_rates"
         root.mkdir(parents=True)

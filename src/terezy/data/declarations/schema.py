@@ -1992,9 +1992,8 @@ class NonPublicationRuleTable(BaseModel):
     published text, which changes by amendment rather than by drift.
 
     Which kind a file names is not pinned, only that it names one ``data/observation_kinds.toml``
-    declares -- and that check is the **resolver's**, uniquely for this table. The provenance
-    gate recognises a sourced table by its numeric leaves and this one has none, so it cannot
-    see it (see ``official_rates_from_data_root``).
+    declares -- and that check is the **resolver's** rather than the provenance gate's, for the
+    reason ``resolver.official_rates_from_data_root`` gives.
     """
 
     source: str

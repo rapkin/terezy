@@ -169,10 +169,11 @@ class TaxContext:
 
     **A rule may not assume it is the tax currency**, and may not assume which currency it is
     at all: an income event is charged on its own amount, and a disposal on the realised gain,
-    which the ledger computes in its own base currency. A foreign-currency charge is restated
-    in the tax currency when the year is assembled. See this module's docstring for the
-    assumption that ordering rests on, and for why a non-proportional rule cannot simply
-    convert here.
+    which the ledger computes in its own base currency. A foreign-currency charge on an income
+    event is restated in the tax currency when the year is assembled; one on a **gain** is
+    refused there instead, for the reason this module's docstring gives -- along with the
+    assumption that ordering rests on, and why a non-proportional rule cannot simply convert
+    here.
 
     A negative base is possible -- a realised loss -- and is passed through rather than
     clamped. See :mod:`terezy.core.tax.flat_rate` for what that means and does not mean.

@@ -2549,19 +2549,24 @@ def official_rates_from_data_root(
 
     Sorted, so a run does not depend on the order a filesystem happens to return.
 
-    ``kinds`` is required because a **rule** table's staleness kind is checked nowhere else.
-    `scripts/check_provenance.py` recognises a sourced table by its numeric leaves, and
-    `[non_publication_rule]` has none -- it is a citation and a list of dates -- so the gate
-    cannot see it, exactly as it cannot see `[series]`. Left unchecked, a misspelt kind loads
-    and then raises from `staleness.kind_for` when a figure it marked is aged: a crash at
-    report time for a file that could have been refused by name at load.
+    ⚙ **``kinds`` is required, and this docstring is where that is explained.** A
+    `[non_publication_rule]` table carries a citation and a list of dates and **no number**,
+    so `scripts/check_provenance.py` -- which recognises a sourced table by its numeric
+    leaves -- cannot see it, and its staleness kind would be checked nowhere. Left unchecked a
+    misspelt kind loads clean and then raises from `staleness.kind_for` when a figure it
+    marked is aged: a crash at report time for a file that could have been refused by name at
+    load. Measured 2026-08-29.
     """
     series: dict[str, OfficialRateSeries] = {}
     declaring: dict[str, Path] = {}
     for path in sorted((root / OFFICIAL_RATES_DIR).glob("*.toml")):
         declared = loader.official_rate_from_file(path)
         if declared.rule is not None:
-            for source in declared.rule.provenance.sources:
+            # Sorted, for the reason the file list above is: a set has no order, and a
+            # refusal that depends on one is a refusal that changes between runs. The field
+            # path is the rule table's regardless of how many citations it grows, because
+            # `loader._non_publication_rule` builds this provenance from that table alone.
+            for source in sorted(declared.rule.provenance.sources, key=lambda ref: ref.id):
                 _check_kind(
                     source.kind,
                     kinds,
