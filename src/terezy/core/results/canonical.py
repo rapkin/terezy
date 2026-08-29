@@ -32,21 +32,36 @@ from typing import assert_never
 
 from terezy.core.ledger import canonical as ledger_canonical
 from terezy.core.ledger.canonical import Canonical
+from terezy.core.primitives.conventions import AmountsAsDeclared, ConventionsApplied
 from terezy.core.primitives.rates import RealRate, RealTermsUnavailable
 from terezy.core.results.hurdle import HurdleRate, RealTerms
 from terezy.core.results.project import Projection
-from terezy.core.results.schedule import CashFlowRow, CashFlowSchedule, ConventionsApplied
+from terezy.core.results.schedule import CashFlowRow, CashFlowSchedule
 from terezy.core.tax.interface import TaxCharge
 
 
-def of_conventions(value: ConventionsApplied) -> tuple[str, str, str]:
-    """The three declared conventions a schedule applied.
+def of_conventions(value: ConventionsApplied | AmountsAsDeclared) -> tuple[str, ...]:
+    """Whichever statement a row makes about what shaped it, rendered so the two differ.
 
     Part of the identity of a result, not decoration: the same terms under ``act/365`` and
     under ``30/360`` are different schedules, and a digest that ignored the convention
-    would call two genuinely different answers the same.
+    would call two genuinely different answers the same. The same argument reaches one step
+    further -- a schedule whose amounts were **declared** and one whose amounts were
+    computed from three conventions are two different claims about where the money came
+    from, and a digest agreeing between them would report them as one (013 FR-016).
+
+    A three-name rendering can never equal a two-entry one, so the two are told apart by
+    shape as well as by the tag. The three-name arm is deliberately **untagged**: it is
+    byte-for-byte what it has always been, so no generative row's digest moves for a reason
+    that is not about that row (013 SC-017).
     """
-    return (value.periodicity, value.day_count, value.business_day_rule)
+    match value:
+        case ConventionsApplied():
+            return (value.periodicity, value.day_count, value.business_day_rule)
+        case AmountsAsDeclared():
+            return ("declared", value.day_count)
+        case _:  # pragma: no cover -- mypy proves this unreachable
+            assert_never(value)
 
 
 def of_row(value: CashFlowRow) -> tuple[Canonical, ...]:

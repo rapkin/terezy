@@ -31,12 +31,12 @@ from terezy.core.errors import LedgerInvariantError
 from terezy.core.ledger import engine
 from terezy.core.ledger.events import CausationKind, CausationRef, Event, EventKind, LotRef
 from terezy.core.primitives import provenance as prov
+from terezy.core.primitives.conventions import ConventionsApplied
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.tolerance import assert_money_close
 from terezy.core.results import project, schedule
 from terezy.core.results.project import Projection
-from terezy.core.results.schedule import ConventionsApplied
 from tests import synthetic
 
 UAH = Currency.UAH

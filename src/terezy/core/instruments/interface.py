@@ -47,9 +47,11 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import date
+from enum import Enum
+from typing import Final
 
 from terezy.core.errors import InstrumentFailure
-from terezy.core.ledger.events import Event
+from terezy.core.ledger.events import Event, EventKind
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance
@@ -98,6 +100,162 @@ class BondTerms:
     """The sources these terms rest on. Reaches every amount derived from them."""
 
 
+# ---------------------------------------------------------------------------
+# 013-enumerated-schedule: the second thing a declaration can say about a bond
+# ---------------------------------------------------------------------------
+#
+# ⚙ **Two epistemic situations, not two encodings of one.** `BondTerms` says *I know this
+# issue's full terms*, and every figure derived from it is checkable on paper against the
+# contract. `EnumeratedTerms` says *I am buying a stream of dated payments on the secondary
+# market; the issue's history is neither known to me nor relevant to what I will receive*.
+#
+# The fact that forced the second record is the **issue date**. The endpoint that publishes
+# the 32 real OVDP schedules gives a list of dated amounts and no issue date, and no issue
+# date is derivable from one: extrapolating one backwards would be inventing a legal fact
+# about a state security, which Principle I forbids outright and which is invisible once
+# made -- a plausible date produces a plausible schedule and nothing ever contradicts it.
+# The issue date affects **no future cash flow of a purchase made today**, so a form that
+# demanded one would be forcing an invention that changes no figure.
+
+
+class PaymentKind(Enum):
+    """What one enumerated payment is, from a closed set. Never inferred (FR-008).
+
+    The ``value`` strings are the data contract a declaration file writes.
+    """
+
+    COUPON = "coupon"
+    """A contractual interest payment. Cash in; it touches no lot."""
+
+    PRINCIPAL_REPAYMENT = "principal_repayment"
+    """A repayment of principal: cash in against units surrendered.
+
+    A disposal, like the generative form's redemption -- it consumes basis and realises a
+    gain or a loss. Treating it as a cash receipt would tax the owner's own money back.
+    """
+
+
+PAYMENT_KINDS: Final[Mapping[PaymentKind, tuple[EventKind, TaxableEventKind]]] = {
+    PaymentKind.COUPON: (EventKind.COUPON, TaxableEventKind.COUPON),
+    PaymentKind.PRINCIPAL_REPAYMENT: (
+        EventKind.PRINCIPAL_REPAYMENT,
+        TaxableEventKind.DISPOSAL_GAIN,
+    ),
+}
+"""What each declared label settles: the ledger movement, and the income kind assessed.
+
+**One mapping, not two**, and that is FR-007's requirement rather than a convenience. Those
+are already two distinct vocabularies in this engine -- `EventKind` says what *moved*,
+`TaxableEventKind` says what a tax class can speak *about* -- and a payment whose two halves
+disagreed would change no figure on the instruments that motivate this feature, because both
+OVDP income kinds are exempt. That is luck rather than design, and it is exactly the
+condition under which a defect ships (FR-010).
+"""
+
+
+@dataclass(frozen=True, slots=True)
+class ScheduledPayment:
+    """One dated, per-unit amount with a declared kind. The unit of an enumerated schedule.
+
+    Two of these on one date with different kinds is the normal end of a bond -- the final
+    coupon and the principal repayment -- and 31 of the 32 observed issues are shaped that
+    way. They are never merged, deduplicated or summed into one row.
+    """
+
+    on: date
+    """The date money changes hands. Not adjusted by anything: no business-day rule is
+    declared, because none was applied to a payment somebody has already published."""
+
+    amount: Money
+    """The payment **per unit**, in the instrument's currency, in its major units.
+
+    Per unit for the reason `BondTerms.face_value` is: the holding says how many units, and
+    keeping the two apart is what lets one declaration serve purchases of any size. The
+    engine performs **no unit scaling** of a declared amount (FR-004) -- a figure published
+    in kopecks is converted when it is transcribed, and the conversion is recorded there as
+    an inference rather than performed here as a division that looks like plumbing.
+
+    Carries its own provenance, as every `Money` does, so a payment's mark reaches every
+    figure derived from it without a second mechanism.
+    """
+
+    pays: PaymentKind
+    """Declared, never read off the amount, the date or the position in the list (FR-008).
+
+    ``8305, 8305, 8305, 100000`` is obviously three coupons and a principal repayment to a
+    human and obviously nothing at all to a machine, and the endpoint does not label them.
+    """
+
+
+@dataclass(frozen=True, slots=True)
+class EnumeratedTerms:
+    """A bond declared as the payments it will make, for a buyer who knows only those.
+
+    **What is absent is absent by construction**: no issue date, no coupon rate, no
+    periodicity, no business-day rule and no maturity date. FR-003 forbids them rather than
+    making them optional, because an accepted-and-ignored field is worse than a missing one
+    and each of these would be either invented or unread. There is nowhere here to put one.
+    """
+
+    face_value: Money
+    """Redemption amount **per unit**. Positive.
+
+    A redemption amount and nothing else. It is deliberately **not** a price: for a
+    generative bond, face is the price at which a unit earns the issue's declared rate, and
+    an enumerated instrument declares no rate (FR-015).
+    """
+
+    covers_from: date
+    """The date from which this list is complete, to the end of the instrument's life.
+
+    **One-ended by construction** (FR-005). There is no closing field, so a schedule
+    truncated at the far end is an unrepresentable state rather than a silently short
+    projection. The claim is the transcriber's and it is cited: the endpoint states no
+    window, and the window it in fact publishes is not uniform.
+    """
+
+    payments: tuple[ScheduledPayment, ...]
+    """Every payment, in ascending date order, none before :attr:`covers_from`."""
+
+    day_count: str
+    """A key of ``conventions.DAY_COUNT_FNS``. Required, and **not** an exception to FR-003.
+
+    The distinction a reader has to be able to make: the forbidden five are terms of the
+    **issue** -- they describe the paper. A day count is a convention of **computation** --
+    it describes how *we* turn a span of days into a fraction of a year in order to
+    annualise. Nothing about the issue is claimed by declaring one.
+
+    It is required rather than optional because the contractual yield cannot be computed
+    without it (FR-018), and `results.hurdle.net_present_value` forbids the hard-coded 365
+    that would otherwise be needed: the yield would then disagree with the schedule it was
+    computed from.
+
+    ⚙ **It is an input to no figure describing the instrument's own terms** (FR-003b) -- not
+    an amount, and **not a rate**. The boundary is *return figures versus issue terms*, and
+    the difference is the whole door: a day count plus one coupon amount plus the interval
+    between two coupons yields a **coupon rate**, and a coupon rate plus the spacing yields
+    an extrapolated **issue date**. That is the invented legal fact this form exists to
+    refuse, reached in two steps from a field this record requires.
+    """
+
+    published_in_order: tuple[date, ...] | None
+    """The dates in the order the **source** published them, where that was not ascending.
+
+    ``None`` where the source published them in date order, which is the ordinary case.
+    Ordering is settled at transcription -- the same declared human step that turns kopecks
+    into hryvnia -- and the loader neither sorts nor accepts an unordered list (FR-006).
+
+    ⚙ **An observation about the source, not about the money**, and the one that silently
+    disappears: that an issuer publishes the principal repayment before the final coupon is
+    a fact about how the endpoint reports, and sorting the list is precisely the act that
+    would delete it. Of the 32 observed issues exactly one is shaped that way, and it is the
+    only one this form would have refused as published.
+    """
+
+    provenance: Provenance
+    """The sources the schedule table rests on. Every one of them an inference."""
+
+
 @dataclass(frozen=True, slots=True)
 class InstrumentConstraints:
     """What the instrument requires of a purchase. Feasibility, not arithmetic."""
@@ -143,8 +301,19 @@ class InstrumentDeclaration:
     omission -- the omission would run the wrong way round.
     """
 
-    terms: BondTerms
-    """The contractual terms."""
+    terms: BondTerms | EnumeratedTerms
+    """What this declaration says about the paper -- in one of the two forms it can say it.
+
+    ⚙ **A union, and the union is the mechanism** (FR-002). The two forms are two epistemic
+    situations rather than two encodings of one thing, and the cost of keeping them apart is
+    paid here: code reading a generative-only term cannot type-check against an enumerated
+    declaration without handling its absence, so `mypy --strict` is what enumerates the sites
+    that must change rather than a reviewer noticing.
+
+    Which form a file is in is settled by :attr:`instrument_class`, the one dispatch key this
+    record permits. Nothing outside `core.instruments` asks which member it holds; the four
+    questions in `core.instruments.terms` are how the rest of the engine talks to it.
+    """
 
     constraints: InstrumentConstraints
     """The feasibility constraints."""

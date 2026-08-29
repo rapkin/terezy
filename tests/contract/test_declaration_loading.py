@@ -50,6 +50,7 @@ from terezy.core.tax.interface import TaxableEventKind
 from terezy.core.tax.schedule import RateUndeclaredBefore
 from terezy.data.declarations import loader, resolver
 from terezy.data.declarations.errors import DeclarationError
+from tests import declared_terms
 
 pytestmark = pytest.mark.contract
 
@@ -168,12 +169,13 @@ class TestTheShippedFilesLoad:
         # which is the literal `0.155` bit for bit. An approximate assertion here would
         # pass just as happily on a rate that was off by a rounding step, and the whole
         # point of this line is that the conversion happens once and lands exactly.
-        assert declaration.terms.coupon_rate == 0.155
-        assert declaration.terms.issue_date == date(2026, 1, 15)
-        assert declaration.terms.maturity_date == date(2028, 1, 15)
-        assert declaration.terms.periodicity == "semiannual"
-        assert declaration.terms.day_count == "act/365"
-        assert declaration.terms.business_day_rule == "following"
+        terms = declared_terms.contractual(declaration)
+        assert terms.coupon_rate == 0.155
+        assert terms.issue_date == date(2026, 1, 15)
+        assert terms.maturity_date == date(2028, 1, 15)
+        assert terms.periodicity == "semiannual"
+        assert terms.day_count == "act/365"
+        assert terms.business_day_rule == "following"
         assert declaration.constraints.min_unit == 1.0
         assert declaration.tax_classes == {
             TaxableEventKind.COUPON: "ua_government_bond",
@@ -697,7 +699,7 @@ class TestNonPositiveAmounts:
                 "coupon_rate_pct   = 0.0",
             ),
         )
-        assert loader.instrument_from_file(zero).terms.coupon_rate == 0.0
+        assert declared_terms.contractual(loader.instrument_from_file(zero)).coupon_rate == 0.0
 
     @pytest.mark.parametrize(
         ("old", "new", "field_path"),
@@ -819,7 +821,8 @@ class TestAnImpossibleInstrumentIsNotALoadError:
             ),
         )
         declaration = loader.instrument_from_file(broken)
-        assert declaration.terms.maturity_date < declaration.terms.issue_date
+        impossible = declared_terms.contractual(declaration)
+        assert impossible.maturity_date < impossible.issue_date
 
         outcome = project.project(
             declaration,

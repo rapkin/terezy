@@ -54,7 +54,7 @@ from terezy.core.results.project import Projection
 from terezy.core.tax.interface import TaxableEventKind
 from terezy.data.declarations import loader, resolver
 from terezy.data.declarations.errors import DeclarationError
-from tests import synthetic
+from tests import declared_terms, synthetic
 
 pytestmark = pytest.mark.contract
 
@@ -294,8 +294,8 @@ class TestEachScheduleReportsItsOwnConventions:
         conventions_b = {row.conventions for row in _issue_b().schedule.rows}
         assert len(conventions_a) == 1, "one issue, one set of conventions"
         assert len(conventions_b) == 1
-        applied_a = conventions_a.pop()
-        applied_b = conventions_b.pop()
+        applied_a = declared_terms.generated(conventions_a.pop())
+        applied_b = declared_terms.generated(conventions_b.pop())
 
         assert (applied_a.periodicity, applied_a.day_count, applied_a.business_day_rule) == (
             "semiannual",
@@ -316,11 +316,12 @@ class TestEachScheduleReportsItsOwnConventions:
         """Reported, not assumed: the schedule's claim is checked against the file."""
         declarations = _declarations()
         for instrument_id, projection in ((ISSUE_A, _issue_a()), (ISSUE_B, _issue_b())):
-            terms = declarations.instruments[instrument_id].terms
+            terms = declared_terms.contractual(declarations.instruments[instrument_id])
             for row in projection.schedule.rows:
-                assert row.conventions.periodicity == terms.periodicity
-                assert row.conventions.day_count == terms.day_count
-                assert row.conventions.business_day_rule == terms.business_day_rule
+                applied = declared_terms.generated(row.conventions)
+                assert applied.periodicity == terms.periodicity
+                assert applied.day_count == terms.day_count
+                assert applied.business_day_rule == terms.business_day_rule
 
     def test_the_two_issues_produce_different_schedules_and_different_figures(self) -> None:
         """The conventions have to *matter*, or reporting them proves nothing.
@@ -489,15 +490,17 @@ class TestTheLoaderAndTheHandBuiltRecordsAgree:
     def test_the_two_declarations_are_the_same_record(self) -> None:
         loaded = loader.instrument_from_file(DATA_ROOT / "instruments" / f"{ISSUE_A}.toml")
         hand = synthetic.declaration(id=loaded.id, name=loaded.name)
-        assert loaded.terms.coupon_rate == hand.terms.coupon_rate
-        assert loaded.terms.face_value == hand.terms.face_value, (
+        from_file = declared_terms.contractual(loaded)
+        from_code = declared_terms.contractual(hand)
+        assert from_file.coupon_rate == from_code.coupon_rate
+        assert from_file.face_value == from_code.face_value, (
             "money equality ignores provenance, so this compares amount and currency"
         )
-        assert loaded.terms.issue_date == hand.terms.issue_date
-        assert loaded.terms.maturity_date == hand.terms.maturity_date
-        assert loaded.terms.periodicity == hand.terms.periodicity
-        assert loaded.terms.day_count == hand.terms.day_count
-        assert loaded.terms.business_day_rule == hand.terms.business_day_rule
+        assert from_file.issue_date == from_code.issue_date
+        assert from_file.maturity_date == from_code.maturity_date
+        assert from_file.periodicity == from_code.periodicity
+        assert from_file.day_count == from_code.day_count
+        assert from_file.business_day_rule == from_code.business_day_rule
         assert loaded.constraints.min_ticket == hand.constraints.min_ticket
         assert loaded.constraints.min_unit == hand.constraints.min_unit
         assert loaded.is_synthetic == hand.is_synthetic

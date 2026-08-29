@@ -38,30 +38,9 @@ from terezy.core.errors import LedgerInvariantError
 from terezy.core.ledger.engine import LedgerState
 from terezy.core.ledger.events import CausationRef, Event, EventKind
 from terezy.core.primitives import money
+from terezy.core.primitives.conventions import AmountsAsDeclared, ConventionsApplied
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
-
-
-@dataclass(frozen=True, slots=True)
-class ConventionsApplied:
-    """The three declared conventions that shaped a schedule's dates and amounts.
-
-    Carried on every row rather than once on the schedule, because FR-021 is a statement
-    about what the schedule *says*: a row lifted out of the table -- into a report, into a
-    comparison -- has to keep saying which convention placed it. They are identical across
-    the rows of one issue today; they will not be when a schedule spans two instruments.
-    """
-
-    periodicity: str
-    """The declared coupon frequency that generated the dates."""
-
-    day_count: str
-    """The declared day-count convention that turned each accrual period into a fraction
-    of a year, and therefore fixed each coupon's size."""
-
-    business_day_rule: str
-    """The declared rule that moved a payment off a non-business day. Applied to the
-    payment date only; the accrual was measured on the unadjusted dates."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,8 +76,14 @@ class CashFlowRow:
     net: Money
     """``gross - tax``: what the holding actually received or paid on this date."""
 
-    conventions: ConventionsApplied
-    """Which declared conventions placed this date and sized this amount (FR-021)."""
+    conventions: ConventionsApplied | AmountsAsDeclared
+    """What the declaration says shaped this date and this amount (001 FR-021, 013 FR-016).
+
+    Two statements rather than one, because a schedule of *declared* payments has a
+    different true thing to say: no periodicity generated the date, no business-day rule
+    moved it, and no day count sized the amount. The row does not decide which statement it
+    makes -- the declaration answers, and this carries the answer.
+    """
 
     caused_by: CausationRef
     """The instrument term or tax rule that produced the event behind this row."""
@@ -134,7 +119,7 @@ class ChargedOn:
 def of_ledger(
     state: LedgerState,
     *,
-    conventions: ConventionsApplied,
+    conventions: ConventionsApplied | AmountsAsDeclared,
     taxed_by: Mapping[int, ChargedOn],
 ) -> CashFlowSchedule:
     """Build the schedule a folded ledger implies.
@@ -167,7 +152,7 @@ def of_ledger(
 def _row(
     event: Event,
     taxed_by: Mapping[int, ChargedOn],
-    conventions: ConventionsApplied,
+    conventions: ConventionsApplied | AmountsAsDeclared,
 ) -> CashFlowRow:
     """One row: the event's own amount, and the tax event charged against it."""
     assessed = taxed_by.get(event.sequence)

@@ -49,6 +49,7 @@ from datetime import date
 from typing import TYPE_CHECKING, Final, assert_never
 
 from terezy.core.errors import InconsistentTerms, SeedInstrumentUndeclared
+from terezy.core.instruments import terms
 from terezy.core.ledger.events import CausationKind, CausationRef, Event, EventKind, LotRef
 from terezy.core.primitives import money
 from terezy.core.primitives import provenance as prov
@@ -339,14 +340,20 @@ def _inconsistency(
                 "instrument would be a confident answer about something that does not exist."
             ),
         )
-    if lot.acquired_on < declaration.terms.issue_date:
+    # ⚙ The question is *the earliest date from which this instrument's terms are known*,
+    # and it is asked of the declaration rather than read off a field. This site used to
+    # read an issue date, which was never what it needed -- it needed a date it could
+    # compare an acquisition against, and it asked for the only spelling that existed. A
+    # declaration that states its terms from a coverage start answers the same question.
+    known = terms.known_from(declaration.terms)
+    if lot.acquired_on < known.on:
         return InconsistentTerms(
             first_term="seed.acquired_on",
-            second_term="instrument.terms.issue_date",
+            second_term=known.term,
             reason=(
                 f"the declared opening lot {lot.lot_id!r} was acquired on "
-                f"{lot.acquired_on.isoformat()}, before {lot.instrument_id!r} was issued on "
-                f"{declaration.terms.issue_date.isoformat()}. Two declared facts that cannot "
+                f"{lot.acquired_on.isoformat()}, before {lot.instrument_id!r} "
+                f"{known.as_declared} {known.on.isoformat()}. Two declared facts that cannot "
                 "both hold: the lot is not admitted and it is not silently re-dated, because "
                 "moving it would change the acquisition date every holding-period rule and "
                 "every consumption order is measured from."

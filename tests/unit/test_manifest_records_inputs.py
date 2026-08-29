@@ -48,7 +48,7 @@ from terezy.core.results.project import Projection
 from terezy.data import manifest
 from terezy.data.declarations import resolver
 from terezy.data.declarations.errors import DeclarationError
-from tests import synthetic
+from tests import declared_terms, synthetic
 
 UAH = Currency.UAH
 
@@ -90,7 +90,7 @@ def _holding(declarations: resolver.Declarations, instrument_id: str = ISSUE_A) 
         owner_id="owner-1",
         instrument_id=instrument_id,
         quantity=10.0,
-        purchased_on=declaration.terms.issue_date,
+        purchased_on=declared_terms.contractual(declaration).issue_date,
         cost=Money(10_000.0, UAH, prov.EMPTY),
     )
 

@@ -57,6 +57,7 @@ from terezy.core.errors import (
 from terezy.core.inflation.series import CpiSeries, InflationAssumption
 from terezy.core.instruments import fixed_income
 from terezy.core.instruments import registry as instrument_registry
+from terezy.core.instruments import terms as instrument_terms
 from terezy.core.instruments.interface import (
     Assumptions,
     DateRange,
@@ -74,7 +75,7 @@ from terezy.core.primitives.staleness import Ageing
 from terezy.core.results import hurdle as hurdle_figures
 from terezy.core.results import schedule as schedule_rows
 from terezy.core.results.hurdle import CashFlow, HurdleRate
-from terezy.core.results.schedule import CashFlowSchedule, ChargedOn, ConventionsApplied
+from terezy.core.results.schedule import CashFlowSchedule, ChargedOn
 from terezy.core.tax import registry as tax_registry
 from terezy.core.tax import year as tax_year
 from terezy.core.tax.interface import TaxableEventKind, TaxCharge, TaxClass, TaxContext
@@ -177,7 +178,7 @@ def project(
         consumption_method=assumptions.consumption_method,
     )
 
-    year_fraction = conventions.day_count(declaration.terms.day_count)
+    year_fraction = conventions.day_count(instrument_terms.day_count_of(declaration.terms))
 
     # The contractual series is generated WITHOUT the coupon policy, because a
     # contractual yield to maturity is a property of the paper and reinvestment is a
@@ -194,11 +195,7 @@ def project(
         ledger=state,
         schedule=schedule_rows.of_ledger(
             state,
-            conventions=ConventionsApplied(
-                periodicity=declaration.terms.periodicity,
-                day_count=declaration.terms.day_count,
-                business_day_rule=declaration.terms.business_day_rule,
-            ),
+            conventions=instrument_terms.conventions_of(declaration.terms),
             taxed_by=taxed_by,
         ),
         charges=charges,
@@ -211,6 +208,7 @@ def project(
                 assessed={charged.tax_event: charged.amount for charged in taxed_by.values()},
             ),
             total_tax=money.total([charge.total for charge in charges], base_currency),
+            excludes=hurdle_figures.EXCLUDES | instrument_terms.excludes_of(declaration.terms),
             provenance=prov.merge(
                 prov.merge_all(event.amount.provenance for event in state.applied),
                 prov.merge_all(charge.provenance for charge in charges),

@@ -125,6 +125,7 @@ from terezy.core.tax import year as tax_year
 from terezy.core.tax.interface import TaxCharge, TaxClass
 from terezy.data import manifest
 from terezy.data.declarations import resolver
+from tests import declared_terms
 
 pytestmark = pytest.mark.golden
 
@@ -363,9 +364,10 @@ def _schedule(rows: Sequence[CashFlowRow]) -> Iterable[str]:
         yield f"       gross {_money(row.gross)}"
         yield f"       tax   {_money(row.tax)}"
         yield f"       net   {_money(row.net)}"
+        applied = declared_terms.generated(row.conventions)
         yield (
-            f"       conventions {row.conventions.periodicity} / {row.conventions.day_count}"
-            f" / {row.conventions.business_day_rule}"
+            f"       conventions {applied.periodicity} / {applied.day_count}"
+            f" / {applied.business_day_rule}"
         )
         yield f"       caused_by {row.caused_by.kind.value} {row.caused_by.id}"
         yield f"       because   {row.caused_by.detail}"

@@ -71,9 +71,13 @@ declared = declarations.instruments["ovdp_enumerated_a"]
 
 outcome = project.project(
     declared,
-    Holding(owner_id="owner-001", instrument_id=declared.id, quantity=10.0,
-            purchased_on=date(2026, 2, 1),
-            cost=Money(10_255.90, Currency.UAH, declared.terms.provenance)),
+    Holding(
+        owner_id="owner-001",
+        instrument_id=declared.id,
+        quantity=10.0,
+        purchased_on=date(2026, 2, 1),
+        cost=Money(10_255.90, Currency.UAH, declared.terms.provenance),
+    ),
     DateRange(start=date(2026, 2, 1), end=date(2029, 12, 31)),
     Assumptions(consumption_method="fifo", coupon_policy="hold_cash"),
     tax_classes=declarations.tax_classes,

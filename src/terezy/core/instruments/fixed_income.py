@@ -88,6 +88,7 @@ from terezy.core.errors import (
     InfeasiblePurchase,
     InstrumentFailure,
 )
+from terezy.core.instruments.interface import BondTerms
 from terezy.core.ledger.events import CausationKind, CausationRef, Event, EventKind, LotRef
 from terezy.core.primitives import conventions, money
 from terezy.core.primitives.money import Money
@@ -96,7 +97,6 @@ from terezy.core.primitives.tolerance import is_close
 if TYPE_CHECKING:  # pragma: no cover -- import-time cycle avoidance
     from terezy.core.instruments.interface import (
         Assumptions,
-        BondTerms,
         DateRange,
         Holding,
         InstrumentConstraints,
@@ -104,12 +104,33 @@ if TYPE_CHECKING:  # pragma: no cover -- import-time cycle avoidance
     )
     from terezy.core.tax.interface import TaxableEventKind
 
-# The registry in ``terezy.core.instruments.registry`` imports this module to build its
-# mapping, and the records above live beside that interface. Importing them only under
-# ``TYPE_CHECKING`` keeps the reference where it is useful -- the type checker -- and out
-# of the runtime import graph, where it would be a cycle. Nothing here constructs one of
-# those records; this module reads declarations and produces events, which is why the
-# type-only import is sufficient rather than a trick.
+# The records this module reads live beside the interface it satisfies, and most of them are
+# needed only by the type checker: nothing here constructs an ``Assumptions`` or a
+# ``Holding``, so a type-only import keeps the reference where it is useful and out of the
+# runtime graph. ``BondTerms`` is the exception and has to be imported for real, because
+# ``_contractual_terms`` below narrows to it at runtime. ``interface`` imports nothing from this
+# package, so neither import is a cycle -- the registry is what imports both.
+
+
+def _contractual_terms(declaration: InstrumentDeclaration) -> BondTerms:
+    """The declaration's terms, narrowed to the closed form this module computes from.
+
+    A raise rather than a typed failure, on the reading `registry.ops_for` and
+    `primitives.conventions` already established: which functions project a declaration is
+    decided by its declared class at the data boundary, so a declaration reaching *this*
+    module carrying anything else means that dispatch was bypassed. That is a programmer
+    error rather than a fact about the money, and a typed failure would offer a caller a
+    business outcome where there is none.
+    """
+    terms = declaration.terms
+    if not isinstance(terms, BondTerms):
+        raise TypeError(
+            f"{declaration.id!r} declares class {declaration.instrument_class!r} and reached "
+            "the closed-form schedule generator carrying terms it cannot compute from. The "
+            "declared class is the only dispatch key; this can only happen if it was not the "
+            "key used."
+        )
+    return terms
 
 
 def lot_id_for(holding: Holding) -> str:
@@ -148,7 +169,7 @@ def events(
     if problem is not None:
         return problem
 
-    terms = declaration.terms
+    terms = _contractual_terms(declaration)
     adjust = conventions.business_day_rule(terms.business_day_rule)
     stream = [_purchase(declaration, holding, sequence=1)]
     units = holding.quantity
@@ -229,7 +250,7 @@ def _check_feasible(
 
 def _terms_problem(declaration: InstrumentDeclaration) -> InstrumentFailure | None:
     """Whether the instrument's own declared terms can hold at all."""
-    terms = declaration.terms
+    terms = _contractual_terms(declaration)
     if terms.maturity_date <= terms.issue_date:
         return InconsistentTerms(
             first_term="instrument.maturity_date",
@@ -256,7 +277,7 @@ def _purchase_problem(
     instrument's life -- and reporting a shortfall against a ticket would be answering a
     question the caller has not yet managed to ask.
     """
-    terms = declaration.terms
+    terms = _contractual_terms(declaration)
     if holding.quantity <= 0.0:
         return InconsistentTerms(
             first_term="holding.quantity",
@@ -556,7 +577,7 @@ def coupon_plan(
     conventions, which is the right answer for a programmer error and the wrong one for a
     caller who should have been given a typed failure.
     """
-    terms = declaration.terms
+    terms = _contractual_terms(declaration)
     if terms.coupon_rate == 0.0:
         # A zero-coupon bond, which is a valid declaration and not a missing rate. It pays
         # its principal and nothing else, and emitting a stream of zero-amount coupon
@@ -618,7 +639,7 @@ def _decide(
     the calendar for a decision the policy made -- a plausible explanation that would send a
     reader looking for a bug in the wrong place.
     """
-    terms = declaration.terms
+    terms = _contractual_terms(declaration)
     constraints = declaration.constraints
     price = terms.face_value
 
@@ -674,7 +695,7 @@ def _bought_nothing(declaration: InstrumentDeclaration, coupon: Money) -> str:
     yet. Branching on the name here would put the set of policies in two places -- the
     registry and a message -- and the second copy is the one that would go stale.
     """
-    terms = declaration.terms
+    terms = _contractual_terms(declaration)
     constraints = declaration.constraints
     price = terms.face_value
     increment = money.scale_sourced(price, constraints.min_unit, terms.provenance)
@@ -719,7 +740,7 @@ def _coupon(
     sequence: int,
 ) -> Event:
     """One coupon: face x rate x year fraction x units, resting on the declared terms."""
-    terms = declaration.terms
+    terms = _contractual_terms(declaration)
     return Event(
         sequence=sequence,
         occurred_on=period.paid_on,
@@ -837,7 +858,7 @@ def _redemption(
     the configured consumption method, and an event that named one would be asking for
     specific-lot selection, which the ledger refuses loudly rather than ignoring.
     """
-    terms = declaration.terms
+    terms = _contractual_terms(declaration)
     paid_on = conventions.business_day_rule(terms.business_day_rule)(terms.maturity_date)
     return Event(
         sequence=sequence,
