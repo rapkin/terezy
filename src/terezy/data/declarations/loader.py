@@ -99,6 +99,12 @@ from terezy.core.streams import streams
 from terezy.core.streams.streams import IncomeStream, Indexation
 from terezy.core.tax import year as tax_year
 from terezy.core.tax.interface import TaxableEventKind, TaxClass
+from terezy.core.tax.official_rate import (
+    NonPublicationDay,
+    NonPublicationRule,
+    OfficialRateObservation,
+    OfficialRateSeries,
+)
 from terezy.core.tax.schedule import RateEntry
 from terezy.data.declarations import schema
 from terezy.data.declarations.errors import DeclarationError
@@ -1110,9 +1116,14 @@ def venues_from_file(path: Path) -> tuple[Venue, ...]:
 def _non_empty_list[T](path: Path, field_path: str, values: list[T], why: str) -> list[T]:
     """A declared list that may not be empty, checked where the field can be named.
 
-    Generic because the three callers -- a venue's currencies, a regime's routes, a
-    scenario's transitions -- fail for the same reason in three different files, and one
-    message shape keeps them saying it the same way.
+    Generic because its callers fail for the same reason in different files -- an empty list
+    of a venue's currencies, of a regime's routes, of the two currencies a quote is between --
+    and one message shape keeps them saying it the same way.
+
+    ⚙ **The callers are deliberately not counted.** They were, and the count was already wrong
+    when somebody re-read it -- then the sentence written to replace it got its own count
+    wrong, and review caught that too. A number in prose beside a function that counts nothing
+    is a claim with no way to fail except by being read.
     """
     if not values:
         raise DeclarationError(
@@ -3556,6 +3567,14 @@ class TimingDeclaration:
 
     jurisdiction_id: str
     tax_currency: Currency
+    official_rate_series: str | None
+    """The id of the series this jurisdiction declares for its tax currency, or ``None``.
+
+    Carried as declared text rather than resolved here, on ``category_of_class``'s precedent:
+    resolving it needs every official-rate file parsed first, which is the resolver's boundary
+    and the only place that can name both files.
+    """
+
     categories: tuple[tax_year.IncomeCategory, ...]
     timing: tuple[tax_year.TimingRule, ...]
     methods: tuple[tax_year.MethodStanding, ...]
@@ -3617,6 +3636,7 @@ def timing_from_file(path: Path) -> TimingDeclaration:
     return TimingDeclaration(
         jurisdiction_id=jurisdiction,
         tax_currency=currency,
+        official_rate_series=table.official_rate_series,
         categories=categories,
         timing=tuple(rule for _, rule in built),
         methods=methods,
@@ -3915,4 +3935,276 @@ def _access_price(
             "a venue quote ages under a declared threshold, and there is no default one "
             "(FR-028): a price whose kind nobody named could never be reported stale",
         ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# 011-official-rate: the declared official-rate series
+# ---------------------------------------------------------------------------
+#
+# The same four responsibilities -- read, shape, meaning, construct -- over the one
+# declaration whose values decide what the *law* says an income was rather than what the
+# owner received. Nothing here knows about a channel, and `.importlinter` keeps it that way
+# in both directions: an official rate may never price a leg (FR-012) and a channel's
+# reference rate may never strike a tax base (FR-013).
+#
+# **No network, no cache, and no knowledge that a fetcher exists.** The National Bank
+# publishes through an open developer API and `scripts/fetch_cpi.py` established the pattern
+# a script would follow -- retrieve, write an EMPTY `verified_on`, never verify. Building it
+# is `provider-automation`'s, not this module's; what this module owes it is the shape it
+# writes into.
+#
+# What is *not* here, because it needs a second file: whether two files declare one series
+# identity, and whether the series a jurisdiction names exists and quotes its tax currency.
+# Both are relations and live in the resolver, where the whole set is in hand.
+
+OFFICIAL_RATE_SERIES_TABLE: Final = "series"
+"""The identity table of an official-rate file, and the prefix of every field path in it."""
+
+OFFICIAL_RATE_OBSERVATION_TABLE: Final = "observation"
+"""The observation array of an official-rate file."""
+
+OFFICIAL_RATE_RULE_TABLE: Final = "non_publication_rule"
+"""The optional rule table of an official-rate file."""
+
+
+def _non_publication_rule(
+    path: Path,
+    table: schema.NonPublicationRuleTable,
+    declared: Mapping[date, OfficialRateObservation],
+) -> NonPublicationRule:
+    """A declared rule, checked against the observations it points at.
+
+    Two checks make the runtime lookup total, so a broken rule can never masquerade as a
+    missing date:
+
+    * **``governed_by`` must be a declared observation.** A rule pointing at a date the series
+      does not carry selects nothing, and the refusal a reader would then see would name the
+      *event's* date and send them to declare the wrong observation.
+    * **``applies_to`` must not be.** A rule speaks for dates the publisher does not publish
+      for; one claiming a published date contradicts the publication, and which of the two
+      won would depend on lookup order.
+    """
+    rule_id = _require_text(
+        path,
+        f"{OFFICIAL_RATE_RULE_TABLE}.id",
+        table.id,
+        "a rule is named so a base can say which rule chose the date its rate came from",
+    )
+    if not table.day:
+        raise DeclarationError(
+            path,
+            f"{OFFICIAL_RATE_RULE_TABLE}.day",
+            "declares a non-publication-day rule with no days. A rule that governs no date "
+            "grants nothing and refuses nothing; it reads as though the dates it was written "
+            "for were covered.",
+            f"declare at least one [[{OFFICIAL_RATE_RULE_TABLE}.day]], or delete the table",
+        )
+    days: list[NonPublicationDay] = []
+    seen: set[date] = set()
+    for position, entry in enumerate(table.day):
+        field_prefix = f"{OFFICIAL_RATE_RULE_TABLE}.day[{position}]"
+        applies_to = _parse_date(path, f"{field_prefix}.applies_to", entry.applies_to)
+        governed_by = _parse_date(path, f"{field_prefix}.governed_by", entry.governed_by)
+        if applies_to in seen:
+            raise DeclarationError(
+                path,
+                f"{field_prefix}.applies_to",
+                f"declares {applies_to.isoformat()} for the second time. One date is governed "
+                "by one observation: two rows for it are not merged and neither wins, because "
+                "whichever the lookup reached first would decide a legal base by file order.",
+                "delete the duplicate row",
+            )
+        if applies_to in declared:
+            raise DeclarationError(
+                path,
+                f"{field_prefix}.applies_to",
+                f"sends {applies_to.isoformat()} to another date's rate, and this series "
+                "declares an observation for it. A non-publication-day rule speaks for dates "
+                "the publisher does NOT publish for; one that redirects a published date "
+                "contradicts the publication, and which answer won would depend on lookup "
+                "order.",
+                "remove the row, or remove the observation it contradicts",
+            )
+        if governed_by not in declared:
+            raise DeclarationError(
+                path,
+                f"{field_prefix}.governed_by",
+                f"sends {applies_to.isoformat()} to {governed_by.isoformat()}, which this "
+                "series does not declare. A rule pointing at a date that carries no rate "
+                "selects nothing, and the refusal a reader would then see would name the "
+                "event's date and send them to declare the wrong observation.",
+                f"declare an [[{OFFICIAL_RATE_OBSERVATION_TABLE}]] for "
+                f"{governed_by.isoformat()}, or point the row at a date that has one",
+            )
+        seen.add(applies_to)
+        days.append(NonPublicationDay(applies_to=applies_to, governed_by=governed_by))
+    return NonPublicationRule(
+        id=rule_id,
+        days=tuple(days),
+        provenance=prov.of(
+            [
+                _source_ref(
+                    path,
+                    OFFICIAL_RATE_RULE_TABLE,
+                    source=table.source,
+                    retrieved_on=table.retrieved_on,
+                    verified_on=table.verified_on,
+                    kind=table.kind,
+                )
+            ]
+        ),
+    )
+
+
+def official_rate_from_file(path: Path) -> OfficialRateSeries:
+    """One ``data/official_rates/<series>.toml`` as an :class:`OfficialRateSeries`.
+
+    Every refusal below is a property of this one file read in isolation, and every one names
+    the file and the offending field or date (FR-004):
+
+    * **A non-positive rate**, and **a missing or non-positive quotation unit**. A rate quoted
+      per 100 units and read as per 1 is wrong by two orders of magnitude while looking
+      entirely reasonable, which is why the unit has no default.
+    * **A duplicate date**, and **dates running backwards**. One date, one official rate:
+      unlike a channel there is nothing here for a second value to legitimately be.
+    * **A rate dated after its own retrieval.** A rate for a date that has not arrived is a
+      forecast wearing an observation's clothes, and this one would silently set a legal base.
+      Aged against the file's own ``retrieved_on`` rather than a clock, so the same file loads
+      the same way for ever.
+    * **A rule pointing at an undeclared date, or redirecting a published one.**
+
+    **An observation carrying two sides is refused by the schema**, not here: there is no
+    field for a second side, so ``extra="forbid"`` makes declaring one an unrecognised field.
+
+    **Gaps between declared dates load, and so does a series declaring ``observation = []``.**
+    A date the publisher did not publish for is a fact and FR-010 forbids inventing one; and
+    an empty declaration is the shape a fetch script writes into. The refusal for both belongs
+    to ``core.tax.official_rate.strike_base``, which knows the date being asked about.
+    """
+    document = read_document(path)
+    file = _validate(schema.OfficialRateFile, document, path)
+    series_id = _require_text(
+        path,
+        f"{OFFICIAL_RATE_SERIES_TABLE}.id",
+        file.series.id,
+        "a series is referred to by id from the jurisdiction whose tax currency it serves, "
+        "and two series declaring one id are refused across the whole data root",
+    )
+    pair = _non_empty_list(
+        path,
+        f"{OFFICIAL_RATE_SERIES_TABLE}.pair",
+        file.series.pair,
+        "a series quotes one ordered currency pair and cannot quote none",
+    )
+    if len(pair) != _CURRENCY_PAIR_LENGTH:
+        raise DeclarationError(
+            path,
+            f"{OFFICIAL_RATE_SERIES_TABLE}.pair",
+            f"declares {len(pair)} currencies {pair!r}. A quote is between exactly two: the "
+            "price currency and the unit currency, in that order. The order decides which "
+            "direction the series converts, and reversing it would strike every tax base at "
+            "the reciprocal of the published rate while leaving every figure plausible.",
+            'write it as ["UAH", "USD"], meaning UAH per USD',
+        )
+    price_currency = _currency(path, f"{OFFICIAL_RATE_SERIES_TABLE}.pair", pair[0])
+    unit_currency = _currency(path, f"{OFFICIAL_RATE_SERIES_TABLE}.pair", pair[1])
+    if price_currency is unit_currency:
+        raise DeclarationError(
+            path,
+            f"{OFFICIAL_RATE_SERIES_TABLE}.pair",
+            f"quotes {price_currency.value} against itself. A series converts between two "
+            "different currencies, and an amount already in the tax currency needs no "
+            "official rate at all (FR-009).",
+            "name two different currencies",
+        )
+
+    observations: list[OfficialRateObservation] = []
+    seen: dict[date, int] = {}
+    for position, entry in enumerate(file.observation):
+        field_prefix = f"{OFFICIAL_RATE_OBSERVATION_TABLE}[{position}]"
+        on_date = _parse_date(path, f"{field_prefix}.on_date", entry.on_date)
+        retrieved_on = _parse_date(path, f"{field_prefix}.retrieved_on", entry.retrieved_on)
+        if on_date in seen:
+            raise DeclarationError(
+                path,
+                f"{field_prefix}.on_date",
+                f"declares {on_date.isoformat()} for the second time; entry {seen[on_date]} of "
+                "this file already declares it. The two are not merged and neither wins: one "
+                "date has one official rate, and a repeated date is a file edited twice.",
+                "delete the duplicate entry",
+            )
+        if observations and on_date <= observations[-1].on_date:
+            raise DeclarationError(
+                path,
+                f"{field_prefix}.on_date",
+                f"declares {on_date.isoformat()} after "
+                f"{observations[-1].on_date.isoformat()}, so the series runs backwards here. "
+                "Observations are declared in strictly ascending order and are not reordered: "
+                "sorting silently would hide which edit was meant, and the covered window a "
+                "refusal reports is read off the two ends.",
+                "put the observations in date order",
+            )
+        if on_date > retrieved_on:
+            raise DeclarationError(
+                path,
+                f"{field_prefix}.on_date",
+                f"declares a rate for {on_date.isoformat()} but was retrieved on "
+                f"{retrieved_on.isoformat()}. An authority sets an official rate for a date on "
+                "or before that date, so a value read before the date it applies to is a "
+                "forecast rather than an observation -- and this forecast would silently set a "
+                "legal base.",
+                "correct the date, or re-fetch the series once the rate has been published",
+            )
+        seen[on_date] = position
+        observations.append(
+            OfficialRateObservation(
+                on_date=on_date,
+                value=_positive(
+                    path,
+                    f"{field_prefix}.value",
+                    entry.value,
+                    "an official rate is a strictly positive number of the price currency per "
+                    "quotation_unit units of the unit currency. Zero or below is not a rate "
+                    "and would produce a base that merely looks like money",
+                ),
+                provenance=prov.of(
+                    [
+                        _source_ref(
+                            path,
+                            field_prefix,
+                            source=entry.source,
+                            retrieved_on=entry.retrieved_on,
+                            verified_on=entry.verified_on,
+                            kind=entry.kind,
+                        )
+                    ]
+                ),
+            )
+        )
+    declared = {observation.on_date: observation for observation in observations}
+    return OfficialRateSeries(
+        id=series_id,
+        authority=_require_text(
+            path,
+            f"{OFFICIAL_RATE_SERIES_TABLE}.authority",
+            file.series.authority,
+            "a series states which authority publishes it; that is half of what makes a "
+            "second jurisdiction's series a data-only addition (FR-005)",
+        ),
+        pair=(price_currency, unit_currency),
+        quotation_unit=_positive(
+            path,
+            f"{OFFICIAL_RATE_SERIES_TABLE}.quotation_unit",
+            file.series.quotation_unit,
+            "the number of units a rate is quoted per is declared and never defaulted "
+            "(FR-002): a rate quoted per 100 and read as per 1 is wrong by two orders of "
+            "magnitude and looks entirely plausible",
+        ),
+        rule=(
+            None
+            if file.non_publication_rule is None
+            else _non_publication_rule(path, file.non_publication_rule, declared)
+        ),
+        observations=tuple(observations),
     )

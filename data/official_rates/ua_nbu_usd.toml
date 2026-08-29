@@ -1,0 +1,71 @@
+# The National Bank of Ukraine's official hryvnia/dollar rate: the tax-currency series.
+#
+# NO OBSERVATION IS DECLARED, AND THAT IS THE SHIPPED STATE.
+#
+# An official rate is a legal value, and no legal value may originate from an implementer's
+# or an agent's memory (constitution, Principle I; 011 FR-001). The National Bank publishes
+# these through an open developer API, and retrieving them is a repository script's job —
+# the pattern `scripts/fetch_cpi.py` established: fetch, write an EMPTY `verified_on`,
+# never verify. That script is `provider-automation` and is not this feature. What this file
+# carries meanwhile is the *identity* the script writes into, and every date asked of the
+# series refuses by name until it does — which is what a gap in this project looks like when
+# it is honest.
+#
+# `observation` sits above `[series]` because TOML binds a bare key to the table it follows:
+# written below, it would declare `series.observation`. It is required and has no default —
+# a file that forgot its observations and a file declaring it has none must not look alike.
+#
+# ---------------------------------------------------------------------------
+# NO NON-PUBLICATION-DAY RULE IS DECLARED, AND THAT IS NOT AN OVERSIGHT
+# ---------------------------------------------------------------------------
+#
+# The National Bank does not set a rate for every calendar day, and which rate governs a day
+# it does not is пункт 10 розділу III of the Положення затверджене Постановою Правління НБУ
+# від 10.12.2019 № 148. Its two підпункти are written entirely in working days, pre-holiday
+# days, weekends and post-holiday working days, and пункт 11 of the same розділ adds the
+# Cabinet's power to move working days. Which абзаци are № 148's own words and which were
+# amended is a distinction that matters, and it is stated in ONE place — the pointer at the
+# end of this header — because a copy of it is what got it wrong before.
+#
+# 011 FR-011 forbids the engine any notion of a weekend, a public holiday or a banking
+# calendar, and it is right to — but that leaves the rule undeclarable here, because nothing
+# in this system supplies a working-day and holiday calendar and the rule cannot be evaluated
+# without one. Declaring it therefore needs a DECLARED, CITED calendar: a new kind of
+# declaration with its own jurisdiction, provenance and amendment history, recorded as the
+# `declared-working-day-calendar` entry in `specs/features.toml` (011 FR-018).
+#
+# Until that lands, a date this series does not declare REFUSES, naming the series, the pair
+# and the date. The refusal is the feature: a gap recorded only in a specification is a gap
+# nobody meets, and one that refuses is a gap the first run reports to the person who can
+# close it.
+#
+# The one encoding that would avoid a calendar — "the latest observation on or before the
+# event date" — MUST NOT be adopted: it cannot tell a weekend from a gap in the series, and
+# it would make the refusal unreachable for exactly the dates the refusal exists for.
+#
+# The quotation, the amendment markers and which абзаци are № 148's own words are in
+# `specs/011-official-rate/spec.md` under "Owner verification tasks", and are deliberately not
+# copied here.
+
+# ---------------------------------------------------------------------------
+# THE QUOTATION UNIT IS NOT CHECKED BY ANY GATE
+# ---------------------------------------------------------------------------
+#
+# `quotation_unit` is the only numeric leaf in `[series]`, and it is listed as structural in
+# `scripts/check_provenance.py` — which drops the citation requirement for this whole table,
+# not just for that field. So nothing verifies it, and a value read as 1 where the publisher
+# quotes per 100 is wrong by two orders of magnitude while every figure stays plausible.
+#
+# Whoever declares a series quoted per anything but 1: check the unit against the published
+# table by eye. The gate did not. Why the gap is not closed here — a `retrieved_on` for an
+# authority and a pair nobody retrieved would be a fabricated retrieval, which is worse than
+# an uncited field — is recorded at the exemption in that script, and closing it belongs with
+# the fetch script that will retrieve the published table this unit is read off.
+
+observation = []
+
+[series]
+id             = "ua_nbu_usd"
+authority      = "Національний банк України"
+pair           = ["UAH", "USD"]
+quotation_unit = 1.0

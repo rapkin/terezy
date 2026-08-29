@@ -446,10 +446,13 @@ class RateNotComparable:
     **The case that is reachable today** is a tuple funded in one currency and spent in
     another: dollar contract income reaching a hryvnia fund produces a dollar outflow and
     hryvnia inflows, and an internal rate of return over the two is not a rate of anything.
-    Valuing the outlay in hryvnia needs a reference rate on a date, which is feature 011 --
-    and a channel rate is not one. A channel is a market you transact in; the rate that values
-    an outlay against a return is a reference, and substituting one for the other would put a
-    transaction price where a valuation belongs and quietly change every ranking it touched.
+    Valuing the outlay in hryvnia needs a rate that values one currency in another **for a
+    return**, and nothing in this system declares one. Neither of the two rates that do exist
+    is it. A channel rate is a transaction price, and using it to value an outlay against a
+    return would put a price where a valuation belongs and quietly change every ranking it
+    touched. The official rate feature 011 brought is a *legal* reference -- what the law says
+    an income was worth on a date -- and reusing it to score a return is the role conflation
+    Principle VI names, not a shortcut around it.
 
     A remainder the purchase could not deploy joins that first case when it is in a third
     currency, because it is netted off the outlay: three amounts, and a rate is a rate only
@@ -821,19 +824,25 @@ class PlanDoesNotFitInstrument:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class TaxCurrencyConversionUnavailable:
-    """A taxable event in a currency the tax is not assessed in, and no official rate exists.
+    """A taxable instrument in a currency the projection cannot hold its tax in.
 
-    Principle VI gives currency three roles, and the tax role is *base currency at the
-    official rate on the transaction date*. That machinery is feature 011, which is drafted
-    and not built, so the honest answer is a refusal naming what is missing.
+    Principle VI's tax role -- base currency at the official rate on the transaction date --
+    exists as of feature 011, and ``core.tax.year`` strikes a base with it at assessment. This
+    refusal is upstream of that and is about a different gap: ``core.results.project`` folds a
+    holding under **one** currency and sums every charge in it, so a hryvnia charge inside a
+    dollar projection is a currency mismatch rather than a figure. A disposal adds a second
+    gap, because a realised gain needs a per-lot basis carried in both currencies with each
+    leg struck at its own date's rate.
 
-    **It must not be satisfied with a channel rate.** A channel is a market you transact in;
-    the official rate is a legal reference you never transact at, and substituting one for the
-    other would strike a tax base at a price nobody was charged. Feature 002 already refuses
-    that substitution one layer down, at ``routes.legs.channel_for``, and this refusal is the
-    same rule where the tax base is struck.
+    Both are ``fx-tax-asymmetry-f1`` in ``specs/features.toml``, whose remaining blocker this
+    refusal names. 011 supplied the dated rates it needs and deliberately did not build it.
 
-    Unreachable in the shipped registry, where every taxable event is in hryvnia, and it
+    **It must not be satisfied with a channel rate**, and neither must the base itself. A
+    channel is a market you transact in; the official rate is a legal reference you never
+    transact at, and substituting one for the other would strike a tax base at a price nobody
+    was charged.
+
+    Unreachable in the shipped registry, where every declared instrument is in hryvnia, and it
     exists because unreachable-today is not the same as never.
     """
 

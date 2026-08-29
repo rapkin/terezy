@@ -3135,7 +3135,175 @@ the ramp.
 
 ---
 
-## 30. Where to look next
+## 30. The tax currency: what the law says a foreign amount was worth
+
+Constitution Principle VI gives currency three roles — **base** (UAH), **tax** (UAH at the
+official rate on the transaction date) and **display** (user-switchable) — and says that
+conflating any two of them is a defect. This section is the tax role.
+
+### 30.1 The distinction the whole thing rests on
+
+An **FX channel** is a market you transact in. It has two sides, a spread, a fee and a
+counterparty, and it decides **how much money you end up with**.
+
+An **official rate** is a legal reference you never transact at. It has one side, no spread
+and no counterparty, and it decides **what number the law says your income was**.
+
+Those are different questions with different answers, and reporting either as the other is
+the failure this machinery exists to prevent. `SIMULATOR_SPEC.md` §4.4 names the consequence
+as a headline finding: *tax on FX gains never received* — the trade uses a channel rate and
+the tax uses the official rate, and the gap between them is real money.
+
+The prohibition runs **both ways**, and they are two requirements rather than one sentence
+read twice:
+
+- the amount **received** is never computed from an official rate — `core/routes/` may not
+  reach the official-rate machinery at all;
+- a channel's `reference_rate` is never a **tax** rate — `core/tax/` may not reach the module
+  that owns one.
+
+Each is a separate `.importlinter` contract, because one contract naming both would stay
+green if either half were deleted. The value-level claim — that no tax figure is *derived*
+from a reference rate — is a source scan in
+`tests/contract/test_the_rate_you_are_taxed_at.py`.
+
+### 30.2 The base
+
+For an amount denominated in something other than the tax currency:
+
+```
+base = amount × rate / quotation_unit
+```
+
+where `rate` is the series' declared value **for the event's own date** and `quotation_unit`
+is how many units of the foreign currency that value is stated per. Nothing is averaged, no
+period rate is used, no neighbouring date is borrowed, and no series the jurisdiction did not
+name is consulted.
+
+**The quotation unit has no default.** A published table that quotes some currencies per 1
+unit and others per 100 is ordinary, and a value read at the wrong unit is wrong by two orders
+of magnitude while looking entirely plausible. A series that omits it fails at load.
+
+What load-time checking does *not* do is verify the unit is the published one. The provenance
+gate recognises a sourced table by its numeric leaves, and `quotation_unit` is the only one in
+a series' identity table — listing it as structural drops that table's citation requirement
+altogether. So the unit is declared, non-defaulted, positive and **uncited**: a wrong one is
+caught by a reader or not at all. The data file's own header says so where a declarer meets
+it, and `scripts/check_provenance.py` records why the gap is not closed here.
+
+**The date is the one the taxable event already carries.** This machinery introduces no second
+notion of when a taxable event happened: two modules with their own opinion about that is how
+a tax figure becomes unreproducible.
+
+**An amount already in the tax currency consults no rate at all**, and no rate-unavailable
+reason is attached to it. A refusal for a rate nobody needed trains a reader to ignore true
+ones.
+
+### 30.3 Worked example
+
+A synthetic series quoting hryvnia per dollar, one value per date — invented figures, as every
+example in this project is:
+
+| date | rate |
+| --- | --- |
+| 2026-03-02 | 41.50 |
+| 2026-03-03 | 42.25 |
+
+A receipt of 1 200.00 USD:
+
+```
+on 2026-03-02:   1200.00 × 41.50 = 49 800.00 UAH
+on 2026-03-03:   1200.00 × 42.25 = 50 700.00 UAH
+difference:      (42.25 − 41.50) × 1200.00 = 900.00 UAH
+```
+
+The date is load-bearing, not decorative. And the same rate quoted per a hundred units strikes
+the same base:
+
+```
+1200.00 × 4150.00 / 100 = 49 800.00 UAH
+```
+
+Ignoring the unit would give 4 980 000.00 — not a near miss.
+`tests/worked_examples/test_official_rate_base.py` holds the arithmetic.
+
+### 30.4 A date with no declared rate refuses
+
+The publisher does not publish for every calendar day. Where no observation is declared for an
+event's date, the outcome is a **typed refusal naming the series, the currency pair and the
+date**, and the covered window so a reader can see whether the date is before it, after it or
+inside a gap.
+
+Nothing interpolates, extrapolates, carries yesterday's value forward, or snaps to the nearest
+observation. Each of those produces a number that looks exactly like a correct number, and
+every tax figure downstream would inherit the invention with no mark on it. This is the same
+answer §27.4 gives for a missing CPI month, for the same reason.
+
+The one sanctioned alternative is a **declared non-publication-day rule**: a cited statement of
+which observation governs a date the publisher does not publish for. It is data, it carries its
+own citation, and the engine contains no notion of a weekend, a public holiday or a banking
+calendar. Where a rule applies, the output states **which observation's date** supplied the
+rate beside the event's own, so a Friday rate applied to a Sunday event is visible rather than
+implied. Where no rule is declared, the refusal stands: the absence of a rule is not permission
+to choose one.
+
+### 30.5 What the Ukrainian series does today, and why
+
+It declares its identity, **no observations**, and **no rule**, so every date asked of it
+refuses.
+
+*No observations*, because an official rate is a legal value and no legal value may originate
+from an implementer's or an agent's memory. The National Bank publishes through an open
+developer API and retrieving the series is a repository script's job, on
+`scripts/fetch_cpi.py`'s pattern: fetch, write an **empty** `verified_on`, never verify. What
+is committed today is the shape that script writes into.
+
+*No rule*, and this one is not waiting on a fetch. Which rate governs a day the National Bank
+does not set one is пункт 10 розділу III of the Положення that Постанова Правління НБУ від
+10.12.2019 № 148 approves, and its two підпункти are written entirely in working days,
+pre-holiday days, weekends and post-holiday working days. Nothing in this system can declare a
+working-day and holiday calendar, and the engine is forbidden from containing one, so the rule
+cannot be declared until a **declared, cited calendar** exists — a new kind of declaration with
+its own jurisdiction, provenance and amendment history. It is recorded as
+`specs/features.toml`'s `declared-working-day-calendar` entry and is deliberately not built.
+
+The calendar-free shortcut — *the latest observation on or before the event date* — is refused
+rather than adopted: it cannot tell a weekend from a gap in the series, and it would make the
+refusal unreachable for exactly the dates the refusal exists for.
+
+### 30.6 What is **not** converted, and why that is the point
+
+A **realised gain in a foreign currency refuses.** It is not an amount on a date: it is the
+difference between proceeds received on one date and a basis struck on another, and each has
+its own official rate.
+
+Converting the difference at the disposal date's rate is not an approximation — it is the
+arithmetic that deletes the thing being looked for. A position flat in dollars across a
+devaluation realises **zero dollars**, and zero at any rate is zero hryvnia. Required test F1
+— *a position flat in USD across a devaluation produces a positive taxable gain in UAH* —
+would then be unfalsifiable, and it is the test the rewrite exists for.
+
+What that case needs is a per-lot basis carried in both currencies with each leg struck at its
+own date's rate, which is `specs/features.toml`'s `fx-tax-asymmetry-f1`. The dated rates it
+needed are now here; the two-currency position is not.
+
+### 30.7 The mark, and the age
+
+A base struck through an official rate rests on **both** sides: the amount's own sources and
+the rate observation's, unioned by the one function in the project that can produce an amount
+in a different currency. An unverified rate marks a base struck from a verified amount, and a
+marked amount survives a fully verified rate — neither launders the other.
+
+Official rates age under their own declared kind, `official_rate`, whose threshold is declared
+with it (§18). What decays is the **retrieval**: a published rate for a date that has passed is
+a historical fact and does not go wrong, but the publisher adds a rate every working day, so a
+series fetched long ago is short of its own end. Ageing a derived figure goes through each
+citation's own kind, because that is the only thing that survives the merge of provenance a tax
+base passes through.
+
+---
+
+## 31. Where to look next
 
 | question | file |
 | --- | --- |
@@ -3158,6 +3326,9 @@ the ramp.
 | Does a monthly cap bind, and is the excess reported? | `tests/worked_examples/test_monthly_cap.py` |
 | Is anything silently clamped? | `tests/invariants/test_no_silent_clamping.py` |
 | Does the ledger agree with the comparison? | `tests/invariants/test_cost_execute_agreement.py` |
+| What is a dollar income worth for tax? | `tests/worked_examples/test_official_rate_base.py` |
+| What happens on a date the publisher skipped? | `tests/unit/test_official_rate_refusals.py` |
+| Is the tax rate kept apart from the trading rate? | `tests/contract/test_the_rate_you_are_taxed_at.py` |
 | What does the war ending change? | `tests/worked_examples/test_regime_transition.py` |
 | Can an assumption be mistaken for an observation? | `tests/unit/test_transition_is_an_assumption.py` |
 | Which comparisons can the declared registry support? | `tests/worked_examples/test_coverage_table.py` |

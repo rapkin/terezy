@@ -109,9 +109,9 @@ xfailed, or deleted without an amendment.
 
 | # | Example | Test |
 |---|---|---|
-| F1 | **A position flat in USD across a devaluation produces a positive taxable gain in UAH.** This test is the reason the rewrite exists. | `[ ]` |
-| F2 | Switching display currency changes no realised amount, no tax figure, and no after-tax UAH ranking. | `[ ]` |
-| F3 | Historical series convert at per-date rates, never at today's rate. | `[ ]` |
+| F1 | **A position flat in USD across a devaluation produces a positive taxable gain in UAH.** This test is the reason the rewrite exists. | `[ ]` — **one of its two blockers is gone and the row stays open.** Feature 011 built the official rate: a foreign amount is struck in the tax currency at the series' declared rate for the event's own date, hand-checked in `tests/worked_examples/test_official_rate_base.py`. What is still missing is the **position**: `core.results.project` folds a holding under one currency and sums every charge in it, and a realised gain needs a per-lot basis carried in both currencies with each leg struck at its own date's rate. 011 refuses that case by name rather than converting the gain at one date's rate — which would report zero hryvnia for a position flat in dollars and make this very row unfalsifiable (`tests/unit/test_tax_base_in_the_tax_currency.py`). Tracked as `fx-tax-asymmetry-f1`. |
+| F2 | Switching display currency changes no realised amount, no tax figure, and no after-tax UAH ranking. | `[ ]` — the tax-figure half is established **before** the switch exists, so the row cannot be closed later by a feature that never checked it: no module under `core/tax/` reads a display choice, and a struck base takes its currency from the jurisdiction's declaration and from nowhere else (`tests/contract/test_the_rate_you_are_taxed_at.py::TestNoDisplayChoiceCanReachATaxFigure`, measured 2026-08-29). The realised-amount and ranking halves need the switch. |
+| F3 | Historical series convert at per-date rates, never at today's rate. | `[ ]` — **deliberately not attempted by 011**, and the shared phrase is a coincidence of wording. F3 is about the display switch converting a chart, which is a channel-rate question about presentation; 011 built the *tax* role, and treating the two as one requirement would conflate the two roles the constitution names explicitly. |
 | F4 | The real-terms view uses UA CPI in the UAH display and US CPI in the USD display. | `[ ]` — **half of the machinery exists; the row stays open because the example does not.** Feature 007 built the UA half: CPI enters as declared, dated, cited observations (`data/cpi/ua.toml`, 411 months, every one unverified), a window is deflated by the exact Fisher relation over the chained monthly product, and `HurdleRate.real` carries a realized and an assumed figure that never mix — `tests/worked_examples/test_deflation_arithmetic.py`, `tests/worked_examples/test_falling_prices.py`, `tests/contract/test_two_figures_never_blend.py`. What F4 actually asks is that the **display switch** selects the deflator, and there is no display switch yet: that is the display-currency feature's, alongside F1–F3. 007's obligation to it was structural and is discharged — a second series with a distinct identity is a data-only addition that loads and deflates, proved by `tests/contract/test_cpi_data_only.py`, so the shape does not preclude US CPI. |
 | F5 | Cash-vs-non-cash channel selection changes the result and is visible in the attribution. A single mid-rate is never used for a transaction. | `[x]` `tests/contract/test_route_data_only.py::TestTheChannelChoiceChangesTheResultAndIsVisible` — closed by **declared data**, not by code: `data/routes/monobank_to_binance_card.toml` differs from `monobank_to_binance_p2p.toml` in the `channel` its one `fx` leg names (and the provider doing the converting), and nothing else. The card's 150 bps costs **1.4778%** one way (`0.63/42.63`) against the P2P premium's **6.6667%** (`3/45`); round trip through the same declared exit, **7.3422%** against **12.2222%**. Each result names the channel it took in `channels_applied` — `('card', 'p2p')` and `('p2p', 'p2p')` — and reports `3/42 = 7.14%` as the spread over the reference *beside* the cost, never instead of it. `tests/worked_examples/test_channel_rates.py` holds the two-sided arithmetic. |
 
@@ -247,7 +247,7 @@ reinforces without closing:
 |---|---|
 | **G6** | Extended, not re-derived: a third labelled cost record, `WayOutCost`, prices what an instrument *released* rather than what a ramp delivered — unrelated to `OneWayCost` and `RoundTripCost` by type, so none can stand in for another. `tests/contract/test_cost_labels.py` was widened to pin it. The row is 002's and stays where it is. |
 | **I4** | *Naive baseline strategies always scored.* Half of it is now structural: the hurdle is always scored, always shown, and held as an **index** into the ranking rather than as a second figure beside it (`tests/contract/test_the_hurdle_is_a_tuple.py`). The box stays open because I4 is about a *strategy* shortlist, and there is no decision layer to shortlist anything yet. |
-| **F1** | The FX tax asymmetry stays with the feature that introduces a real taxable foreign instrument. What 010 adds is the refusal in its place: a taxable event in a currency the tax is not assessed in names the missing official-rate machinery rather than converting at a channel rate (`tests/unit/test_rate_and_horizon_boundaries.py`). Unreachable through the shipped registry, which is a property of today's data. |
+| **F1** | The FX tax asymmetry stays with the feature that introduces a real taxable foreign position. What 010 added is the refusal in its place, and feature 011 narrowed what that refusal names — see F1's own row. Unreachable through the shipped registry, which is a property of today's data. |
 | **H3** | Unmoved and worth naming: the new `data/access/` declarations are **not** in the run manifest's input references, so a result does not yet trace to the access file that priced its purchase. H3 asks for every data file's values to round-trip through the manifest, and this feature widened what a run reads without widening what it records. |
 
 ---
@@ -259,3 +259,14 @@ hand-computed schedule **exactly**" is therefore implemented as "within the proj
 tolerance", which is defined in exactly one place and imported. A test that invents
 its own tolerance is a defect; a test that needs a looser one states why at the
 assertion site (constitution, Principle IV).
+
+---
+
+**011-official-rate** closes no row and moves three notes. **F1** loses one of its two
+blockers: the dated official rates exist, and what remains is a position and a basis in two
+currencies. **F2** gains its tax-figure half as a standing property asserted before the
+display switch exists. **F3** is recorded as deliberately not attempted, so a later reader
+does not mistake "per-date rates" for the same requirement. **E8** — a second jurisdiction —
+is unmoved, and 011's obligation to it is discharged structurally: a second official-rate
+series with a distinct identity is a data-only addition that loads and is addressable
+(`tests/contract/test_official_rate_data_only.py`).

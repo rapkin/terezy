@@ -75,6 +75,8 @@ def test_importlinter_config_is_present() -> None:
         "[importlinter:contract:core-is-pure]",
         "[importlinter:contract:core-independent-of-frameworks]",
         "[importlinter:contract:data-below-api]",
+        "[importlinter:contract:official-rate-never-prices-a-leg]",
+        "[importlinter:contract:no-tax-base-from-a-channel]",
     ):
         assert required in text, f"required contract {required} was removed from .importlinter"
 

@@ -377,17 +377,23 @@ class TestADueDateRuleIsRequiredAndIsData:
         assert august.payments[0].amount == december.payments[0].amount
 
 
-class TestAForeignCurrencyTaxableEventRefuses:
-    """The boundary: the official rate is feature 011, and a channel rate may not stand in."""
+class TestAForeignCurrencyDisposalGainRefuses:
+    """The boundary feature 011 did **not** move, and why it did not move it.
 
-    def test_it_names_the_missing_machinery_rather_than_converting(self) -> None:
+    011 built the official rate, so a foreign *receipt* is now struck in the tax currency
+    (``tests/unit/test_tax_base_in_the_tax_currency.py``). This ledger's taxable result is a
+    realised **gain**, which is a difference between proceeds on one date and a basis struck
+    on another. Striking it at the disposal date's rate is the arithmetic that deletes the
+    gain required test F1 exists to find, so it refuses and names what is actually missing.
+    """
+
+    def test_it_names_the_two_currency_basis_rather_than_converting(self) -> None:
         outcome = _assess(currency=Currency.USD)
 
-        assert isinstance(outcome, tax_year.TaxCurrencyConversionUnavailable), outcome
+        assert isinstance(outcome, tax_year.ForeignGainNotStruckPerDate), outcome
         assert outcome.found is Currency.USD
         assert outcome.tax_currency is Currency.UAH
-        assert "official" in outcome.reason
-        assert "channel rate" in outcome.reason
+        assert "fx-tax-asymmetry-f1" in outcome.reason
 
 
 class TestTheCrossFileRelationsAreCheckedToo:
