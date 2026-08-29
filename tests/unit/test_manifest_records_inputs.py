@@ -66,6 +66,9 @@ FUND_C = "synthetic_fund_c"
 ENUMERATED_A = "ovdp_enumerated_a"
 ENUMERATED_MIRROR = "ovdp_enumerated_mirror"
 ENUMERATED_OUT_OF_ORDER = "enumerated_out_of_order"
+ENUMERATED_TAXABLE = "enumerated_taxable_x"
+FIXTURE_COUPON_CLASS = "synthetic_enumerated_coupon"
+FIXTURE_ENUMERATED_DISPOSAL_CLASS = "synthetic_enumerated_disposal"
 FIXTURE_PAYOUT_CLASS = "synthetic_fund_payout"
 FIXTURE_DISPOSAL_CLASS = "synthetic_fund_disposal"
 """⚙ Features 006 and 013 added declarations to the shipped data root: two fund files
@@ -205,6 +208,7 @@ class TestEveryDeclarationAndVersionThatFedTheRun:
             ("instrument", ENUMERATED_A),
             ("instrument", ENUMERATED_MIRROR),
             ("instrument", ENUMERATED_OUT_OF_ORDER),
+            ("instrument", ENUMERATED_TAXABLE),
             ("fund", REIT),
             ("fund", MILTECH),
             ("fund", FUND_C),
@@ -213,6 +217,8 @@ class TestEveryDeclarationAndVersionThatFedTheRun:
             ("tax_class", DISPOSAL_CLASS),
             ("tax_class", FIXTURE_PAYOUT_CLASS),
             ("tax_class", FIXTURE_DISPOSAL_CLASS),
+            ("tax_class", FIXTURE_COUPON_CLASS),
+            ("tax_class", FIXTURE_ENUMERATED_DISPOSAL_CLASS),
         }
 
     def test_the_second_issue_is_named_although_this_run_did_not_project_it(self) -> None:
@@ -246,6 +252,7 @@ class TestEveryDeclarationAndVersionThatFedTheRun:
             ENUMERATED_A: f"instruments/{ENUMERATED_A}.toml",
             ENUMERATED_MIRROR: f"instruments/{ENUMERATED_MIRROR}.toml",
             ENUMERATED_OUT_OF_ORDER: f"instruments/{ENUMERATED_OUT_OF_ORDER}.toml",
+            ENUMERATED_TAXABLE: f"instruments/{ENUMERATED_TAXABLE}.toml",
             REIT: f"instruments/{REIT}.toml",
             MILTECH: f"instruments/{MILTECH}.toml",
             FUND_C: f"instruments/{FUND_C}.toml",
@@ -254,6 +261,8 @@ class TestEveryDeclarationAndVersionThatFedTheRun:
             DISPOSAL_CLASS: "tax/ua.toml",
             FIXTURE_PAYOUT_CLASS: "tax/synthetic_fixture.toml",
             FIXTURE_DISPOSAL_CLASS: "tax/synthetic_fixture.toml",
+            FIXTURE_COUPON_CLASS: "tax/synthetic_fixture.toml",
+            FIXTURE_ENUMERATED_DISPOSAL_CLASS: "tax/synthetic_fixture.toml",
         }
         for name in files.values():
             assert not Path(name).is_absolute()
@@ -275,6 +284,7 @@ class TestEveryDeclarationAndVersionThatFedTheRun:
             ENUMERATED_OUT_OF_ORDER: (
                 DATA_ROOT / "instruments" / f"{ENUMERATED_OUT_OF_ORDER}.toml"
             ),
+            ENUMERATED_TAXABLE: DATA_ROOT / "instruments" / f"{ENUMERATED_TAXABLE}.toml",
             REIT: DATA_ROOT / "instruments" / f"{REIT}.toml",
             MILTECH: DATA_ROOT / "instruments" / f"{MILTECH}.toml",
             FUND_C: DATA_ROOT / "instruments" / f"{FUND_C}.toml",
@@ -283,6 +293,8 @@ class TestEveryDeclarationAndVersionThatFedTheRun:
             DISPOSAL_CLASS: DATA_ROOT / "tax" / "ua.toml",
             FIXTURE_PAYOUT_CLASS: DATA_ROOT / "tax" / "synthetic_fixture.toml",
             FIXTURE_DISPOSAL_CLASS: DATA_ROOT / "tax" / "synthetic_fixture.toml",
+            FIXTURE_COUPON_CLASS: DATA_ROOT / "tax" / "synthetic_fixture.toml",
+            FIXTURE_ENUMERATED_DISPOSAL_CLASS: (DATA_ROOT / "tax" / "synthetic_fixture.toml"),
         }
         recorded = _manifest().inputs
         assert {ref.id for ref in recorded} == set(expected), (

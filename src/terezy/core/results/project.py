@@ -44,7 +44,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
-from typing import assert_never
+from typing import Final, assert_never
 
 from terezy.core.errors import (
     InconsistentTerms,
@@ -80,6 +80,73 @@ from terezy.core.tax import registry as tax_registry
 from terezy.core.tax import year as tax_year
 from terezy.core.tax.interface import TaxableEventKind, TaxCharge, TaxClass, TaxContext
 from terezy.core.tax.schedule import RateUndeclaredBefore
+from terezy.core.tax.year import AssessmentRules
+
+
+@dataclass(frozen=True, slots=True)
+class GovernedBy:
+    """Which declared category treatment decides what becomes of a purchase difference."""
+
+    category_id: str
+    treatment: str
+    reason: str
+    """What that treatment means for this difference, in the output's own words."""
+
+
+@dataclass(frozen=True, slots=True)
+class TreatmentUnstated:
+    """No assessment rules were given, so nothing here can say what governs the difference.
+
+    A typed absence rather than a blank field or a guess: *outside*, *nets* and *per event*
+    are three different claims about the same money, and defaulting to any of them would be
+    the tool answering a question nobody asked it.
+    """
+
+    reason: str
+
+
+@dataclass(frozen=True, slots=True)
+class PurchasePremium:
+    """What was paid, what the face value comes to, and the difference between them.
+
+    FR-025. Reported as its own figure so that a premium or a discount is **visible** rather
+    than surfacing only as a realised gain or loss at redemption -- which is where it would
+    otherwise appear, a year or five later, indistinguishable from a market movement.
+
+    **Always present, carrying a possibly-zero difference**, on the same reading that makes a
+    zero tax charge cite its exemption: an absent figure meaning *bought at par* is a silent
+    default, and the whole point of recording zeroes is that they name what produced them.
+
+    ⚙ **This feature adds no premium rule.** What happens to the difference is the declared
+    tax category's business and nothing else's -- there is no amortisation here, no
+    imputation, and no branch of its own. The figure states which treatment governed it and
+    stops (FR-026).
+    """
+
+    paid: Money
+    """What was actually paid, in full and exactly as stated. Nothing is amortised, nothing
+    is imputed, and no part of it is reclassified as accrued interest (FR-024).
+
+    ⚙ Named ``paid`` rather than ``cost`` deliberately. ``cost`` on a result record is one of
+    the names `tests/contract/test_cost_labels.py` forbids, because a route cost under an
+    unlabelled name is a figure whose one-way-or-round-trip label has stopped travelling with
+    it. This is not a route cost -- it is the purchase price -- and the clearer word says so
+    without having to argue the point.
+    """
+
+    at_face: Money
+    """``face value x quantity``: what the paper returns if it returns exactly its face."""
+
+    difference: Money
+    """``paid - at_face``. Positive is a premium, negative a discount, zero is par -- and a
+    zero here says *par* rather than saying nothing."""
+
+    tax_class_id: str
+    """The declared class governing a disposal of this instrument, which is the event the
+    difference is realised by."""
+
+    governed_by: GovernedBy | TreatmentUnstated
+    """The category treatment that decides what the difference does, or why nobody said."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -104,6 +171,9 @@ class Projection:
     hurdle: HurdleRate
     """The benchmark figure this whole feature exists to produce."""
 
+    at_purchase: PurchasePremium
+    """What was paid against what the face value comes to, and what governs the difference."""
+
 
 ProjectionOutcome = Projection | InstrumentFailure | TaxFailure
 """What a projection returns: a result, or a typed reason there is none.
@@ -124,6 +194,7 @@ def project(
     cpi_series: CpiSeries | None = None,
     inflation_assumption: InflationAssumption | None = None,
     ageing: Ageing | None = None,
+    assessment_rules: AssessmentRules | None = None,
 ) -> ProjectionOutcome:
     """Project one holding to maturity and report what it pays and what it returns.
 
@@ -141,6 +212,12 @@ def project(
     projection identical to one that ran under feature 001* to run here unchanged and produce
     a shape-identical result; a required argument would have made every one of those call
     sites a lie about what changed.
+
+    ⚙ **``assessment_rules`` is what lets the purchase figure say which treatment governs
+    the difference** (FR-026). ``None`` is not a silence either: the figure then carries
+    :class:`TreatmentUnstated`, saying that nobody supplied the rules -- because *outside*,
+    *nets* and *per event* are three different claims about the same money and defaulting to
+    one would answer a question nobody asked.
 
     ``ageing`` carries the declared staleness thresholds and the ``as_of`` date the question is
     asked at (FR-005). It is one record rather than two arguments so it cannot be half-supplied
@@ -199,6 +276,7 @@ def project(
             taxed_by=taxed_by,
         ),
         charges=charges,
+        at_purchase=_at_purchase(declaration, holding, assessment_rules),
         hurdle=hurdle_figures.of_flows(
             contractual=_flows(contractual_events, holding, year_fraction),
             received=_flows(
@@ -220,6 +298,81 @@ def project(
                 ageing=ageing,
             ),
         ),
+    )
+
+
+TREATMENT_MEANS: Final[Mapping[tax_year.Treatment, str]] = {
+    tax_year.Treatment.OUTSIDE: (
+        "this category stands outside the annual calculation on both sides, income and "
+        "costs alike, so the difference reduces no other base -- a loss here buys no shield"
+    ),
+    tax_year.Treatment.NETS: (
+        "this category nets its year's results before any rate applies, so the difference "
+        "reaches the annual base and a negative year carries forward"
+    ),
+    tax_year.Treatment.PER_EVENT: (
+        "nothing nets in this category: the difference is realised on the disposal it "
+        "belongs to and reaches no other event's charge"
+    ),
+}
+"""What each declared treatment means for a purchase difference, in the output's own words.
+
+One sentence per member and an exhaustive mapping, so a fourth treatment is a type error
+here rather than a figure that quietly explains itself wrongly.
+"""
+
+
+def _at_purchase(
+    declaration: InstrumentDeclaration,
+    holding: Holding,
+    rules: AssessmentRules | None,
+) -> PurchasePremium:
+    """What was paid against what the face value comes to (FR-025).
+
+    ``face_value`` is read directly because **both** declaration forms state one and mean the
+    same thing by it: the amount one unit returns if it returns exactly its face. Reading a
+    field both forms carry is not a test of which form this is.
+    """
+    at_face = money.scale_sourced(
+        declaration.terms.face_value, holding.quantity, declaration.terms.provenance
+    )
+    disposal_class = declaration.tax_classes.get(TaxableEventKind.DISPOSAL_GAIN, "")
+    return PurchasePremium(
+        paid=holding.cost,
+        at_face=at_face,
+        difference=money.sub(holding.cost, at_face),
+        tax_class_id=disposal_class,
+        governed_by=_governed_by(disposal_class, rules),
+    )
+
+
+def _governed_by(
+    disposal_class: str, rules: AssessmentRules | None
+) -> GovernedBy | TreatmentUnstated:
+    """The declared category treatment that decides what the difference does, or why not."""
+    if rules is None:
+        return TreatmentUnstated(
+            reason=(
+                "this run was given no assessment rules, so nothing here can say whether "
+                "the difference nets with the year's other results, is charged on its own "
+                "event, or falls outside the calculation entirely. Those are three "
+                "different claims about the same money and none of them is assumed."
+            )
+        )
+    category_id = rules.category_of_class.get(disposal_class)
+    category = None if category_id is None else rules.categories.get(category_id)
+    if category is None:
+        return TreatmentUnstated(
+            reason=(
+                f"the rules of {rules.jurisdiction_id!r} map no income category to the tax "
+                f"class {disposal_class!r}, so what governs the difference is undeclared "
+                "rather than decided here."
+            )
+        )
+    return GovernedBy(
+        category_id=category.id,
+        treatment=category.treatment.value,
+        reason=TREATMENT_MEANS[category.treatment],
     )
 
 

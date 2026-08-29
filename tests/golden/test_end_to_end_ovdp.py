@@ -96,7 +96,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import replace
 from datetime import date
 from pathlib import Path
-from typing import Final
+from typing import Final, assert_never
 
 import pytest
 
@@ -119,7 +119,12 @@ from terezy.core.primitives.rates import RealRate, RealTermsUnavailable
 from terezy.core.primitives.tolerance import assert_money_close, is_close
 from terezy.core.results import project
 from terezy.core.results import tax_year as settlement
-from terezy.core.results.project import Projection
+from terezy.core.results.project import (
+    GovernedBy,
+    Projection,
+    PurchasePremium,
+    TreatmentUnstated,
+)
 from terezy.core.results.schedule import CashFlowRow
 from terezy.core.tax import year as tax_year
 from terezy.core.tax.interface import TaxCharge, TaxClass
@@ -137,6 +142,11 @@ UPDATE_VARIABLE: Final = "TEREZY_UPDATE_GOLDEN"
 """Set it to rewrite the artefact. See the module docstring for the procedure."""
 
 INSTRUMENT_ID: Final = "ovdp_synthetic_a"
+JURISDICTION: Final = "ua"
+"""Whose assessment rules this run is given, so the purchase figure can say which
+declared category treatment governs the difference between what was paid and face
+(013 FR-026). Named here rather than passed inline because the run is the artefact's
+subject: a reader has to be able to see every input it was given."""
 OWNER_ID: Final = "owner-1"
 QUANTITY: Final = 10.0
 COST: Final = 10_000.0
@@ -218,6 +228,7 @@ def _project(declarations: resolver.Declarations) -> Projection:
         tax_classes=declarations.tax_classes,
         cpi_series=inflation.series[CPI_SERIES_ID],
         inflation_assumption=inflation.assumption,
+        assessment_rules=resolver.tax_rules_from_data_root(DATA_ROOT, declarations)[JURISDICTION],
     )
     assert isinstance(outcome, Projection), f"expected a projection, got {outcome!r}"
     return outcome
@@ -353,6 +364,29 @@ def _figures(result: Projection) -> Iterable[str]:
         yield f"accounts_for                 {item}"
     for item in sorted(hurdle.excludes):
         yield f"excludes                     {item}"
+    yield from _at_purchase(result.at_purchase)
+
+
+def _at_purchase(figure: PurchasePremium) -> Iterable[str]:
+    """What was paid against what face comes to, and the declared treatment that governs it.
+
+    ⚙ Rendered because it is a figure the projection now reports (013 FR-025). This bond is
+    bought at par, so the difference is **zero** -- and a zero here says *par* rather than
+    saying nothing, which is why the figure exists at all rather than appearing only where
+    there is a premium.
+    """
+    yield f"paid                         {_money(figure.paid)}"
+    yield f"at_face                      {_money(figure.at_face)}"
+    yield f"premium_or_discount          {_money(figure.difference)}"
+    yield f"realised_under               {figure.tax_class_id}"
+    match figure.governed_by:
+        case GovernedBy():
+            yield f"governed_by                  {figure.governed_by.category_id}"
+            yield f"treatment                    {figure.governed_by.treatment}"
+        case TreatmentUnstated():
+            yield "governed_by                  unstated"
+        case _:  # pragma: no cover -- mypy proves this unreachable
+            assert_never(figure.governed_by)
 
 
 def _schedule(rows: Sequence[CashFlowRow]) -> Iterable[str]:

@@ -24,11 +24,6 @@ and nothing else.
 schedule's yield is silently wrong, and an implicit liquidation would be a fabricated cash
 flow.
 
-*Principal repayments that would retire more units than are held.* Two declared facts that
-cannot both hold. Reported rather than left to ``ledger.lots``, which raises -- correctly,
-because to the ledger an over-disposal is a programmer error, and here it is a statement
-about a file.
-
 **Both kinds of payment on one date are two payments.** 31 of the 32 observed issues end
 with the final coupon and the principal repayment on the same date, as two entries. They
 are taxed under different classes, so summing them would tax the result under whichever
@@ -50,7 +45,6 @@ from terezy.core.instruments.interface import (
 )
 from terezy.core.ledger.events import CausationKind, CausationRef, Event, LotRef
 from terezy.core.primitives import money
-from terezy.core.primitives.tolerance import TOLERANCE
 
 if TYPE_CHECKING:  # pragma: no cover -- import-time cycle avoidance
     from terezy.core.instruments.interface import (
@@ -136,7 +130,6 @@ def _check_feasible(
         _purchase_problem(declaration, terms, holding),
         _policy_problem(declaration, assumptions),
         _horizon_problem(declaration, terms, holding, horizon),
-        _amortisation_problem(declaration, terms, holding),
     ):
         if problem is not None:
             return problem
@@ -269,56 +262,38 @@ def _horizon_problem(
     return None
 
 
-def _amortisation_problem(
-    declaration: InstrumentDeclaration,
-    terms: EnumeratedTerms,
-    holding: Holding,
-) -> InstrumentFailure | None:
-    """Whether the declared principal repayments retire more units than are held.
-
-    Reached only by an amortising schedule whose repayments sum past the face value, which
-    is two declared facts that cannot both hold rather than a fact about this purchase --
-    the units cancel. Reported here because `ledger.lots.consume` **raises** on an
-    over-disposal, and a raise is the right answer to a programmer error and the wrong one
-    to a file that says something impossible.
-    """
-    retired = sum(_units_retired(terms, payment, holding.quantity) for payment in terms.payments)
-    if retired <= holding.quantity + TOLERANCE:
-        return None
-    repaid = sum(
+def _principal_declared(terms: EnumeratedTerms) -> float:
+    """Everything the declared repayments of principal return, per unit."""
+    return sum(
         payment.amount.amount
         for payment in terms.payments
         if payment.pays is PaymentKind.PRINCIPAL_REPAYMENT
     )
-    return InconsistentTerms(
-        first_term="instrument.schedule.payment",
-        second_term="instrument.schedule.face_value",
-        reason=(
-            f"the principal repayments {declaration.id!r} declares return {repaid!r} "
-            f"{terms.face_value.currency.value} per unit against a declared face value of "
-            f"{terms.face_value.amount!r}, so they would retire {retired!r} of the "
-            f"{holding.quantity!r} units held. A repayment retires the fraction of each "
-            "unit whose face it returns, and no holding can surrender more than it holds."
-        ),
-    )
 
 
 def _units_retired(terms: EnumeratedTerms, payment: ScheduledPayment, quantity: float) -> float:
-    """How many units one payment surrenders: the fraction of face it repays.
+    """How many units one payment surrenders: its share of the repayments declared.
 
-    Zero for a coupon, which surrenders nothing. For a principal repayment it is
-    ``quantity x amount / face``, which is the whole holding for the ordinary bond that
-    repays its whole face once -- exactly what the generative form's redemption does -- and
-    a proportional part of it for an amortising schedule.
+    Zero for a coupon, which surrenders nothing. For a repayment of principal it is
+    ``quantity x amount / everything the repayments return``, so the stream as a whole
+    retires the holding as a whole -- once, whatever the schedule's shape. One repayment
+    retires everything, which is exactly what the generative form's redemption does; two
+    equal ones retire half each.
 
-    ⚙ **Arithmetic over two declared amounts, not an inference.** It reads no position in
-    the list and no relative size: a repayment is a repayment because the declaration says
-    so (FR-008), and how much of a unit it retires is then the ratio of two figures that
-    are both on the page.
+    ⚙ **Its share of the repayments, not its share of the face value**, and the difference
+    is a bond redeemed above par. A schedule returning 1 050.00 against a declared face of
+    1 000.00 repays the whole of each unit and realises a gain; measured against face it
+    would retire 1.05 units of every 1 held, which is not a bond -- it is arithmetic run
+    past the thing it was describing. Face value is what the redemption is compared *with*
+    (FR-025), never what it is divided by.
+
+    ⚙ **Arithmetic over declared amounts, not an inference.** It reads no position in the
+    list and no relative size: a repayment is a repayment because the declaration says so
+    (FR-008), and how much of a unit it retires follows from figures that are on the page.
     """
     if payment.pays is not PaymentKind.PRINCIPAL_REPAYMENT:
         return 0.0
-    return quantity * payment.amount.amount / terms.face_value.amount
+    return quantity * payment.amount.amount / _principal_declared(terms)
 
 
 def _payment(

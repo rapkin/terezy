@@ -35,7 +35,12 @@ from terezy.core.ledger.canonical import Canonical
 from terezy.core.primitives.conventions import AmountsAsDeclared, ConventionsApplied
 from terezy.core.primitives.rates import RealRate, RealTermsUnavailable
 from terezy.core.results.hurdle import HurdleRate, RealTerms
-from terezy.core.results.project import Projection
+from terezy.core.results.project import (
+    GovernedBy,
+    Projection,
+    PurchasePremium,
+    TreatmentUnstated,
+)
 from terezy.core.results.schedule import CashFlowRow, CashFlowSchedule
 from terezy.core.tax.interface import TaxCharge
 
@@ -174,16 +179,50 @@ def of_hurdle_rate(value: HurdleRate) -> tuple[Canonical, ...]:
     )
 
 
+def of_at_purchase(value: PurchasePremium) -> tuple[Canonical, ...]:
+    """What was paid, what face comes to, the difference, and what governs it.
+
+    The governing treatment is **tagged**, so that "outside" and "nobody said" can never
+    render as the same bytes: they are opposite claims -- one is a cited rule and the other
+    is its absence -- and a digest agreeing between them would report an unanswered question
+    as an answer.
+    """
+    match value.governed_by:
+        case GovernedBy():
+            governs: Canonical = (
+                "governed",
+                value.governed_by.category_id,
+                value.governed_by.treatment,
+            )
+        case TreatmentUnstated():
+            governs = ("unstated",)
+        case _:  # pragma: no cover -- mypy proves this unreachable
+            assert_never(value.governed_by)
+    return (
+        ledger_canonical.of_money(value.paid),
+        ledger_canonical.of_money(value.at_face),
+        ledger_canonical.of_money(value.difference),
+        value.tax_class_id,
+        governs,
+    )
+
+
 def of_projection(value: Projection) -> tuple[Canonical, ...]:
     """A whole projection: the ledger it came from, then everything derived from it.
 
     The ledger is included in full rather than summarised. The figures are a *claim* about
     those events, and a digest covering only the conclusions would agree between a correct
     projection and an incorrect one that happened to land on the same number.
+
+    ⚙ **The purchase figure was added by 013 and moved every recorded digest**, which is what
+    a golden is for: its input digests are witnesses rather than terms, and a projection that
+    says one more true thing about every holding is *supposed* to change them (constitution
+    1.2.0, Principle V). No amount, date, tax or rate moved with it.
     """
     return (
         ledger_canonical.of_result(value.ledger),
         of_schedule(value.schedule),
         tuple(of_charge(charge) for charge in value.charges),
         of_hurdle_rate(value.hurdle),
+        of_at_purchase(value.at_purchase),
     )

@@ -104,6 +104,34 @@ risk_class    = "sovereign_debt"
   retrieved_on = "2026-08-29"
   verified_on  = ""
 
+[[access]]
+instrument_id = "enumerated_taxable_x"
+bought_at     = "inzhur"
+proceeds_to   = "inzhur"
+risk_class    = "synthetic_fixture"
+
+  [access.price]
+  per_unit     = 1030.0
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "SYNTHETIC FIXTURE — an invented quote 30.00 above this fixture's declared face value, so the premium at purchase is a round number a reader can carry through the arithmetic. Not a quote observed at any venue."
+  retrieved_on = "2026-08-29"
+  verified_on  = ""
+
+[[access]]
+instrument_id = "enumerated_out_of_order"
+bought_at     = "inzhur"
+proceeds_to   = "inzhur"
+risk_class    = "sovereign_debt"
+
+  [access.price]
+  per_unit     = 1000.0
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "SYNTHETIC FIXTURE — par. This fixture exists for what its transcription records rather than for any figure, so it is priced at face and nothing turns on the number."
+  retrieved_on = "2026-08-29"
+  verified_on  = ""
+
 # --- the funds, which price themselves ---------------------------------------------------
 #
 # No [access.price] on any of the three: each declares its own net asset value per unit and

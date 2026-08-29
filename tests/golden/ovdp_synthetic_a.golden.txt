@@ -45,12 +45,15 @@ fund                 inzhur_reit                  instruments/inzhur_reit.toml  
 fund                 synthetic_fund_c             instruments/synthetic_fund_c.toml        sha256:39ed338a5a88918dfd813a2b0401e6fca6172ad9c10eebf21c32d77c361a232a
 inflation_assumption owner_placeholder_inflation  inflation/owner-001.toml                 sha256:624e2b5124527c2b30bc4c0773b2d8c79e9ffcfd38b0f253ab5080c36cd71d6c
 instrument           enumerated_out_of_order      instruments/enumerated_out_of_order.toml sha256:9517c2bb0e614a686e1c35999db54509c90b1bcdcc476c1ca835dbff8fd87dcd
+instrument           enumerated_taxable_x         instruments/enumerated_taxable_x.toml    sha256:2f368554d89b1946b2624c302d7b8d594efc371dc96aa4955e7762775c6790d8
 instrument           ovdp_enumerated_a            instruments/ovdp_enumerated_a.toml       sha256:993b95c0bc3df5246a262e726925700a0e78e445b44704d2f34c810eebafc5a2
 instrument           ovdp_enumerated_mirror       instruments/ovdp_enumerated_mirror.toml  sha256:c5f341ce061cc6ea01ecba60e888249bc04f91add889435f9bb7877187406857
 instrument           ovdp_synthetic_a             instruments/ovdp_synthetic_a.toml        sha256:6d6fcafc9e3da360c2f2c523704b488065f253c2db5fce362b3ad72cd6b5e49e
 instrument           ovdp_synthetic_b             instruments/ovdp_synthetic_b.toml        sha256:fa433d052d2ca1525e597b8050cf2565f69e2a233dd51150e7a9601add8822a9
-tax_class            synthetic_fund_disposal      tax/synthetic_fixture.toml               sha256:d0e3848a8f82e3cabf8d8e9a1c7b5c76e288883a240c744a813c379743f27d12
-tax_class            synthetic_fund_payout        tax/synthetic_fixture.toml               sha256:d0e3848a8f82e3cabf8d8e9a1c7b5c76e288883a240c744a813c379743f27d12
+tax_class            synthetic_enumerated_coupon  tax/synthetic_fixture.toml               sha256:59fa3761fb68d26bf0100a750d27eab68392b41799d8271e4e5adc48edfec964
+tax_class            synthetic_enumerated_disposal tax/synthetic_fixture.toml               sha256:59fa3761fb68d26bf0100a750d27eab68392b41799d8271e4e5adc48edfec964
+tax_class            synthetic_fund_disposal      tax/synthetic_fixture.toml               sha256:59fa3761fb68d26bf0100a750d27eab68392b41799d8271e4e5adc48edfec964
+tax_class            synthetic_fund_payout        tax/synthetic_fixture.toml               sha256:59fa3761fb68d26bf0100a750d27eab68392b41799d8271e4e5adc48edfec964
 tax_class            ua_ci_fund_distribution      tax/ua.toml                              sha256:3d703056d42f57b0f3943bd064cd08f23475d0ab304257cb267eb77c0ffd99ca
 tax_class            ua_government_bond           tax/ua.toml                              sha256:3d703056d42f57b0f3943bd064cd08f23475d0ab304257cb267eb77c0ffd99ca
 tax_class            ua_investment_profit         tax/ua.toml                              sha256:3d703056d42f57b0f3943bd064cd08f23475d0ab304257cb267eb77c0ffd99ca
@@ -71,6 +74,12 @@ excludes                     exit route costs (out)
 excludes                     funding route costs (in)
 excludes                     inflation (the figure is nominal)
 excludes                     public holidays (weekends are observed; no holiday calendar is modelled)
+paid                         10000.0 UAH
+at_face                      10000.0 UAH
+premium_or_discount          0.0 UAH
+realised_under               ua_government_bond
+governed_by                  exempt_securities
+treatment                    outside
 
 == schedule ==
 
@@ -246,4 +255,4 @@ event  10  2028-01-17  ovdp_synthetic_a  quantity 10.0
 # sha256 over core.results.canonical.of_projection, taken by
 # data.manifest.digest_of_projection. Amounts reach it as float.hex(), so this
 # asserts bit-identity -- deliberately stricter than the project tolerance.
-sha256:0fdaace7c445521c07dd839bd4c4243a7b182e93e7d9337ab2aeb8589bca95d8
+sha256:e690f93fd4483f9bf0e9881edd90453f25884569582efd867b1fb1b48f6b63db

@@ -1,0 +1,102 @@
+# SYNTHETIC FIXTURE. Every payment and every date in this file is invented.
+#
+# WHY IT EXISTS — two requirements, one fixture.
+#
+# 013 FR-010. For ОВДП both income kinds are exempt, so a payment mislabelled as a coupon
+# rather than a repayment of principal changes no figure on the instruments the enumerated
+# form was built for. That is luck rather than design. This instrument declares two income
+# kinds at DIFFERENT invented rates — `synthetic_enumerated_coupon` at 8% in total,
+# `synthetic_enumerated_disposal` at 15% — so relabelling one payment moves the tax total by
+# an amount a reader can work out by hand.
+#
+# 013 FR-026. Its disposal class sits in a NETTING category
+# (`../tax/timing/synthetic_fixture.toml`), which is where a premium paid at purchase has an
+# effect worth asserting: the loss it realises at redemption reduces that category's netted
+# base, and carries forward when the year is negative. Under Ukraine's exempt category the
+# answer is `outside` and the loss buys no shield — declared and cited in `data/tax/timing/ua.toml`.
+#
+# THE SCHEDULE IS SMALL AND ROUND ON PURPOSE: a face value of 1 000.00, two coupons of
+# 50.00, and the principal on the same date as the second coupon. Everything a worked
+# example needs and nothing it does not.
+#
+# NOTHING HERE DESCRIBES A BOND ANYONE CAN BUY, and no figure computed from it may be quoted
+# as though it did.
+
+[instrument]
+id           = "enumerated_taxable_x"
+name         = "Synthetic taxable enumerated issue X — TEST FIXTURE, payments invented"
+class        = "enumerated_schedule"
+currency     = "UAH"
+is_synthetic = true
+
+[instrument.schedule]
+face_value   = 1000.0
+covers_from  = "2026-01-05"
+day_count    = "act/365"
+kind         = "bond_terms"
+source       = "INFERENCE: SYNTHETIC FIXTURE — the face value is read off the largest payment and the coverage claim is invented. Both are the readings a transcribed schedule rests on, recorded as inferences here even though there is nothing real behind them, because a fixture that skipped the record would not exercise the gate that requires it."
+retrieved_on = "2026-08-29"
+verified_on  = ""
+
+  [[instrument.schedule.payment]]
+  on           = "2026-07-05"
+  amount       = 50.00
+  pays         = "coupon"
+  kind         = "bond_terms"
+  source       = "INFERENCE: SYNTHETIC FIXTURE — an invented amount, labelled a coupon by a human reading a list of numbers."
+  retrieved_on = "2026-08-29"
+  verified_on  = ""
+
+  [[instrument.schedule.payment]]
+  on           = "2026-12-05"
+  amount       = 50.00
+  pays         = "coupon"
+  kind         = "bond_terms"
+  source       = "INFERENCE: SYNTHETIC FIXTURE — an invented amount, labelled a coupon by a human reading a list of numbers."
+  retrieved_on = "2026-08-29"
+  verified_on  = ""
+
+  [[instrument.schedule.payment]]
+  on           = "2026-12-05"
+  amount       = 1000.00
+  pays         = "principal_repayment"
+  kind         = "bond_terms"
+  source       = "INFERENCE: SYNTHETIC FIXTURE — an invented amount, labelled a repayment of principal by a human reading a list of numbers. It shares its date with the final coupon, which is how 31 of the 32 observed issues end — and the two are taxed under different declared classes here, which is what makes the labels matter."
+  retrieved_on = "2026-08-29"
+  verified_on  = ""
+
+[instrument.constraints]
+min_ticket   = 500.0
+min_unit     = 1.0
+kind         = "venue_terms"
+source       = "SYNTHETIC FIXTURE — an invented minimum ticket. Not observed from any venue."
+retrieved_on = "2026-08-29"
+verified_on  = ""
+
+[instrument.tax_classes]
+coupon        = "synthetic_enumerated_coupon"
+disposal_gain = "synthetic_enumerated_disposal"
+
+[[instrument.verification_task]]
+settles     = "face_value"
+question    = "What face value does this issue actually have?"
+searched    = "SYNTHETIC FIXTURE — nothing was searched; the value is invented."
+searched_on = "2026-08-29"
+
+[[instrument.verification_task]]
+settles     = "payment_kind"
+question    = "Which of these payments is a coupon and which repays principal? Here the answer moves a figure: the two kinds carry different declared rates."
+searched    = "SYNTHETIC FIXTURE — nothing was searched; the labels are invented."
+searched_on = "2026-08-29"
+
+[[instrument.verification_task]]
+settles     = "minor_unit_conversion"
+question    = "Do the published figures denote hryvnia or kopecks?"
+searched    = "SYNTHETIC FIXTURE — no conversion was performed; the figures are invented."
+searched_on = "2026-08-29"
+
+[[instrument.verification_task]]
+settles     = "coverage"
+question    = "Is this list complete from 2026-01-05 onwards?"
+searched    = "SYNTHETIC FIXTURE — the claim is invented."
+searched_on = "2026-08-29"

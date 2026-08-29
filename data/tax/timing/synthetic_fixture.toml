@@ -1,0 +1,85 @@
+# SYNTHETIC FIXTURE JURISDICTION — assessment rules. Every value here is invented.
+#
+# The companion to `../synthetic_fixture.toml`, which declares the invented rates. This file
+# declares what a tax year needs beyond them: which income category each class belongs to,
+# whether that category nets, what a loss in it does, and when the money leaves.
+#
+# WHY IT EXISTS. 013 FR-026 requires the NETTING case to be exercised rather than warned
+# about: a secondary-market bond bought at a premium realises a loss at redemption, and
+# whether that loss reduces the year's base is decided by the declared category treatment
+# and by nothing the engine believes. Under Ukraine's `exempt_securities` the answer is
+# `outside` and the loss buys no shield — declared and cited in `ua.toml`, which is why 013
+# withdrew its clarification. Under a category that NETS the answer is different, and the
+# difference had nowhere to be shown until this file.
+#
+# The two classes it maps are the ones FR-010 already required for a different reason: an
+# instrument whose two income kinds carry different rates, so that a payment's declared
+# label is provably load-bearing. One fixture, two requirements.
+#
+# NOTHING HERE DESCRIBES ANY REAL TAX SYSTEM, and the deadlines are chosen to differ
+# visibly from Ukraine's (1 April and 1 July rather than 1 May and 1 August) so that no
+# figure computed from this file could be mistaken for a Ukrainian one.
+
+[timing]
+jurisdiction = "synthetic_fixture"
+tax_currency = "UAH"
+
+[[timing.category]]
+id                    = "synthetic_netting"
+treatment             = "nets"
+carryforward          = "unlimited"
+settlement            = "self_assessed"
+declare_by_month      = 4
+declare_by_day        = 1
+pay_by_month          = 7
+pay_by_day            = 1
+non_business_day_rule = "following"
+note                  = "FIXTURE — an invented category in which the year's gains and losses net to one result before any rate applies, and a negative result carries forward without limit. Invented so that 013 FR-026's assertion has somewhere to be made; not a reading of any law."
+kind                  = "tax_rule"
+source                = "SYNTHETIC FIXTURE — not an observation of anything."
+retrieved_on          = "2026-08-29"
+verified_on           = ""
+
+[[timing.category]]
+id                    = "synthetic_per_event"
+treatment             = "per_event"
+carryforward          = "none"
+settlement            = "self_assessed"
+declare_by_month      = 4
+declare_by_day        = 1
+pay_by_month          = 7
+pay_by_day            = 1
+non_business_day_rule = "following"
+note                  = "FIXTURE — an invented category charged event by event, so that the coupon class stands outside the netting one. Two classes in one netting category would be a different fixture and a different refusal."
+kind                  = "tax_rule"
+source                = "SYNTHETIC FIXTURE — not an observation of anything."
+retrieved_on          = "2026-08-29"
+verified_on           = ""
+
+[[timing.class]]
+tax_class = "synthetic_enumerated_disposal"
+category  = "synthetic_netting"
+note      = "FIXTURE — the class 013 FR-026 reaches: a premium paid at purchase becomes a realised loss at redemption, and a netting category is where that loss has an effect to assert."
+
+[[timing.class]]
+tax_class = "synthetic_enumerated_coupon"
+category  = "synthetic_per_event"
+note      = "FIXTURE — charged on its own, at its own rate, so that relabelling a payment moves the total by a figure that can be worked out by hand."
+
+[[timing.lot_method]]
+method            = "fifo"
+verdict           = "tax_agent_methodology"
+what_the_law_says = "FIXTURE — an invented standing, so that a fixture run may state a method without the engine choosing one. Not a claim about any jurisdiction."
+kind              = "tax_rule"
+source            = "SYNTHETIC FIXTURE — not an observation of anything."
+retrieved_on      = "2026-08-29"
+verified_on       = ""
+
+[[timing.lot_method]]
+method            = "average_cost"
+verdict           = "self_declarant_guidance"
+what_the_law_says = "FIXTURE — an invented standing, declared so a fixture run may choose either method and still say what backs it."
+kind              = "tax_rule"
+source            = "SYNTHETIC FIXTURE — not an observation of anything."
+retrieved_on      = "2026-08-29"
+verified_on       = ""

@@ -32,7 +32,6 @@ from tests.worked_examples.test_enumerated_schedule import (
     EXEMPT_CLASS,
     HOLDING,
     HORIZON,
-    QUANTITY,
     TERMS,
 )
 
@@ -135,27 +134,6 @@ class TestAPurchaseThatIsNotAPurchase:
         )
         assert isinstance(outcome, InfeasiblePurchase), outcome
         assert outcome.shortfall.amount == 500.0
-
-
-class TestPrincipalRepaymentsThatWouldRetireMoreThanIsHeld:
-    def test_an_over_amortising_schedule_refuses(self) -> None:
-        """Two declared facts that cannot both hold: what the repayments return per unit,
-        and the face value they are a fraction of. Reported rather than left to the ledger,
-        which raises on an over-disposal."""
-        doubled = replace(
-            TERMS,
-            payments=tuple(
-                replace(payment, amount=Money(2000.0, COST.currency, COST.provenance))
-                if payment.pays.value == "principal_repayment"
-                else payment
-                for payment in TERMS.payments
-            ),
-        )
-        ops = registry.ops_for(DECLARATION.instrument_class)
-        outcome = ops.events(replace(DECLARATION, terms=doubled), HOLDING, HORIZON, HOLD_CASH)
-        assert isinstance(outcome, InconsistentTerms), outcome
-        assert outcome.second_term == "instrument.schedule.face_value"
-        assert f"{QUANTITY!r} units held" in outcome.reason
 
 
 class TestEveryReasonSurvivesIntoTheOutput:
