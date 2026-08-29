@@ -1310,6 +1310,21 @@ class TestNoFieldDefaultStandsInForAValue:
                 "available_until",
             }
         ),
+        # Both arrived with feature 011, and both are the permitted shape rather than the
+        # forbidden one: the absence of the key IS the declaration.
+        #
+        # `non_publication_rule` is the sharper of the two, and 011 turns on it. The rule
+        # for a date the National Bank publishes no rate for is written in working days and
+        # public holidays, which FR-011 forbids the engine to know about, so the Ukrainian
+        # series ships WITHOUT one and every such date refuses. A default here would be a
+        # rule nobody declared, applied silently, to the one input that makes a foreign
+        # amount a legal one.
+        "OfficialRateFile": frozenset({"non_publication_rule"}),
+        # A timing table for a jurisdiction whose taxable events are all in the base
+        # currency needs no rate series, and saying so by omission is the same shape
+        # `StreamTable.income_tax_rate_pct` already has: omitted means not stated, which is
+        # a different claim from stated-as-nothing.
+        "TimingTable": frozenset({"official_rate_series"}),
         "RouteTable": frozenset({"partner_route"}),
         "SeedTable": frozenset({"reason"}),
         "StreamTable": frozenset({"income_tax_rate_pct"}),
