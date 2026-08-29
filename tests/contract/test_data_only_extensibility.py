@@ -388,10 +388,20 @@ X: int = 1
         )
 
     def test_both_issues_dispatch_through_the_one_registered_class(self) -> None:
+        """A second *issue* needs no second registry entry.
+
+        ⚙ The assertion is scoped to these two issues and to the class they share, not to
+        the size of the registry. Feature 013 added a second entry, and it is a second
+        declaration **form** rather than a second issue -- a different claim, tested by its
+        own data-only test. What would still be a defect is either of these two issues
+        needing an entry of its own, which is what this asserts.
+        """
         declarations = _declarations()
-        classes = {instrument.instrument_class for instrument in declarations.instruments.values()}
-        assert classes == {instrument_registry.FIXED_INCOME}
-        assert set(instrument_registry.REGISTRY) == {instrument_registry.FIXED_INCOME}, (
+        classes = {
+            declarations.instruments[instrument_id].instrument_class
+            for instrument_id in (ISSUE_A, ISSUE_B)
+        }
+        assert classes == {instrument_registry.FIXED_INCOME}, (
             "a second issue that had needed a second registry entry would be an engine "
             "change wearing a data change's clothes"
         )

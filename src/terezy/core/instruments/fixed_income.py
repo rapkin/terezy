@@ -88,6 +88,7 @@ from terezy.core.errors import (
     InfeasiblePurchase,
     InstrumentFailure,
 )
+from terezy.core.instruments import acquire
 from terezy.core.instruments.interface import BondTerms
 from terezy.core.ledger.events import CausationKind, CausationRef, Event, EventKind, LotRef
 from terezy.core.primitives import conventions, money
@@ -133,17 +134,6 @@ def _contractual_terms(declaration: InstrumentDeclaration) -> BondTerms:
     return terms
 
 
-def lot_id_for(holding: Holding) -> str:
-    """The identity of the lot a purchase opens: instrument and settlement date.
-
-    Derived from the purchase rather than generated, because a generated id would need a
-    counter or a clock and the core has neither -- and because two runs of the same
-    scenario must produce the same lot ids or the determinism digest compares two
-    different-looking results (C4).
-    """
-    return f"{holding.instrument_id}@{holding.purchased_on.isoformat()}"
-
-
 def events(
     declaration: InstrumentDeclaration,
     holding: Holding,
@@ -171,7 +161,7 @@ def events(
 
     terms = _contractual_terms(declaration)
     adjust = conventions.business_day_rule(terms.business_day_rule)
-    stream = [_purchase(declaration, holding, sequence=1)]
+    stream = [acquire.purchase(declaration, holding, sequence=1)]
     units = holding.quantity
     for period in coupon_plan(declaration, holding, assumptions):
         stream.append(_coupon(declaration, holding, period, sequence=len(stream) + 1))
@@ -367,39 +357,6 @@ def _horizon_problem(holding: Holding, horizon: DateRange) -> InstrumentFailure 
             ),
         )
     return None
-
-
-def _purchase(
-    declaration: InstrumentDeclaration,
-    holding: Holding,
-    *,
-    sequence: int,
-) -> Event:
-    """Cash out, one lot in, at the cost the owner stated.
-
-    The cause is recorded as an instrument term rather than an owner action because
-    ``CausationKind`` admits no owner-action member by design (see ``ledger.events``): the
-    term named is the declared instrument the purchase acquired, which is the fact a reader
-    following the audit trail actually wants.
-    """
-    return Event(
-        sequence=sequence,
-        occurred_on=holding.purchased_on,
-        kind=EventKind.PURCHASE,
-        amount=money.scale(holding.cost, -1.0),
-        owner_id=holding.owner_id,
-        caused_by=CausationRef(
-            kind=CausationKind.INSTRUMENT_TERM,
-            id=f"{declaration.id}:purchase",
-            detail=(
-                f"purchase of {holding.quantity!r} units of {declaration.name!r} at the stated cost"
-            ),
-        ),
-        lot_ref=LotRef(instrument_id=declaration.id, lot_id=lot_id_for(holding)),
-        quantity=holding.quantity,
-        allocated_to=None,
-        capacity_pool=None,
-    )
 
 
 HOLD_CASH: Final = "hold_cash"
@@ -767,7 +724,7 @@ def _coupon(
 def reinvestment_lot_id_for(instrument_id: str, paid_on: date) -> str:
     """The identity of a lot a reinvested coupon opens: instrument and payment date.
 
-    Derived rather than generated, for the reason :func:`lot_id_for` gives -- the core has
+    Derived rather than generated, for the reason `acquire.lot_id_for` gives -- the core has
     no counter and no clock, and two runs of the same scenario must produce the same lot
     ids or the determinism digest compares two different-looking results (C4). The suffix
     keeps it distinct from the lot a purchase on the same date would open, so the two can
