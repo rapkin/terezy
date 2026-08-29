@@ -21,10 +21,11 @@
 #
 # The National Bank does not set a rate for every calendar day, and which rate governs a day
 # it does not is пункт 10 розділу III of the Положення затверджене Постановою Правління НБУ
-# від 10.12.2019 № 148 (абзаци перший і другий в редакції Постанови № 36 від 24.03.2025).
-# Its two підпункти are written entirely in working days, pre-holiday days, weekends and
-# post-holiday working days, and пункт 11 of the same розділ adds the Cabinet's power to move
-# working days.
+# від 10.12.2019 № 148. Its two підпункти are written entirely in working days, pre-holiday
+# days, weekends and post-holiday working days, and пункт 11 of the same розділ adds the
+# Cabinet's power to move working days. Which абзаци are № 148's own words and which were
+# amended is a distinction that matters, and it is stated in ONE place — the pointer at the
+# end of this header — because a copy of it is what got it wrong before.
 #
 # 011 FR-011 forbids the engine any notion of a weekend, a public holiday or a banking
 # calendar, and it is right to — but that leaves the rule undeclarable here, because nothing

@@ -3287,12 +3287,12 @@ the rate observation's, unioned by the one function in the project that can prod
 in a different currency. An unverified rate marks a base struck from a verified amount, and a
 marked amount survives a fully verified rate — neither launders the other.
 
-Official rates age under their own declared kind, `official_rate`, at seven days. What decays
-is the **retrieval**, exactly as for `cpi_index` (§18): a published rate for a date that has
-passed is a historical fact and does not go wrong, but the publisher adds a rate every working
-day, so a series fetched a month ago is a month short of its own end. Ageing a derived figure
-goes through each citation's own kind, because that is the only thing that survives the merge
-of provenance a tax base passes through.
+Official rates age under their own declared kind, `official_rate`, whose threshold is declared
+with it (§18). What decays is the **retrieval**: a published rate for a date that has passed is
+a historical fact and does not go wrong, but the publisher adds a rate every working day, so a
+series fetched long ago is short of its own end. Ageing a derived figure goes through each
+citation's own kind, because that is the only thing that survives the merge of provenance a tax
+base passes through.
 
 ---
 

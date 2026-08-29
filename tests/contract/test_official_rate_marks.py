@@ -12,8 +12,7 @@ and a marked *amount* must survive a fully verified rate. Neither side launders 
 **Ageing goes through** ``staleness.staleness_of_sources``, which reads each citation's own
 ``kind``. That is the only call that works here: by the time a liability rests on the rate,
 the amount, the tax class's dated entry and the timing rule, no record is in hand to name a
-threshold, and a kind held on a record rather than on a citation would have been lost at the
-merge (feature 010's finding, and why ``OfficialRateObservation`` carries no ``kind``).
+threshold.
 """
 
 from __future__ import annotations

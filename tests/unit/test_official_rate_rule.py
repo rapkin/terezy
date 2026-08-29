@@ -6,10 +6,8 @@ nothing about weekends, holidays or banking calendars.
 
 The form exercised here is an **explicitly enumerated per-date mapping** -- this date's rate
 governs that date, listed -- which is a statement of the kind FR-011 defines and needs no
-calendar. It is deliberately **not** the Ukrainian rule: пункт 10 розділу III is written in
-working days and pre-holiday days, and declaring it needs a declared, cited working-day and
-holiday calendar that this feature does not build (FR-018,
-``specs/features.toml`` → ``declared-working-day-calendar``).
+calendar. It is deliberately not the Ukrainian rule, whose own file records why it is not
+declared.
 
 The load-time half -- that a rule's ``governed_by`` names a declared observation and its
 ``applies_to`` does not -- lives in

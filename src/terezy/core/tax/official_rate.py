@@ -32,13 +32,10 @@ The one sanctioned escape is a **declared** non-publication-day rule: a cited st
 which observation governs a date the publisher does not publish for. It is data, and this
 module contains no notion of a weekend, a public holiday or a banking calendar (FR-011).
 
-⚙ **The Ukrainian rule is not declared and this is not an oversight.** Its text -- пункт 10
-розділу III of the Положення that Постанова Правління НБУ від 10.12.2019 № 148 approves, as
-amended -- is written entirely in working days, pre-holiday days and post-holiday working
-days, so it cannot be declared without a declared, cited working-day and holiday calendar.
-That is a feature (``specs/features.toml`` → ``declared-working-day-calendar``), not a data
-entry, and until it lands the Ukrainian series declares no rule and every date it does not
-cover refuses (011 FR-017, FR-018).
+⚙ **A rule written in working days or public holidays cannot be declared against these
+records at all**, because evaluating one needs a working-day and holiday calendar and nothing
+declares one. That is the constraint this module imposes; which series it bites and what it
+costs them is stated where the absence lives, in the declaration file.
 
 **No clock, no I/O.** Every date is an argument; ``as_of`` belongs to staleness and is a run
 input recorded in the manifest.

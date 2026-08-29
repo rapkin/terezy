@@ -207,10 +207,8 @@ STRUCTURAL_KEYS = frozenset(
         "redirect_to",
         "observed_on",
         # --- feature 011: the form a rate is quoted in, not a rate ---
-        # `quotation_unit` is the counterpart of a CPI series' `base` ("previous month =
-        # 100"), which is a string and therefore invisible to the numeric-leaf heuristic. It
-        # states how many units the values are quoted per, sits on the `[series]` identity
-        # table beside `pair`, and every `value` it scales carries its own citation on its own
+        # How many units the values are quoted per. It sits on the `[series]` identity table
+        # beside `pair`, and every `value` it scales carries its own citation on its own
         # observation.
         "quotation_unit",
     }

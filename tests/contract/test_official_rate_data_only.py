@@ -13,13 +13,11 @@ enumerated mapping, this date's rate governs that date, listed. The base is stru
 another date's observation and the output states **both** dates, so a Friday rate applied to a
 Sunday event is visible rather than implied.
 
-⚙ It is deliberately **not** a claim about the Ukrainian rule. Пункт 10 розділу III is
-written in working days and pre-holiday days, and declaring it needs a declared, cited
-working-day and holiday calendar this feature does not build (FR-018,
-``specs/features.toml`` → ``declared-working-day-calendar``). What is exercised here is that
-the *path* exists and that a rule expressible without a calendar reaches it -- and the
-enumerated form needs no calendar precisely because it derives nothing: every date it governs
-is written down.
+⚙ It is deliberately **not** a claim about the Ukrainian rule, which needs a calendar nothing
+declares (``data/official_rates/ua_nbu_usd.toml``). What is exercised is that the *path*
+exists and that a rule expressible without a calendar reaches it -- and the enumerated form
+needs no calendar precisely because it derives nothing: every date it governs is written down,
+which is what the second test below asserts.
 """
 
 from __future__ import annotations

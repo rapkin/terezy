@@ -1014,31 +1014,22 @@ def _in_tax_currency(
             ),
         )
     if rules.official_rate is None:
-        return TaxCurrencyConversionUnavailable(
-            event_sequence=sequence,
-            found=result.currency,
-            tax_currency=rules.tax_currency,
-            unavailable=OfficialRateSeriesUnavailable(
-                wanted=(rules.tax_currency, result.currency),
-                series_id=None,
-                quotes=None,
-                reason=(
-                    f"jurisdiction {rules.jurisdiction_id!r} declares no official-rate series "
-                    "for its tax currency."
-                ),
-            ),
+        struck: TaxCurrencyConversion | OfficialRateUnavailable = OfficialRateSeriesUnavailable(
+            wanted=(rules.tax_currency, result.currency),
+            series_id=None,
+            quotes=None,
             reason=(
-                f"event {sequence} produces a taxable result in {result.currency.value} "
-                f"and tax is assessed in {rules.tax_currency.value}, and jurisdiction "
-                f"{rules.jurisdiction_id!r} names no official-rate series to strike it with. "
-                "No series is chosen for it by load order, and no channel rate stands in: a "
-                "channel is a market you transact in and the official rate is a legal "
-                "reference you never transact at. Declare official_rate_series in the "
+                f"jurisdiction {rules.jurisdiction_id!r} names no official-rate series for its "
+                "tax currency. No series is chosen for it by load order, and no channel rate "
+                "stands in: a channel is a market you transact in and the official rate is a "
+                "legal reference you never transact at. Declare official_rate_series in the "
                 "jurisdiction's assessment rules."
             ),
         )
-    series = rules.official_rate
-    struck = strike_base(result, series, tax_currency=rules.tax_currency, on_date=occurred_on)
+    else:
+        struck = strike_base(
+            result, rules.official_rate, tax_currency=rules.tax_currency, on_date=occurred_on
+        )
     if not isinstance(struck, TaxCurrencyConversion):
         return TaxCurrencyConversionUnavailable(
             event_sequence=sequence,

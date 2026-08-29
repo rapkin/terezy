@@ -7,12 +7,9 @@ test are **stated in the test that uses them** rather than read out of a data fi
 Every citation says so in its own text, so a value that escaped into an output would
 announce itself. Nothing here is a rate anybody published.
 
-**Every ``SourceRef`` carries its kind**, because that is the only thing that survives a
-merge of provenance -- a tax base rests on the amount's sources and the rate's, and by the
-time a figure has been through that union no record knows which kind each citation ages
-under. Feature 010 found that the expensive way; ``official_rate.OfficialRateObservation``
-therefore has no ``kind`` field and a fixture that left the citation's blank would make
-every staleness assertion pass by ageing nothing.
+**Every ``SourceRef`` here carries its kind.** A fixture that left it blank would make every
+staleness assertion in the suite pass by ageing nothing at all, which is the shape of a green
+test that checks nothing.
 """
 
 from __future__ import annotations
