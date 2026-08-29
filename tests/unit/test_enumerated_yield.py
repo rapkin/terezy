@@ -96,9 +96,21 @@ class TestEveryRowStatesWhatShapedIt:
             canonical.of_conventions(row.conventions)
             for row in _projected(GENERATIVE).schedule.rows
         }
-        assert declared == {("declared", "act/365")}
+        assert {rendered[:2] for rendered in declared} == {("declared", "act/365")}
         assert generated == {("semiannual", "act/365", "following")}
         assert declared.isdisjoint(generated)
+
+    def test_the_statement_s_own_words_reach_the_encoding(self) -> None:
+        """`AmountsAsDeclared.reason` is overridable, so two rows can make different
+        statements about what shaped them -- and a digest ignoring it would call two
+        differently-explained results identical, which is the argument the ledger's
+        canonical form already makes about a causation's detail."""
+        row = _projected(MIRROR).schedule.rows[0]
+        assert isinstance(row.conventions, AmountsAsDeclared)
+        assert canonical.of_conventions(row.conventions)[2] == row.conventions.reason
+        assert canonical.of_conventions(
+            replace(row.conventions, reason="something else entirely")
+        ) != canonical.of_conventions(row.conventions)
 
     def test_the_generative_encoding_is_unchanged_by_this_feature(self) -> None:
         """SC-017 for the half a digest can see: the three-name rendering is untagged and

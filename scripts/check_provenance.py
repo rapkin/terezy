@@ -451,11 +451,28 @@ def enumerated_findings(document: dict[str, Any], path: Path) -> list[Finding]:
     instrument = document.get("instrument")
     if not isinstance(instrument, dict) or instrument.get("class") != ENUMERATED_CLASS:
         return []
-    schedule = instrument.get("schedule")
-    if not isinstance(schedule, dict):
-        return []  # the loader reports a missing schedule, naming the field
 
     findings: list[Finding] = []
+    # ⚙ **The task check runs whatever shape the rest of the file is in.** An earlier
+    # version returned early on a missing or malformed schedule, on the reading that the
+    # loader reports that and names the field -- which is true, and skipped the one check
+    # this function exists for. A file with a broken schedule and no verification tasks then
+    # passed the gate silently, which is the fail-open shape the header argues against in
+    # the same script.
+    findings.extend(_missing_tasks(instrument, path))
+    findings.extend(_uncited_inferences(instrument.get("schedule"), path))
+    return findings
+
+
+def _uncited_inferences(schedule: Any, path: Path) -> list[Finding]:
+    """Each table carrying inferred values says so, and carries no verification date.
+
+    Reports nothing about a schedule that is not a table or whose payments are not a list:
+    those are shape faults, and the loader names the field. What it must not do is let a
+    shape fault stand in for the checks it *can* make on the tables that are there.
+    """
+    if not isinstance(schedule, dict):
+        return []
     payments = schedule.get("payment")
     inferring = [("instrument.schedule", schedule)]
     if isinstance(payments, list):
@@ -464,6 +481,7 @@ def enumerated_findings(document: dict[str, Any], path: Path) -> list[Finding]:
             for index, entry in enumerate(payments)
             if isinstance(entry, dict)
         ]
+    findings: list[Finding] = []
     for name, table in inferring:
         source = table.get("source")
         if not isinstance(source, str) or not source.startswith(INFERENCE_MARKER):
@@ -471,8 +489,8 @@ def enumerated_findings(document: dict[str, Any], path: Path) -> list[Finding]:
                 Finding(
                     path,
                     name,
-                    f"carries values nobody stated -- a face value read off a list, a "
-                    f"payment labelled by a human, a conversion out of minor units -- and "
+                    "carries values nobody stated -- a face value read off a list, a "
+                    "payment labelled by a human, a conversion out of minor units -- and "
                     f"its source does not say so. Begin the citation {INFERENCE_MARKER!r} "
                     "and state what the inference rests on",
                     error=True,
@@ -489,14 +507,18 @@ def enumerated_findings(document: dict[str, Any], path: Path) -> list[Finding]:
                     error=True,
                 )
             )
+    return findings
 
+
+def _missing_tasks(instrument: dict[str, Any], path: Path) -> list[Finding]:
+    """Every inference a declared schedule rests on has a task saying what would settle it."""
     tasks = instrument.get("verification_task")
     settled = {
         entry.get("settles")
         for entry in (tasks if isinstance(tasks, list) else [])
         if isinstance(entry, dict)
     }
-    findings.extend(
+    return [
         Finding(
             path,
             "instrument.verification_task",
@@ -507,8 +529,7 @@ def enumerated_findings(document: dict[str, Any], path: Path) -> list[Finding]:
         )
         for inference in INFERRED
         if inference not in settled
-    )
-    return findings
+    ]
 
 
 def check_file(path: Path, kinds: frozenset[str]) -> list[Finding]:

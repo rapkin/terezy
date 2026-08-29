@@ -862,6 +862,10 @@ def _published_in_order(
     rearrangement of these very payments describes some other list; an order identical to
     the ascending one records no difference at all, and a field that can be filled in
     without saying anything is a field that stops tracking the source.
+
+    ⚙ The second refusal is also the field's stated limit: two payments of different kinds
+    on one date are one date here, so a source that published *that pair* the other way
+    round has nothing to record and is told so. See ``EnumeratedTerms.published_in_order``.
     """
     if declared is None:
         return None

@@ -16,11 +16,12 @@ because for a tax rule the comfortable default is "no tax".
 from __future__ import annotations
 
 import dataclasses
+import inspect
 from collections.abc import Mapping
 
 import pytest
 
-from terezy.core.instruments import fixed_income
+from terezy.core.instruments import enumerated, fixed_income
 from terezy.core.instruments import registry as instruments
 from terezy.core.instruments.interface import InstrumentOps
 from terezy.core.tax import flat_rate
@@ -77,6 +78,38 @@ class TestDispatchIsAMapping:
         assert ops.events is fixed_income.events
         assert ops.tax_classes is fixed_income.tax_classes
         assert ops.constraints is fixed_income.constraints
+
+    def test_the_second_bond_form_selects_its_own_three_functions(self) -> None:
+        """⚙ Feature 013. A bond declared as the payments it will make is a further entry
+        under the **same** interface, not a fifth one."""
+        ops = instruments.ops_for(instruments.ENUMERATED_SCHEDULE)
+        assert ops.events is enumerated.events
+        assert ops.tax_classes is enumerated.tax_classes
+        assert ops.constraints is enumerated.constraints
+
+    def test_both_bond_forms_answer_the_same_three_questions(self) -> None:
+        """FR-013's first clause: *the same function signature, the same return type*. The
+        signatures are compared rather than described, because "the same interface" is the
+        whole claim and prose asserting it would be the copy that drifts."""
+        for name in ("events", "tax_classes", "constraints"):
+            generative = inspect.signature(getattr(fixed_income, name))
+            listed = inspect.signature(getattr(enumerated, name))
+            assert [p.name for p in generative.parameters.values()] == [
+                p.name for p in listed.parameters.values()
+            ], name
+            assert generative.return_annotation == listed.return_annotation, name
+
+    def test_the_two_forms_produce_the_same_kind_of_answer(self) -> None:
+        """FR-013's third clause, and the one that kept a fund out of this registry: *a
+        different arity of answer*. Both forms return one event stream."""
+        assert instruments.ops_for(instruments.ENUMERATED_SCHEDULE).events is not (
+            instruments.ops_for(instruments.FIXED_INCOME).events
+        )
+        assert (
+            inspect.signature(enumerated.events).return_annotation
+            == inspect.signature(fixed_income.events).return_annotation
+            == "tuple[Event, ...] | InstrumentFailure"
+        )
 
 
 class TestAnUnknownNameIsAFailureNotAFallback:

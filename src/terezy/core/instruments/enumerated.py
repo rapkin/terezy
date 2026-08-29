@@ -72,15 +72,33 @@ def events(
     not declared and may not be inferred (FR-017).
     """
     terms = terms_of.narrowed(declaration, EnumeratedTerms)
-    problem = _check_feasible(declaration, terms, holding, horizon, assumptions)
+    receivable = _receivable(terms, holding)
+    problem = _check_feasible(
+        declaration, terms, receivable, holding=holding, horizon=horizon, assumptions=assumptions
+    )
     if problem is not None:
         return problem
 
+    principal = _principal_in(receivable)
     stream = [acquire.purchase(declaration, holding, sequence=1)]
-    for payment in terms.payments:
-        if payment.on > holding.purchased_on:
-            stream.append(_payment(declaration, terms, holding, payment, sequence=len(stream) + 1))
+    for payment in receivable:
+        stream.append(
+            _payment(declaration, holding, payment, principal=principal, sequence=len(stream) + 1)
+        )
     return tuple(stream)
+
+
+def _receivable(terms: EnumeratedTerms, holding: Holding) -> tuple[ScheduledPayment, ...]:
+    """The payments this holding is paid: the declared ones falling after the purchase.
+
+    ⚙ **This tuple is the denominator as well as the numerator**, and keeping the two the
+    same set is what makes the holding close. A schedule that had already repaid part of its
+    principal before the purchase sells units of what *remains*, so what retires them is the
+    remaining repayments -- measured against every repayment the paper ever made, the
+    emitted ones would retire strictly less than the holding, leaving basis stranded in a
+    position that never closes and reporting the stranded basis as a realised gain.
+    """
+    return tuple(payment for payment in terms.payments if payment.on > holding.purchased_on)
 
 
 def tax_classes(declaration: InstrumentDeclaration) -> Mapping[TaxableEventKind, str]:
@@ -96,6 +114,8 @@ def constraints(declaration: InstrumentDeclaration) -> InstrumentConstraints:
 def _check_feasible(
     declaration: InstrumentDeclaration,
     terms: EnumeratedTerms,
+    receivable: tuple[ScheduledPayment, ...],
+    *,
     holding: Holding,
     horizon: DateRange,
     assumptions: Assumptions,
@@ -106,15 +126,23 @@ def _check_feasible(
     its own. The **first** problem found is the one reported, on the generative form's
     reading: a reader fixing a purchase below the minimum ticket does not need to be told
     simultaneously that their horizon is short.
+
+    ⚙ **Written as early returns rather than as a tuple of results, and the difference is
+    not style.** A tuple evaluates every check before the first is read, and the horizon
+    check reads the *last date this holding receives* -- which does not exist when the
+    receivable check is the one that should have fired. Ordering guards by which answers a
+    reader wants first only works if the later ones do not run.
     """
-    for problem in (
-        _purchase_problem(declaration, terms, holding),
-        _policy_problem(declaration, assumptions),
-        _horizon_problem(declaration, terms, holding, horizon),
-    ):
-        if problem is not None:
-            return problem
-    return None
+    problem = _purchase_problem(declaration, terms, holding)
+    if problem is not None:
+        return problem
+    problem = _policy_problem(declaration, assumptions)
+    if problem is not None:
+        return problem
+    problem = _receivable_problem(declaration, terms, receivable, holding)
+    if problem is not None:
+        return problem
+    return _horizon_problem(declaration, receivable, holding, horizon)
 
 
 def _purchase_problem(
@@ -202,7 +230,7 @@ def _policy_problem(
 
 def _horizon_problem(
     declaration: InstrumentDeclaration,
-    terms: EnumeratedTerms,
+    receivable: tuple[ScheduledPayment, ...],
     holding: Holding,
     horizon: DateRange,
 ) -> InstrumentFailure | None:
@@ -227,14 +255,14 @@ def _horizon_problem(
                 "measure returns from a date on which nothing was bought."
             ),
         )
-    last = max(payment.on for payment in terms.payments)
+    last = max(payment.on for payment in receivable)
     if horizon.end < last:
         return InconsistentTerms(
             first_term="horizon.end",
             second_term="instrument.schedule.payment",
             reason=(
-                f"the horizon ends {horizon.end.isoformat()} but the last payment "
-                f"{declaration.id!r} declares falls on {last.isoformat()}. A truncated "
+                f"the horizon ends {horizon.end.isoformat()} but the last payment this "
+                f"holding of {declaration.id!r} receives falls on {last.isoformat()}. A truncated "
                 "schedule is not reported: the yield of a holding whose principal was cut "
                 "off would be wrong rather than partial, and an implicit liquidation at "
                 "the horizon would be a cash flow nobody declared."
@@ -243,23 +271,68 @@ def _horizon_problem(
     return None
 
 
-def _principal_declared(terms: EnumeratedTerms) -> float:
-    """Everything the declared repayments of principal return, per unit."""
+def _receivable_problem(
+    declaration: InstrumentDeclaration,
+    terms: EnumeratedTerms,
+    receivable: tuple[ScheduledPayment, ...],
+    holding: Holding,
+) -> InstrumentFailure | None:
+    """Whether this purchase receives anything, and whether what it receives closes it.
+
+    Both are facts about *this purchase against this schedule* rather than about either
+    alone, which is why they are typed refusals here rather than load failures: the same
+    declaration is perfectly good for a buyer who bought earlier.
+
+    They also stand where a bare arithmetic error would otherwise reach the caller -- a
+    ``max()`` over nothing and a division by nothing. An uncontextualised ``ValueError``
+    tells a reader that this engine broke; a refusal tells them which two declared facts
+    cannot both hold.
+    """
+    if not receivable:
+        return InconsistentTerms(
+            first_term="holding.purchased_on",
+            second_term="instrument.schedule.payment",
+            reason=(
+                f"{declaration.id!r} was bought {holding.purchased_on.isoformat()}, on or "
+                "after every payment its schedule declares. The purchase receives nothing, "
+                "so there is no holding to project -- and no yield, because there is no "
+                "series. The payments before that date went to whoever held the paper then."
+            ),
+        )
+    if _principal_in(receivable) > 0.0:
+        return None
+    return InconsistentTerms(
+        first_term="holding.purchased_on",
+        second_term="instrument.schedule.payment",
+        reason=(
+            f"{declaration.id!r} was bought {holding.purchased_on.isoformat()}, after every "
+            "repayment of principal its schedule declares. What is left is coupons on a "
+            "position nothing ever closes, so the basis would never be recovered and the "
+            "yield would be computed on a holding still open at the end of its own "
+            f"schedule. The declaration lists {len(terms.payments)} payment(s) in all."
+        ),
+    )
+
+
+def _principal_in(payments: tuple[ScheduledPayment, ...]) -> float:
+    """What the repayments of principal among these payments return, per unit."""
     return sum(
         payment.amount.amount
-        for payment in terms.payments
+        for payment in payments
         if payment.pays is PaymentKind.PRINCIPAL_REPAYMENT
     )
 
 
-def _units_retired(terms: EnumeratedTerms, payment: ScheduledPayment, quantity: float) -> float:
-    """How many units one payment surrenders: its share of the repayments declared.
+def _units_retired(payment: ScheduledPayment, *, principal: float, quantity: float) -> float:
+    """How many units one payment surrenders: its share of the repayments **this holding
+    receives**.
 
     Zero for a coupon, which surrenders nothing. For a repayment of principal it is
-    ``quantity x amount / everything the repayments return``, so the stream as a whole
-    retires the holding as a whole -- once, whatever the schedule's shape. One repayment
-    retires everything, which is exactly what the generative form's redemption does; two
-    equal ones retire half each.
+    ``quantity x amount / principal``, where ``principal`` is what the receivable repayments
+    return per unit -- so the stream as a whole retires the holding as a whole, whatever the
+    schedule's shape and wherever in it the purchase falls. One repayment retires everything,
+    which is exactly what the generative form's redemption does; two equal ones retire half
+    each.
 
     ⚙ **Its share of the repayments, not its share of the face value**, and the difference
     is a bond redeemed above par. A schedule returning 1 050.00 against a declared face of
@@ -274,15 +347,15 @@ def _units_retired(terms: EnumeratedTerms, payment: ScheduledPayment, quantity: 
     """
     if payment.pays is not PaymentKind.PRINCIPAL_REPAYMENT:
         return 0.0
-    return quantity * payment.amount.amount / _principal_declared(terms)
+    return quantity * payment.amount.amount / principal
 
 
 def _payment(
     declaration: InstrumentDeclaration,
-    terms: EnumeratedTerms,
     holding: Holding,
     payment: ScheduledPayment,
     *,
+    principal: float,
     sequence: int,
 ) -> Event:
     """One declared payment, scaled by the units held, as the movement its kind names.
@@ -296,7 +369,7 @@ def _payment(
     selection rather than for the configured consumption method.
     """
     kind, _ = PAYMENT_KINDS[payment.pays]
-    retired = _units_retired(terms, payment, holding.quantity)
+    retired = _units_retired(payment, principal=principal, quantity=holding.quantity)
     disposal = payment.pays is PaymentKind.PRINCIPAL_REPAYMENT
     return Event(
         sequence=sequence,

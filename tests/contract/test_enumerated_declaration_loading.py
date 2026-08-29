@@ -185,13 +185,33 @@ class TestTheBatteryOfBrokenDeclarations:
         neither = BASE.replace("[instrument.schedule]", "[instrument.nothing_at_all]", 1)
         assert self._refused(tmp_path, neither).field_path
 
-    def test_an_empty_payment_list(self, tmp_path: Path) -> None:
+    def test_a_declared_but_empty_payment_list(self, tmp_path: Path) -> None:
+        """``payment = []`` -- a list that is there and holds nothing.
+
+        ⚙ Split from the case below, which used to stand for both and did not: removing the
+        payment **tables** trips the required-field check in the shape validation, which
+        reports the same field path and a different problem. One of the two cases would have
+        passed while the guard it was written for never ran.
+        """
+        head = BASE[: BASE.index("  [[instrument.schedule.payment]]")]
         empty = (
-            BASE[: BASE.index("  [[instrument.schedule.payment]]")]
+            head.replace('day_count    = "act/365"', 'day_count    = "act/365"\npayment      = []')
             + BASE[BASE.index("[instrument.constraints]") :]
         )
         refused = self._refused(tmp_path, empty)
         assert refused.field_path == "instrument.schedule.payment"
+        assert "declares no payments" in refused.problem
+
+    def test_a_missing_payment_list(self, tmp_path: Path) -> None:
+        """No ``payment`` key at all. A forgotten key and a deliberate empty list are
+        different mistakes and get different messages."""
+        missing = (
+            BASE[: BASE.index("  [[instrument.schedule.payment]]")]
+            + BASE[BASE.index("[instrument.constraints]") :]
+        )
+        refused = self._refused(tmp_path, missing)
+        assert refused.field_path == "instrument.schedule.payment"
+        assert "is required and is absent" in refused.problem
 
     def test_a_payment_list_out_of_date_order(self, tmp_path: Path) -> None:
         """The loader neither sorts nor accepts it (FR-006). Sorting would delete the fact
@@ -275,6 +295,15 @@ class TestTheBatteryOfBrokenDeclarations:
             'covers_from  = "2026-02-01"\ncovers_until = "2027-02-01"',
         )
         assert "covers_until" in self._refused(tmp_path, two_ended).field_path
+
+    def test_a_verification_task_settling_nothing_this_engine_tracks(self, tmp_path: Path) -> None:
+        """FR-020's four inferences are a closed set here too: a task naming something else
+        would leave the inference it was written for uncovered while looking present."""
+        typo = _replaced('settles     = "coverage"', 'settles     = "coverage_window"')
+        refused = self._refused(tmp_path, typo)
+        assert refused.field_path.endswith(".settles")
+        assert "coverage_window" in refused.problem
+        assert "face_value" in str(refused)
 
     def test_an_income_kind_with_no_declared_tax_class(self, tmp_path: Path) -> None:
         """FR-009. A missing rule and a cited exemption are opposite claims, and only one

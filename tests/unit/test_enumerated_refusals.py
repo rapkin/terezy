@@ -118,6 +118,63 @@ class TestAHorizonThatDoesNotReachTheLastPayment:
         assert "nobody declared" in outcome.reason
 
 
+class TestAHorizonThatCannotContainThePurchase:
+    """The two guards that are about the *window* rather than about the declaration."""
+
+    def test_a_horizon_running_backwards_refuses(self) -> None:
+        outcome = _events(horizon=DateRange(start=HORIZON.end, end=HORIZON.start))
+        assert isinstance(outcome, InconsistentTerms), outcome
+        assert outcome.first_term == "horizon.start"
+        assert "runs backwards" in outcome.reason
+
+    def test_a_horizon_opening_after_the_purchase_refuses(self) -> None:
+        """The purchase is the origin of every time measurement in the result, so a window
+        that excludes it would measure returns from a date on which nothing was bought."""
+        outcome = _events(horizon=replace(HORIZON, start=COVERS_FROM + timedelta(days=1)))
+        assert isinstance(outcome, InconsistentTerms), outcome
+        assert outcome.second_term == "holding.purchased_on"
+
+
+class TestAPaymentDatedOnOrBeforeThePurchase:
+    """It went to whoever held the paper then, exactly as a coupon does for a bond declared
+    by its terms.
+
+    There is no accrued-interest apportionment of the payment straddling the purchase, and
+    there could not be: the two facts it would need are not declared and may not be inferred
+    (FR-017).
+    """
+
+    def test_it_is_not_this_holding_s_income(self) -> None:
+        first = min(payment.on for payment in TERMS.payments)
+        bought_on_the_first_payment = replace(HOLDING, purchased_on=first)
+        produced = _events(
+            holding=bought_on_the_first_payment,
+            horizon=replace(HORIZON, start=first),
+        )
+        assert isinstance(produced, tuple), produced
+        assert first not in [event.occurred_on for event in produced[1:]]
+
+    def test_every_later_payment_still_arrives(self) -> None:
+        first = min(payment.on for payment in TERMS.payments)
+        produced = _events(
+            holding=replace(HOLDING, purchased_on=first),
+            horizon=replace(HORIZON, start=first),
+        )
+        assert isinstance(produced, tuple), produced
+        assert len(produced) == 1 + len([p for p in TERMS.payments if p.on > first])
+
+    def test_nothing_is_apportioned_to_make_up_for_it(self) -> None:
+        """The whole payment goes to the earlier holder; this one is not paid a fraction of
+        it. A schedule that apportioned would need an accrual period nobody declared."""
+        first = min(payment.on for payment in TERMS.payments)
+        produced = _events(
+            holding=replace(HOLDING, purchased_on=first), horizon=replace(HORIZON, start=first)
+        )
+        assert isinstance(produced, tuple), produced
+        declared = {payment.amount.amount * HOLDING.quantity for payment in TERMS.payments}
+        assert all(event.amount.amount in declared for event in produced[1:])
+
+
 class TestAPurchaseThatIsNotAPurchase:
     def test_no_units_refuses(self) -> None:
         outcome = _events(holding=replace(HOLDING, quantity=0.0))

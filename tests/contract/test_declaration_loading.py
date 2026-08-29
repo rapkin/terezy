@@ -30,12 +30,14 @@ from __future__ import annotations
 
 import re
 import shutil
+from collections.abc import Mapping
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Final
 
 import pydantic
 import pytest
+from pydantic import BaseModel
 
 from terezy.core.errors import InconsistentTerms
 from terezy.core.instruments.interface import Assumptions, DateRange, Holding
@@ -48,7 +50,7 @@ from terezy.core.results import project
 from terezy.core.results.project import Projection
 from terezy.core.tax.interface import TaxableEventKind
 from terezy.core.tax.schedule import RateUndeclaredBefore
-from terezy.data.declarations import loader, resolver
+from terezy.data.declarations import loader, resolver, schema
 from terezy.data.declarations.errors import DeclarationError
 from tests import declared_terms
 
@@ -1265,8 +1267,77 @@ class TestTheBatteryCoversTheContract:
             "TestNoPydanticTypeEscapes",
             "TestAnImpossibleInstrumentIsNotALoadError",
             "TestTheBatteryCoversTheContract",
+            "TestNoFieldDefaultStandsInForAValue",
         }
 
     def test_the_second_issue_is_a_file_and_not_a_special_case(self) -> None:
         """Both shipped issues load through the same function, with no branch on id."""
         assert loader.instrument_from_file(INSTRUMENT_B).id == "ovdp_synthetic_b"
+
+
+class TestNoFieldDefaultStandsInForAValue:
+    """The schema module's own rule, pinned rather than restated (FR-016).
+
+    A default in pydantic is the only mechanism by which a value no file contains can enter
+    the model, so the set of fields that have one is worth knowing exactly. Every entry
+    below is a field whose **absence is itself a declaration** — an omitted `[access.price]`
+    says *this instrument prices itself*, an omitted `published_in_order` says *the source
+    published in date order* — and every one of them defaults to ``None`` rather than to a
+    value.
+
+    ⚙ Written after the module docstring was found claiming *"Zero field defaults,
+    anywhere"* over eleven of them (2026-08-30). A sentence asserting a mechanical property
+    is a test or it is not written.
+    """
+
+    OPTIONAL: Final[Mapping[str, frozenset[str]]] = {
+        "AccessTable": frozenset({"price"}),
+        "ChannelSideTable": frozenset({"markup_bps", "premium_per_unit"}),
+        "DistributionTable": frozenset({"peg"}),
+        "EnumeratedScheduleTable": frozenset({"published_in_order"}),
+        "FundTable": frozenset({"subscription_cutoff", "distribution"}),
+        "GoalTable": frozenset({"monthly_contribution", "target_sum", "target_date"}),
+        "IndexationTable": frozenset({"rate_pct"}),
+        "LegTable": frozenset(
+            {
+                "channel",
+                "capacity_pool",
+                "minimum",
+                "maximum",
+                "monthly_cap",
+                "available_from",
+                "available_until",
+            }
+        ),
+        "RouteTable": frozenset({"partner_route"}),
+        "SeedTable": frozenset({"reason"}),
+        "StreamTable": frozenset({"income_tax_rate_pct"}),
+    }
+
+    @staticmethod
+    def _defaults() -> dict[str, frozenset[str]]:
+        return {
+            name: frozenset(
+                field for field, info in model.model_fields.items() if not info.is_required()
+            )
+            for name, model in vars(schema).items()
+            if isinstance(model, type)
+            and issubclass(model, BaseModel)
+            and model is not BaseModel
+            and any(not info.is_required() for info in model.model_fields.values())
+        }
+
+    def test_exactly_these_fields_may_be_omitted(self) -> None:
+        assert self._defaults() == dict(self.OPTIONAL), (
+            "a field gained or lost an optional marker. Adding one is permitted where the "
+            "absence of the key is itself a declaration; it is not permitted as a way of "
+            "not writing a value (FR-016), so the decision is taken here"
+        )
+
+    def test_and_every_one_of_them_defaults_to_nothing_rather_than_to_a_value(self) -> None:
+        """The half that matters. ``None`` is "the key was not written"; anything else is a
+        number, a date or a name that no file on disk contains."""
+        for name, fields in self._defaults().items():
+            model = getattr(schema, name)
+            for field in sorted(fields):
+                assert model.model_fields[field].default is None, f"{name}.{field}"

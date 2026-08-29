@@ -141,9 +141,16 @@ class PurchasePremium:
     """``paid - at_face``. Positive is a premium, negative a discount, zero is par -- and a
     zero here says *par* rather than saying nothing."""
 
-    tax_class_id: str
+    tax_class_id: str | None
     """The declared class governing a disposal of this instrument, which is the event the
-    difference is realised by."""
+    difference is realised by -- or ``None`` where the declaration names none.
+
+    ⚙ **``None`` rather than an empty string**, because the two say different things and the
+    empty string said the wrong one: a declaration is not required to name a class for every
+    kind of income it might produce, and a figure carrying ``""`` here reported the *rules*
+    as mapping no category to a class, sending a reader to the jurisdiction file when the
+    thing to fix was the instrument's own declaration.
+    """
 
     governed_by: GovernedBy | TreatmentUnstated
     """The category treatment that decides what the difference does, or why nobody said."""
@@ -343,7 +350,7 @@ def _at_purchase(
     at_face = money.scale_sourced(
         declaration.terms.face_value, holding.quantity, declaration.terms.provenance
     )
-    disposal_class = declaration.tax_classes.get(TaxableEventKind.DISPOSAL_GAIN, "")
+    disposal_class = declaration.tax_classes.get(TaxableEventKind.DISPOSAL_GAIN)
     return PurchasePremium(
         paid=holding.cost,
         at_face=at_face,
@@ -354,9 +361,23 @@ def _at_purchase(
 
 
 def _governed_by(
-    disposal_class: str, rules: AssessmentRules | None
+    disposal_class: str | None, rules: AssessmentRules | None
 ) -> GovernedBy | TreatmentUnstated:
-    """The declared category treatment that decides what the difference does, or why not."""
+    """The declared category treatment that decides what the difference does, or why not.
+
+    Three ways there can be no answer, and they send a reader to three different files, so
+    each says which one: the run was given no rules, the **instrument** names no class for a
+    disposal, or the **rules** map no category to the class it does name.
+    """
+    if disposal_class is None:
+        return TreatmentUnstated(
+            reason=(
+                "this instrument declares no tax class for a disposal, so nothing here can "
+                "say what governs the difference between what was paid and face. It is the "
+                "declaration that is incomplete rather than the rules: a class named and "
+                "unmapped is a different fault, and reported as one."
+            )
+        )
     if rules is None:
         return TreatmentUnstated(
             reason=(

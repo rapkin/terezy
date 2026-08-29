@@ -12,12 +12,17 @@ which the instrument's terms are known, and it asked for the only spelling that 
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date
+
+import pytest
 
 from terezy.core.instruments import terms as declared_terms
 from terezy.core.instruments.interface import (
     BondTerms,
     EnumeratedTerms,
+    InstrumentConstraints,
+    InstrumentDeclaration,
     PaymentKind,
     ScheduledPayment,
 )
@@ -55,6 +60,20 @@ ENUMERATED = EnumeratedTerms(
     day_count="act/365",
     published_in_order=None,
     provenance=SOURCES,
+)
+
+
+DECLARATION = InstrumentDeclaration(
+    id="terms_fixture",
+    name="Synthetic declaration — TEST FIXTURE, terms invented",
+    instrument_class="fixed_income",
+    currency=Currency.UAH,
+    is_synthetic=True,
+    terms=GENERATIVE,
+    constraints=InstrumentConstraints(
+        min_ticket=Money(1000.0, Currency.UAH, SOURCES), min_unit=1.0, provenance=SOURCES
+    ),
+    tax_classes={},
 )
 
 
@@ -120,3 +139,30 @@ class TestWhatAFigureDerivedFromTheseTermsAdditionallyExcludes:
         stated = declared_terms.excludes_of(ENUMERATED)
         assert len(stated) == 1
         assert "dirty price" in next(iter(stated))
+
+
+class TestNarrowingToTheFormAGeneratorReads:
+    """The one place a schedule generator is allowed to learn which form it was given.
+
+    A raise rather than a typed failure: which functions project a declaration is decided by
+    its declared class at the data boundary, so a declaration reaching a generator carrying
+    terms it cannot read means that dispatch was bypassed -- a programmer error rather than
+    a fact about the money.
+    """
+
+    def test_it_returns_the_terms_when_the_form_matches(self) -> None:
+        declared = replace(DECLARATION, terms=ENUMERATED)
+        assert declared_terms.narrowed(declared, EnumeratedTerms) is ENUMERATED
+        assert declared_terms.narrowed(DECLARATION, BondTerms) is GENERATIVE
+
+    def test_it_raises_naming_both_forms_when_it_does_not(self) -> None:
+        with pytest.raises(TypeError, match="EnumeratedTerms") as raised:
+            declared_terms.narrowed(DECLARATION, EnumeratedTerms)
+        assert "BondTerms" in str(raised.value)
+        assert DECLARATION.id in str(raised.value)
+
+    def test_the_message_says_the_declared_class_is_the_only_dispatch_key(self) -> None:
+        """So a reader who hits this looks at the class the file declares rather than at the
+        generator, which is where the mistake actually is."""
+        with pytest.raises(TypeError, match="only dispatch key"):
+            declared_terms.narrowed(replace(DECLARATION, terms=ENUMERATED), BondTerms)

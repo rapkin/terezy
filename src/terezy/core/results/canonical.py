@@ -55,8 +55,13 @@ def of_conventions(value: ConventionsApplied | AmountsAsDeclared) -> tuple[str, 
     computed from three conventions are two different claims about where the money came
     from, and a digest agreeing between them would report them as one (013 FR-016).
 
-    A three-name rendering can never equal a two-entry one, so the two are told apart by
-    shape as well as by the tag. The three-name arm is deliberately **untagged**: it is
+    The **reason** is rendered too, and for the same argument the ledger's canonical form
+    makes about a causation's ``detail``: it is overridable, so two rows can make different
+    statements about what shaped them, and a digest ignoring it would call two
+    differently-explained results identical. A three-name rendering can never equal a
+    three-entry tagged one, so the two are told apart by the tag as well as by content.
+
+    The three-name arm is deliberately **untagged**: it is
     byte-for-byte what it has always been, so no generative row's digest moves for a reason
     that is not about that row (013 SC-017).
     """
@@ -64,7 +69,7 @@ def of_conventions(value: ConventionsApplied | AmountsAsDeclared) -> tuple[str, 
         case ConventionsApplied():
             return (value.periodicity, value.day_count, value.business_day_rule)
         case AmountsAsDeclared():
-            return ("declared", value.day_count)
+            return ("declared", value.day_count, value.reason)
         case _:  # pragma: no cover -- mypy proves this unreachable
             assert_never(value)
 
@@ -182,8 +187,9 @@ def of_hurdle_rate(value: HurdleRate) -> tuple[Canonical, ...]:
 def of_at_purchase(value: PurchasePremium) -> tuple[Canonical, ...]:
     """What was paid, what face comes to, the difference, and what governs it.
 
-    The governing treatment is **tagged**, so that "outside" and "nobody said" can never
-    render as the same bytes: they are opposite claims -- one is a cited rule and the other
+    The class the difference is realised under and the governing treatment are both
+    **tagged**, so that a declared answer and its absence can never render as the same
+    bytes: they are opposite claims -- one is a cited rule and the other
     is its absence -- and a digest agreeing between them would report an unanswered question
     as an answer.
     """
@@ -202,7 +208,7 @@ def of_at_purchase(value: PurchasePremium) -> tuple[Canonical, ...]:
         ledger_canonical.of_money(value.paid),
         ledger_canonical.of_money(value.at_face),
         ledger_canonical.of_money(value.difference),
-        value.tax_class_id,
+        ("class", value.tax_class_id) if value.tax_class_id else ("undeclared",),
         governs,
     )
 

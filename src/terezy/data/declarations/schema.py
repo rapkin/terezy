@@ -27,11 +27,21 @@ file can lie about itself:
     A validated document is a fact about a file on disk. Nothing may edit it afterwards
     and hand on a value that no file contains.
 
-**Zero field defaults, anywhere.** Not one model below has a default, and that is a
-standing rule rather than a coincidence: FR-016 says *"a default value MUST NOT be
-substituted for anything absent"*, and in pydantic a default is the only mechanism by
-which that substitution can happen. So the absence of defaults is the enforcement. Two
-consequences a reader should expect and not try to fix:
+**No field default ever stands in for a value** (FR-016: *"a default value MUST NOT be
+substituted for anything absent"*). In pydantic a default is the only mechanism by which
+that substitution can happen, so a default here is written **only** where the absence of
+the key is itself a declaration -- an omitted `[access.price]` says *this instrument prices
+itself*, an omitted `published_in_order` says *the source published in date order*, an
+omitted goal variable says *solve for this one*. Every such field defaults to ``None`` and
+never to a value, because ``None`` is "the key was not written" and a value would be a
+number no file contains.
+
+⚙ This paragraph used to read *"Zero field defaults, anywhere. Not one model below has a
+default"*, and by 2026-08-30 eleven models had one. Corrected rather than reworded, and the
+exact set is pinned by ``tests/contract/test_declaration_loading.py`` so the next one is a
+decision somebody takes rather than a sentence that quietly stops being true.
+
+Two consequences a reader should expect and not try to fix:
 
 * ``verified_on`` must be **present** in every sourced table, and empty (``""``) is how
   a value says it is unverified (FR-014). The key being absent is an error; a default of

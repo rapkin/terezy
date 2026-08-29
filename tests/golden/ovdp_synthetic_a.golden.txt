@@ -255,4 +255,4 @@ event  10  2028-01-17  ovdp_synthetic_a  quantity 10.0
 # sha256 over core.results.canonical.of_projection, taken by
 # data.manifest.digest_of_projection. Amounts reach it as float.hex(), so this
 # asserts bit-identity -- deliberately stricter than the project tolerance.
-sha256:e690f93fd4483f9bf0e9881edd90453f25884569582efd867b1fb1b48f6b63db
+sha256:d8b3c30e4e71c81365d899672d12319919427ff6617f9a5c00355a8914822f70

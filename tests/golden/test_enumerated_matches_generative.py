@@ -68,6 +68,16 @@ REGISTRIES = fixtures.without_latency(fixtures.shipped())
 cost and it is the same cost on both sides, but leaving it in would need a tolerance loose
 enough to hide the thing this test is looking for."""
 
+WITHIN_TOLERANCE = frozenset({"implied_rate", "parts", "arrivals"})
+"""Fields whose *contents* are compared above at the imported tolerance rather than by
+equality, because the two forms reach the same amount by different arithmetic.
+
+Named rather than inlined so the field-by-field sweep can say what it is deferring and to
+where. Each is compared field by field in its own test; what the sweep still checks here is
+that the two sides have the same number of them, so a form that dropped an arrival could not
+hide behind a name on this list.
+"""
+
 HORIZON = DateRange(start=fixtures.ISSUE_DATE, end=fixtures.HORIZON_END)
 """Opened on the issue date rather than the day before, as `test_the_hurdle_is_a_tuple`
 does: with the latency zeroed the money arrives the day it leaves, and a purchase dated
@@ -104,12 +114,17 @@ class TestEveryFigureAgrees:
     def test_the_same_money_comes_back(self) -> None:
         assert is_close(GENERATIVE.reaches.amount, ENUMERATED.reaches.amount)
 
-    def test_the_same_arrivals_on_the_same_dates(self) -> None:
-        assert [arrival.arrived_on for arrival in GENERATIVE.arrivals] == [
-            arrival.arrived_on for arrival in ENUMERATED.arrivals
-        ]
+    def test_every_arrival_agrees_in_every_field(self) -> None:
+        """All four, not only the date and the amount. ``released`` is the net-of-tax figure
+        two other contract tests assert against, and ``released_on`` differs from
+        ``arrived_on`` the moment latency is not zeroed -- so comparing the pair a test
+        happens to have zeroed apart would agree by accident."""
         for one, other in zip(GENERATIVE.arrivals, ENUMERATED.arrivals, strict=True):
-            assert is_close(one.amount.amount, other.amount.amount)
+            assert (one.released_on, one.arrived_on) == (other.released_on, other.arrived_on)
+            for field in ("released", "amount"):
+                mine, theirs = getattr(one, field), getattr(other, field)
+                assert is_close(mine.amount, theirs.amount), field
+                assert mine.currency == theirs.currency, field
 
     def test_every_part_contributes_the_same_amount(self) -> None:
         """The join reports each term of the tuple separately so a reader can see which one
@@ -117,6 +132,11 @@ class TestEveryFigureAgrees:
         assert [part.part for part in GENERATIVE.parts] == [part.part for part in ENUMERATED.parts]
         for one, other in zip(GENERATIVE.parts, ENUMERATED.parts, strict=True):
             assert is_close(one.amount.amount, other.amount.amount), one.part
+            assert one.amount.currency == other.amount.currency, one.part
+            assert one.source == other.source, (
+                "the source is the mechanical half of *the join invents nothing*: two forms "
+                "of one instrument must attribute each part to the same place"
+            )
 
     def test_the_same_implied_rate(self) -> None:
         assert is_close(_rate(GENERATIVE), _rate(ENUMERATED))
@@ -174,9 +194,11 @@ class TestTheOnlyDifferencesArePermittedOnes:
         """The assertion the rest of this class exists to make safe: every field of the
         outcome compared, with the permitted differences named and nothing else allowed.
 
-        Each name in ``permitted`` is asserted on separately above; what this adds is that
-        the list is **exhaustive**, so a field added to the outcome later cannot differ
-        between the forms without somebody deciding that it may."""
+        Each name in ``permitted`` is asserted on separately above, as is each name in
+        :data:`WITHIN_TOLERANCE`; what this adds is that the two lists are **exhaustive**,
+        so a field added to the outcome later cannot differ between the forms without
+        somebody deciding that it may -- an added field falls to the ``else`` arm and is
+        compared for equality."""
         permitted = {"key", "excludes", "provenance", "rests_on", "staleness"}
         for field in TupleOutcome.__dataclass_fields__:
             if field in permitted:
@@ -185,8 +207,8 @@ class TestTheOnlyDifferencesArePermittedOnes:
             if hasattr(one, "amount") and hasattr(one, "currency"):
                 assert is_close(one.amount, other.amount), field
                 assert one.currency == other.currency, field
-            elif field in {"implied_rate", "parts", "arrivals"}:
-                continue  # asserted amount-wise above, where the tolerance belongs
+            elif field in WITHIN_TOLERANCE:
+                assert len(one) == len(other) if hasattr(one, "__len__") else True, field
             else:
                 assert one == other, field
 

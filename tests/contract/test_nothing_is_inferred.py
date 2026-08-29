@@ -149,12 +149,18 @@ def test_only_the_two_named_sites_divide_by_a_hundred() -> None:
     )
 
 
-def test_every_permitted_division_still_exists() -> None:
-    """The other direction, so the allowlist cannot outlive what it excuses. An entry for a
-    site that no longer divides is an exemption nobody would notice had gone stale."""
+def test_each_permitted_file_divides_exactly_once() -> None:
+    """The other direction, and it is the half the allowlist would otherwise lose.
+
+    An entry excuses a **file**, so a second division added inside an excused file would go
+    unseen -- which is the fail-open shape the allowlist exists to prevent, reintroduced by
+    the allowlist itself. The count is what closes it: each named file has exactly one, and
+    a second is a decision somebody takes here. It also catches the opposite drift, an entry
+    for a site that no longer divides at all.
+    """
     for name in DIVIDING_BY_A_HUNDRED_FOR_A_REASON:
         source = source_scan.executable_source(SOURCE_ROOT / name)
-        assert DIVIDES_BY_A_HUNDRED.search(source), name
+        assert len(DIVIDES_BY_A_HUNDRED.findall(source)) == 1, name
 
 
 def test_no_module_derives_a_coupon_rate() -> None:

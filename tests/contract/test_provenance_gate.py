@@ -190,3 +190,35 @@ def test_the_gate_and_the_loader_agree_on_what_is_inferred() -> None:
     )
     assert set(gate["INFERRED"]) == set(INFERENCES)  # type: ignore[call-overload]
     assert gate["INFERENCE_MARKER"] == INFERENCE_MARKER
+
+
+def test_a_malformed_schedule_does_not_hide_a_missing_verification_task(
+    tmp_path: Path,
+) -> None:
+    """The fail-open shape this gate exists to prevent, in the gate itself.
+
+    A file whose `[instrument.schedule]` is broken *and* which records no verification task
+    used to pass clean: the check returned early on the shape fault, on the reading that the
+    loader reports that one and names the field — which is true, and skipped the relation
+    this check exists for. The loader and the gate answer different questions, and a file
+    that fails one is not thereby excused the other.
+    """
+    root = _scratch_root(tmp_path)
+    declaration = root / ENUMERATED
+    lines = declaration.read_text(encoding="utf-8").splitlines(keepends=True)
+    first_task = next(
+        index
+        for index, line in enumerate(lines)
+        if line.startswith("[[instrument.verification_task]]")
+    )
+    declaration.write_text(
+        "".join(lines[:first_task]).replace(
+            "\n[instrument.schedule]\n", "\n[instrument.schedule_typo]\n"
+        ),
+        encoding="utf-8",
+    )
+
+    outcome = _run(root)
+    assert outcome.returncode == 1, outcome.stdout
+    for inference in sorted(INFERENCES):
+        assert inference in outcome.stdout

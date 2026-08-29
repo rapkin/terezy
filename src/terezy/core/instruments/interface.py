@@ -249,10 +249,19 @@ class EnumeratedTerms:
     into hryvnia -- and the loader neither sorts nor accepts an unordered list (FR-006).
 
     ⚙ **An observation about the source, not about the money**, and the one that silently
-    disappears: that an issuer publishes the principal repayment before the final coupon is
-    a fact about how the endpoint reports, and sorting the list is precisely the act that
-    would delete it. Of the 32 observed issues exactly one is shaped that way, and it is the
-    only one this form would have refused as published.
+    disappears: that an issuer publishes a repayment of principal after a coupon dated later
+    than it is a fact about how the endpoint reports, and sorting the list is precisely the
+    act that would delete it.
+
+    ⚙ **Its reach is the dates, and that is a stated limit rather than the whole of what a
+    source can do** (recorded 2026-08-30). Two payments of different kinds on one date are
+    indistinguishable here, so a source that published *those two* the other way round
+    records nothing: the declared order would equal the ascending one and the loader refuses
+    it as recording no difference. Nothing observed is shaped that way -- the one issue whose
+    list is not ascending has distinct dates -- and the field is dates rather than positions
+    because a reader checking a transcription against a published page reads dates. What
+    would close it is recording positions instead, which costs that readability; it is worth
+    doing the day a source publishes two same-date payments out of order.
     """
 
     provenance: Provenance
