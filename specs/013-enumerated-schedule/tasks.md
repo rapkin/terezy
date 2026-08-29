@@ -153,7 +153,9 @@ purchase price.
 - [x] T049 [P] Update `docs/METHODOLOGY.md` in the same change as the formulas: the enumerated form's yield, the premium figure, and what a row's conventions statement means
 - [x] T050 [P] Record in `docs/REQUIRED_TESTS.md` that **H1 and D1 are touched and not claimed** — H1 gains a second instrument shape (SC-004) and D1 is unchanged by design (SC-017). Flip nothing
 - [x] T051 [P] Flip `specs/features.toml`'s `013-enumerated-schedule` status to `in-progress` at the first implementation commit
-- [ ] T052 Run `/condense` over the branch diff — one fact, one place — then `/code-review` until clean. Both are blocking gates before anything lands
+- [x] T052 Run `/condense` over the branch diff — one fact, one place. Done: one narrowing helper in place of two, the two-epistemic-situations argument stated once, and the 32-issue measurement converted from four docstrings into `tests/contract/test_the_observation_the_form_rests_on.py`
+- [x] T053 `/code-review` round one over `a93520d..HEAD`, and fix its findings. Eight findings, one top-severity (a repayment retiring its share of *every* declared repayment rather than of the ones this holding receives). All fixed; see the fix commit
+- [ ] T054 `/code-review` round two, over the diff that will actually land. **The round-one review is spent**: the branch changed after it, and CLAUDE.md is explicit that a review of a diff that no longer exists is not a review of what is being merged. Round one also reported what it did *not* reach — every spec artefact, the golden file, three of the four data fixtures, and eleven test modules beyond their headers — so round two has a stated scope rather than a fresh sweep
 
 ---
 

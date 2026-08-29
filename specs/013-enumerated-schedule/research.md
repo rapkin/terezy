@@ -140,6 +140,16 @@ generative form's redemption does and what SC-002 needs; two equal ones retire h
 - *Surrender everything on the last principal repayment.* "The last one" is a reading of
   position in the list, which is the shape FR-008 forbids for kinds and SC-014 scans for.
 
+⚙ **Corrected a second time by the review, and the correction is the whole of the rule.**
+The denominator is what **this holding receives** — the repayments after the purchase — not
+what the declaration lists. A schedule that had already repaid part of its principal before
+the purchase sells units of what *remains*; measured against every repayment the paper ever
+made, the emitted ones retire strictly less than the holding, leaving basis stranded in a
+position that never closes and reporting the stranded basis as a realised gain on a trade
+that broke even. Two refusals fall out of it: a purchase that receives nothing, and one that
+receives no repayment of principal — each of which would otherwise have reached the caller
+as a bare `ValueError`.
+
 ## D7 — Reinvestment refuses, and it refuses in the instrument
 
 **Decision.** `enumerated.events` returns `InconsistentTerms` when
