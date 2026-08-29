@@ -75,7 +75,7 @@ why    = "connect ramp to instrument purchases: net-of-access-cost comparison (�
 
 [[feature]]
 id     = "011-official-rate"
-status = "spec"
+status = "done"
 needs  = ["002-ramp-cost"]
 why    = "the tax-currency role (Principle VI) has never had machinery: 011's per-kind staleness threshold follows 002's FR-028 and lands in the same `data/observation_kinds.toml`, and 011's central prohibition — the official rate never prices a leg, a channel rate never strikes a tax base — is the rule 002 already wrote at `core/routes/legs.py::channel_for` and `data/declarations/resolver.py::_check_channel`, which 011 must leave standing"
 note   = "no open clarifications. One owner verification task -- the clause naming which official rate governs a day the NBU does not set one -- and FR-017 ships its refusal live, so the gap is in the output rather than only in prose. Declaring the rule is NOT a data-only change: it is written in working days and public holidays, so it needs the declared-working-day-calendar future entry below (FR-018). The citation, the retrieval record and what the paraphrase lost are in the spec's owner verification task 1; nothing is repeated here."
@@ -124,7 +124,7 @@ note  = "paying a tax liability late under statutory interest, as an alternative
 [[future]]
 id    = "fx-tax-asymmetry-f1"
 after = ["002-ramp-cost"]
-note  = "flat-in-USD posts taxable UAH gain; needs a taxable foreign instrument + dated official rates"
+note  = "flat-in-USD posts taxable UAH gain. 011 supplied the dated official rates; what remains is the POSITION, and it is two things rather than one. `core.results.project` folds a holding under a single currency and sums every charge in it, so a hryvnia charge inside a dollar projection is a currency mismatch before any rate is consulted. And a realised gain is not an amount on a date: it needs a per-lot basis carried in both currencies with each leg struck at its own date's official rate. 011 refuses the gain by name rather than converting it at the disposal date's rate, because that arithmetic reports zero hryvnia for a position flat in dollars and would make F1 unfalsifiable (core.tax.year.ForeignGainNotStruckPerDate). Narrowed 2026-08-29 while implementing 011."
 
 [[future]]
 id    = "declared-working-day-calendar"

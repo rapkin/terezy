@@ -44,7 +44,19 @@ DATA_ROOT = REPO_ROOT / "data"
 # unit at the venue the instrument is bought from, and that is a market quote: exactly the kind
 # of figure that gets believed without checking, and the number every purchase in a comparison
 # is sized by.
-SOURCED_DIRS = ("tax", "instruments", "routes", "channels", "cpi", "access", "observations")
+# `official_rates` joined in feature 011. Every `[[observation]]` is one date's published
+# legal reference — the single input that turns a foreign amount into a hryvnia tax base —
+# so an uncited one is the confidently-wrong number this project exists to refuse.
+SOURCED_DIRS = (
+    "tax",
+    "instruments",
+    "routes",
+    "channels",
+    "cpi",
+    "access",
+    "observations",
+    "official_rates",
+)
 
 # The directories exempt from the citation requirement, each BY NAME and WITH ITS REASON.
 # Together with SOURCED_DIRS this list is exhaustive: a directory under data/ that appears
@@ -194,6 +206,26 @@ STRUCTURAL_KEYS = frozenset(
         "rationale",
         "redirect_to",
         "observed_on",
+        # --- feature 011: the form a rate is quoted in, not a rate ---
+        # How many units the values are quoted per. It sits on the `[series]` identity table
+        # beside `pair`, and every `value` it scales carries its own citation on its own
+        # observation.
+        #
+        # ⚙ **What this actually exempts is the whole `[series]` table, not one field**, and
+        # that is worth stating because the heuristic above makes it invisible: `[series]`
+        # holds exactly one numeric leaf, so listing it here drops the table's numeric-leaf
+        # count to zero and with it the `source`, `retrieved_on`, `verified_on` and `kind`
+        # requirements. Measured 2026-08-29: removing this line produces four errors on
+        # `data/official_rates/ua_nbu_usd.toml`, not one.
+        #
+        # A STATED GAP, therefore: `quotation_unit` decides a tax base to within two orders of
+        # magnitude and this gate cannot see it. Closing it means requiring a citation on a
+        # series' identity table, which is a real question rather than a line here — the
+        # authority and the pair are not retrieved values, so a `retrieved_on` for them would
+        # be a fabricated retrieval, and that is worse than an uncited field. It belongs with
+        # whoever builds the fetch script, which retrieves the published table the unit is read
+        # off and is the first thing that can date it honestly.
+        "quotation_unit",
     }
 )
 

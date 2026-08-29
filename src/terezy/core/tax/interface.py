@@ -26,10 +26,33 @@ folded into a rate. Nothing in feature 001 exercises the difference -- both rate
 source: foreign withholding creditable against PIT but **not** against the levy cannot be
 expressed against a blended figure at all.
 
-*Tax currency is not display currency.* All three currency roles are UAH here, so the
-obligation is negative: do not collapse them. ``TaxCharge`` amounts are in the tax
-currency by definition, and no code in this feature may assume that equals the currency
-anything is displayed in, because for a foreign security it will not.
+*Tax currency is not display currency.* No code here may assume the currency a charge is
+computed in is the currency anything is displayed in. The three roles Principle VI names are
+three because they come apart, and this interface is where they would be collapsed first.
+
+⚙ **A charge is computed in the currency its base arrived in, which is not always the tax
+currency.** Feature 011 made that reachable: an event denominated in a foreign currency is
+charged here on its own amount, and ``core.tax.year`` restates the whole charge at the
+declared official rate for the event's date when it assembles the year -- except for a
+realised disposal gain, which it refuses outright rather than converting. So a ``TaxCharge``
+leaving this module may be denominated in USD, and a rule that compared its base against the
+jurisdiction's tax currency -- or skipped a conversion on the strength of one -- would be
+wrong.
+
+That ordering carries **one assumption, and it is this interface's to state**: restating a
+charge after the fact is only equivalent to charging the declared rates on a converted base
+because ``flat_rate`` is *linear* in its base. A rule with a bracket, a cap, a floor or an
+allowance stated in the tax currency would apply those thresholds to a foreign-magnitude base
+before ``year`` ever sees the figure, and the answer would be plausible and wrong.
+
+**Such a rule is not expressible against this signature, and that is the thing to know before
+writing one.** Striking a base in the tax currency needs the declared rate series and the
+currency itself; :data:`ChargeFn` passes an ``Event``, a ``TaxClass`` and a ``TaxContext``,
+and none of the three carries either -- a rule cannot even learn what the tax currency is. So
+the first non-proportional rule is a change to this interface (the series, or the assessment
+rules, reaching the rule), and only then a call to
+``core.tax.official_rate.strike_base``. Recorded 2026-08-29, when ``flat_rate`` was still the
+only rule and the question was therefore cheap to answer wrongly.
 """
 
 from __future__ import annotations
@@ -142,7 +165,18 @@ class TaxContext:
     """Which kind of income, so the rule can check the class actually covers it."""
 
     taxable_base: Money
-    """The amount the rates are applied to, in the tax currency.
+    """The amount the rates are applied to, in whatever currency the caller struck it in.
+
+    **A rule may not assume it is the tax currency**, and may not assume which currency it is
+    at all: an income event is charged on its own amount, and a disposal on the realised gain,
+    which the ledger computes in its own base currency.
+
+    What ``core.tax.year`` then does with a foreign-currency charge is not one thing. An income
+    event's is restated at the declared official rate for its date, or is refused by name when
+    no such rate is declared. A **gain**'s is refused before any series is consulted, for the
+    reason :class:`terezy.core.tax.year.ForeignGainNotStruckPerDate` gives. This module's
+    docstring carries the assumption the restatement rests on, and why a non-proportional rule
+    cannot simply convert here.
 
     A negative base is possible -- a realised loss -- and is passed through rather than
     clamped. See :mod:`terezy.core.tax.flat_rate` for what that means and does not mean.

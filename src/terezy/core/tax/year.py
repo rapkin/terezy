@@ -37,6 +37,13 @@ from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance
 from terezy.core.tax.interface import TaxCharge, TaxClass
+from terezy.core.tax.official_rate import (
+    OfficialRateSeries,
+    OfficialRateSeriesUnavailable,
+    OfficialRateUnavailable,
+    TaxCurrencyConversion,
+    strike_base,
+)
 from terezy.core.tax.schedule import RateEntry, RateUndeclaredBefore, rate_on
 
 _NO_CASH_EFFECT: Final = -0.0
@@ -234,8 +241,27 @@ class AssessmentRules:
 
     jurisdiction_id: str
     tax_currency: Currency
-    """The currency a liability is assessed in. Stated rather than assumed: a taxable result
-    in another currency is refused, never converted (:class:`TaxCurrencyConversionUnavailable`)."""
+    """The currency a liability is assessed in. Stated rather than assumed."""
+
+    official_rate: OfficialRateSeries | None
+    """The declared series that strikes a base in :attr:`tax_currency`, or ``None``.
+
+    ``None`` is a declared absence and not a permissive one: a taxable result in another
+    currency then comes back :class:`TaxCurrencyConversionUnavailable` saying the jurisdiction
+    declared none -- there is no series for it to name -- and no other series is picked for it
+    by load order (FR-007).
+    A realised *gain* in another currency does not reach that check at all -- it comes back
+    :class:`ForeignGainNotStruckPerDate`, whose own reason says why.
+
+    One series, so income in two foreign currencies is not expressible today. That is inside
+    FR-005 -- a second series is declarable and addressable, and no run consumes one -- and is
+    noted here because this field is where a second one would have to arrive.
+
+    Never a channel. A channel is a market you transact in and decides an amount received; an
+    official rate is a legal reference nobody transacts at and decides a tax base. The two may
+    not stand in for each other in either direction, which ``.importlinter`` enforces as two
+    separate contracts because they are two separate requirements (FR-012, FR-013).
+    """
 
     categories: Mapping[str, IncomeCategory]
     category_of_class: Mapping[str, str]
@@ -374,6 +400,20 @@ class ChargeRef:
     that charges nothing on a loss is right for a line saying what was charged and wrong for a
     year that has to net. The year clamps once, where the statute clamps it, not once per
     event.
+    """
+
+    conversion: TaxCurrencyConversion | None
+    """How this item reached the tax currency, or ``None`` when it was already in it.
+
+    ``None`` is the answer for every item in a hryvnia run, and it says *no rate was
+    consulted* rather than *a rate was unavailable*: an event already denominated in the tax
+    currency must not consult one at all (FR-009), and a rate-unavailable reason attached to a
+    figure that never needed a rate is a false refusal.
+
+    When it is present it names the series, the observation date whose rate was applied, the
+    rate and the quotation unit, so a reader can re-derive the base on paper without opening a
+    data file (FR-016) -- and a rate applied from a date other than the event's own is visible
+    rather than implied.
     """
 
 
@@ -644,16 +684,59 @@ class CategoryTaxedByTwoClasses:
 
 @dataclass(frozen=True, slots=True)
 class TaxCurrencyConversionUnavailable:
-    """A taxable amount is not in the tax currency, and no official rate exists to convert it.
+    """A taxable amount is not in the tax currency, and no declared official rate strikes it.
 
-    The boundary this feature must not cross. Tax is assessed in the tax currency at the
-    **official** rate on the transaction date -- a legal reference nobody transacts at -- and
-    that machinery is feature 011, which is ``drafted`` and not built. Converting at a channel
-    rate would substitute a market you transact in for a legal reference you never transact
-    at, which ``core.routes.legs.channel_for`` already refuses to do in the other direction.
+    Two ways to get here, told apart by :attr:`unavailable`: the jurisdiction names no
+    official-rate series at all, or the series it names declares nothing for this date and no
+    rule covering it. Both are declarations that are missing, and both are fixed in ``data/``.
 
-    Unreachable with the shipped registry, where every taxable event is in hryvnia, and it
-    exists anyway: the first foreign instrument must stop here rather than produce a figure.
+    **It is never satisfied with a channel rate.** A channel is a market you transact in and
+    an official rate is a legal reference you never transact at; substituting one for the
+    other would strike a real liability at a price nobody was charged. That is the same rule
+    ``core.routes.legs.channel_for`` enforces in the other direction, and ``.importlinter``
+    keeps both directions structural rather than remembered.
+
+    Unreachable with the shipped registry, where every taxable event is in hryvnia -- which is
+    a property of today's data rather than of the arithmetic, and is why the guard exists.
+    """
+
+    event_sequence: int
+    found: Currency
+    tax_currency: Currency
+
+    unavailable: OfficialRateUnavailable
+    """Which half is missing -- no series for the pair, or no rate on the date -- each naming
+    what it has, which is not the same list.
+
+    **Do not restate that list here or anywhere else.** Which variant carries which field is
+    asserted in ``tests/unit/test_official_rate_refusals.py``, and that a jurisdiction
+    declaring no series reports ``series_id`` as ``None`` is asserted in
+    ``tests/unit/test_tax_base_in_the_tax_currency.py``. Every prose copy of those facts
+    written on this feature went false, and each was written by somebody who had just read a
+    true one.
+
+    Carried rather than flattened into the reason, so a caller can act on it without parsing
+    prose."""
+
+    reason: str
+
+
+@dataclass(frozen=True, slots=True)
+class ForeignGainNotStruckPerDate:
+    """A realised gain in a foreign currency. Refused, and deliberately never converted.
+
+    A gain is not an amount on a date. It is the difference between proceeds received on one
+    date and a basis struck on another, and each of those has its own official rate.
+
+    Converting the difference at the disposal date's rate is not an approximation, it is the
+    arithmetic that deletes the thing being looked for: a position flat in dollars across a
+    devaluation realises **zero dollars**, and zero at any rate is zero hryvnia. Required test
+    F1 -- *"a position flat in USD across a devaluation produces a positive taxable gain in
+    UAH"* -- would then be unfalsifiable, and it is the test the rewrite exists for.
+
+    What is missing is a per-lot basis carried in both currencies, each leg struck at its own
+    date's official rate. That is ``fx-tax-asymmetry-f1`` in ``specs/features.toml``; feature
+    011 supplies the dated rates it needs and does not build it.
     """
 
     event_sequence: int
@@ -671,6 +754,7 @@ TaxYearRefused = (
     | RateChangedWithinTaxYear
     | CategoryTaxedByTwoClasses
     | TaxCurrencyConversionUnavailable
+    | ForeignGainNotStruckPerDate
     | RateUndeclaredBefore
 )
 """Why a year could not be assessed. Match exhaustively; every member names its own fix.
@@ -725,7 +809,7 @@ def statements(
     method, standing, method_switch = basis
 
     grouped = _items(state, charges, rules)
-    if isinstance(grouped, CategoryUndeclared | TaxCurrencyConversionUnavailable):
+    if not isinstance(grouped, Mapping):
         return grouped
 
     built: list[AnnualStatement] = []
@@ -841,7 +925,12 @@ def _items(
     state: LedgerState,
     charges: Sequence[TaxCharge],
     rules: AssessmentRules,
-) -> Mapping[str, tuple[ChargeRef, ...]] | CategoryUndeclared | TaxCurrencyConversionUnavailable:
+) -> (
+    Mapping[str, tuple[ChargeRef, ...]]
+    | CategoryUndeclared
+    | TaxCurrencyConversionUnavailable
+    | ForeignGainNotStruckPerDate
+):
     """The charges as category-keyed items, each carrying the signed result it contributes."""
     by_sequence = {event.sequence: event for event in state.applied}
     gains = {disposal.sequence: disposal.realised_gain_base_ccy for disposal in state.disposals}
@@ -869,30 +958,154 @@ def _items(
             )
         realised = gains.get(event.sequence)
         result = charge.taxable_base if realised is None else realised
-        if result.currency is not rules.tax_currency:
-            return TaxCurrencyConversionUnavailable(
-                event_sequence=event.sequence,
-                found=result.currency,
-                tax_currency=rules.tax_currency,
-                reason=(
-                    f"event {event.sequence} produces a taxable result in "
-                    f"{result.currency.value} and tax is assessed in "
-                    f"{rules.tax_currency.value}. Converting it needs the **official** rate on "
-                    "the transaction date -- a legal reference, not a price anyone deals at -- "
-                    "and that machinery is feature 011, which is drafted and not built. A "
-                    "channel rate is a market you transact in and may never stand in for it, "
-                    "which is the substitution core.routes.legs.channel_for already refuses."
-                ),
-            )
+        item = _in_tax_currency(
+            charge,
+            result,
+            sequence=event.sequence,
+            occurred_on=event.occurred_on,
+            from_disposal=realised is not None,
+            rules=rules,
+        )
+        if not isinstance(item, tuple):
+            return item
+        struck_charge, struck_result, conversion = item
         grouped.setdefault(category_id, []).append(
             ChargeRef(
-                charge=charge,
+                charge=struck_charge,
                 occurred_on=event.occurred_on,
                 from_disposal=realised is not None,
-                result=result,
+                result=struck_result,
+                conversion=conversion,
             )
         )
     return {category_id: tuple(items) for category_id, items in grouped.items()}
+
+
+def _in_tax_currency(
+    charge: TaxCharge,
+    result: Money,
+    *,
+    sequence: int,
+    occurred_on: date,
+    from_disposal: bool,
+    rules: AssessmentRules,
+) -> (
+    tuple[TaxCharge, Money, TaxCurrencyConversion | None]
+    | TaxCurrencyConversionUnavailable
+    | ForeignGainNotStruckPerDate
+):
+    """One item restated in the tax currency, or the typed reason it cannot be.
+
+    **The whole charge is restated, not only the netting result.** A per-event category sums
+    ``charge.pit`` and ``charge.levy`` against the result's own currency, so converting one
+    and leaving the other would be a currency mismatch on the first such category. Each line
+    is struck at the same rate on the same date.
+
+    **Restating after the fact is equivalent to charging on a converted base only because the
+    rule is linear in its base**, and that assumption belongs to the ``TaxRule`` interface
+    rather than to this function -- ``core.tax.interface`` states it, and states what a rule
+    with a bracket, a cap or an allowance must do instead. This site cannot enforce it: by the
+    time a charge reaches here it has already been computed.
+
+    ``total`` is **recomputed** from the two struck lines rather than converted with them, so
+    the record's own identity ``total == pit + levy`` stays exact rather than holding to a
+    tolerance.
+
+    A **realised gain** never reaches the conversion. See
+    :class:`ForeignGainNotStruckPerDate` for why converting one is the defect rather than the
+    feature.
+
+    ⚠ **A hazard this function created and does not close, recorded 2026-08-30.** Before
+    feature 011 a foreign taxable result stopped here unconditionally, which made one state
+    structurally impossible: a run whose year is assessed in the tax currency while its other
+    tax figures are not. Restating the charge here removes that guard, and the figures the
+    restatement does *not* reach -- ``results.hurdle``'s ``total_tax`` and the ``TAX_CHARGE``
+    memos folded into the ledger -- stay in the currency they were charged in. Nothing types
+    that disagreement; ``results.tax_year.settle`` would meet it as a raised
+    ``CurrencyMismatchError`` from its cash check rather than a typed refusal.
+
+    Unreachable today three ways over -- no declared instrument is foreign,
+    ``decision.tuple_outcome`` refuses one that declares tax classes, and
+    ``results.project`` cannot fold a holding and its tax in two currencies at all. Whoever
+    makes any of those reachable owns this: the guard that used to make it impossible is
+    gone, and its replacement is not in this module.
+    """
+    if result.currency is rules.tax_currency:
+        return charge, result, None
+    if from_disposal:
+        return ForeignGainNotStruckPerDate(
+            event_sequence=sequence,
+            found=result.currency,
+            tax_currency=rules.tax_currency,
+            reason=(
+                f"event {sequence} realises a gain in {result.currency.value} and tax is "
+                f"assessed in {rules.tax_currency.value}. The gain is refused rather than "
+                "converted: it is the difference between proceeds on one date and a basis "
+                "struck on another, and striking it at the disposal date's rate would report "
+                "zero hryvnia for a position that stood still in dollars across a devaluation "
+                "-- deleting the taxable gain required test F1 exists to find. What it needs "
+                "is a per-lot basis carried in both currencies, each leg at its own date's "
+                "official rate: specs/features.toml, fx-tax-asymmetry-f1."
+            ),
+        )
+    if rules.official_rate is None:
+        struck: TaxCurrencyConversion | OfficialRateUnavailable = OfficialRateSeriesUnavailable(
+            wanted=(rules.tax_currency, result.currency),
+            series_id=None,
+            quotes=None,
+            reason=(
+                f"jurisdiction {rules.jurisdiction_id!r} names no official-rate series for its "
+                "tax currency. No series is chosen for it by load order, and no channel rate "
+                "stands in: a channel is a market you transact in and the official rate is a "
+                "legal reference you never transact at. Declare official_rate_series in the "
+                "jurisdiction's assessment rules."
+            ),
+        )
+    else:
+        struck = strike_base(
+            result, rules.official_rate, tax_currency=rules.tax_currency, on_date=occurred_on
+        )
+    if not isinstance(struck, TaxCurrencyConversion):
+        return TaxCurrencyConversionUnavailable(
+            event_sequence=sequence,
+            found=result.currency,
+            tax_currency=rules.tax_currency,
+            unavailable=struck,
+            reason=(
+                f"event {sequence} on {occurred_on.isoformat()} produces a taxable result in "
+                f"{result.currency.value} and no official rate strikes it in "
+                f"{rules.tax_currency.value}: {struck.reason}"
+            ),
+        )
+
+    # The two lines are restated at **the same rate the base was struck at**, read off the
+    # conversion rather than looked up again: a second lookup could in principle disagree with
+    # the first, and there would be no honest value to fall back on if it did. The rate's own
+    # sources ride on ``struck.base``, so the union carries them onto every line.
+    def _line(amount: Money) -> Money:
+        return money.convert(
+            amount,
+            to_currency=rules.tax_currency,
+            rate=struck.rate / struck.quotation_unit,
+            sources=struck.base.provenance,
+        )
+
+    pit = _line(charge.pit)
+    levy = _line(charge.levy)
+    return (
+        TaxCharge(
+            event_sequence=charge.event_sequence,
+            pit=pit,
+            levy=levy,
+            total=money.add(pit, levy),
+            taxable_base=struck.base,
+            tax_class_id=charge.tax_class_id,
+            charged_for_year=charge.charged_for_year,
+            provenance=prov.merge(charge.provenance, struck.base.provenance),
+        ),
+        struck.base,
+        struck,
+    )
 
 
 @dataclass(frozen=True, slots=True)

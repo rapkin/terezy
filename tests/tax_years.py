@@ -184,6 +184,7 @@ def rules(**overrides: Any) -> tax_year.AssessmentRules:
     base = tax_year.AssessmentRules(
         jurisdiction_id="fixture",
         tax_currency=UAH,
+        official_rate=None,
         categories={
             INVESTMENT: category(
                 INVESTMENT, tax_year.Treatment.NETS, tax_year.Carryforward.UNLIMITED

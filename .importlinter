@@ -80,3 +80,39 @@ source_modules =
 forbidden_modules =
     terezy.api
     terezy.cli
+
+; --- feature 011: the tax-currency role, and the prohibition that guards it -------------
+;
+; Constitution Principle VI gives currency three roles and says conflating any two is a
+; defect. The one this pair of contracts guards is tax-versus-transaction, and it is
+; **bidirectional**: an official rate decides what the law says an income was and never how
+; much money arrived, and a channel rate decides how much money arrived and never what the
+; law says. They are two requirements (011 FR-012 and FR-013), so they are two contracts —
+; one naming both source modules would stay green if either direction were deleted, and the
+; requirement that survived would look enforced.
+
+[importlinter:contract:official-rate-never-prices-a-leg]
+name = FR-012 — the amount received is never computed from an official rate
+type = forbidden
+source_modules =
+    terezy.core.routes
+forbidden_modules =
+    terezy.core.tax.official_rate
+allow_indirect_imports = False
+
+; ⚙ `allow_indirect_imports = True` on the second contract, and only on it: it means DIRECT
+; imports only. The chain that forces it is
+; `terezy.core.tax.year -> ledger.engine -> routes.capacity -> routes.legs -> routes.channels`
+; — four hops that exist for capacity pools and have nothing to do with a rate, and the last
+; of which is why forbidding the module indirectly is not available. What this contract forbids is a tax module reaching for the module that
+; owns `reference_rate` — and the value-level claim, that no tax figure is derived from one,
+; is asserted over the source in tests/contract/test_the_rate_you_are_taxed_at.py.
+
+[importlinter:contract:no-tax-base-from-a-channel]
+name = FR-013 — a channel's reference rate never serves as a tax rate
+type = forbidden
+source_modules =
+    terezy.core.tax
+forbidden_modules =
+    terezy.core.routes.channels
+allow_indirect_imports = True

@@ -68,6 +68,7 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.streams.streams import IncomeStream
     from terezy.core.tax import year as tax_year
     from terezy.core.tax.interface import TaxClass
+    from terezy.core.tax.official_rate import OfficialRateSeries
     from terezy.data.declarations.loader import ScenarioDeclaration
 
 INSTRUMENTS_DIR = "instruments"
@@ -2181,6 +2182,7 @@ def tax_rules_from_data_root(
             "whichever holding happened to be projected first.",
             "declare data/tax/timing/<jurisdiction>.toml",
         )
+    rates = official_rates_from_data_root(root, _resolved_kinds(root / KINDS_FILE)[0])
     built: dict[str, AssessmentRules] = {}
     declaring: dict[str, Path] = {}
     for path in files:
@@ -2199,6 +2201,7 @@ def tax_rules_from_data_root(
         built[declared.jurisdiction_id] = AssessmentRules(
             jurisdiction_id=declared.jurisdiction_id,
             tax_currency=declared.tax_currency,
+            official_rate=_official_rate_for(path, declared, rates),
             categories={category.id: category for category in declared.categories},
             category_of_class=declared.category_of_class,
             timing={rule.category_id: rule for rule in declared.timing},
@@ -2514,3 +2517,128 @@ def tuple_from_data_root(
             base_currency=covered.ramp.base_currency,
         ),
     )
+
+
+# ---------------------------------------------------------------------------
+# 011-official-rate: the declared official-rate series
+# ---------------------------------------------------------------------------
+#
+# Two relations a per-file validator structurally cannot check:
+#
+# **Two files declaring one series identity.** Each is individually valid; together whichever
+# loaded second would win by directory order and every tax base would rest on the other one.
+#
+# **The series a jurisdiction names for its tax currency.** Whether it exists is a fact about
+# another file, and so is whether it quotes the currency the tax is assessed in — a series
+# quoting dollars per hryvnia would strike every base at the reciprocal of the published rate
+# and leave every figure plausible.
+#
+# ⚙ **An absent directory is an empty set, not a load failure**, on `cpi`'s reading rather
+# than `composition`'s. A run that never strikes a foreign base needs no series, and the one
+# that does comes back typed-unavailable, naming the pair it wanted and the event it failed on
+# — which is more use to the owner than a load error naming a directory.
+
+OFFICIAL_RATES_DIR = "official_rates"
+"""Where declared official-rate series live under a data root. Cited; in `SOURCED_DIRS`."""
+
+
+@dataclass(frozen=True, slots=True)
+class OfficialRateDeclarations:
+    """Every declared official-rate series under one data root, and which file declared it."""
+
+    series: Mapping[str, OfficialRateSeries]
+    """By their own declared id, never by file name or load order (FR-005).
+
+    Empty is a valid state and is reported by the base that wanted one, not here.
+    """
+
+    files: Mapping[str, Path]
+    """Which file declared each series, so a later failure can still name it after the TOML
+    has been discarded."""
+
+
+def official_rates_from_data_root(
+    root: Path, kinds: Mapping[str, ObservationKind]
+) -> OfficialRateDeclarations:
+    """Every official-rate series under a data root, refusing two files claiming one identity.
+
+    Sorted, so a run does not depend on the order a filesystem happens to return.
+
+    ⚙ **``kinds`` is required, and this docstring is where that is explained.** A
+    `[non_publication_rule]` table carries a citation and a list of dates and **no number**,
+    so `scripts/check_provenance.py` -- which recognises a sourced table by its numeric
+    leaves -- cannot see it, and its staleness kind would be checked nowhere. Left unchecked a
+    misspelt kind loads clean and then raises from `staleness.kind_for` when a figure it
+    marked is aged: a crash at report time for a file that could have been refused by name at
+    load. Measured 2026-08-29.
+    """
+    series: dict[str, OfficialRateSeries] = {}
+    declaring: dict[str, Path] = {}
+    for path in sorted((root / OFFICIAL_RATES_DIR).glob("*.toml")):
+        declared = loader.official_rate_from_file(path)
+        if declared.rule is not None:
+            # Sorted, for the reason the file list above is: a set has no order, and a
+            # refusal that depends on one is a refusal that changes between runs. The field
+            # path is the rule table's regardless of how many citations it grows, because
+            # `loader._non_publication_rule` builds this provenance from that table alone.
+            for source in sorted(declared.rule.provenance.sources, key=lambda ref: ref.id):
+                _check_kind(
+                    source.kind,
+                    kinds,
+                    path=path,
+                    field_path=f"{loader.OFFICIAL_RATE_RULE_TABLE}.kind",
+                )
+        if declared.id in series:
+            raise DeclarationError(
+                path,
+                f"{loader.OFFICIAL_RATE_SERIES_TABLE}.id",
+                f"declares the series id {declared.id!r}, which "
+                f"{declaring[declared.id].name} already declares. Two series cannot share an "
+                "identity: whichever loaded second would win by directory order, and every "
+                "tax base would rest on the other one with nothing in the output to say "
+                "which. A second authority's series is a second id.",
+                f"give one of {declaring[declared.id].name} and {path.name} a distinct id",
+            )
+        series[declared.id] = declared
+        declaring[declared.id] = path
+    return OfficialRateDeclarations(series=series, files=declaring)
+
+
+def _official_rate_for(
+    path: Path,
+    declared: loader.TimingDeclaration,
+    rates: OfficialRateDeclarations,
+) -> OfficialRateSeries | None:
+    """The series this jurisdiction declares for its tax currency, checked both ways.
+
+    ``None`` when the file names none, which is a declared absence rather than an oversight:
+    a foreign-currency taxable result then refuses saying this jurisdiction declared no series
+    -- there is none to name -- and no other series is picked for it.
+    """
+    named = declared.official_rate_series
+    if named is None:
+        return None
+    found = rates.series.get(named)
+    if found is None:
+        raise DeclarationError(
+            path,
+            f"{loader.TIMING_TABLE}.official_rate_series",
+            f"names the official-rate series {named!r}, which no file in "
+            f"data/{OFFICIAL_RATES_DIR} declares. There is no default series and no fallback "
+            "to whichever one loaded first: a tax base struck from a series the jurisdiction "
+            f"did not name is a legal figure nobody declared. Declared series: "
+            f"{sorted(rates.series)}.",
+            f"declare {named!r} in data/{OFFICIAL_RATES_DIR}, or name a series that exists",
+        )
+    if found.pair[0] is not declared.tax_currency:
+        raise DeclarationError(
+            path,
+            f"{loader.TIMING_TABLE}.official_rate_series",
+            f"assesses tax in {declared.tax_currency.value} and names the series {named!r}, "
+            f"which quotes {found.pair[0].value} per {found.pair[1].value}. A series serves a "
+            "tax currency only when that currency is the one it is quoted **in**; naming the "
+            "series the other way round would strike every base at the reciprocal of the "
+            "published rate and leave every figure plausible.",
+            f"name a series quoting {declared.tax_currency.value} per another currency",
+        )
+    return found
