@@ -20,14 +20,13 @@ bond declared by its terms, face is the price at which a unit earns the issue's 
 rate, and a declaration that states no rate has no such price -- face is a redemption amount
 and nothing else.
 
-*A horizon ending before the last payment*, on the generative form's reading: a truncated
-schedule's yield is silently wrong, and an implicit liquidation would be a fabricated cash
-flow.
+*A horizon ending before the last payment.* A truncated schedule's yield is wrong rather
+than partial, and an implicit liquidation at the horizon would be a cash flow nobody
+declared.
 
-**Both kinds of payment on one date are two payments.** 31 of the 32 observed issues end
-with the final coupon and the principal repayment on the same date, as two entries. They
-are taxed under different classes, so summing them would tax the result under whichever
-class won.
+**Both kinds of payment on one date are two payments** -- the ordinary way a bond ends.
+They are taxed under different declared classes, so summing them would tax the result under
+whichever class won.
 """
 
 from __future__ import annotations
@@ -37,6 +36,7 @@ from typing import TYPE_CHECKING
 
 from terezy.core.errors import InconsistentTerms, InfeasiblePurchase, InstrumentFailure
 from terezy.core.instruments import acquire, fixed_income
+from terezy.core.instruments import terms as terms_of
 from terezy.core.instruments.interface import (
     PAYMENT_KINDS,
     EnumeratedTerms,
@@ -71,7 +71,7 @@ def events(
     -- the start of the accrual period and the basis interest accrues on within it -- are
     not declared and may not be inferred (FR-017).
     """
-    terms = _enumerated(declaration)
+    terms = terms_of.narrowed(declaration, EnumeratedTerms)
     problem = _check_feasible(declaration, terms, holding, horizon, assumptions)
     if problem is not None:
         return problem
@@ -91,25 +91,6 @@ def tax_classes(declaration: InstrumentDeclaration) -> Mapping[TaxableEventKind,
 def constraints(declaration: InstrumentDeclaration) -> InstrumentConstraints:
     """The feasibility constraints a purchase of this instrument must satisfy."""
     return declaration.constraints
-
-
-def _enumerated(declaration: InstrumentDeclaration) -> EnumeratedTerms:
-    """The declaration's terms, narrowed to the listed form this module reads.
-
-    A raise rather than a typed failure, on the reading ``registry.ops_for`` already
-    established: which functions project a declaration is decided by its declared class at
-    the data boundary, so a declaration reaching here carrying anything else means that
-    dispatch was bypassed. That is a programmer error rather than a fact about the money.
-    """
-    terms = declaration.terms
-    if not isinstance(terms, EnumeratedTerms):
-        raise TypeError(
-            f"{declaration.id!r} declares class {declaration.instrument_class!r} and reached "
-            "the listed-payment schedule generator carrying terms it cannot read. The "
-            "declared class is the only dispatch key; this can only happen if it was not "
-            "the key used."
-        )
-    return terms
 
 
 def _check_feasible(
@@ -311,9 +292,8 @@ def _payment(
 
     A principal repayment carries the units it surrenders and closes lots; a coupon carries
     neither. Which of the two this is comes from the declared label and from nothing else.
-    The lot is deliberately **not** named: which lots a disposal consumes is decided by the
-    configured consumption method, and an event naming one would be asking for specific-lot
-    selection, which the ledger refuses loudly rather than ignoring.
+    The lot is deliberately **not** named, because naming one would be asking for specific-lot
+    selection rather than for the configured consumption method.
     """
     kind, _ = PAYMENT_KINDS[payment.pays]
     retired = _units_retired(terms, payment, holding.quantity)

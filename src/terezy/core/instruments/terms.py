@@ -24,10 +24,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
-from typing import Final, assert_never
+from typing import TYPE_CHECKING, Final, assert_never
 
 from terezy.core.instruments.interface import BondTerms, EnumeratedTerms
 from terezy.core.primitives.conventions import AmountsAsDeclared, ConventionsApplied
+
+if TYPE_CHECKING:  # pragma: no cover -- read by :func:`narrowed`, never constructed here
+    from terezy.core.instruments.interface import InstrumentDeclaration
 
 DeclaredTerms = BondTerms | EnumeratedTerms
 """What a declaration says about the paper, in one of the two forms it can say it."""
@@ -134,3 +137,28 @@ def excludes_of(terms: DeclaredTerms) -> frozenset[str]:
             return frozenset({DIRTY_PRICE})
         case _:  # pragma: no cover -- mypy proves this unreachable
             assert_never(terms)
+
+
+def narrowed[T: DeclaredTerms](declaration: InstrumentDeclaration, form: type[T]) -> T:
+    """The declaration's terms as the form a schedule generator computes from, or a raise.
+
+    A raise rather than a typed failure, on the reading ``registry.ops_for`` and
+    ``primitives.conventions`` already established: which functions project a declaration is
+    decided by its declared class at the data boundary, so a declaration reaching a generator
+    carrying terms it cannot read means that dispatch was bypassed. That is a programmer
+    error rather than a fact about the money, and a typed failure would offer a caller a
+    business outcome where there is none.
+
+    One function rather than one per generator, because there is one rule and one message:
+    two copies would be two chances for a reader to be told two different things about the
+    same mistake.
+    """
+    terms = declaration.terms
+    if not isinstance(terms, form):
+        raise TypeError(
+            f"{declaration.id!r} declares class {declaration.instrument_class!r} and reached "
+            f"a schedule generator expecting {form.__name__} while carrying "
+            f"{type(terms).__name__}. The declared class is the only dispatch key; this can "
+            "only happen if it was not the key used."
+        )
+    return terms

@@ -231,8 +231,9 @@ class TestTheBatteryOfBrokenDeclarations:
 
     def test_a_declared_maturity_date(self, tmp_path: Path) -> None:
         """SC-019. The endpoint gives one and it disagrees with the last published payment
-        in 18 of 32 issues; accepting it would import that disagreement for a field nothing
-        reads."""
+        in over half the observed issues; accepting it would import that disagreement in
+        exchange for a field nothing reads. The count is measured in
+        `tests/contract/test_the_observation_the_form_rests_on.py`."""
         with_maturity = _replaced(
             'day_count    = "act/365"', 'day_count    = "act/365"\nmaturity_date = "2027-07-16"'
         )

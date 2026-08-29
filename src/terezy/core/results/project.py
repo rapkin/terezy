@@ -44,7 +44,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
-from typing import Final, assert_never
+from typing import assert_never
 
 from terezy.core.errors import (
     InconsistentTerms,
@@ -301,25 +301,32 @@ def project(
     )
 
 
-TREATMENT_MEANS: Final[Mapping[tax_year.Treatment, str]] = {
-    tax_year.Treatment.OUTSIDE: (
-        "this category stands outside the annual calculation on both sides, income and "
-        "costs alike, so the difference reduces no other base -- a loss here buys no shield"
-    ),
-    tax_year.Treatment.NETS: (
-        "this category nets its year's results before any rate applies, so the difference "
-        "reaches the annual base and a negative year carries forward"
-    ),
-    tax_year.Treatment.PER_EVENT: (
-        "nothing nets in this category: the difference is realised on the disposal it "
-        "belongs to and reaches no other event's charge"
-    ),
-}
-"""What each declared treatment means for a purchase difference, in the output's own words.
+def _what_the_treatment_means(treatment: tax_year.Treatment) -> str:
+    """What one declared treatment means for a purchase difference, in the output's own words.
 
-One sentence per member and an exhaustive mapping, so a fourth treatment is a type error
-here rather than a figure that quietly explains itself wrongly.
-"""
+    An exhaustive ``match`` rather than a mapping, so a fourth treatment is a **type error**
+    here rather than a figure that quietly explains itself wrongly at runtime -- the same
+    reason ``_taxable_kind`` below is written the same way.
+    """
+    match treatment:
+        case tax_year.Treatment.OUTSIDE:
+            return (
+                "this category stands outside the annual calculation on both sides, income "
+                "and costs alike, so the difference reduces no other base -- a loss here "
+                "buys no shield"
+            )
+        case tax_year.Treatment.NETS:
+            return (
+                "this category nets its year's results before any rate applies, so the "
+                "difference reaches the annual base and a negative year carries forward"
+            )
+        case tax_year.Treatment.PER_EVENT:
+            return (
+                "nothing nets in this category: the difference is realised on the disposal "
+                "it belongs to and reaches no other event's charge"
+            )
+        case _:  # pragma: no cover -- mypy proves this unreachable
+            assert_never(treatment)
 
 
 def _at_purchase(
@@ -372,7 +379,7 @@ def _governed_by(
     return GovernedBy(
         category_id=category.id,
         treatment=category.treatment.value,
-        reason=TREATMENT_MEANS[category.treatment],
+        reason=_what_the_treatment_means(category.treatment),
     )
 
 

@@ -127,6 +127,4 @@ def test_the_instrument_layer_is_deliberately_outside_the_seal() -> None:
     modules deciding it separately."""
     answering = source_scan.executable_source(SOURCE_ROOT / "core" / "instruments" / "terms.py")
     assert "EnumeratedTerms" in answering
-    assert not any(
-        (SOURCE_ROOT / package).samefile(SOURCE_ROOT / "core" / "instruments") for package in SEALED
-    )
+    assert "core/instruments" not in SEALED

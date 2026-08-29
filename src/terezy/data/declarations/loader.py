@@ -649,10 +649,11 @@ INFERENCES: Final[Mapping[str, str]] = {
 }
 """The four things a transcribed schedule infers, and what each would have to settle.
 
-Read here to validate a ``settles`` key and read again by
-``scripts/check_provenance.py``, which checks the relation FR-022 asks for: that each
-inferred value's source says it is an inference and that a task exists for it. The set is
-declared **once**, here, because a second copy in the gate is the copy that would go stale.
+Read here to validate a ``settles`` key. ``scripts/check_provenance.py`` checks the relation
+FR-022 asks for -- that each inferred value's source says it is an inference and that a task
+exists for it -- and holds its own copy of these ids, because a script that imported the
+engine would stop being runnable by someone who has not installed it. The two are held equal
+by ``tests/contract/test_provenance_gate.py``, which is what makes the copy safe.
 """
 
 INFERENCE_MARKER: Final = "INFERENCE:"

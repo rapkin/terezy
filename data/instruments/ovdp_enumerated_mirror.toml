@@ -18,8 +18,8 @@
 # already been applied, by whoever published the schedule. Nothing in this file names a rule,
 # because none was applied by this engine.
 #
-# The final coupon and the repayment of principal share that date, as two entries. That is
-# how 31 of the 32 real issues observed on 2026-08-24 end.
+# The final coupon and the repayment of principal share that date, as two entries, which is
+# how a bond ordinarily ends.
 
 [instrument]
 id           = "ovdp_enumerated_mirror"

@@ -4,11 +4,12 @@
 # order other than ascending by date is an observation about **the source**, not about the
 # money, and sorting the list is precisely the act that would delete it.
 #
-# MODELLED ON A REAL ISSUE AND DELIBERATELY NOT IT. Of the 32 ОВДП issues observed on
-# 2026-08-24, `UA4000235865` is the single counterexample to the pattern the other 31
-# follow: it publishes the repayment of principal one day BEFORE the final coupon, which
-# also makes its list the only one not in ascending date order. So the one real exception is
-# the one issue this form would have refused as published. The fixture is shaped like it —
+# MODELLED ON A REAL ISSUE AND DELIBERATELY NOT IT. `UA4000235865` is the single observed
+# counterexample to the pattern every other issue follows: it publishes the repayment of
+# principal one day BEFORE the final coupon, which also makes its list the only one not in
+# ascending date order. So the one real exception is the one issue this form would have
+# refused as published. The counts are measured in
+# tests/contract/test_the_observation_the_form_rests_on.py rather than restated here. The fixture is shaped like it —
 # principal a day before the final coupon, published after it — because the assertion is about
 # the mechanism and
 # not about that ISIN, and declaring a real ОВДП is out of this feature's scope.

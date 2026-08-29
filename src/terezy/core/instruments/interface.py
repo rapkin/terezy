@@ -110,8 +110,10 @@ class BondTerms:
 # market; the issue's history is neither known to me nor relevant to what I will receive*.
 #
 # The fact that forced the second record is the **issue date**. The endpoint that publishes
-# the 32 real OVDP schedules gives a list of dated amounts and no issue date, and no issue
-# date is derivable from one: extrapolating one backwards would be inventing a legal fact
+# real OVDP schedules gives a list of dated amounts and no issue date -- measured in
+# `tests/contract/test_the_observation_the_form_rests_on.py` rather than asserted here -- and
+# no issue date is derivable from one: extrapolating one backwards would be inventing a legal
+# fact
 # about a state security, which Principle I forbids outright and which is invisible once
 # made -- a plausible date produces a plausible schedule and nothing ever contradicts it.
 # The issue date affects **no future cash flow of a purchase made today**, so a form that
@@ -158,8 +160,9 @@ class ScheduledPayment:
     """One dated, per-unit amount with a declared kind. The unit of an enumerated schedule.
 
     Two of these on one date with different kinds is the normal end of a bond -- the final
-    coupon and the principal repayment -- and 31 of the 32 observed issues are shaped that
-    way. They are never merged, deduplicated or summed into one row.
+    coupon and the repayment of principal. They are never merged, deduplicated or summed
+    into one row: they are taxed under different declared classes, so summing them would tax
+    the result under whichever class won.
     """
 
     on: date
@@ -304,15 +307,11 @@ class InstrumentDeclaration:
     terms: BondTerms | EnumeratedTerms
     """What this declaration says about the paper -- in one of the two forms it can say it.
 
-    ⚙ **A union, and the union is the mechanism** (FR-002). The two forms are two epistemic
-    situations rather than two encodings of one thing, and the cost of keeping them apart is
-    paid here: code reading a generative-only term cannot type-check against an enumerated
-    declaration without handling its absence, so `mypy --strict` is what enumerates the sites
-    that must change rather than a reviewer noticing.
-
-    Which form a file is in is settled by :attr:`instrument_class`, the one dispatch key this
-    record permits. Nothing outside `core.instruments` asks which member it holds; the four
-    questions in `core.instruments.terms` are how the rest of the engine talks to it.
+    ⚙ **A union, and the union is the mechanism** (FR-002). Code reading a generative-only
+    term cannot type-check against a declaration that states none, so `mypy --strict` is what
+    enumerates the sites that must change rather than a reviewer noticing. Which form a file
+    is in is settled by :attr:`instrument_class`, the one dispatch key this record permits;
+    the section above says why the two are kept apart at all.
     """
 
     constraints: InstrumentConstraints

@@ -1,10 +1,9 @@
 """SC-016: a purchase above face, and what the declared category does with the difference.
 
-A secondary-market bond is usually bought at a **dirty price above face** -- 31 of the 32
-issues observed on 2026-08-24 quote above 1 000.00. Held to the end of its schedule it
-returns face, so the ledger realises a loss equal to the premium. Whether that loss reduces
-anything is decided by the declared tax category and by nothing this engine believes
-(FR-025, FR-026).
+A secondary-market bond is usually bought at a **dirty price above face**. Held to the end
+of its schedule it returns face, so the ledger realises a loss equal to the premium.
+Whether that loss reduces anything is decided by the declared tax category and by nothing
+this engine believes (FR-025, FR-026).
 
 **Both answers are exercised here rather than one being warned about.** Under Ukraine's
 `exempt_securities` the treatment is `outside`: the provision it cites in

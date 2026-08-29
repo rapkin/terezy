@@ -72,9 +72,9 @@ risk_class    = "sovereign_debt"
 
 # --- the enumerated fixture ---------------------------------------------------------------
 #
-# Quoted ABOVE its face value, which is the ordinary case for a secondary-market purchase:
-# 31 of the 32 issues observed on 2026-08-24 quote above 1 000.00. What happens to that
-# premium is decided by the declared tax category and by nothing this file knows.
+# Quoted ABOVE its face value, which is the ordinary case for a secondary-market purchase.
+# What happens to that premium is decided by the declared tax category and by nothing this
+# file knows.
 
 [[access]]
 instrument_id = "ovdp_enumerated_a"

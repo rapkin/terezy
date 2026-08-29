@@ -47,11 +47,11 @@ issue date and a maturity date."""
 ENUMERATED_SCHEDULE: Final = "enumerated_schedule"
 """A bond declared by the payments it will make: the schedule *is* the declaration.
 
-⚙ **Two epistemic situations, one interface** (013). This is not a second encoding of the
-kind above -- it is what a buyer can honestly declare when the published data is a list of
-dated amounts and the issue date is neither given nor derivable. It takes the same
-arguments, returns the same event stream, and fails with the same union; the three
-mismatches recorded below, which kept a fund out of this registry, hold for none of it.
+⚙ **A second entry, and not a second interface** (013). It takes the same arguments, returns
+the same event stream, and fails with the same union, so it belongs in this mapping where a
+fund does not -- the three mismatches recorded below hold for none of it. Why the two forms
+are kept apart rather than merged is argued where the records are, in
+`core.instruments.interface`.
 """
 
 OPS: Final[InstrumentOps] = InstrumentOps(

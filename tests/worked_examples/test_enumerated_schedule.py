@@ -182,9 +182,8 @@ class TestTheScheduleIsExactlyWhatWasDeclared:
         ]
 
     def test_two_payments_on_one_date_survive_as_two_rows(self) -> None:
-        """SC-007. The ordinary way a bond ends, and 31 of the 32 observed issues are
-        shaped this way. Merging them would sum a coupon into a principal repayment and
-        tax the result under whichever class won."""
+        """SC-007. The ordinary way a bond ends. Merging them would sum a coupon into a
+        repayment of principal and tax the result under whichever class won."""
         rows = [row for row in _projection().schedule.rows if row.occurred_on == date(2027, 7, 15)]
         assert len(rows) == 2
         assert {row.kind for row in rows} == {EventKind.COUPON, EventKind.PRINCIPAL_REPAYMENT}

@@ -44,10 +44,10 @@ fund                 inzhur_miltech               instruments/inzhur_miltech.tom
 fund                 inzhur_reit                  instruments/inzhur_reit.toml             sha256:95c2b5d997c2e9d686e730dbbe2b7ca5ab63ce8c5e219af74508fff142a76f4c
 fund                 synthetic_fund_c             instruments/synthetic_fund_c.toml        sha256:39ed338a5a88918dfd813a2b0401e6fca6172ad9c10eebf21c32d77c361a232a
 inflation_assumption owner_placeholder_inflation  inflation/owner-001.toml                 sha256:624e2b5124527c2b30bc4c0773b2d8c79e9ffcfd38b0f253ab5080c36cd71d6c
-instrument           enumerated_out_of_order      instruments/enumerated_out_of_order.toml sha256:9517c2bb0e614a686e1c35999db54509c90b1bcdcc476c1ca835dbff8fd87dcd
-instrument           enumerated_taxable_x         instruments/enumerated_taxable_x.toml    sha256:2f368554d89b1946b2624c302d7b8d594efc371dc96aa4955e7762775c6790d8
-instrument           ovdp_enumerated_a            instruments/ovdp_enumerated_a.toml       sha256:993b95c0bc3df5246a262e726925700a0e78e445b44704d2f34c810eebafc5a2
-instrument           ovdp_enumerated_mirror       instruments/ovdp_enumerated_mirror.toml  sha256:c5f341ce061cc6ea01ecba60e888249bc04f91add889435f9bb7877187406857
+instrument           enumerated_out_of_order      instruments/enumerated_out_of_order.toml sha256:59ba87ab15a5597a42503cc104e98a6bc426fe8fc60c34a752658840b40a1398
+instrument           enumerated_taxable_x         instruments/enumerated_taxable_x.toml    sha256:a676014148592e31f38bc77538a7185cace182c375e47badc9f15fdf8218325b
+instrument           ovdp_enumerated_a            instruments/ovdp_enumerated_a.toml       sha256:99863b5c0aeac95e2dc24b1239ea5a62763a1583e177c2d7f214beb221046b04
+instrument           ovdp_enumerated_mirror       instruments/ovdp_enumerated_mirror.toml  sha256:e5bb604cbde2146e965ce0efdd0b26ed3419c75c41d8bf37127bfc0fbd1d693f
 instrument           ovdp_synthetic_a             instruments/ovdp_synthetic_a.toml        sha256:6d6fcafc9e3da360c2f2c523704b488065f253c2db5fce362b3ad72cd6b5e49e
 instrument           ovdp_synthetic_b             instruments/ovdp_synthetic_b.toml        sha256:fa433d052d2ca1525e597b8050cf2565f69e2a233dd51150e7a9601add8822a9
 tax_class            synthetic_enumerated_coupon  tax/synthetic_fixture.toml               sha256:59fa3761fb68d26bf0100a750d27eab68392b41799d8271e4e5adc48edfec964

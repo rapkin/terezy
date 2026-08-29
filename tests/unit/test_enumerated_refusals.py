@@ -5,21 +5,22 @@ number computed around the gap (FR-019). A figure silently computed on a missing
 the defect this whole form exists to prevent, and a refusal that is not typed is a refusal
 caught in review rather than by a test.
 
-The refusals are all members of the **existing** instrument failure union. Nothing is
-widened, and that is load-bearing rather than pedantic: *different failures* is one of the
-three mismatches recorded at `core.instruments.registry` that kept a fund out of that
-registry, so a widened union would be the sentence putting a constitution amendment back on
-the table (FR-013).
+The refusals are all members of the **existing** instrument failure union, which is
+load-bearing rather than pedantic: *different failures* is one of the three mismatches that
+kept a fund out of the instrument registry, so widening the union would be the sentence
+putting a constitution amendment back on the table (FR-013). That claim is asserted at the
+foot of this file rather than left as a sentence.
 """
 
 from __future__ import annotations
 
 from dataclasses import replace
 from datetime import date, timedelta
+from typing import get_args
 
 import pytest
 
-from terezy.core.errors import InconsistentTerms, InfeasiblePurchase
+from terezy.core.errors import InconsistentTerms, InfeasiblePurchase, InstrumentFailure
 from terezy.core.instruments import registry
 from terezy.core.instruments.interface import Assumptions, DateRange, Holding
 from terezy.core.primitives.money import Money
@@ -161,3 +162,30 @@ class TestEveryReasonSurvivesIntoTheOutput:
         ):
             assert isinstance(outcome, InconsistentTerms), outcome
             assert len(outcome.reason) > 80, "a reason a reader cannot act on is not a reason"
+
+
+def test_the_instrument_failure_union_is_unchanged() -> None:
+    """FR-013. The claim the module docstring makes, checked rather than stated.
+
+    A test over the union's *membership* rather than over this form's behaviour, because
+    that is what the requirement is about: a member added for the enumerated form would be a
+    member every existing caller has to learn, and the callers are the reason the union is
+    narrow. Written as an exact set so a widening is a decision somebody has to take here.
+    """
+    assert set(get_args(InstrumentFailure)) == {InfeasiblePurchase, InconsistentTerms}
+
+
+def test_every_refusal_this_form_produces_is_a_member_of_it() -> None:
+    """And the other direction: the form uses the union rather than merely not widening it."""
+    early = replace(HOLDING, purchased_on=COVERS_FROM - timedelta(days=1))
+    produced = (
+        _events(holding=early, horizon=replace(HORIZON, start=early.purchased_on)),
+        _events(assumptions=REINVEST),
+        _events(holding=replace(HOLDING, quantity=0.0)),
+        _events(
+            holding=replace(
+                HOLDING, quantity=0.5, cost=Money(500.0, COST.currency, COST.provenance)
+            )
+        ),
+    )
+    assert all(isinstance(outcome, InfeasiblePurchase | InconsistentTerms) for outcome in produced)

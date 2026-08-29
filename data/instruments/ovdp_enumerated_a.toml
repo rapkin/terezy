@@ -30,7 +30,7 @@ face_value   = 1000.0
 covers_from  = "2026-02-01"
 day_count    = "act/365"
 kind         = "bond_terms"
-source       = "INFERENCE: SYNTHETIC FIXTURE — the face value is inferred from the largest payment in the list, on the reading the real observation supports (a payment of exactly 100000 in 32 of 32 published schedules, against buy prices near 1 000). Here it is simply invented, and the coverage claim with it: no source states a window, and this file's is chosen to make the example checkable on paper."
+source       = "INFERENCE: SYNTHETIC FIXTURE — the face value is inferred from the largest payment in the list, on the reading the real observation supports (a payment of exactly 100000, the largest in every published schedule, against buy prices near 1 000). Here it is simply invented, and the coverage claim with it: no source states a window, and this file's is chosen to make the example checkable on paper."
 retrieved_on = "2026-08-29"
 verified_on  = ""
 
@@ -66,7 +66,7 @@ verified_on  = ""
   amount       = 1000.00
   pays         = "principal_repayment"
   kind         = "bond_terms"
-  source       = "INFERENCE: SYNTHETIC FIXTURE — an invented amount, labelled a repayment of principal by a human reading a list of numbers. It shares a date with the final coupon, which is how 31 of the 32 observed issues end."
+  source       = "INFERENCE: SYNTHETIC FIXTURE — an invented amount, labelled a repayment of principal by a human reading a list of numbers. It shares a date with the final coupon, which is how a bond ordinarily ends."
   retrieved_on = "2026-08-29"
   verified_on  = ""
 
