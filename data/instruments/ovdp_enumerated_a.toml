@@ -1,0 +1,107 @@
+# SYNTHETIC FIXTURE. Every payment in this file is invented.
+#
+# It is the counterpart of `ovdp_synthetic_a.toml` for the OTHER thing a declaration can
+# say about a bond. That file states the issue's terms — a rate, a periodicity, an issue
+# date — and the engine derives the schedule. This one states the schedule, because that is
+# what a secondary-market buyer can honestly say: the platform publishes a list of dated
+# amounts, and the issue date is neither given nor derivable from one.
+#
+# Nothing here describes a bond anyone can buy. The 32 real ОВДП issues observed on
+# 2026-08-24 (`data/observations/inzhur.toml`) are what this form exists for and are
+# deliberately NOT declared here — declaring one needs the owner's verification tasks
+# answered, and that is a later data change.
+#
+# WHAT IS INFERRED IS DECLARED AS AN INFERENCE. Four things about a transcribed schedule
+# are nobody's statement: the face value, each payment's kind, any conversion out of minor
+# units, and the claim that the list is complete from a date. Each carries a source
+# beginning `INFERENCE:`, an empty `verified_on`, and a matching `[[instrument.verification_task]]`
+# saying what would settle it. `scripts/check_provenance.py` refuses a file missing either
+# half.
+
+[instrument]
+id           = "ovdp_enumerated_a"
+name         = "Synthetic enumerated issue A — TEST FIXTURE, payments invented"
+class        = "enumerated_schedule"
+currency     = "UAH"
+is_synthetic = true
+
+[instrument.schedule]
+face_value   = 1000.0
+covers_from  = "2026-02-01"
+day_count    = "act/365"
+kind         = "bond_terms"
+source       = "INFERENCE: SYNTHETIC FIXTURE — the face value is inferred from the largest payment in the list, on the reading the real observation supports (a payment of exactly 100000 in 32 of 32 published schedules, against buy prices near 1 000). Here it is simply invented, and the coverage claim with it: no source states a window, and this file's is chosen to make the example checkable on paper."
+retrieved_on = "2026-08-29"
+verified_on  = ""
+
+  [[instrument.schedule.payment]]
+  on           = "2026-07-15"
+  amount       = 40.00
+  pays         = "coupon"
+  kind         = "bond_terms"
+  source       = "INFERENCE: SYNTHETIC FIXTURE — an invented amount, labelled a coupon by a human reading a list of numbers. The published data carries no labels."
+  retrieved_on = "2026-08-29"
+  verified_on  = ""
+
+  [[instrument.schedule.payment]]
+  on           = "2027-01-15"
+  amount       = 40.00
+  pays         = "coupon"
+  kind         = "bond_terms"
+  source       = "INFERENCE: SYNTHETIC FIXTURE — an invented amount, labelled a coupon by a human reading a list of numbers."
+  retrieved_on = "2026-08-29"
+  verified_on  = ""
+
+  [[instrument.schedule.payment]]
+  on           = "2027-07-15"
+  amount       = 40.00
+  pays         = "coupon"
+  kind         = "bond_terms"
+  source       = "INFERENCE: SYNTHETIC FIXTURE — an invented amount, labelled a coupon by a human reading a list of numbers."
+  retrieved_on = "2026-08-29"
+  verified_on  = ""
+
+  [[instrument.schedule.payment]]
+  on           = "2027-07-15"
+  amount       = 1000.00
+  pays         = "principal_repayment"
+  kind         = "bond_terms"
+  source       = "INFERENCE: SYNTHETIC FIXTURE — an invented amount, labelled a repayment of principal by a human reading a list of numbers. It shares a date with the final coupon, which is how 31 of the 32 observed issues end."
+  retrieved_on = "2026-08-29"
+  verified_on  = ""
+
+[instrument.constraints]
+min_ticket   = 1000.0
+min_unit     = 1.0
+kind         = "venue_terms"
+source       = "SYNTHETIC FIXTURE — an invented minimum ticket of one bond, matching ovdp_synthetic_a so that the two fixtures differ in their declaration form and not in what a purchase must satisfy. Not observed from any venue."
+retrieved_on = "2026-08-29"
+verified_on  = ""
+
+[instrument.tax_classes]
+coupon        = "ua_government_bond"
+disposal_gain = "ua_government_bond"
+
+[[instrument.verification_task]]
+settles     = "face_value"
+question    = "What face value does this issue actually have? The figure here rests on reading the largest payment in the list as the redemption amount, and no issuer statement has been read."
+searched    = "SYNTHETIC FIXTURE — nothing was searched, because there is nothing to search: the payments are invented. For a real issue this would be settled by its умови розміщення, or the МФУ or НБУ record for the ISIN."
+searched_on = "2026-08-29"
+
+[[instrument.verification_task]]
+settles     = "payment_kind"
+question    = "Which of these payments is a coupon and which repays principal? The list carries no labels; the split here is a human reading of a sequence of numbers."
+searched    = "SYNTHETIC FIXTURE — nothing was searched. For a real issue this would be settled by the same source as the face value."
+searched_on = "2026-08-29"
+
+[[instrument.verification_task]]
+settles     = "minor_unit_conversion"
+question    = "Do the published figures denote hryvnia or kopecks? Reading 100000 as 1 000.00 rather than 100 000.00 rests on comparing it with the buy price, and on nothing the publisher says."
+searched    = "SYNTHETIC FIXTURE — no conversion was performed here: the amounts are invented and already in hryvnia. `scripts/fetch_inzhur.py` carries the endpoint's figure verbatim and converts nothing, so for a real issue the scaling would be entirely this project's reading."
+searched_on = "2026-08-29"
+
+[[instrument.verification_task]]
+settles     = "coverage"
+question    = "Is this list complete from 2026-02-01 to the end of the issue's life? Nothing published states a window."
+searched    = "SYNTHETIC FIXTURE — the claim is invented. For a real issue the window the endpoint in fact publishes is not uniform (from 341 days before the retrieval date to 170 days after it, across 24 active issues), so whether one platform's publication is acceptable evidence for a completeness claim is the owner's call."
+searched_on = "2026-08-29"

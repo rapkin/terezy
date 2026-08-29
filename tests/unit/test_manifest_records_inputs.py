@@ -63,9 +63,11 @@ DISPOSAL_CLASS = "ua_investment_profit"
 REIT = "inzhur_reit"
 MILTECH = "inzhur_miltech"
 FUND_C = "synthetic_fund_c"
+ENUMERATED_A = "ovdp_enumerated_a"
 FIXTURE_PAYOUT_CLASS = "synthetic_fund_payout"
 FIXTURE_DISPOSAL_CLASS = "synthetic_fund_disposal"
-"""⚙ Feature 006 added two fund files and two tax classes to the shipped data root.
+"""⚙ Features 006 and 013 added declarations to the shipped data root: two fund files
+and two tax classes, then a bond declared as the payments it will make.
 
 They are named here rather than the set being loosened to "whatever is on disk", because
 the claim under test is that the manifest records **every** declaration a run was given:
@@ -198,6 +200,7 @@ class TestEveryDeclarationAndVersionThatFedTheRun:
             ("inflation_assumption", INFLATION_BELIEF),
             ("instrument", ISSUE_A),
             ("instrument", ISSUE_B),
+            ("instrument", ENUMERATED_A),
             ("fund", REIT),
             ("fund", MILTECH),
             ("fund", FUND_C),
@@ -236,6 +239,7 @@ class TestEveryDeclarationAndVersionThatFedTheRun:
             INFLATION_BELIEF: "inflation/owner-001.toml",
             ISSUE_A: f"instruments/{ISSUE_A}.toml",
             ISSUE_B: f"instruments/{ISSUE_B}.toml",
+            ENUMERATED_A: f"instruments/{ENUMERATED_A}.toml",
             REIT: f"instruments/{REIT}.toml",
             MILTECH: f"instruments/{MILTECH}.toml",
             FUND_C: f"instruments/{FUND_C}.toml",
@@ -260,6 +264,7 @@ class TestEveryDeclarationAndVersionThatFedTheRun:
             INFLATION_BELIEF: DATA_ROOT / "scenarios" / "inflation" / "owner-001.toml",
             ISSUE_A: DATA_ROOT / "instruments" / f"{ISSUE_A}.toml",
             ISSUE_B: DATA_ROOT / "instruments" / f"{ISSUE_B}.toml",
+            ENUMERATED_A: DATA_ROOT / "instruments" / f"{ENUMERATED_A}.toml",
             REIT: DATA_ROOT / "instruments" / f"{REIT}.toml",
             MILTECH: DATA_ROOT / "instruments" / f"{MILTECH}.toml",
             FUND_C: DATA_ROOT / "instruments" / f"{FUND_C}.toml",

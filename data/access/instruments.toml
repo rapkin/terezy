@@ -70,6 +70,26 @@ risk_class    = "sovereign_debt"
   retrieved_on = "2026-08-23"
   verified_on  = ""
 
+# --- the enumerated fixture ---------------------------------------------------------------
+#
+# Quoted ABOVE its face value, which is the ordinary case for a secondary-market purchase:
+# 31 of the 32 issues observed on 2026-08-24 quote above 1 000.00. What happens to that
+# premium is decided by the declared tax category and by nothing this file knows.
+
+[[access]]
+instrument_id = "ovdp_enumerated_a"
+bought_at     = "inzhur"
+proceeds_to   = "inzhur"
+risk_class    = "sovereign_debt"
+
+  [access.price]
+  per_unit     = 1015.0
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "SYNTHETIC FIXTURE — an invented quote above this fixture's declared face value of 1000.0 UAH, so that a premium at purchase is exercised rather than only described. Not a quote observed at any venue."
+  retrieved_on = "2026-08-29"
+  verified_on  = ""
+
 # --- the funds, which price themselves ---------------------------------------------------
 #
 # No [access.price] on any of the three: each declares its own net asset value per unit and

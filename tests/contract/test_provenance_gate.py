@@ -26,6 +26,8 @@ from pathlib import Path
 
 import pytest
 
+from terezy.data.declarations.loader import INFERENCE_MARKER, INFERENCES
+
 pytestmark = pytest.mark.contract
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -112,3 +114,79 @@ def test_a_root_level_file_is_scanned_rather_than_invisible(tmp_path: Path) -> N
     dirty = _run(root)
     assert dirty.returncode == 1
     assert "venues.toml" in dirty.stdout
+
+
+# ---------------------------------------------------------------------------
+# 013-enumerated-schedule: the gate's first relation
+# ---------------------------------------------------------------------------
+#
+# Everything above is shape -- a table with a numeric leaf needs a citation. SC-013 asks
+# for a *relation*: an inferred value must have a source saying it is an inference and a
+# task saying what would settle it. The two halves fail separately because the fixes
+# differ.
+
+ENUMERATED = "instruments/ovdp_enumerated_a.toml"
+
+
+def _mutated(tmp_path: Path, old: str, new: str) -> subprocess.CompletedProcess[str]:
+    root = _scratch_root(tmp_path)
+    declaration = root / ENUMERATED
+    text = declaration.read_text(encoding="utf-8")
+    assert old in text, f"the fixture no longer contains {old!r}"
+    declaration.write_text(text.replace(old, new, 1), encoding="utf-8")
+    return _run(root)
+
+
+def test_an_inferred_value_whose_source_does_not_say_so_is_an_error(tmp_path: Path) -> None:
+    outcome = _mutated(tmp_path, 'source       = "INFERENCE:', 'source       = "')
+    assert outcome.returncode == 1, outcome.stdout
+    assert ENUMERATED in outcome.stdout
+    assert "instrument.schedule" in outcome.stdout
+
+
+def test_an_inferred_value_carrying_a_verification_date_is_an_error(tmp_path: Path) -> None:
+    """An inference is unverified by construction. What a later reading verifies is the
+    source it rests on, and that is a different table."""
+    outcome = _mutated(
+        tmp_path,
+        'verified_on  = ""\n\n  [[instrument.schedule.payment]]',
+        'verified_on  = "2026-08-29"\n\n  [[instrument.schedule.payment]]',
+    )
+    assert outcome.returncode == 1, outcome.stdout
+    assert "verification date on an inferred value" in outcome.stdout
+
+
+def test_an_inference_with_no_verification_task_is_an_error(tmp_path: Path) -> None:
+    outcome = _mutated(tmp_path, 'settles     = "coverage"', 'settles     = "face_value"')
+    assert outcome.returncode == 1, outcome.stdout
+    assert ENUMERATED in outcome.stdout
+    assert "coverage" in outcome.stdout
+
+
+def test_the_checks_run_on_no_other_declaration_kind(tmp_path: Path) -> None:
+    """A bond declared by its terms infers none of this, and a fund's verification tasks
+    answer a different question. The shipped tree contains both and stays clean."""
+    root = _scratch_root(tmp_path)
+    (root / ENUMERATED).unlink()
+    assert _run(root).returncode == 0
+
+
+def test_the_gate_and_the_loader_agree_on_what_is_inferred() -> None:
+    """The gate copies the loader's list, because a script that imported the engine would
+    stop being runnable by someone who has not installed it. A copy nothing checks is the
+    copy that goes stale, so this checks it."""
+    gate: dict[str, object] = {}
+    exec(
+        compile(
+            "\n".join(
+                line
+                for line in SCRIPT.read_text(encoding="utf-8").splitlines()
+                if line.startswith(("INFERRED =", "INFERENCE_MARKER ="))
+            ),
+            str(SCRIPT),
+            "exec",
+        ),
+        gate,
+    )
+    assert set(gate["INFERRED"]) == set(INFERENCES)  # type: ignore[call-overload]
+    assert gate["INFERENCE_MARKER"] == INFERENCE_MARKER
