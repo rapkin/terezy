@@ -58,8 +58,13 @@ def of_conventions(value: ConventionsApplied | AmountsAsDeclared) -> tuple[str, 
     The **reason** is rendered too, and for the same argument the ledger's canonical form
     makes about a causation's ``detail``: it is overridable, so two rows can make different
     statements about what shaped them, and a digest ignoring it would call two
-    differently-explained results identical. A three-name rendering can never equal a
-    three-entry tagged one, so the two are told apart by the tag as well as by content.
+    differently-explained results identical.
+
+    The two are told apart by the **tag in slot 0**: a generative rendering opens with a
+    periodicity, and no key of ``conventions.PERIODICITY_FNS`` may be spelled ``"declared"``.
+    That is the whole of the separation -- both renderings are three entries long, so arity
+    separates nothing -- and it is asserted rather than argued, in
+    ``tests/unit/test_conventions_statement.py``.
 
     The three-name arm is deliberately **untagged**: it is
     byte-for-byte what it has always been, so no generative row's digest moves for a reason
@@ -185,7 +190,7 @@ def of_hurdle_rate(value: HurdleRate) -> tuple[Canonical, ...]:
 
 
 def of_at_purchase(value: PurchasePremium) -> tuple[Canonical, ...]:
-    """What was paid, what face comes to, the difference, and what governs it.
+    """What was paid, what comes back as principal, the difference, and what governs it.
 
     The class the difference is realised under and the governing treatment are both
     **tagged**, so that a declared answer and its absence can never render as the same
@@ -206,7 +211,7 @@ def of_at_purchase(value: PurchasePremium) -> tuple[Canonical, ...]:
             assert_never(value.governed_by)
     return (
         ledger_canonical.of_money(value.paid),
-        ledger_canonical.of_money(value.at_face),
+        ledger_canonical.of_money(value.principal_returned),
         ledger_canonical.of_money(value.difference),
         ("class", value.tax_class_id) if value.tax_class_id else ("undeclared",),
         governs,

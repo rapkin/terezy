@@ -1,7 +1,15 @@
 """Opening a lot: the one event every instrument class that pays a schedule begins with.
 
 Shared rather than written twice, because a purchase is not a term of either declaration
-form. What the owner paid, on what date, for how many units of what is the same fact
+form -- the two bond forms open a lot the same way, and this is where they do it.
+
+⚙ **A fund keeps its own** (`core.instruments.fund`), byte-identical today, and that is a
+recorded duplicate rather than an oversight: a fund purchase is priced from its declared NAV
+plus an entry markup, so what it will need from a shared helper is not yet what these two
+need. Unifying all three is a decision about the fund's shape and belongs to whoever changes
+it (noted 2026-08-30).
+
+What the owner paid, on what date, for how many units of what is the same fact
 whether the paper's terms were declared in closed form or as a list of payments — and the
 lot id it derives is what a later disposal consumes, so two implementations that drifted
 would open two lots nothing could reconcile.

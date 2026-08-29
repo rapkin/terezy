@@ -1268,6 +1268,7 @@ class TestTheBatteryCoversTheContract:
             "TestAnImpossibleInstrumentIsNotALoadError",
             "TestTheBatteryCoversTheContract",
             "TestNoFieldDefaultStandsInForAValue",
+            "TestEveryShippedInstrumentSaysItIsAFixture",
         }
 
     def test_the_second_issue_is_a_file_and_not_a_special_case(self) -> None:
@@ -1341,3 +1342,37 @@ class TestNoFieldDefaultStandsInForAValue:
             model = getattr(schema, name)
             for field in sorted(fields):
                 assert model.model_fields[field].default is None, f"{name}.{field}"
+
+
+class TestEveryShippedInstrumentSaysItIsAFixture:
+    """`docs/METHODOLOGY.md` §0's claim about `data/instruments/`, as a check.
+
+    Every declaration this repository ships is invented, and every one of them says so on
+    its face — a bond through `is_synthetic`, a fund through `is_assumption_driven` — with
+    every `verified_on` empty. §0 tells a reader that no figure computed from any of them
+    describes something anyone can buy, and it used to tell them by naming two files by
+    hand, which had been wrong since feature 006 added three more.
+
+    ⚙ The correction replaced the count with the property and cited a file that checks no
+    such thing (found 2026-08-30). This is that file.
+    """
+
+    def test_every_declared_bond_declares_itself_synthetic(self) -> None:
+        declared = resolver.from_data_root(DATA_ROOT)
+        assert declared.instruments
+        for identifier, instrument in sorted(declared.instruments.items()):
+            assert instrument.is_synthetic, identifier
+
+    def test_every_declared_fund_declares_itself_assumption_driven(self) -> None:
+        declared = resolver.from_data_root(DATA_ROOT)
+        assert declared.funds
+        for identifier, fund in sorted(declared.funds.items()):
+            assert fund.is_assumption_driven, identifier
+
+    def test_and_nothing_they_rest_on_claims_to_have_been_verified(self) -> None:
+        """The other half of the sentence. A verified term in a file of invented ones would
+        be a claim that somebody checked an invention against a source."""
+        declared = resolver.from_data_root(DATA_ROOT)
+        for identifier, instrument in sorted(declared.instruments.items()):
+            assert prov.is_unverified(instrument.terms.provenance), identifier
+            assert prov.is_unverified(instrument.constraints.provenance), identifier

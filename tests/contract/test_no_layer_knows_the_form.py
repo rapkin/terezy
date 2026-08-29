@@ -20,6 +20,22 @@ delegation being *sufficient* -- there is nothing those spellings would buy that
 `core.instruments.terms` does not already answer -- and by review. It is recorded here
 rather than left for a reader to discover, because a scan believed complete is the one
 nobody adds a second check beside.
+
+⚙ **One escape is not hypothetical and is in the tree**: ``AmountsAsDeclared``, in
+`core/primitives/conventions.py`, is a form-shaped name that `core/results/canonical.py`
+matches on. FR-012's substance holds -- it renders a statement it was handed and moves no
+money, and FR-016 *requires* the encoder to tell the two statements apart -- but the scan
+cannot see it, and three docstrings on this branch call `core.instruments.terms` "the one
+place in ``src/`` that matches on which form a declaration is in" without qualifying it.
+Recorded here so the list of what this scan misses matches the tree rather than only the
+hypotheticals (2026-08-30).
+
+⚙ **And one escape is closed below rather than listed.** ``day_count`` is the one declared
+term **both** forms carry, so a sealed module that stopped asking `day_count_of` and read
+``declaration.terms.day_count`` directly would pass `mypy`, `lint-imports` and this scan --
+FR-002's promise that *the type checker enumerates the sites that must change* covers four
+of the five forbidden terms and not that one. It is the exact regression FR-011a exists to
+prevent, so it gets an assertion of its own.
 """
 
 from __future__ import annotations
@@ -93,8 +109,11 @@ def test_no_sealed_module_names_the_enumerated_form() -> None:
 
 
 def test_the_scan_reaches_the_modules_that_could_hold_such_a_branch() -> None:
-    """A scan of nothing passes forever. These are the three sites FR-011a names and the
-    two FR-016 corrects, so the scan is worthless if it does not read them."""
+    """A scan of nothing passes forever, so the modules it must reach are named.
+
+    Every site this feature touched inside the seal: FR-011a's three, FR-016's corrected
+    docstrings, and FR-023's per-declaration exclusions. Named rather than counted -- a
+    count over its own list is the staleness shape this branch corrected six times."""
     walked = {path.relative_to(SOURCE_ROOT).as_posix() for path in _sealed_files()}
     assert {
         "core/ledger/seeds.py",
@@ -121,10 +140,47 @@ def test_the_scan_would_catch_a_module_that_learned_the_form(tmp_path: Path) -> 
     ), "asking a declaration a question both forms answer must stay permitted (FR-011a)"
 
 
+READS_A_SHARED_TERM = re.compile(r"terms\.day_count(?!_of)\b")
+"""The one generative-term read the type checker cannot catch, because both forms carry it.
+
+Reading ``declaration.terms.day_count`` type-checks against either form, so nothing in the
+toolchain objects -- and the site has silently stopped asking the declaration, which is what
+FR-011a requires of it. ``day_count_of`` is the only permitted spelling inside the seal,
+and the lookahead is what lets ``instrument_terms.day_count_of(...)`` through -- it ends in
+the same characters.
+"""
+
+
+def test_no_sealed_module_reads_the_one_term_both_forms_carry() -> None:
+    offenders = {
+        path.relative_to(SOURCE_ROOT).as_posix()
+        for path in _sealed_files()
+        if READS_A_SHARED_TERM.search(source_scan.executable_source(path))
+    }
+    assert not offenders, (
+        "a sealed module reads a declaration's day count directly instead of asking for it "
+        f"(FR-011a): {offenders}. It type-checks against both forms, which is exactly why "
+        "the union does not catch it -- ask `instrument_terms.day_count_of` instead"
+    )
+
+
+def test_that_scan_would_catch_the_read_it_forbids() -> None:
+    assert READS_A_SHARED_TERM.search("year_fraction = conventions.day_count(terms.day_count)\n")
+    assert READS_A_SHARED_TERM.search("if declaration.terms.day_count == '30/360':\n")
+    assert not READS_A_SHARED_TERM.search(
+        "year_fraction = conventions.day_count(instrument_terms.day_count_of(terms))\n"
+    ), "asking the declaration must stay permitted (FR-011a)"
+
+
 def test_the_instrument_layer_is_deliberately_outside_the_seal() -> None:
-    """The one place that matches on the form is `core.instruments.terms`, and it has to
-    be: somebody must answer the question, and answering it once is what stops four
-    modules deciding it separately."""
+    """The one place that matches on a *declaration's* form is `core.instruments.terms`, and
+    it has to be: somebody must answer the question, and answering it once is what stops four
+    modules deciding it separately.
+
+    ⚙ Not the only `match` on a form-shaped **type** in `src/` -- see the module docstring's
+    note on `AmountsAsDeclared`, which `core.results.canonical` matches on because FR-016
+    requires the two conventions statements to be told apart. That one renders a value it was
+    handed and moves no money."""
     answering = source_scan.executable_source(SOURCE_ROOT / "core" / "instruments" / "terms.py")
     assert "EnumeratedTerms" in answering
     assert "core/instruments" not in SEALED

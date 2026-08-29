@@ -72,33 +72,26 @@ def events(
     not declared and may not be inferred (FR-017).
     """
     terms = terms_of.narrowed(declaration, EnumeratedTerms)
-    receivable = _receivable(terms, holding)
+    receivable = terms_of.payments_after(terms.payments, holding.purchased_on)
     problem = _check_feasible(
         declaration, terms, receivable, holding=holding, horizon=horizon, assumptions=assumptions
     )
     if problem is not None:
         return problem
 
-    principal = _principal_in(receivable)
+    principal = terms_of.principal_returned(terms, bought_on=holding.purchased_on)
     stream = [acquire.purchase(declaration, holding, sequence=1)]
     for payment in receivable:
         stream.append(
-            _payment(declaration, holding, payment, principal=principal, sequence=len(stream) + 1)
+            _payment(
+                declaration,
+                holding,
+                payment,
+                principal=principal.amount,
+                sequence=len(stream) + 1,
+            )
         )
     return tuple(stream)
-
-
-def _receivable(terms: EnumeratedTerms, holding: Holding) -> tuple[ScheduledPayment, ...]:
-    """The payments this holding is paid: the declared ones falling after the purchase.
-
-    ⚙ **This tuple is the denominator as well as the numerator**, and keeping the two the
-    same set is what makes the holding close. A schedule that had already repaid part of its
-    principal before the purchase sells units of what *remains*, so what retires them is the
-    remaining repayments -- measured against every repayment the paper ever made, the
-    emitted ones would retire strictly less than the holding, leaving basis stranded in a
-    position that never closes and reporting the stranded basis as a realised gain.
-    """
-    return tuple(payment for payment in terms.payments if payment.on > holding.purchased_on)
 
 
 def tax_classes(declaration: InstrumentDeclaration) -> Mapping[TaxableEventKind, str]:
@@ -299,7 +292,7 @@ def _receivable_problem(
                 "series. The payments before that date went to whoever held the paper then."
             ),
         )
-    if _principal_in(receivable) > 0.0:
+    if terms_of.principal_returned(terms, bought_on=holding.purchased_on).amount > 0.0:
         return None
     return InconsistentTerms(
         first_term="holding.purchased_on",
@@ -311,15 +304,6 @@ def _receivable_problem(
             "yield would be computed on a holding still open at the end of its own "
             f"schedule. The declaration lists {len(terms.payments)} payment(s) in all."
         ),
-    )
-
-
-def _principal_in(payments: tuple[ScheduledPayment, ...]) -> float:
-    """What the repayments of principal among these payments return, per unit."""
-    return sum(
-        payment.amount.amount
-        for payment in payments
-        if payment.pays is PaymentKind.PRINCIPAL_REPAYMENT
     )
 
 

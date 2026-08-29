@@ -69,7 +69,9 @@ of them describes something anyone can buy, and none may be quoted as if it did.
 ⚙ This paragraph used to name two files by hand, and had said "two" since feature 006 added
 three more. Corrected in 013 to state the property instead: a count of files goes stale on
 the next data change, and what actually matters is that the property holds of all of them —
-which `tests/contract/test_owner_scoping.py` and the provenance gate both check.
+which `tests/contract/test_declaration_loading.py::TestEveryShippedInstrumentSaysItIsAFixture`
+now checks, having been cited to a file that checked nothing of the kind under a ⚙ whose own
+point was replacing an unchecked count with a checked property.
 
 **The tax exemption is cited but unverified.** `data/tax/ua.toml` declares the
 `ua_government_bond` class with a PIT rate of 0% and a military levy of 0%. The zeroes cite
@@ -3148,200 +3150,6 @@ the ramp.
 
 ---
 
-## 31. A bond declared as the payments it will make
-
-### 31.1 Why there are two forms and not one
-
-§1 computes a schedule **from terms**: a face value, a coupon rate, an issue date, a
-periodicity, a day count, a business-day rule. That form says one thing about the world —
-*these are the issue's terms, and I know them* — and every figure derived from it is
-checkable on paper against the contract.
-
-A secondary-market purchase says the opposite thing. The platform that sells ОВДП publishes,
-per issue, a **list of dated amounts**: no coupon rate, no periodicity, no day count, and
-**no issue date**. Of those, the issue date is the one that is neither given nor derivable,
-and extrapolating one backwards would be inventing a legal fact about a state security —
-invisible once made, because a plausible date produces a plausible schedule and nothing ever
-contradicts it.
-
-So a declaration can be in one of two forms, and they are two **epistemic situations** rather
-than two encodings of one thing:
-
-| | says | states |
-| --- | --- | --- |
-| `fixed_income` | *I know this issue's full terms* | face, rate, issue date, maturity, periodicity, day count, business-day rule |
-| `enumerated_schedule` | *I am buying a stream of dated payments; the issue's history is neither known to me nor relevant to what I will receive* | face, coverage start, the payments, a day count |
-
-The issue date affects **no future cash flow of a purchase made today**, which is why
-demanding one would be forcing an invention that changes no figure. What is bought by keeping
-the forms apart is that no figure in this system rests on a date nobody published.
-
-### 31.2 The arithmetic, such as it is
-
-There is none. Every amount is
-
-```text
-declared amount per unit  x  units held
-```
-
-and every date is the date the declaration states. Nothing is generated, nothing is adjusted,
-and no convention sizes anything. A payment falling on or before the purchase date went to
-whoever held the paper then, exactly as a coupon does in §1.
-
-**Each payment declares what it is** — `coupon` or `principal_repayment` — and that one
-label settles two vocabularies at once: what the ledger records as having moved, and which
-income kind the tax layer assesses. It is never read off the amount, the date or the position
-in the list. `8305, 8305, 8305, 100000` is obviously three coupons and a repayment of
-principal to a human and obviously nothing at all to a machine.
-
-**A repayment retires its share of the repayments the schedule declares**, so the stream as a
-whole retires the holding as a whole — once, whatever the shape. One repayment retires
-everything, which is what §1's redemption does; two equal ones retire half each. It is the
-*share of the repayments* rather than the share of the face value, and the difference is a
-bond redeemed above par: a schedule returning 1 050.00 against a declared face of 1 000.00
-repays the whole of each unit and realises a gain, where measuring against face would retire
-1.05 units of every 1 held.
-
-### 31.3 The day count is a convention of computation, not a term of the issue
-
-This is the one field that looks generative and is not, and it is the place this form can
-most easily go wrong.
-
-It is **required**, because the contractual yield of §3 cannot be annualised without one and
-§3's root find forbids a hard-coded 365 — the yield would then disagree with the schedule it
-was computed from. It describes how *we* turn a span of days into a fraction of a year.
-Nothing about the paper is claimed by declaring one.
-
-It is an input to **no figure describing the instrument's own terms**: not an amount, not a
-date, not a schedule, not an accrual period, and **not a rate**. That last one is the whole
-door:
-
-```text
-day count + one coupon amount + the interval between two coupons  =>  a coupon rate
-a coupon rate + the spacing                                       =>  an issue date
-```
-
-— the invented legal fact the form exists to refuse, two steps from a required field. Two
-locks hold it shut. `tests/contract/test_day_count_reaches_no_amount.py` changes the declared
-convention in a copy of a declaration and asserts that the yield moves while **every
-cash-flow amount stays bit-identical**; `tests/contract/test_nothing_is_inferred.py` scans for
-the coupon-rate derivation itself. Two, because a guard that believes itself sufficient is
-the one nobody adds a second lock to.
-
-### 31.4 What a row says about the conventions that shaped it
-
-§1's rows name three conventions. A row of declared payments names **one** and denies the
-other two:
-
-> no periodicity generated this date, no business-day rule moved it, and no day count sized
-> this amount — the amount is declared, per unit, and is carried through unchanged. The day
-> count named here annualises a span and does nothing else.
-
-Both halves are load-bearing. A row that said *no day count was applied* would be false the
-moment a yield is emitted from the same projection; a row that named all three would claim two
-conventions that never ran. The canonical form of §12 renders the two statements differently
-— three names for a generated schedule, `("declared", <day count>)` for a listed one — so a
-digest can never agree between them. The three-name rendering is byte-for-byte what it has
-always been, so no existing row's digest moved for this.
-
-### 31.5 What the figure additionally excludes
-
-A secondary-market price is a **dirty price**: it includes interest that has accrued since the
-last coupon, and the buyer receives that interest back in the next coupon. Separating it would
-need two facts, and neither may be inferred — the start of the accrual period containing the
-purchase, and the basis interest accrues on within it. Neither is the issue date; what accrual
-actually needs is the **previous coupon date**.
-
-So no accrued-interest figure and no clean price is emitted, and the yield says so: an
-enumerated projection's `HurdleRate.excludes` carries the dirty-price clause that a generative
-one's does not. This is a prohibition rather than a refusal — nothing in the engine computes
-accrued interest today, so a typed refusal for it would be dead code — and the absence is
-proved by a walk over every field of every result record rather than assumed.
-
-### 31.6 The premium at purchase, and what governs it
-
-A holding bought above face and held to the end of its schedule returns face, so the ledger
-realises a **loss equal to the premium** — years later, at redemption, indistinguishable from
-a market movement. That is why the difference is reported as its own figure at purchase:
-
-```text
-paid                 what the owner actually paid, in full
-at_face              face value x quantity
-premium_or_discount  paid - at_face      positive premium, negative discount, zero par
-realised_under       the declared class governing a disposal of this instrument
-governed_by          the income category that class belongs to
-treatment            outside | nets | per_event
-```
-
-The figure is **always present**, carrying a possibly-zero difference, on the same reading
-that makes a zero tax charge cite its exemption: an absent figure meaning *bought at par* is a
-silent default. And this adds **no premium rule** — no amortisation, no imputation, no branch
-of its own. What becomes of the difference is the declared category treatment's business:
-
-- `outside` — the category stands outside the annual calculation on both sides, income and
-  costs alike, so the difference reduces no other base. **An exempt loss buys no shield**,
-  which is Ukraine's answer for ОВДП and the unwelcome half of the exemption.
-- `nets` — the difference reaches the year's netted base, and a negative year carries forward.
-- `per_event` — nothing nets; the difference is realised on its own disposal and nowhere else.
-
-The full cost stays the lot's basis. Nothing is amortised, nothing is imputed, and no part of
-it is reclassified as accrued interest — which is the only honest treatment while the two
-facts §31.5 names are missing.
-
-### 31.7 What is inferred is declared, and the gate checks it
-
-Four things about a transcribed schedule are nobody's statement, and each is declared **in the
-file** as an inference rather than derived in code:
-
-| inference | what it rests on |
-| --- | --- |
-| the **face value** | reading the largest payment in the list as the redemption amount |
-| each payment's **kind** | a human reading a list of numbers that carries no labels |
-| any **minor-unit conversion** | comparing a published figure with a buy price |
-| the **coverage claim** | nothing the publisher says at all |
-
-Each carries a citation beginning `INFERENCE:`, an empty `verified_on`, and a matching
-`[[instrument.verification_task]]` saying what would settle it.
-`scripts/check_provenance.py` refuses a declaration missing either half — its first check of a
-*relation* rather than of a table's shape. No new kind of mark is introduced: an inference is
-an unverified value, and §10.2's propagation carries it.
-
-**Ordering is settled at transcription**, the same declared human step that turns kopecks into
-hryvnia. The loader neither sorts an unordered list nor accepts one; where the source published
-in an order other than ascending, the declaration **records the order it gave**. That an issuer
-publishes the repayment of principal after a coupon dated later than it is a fact about how the
-endpoint reports, and sorting the list is precisely the act that would delete it. Declaring the
-ascending order is refused, so the field cannot become boilerplate.
-
-### 31.8 Nothing downstream knows which form was used
-
-Three modules outside the instrument layer read a generative field before this landed, and all
-three now **ask the declaration a question both forms answer**:
-
-| question | who asks | generative answers | enumerated answers |
-| --- | --- | --- | --- |
-| from what date are the terms known? | `core/ledger/seeds.py` | its issue date | its coverage start |
-| what convention annualises a span? | `core/decision/tuple_outcome.py`, `core/results/project.py` | its day count | its day count |
-| what should a row say about conventions? | `core/results/project.py` | three names | the one that annualises |
-| what does a figure additionally exclude? | both | nothing | the dirty-price clause |
-
-The observation that made this delegation rather than branching: **`seeds.py` never needed an
-issue date.** It needed the earliest date from which the terms are known, and it asked for the
-only spelling that existed.
-
-`tests/contract/test_no_layer_knows_the_form.py` asserts that no module under the ledger, the
-tax engine, the decision layer or the results names the second form — in code **or in prose**.
-The one place that matches on it is `core/instruments/terms.py`, and that is the point:
-somebody must answer, and answering once is what stops four modules deciding separately.
-
-The property this buys is asserted end to end by
-`tests/golden/test_enumerated_matches_generative.py`: a tuple on a bond declared by its terms
-and a tuple on a transcription of that bond's own computed schedule produce equal figures and
-tie in the ranking, differing only in identity, provenance, the stated exclusions, the
-conventions statement and the causation detail prose.
-
----
-
 ## 30. Where to look next
 
 | question | file |
@@ -3414,6 +3222,222 @@ conventions statement and the causation detail prose.
 | Is anything inferred that should be declared? | `tests/contract/test_nothing_is_inferred.py` |
 | Does any layer know there are two forms? | `tests/contract/test_no_layer_knows_the_form.py` |
 | What is still uncovered? | `docs/REQUIRED_TESTS.md` |
+
+## 31. A bond declared as the payments it will make
+
+### 31.1 Why there are two forms and not one
+
+§1 computes a schedule **from terms**: a face value, a coupon rate, an issue date, a
+periodicity, a day count, a business-day rule. That form says one thing about the world —
+*these are the issue's terms, and I know them* — and every figure derived from it is
+checkable on paper against the contract.
+
+A secondary-market purchase says the opposite thing. The platform that sells ОВДП publishes,
+per issue, a **list of dated amounts**: no coupon rate, no periodicity, no day count, and
+**no issue date**. Of those, the issue date is the one that is neither given nor derivable,
+and extrapolating one backwards would be inventing a legal fact about a state security —
+invisible once made, because a plausible date produces a plausible schedule and nothing ever
+contradicts it.
+
+So a declaration can be in one of two forms, and they are two **epistemic situations** rather
+than two encodings of one thing:
+
+| | says | states |
+| --- | --- | --- |
+| `fixed_income` | *I know this issue's full terms* | face, rate, issue date, maturity, periodicity, day count, business-day rule |
+| `enumerated_schedule` | *I am buying a stream of dated payments; the issue's history is neither known to me nor relevant to what I will receive* | face, coverage start, the payments, a day count |
+
+The issue date affects **no future cash flow of a purchase made today**, which is why
+demanding one would be forcing an invention that changes no figure. What is bought by keeping
+the forms apart is that no figure in this system rests on a date nobody published.
+
+### 31.2 The arithmetic, such as it is
+
+There is none. Every amount is
+
+```text
+declared amount per unit  x  units held
+```
+
+and every date is the date the declaration states. Nothing is generated, nothing is adjusted,
+and no convention sizes anything. A payment falling on or before the purchase date went to
+whoever held the paper then, exactly as a coupon does in §1.
+
+**Each payment declares what it is** — `coupon` or `principal_repayment` — and that one
+label settles two vocabularies at once: what the ledger records as having moved, and which
+income kind the tax layer assesses. It is never read off the amount, the date or the position
+in the list. `8305, 8305, 8305, 100000` is obviously three coupons and a repayment of
+principal to a human and obviously nothing at all to a machine.
+
+**A repayment retires its share of the repayments this holding *receives*** — the ones dated
+after the purchase — so the stream as a whole retires the holding as a whole. One repayment
+retires everything, which is what §1's redemption does; two equal ones retire half each.
+
+Two things it is deliberately *not* a share of, and each was got wrong once on the way here:
+
+- **Not the face value.** A schedule returning 1 050.00 against a declared face of 1 000.00
+  is a bond redeemed above par: it repays the whole of each unit and realises a gain, where
+  measuring against face would retire 1.05 units of every 1 held, which the ledger refuses.
+- **Not every repayment the declaration lists.** A schedule that had already repaid half its
+  principal before this buyer arrived sells units of what **remains**, so the remaining
+  repayment retires the whole of what was bought. Measured against every repayment the paper
+  ever made it would retire half, leaving basis stranded in a position that never closes —
+  and reporting the stranded half as a realised gain on a trade that broke even.
+
+The same reading decides the premium figure of §31.6, and it has to: *paid* versus
+*received* would be measuring "received" two different ways in one projection otherwise.
+
+### 31.3 The day count is a convention of computation, not a term of the issue
+
+This is the one field that looks generative and is not, and it is the place this form can
+most easily go wrong.
+
+It is **required**, because the contractual yield of §3 cannot be annualised without one and
+§3's root find forbids a hard-coded 365 — the yield would then disagree with the schedule it
+was computed from. It describes how *we* turn a span of days into a fraction of a year.
+Nothing about the paper is claimed by declaring one.
+
+It is an input to **no figure describing the instrument's own terms**: not an amount, not a
+date, not a schedule, not an accrual period, and **not a rate**. That last one is the whole
+door:
+
+```text
+day count + one coupon amount + the interval between two coupons  =>  a coupon rate
+a coupon rate + the spacing                                       =>  an issue date
+```
+
+— the invented legal fact the form exists to refuse, two steps from a required field. Two
+locks hold it shut. `tests/contract/test_day_count_reaches_no_amount.py` changes the declared
+convention in a copy of a declaration and asserts that the yield moves while **every
+cash-flow amount stays bit-identical**; `tests/contract/test_nothing_is_inferred.py` scans for
+the coupon-rate derivation itself. Two, because a guard that believes itself sufficient is
+the one nobody adds a second lock to.
+
+### 31.4 What a row says about the conventions that shaped it
+
+§1's rows name three conventions. A row of declared payments names **one** and denies the
+other two:
+
+> no periodicity generated this date, no business-day rule moved it, and no day count sized
+> this amount — the amount is declared, per unit, and is carried through unchanged. The day
+> count named here annualises a span and does nothing else.
+
+Both halves are load-bearing. A row that said *no day count was applied* would be false the
+moment a yield is emitted from the same projection; a row that named all three would claim two
+conventions that never ran. The canonical form of §12 renders the two statements differently
+— three names for a generated schedule, `("declared", <day count>, <what the row says>)` for
+a listed one — so a digest can never agree between them. What separates them is the **tag in
+slot 0**: both renderings are three entries long, and no key of `PERIODICITY_FNS` may be
+spelled `declared`, which is asserted rather than assumed. The three-name rendering is byte-for-byte what it has
+always been, so no existing row's digest moved for this.
+
+### 31.5 What the figure additionally excludes
+
+A secondary-market price is a **dirty price**: it includes interest that has accrued since the
+last coupon, and the buyer receives that interest back in the next coupon. Separating it would
+need two facts, and neither may be inferred — the start of the accrual period containing the
+purchase, and the basis interest accrues on within it. Neither is the issue date; what accrual
+actually needs is the **previous coupon date**.
+
+So no accrued-interest figure and no clean price is emitted, and the yield says so: an
+enumerated projection's `HurdleRate.excludes` carries the dirty-price clause that a generative
+one's does not. This is a prohibition rather than a refusal — nothing in the engine computes
+accrued interest today, so a typed refusal for it would be dead code — and the absence is
+proved by a walk over every field of every result record rather than assumed.
+
+### 31.6 The premium at purchase, and what governs it
+
+A holding bought above face and held to the end of its schedule returns face, so the ledger
+realises a **loss equal to the premium** — years later, at redemption, indistinguishable from
+a market movement. That is why the difference is reported as its own figure at purchase:
+
+```text
+paid                 what the owner actually paid, in full
+principal_returned   the repayments this holding will receive, times quantity
+premium_or_discount  paid - principal_returned
+                     positive premium, negative discount, zero par
+realised_under       the declared class governing a disposal of this instrument
+governed_by          the income category that class belongs to
+treatment            outside | nets | per_event
+```
+
+**Against what comes back, not against the nominal face** (FR-025, amended 2026-08-30). For
+a bond that repays its face once the two are the same number, which is every declaration
+this repository ships. They part for a schedule that has already repaid part of its
+principal: a buyer paying the remaining principal exactly has broken even, and the face-based
+reading reported a discount of everything repaid before they arrived — somebody else's trade,
+years earlier, named with the tax treatment that governs it. The figure and the ledger now
+agree by construction, and a worked example asserts that they do
+(`tests/worked_examples/test_enumerated_premium.py`).
+
+The figure is **always present**, carrying a possibly-zero difference, on the same reading
+that makes a zero tax charge cite its exemption: an absent figure meaning *bought at par* is a
+silent default. And this adds **no premium rule** — no amortisation, no imputation, no branch
+of its own. What becomes of the difference is the declared category treatment's business:
+
+- `outside` — the category stands outside the annual calculation on both sides, income and
+  costs alike, so the difference reduces no other base. **An exempt loss buys no shield**,
+  which is Ukraine's answer for ОВДП and the unwelcome half of the exemption.
+- `nets` — the difference reaches the year's netted base, and a negative year carries forward.
+- `per_event` — nothing nets; the difference is realised on its own disposal and nowhere else.
+
+The full cost stays the lot's basis. Nothing is amortised, nothing is imputed, and no part of
+it is reclassified as accrued interest — which is the only honest treatment while the two
+facts §31.5 names are missing.
+
+### 31.7 What is inferred is declared, and the gate checks it
+
+Four things about a transcribed schedule are nobody's statement, and each is declared **in the
+file** as an inference rather than derived in code:
+
+| inference | what it rests on |
+| --- | --- |
+| the **face value** | reading the largest payment in the list as the redemption amount |
+| each payment's **kind** | a human reading a list of numbers that carries no labels |
+| any **minor-unit conversion** | comparing a published figure with a buy price |
+| the **coverage claim** | nothing the publisher says at all |
+
+Each carries a citation beginning `INFERENCE:`, an empty `verified_on`, and a matching
+`[[instrument.verification_task]]` saying what would settle it.
+`scripts/check_provenance.py` refuses a declaration missing either half — its first check of a
+*relation* rather than of a table's shape. No new kind of mark is introduced: an inference is
+an unverified value, and §10.2's propagation carries it.
+
+**Ordering is settled at transcription**, the same declared human step that turns kopecks into
+hryvnia. The loader neither sorts an unordered list nor accepts one; where the source published
+in an order other than ascending, the declaration **records the order it gave**. That an issuer
+publishes the repayment of principal after a coupon dated later than it is a fact about how the
+endpoint reports, and sorting the list is precisely the act that would delete it. Declaring the
+ascending order is refused, so the field cannot become boilerplate.
+
+### 31.8 Nothing downstream knows which form was used
+
+Three modules outside the instrument layer read a generative field before this landed, and all
+three now **ask the declaration a question both forms answer**:
+
+| question | who asks | generative answers | enumerated answers |
+| --- | --- | --- | --- |
+| from what date are the terms known? | `core/ledger/seeds.py` | its issue date | its coverage start |
+| what convention annualises a span? | `core/decision/tuple_outcome.py`, `core/results/project.py` | its day count | its day count |
+| what should a row say about conventions? | `core/results/project.py` | three names | the one that annualises |
+| what does a figure additionally exclude? | both | nothing | the dirty-price clause |
+
+The observation that made this delegation rather than branching: **`seeds.py` never needed an
+issue date.** It needed the earliest date from which the terms are known, and it asked for the
+only spelling that existed.
+
+`tests/contract/test_no_layer_knows_the_form.py` asserts that no module under the ledger, the
+tax engine, the decision layer or the results names the second form — in code **or in prose**.
+The one place that matches on it is `core/instruments/terms.py`, and that is the point:
+somebody must answer, and answering once is what stops four modules deciding separately.
+
+The property this buys is asserted end to end by
+`tests/golden/test_enumerated_matches_generative.py`: a tuple on a bond declared by its terms
+and a tuple on a transcription of that bond's own computed schedule produce equal figures and
+tie in the ranking, differing only in identity, provenance, the stated exclusions, the
+conventions statement and the causation detail prose.
+
+---
 
 The product specification is `docs/reference/SIMULATOR_SPEC.md`; the engine charter and the
 audit of the predecessor project is `docs/reference/REWRITE_BRIEF.md`. Both are read-only

@@ -15,8 +15,8 @@ foot of this file rather than left as a sentence.
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import date, timedelta
-from typing import get_args
+from datetime import timedelta
+from typing import Final, get_args
 
 import pytest
 
@@ -37,6 +37,8 @@ from tests.worked_examples.test_enumerated_schedule import (
 )
 
 HOLD_CASH = Assumptions(consumption_method="fifo", coupon_policy="hold_cash")
+DAY = timedelta(days=1)
+LAST_PAYMENT = max(payment.on for payment in TERMS.payments)
 REINVEST = Assumptions(consumption_method="fifo", coupon_policy="reinvest")
 TAX_CLASSES = {EXEMPT_CLASS.id: EXEMPT_CLASS}
 
@@ -196,28 +198,63 @@ class TestAPurchaseThatIsNotAPurchase:
 
 class TestEveryReasonSurvivesIntoTheOutput:
     """SC-024. A refusal whose reason is dropped between the core and the result is a
-    refusal a reader is never told about."""
+    refusal a reader is never told about.
 
-    def test_the_projection_returns_the_instrument_s_own_refusal_unchanged(self) -> None:
-        early = replace(HOLDING, purchased_on=COVERS_FROM - timedelta(days=1))
-        outcome = project.project(
-            DECLARATION,
-            early,
-            replace(HORIZON, start=early.purchased_on),
-            HOLD_CASH,
-            tax_classes=TAX_CLASSES,
-        )
-        assert isinstance(outcome, InconsistentTerms), outcome
-        assert outcome.reason
-        assert outcome == _events(holding=early, horizon=replace(HORIZON, start=early.purchased_on))
+    ⚙ **A battery over every refusal this form adds**, because that is what SC-024 asks for
+    and one round-tripped case is not it: the requirement is that *no* refusal loses its
+    reason at the seam, and a seam only leaks for some of what crosses it.
+    """
 
-    def test_every_refusal_this_form_adds_carries_a_non_empty_reason(self) -> None:
-        early = replace(HOLDING, purchased_on=date(2026, 1, 1))
-        for outcome in (
-            _events(holding=early, horizon=replace(HORIZON, start=early.purchased_on)),
-            _events(assumptions=REINVEST),
-        ):
-            assert isinstance(outcome, InconsistentTerms), outcome
+    REFUSALS: Final[tuple[tuple[str, Holding], ...]] = (
+        ("purchased before the coverage start", replace(HOLDING, purchased_on=COVERS_FROM - DAY)),
+        ("purchased after every payment", replace(HOLDING, purchased_on=LAST_PAYMENT)),
+        ("no units acquired", replace(HOLDING, quantity=0.0)),
+        ("nothing paid", replace(HOLDING, cost=Money(0.0, COST.currency, COST.provenance))),
+        (
+            "below the minimum ticket",
+            replace(HOLDING, quantity=0.5, cost=Money(500.0, COST.currency, COST.provenance)),
+        ),
+    )
+    """Every refusal reachable by varying the **holding**. The two reachable by varying the
+    assumptions and the horizon are separate parameters below, because they are not holdings.
+    """
+
+    @staticmethod
+    def _projected(
+        *, holding: Holding = HOLDING, horizon: DateRange = HORIZON, policy: Assumptions = HOLD_CASH
+    ) -> object:
+        return project.project(DECLARATION, holding, horizon, policy, tax_classes=TAX_CLASSES)
+
+    @pytest.mark.parametrize(("what", "holding"), REFUSALS, ids=[case[0] for case in REFUSALS])
+    def test_a_refused_holding_reaches_the_result_unchanged(
+        self, what: str, holding: Holding
+    ) -> None:
+        horizon = replace(HORIZON, start=min(HORIZON.start, holding.purchased_on))
+        from_the_core = _events(holding=holding, horizon=horizon)
+        from_the_result = self._projected(holding=holding, horizon=horizon)
+        assert isinstance(from_the_core, InconsistentTerms | InfeasiblePurchase), what
+        assert from_the_result == from_the_core, what
+        assert from_the_core.reason in str(from_the_result), what
+
+    def test_a_refused_policy_reaches_the_result_unchanged(self) -> None:
+        assert self._projected(policy=REINVEST) == _events(assumptions=REINVEST)
+
+    def test_a_refused_horizon_reaches_the_result_unchanged(self) -> None:
+        short = replace(HORIZON, end=LAST_PAYMENT - DAY)
+        assert self._projected(horizon=short) == _events(horizon=short)
+
+    def test_every_one_of_them_carries_a_reason_a_reader_can_act_on(self) -> None:
+        short = replace(HORIZON, end=LAST_PAYMENT - DAY)
+        crossed = [
+            self._projected(
+                holding=holding,
+                horizon=replace(HORIZON, start=min(HORIZON.start, holding.purchased_on)),
+            )
+            for _, holding in self.REFUSALS
+        ] + [self._projected(policy=REINVEST), self._projected(horizon=short)]
+        assert len(crossed) == len(self.REFUSALS) + 2
+        for outcome in crossed:
+            assert isinstance(outcome, InconsistentTerms | InfeasiblePurchase), outcome
             assert len(outcome.reason) > 80, "a reason a reader cannot act on is not a reason"
 
 

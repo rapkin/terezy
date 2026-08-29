@@ -182,8 +182,22 @@ class TestTheBatteryOfBrokenDeclarations:
         assert "instrument" in self._refused(tmp_path, both).field_path
 
     def test_a_declaration_in_neither_form(self, tmp_path: Path) -> None:
-        neither = BASE.replace("[instrument.schedule]", "[instrument.nothing_at_all]", 1)
-        assert self._refused(tmp_path, neither).field_path
+        """FR-002. Neither ``[instrument.terms]`` nor ``[instrument.schedule]``.
+
+        ⚙ Renaming the ``[instrument.schedule]`` header alone does **not** produce this
+        case, and used to: the ``[[instrument.schedule.payment]]`` tables below it recreate
+        ``instrument.schedule`` in TOML, so the declaration was still enumerated and merely
+        missing its scalars -- the same class of failure as the missing-payment-list case
+        two above. Every table under the schedule has to go with it.
+        """
+        neither = (
+            BASE[: BASE.index("[instrument.schedule]")]
+            + BASE[BASE.index("[instrument.constraints]") :]
+        )
+        refused = self._refused(tmp_path, neither)
+        assert refused.field_path == "instrument.schedule"
+        assert "is required and is absent" in refused.problem
+        assert "No default value is substituted" in refused.problem
 
     def test_a_declared_but_empty_payment_list(self, tmp_path: Path) -> None:
         """``payment = []`` -- a list that is there and holds nothing.

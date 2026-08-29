@@ -35,7 +35,7 @@ a generative field. Nothing is projectable yet.
 answer. No module outside `core/instruments/` learns that a second form exists.
 
 - [x] T007 [P] Write `tests/unit/test_terms_answer_both_forms.py`: `known_from`, `day_count_of`, `conventions_of` and `excludes_of` each answer for a hand-built `BondTerms` and a hand-built `EnumeratedTerms`, and `known_from` carries the field path a refusal will name (SC-022) — fails with `ImportError` until T008
-- [x] T008 Create `src/terezy/core/instruments/terms.py`: `TermsKnownFrom` and the four free functions, with the only `match` on the form in `src/`
+- [x] T008 Create `src/terezy/core/instruments/terms.py`: `TermsKnownFrom` and the four free functions, with the only `match` on a declaration's form in `src/` (`results/canonical.py` matches on the conventions statement, which FR-016 requires)
 - [x] T009 `src/terezy/core/ledger/seeds.py` asks `known_from` instead of reading `terms.issue_date`; the refusal keeps its type and names the term the declaration states
 - [x] T010 `src/terezy/core/decision/tuple_outcome.py` asks `day_count_of` and gains `_excludes_of` beside it; **correct `_day_count_of`'s docstring** — the convention did not size an enumerated instrument's flows (FR-016)
 - [x] T011 `src/terezy/core/results/project.py` asks `conventions_of`, `day_count_of` and `excludes_of`; it constructs no `ConventionsApplied` of its own and tests no form
@@ -137,12 +137,12 @@ purchase price.
 
 ## Phase 8: The premium, and the figures that state it
 
-**Goal**: FR-024 to FR-026. This is the phase that moves two goldens.
+**Goal**: FR-024 to FR-026. This is the phase that moves the golden.
 
 - [x] T045 [P] Write `tests/worked_examples/test_enumerated_premium.py`: a purchase above face reports the premium as its own figure, names the category treatment, and records the full cost as the lot's basis; under the exempt category the year's liability is zero, the carryforward is absent and no other category's base moves; under the netting category the same premium reduces that category's netted base by exactly the hand-computed amount and carries forward when the year is negative — the two runs differing only in the declared category (SC-016)
 - [x] T046 Add `PurchasePremium` to `src/terezy/core/results/project.py` and the `at_purchase` field to `Projection`; it names the treatment of the category the disposal class belongs to and nothing else decides it (FR-025, FR-026)
 - [x] T047 Add it to `results.canonical.of_projection`, and to `tests/golden/test_end_to_end_ovdp.py`'s rendering
-- [x] T048 Regenerate the two goldens with `TEREZY_UPDATE_GOLDEN=1`, read the diff, and quote the changed lines in the commit message (constitution 1.2.0, Principle V)
+- [x] T048 Regenerate the golden with `TEREZY_UPDATE_GOLDEN=1`, read the diff, and quote the changed lines in the commit message (constitution 1.2.0, Principle V)
 
 **Checkpoint**: SC-016 green, goldens regenerated deliberately. Commit.
 
@@ -155,7 +155,8 @@ purchase price.
 - [x] T051 [P] Flip `specs/features.toml`'s `013-enumerated-schedule` status to `in-progress` at the first implementation commit
 - [x] T052 Run `/condense` over the branch diff — one fact, one place. Done: one narrowing helper in place of two, the two-epistemic-situations argument stated once, and the 32-issue measurement converted from four docstrings into `tests/contract/test_the_observation_the_form_rests_on.py`
 - [x] T053 `/code-review` round one over `a93520d..HEAD`, and fix its findings. Eight findings, one top-severity (a repayment retiring its share of *every* declared repayment rather than of the ones this holding receives). All fixed; see the fix commit
-- [ ] T054 `/code-review` round two, over the diff that will actually land. **The round-one review is spent**: the branch changed after it, and CLAUDE.md is explicit that a review of a diff that no longer exists is not a review of what is being merged. Round one also reported what it did *not* reach — every spec artefact, the golden file, three of the four data fixtures, and eleven test modules beyond their headers — so round two has a stated scope rather than a fresh sweep
+- [x] T054 `/code-review` round two, over the diff that will actually land. Twenty-one findings, one requiring an owner decision (FR-025's base, amended) and one top-severity documentation defect (METHODOLOGY teaching the rule round one had just fixed). All addressed
+- [ ] T055 `/code-review` round three, over the diff that will actually land. **Round two is spent**: the branch changed after it, and CLAUDE.md is explicit that a review of a diff that no longer exists is not a review of what is being merged. Round one also reported what it did *not* reach — every spec artefact, the golden file, three of the four data fixtures, and eleven test modules beyond their headers — so round two has a stated scope rather than a fresh sweep
 
 ---
 

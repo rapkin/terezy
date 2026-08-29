@@ -74,18 +74,21 @@ def _walk(value: Any, path: str, seen: set[int], found: list[str]) -> None:
     if id(value) in seen:
         return
     seen.add(id(value))
+    for name, child in _children(value, path):
+        if any(word in name.rsplit(".", maxsplit=1)[-1] for word in FORBIDDEN):
+            found.append(name)
+        _walk(child, name, seen, found)
+
+
+def _children(value: Any, path: str) -> list[tuple[str, Any]]:
+    """Everything reachable from one value, named. The one traversal both walks share."""
     if is_dataclass(value) and not isinstance(value, type):
-        for field in fields(value):
-            name = f"{path}.{field.name}"
-            if any(word in field.name for word in FORBIDDEN):
-                found.append(name)
-            _walk(getattr(value, field.name), name, seen, found)
-    elif isinstance(value, (tuple, list, frozenset, set)):
-        for index, item in enumerate(value):
-            _walk(item, f"{path}[{index}]", seen, found)
-    elif isinstance(value, dict):
-        for key, item in value.items():
-            _walk(item, f"{path}[{key!r}]", seen, found)
+        return [(f"{path}.{field.name}", getattr(value, field.name)) for field in fields(value)]
+    if isinstance(value, (tuple, list, frozenset, set)):
+        return [(f"{path}[{index}]", item) for index, item in enumerate(value)]
+    if isinstance(value, dict):
+        return [(f"{path}[{key!r}]", item) for key, item in value.items()]
+    return []
 
 
 def test_no_field_of_any_result_record_splits_the_purchase_price() -> None:
@@ -112,17 +115,19 @@ def test_the_walk_reaches_the_records_that_could_hold_such_a_field() -> None:
 
 
 def _collect(value: Any, path: str, seen: set[int], found: list[str]) -> None:
-    """The same walk, recording every name rather than only the forbidden ones."""
+    """:func:`_walk` with every name recorded rather than only the forbidden ones.
+
+    ⚙ It has to traverse **exactly** what `_walk` traverses, or the non-vacuity check proves
+    reachability under a narrower walk than the one doing the work -- which it did until
+    2026-08-30, missing `_walk`'s ``dict`` arm. The two are kept in step by sharing this
+    function's body with `_walk` through :func:`_children`.
+    """
     if id(value) in seen:
         return
     seen.add(id(value))
     found.append(path)
-    if is_dataclass(value) and not isinstance(value, type):
-        for field in fields(value):
-            _collect(getattr(value, field.name), f"{path}.{field.name}", seen, found)
-    elif isinstance(value, (tuple, list, frozenset, set)):
-        for index, item in enumerate(value):
-            _collect(item, f"{path}[{index}]", seen, found)
+    for name, child in _children(value, path):
+        _collect(child, name, seen, found)
 
 
 def test_the_walk_would_catch_a_split_if_one_were_added() -> None:

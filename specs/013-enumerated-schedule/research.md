@@ -92,7 +92,7 @@ SC-003 records its scan as unable to catch.
 
 **Decision.** `results.canonical.of_conventions` returns `(periodicity, day_count,
 business_day_rule)` for `ConventionsApplied` — byte-for-byte what it returns today — and
-`("declared", day_count)` for `AmountsAsDeclared`.
+`("declared", day_count, reason)` for `AmountsAsDeclared`.
 
 **Rationale.** FR-016 and SC-010 require the golden encoding to distinguish the two. A
 2-tuple can never equal a 3-tuple, so they are distinguished by shape as well as by the tag.
@@ -187,12 +187,13 @@ declared `kind = "coupon"` would be reported as naming an undeclared observation
 true statement about the wrong field. This is the same trap `LEG_KIND_KEY` exists for. The
 payment's label is therefore `pays`.
 
-## D9 — The premium is a figure on the projection, and it moves two goldens
+## D9 — The premium is a figure on the projection, and it moves the golden
 
 **Decision.** `Projection` gains `at_purchase: PurchasePremium` — always present, carrying a
 possibly-zero difference, the cost, `face × quantity`, and the treatment of the category the
 disposal class belongs to. It is appended to `results.canonical.of_projection`, so the
-recorded digests of the existing goldens move by one entry.
+recorded digest of the one golden on this path
+(`tests/golden/ovdp_synthetic_a.golden.txt`) moves.
 
 **Rationale.** FR-025 conditions the figure on the *amounts* (*"where the purchase cost
 differs from face value times quantity"*), not on the form, so a generative projection

@@ -59,9 +59,17 @@ them, and a file that supplies one fails on the unrecognised field (SC-019).
 terms: BondTerms | EnumeratedTerms
 ```
 
-This one line is FR-002's mechanism. Every existing `declaration.terms.issue_date`,
-`.coupon_rate`, `.periodicity`, `.business_day_rule`, `.maturity_date` and `.day_count` stops
-type-checking, and `mypy --strict` enumerates the sites — the type checker, not a reviewer.
+This one line is FR-002's mechanism for **five of the six** terms. Every existing
+`declaration.terms.issue_date`, `.coupon_rate`, `.periodicity`, `.business_day_rule` and
+`.maturity_date` stops type-checking, and `mypy --strict` enumerates those sites — the type
+checker, not a reviewer.
+
+⚙ **`.day_count` is the exception, and it is the one FR-011a cares most about**: both forms
+carry one, so a sealed module reading `declaration.terms.day_count` directly type-checks and
+silently stops asking the declaration. Nothing in the toolchain objects. That gap is closed
+by an assertion instead — `tests/contract/test_no_layer_knows_the_form.py` forbids the read
+inside the seal — and it is recorded here because the union's promise reads as total and is
+not.
 
 ### `AmountsAsDeclared` — `core/primitives/conventions.py`
 
@@ -93,9 +101,9 @@ FR-025, FR-026. Always present on a `Projection`, carrying a possibly-zero diffe
 | Field | Type | Meaning |
 |---|---|---|
 | `paid` | `Money` | What was paid, in full, exactly as stated. Nothing is amortised or reclassified (FR-024). Named `paid` rather than `cost`, which `tests/contract/test_cost_labels.py` forbids on a result record. |
-| `at_face` | `Money` | `face_value × quantity`. |
-| `difference` | `Money` | `paid − at_face`. Positive is a premium, negative a discount, zero is par and says so. |
-| `tax_class_id` | `str` | The class the disposal is taxed under. |
+| `principal_returned` | `Money` | The repayments this holding will receive, times quantity. **Not `face_value × quantity`** — FR-025 amended 2026-08-30; the two coincide for a bond that repays its face once. |
+| `difference` | `Money` | `paid − principal_returned`. Positive is a premium, negative a discount, zero is par and says so. |
+| `tax_class_id` | `str \| None` | The class the disposal is taxed under, or `None` where the declaration names none — a different fault from the rules mapping no category to it, and reported as one. |
 | `governed_by` | `GovernedBy \| TreatmentUnstated` | The declared category and its treatment — `outside`, `nets`, `per_event` — with what it means for this difference; or a typed statement that the run was given no assessment rules, because those three are different claims and none is assumed. |
 
 ## Declaration files
@@ -173,4 +181,7 @@ failures.
 | Purchase, or declared opening lot, dated before `covers_from` | `InconsistentTerms`, naming both dates | FR-014, SC-008 |
 | Coupon policy `reinvest` | `InconsistentTerms`, naming the missing price and refusing to substitute face | FR-015, SC-009 |
 | Horizon ending before the last enumerated payment | `InconsistentTerms` | Edge Cases |
+| A purchase dated on or after every payment the schedule declares | `InconsistentTerms` — it receives nothing, so there is no holding to project and no series to yield on | research D6 |
+| A purchase after every repayment of principal | `InconsistentTerms` — coupons on a position nothing closes | research D6 |
+| A horizon opening after the purchase, or running backwards | `InconsistentTerms` | as the generative form |
 | Quantity ≤ 0, cost ≤ 0, cost below the minimum ticket | as the generative form | unchanged |

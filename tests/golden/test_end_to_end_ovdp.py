@@ -368,7 +368,7 @@ def _figures(result: Projection) -> Iterable[str]:
 
 
 def _at_purchase(figure: PurchasePremium) -> Iterable[str]:
-    """What was paid against what face comes to, and the declared treatment that governs it.
+    """What was paid against what comes back as principal, and the treatment that governs it.
 
     ⚙ Rendered because it is a figure the projection now reports (013 FR-025). This bond is
     bought at par, so the difference is **zero** -- and a zero here says *par* rather than
@@ -376,7 +376,7 @@ def _at_purchase(figure: PurchasePremium) -> Iterable[str]:
     there is a premium.
     """
     yield f"paid                         {_money(figure.paid)}"
-    yield f"at_face                      {_money(figure.at_face)}"
+    yield f"principal_returned           {_money(figure.principal_returned)}"
     yield f"premium_or_discount          {_money(figure.difference)}"
     yield f"realised_under               {figure.tax_class_id}"
     match figure.governed_by:

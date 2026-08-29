@@ -388,8 +388,15 @@ class EnumeratedInstrumentTable(BaseModel):
     """Unchanged, and it must cover every income kind the schedule produces (FR-009)."""
 
     verification_task: list[EnumeratedVerificationTaskTable]
-    """What is inferred, and what would settle it. Required and non-empty: every declared
-    schedule rests on inferences, and a file claiming none has not looked."""
+    """What is inferred, and what would settle it.
+
+    The **key** is required here; that the list covers every inference is
+    ``scripts/check_provenance.py``'s check, and it errors and exits 1 on a file that misses
+    one. This model has no ``min_length``, so an empty list validates and the loader's
+    per-entry checks then loop zero times -- which is correct division of labour and was not
+    what this docstring said: it claimed "required and non-empty" and attributed to the
+    schema an enforcement that lives in the gate.
+    """
 
 
 class EnumeratedInstrumentFile(BaseModel):

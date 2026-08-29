@@ -76,11 +76,22 @@ itself sufficient is the one nobody adds a second lock to.
 
 ```
 ConventionsApplied  ->  (periodicity, day_count, business_day_rule)
-AmountsAsDeclared   ->  ("declared", day_count)
+AmountsAsDeclared   ->  ("declared", day_count, reason)
 ```
 
-A 2-tuple can never equal a 3-tuple. The generative arm is byte-for-byte what it is today, so
-no generative row's canonical bytes move.
+**The tag in slot 0 is the separation**, and it is the only one: both renderings are three
+entries long. A generative rendering opens with a periodicity, so what keeps the two apart is
+that no key of `conventions.PERIODICITY_FNS` may be spelled `"declared"` — asserted by
+`tests/unit/test_conventions_statement.py`, because the property is now load-bearing rather
+than incidental.
+
+⚙ This paragraph said *"a 2-tuple can never equal a 3-tuple"* until 2026-08-30, and the
+declared rendering had by then gained the statement's own words — which it needs, for the
+reason the ledger's canonical form includes a causation's `detail`. The arity argument was
+true when written and stopped being true in the same branch.
+
+The generative arm is byte-for-byte what it is today, so no generative row's canonical bytes
+move.
 
 ## 6. What the data boundary promises
 

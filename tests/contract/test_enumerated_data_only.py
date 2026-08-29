@@ -169,13 +169,28 @@ class TestAThirdIssueNeedsAFileAndNothingElse:
             (date(2027, 3, 1), 2_000.0),
         ]
 
-    def test_its_own_declared_day_count_annualises_its_own_yield(self, tmp_path: Path) -> None:
-        """The point of declaring a different one: 30/360 rather than the shipped act/365,
-        so the file proves the convention is data rather than an engine constant."""
+    def test_it_declares_a_convention_the_shipped_fixtures_do_not(self, tmp_path: Path) -> None:
+        """What a *data-only* test can honestly claim about the day count: a third file
+        naming a convention no shipped declaration names loads, projects and annualises on
+        it, with no engine edit.
+
+        ⚙ It cannot claim the convention is what **moved** the yield, and used to: the two
+        instruments differ in five things, so a different yield is over-determined and the
+        assertion held with the day counts made identical. The single-variable version --
+        one declaration, one field changed -- is `test_enumerated_yield.py`, and
+        `test_day_count_reaches_no_amount.py` holds the bit-identity half.
+        """
         root = _scratch(tmp_path)
-        third = _projected(root, THIRD)
-        shipped = _projected(root, SHIPPED)
-        assert not is_close(third.hurdle.nominal_ytm.value, shipped.hurdle.nominal_ytm.value)
+        declarations = resolver.from_data_root(root)
+        terms = declarations.instruments[THIRD].terms
+        assert isinstance(terms, EnumeratedTerms)
+        assert terms.day_count == "30/360"
+        assert terms.day_count not in {
+            declared.terms.day_count
+            for identifier, declared in declarations.instruments.items()
+            if identifier != THIRD and isinstance(declared.terms, EnumeratedTerms)
+        }, "no shipped declaration of this form names it, so the file is what carries it"
+        assert _projected(root, THIRD).hurdle.nominal_ytm.value > 0.0
 
     def test_it_reaches_the_declared_exemption_with_no_extra_declaration(
         self, tmp_path: Path

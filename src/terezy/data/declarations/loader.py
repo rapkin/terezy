@@ -136,9 +136,15 @@ JURISDICTION_TABLE: Final = "jurisdiction"
 def _as_fraction(percent: float) -> float:
     """A declared percentage as the fraction the core works in: ``15.5`` -> ``0.155``.
 
-    The **only** division by 100 in the project. Every ``_pct`` field goes through here
-    and no other code performs the conversion, which is what makes "exactly once, at the
-    boundary" a checkable claim rather than a convention.
+    The only place a declared **percentage** becomes a fraction, and the only division by
+    100 in this module: every ``_pct`` field goes through here, which is what makes "exactly
+    once, at the boundary" a checkable claim rather than a convention.
+
+    ⚙ It is **not** the only division by 100 in the project -- `core.inflation.series` turns
+    a CPI observation published against the previous month = 100 into a growth factor -- and
+    this docstring said it was, twice, after feature 007 landed that one.
+    ``tests/contract/test_nothing_is_inferred.py`` holds the project-wide version, with each
+    permitted site named beside its reason and pinned to exactly one division each.
     """
     return percent / _PERCENT
 

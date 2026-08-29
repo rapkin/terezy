@@ -24,9 +24,11 @@ A reference that *resolves to the wrong section* is the failure this exists to m
 impossible, and a partial scope is what lets one survive. So the scope's own limits, measured
 2026-08-24 rather than assumed:
 
-- **`data/` is 31 TOML files and one markdown**, and only the markdown is read. The curated
-  legal prose lives in TOML `source` and `note` strings. None of them cites a section today,
-  which is why the suffix list is not widened -- but the tree is covered in name only.
+- **Under `data/`, only the markdown is read** -- the curated legal prose lives in TOML
+  `source` and `note` strings, none of which cites a section today, which is why the suffix
+  list is not widened. The tree is covered in name only. (The count of TOML files was
+  written out here as 31 and was 37 four features later; a number nobody re-measures is
+  worse than the shape of the gap, which does not change.)
 - **This file is in the walk and matches nothing** -- zero, measured. Its own section
   references, the dead `§23.6` it quotes as history included, are never preceded by the word
   METHODOLOGY, so the pattern does not see them. It reads itself in the sense that costs

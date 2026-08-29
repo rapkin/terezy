@@ -57,8 +57,10 @@ import pytest
 from terezy.core.instruments.interface import (
     Assumptions,
     DateRange,
+    EnumeratedTerms,
     Holding,
     InstrumentDeclaration,
+    PaymentKind,
 )
 from terezy.core.instruments.registry import ops_for
 from terezy.core.ledger import engine
@@ -68,7 +70,7 @@ from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.tolerance import is_close
 from terezy.core.results import project
-from terezy.core.results.project import GovernedBy, Projection
+from terezy.core.results.project import GovernedBy, Projection, PurchasePremium
 from terezy.core.tax import flat_rate
 from terezy.core.tax import year as tax_year
 from terezy.core.tax.interface import TaxableEventKind, TaxCharge, TaxContext
@@ -81,6 +83,7 @@ pytestmark = pytest.mark.worked_example
 UAH: Final = Currency.UAH
 TAXABLE: Final = "enumerated_taxable_x"
 NETTING_CATEGORY: Final = "synthetic_netting"
+NETTING_CLASS: Final = "synthetic_enumerated_disposal"
 EXEMPT_CATEGORY: Final = "exempt_securities"
 EXEMPT_CLASS: Final = "ua_government_bond"
 
@@ -175,6 +178,21 @@ def _year(*lots: Holding, jurisdiction: str, class_id: str) -> tax_year.AnnualSt
     return statement
 
 
+def _under(class_id: str) -> InstrumentDeclaration:
+    """The fixture with both its income kinds taxed under one declared class.
+
+    The two runs of SC-016 differ in the category their disposal class belongs to, and this
+    is how: the schedule, the holdings and the horizon are the same objects.
+    """
+    return replace(
+        DECLARED,
+        tax_classes={
+            TaxableEventKind.COUPON: class_id,
+            TaxableEventKind.DISPOSAL_GAIN: class_id,
+        },
+    )
+
+
 def _projected(lot: Holding) -> Projection:
     outcome = project.project(
         DECLARED,
@@ -191,10 +209,10 @@ def _projected(lot: Holding) -> Projection:
 class TestThePremiumIsReportedAsItsOwnFigure:
     """FR-025. Visible at purchase rather than surfacing only as a loss years later."""
 
-    def test_it_is_what_was_paid_less_face_times_quantity(self) -> None:
+    def test_it_is_what_was_paid_less_what_comes_back_as_principal(self) -> None:
         figure = _projected(LOT_A).at_purchase
         assert figure.paid.amount == 10_300.00
-        assert figure.at_face.amount == 10_000.00
+        assert figure.principal_returned.amount == 10_000.00
         assert is_close(figure.difference.amount, PREMIUM)
 
     def test_a_discount_is_the_same_figure_with_the_other_sign(self) -> None:
@@ -218,6 +236,113 @@ class TestThePremiumIsReportedAsItsOwnFigure:
         assert disposal.consumed_basis_base_ccy.amount == 10_300.00
 
 
+class TestAPurchaseMadeAfterARepaymentOfPrincipal:
+    """FR-025 as amended (2026-08-30): the difference is measured against what **this
+    holding** gets back, not against the nominal face.
+
+    The case the enumerated form exists for, and the one every shipped fixture hides: all
+    four repay their whole face once, so face and remaining principal coincide and the wrong
+    rule reports the right number. An amortising issue parts them.
+
+    ```
+    face 1 000.00 per unit, repaid 500.00 on 2026-06-05 and 500.00 on 2026-12-05
+    bought 2026-08-01, after the first repayment, at 500.00 per unit -- the principal that
+    is left, exactly. A break-even trade.
+
+      what comes back      10 x 500.00  =  5 000.00
+      paid                                 5 000.00
+      difference                               0.00      par, and it says par
+
+    measured against the nominal face it would read
+      at_face              10 x 1 000.00 = 10 000.00
+      difference                           -5 000.00     a discount of everything the
+                                                         previous holder was already repaid
+    ```
+    """
+
+    HALVES: Final = 500.00
+    BOUGHT_ON: Final = date(2026, 8, 1)
+
+    @staticmethod
+    def _amortising() -> InstrumentDeclaration:
+        """The shipped fixture with its one repayment split into two, the first already
+        made by the time this buyer arrives. Nothing else moves."""
+        terms = DECLARED.terms
+        assert isinstance(terms, EnumeratedTerms)
+        repayment = next(
+            payment for payment in terms.payments if payment.pays is PaymentKind.PRINCIPAL_REPAYMENT
+        )
+        halved = Money(
+            TestAPurchaseMadeAfterARepaymentOfPrincipal.HALVES,
+            UAH,
+            repayment.amount.provenance,
+        )
+        payments = tuple(
+            sorted(
+                [payment for payment in terms.payments if payment is not repayment]
+                + [
+                    replace(repayment, on=date(2026, 6, 5), amount=halved),
+                    replace(repayment, amount=halved),
+                ],
+                key=lambda payment: (payment.on, payment.pays.value),
+            )
+        )
+        return replace(DECLARED, terms=replace(terms, payments=payments))
+
+    def _bought_at(self, per_unit: float) -> PurchasePremium:
+        outcome = project.project(
+            self._amortising(),
+            _holding(on=self.BOUGHT_ON, paid=per_unit * 10.0),
+            replace(HORIZON, start=self.BOUGHT_ON),
+            HOLD_CASH,
+            tax_classes=DECLARATIONS.tax_classes,
+            assessment_rules=RULES["synthetic_fixture"],
+        )
+        assert isinstance(outcome, Projection), outcome
+        return outcome.at_purchase
+
+    def test_what_comes_back_is_the_principal_still_to_be_repaid(self) -> None:
+        assert self._bought_at(self.HALVES).principal_returned.amount == 5_000.00
+
+    def test_paying_exactly_that_reports_par(self) -> None:
+        """The assertion that fails on the nominal face: it reported a discount of
+        5 000.00 -- a figure describing the previous holder's trade -- and named the tax
+        treatment that governs it, inside the canonical digest."""
+        assert self._bought_at(self.HALVES).difference.amount == 0.0
+
+    def test_and_the_ledger_agrees_that_the_trade_broke_even(self) -> None:
+        """The figure and the fold have to say the same thing, or one of them is wrong. A
+        realised gain of zero beside a reported discount of 5 000.00 is the shape of the
+        defect this pins."""
+        outcome = project.project(
+            self._amortising(),
+            _holding(on=self.BOUGHT_ON, paid=self.HALVES * 10.0),
+            replace(HORIZON, start=self.BOUGHT_ON),
+            HOLD_CASH,
+            tax_classes=DECLARATIONS.tax_classes,
+            assessment_rules=RULES["synthetic_fixture"],
+        )
+        assert isinstance(outcome, Projection), outcome
+        realised = sum(
+            disposal.realised_gain_base_ccy.amount for disposal in outcome.ledger.disposals
+        )
+        assert is_close(realised, 0.0)
+        assert is_close(outcome.at_purchase.difference.amount, realised)
+
+    def test_a_premium_over_the_remaining_principal_is_still_a_premium(self) -> None:
+        """The rule is not "always par": it measures against a different, correct base."""
+        assert is_close(self._bought_at(self.HALVES + 30.0).difference.amount, 300.00)
+
+    def test_a_bond_that_repays_its_face_once_is_unaffected(self) -> None:
+        """Why this was latent. For every declaration this repository ships, the amended
+        rule and the old one give the same number -- which is exactly why the wrong rule
+        passed every test on the branch that introduced it."""
+        terms = DECLARED.terms
+        assert isinstance(terms, EnumeratedTerms)
+        figure = _projected(LOT_A).at_purchase
+        assert figure.principal_returned.amount == terms.face_value.amount * 10.0
+
+
 class TestUnderTheNettingCategory:
     """FR-026, and the case the specification refused to leave hypothetical."""
 
@@ -227,29 +352,25 @@ class TestUnderTheNettingCategory:
                 LOT_A,
                 LOT_B,
                 jurisdiction="synthetic_fixture",
-                class_id="synthetic_enumerated_disposal",
+                class_id=NETTING_CLASS,
             ).netted_base.amount,
             NETTED_BASE,
         )
 
     def test_the_liability_is_the_hand_computed_one(self) -> None:
-        statement = _year(
-            LOT_A, LOT_B, jurisdiction="synthetic_fixture", class_id="synthetic_enumerated_disposal"
-        )
+        statement = _year(LOT_A, LOT_B, jurisdiction="synthetic_fixture", class_id=NETTING_CLASS)
         assert is_close(tax_year.liability_total(statement.liability).amount, NETTED_LIABILITY)
 
     def test_the_premium_reduces_the_base_by_exactly_itself(self) -> None:
         """The assertion FR-026 asks for, made as a difference between two runs so that the
         premium's effect is isolated from everything else in the year."""
         at_par = _holding(on=date(2026, 1, 5), paid=10_000.00)
-        with_premium = _year(
-            LOT_A, LOT_B, jurisdiction="synthetic_fixture", class_id="synthetic_enumerated_disposal"
-        )
+        with_premium = _year(LOT_A, LOT_B, jurisdiction="synthetic_fixture", class_id=NETTING_CLASS)
         without = _year(
             at_par,
             LOT_B,
             jurisdiction="synthetic_fixture",
-            class_id="synthetic_enumerated_disposal",
+            class_id=NETTING_CLASS,
         )
         assert is_close(without.netted_base.amount, BASE_WITHOUT_THE_PREMIUM)
         assert is_close(without.netted_base.amount - with_premium.netted_base.amount, PREMIUM)
@@ -265,7 +386,7 @@ class TestUnderTheNettingCategory:
             LOT_A,
             smaller_gain,
             jurisdiction="synthetic_fixture",
-            class_id="synthetic_enumerated_disposal",
+            class_id=NETTING_CLASS,
         )
         assert is_close(statement.netted_base.amount, -CARRIED)
         assert statement.liability.base.amount == 0.0
@@ -275,50 +396,99 @@ class TestUnderTheNettingCategory:
 
 
 class TestUnderTheExemptCategory:
-    """The two runs differ in the declared category and in nothing else."""
+    """The two runs differ in the declared category and in nothing else.
 
-    @staticmethod
-    def _exempt(declared: InstrumentDeclaration) -> InstrumentDeclaration:
-        return replace(
-            declared,
-            tax_classes={
-                TaxableEventKind.COUPON: EXEMPT_CLASS,
-                TaxableEventKind.DISPOSAL_GAIN: EXEMPT_CLASS,
-            },
-        )
+    ⚙ **This class used to be structurally vacuous and is rewritten.** It built charges for
+    the exempt class alone, and `tax_year.statements` emits one statement per category
+    *present in the charges* — so *"every statement is the exempt category"* could not fail,
+    and the liability assertion was determined by rates of 0.0 rather than by the treatment.
+    All three assertions passed unchanged if `exempt_securities` had been declared
+    `nets`/`unlimited`, which is the one thing they existed to distinguish.
+
+    What tells the treatments apart is the **netted base**: `outside` leaves nothing to net,
+    `nets` accumulates 700.00 from the same two lots. So that is what is asserted, and the
+    same run is put through both category declarations so the difference is visible rather
+    than described.
+    """
 
     def test_the_year_owes_nothing(self) -> None:
         statement = _year(LOT_A, LOT_B, jurisdiction="ua", class_id=EXEMPT_CLASS)
         assert statement.category == EXEMPT_CATEGORY
         assert tax_year.liability_total(statement.liability).amount == 0.0
 
+    def test_the_recorded_base_is_arithmetic_and_the_treatment_is_the_claim(self) -> None:
+        """`netted_base` is **700.00 under the exempt category too**, and that is feature
+        009's design rather than a leak: `core.tax.year` sums the charges for every
+        treatment and says so -- *"what distinguishes the two treatments is not the
+        arithmetic but the claim, and ``AnnualStatement.treatment`` carries it."*
+
+        Asserted rather than assumed, because the obvious thing to write here is
+        ``netted_base == 0`` and it is false. A test asserting it would have been red for
+        the right reason and got itself "fixed" by weakening whichever half was easier.
+        """
+        exempt = _year(LOT_A, LOT_B, jurisdiction="ua", class_id=EXEMPT_CLASS)
+        netting = _year(LOT_A, LOT_B, jurisdiction="synthetic_fixture", class_id=NETTING_CLASS)
+        assert is_close(exempt.netted_base.amount, netting.netted_base.amount)
+        assert exempt.treatment is tax_year.Treatment.OUTSIDE
+        assert netting.treatment is tax_year.Treatment.NETS
+
+    def test_the_two_treatments_would_not_pass_for_each_other(self) -> None:
+        """The mutation the previous version of this class could not survive: every one of
+        its assertions held whether `exempt_securities` was declared `outside`/`none` or
+        `nets`/`unlimited`, which is the one distinction it existed to draw.
+
+        What survives the zero rates is the **carryforward**. A liability comparison does
+        not: an exempt class charges 0% and a `nets` category over 0% rates would owe
+        nothing either, so a zero liability says nothing about the treatment. A loss that
+        creates a carryforward under one declaration and none under the other does.
+        """
+        smaller_gain = _holding(on=date(2026, 1, 6), paid=9_900.00)
+        exempt = _year(LOT_A, smaller_gain, jurisdiction="ua", class_id=EXEMPT_CLASS)
+        netting = _year(
+            LOT_A, smaller_gain, jurisdiction="synthetic_fixture", class_id=NETTING_CLASS
+        )
+        assert is_close(exempt.netted_base.amount, netting.netted_base.amount), (
+            "the same two lots, so the arithmetic is the same and only the declared "
+            "treatment differs -- which is what makes the next line a test of the treatment"
+        )
+        assert exempt.carryforward is None
+        assert netting.carryforward is not None
+
     def test_nothing_carries_forward(self) -> None:
         """`carryforward = "none"`: an exempt loss buys no shield, which is the unwelcome
-        half of the exemption and the half that has to be modelled."""
-        statement = _year(LOT_A, LOT_B, jurisdiction="ua", class_id=EXEMPT_CLASS)
-        assert statement.carryforward is None
+        half of the exemption and the half that has to be modelled.
 
-    def test_no_other_category_s_base_moves_by_any_amount(self) -> None:
-        """`outside` means outside on both sides. The premium reduces nothing anywhere."""
-        events = _events(LOT_A, LOT_B)
-        state = engine.fold(events, base_currency=UAH, consumption_method="fifo")
-        built = tax_year.statements(
-            state,
-            _charges(state, events, class_id=EXEMPT_CLASS),
-            rules=RULES["ua"],
-            tax_classes=DECLARATIONS.tax_classes,
-            filing=tax_years.filing(y2025=True, y2026=True),
-            switches=tax_years.positions(),
+        Asserted against the netting category's own carryforward on the same lots, so the
+        claim is *this treatment does not carry* rather than *nothing carried today*.
+        """
+        smaller_gain = _holding(on=date(2026, 1, 6), paid=9_900.00)
+        assert (
+            _year(LOT_A, smaller_gain, jurisdiction="ua", class_id=EXEMPT_CLASS).carryforward
+            is None
         )
-        assert isinstance(built, tuple), built
-        assert {statement.category for statement in built} == {EXEMPT_CATEGORY}
-        assert all(
-            tax_year.liability_total(statement.liability).amount == 0.0 for statement in built
-        )
+        carried = _year(
+            LOT_A, smaller_gain, jurisdiction="synthetic_fixture", class_id=NETTING_CLASS
+        ).carryforward
+        assert carried is not None
+        assert is_close(carried.created.amount, CARRIED)
+
+    def test_nothing_leaves_the_year_for_another_one_to_use(self) -> None:
+        """SC-016's *"no other category's base moves by any amount"*, said in the only terms
+        an annual statement can say it: a category's result reaches another year or another
+        category **only** through a carryforward, and `outside`/`none` creates none.
+
+        The previous version looped over the statements this run produced and found only the
+        category it had built charges for -- true, and determined by the input.
+        """
+        smaller_gain = _holding(on=date(2026, 1, 6), paid=9_900.00)
+        for lots in ((LOT_A, LOT_B), (LOT_A, smaller_gain)):
+            statement = _year(*lots, jurisdiction="ua", class_id=EXEMPT_CLASS)
+            assert statement.carryforward is None
+            assert tax_year.liability_total(statement.liability).amount == 0.0
 
     def test_the_figure_names_that_treatment_instead(self) -> None:
         outcome = project.project(
-            self._exempt(DECLARED),
+            _under(EXEMPT_CLASS),
             LOT_A,
             HORIZON,
             HOLD_CASH,

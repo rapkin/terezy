@@ -508,11 +508,26 @@ missing an inference's citation and watch the provenance gate fail.
   stated. Nothing is amortised, nothing is imputed, and no part of it is reclassified as
   accrued interest — which is the only honest treatment while the two facts FR-017 names
   are missing.
-- **FR-025**: Where the purchase cost differs from face value times quantity, the difference
-  MUST be reported as its own named figure on the projection, so that a premium or discount
-  is visible rather than surfacing only as a realised gain or loss at redemption. Its
+- **FR-025**: Where the purchase cost differs from **the principal this holding will
+  receive** times quantity, the difference MUST be reported as its own named figure on the
+  projection, so that a premium or discount is visible rather than surfacing only as a
+  realised gain or loss at redemption. Its
   treatment MUST be the declared tax category's and nothing else: this feature MUST NOT
-  introduce a premium rule, an amortisation, or a branch of its own. ⚙ For the **shipped**
+  introduce a premium rule, an amortisation, or a branch of its own.
+  ⚙ **Amended 2026-08-30, on the owner's decision, from "face value times quantity".** The
+  original wording is right for a bond that repays its whole face once and wrong for the
+  Edge Case two entries above — *Several principal repayments — valid* — which this same
+  specification requires. For a schedule that has already repaid part of its principal
+  before the purchase, a unit is a unit of what **remains**: a buyer paying the remaining
+  principal exactly has broken even, and measuring them against the nominal face reports a
+  discount of everything repaid before they arrived — a figure describing somebody else's
+  trade, years earlier, carried into the canonical digest and named with the tax treatment
+  that governs it. The amendment also makes this figure agree with the ledger it sits beside:
+  **the share of what this holding receives** is already the rule by which a repayment
+  retires units, and paid-versus-received measuring "received" differently from the fold
+  would be one rule contradicting itself in two places. Where the schedule repays its face
+  once — every declaration this repository ships — the two readings give the same number,
+  which is why the defect was latent and would have shipped. ⚙ For the **shipped**
   ОВДП declarations that motivate this feature, that treatment is already declared and cited
   — `exempt_securities` is `treatment = "outside"`, `carryforward = "none"`, on пп. 170.2.8
   «б» and its last paragraph, which excludes **both** income and acquisition costs from the
@@ -638,15 +653,24 @@ missing an inference's citation and watch the provenance gate fail.
   here rather than only forbidden there. (FR-003c, FR-008, FR-021)
 - **SC-015**: An enumerated projection's yield figure states the dirty-price exclusion, and
   the equivalent generative projection's does not. (FR-023)
-- **SC-016**: A purchase above face reports the premium as its own figure, names the
+- **SC-016**: A purchase above the principal it will get back reports the premium as its own figure, names the
   category treatment that governed it, and records the full cost as the lot's basis. Under
   the exempt category the year's liability is zero, the carryforward is absent, and no other
   category's base moves by any amount. Under the netting category reached by FR-010's
   fixture, the same premium reduces that category's netted base by exactly the hand-computed
   amount and carries forward when the year is negative — the two runs differing only in the
   declared category. (FR-024, FR-025, FR-026)
-- **SC-017**: Feature 001's and feature 010's existing worked examples and goldens are
-  unchanged by this feature, since no generative declaration's behaviour changes.
+- **SC-017**: Feature 001's and feature 010's existing **worked examples** are unchanged by
+  this feature, since no generative declaration's behaviour changes.
+  ⚙ **Amended 2026-08-30. The clause said "and goldens", and that half does not follow from
+  its own reason.** FR-025 puts a new figure on every projection, so the one golden
+  (`tests/golden/ovdp_synthetic_a.golden.txt` — there is exactly one for this path) says one
+  more true thing about every holding and its recorded digest moves. No amount, date, tax or
+  rate moves with it, which is the claim the reason actually supports. Constitution 1.2.0,
+  Principle V: *a golden file is evidence, never a freeze*, and its digests are witnesses
+  rather than terms — shaping the figure around not disturbing one is the inversion that
+  amendment exists to forbid. The golden was regenerated deliberately and the changed lines
+  are quoted in the landing commits.
 - **SC-018**: A **synthetic** fixture transcribed from a declared source that published its
   payments out of date order carries that order as a stated fact; changing the fixture's
   payments to ascending order removes the record, so the field is proved to track the source

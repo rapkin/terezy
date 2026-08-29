@@ -1,7 +1,10 @@
 """The questions a declaration answers about its own terms, in either form.
 
-**This module is the one place in ``src/`` that matches on which form a declaration is
-in**, and that is deliberate rather than incidental. 013 FR-012 forbids every module under
+**This module is the one place in ``src/`` that matches on which form a *declaration* is
+in**, and that is deliberate rather than incidental. (``core.results.canonical`` matches on
+the two **conventions statements** a schedule can make, which FR-016 requires it to tell
+apart; that is a value it was handed, not a declaration it interrogated, and it moves no
+money.) 013 FR-012 forbids every module under
 the ledger, the tax engine, the decision layer and the results from naming the enumerated
 form or testing which form it was given; FR-011a permits — and requires — those modules to
 *ask the declaration a question both forms answer*. The difference between the two is this
@@ -26,8 +29,15 @@ from dataclasses import dataclass
 from datetime import date
 from typing import TYPE_CHECKING, Final, assert_never
 
-from terezy.core.instruments.interface import BondTerms, EnumeratedTerms
+from terezy.core.instruments.interface import (
+    BondTerms,
+    EnumeratedTerms,
+    PaymentKind,
+    ScheduledPayment,
+)
+from terezy.core.primitives import money
 from terezy.core.primitives.conventions import AmountsAsDeclared, ConventionsApplied
+from terezy.core.primitives.money import Money
 
 if TYPE_CHECKING:  # pragma: no cover -- read by :func:`narrowed`, never constructed here
     from terezy.core.instruments.interface import InstrumentDeclaration
@@ -120,6 +130,51 @@ def conventions_of(terms: DeclaredTerms) -> ConventionsApplied | AmountsAsDeclar
             )
         case EnumeratedTerms():
             return AmountsAsDeclared(day_count=terms.day_count)
+        case _:  # pragma: no cover -- mypy proves this unreachable
+            assert_never(terms)
+
+
+def payments_after(
+    payments: tuple[ScheduledPayment, ...], bought_on: date
+) -> tuple[ScheduledPayment, ...]:
+    """The declared payments a buyer acquiring on ``bought_on`` is actually paid.
+
+    Strictly after, never on: a payment falling on the settlement date went to whoever held
+    the paper that morning, which is the same convention a bond declared by its terms applies
+    to a coupon dated on its purchase.
+
+    ⚙ **Here rather than in the schedule generator, because two things need it and they must
+    not disagree** -- what the generator *emits*, and what :func:`principal_returned` says the
+    buyer gets back. They were one set for one commit and a review found the day they were
+    not: the answer to "what does this holding receive" has to be given once.
+    """
+    return tuple(payment for payment in payments if payment.on > bought_on)
+
+
+def principal_returned(terms: DeclaredTerms, *, bought_on: date) -> Money:
+    """What one unit returns as principal to a buyer who acquires it on this date.
+
+    **Not the face value**, and the difference is a schedule that has already repaid part of
+    its principal. A unit of such an issue is a unit of what *remains*: a buyer paying the
+    remaining principal exactly has broken even, and measuring them against the nominal face
+    would report a discount of everything already repaid -- a figure describing a trade
+    somebody else made, years earlier (FR-025, amended).
+
+    For a bond declared by its terms the two coincide, because it repays its face once at
+    maturity and the purchase is guaranteed to precede that.
+    """
+    match terms:
+        case BondTerms():
+            return terms.face_value
+        case EnumeratedTerms():
+            return money.total(
+                [
+                    payment.amount
+                    for payment in payments_after(terms.payments, bought_on)
+                    if payment.pays is PaymentKind.PRINCIPAL_REPAYMENT
+                ],
+                terms.face_value.currency,
+            )
         case _:  # pragma: no cover -- mypy proves this unreachable
             assert_never(terms)
 

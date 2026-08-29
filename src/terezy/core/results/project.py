@@ -107,7 +107,7 @@ class TreatmentUnstated:
 
 @dataclass(frozen=True, slots=True)
 class PurchasePremium:
-    """What was paid, what the face value comes to, and the difference between them.
+    """What was paid, what comes back as principal, and the difference between them.
 
     FR-025. Reported as its own figure so that a premium or a discount is **visible** rather
     than surfacing only as a realised gain or loss at redemption -- which is where it would
@@ -134,12 +134,24 @@ class PurchasePremium:
     without having to argue the point.
     """
 
-    at_face: Money
-    """``face value x quantity``: what the paper returns if it returns exactly its face."""
+    principal_returned: Money
+    """What this holding gets back as principal: the repayments it will receive, times
+    quantity.
+
+    ⚙ **Not ``face value x quantity``**, and FR-025 was amended to say so (2026-08-30). The
+    two coincide for a bond that repays its face once, which is every fixture this
+    repository ships -- and they part the moment a schedule has already repaid part of its
+    principal before the purchase. A unit of such an issue is a unit of what *remains*: a
+    buyer paying the remaining principal exactly has broken even, and measuring them against
+    the nominal face reported a discount of everything repaid before they arrived, a figure
+    describing somebody else's trade years earlier. It is the same rule the retirement of
+    units already follows -- **the share of what this holding receives** -- and it would be
+    strange for paid-versus-received to measure "received" differently from the ledger.
+    """
 
     difference: Money
-    """``paid - at_face``. Positive is a premium, negative a discount, zero is par -- and a
-    zero here says *par* rather than saying nothing."""
+    """``paid - principal_returned``. Positive is a premium, negative a discount, zero is par
+    -- and a zero here says *par* rather than saying nothing."""
 
     tax_class_id: str | None
     """The declared class governing a disposal of this instrument, which is the event the
@@ -179,7 +191,7 @@ class Projection:
     """The benchmark figure this whole feature exists to produce."""
 
     at_purchase: PurchasePremium
-    """What was paid against what the face value comes to, and what governs the difference."""
+    """What was paid against what this holding gets back, and what governs the difference."""
 
 
 ProjectionOutcome = Projection | InstrumentFailure | TaxFailure
@@ -225,6 +237,13 @@ def project(
     :class:`TreatmentUnstated`, saying that nobody supplied the rules -- because *outside*,
     *nets* and *per event* are three different claims about the same money and defaulting to
     one would answer a question nobody asked.
+
+    ⚙ **Nothing on the tuple path supplies it today** (recorded 2026-08-30):
+    ``core.decision.tuple_outcome`` calls this function without rules, so every projection
+    reached through the join carries :class:`TreatmentUnstated`. That is honest rather than
+    wrong -- the join is given no jurisdiction to resolve them from -- and it means FR-026's
+    named treatment is reachable only on a direct call. Closing it needs the join to be told
+    which jurisdiction assesses the holding, which is a term the tuple does not carry.
 
     ``ageing`` carries the declared staleness thresholds and the ``as_of`` date the question is
     asked at (FR-005). It is one record rather than two arguments so it cannot be half-supplied
@@ -341,20 +360,23 @@ def _at_purchase(
     holding: Holding,
     rules: AssessmentRules | None,
 ) -> PurchasePremium:
-    """What was paid against what the face value comes to (FR-025).
+    """What was paid against what this holding gets back as principal (FR-025, amended).
 
-    ``face_value`` is read directly because **both** declaration forms state one and mean the
-    same thing by it: the amount one unit returns if it returns exactly its face. Reading a
-    field both forms carry is not a test of which form this is.
+    The declaration is **asked** what a unit returns to a buyer arriving on this date rather
+    than having its face value read: the two answers differ for a schedule that has already
+    repaid part of its principal, and the question both forms answer is the one that is true
+    of both.
     """
-    at_face = money.scale_sourced(
-        declaration.terms.face_value, holding.quantity, declaration.terms.provenance
+    returned = money.scale_sourced(
+        instrument_terms.principal_returned(declaration.terms, bought_on=holding.purchased_on),
+        holding.quantity,
+        declaration.terms.provenance,
     )
     disposal_class = declaration.tax_classes.get(TaxableEventKind.DISPOSAL_GAIN)
     return PurchasePremium(
         paid=holding.cost,
-        at_face=at_face,
-        difference=money.sub(holding.cost, at_face),
+        principal_returned=returned,
+        difference=money.sub(holding.cost, returned),
         tax_class_id=disposal_class,
         governed_by=_governed_by(disposal_class, rules),
     )
@@ -599,8 +621,11 @@ def _taxable_kind(kind: EventKind) -> TaxableEventKind | None:
             return TaxableEventKind.COUPON
         case EventKind.DISTRIBUTION:  # pragma: no cover -- unreachable on this path
             # ⚙ feature 006. Present for exhaustiveness and **not** reachable here: this
-            # function maps the events of an ``InstrumentOps`` implementation, and the only
-            # one in ``registry.REGISTRY`` is ``fixed_income``, which emits no distribution.
+            # function maps the events of an ``InstrumentOps`` implementation, and no
+            # implementation in ``registry.REGISTRY`` emits a distribution. That is a
+            # property of what those implementations emit rather than of how many of them
+            # there are: this comment used to say "the only one is ``fixed_income``", which
+            # was true when it was written and is a count over a registry that has grown.
             # A fund has its own mapping in ``core.results.fund``. The arm cannot simply be
             # dropped -- the ``assert_never`` below is what makes a forgotten event kind a
             # type error, and omitting this one would make that assertion fail to compile

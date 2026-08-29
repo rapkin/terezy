@@ -66,7 +66,7 @@ regressions plus a new enumerated golden.
 none**; functional style per D-E; one imported tolerance; provenance propagates from every
 declared payment to every figure.
 
-**Scale/Scope**: 2 new core modules, 1 record moved, 3 call sites delegated, 3 docstrings
+**Scale/Scope**: 3 new core modules, 1 record moved, 3 call sites delegated, 3 docstrings
 corrected, 1 gate extended, ~14 test modules, 7 new/edited data files.
 
 ## Constitution Check
@@ -79,16 +79,17 @@ corrected, 1 gate extended, ~14 test modules, 7 new/edited data files.
 | **IV — Reliability through contracts** | **PASS.** Every refusal is a typed member of the existing union carrying its reason (FR-019, SC-024). The tolerance is imported; SC-002 states at the assertion site why tolerance rather than bit-equality (the two forms reach the same amount by different arithmetic). |
 | **V — Test-first** | **PASS.** Every module lands after a test that fails without it, `ImportError` counted. **And the golden rule is applied in the direction 1.2.0 wrote it**: D9 moves two recorded digests deliberately rather than shaping the design around not disturbing them. |
 | **VI — Model the whole tuple** | **PASS.** SC-002 is a full-tuple comparison; the enumerated form changes no term of the tuple but the instrument. |
-| **Engineering Standards — D-E** | **PASS.** Frozen records, free functions, tagged unions matched with `match`. The one `match` on the form is `core/instruments/terms.py`, and that is the point. |
+| **Engineering Standards — D-E** | **PASS.** Frozen records, free functions, tagged unions matched with `match`. The one `match` on a declaration's form is `core/instruments/terms.py`, and that is the point; `core/results/canonical.py` matches on the two conventions **statements**, which FR-016 requires it to distinguish. |
 | **VII — Owner-scoped and private** | **PASS.** No per-owner data. Every fixture is synthetic and says so. |
 
 ### Post-Phase-1 re-evaluation
 
 Three things the design surfaced, each recorded because it will be tempting to undo:
 
-- **FR-025's figure cannot both exist and leave the goldens alone.** D9 chooses the figure
-  and regenerates. Reported as the feature's principal finding against the spec, because
-  SC-017's reasoning is right and its conclusion does not follow.
+- **FR-025's figure cannot both exist and leave the golden alone.** D9 chooses the figure
+  and regenerates, and **SC-017 was amended** (2026-08-30) to drop the goldens clause: its
+  reasoning — *no generative declaration's behaviour changes* — is right and supports the
+  worked examples, not the digest. No amount, date, tax or rate moved.
 - **`core/results/*` may not contain the word.** FR-012 forbids naming the form, and prose
   is naming. So no docstring in `project.py`, `schedule.py`, `canonical.py`, `hurdle.py` or
   `tuple.py` may explain itself by saying "for an enumerated instrument". Each says what it
@@ -135,7 +136,10 @@ src/terezy/core/
 │   ├── interface.py                 EnumeratedTerms, ScheduledPayment, PaymentKind;
 │   │                                InstrumentDeclaration.terms becomes a union
 │   ├── enumerated.py                NEW — events / tax_classes / constraints
-│   ├── terms.py                     NEW — the four questions both forms answer
+│   ├── terms.py                     NEW — the questions both forms answer, and the
+│   │                                narrowing every generator does at its door
+│   ├── acquire.py                   NEW — the purchase event and the lot id it derives,
+│   │                                shared, because a purchase is a term of neither form
 │   └── registry.py                  a second entry
 ├── ledger/seeds.py                  asks known_from
 ├── decision/tuple_outcome.py        asks day_count_of; one docstring corrected
@@ -211,5 +215,5 @@ Six phases, each a green checkpoint and a commit.
 | Departure | Why | Simpler alternative rejected because |
 |---|---|---|
 | `ConventionsApplied` moves out of `core/results/schedule.py` | The declaration must be able to build the answer, so the type must sit below both `core/instruments/` and `core/results/` | Leaving it put makes an *instrument* module import a *result* module — allowed by `.importlinter`, wrong by every other reading of this codebase |
-| `Projection` gains a required field and two goldens move | FR-025 asks for a named figure and FR-026 asks for its treatment to be asserted | An optional field present only where there is a premium makes "no figure" mean "bought at par", which is a silent default |
+| `Projection` gains a required field and the golden moves | FR-025 asks for a named figure and FR-026 asks for its treatment to be asserted | An optional field present only where there is a premium makes "no figure" mean "bought at par", which is a silent default |
 | `check_provenance.py` learns a declaration kind | FR-022 asks it to check a relation, not a shape | A test instead of a gate: the gate must be runnable by a non-developer maintaining a declaration by hand, which is its stated reason for not being a test |

@@ -26,7 +26,7 @@ from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.conventions import AmountsAsDeclared
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
-from terezy.core.primitives.tolerance import is_close
+from terezy.core.primitives.tolerance import TOLERANCE, is_close
 from terezy.core.results import canonical, hurdle, project
 from terezy.core.results.project import Projection
 from terezy.data.declarations import resolver
@@ -155,7 +155,7 @@ class TestTheContractualYieldIsProducedRatherThanRefused:
             (year_fraction(PURCHASE.purchased_on, row.occurred_on), row.gross.amount)
             for row in projected.schedule.rows
         )
-        assert abs(hurdle.net_present_value(flows, projected.hurdle.nominal_ytm.value)) < 1e-6
+        assert abs(hurdle.net_present_value(flows, projected.hurdle.nominal_ytm.value)) < TOLERANCE
 
 
 class TestTheYieldStatesTheDirtyPriceExclusion:

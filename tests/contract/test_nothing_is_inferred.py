@@ -13,6 +13,19 @@ Five derivations, each a one-line temptation in a loader:
 4. computing a **coupon rate** from an amount and an interval;
 5. inferring a **coverage window** from where a published list happens to begin.
 
+**What these scans do not catch, measured rather than assumed** (2026-08-30). The
+derivation walk reads assignments, annotated assignments, augmented assignments and
+**keyword arguments** -- the last being how a value actually reaches a frozen record here.
+It does not read a walrus, a tuple target, or a value computed in one function and returned
+into the field by another; and it keys on the field's *name*, so a derivation assigned to
+``rate`` and passed on as ``coupon_rate`` is invisible. ``LAST_OR_LARGEST`` misses
+``max(payments, key=attrgetter("amount"))``. None of these is closed, and the reason is
+worth stating: each costs a whole-program dataflow to catch, and what actually keeps the
+door shut is that nothing needs to walk through it -- the coupon rate is a *declared* field
+of one form and absent from the other, so there is no site that wants one. These scans are
+the second lock, not the first, and a lock whose limits are written down is a lock; one that
+reads as complete is a promise.
+
 ⚙ **The fourth is here for a second reason** (FR-003c). A coupon rate derived from a day
 count, one coupon amount and the spacing between two coupons yields an extrapolated issue
 date in one more step -- the invented legal fact this declaration form exists to refuse.
@@ -36,7 +49,6 @@ from tests import source_scan
 pytestmark = pytest.mark.contract
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-SOURCE_ROOT = REPO_ROOT / "src" / "terezy"
 
 DIVIDES_BY_A_HUNDRED = re.compile(r"/\s*(?:100(?:\.0*)?|_PERCENT)\b")
 """Turning one unit into another by the factor a minor unit uses.
@@ -45,12 +57,12 @@ DIVIDES_BY_A_HUNDRED = re.compile(r"/\s*(?:100(?:\.0*)?|_PERCENT)\b")
 """
 
 DIVIDING_BY_A_HUNDRED_FOR_A_REASON: Final[Mapping[str, str]] = {
-    "data/declarations/loader.py": (
+    "src/terezy/data/declarations/loader.py": (
         "`_as_fraction`, the one place a declared **percentage** becomes a fraction. A "
         "percentage is a rate written in per-cent; a payment amount is money, and a "
         "division of one by 100 is the unit conversion FR-004 forbids the engine to perform"
     ),
-    "core/inflation/series.py": (
+    "src/terezy/core/inflation/series.py": (
         "a CPI observation published against the previous month = 100, turned into a growth "
         "factor. Index points are not minor units of anything, and the series says so in its "
         "own module docstring (007)"
@@ -79,49 +91,72 @@ payment falls is a fact, what it **is** is a declaration.
 """
 
 
-def _assignments(path: Path, named: str) -> list[ast.Assign]:
-    """Every assignment in a module whose target is called ``named``.
+def _bound(path: Path, named: str) -> list[ast.expr]:
+    """Every expression bound to ``named`` in a module, however it is bound.
 
-    An AST walk rather than a regex, because the two spellings a regex cannot tell apart
-    are exactly the two that matter: ``coupon_rate = <something>`` computes a rate, and
-    ``coupon_rate=<something>`` passes a declared one to a constructor.
+    Four shapes, and the last is the one a regex could never separate from the others:
+    ``x = ...``, an annotated ``x: T = ...``, an augmented ``x += ...``, and
+    ``Record(x=...)`` -- a keyword argument, which is how a value actually reaches a frozen
+    record in this codebase and was outside this walk until 2026-08-30.
     """
     tree = ast.parse(source_scan.executable_source(path))
-    return [
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Assign)
-        and any(
-            (isinstance(target, ast.Name) and target.id == named)
-            or (isinstance(target, ast.Attribute) and target.attr == named)
-            for target in node.targets
-        )
-    ]
+    bound: list[ast.expr] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign) and any(_is(target, named) for target in node.targets):
+            bound.append(node.value)
+        elif isinstance(node, ast.AnnAssign | ast.AugAssign):
+            if _is(node.target, named) and node.value is not None:
+                bound.append(node.value)
+        elif isinstance(node, ast.Call):
+            bound += [word.value for word in node.keywords if word.arg == named]
+    return bound
 
 
-def _computed(node: ast.Assign) -> bool:
-    """Whether the value assigned is arithmetic rather than a read of a declared field."""
-    return any(isinstance(inner, ast.BinOp) for inner in ast.walk(node.value))
+def _is(target: ast.expr, named: str) -> bool:
+    """Whether this target is the name we are watching, plain or attribute."""
+    return (isinstance(target, ast.Name) and target.id == named) or (
+        isinstance(target, ast.Attribute) and target.attr == named
+    )
+
+
+def _computed(value: ast.expr) -> bool:
+    """Whether what is bound is arithmetic rather than a read of a declared field."""
+    return any(isinstance(inner, ast.BinOp) for inner in ast.walk(value))
 
 
 def _derivations(named: str) -> dict[str, str]:
     return {
-        path.relative_to(SOURCE_ROOT).as_posix(): ast.unparse(node)
+        _named(path): ast.unparse(value)
         for path in _python_files()
-        for node in _assignments(path, named)
-        if _computed(node)
+        for value in _bound(path, named)
+        if _computed(value)
     }
 
 
+SCANNED = (REPO_ROOT / "src" / "terezy", REPO_ROOT / "scripts")
+"""Every tree a derivation could be written in.
+
+⚙ **``scripts/`` was outside this scan until 2026-08-30**, and it is where the temptation
+actually lives: `scripts/fetch_inzhur.py` is the transcription site, the one program that
+reads the published figures, and turning kopecks into hryvnia there is precisely the
+one-line convenience FR-021 forbids. A scan that covered only the engine covered everything
+except the place the data comes in.
+"""
+
+
+def _named(path: Path) -> str:
+    return path.relative_to(REPO_ROOT).as_posix()
+
+
 def _python_files() -> list[Path]:
-    return sorted(SOURCE_ROOT.rglob("*.py"))
+    return sorted(path for root in SCANNED for path in root.rglob("*.py"))
 
 
 def _offenders(pattern: re.Pattern[str], *, allowed: Iterable[str] = ()) -> dict[str, str]:
     permitted = set(allowed)
     found: dict[str, str] = {}
     for path in _python_files():
-        name = path.relative_to(SOURCE_ROOT).as_posix()
+        name = _named(path)
         if name in permitted:
             continue
         match = pattern.search(source_scan.executable_source(path))
@@ -159,7 +194,7 @@ def test_each_permitted_file_divides_exactly_once() -> None:
     for a site that no longer divides at all.
     """
     for name in DIVIDING_BY_A_HUNDRED_FOR_A_REASON:
-        source = source_scan.executable_source(SOURCE_ROOT / name)
+        source = source_scan.executable_source(REPO_ROOT / name)
         assert len(DIVIDES_BY_A_HUNDRED.findall(source)) == 1, name
 
 
@@ -182,12 +217,13 @@ def test_no_module_infers_a_coverage_window() -> None:
 def test_the_scan_reaches_every_module_that_could_hold_such_a_line() -> None:
     """A scan of nothing passes forever. The loader and the schedule generator are where
     each of these would actually be written."""
-    walked = {path.relative_to(SOURCE_ROOT).as_posix() for path in _python_files()}
+    walked = {_named(path) for path in _python_files()}
     assert {
-        "data/declarations/loader.py",
-        "core/instruments/enumerated.py",
-        "core/instruments/fixed_income.py",
-        "core/instruments/terms.py",
+        "src/terezy/data/declarations/loader.py",
+        "src/terezy/core/instruments/enumerated.py",
+        "src/terezy/core/instruments/fixed_income.py",
+        "src/terezy/core/instruments/terms.py",
+        "scripts/fetch_inzhur.py",
     } <= walked
 
 
@@ -244,11 +280,14 @@ def test_the_derivation_walk_tells_a_computation_from_a_declared_read(
     both contain the same characters."""
     guilty = tmp_path / "guilty.py"
     guilty.write_text(planted + "\n", encoding="utf-8")
-    assert [node for node in _assignments(guilty, named) if _computed(node)]
+    assert [value for value in _bound(guilty, named) if _computed(value)]
 
     honest = tmp_path / "honest.py"
     honest.write_text(f"Record({innocent})\n", encoding="utf-8")
-    assert not _assignments(honest, named)
+    assert not [value for value in _bound(honest, named) if _computed(value)], (
+        "a declared value passed to a constructor is now *seen* -- keyword arguments are in "
+        "the walk -- and must still not be reported: what is forbidden is computing one"
+    )
 
 
 def test_the_prose_is_stripped_before_the_scan_reads_it() -> None:
@@ -256,6 +295,6 @@ def test_the_prose_is_stripped_before_the_scan_reads_it() -> None:
     own module docstring lists all five. `tests/source_scan` parses and drops them, so the
     scan reads what runs."""
     module = ast.parse(
-        source_scan.executable_source(SOURCE_ROOT / "core" / "instruments" / "enumerated.py")
+        source_scan.executable_source(REPO_ROOT / "src/terezy/core/instruments/enumerated.py")
     )
     assert ast.get_docstring(module) is None

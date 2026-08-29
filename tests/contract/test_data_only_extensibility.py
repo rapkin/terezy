@@ -390,13 +390,13 @@ X: int = 1
         )
 
     def test_both_issues_dispatch_through_the_one_registered_class(self) -> None:
-        """A second *issue* needs no second registry entry.
+        """A second *issue* needs no second registry entry, **and** the registry is closed.
 
-        ⚙ The assertion is scoped to these two issues and to the class they share, not to
-        the size of the registry. Feature 013 added a second entry, and it is a second
-        declaration **form** rather than a second issue -- a different claim, tested by its
-        own data-only test. What would still be a defect is either of these two issues
-        needing an entry of its own, which is what this asserts.
+        ⚙ The first assertion is scoped to these two issues and to the class they share
+        rather than to the size of the registry, because feature 013 added a second entry
+        and it is a second declaration **form** rather than a second issue. The scoping
+        briefly dropped the closed-set assertion altogether, which is the half Principle
+        II's four-interface limit actually rests on; it is back below, one entry wider.
         """
         declarations = _declarations()
         classes = {
@@ -406,6 +406,20 @@ X: int = 1
         assert classes == {instrument_registry.FIXED_INCOME}, (
             "a second issue that had needed a second registry entry would be an engine "
             "change wearing a data change's clothes"
+        )
+        assert set(instrument_registry.REGISTRY) == {
+            instrument_registry.FIXED_INCOME,
+            instrument_registry.ENUMERATED_SCHEDULE,
+        }, (
+            "the registry is a closed set and Principle II's four-interface limit rests on "
+            "its not growing quietly. A third entry is a decision somebody takes here"
+        )
+        assert {
+            instrument_registry.FIXED_INCOME,
+            instrument_registry.ENUMERATED_SCHEDULE,
+            instrument_registry.COLLECTIVE_INVESTMENT_FUND,
+        } == instrument_registry.DECLARATION_KINDS, (
+            "the vocabulary of declaration kinds is closed for the same reason"
         )
 
     def test_adding_a_third_issue_needs_a_file_and_nothing_else(self, tmp_path: Path) -> None:

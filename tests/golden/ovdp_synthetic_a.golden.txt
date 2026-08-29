@@ -75,7 +75,7 @@ excludes                     funding route costs (in)
 excludes                     inflation (the figure is nominal)
 excludes                     public holidays (weekends are observed; no holiday calendar is modelled)
 paid                         10000.0 UAH
-at_face                      10000.0 UAH
+principal_returned           10000.0 UAH
 premium_or_discount          0.0 UAH
 realised_under               ua_government_bond
 governed_by                  exempt_securities

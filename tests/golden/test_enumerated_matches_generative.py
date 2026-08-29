@@ -37,6 +37,7 @@ tolerance covers and rounding to kopecks would not.
 from __future__ import annotations
 
 from dataclasses import replace
+from functools import cache
 
 import pytest
 
@@ -103,23 +104,37 @@ def _outcome(instrument_id: str) -> TupleOutcome:
     return outcome
 
 
-GENERATIVE = _outcome(fixtures.OVDP)
-ENUMERATED = _outcome(MIRROR)
+@cache
+def _generative() -> TupleOutcome:
+    return _outcome(fixtures.OVDP)
+
+
+@cache
+def _enumerated() -> TupleOutcome:
+    return _outcome(MIRROR)
+
+
+# ⚙ **Cached accessors rather than module constants, and the difference is the diagnostic.**
+# Evaluating the engine at import time means a 013 regression surfaces as
+# ``Interrupted: 1 error during collection`` with **no test run and no test name** -- the
+# whole gate reported as infrastructure, taking every unrelated result down with it. Loud
+# rather than silent, so not a coverage lie; the wrong shape all the same. Cached because the
+# two runs are pure and this file asks for them a dozen times.
 
 
 class TestEveryFigureAgrees:
     def test_the_same_money_goes_out(self) -> None:
-        assert is_close(GENERATIVE.outlay.amount, ENUMERATED.outlay.amount)
+        assert is_close(_generative().outlay.amount, _enumerated().outlay.amount)
 
     def test_the_same_money_comes_back(self) -> None:
-        assert is_close(GENERATIVE.reaches.amount, ENUMERATED.reaches.amount)
+        assert is_close(_generative().reaches.amount, _enumerated().reaches.amount)
 
     def test_every_arrival_agrees_in_every_field(self) -> None:
         """All four, not only the date and the amount. ``released`` is the net-of-tax figure
         two other contract tests assert against, and ``released_on`` differs from
         ``arrived_on`` the moment latency is not zeroed -- so comparing the pair a test
         happens to have zeroed apart would agree by accident."""
-        for one, other in zip(GENERATIVE.arrivals, ENUMERATED.arrivals, strict=True):
+        for one, other in zip(_generative().arrivals, _enumerated().arrivals, strict=True):
             assert (one.released_on, one.arrived_on) == (other.released_on, other.arrived_on)
             for field in ("released", "amount"):
                 mine, theirs = getattr(one, field), getattr(other, field)
@@ -129,8 +144,10 @@ class TestEveryFigureAgrees:
     def test_every_part_contributes_the_same_amount(self) -> None:
         """The join reports each term of the tuple separately so a reader can see which one
         dominates. Two forms of the same instrument must not move any of them."""
-        assert [part.part for part in GENERATIVE.parts] == [part.part for part in ENUMERATED.parts]
-        for one, other in zip(GENERATIVE.parts, ENUMERATED.parts, strict=True):
+        assert [part.part for part in _generative().parts] == [
+            part.part for part in _enumerated().parts
+        ]
+        for one, other in zip(_generative().parts, _enumerated().parts, strict=True):
             assert is_close(one.amount.amount, other.amount.amount), one.part
             assert one.amount.currency == other.amount.currency, one.part
             assert one.source == other.source, (
@@ -139,52 +156,52 @@ class TestEveryFigureAgrees:
             )
 
     def test_the_same_implied_rate(self) -> None:
-        assert is_close(_rate(GENERATIVE), _rate(ENUMERATED))
+        assert is_close(_rate(_generative()), _rate(_enumerated()))
 
     def test_the_same_span_and_horizon(self) -> None:
-        assert GENERATIVE.span == ENUMERATED.span
-        assert GENERATIVE.horizon == ENUMERATED.horizon
+        assert _generative().span == _enumerated().span
+        assert _generative().horizon == _enumerated().horizon
 
     def test_the_same_undeployed_remainder(self) -> None:
-        assert (GENERATIVE.undeployed is None) == (ENUMERATED.undeployed is None)
+        assert (_generative().undeployed is None) == (_enumerated().undeployed is None)
 
     def test_the_same_route_standing_and_risk_class(self) -> None:
-        assert GENERATIVE.routes == ENUMERATED.routes
-        assert GENERATIVE.risk_class == ENUMERATED.risk_class
+        assert _generative().routes == _enumerated().routes
+        assert _generative().risk_class == _enumerated().risk_class
 
     def test_the_same_statement_of_what_the_figure_is_net_of(self) -> None:
-        assert GENERATIVE.accounts_for == ENUMERATED.accounts_for
+        assert _generative().accounts_for == _enumerated().accounts_for
 
 
 class TestTheOnlyDifferencesArePermittedOnes:
     def test_the_identity_differs_and_nothing_else_in_the_key(self) -> None:
-        assert GENERATIVE.key.instrument_id != ENUMERATED.key.instrument_id
-        assert replace(GENERATIVE.key, instrument_id=MIRROR) == ENUMERATED.key
+        assert _generative().key.instrument_id != _enumerated().key.instrument_id
+        assert replace(_generative().key, instrument_id=MIRROR) == _enumerated().key
 
     def test_the_exclusions_differ_by_exactly_the_dirty_price_clause(self) -> None:
         """FR-023, SC-015. Two facts are missing and neither may be inferred: the start of
         the accrual period containing the purchase, and the basis interest accrues on."""
-        assert ENUMERATED.excludes - GENERATIVE.excludes == frozenset(
+        assert _enumerated().excludes - _generative().excludes == frozenset(
             {instrument_terms.DIRTY_PRICE}
         )
-        assert GENERATIVE.excludes - ENUMERATED.excludes == frozenset()
+        assert _generative().excludes - _enumerated().excludes == frozenset()
 
     def test_the_provenance_differs_because_the_files_do(self) -> None:
         """Different citations, and the same **mark**: both rest on unverified values, as
         every figure in this repository does today, and a form that lost the mark on one
         side would be the top-severity defect Principle I names."""
-        assert GENERATIVE.provenance != ENUMERATED.provenance
-        assert prov.is_unverified(GENERATIVE.provenance)
-        assert prov.is_unverified(ENUMERATED.provenance)
+        assert _generative().provenance != _enumerated().provenance
+        assert prov.is_unverified(_generative().provenance)
+        assert prov.is_unverified(_enumerated().provenance)
 
     def test_the_staleness_verdict_names_different_sources_and_reaches_the_same_answer(
         self,
     ) -> None:
         """`staleness` is identity again: its `assessed` tuple lists the source ids behind
         the figure, which name the files. What must agree is the verdict."""
-        assert GENERATIVE.staleness.stale == ENUMERATED.staleness.stale == ()
-        assert GENERATIVE.staleness.assessed != ENUMERATED.staleness.assessed
-        assert len(ENUMERATED.staleness.assessed) > len(GENERATIVE.staleness.assessed), (
+        assert _generative().staleness.stale == _enumerated().staleness.stale == ()
+        assert _generative().staleness.assessed != _enumerated().staleness.assessed
+        assert len(_enumerated().staleness.assessed) > len(_generative().staleness.assessed), (
             "a declared schedule cites more sources than a declared rate does, because "
             "every payment carries its own -- and all of them are aged, which is the half "
             "that matters"
@@ -203,7 +220,7 @@ class TestTheOnlyDifferencesArePermittedOnes:
         for field in TupleOutcome.__dataclass_fields__:
             if field in permitted:
                 continue
-            one, other = getattr(GENERATIVE, field), getattr(ENUMERATED, field)
+            one, other = getattr(_generative(), field), getattr(_enumerated(), field)
             if hasattr(one, "amount") and hasattr(one, "currency"):
                 assert is_close(one.amount, other.amount), field
                 assert one.currency == other.currency, field
@@ -215,8 +232,8 @@ class TestTheOnlyDifferencesArePermittedOnes:
     def test_what_each_figure_rests_on_names_its_own_declaration(self) -> None:
         """`rests_on` is identity wearing another name: it lists the declarations behind the
         figure, and the two runs read different files."""
-        assert any(MIRROR in claim for claim in ENUMERATED.rests_on)
-        assert any(fixtures.OVDP in claim for claim in GENERATIVE.rests_on)
+        assert any(MIRROR in claim for claim in _enumerated().rests_on)
+        assert any(fixtures.OVDP in claim for claim in _generative().rests_on)
 
 
 class TestTheScheduleSaysDifferentTrueThings:
@@ -268,7 +285,7 @@ class TestTheRankingPutsThemInTheSamePlace:
         assert comparison.beats_benchmark == ()
 
     def test_the_two_rates_agree_to_the_project_tolerance(self) -> None:
-        assert abs(_rate(GENERATIVE) - _rate(ENUMERATED)) < TOLERANCE
+        assert abs(_rate(_generative()) - _rate(_enumerated())) < TOLERANCE
 
 
 DECLARATIONS = resolver.from_data_root(fixtures.DATA_ROOT)

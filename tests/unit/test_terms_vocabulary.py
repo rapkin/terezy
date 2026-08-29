@@ -8,6 +8,7 @@ than merely unlikely.
 
 from __future__ import annotations
 
+from terezy.core.instruments import interface
 from terezy.core.instruments.interface import PAYMENT_KINDS, PaymentKind
 from terezy.core.ledger.events import EventKind
 from terezy.core.tax.interface import TaxableEventKind
@@ -43,12 +44,18 @@ class TestOneLabelSettlesBothVocabularies:
             TaxableEventKind.DISPOSAL_GAIN,
         )
 
-    def test_the_two_vocabularies_cannot_disagree_because_there_is_one_mapping(self) -> None:
-        """The assertion is about the *shape*: one lookup, not two that could drift.
+    def test_each_label_settles_both_halves_in_one_lookup(self) -> None:
+        """The shape, not the contents: one entry carries both, so a kind cannot be present
+        in one vocabulary and missing from the other.
 
-        Two mappings would satisfy every test above and still be able to disagree the day
-        a third kind is added to one of them.
+        ⚙ This used to build two comprehensions over ``PAYMENT_KINDS.items()`` and compare
+        their key sets, which is true of any mapping whatsoever and passed for every value.
+        What is actually checkable is the arity of an entry -- two mappings would be two
+        module attributes, and there is one.
         """
-        movements = {kind: pair[0] for kind, pair in PAYMENT_KINDS.items()}
-        assessed = {kind: pair[1] for kind, pair in PAYMENT_KINDS.items()}
-        assert set(movements) == set(assessed) == set(PaymentKind)
+        both_halves = 2
+        assert all(len(pair) == both_halves for pair in PAYMENT_KINDS.values())
+        assert [name for name in dir(interface) if name.endswith("_KINDS")] == ["PAYMENT_KINDS"], (
+            "a second mapping would be a second module attribute, and two mappings can "
+            "disagree about a label the day a third payment kind is added to one of them"
+        )
