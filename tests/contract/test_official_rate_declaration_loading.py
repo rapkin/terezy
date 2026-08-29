@@ -31,7 +31,10 @@ from pathlib import Path
 
 import pytest
 
+from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
+from terezy.core.primitives.money import Money
+from terezy.core.tax import official_rate
 from terezy.data.declarations import loader, resolver
 from terezy.data.declarations.errors import DeclarationError
 
@@ -306,3 +309,29 @@ class TestTheShippedUkrainianSeries:
         and pre-holiday days, so declaring it needs a declared, cited working-day and holiday
         calendar -- a feature (``declared-working-day-calendar``), not a data entry (FR-018)."""
         assert loader.official_rate_from_file(SHIPPED).rule is None
+
+    def test_a_base_struck_against_it_refuses_naming_the_series_the_pair_and_the_date(
+        self,
+    ) -> None:
+        """SC-014: the missing rule is something a run reports, not something a spec says.
+
+        **What ships is stronger than FR-017's sentence and demonstrates less of it.** FR-017
+        says "every date the National Bank does not publish for refuses"; this series declares
+        no observation at all yet, because no rate value may originate from an implementer's
+        memory and retrieval is the fetch script's job (FR-001, plan research D6). So *every*
+        date refuses, and the refusal says the window is empty rather than naming a hole in a
+        published run. The published-window case is exercised against synthetic series in
+        ``tests/unit/test_official_rate_refusals.py``.
+        """
+        outcome = official_rate.strike_base(
+            Money(1_000.0, Currency.USD, prov.EMPTY),
+            loader.official_rate_from_file(SHIPPED),
+            tax_currency=Currency.UAH,
+            on_date=date(2026, 3, 8),
+        )
+
+        assert isinstance(outcome, official_rate.OfficialRateUndeclaredOnDate), outcome
+        assert outcome.series_id == "ua_nbu_usd"
+        assert outcome.pair == (Currency.UAH, Currency.USD)
+        assert outcome.on_date == date(2026, 3, 8)
+        assert outcome.covers is None
