@@ -90,6 +90,20 @@ risk_class    = "sovereign_debt"
   retrieved_on = "2026-08-29"
   verified_on  = ""
 
+[[access]]
+instrument_id = "ovdp_enumerated_mirror"
+bought_at     = "inzhur"
+proceeds_to   = "inzhur"
+risk_class    = "sovereign_debt"
+
+  [access.price]
+  per_unit     = 1000.0
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "SYNTHETIC FIXTURE — par, copied from ovdp_synthetic_a's entry so that the pair differs in its declaration form and in nothing else. Not observed anywhere."
+  retrieved_on = "2026-08-29"
+  verified_on  = ""
+
 # --- the funds, which price themselves ---------------------------------------------------
 #
 # No [access.price] on any of the three: each declares its own net asset value per unit and

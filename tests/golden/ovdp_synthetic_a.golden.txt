@@ -45,6 +45,7 @@ fund                 inzhur_reit                  instruments/inzhur_reit.toml  
 fund                 synthetic_fund_c             instruments/synthetic_fund_c.toml        sha256:39ed338a5a88918dfd813a2b0401e6fca6172ad9c10eebf21c32d77c361a232a
 inflation_assumption owner_placeholder_inflation  inflation/owner-001.toml                 sha256:624e2b5124527c2b30bc4c0773b2d8c79e9ffcfd38b0f253ab5080c36cd71d6c
 instrument           ovdp_enumerated_a            instruments/ovdp_enumerated_a.toml       sha256:993b95c0bc3df5246a262e726925700a0e78e445b44704d2f34c810eebafc5a2
+instrument           ovdp_enumerated_mirror       instruments/ovdp_enumerated_mirror.toml  sha256:c5f341ce061cc6ea01ecba60e888249bc04f91add889435f9bb7877187406857
 instrument           ovdp_synthetic_a             instruments/ovdp_synthetic_a.toml        sha256:6d6fcafc9e3da360c2f2c523704b488065f253c2db5fce362b3ad72cd6b5e49e
 instrument           ovdp_synthetic_b             instruments/ovdp_synthetic_b.toml        sha256:fa433d052d2ca1525e597b8050cf2565f69e2a233dd51150e7a9601add8822a9
 tax_class            synthetic_fund_disposal      tax/synthetic_fixture.toml               sha256:d0e3848a8f82e3cabf8d8e9a1c7b5c76e288883a240c744a813c379743f27d12
