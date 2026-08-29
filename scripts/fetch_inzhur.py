@@ -19,7 +19,7 @@ diff this script prints is the input to it.
 The source
 ----------
 ``https://www.inzhur.reit/_api/assets`` -- the JSON behind Inzhur's own asset pages, owner
-supplied 2026-08-27. Thirty-seven assets: their own funds and the ОВДП issues they resell.
+supplied 2026-08-24. Thirty-seven assets: their own funds and the ОВДП issues they resell.
 
 What is taken, and what is deliberately left
 --------------------------------------------
@@ -63,7 +63,7 @@ import urllib.request
 from typing import Any, Final
 
 ENDPOINT: Final = "https://www.inzhur.reit/_api/assets"
-"""Owner-supplied 2026-08-27. Not a documented public API; it is the JSON the site's own
+"""Owner-supplied 2026-08-24. Not a documented public API; it is the JSON the site's own
 pages read, and it may change shape or disappear without notice. Every failure below is
 loud for that reason -- a shape change must stop the run, never write a thinner file."""
 
