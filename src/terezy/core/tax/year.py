@@ -249,6 +249,12 @@ class AssessmentRules:
     ``None`` is a declared absence and not a permissive one: a taxable result in another
     currency then comes back :class:`TaxCurrencyConversionUnavailable` naming the series the
     jurisdiction did not declare, and no other series is picked for it by load order (FR-007).
+    A realised *gain* in another currency does not reach that check at all -- it comes back
+    :class:`ForeignGainNotStruckPerDate`, whose own reason says why.
+
+    One series, so income in two foreign currencies is not expressible today. That is inside
+    FR-005 -- a second series is declarable and addressable, and no run consumes one -- and is
+    noted here because this field is where a second one would have to arrive.
 
     Never a channel. A channel is a market you transact in and decides an amount received; an
     official rate is a legal reference nobody transacts at and decides a tax base. The two may
@@ -983,9 +989,13 @@ def _in_tax_currency(
     **The whole charge is restated, not only the netting result.** A per-event category sums
     ``charge.pit`` and ``charge.levy`` against the result's own currency, so converting one
     and leaving the other would be a currency mismatch on the first such category. Each line
-    is struck at the same rate on the same date, which is the same arithmetic as charging the
-    declared rate against the converted base: ``base x rate_pct x fx`` and
-    ``base x fx x rate_pct`` are the same product.
+    is struck at the same rate on the same date.
+
+    **Restating after the fact is equivalent to charging on a converted base only because the
+    rule is linear in its base**, and that assumption belongs to the ``TaxRule`` interface
+    rather than to this function -- ``core.tax.interface`` states it, and states what a rule
+    with a bracket, a cap or an allowance must do instead. This site cannot enforce it: by the
+    time a charge reaches here it has already been computed.
 
     ``total`` is **recomputed** from the two struck lines rather than converted with them, so
     the record's own identity ``total == pit + levy`` stays exact rather than holding to a

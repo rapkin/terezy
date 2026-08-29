@@ -26,6 +26,7 @@ battery of broken files proves nothing about the file the project actually uses.
 
 from __future__ import annotations
 
+import shutil
 from datetime import date
 from pathlib import Path
 
@@ -79,6 +80,13 @@ verified_on  = ""
 applies_to  = "{applies_to}"
 governed_by = "{governed_by}"
 """
+
+
+def _shipped_root(tmp_path: Path) -> Path:
+    """A copy of the shipped data root, so a case changes exactly one thing about it."""
+    root = tmp_path / "data"
+    shutil.copytree(SHIPPED.parents[1], root)
+    return root
 
 
 def _file(tmp_path: Path, body: str, *, name: str = "xx.toml") -> Path:
@@ -208,6 +216,7 @@ class TestOneFileReadInIsolation:
         body = _body() + "\n[observation.buy_side]\npremium_per_unit = 0.5\n"
         error = _load_error(_file(tmp_path, body))
 
+        assert "buy_side" in str(error)
         assert "xx.toml" in str(error)
 
     def test_a_rule_with_no_citation_is_refused(self, tmp_path: Path) -> None:
@@ -248,6 +257,51 @@ class TestOneFileReadInIsolation:
 
         assert "2026-03-04" in str(error)
 
+    @pytest.mark.parametrize(
+        "pair",
+        ['["UAH"]', '["UAH", "USD", "USD"]'],
+    )
+    def test_a_pair_that_is_not_two_currencies_is_refused(self, tmp_path: Path, pair: str) -> None:
+        """The order of the two decides which direction the series converts, so a list that
+        is not a pair has no direction to read off."""
+        error = _load_error(_file(tmp_path, _body().replace('["UAH", "USD"]', pair)))
+
+        assert "pair" in str(error)
+
+    def test_a_series_quoting_a_currency_against_itself_is_refused(self, tmp_path: Path) -> None:
+        """An amount already in the tax currency needs no official rate at all (FR-009), so a
+        self-quote is a series with nothing to convert."""
+        error = _load_error(_file(tmp_path, _body().replace('["UAH", "USD"]', '["UAH", "UAH"]')))
+
+        assert "pair" in str(error)
+
+    def test_a_rule_declaring_an_empty_list_of_days_is_refused(self, tmp_path: Path) -> None:
+        """A rule that governs no date grants nothing and refuses nothing, and reads as though
+        the dates it was written for were covered.
+
+        ⚙ Written as ``day = []`` and **not** by deleting the rows, because those are two
+        different refusals: an absent key is the schema's (the field has no default, so it
+        cannot be omitted), and this is the loader's. A first draft of this test deleted the
+        rows, passed, and stayed green with the loader's guard disabled.
+        """
+        rule = RULE.format(applies_to="2026-03-04", governed_by="2026-03-03")
+        empty = rule[: rule.index("[[non_publication_rule.day]]")] + "day = []\n"
+        error = _load_error(_file(tmp_path, _body() + empty))
+
+        assert "with no days" in str(error)
+
+    def test_a_rule_omitting_its_days_entirely_is_refused_by_the_schema(
+        self, tmp_path: Path
+    ) -> None:
+        """The other half: absent and empty are different states and neither defaults."""
+        rule = RULE.format(applies_to="2026-03-04", governed_by="2026-03-03")
+        error = _load_error(
+            _file(tmp_path, _body() + rule[: rule.index("[[non_publication_rule.day]]")])
+        )
+
+        assert "day" in str(error)
+        assert "is required and is absent" in str(error)
+
     def test_a_series_with_no_observations_loads_when_it_says_so(self, tmp_path: Path) -> None:
         """The one place this departs from ``cpi_from_file``, which refuses an empty series.
 
@@ -285,6 +339,44 @@ class TestTheRelationsOneFileCannotSee:
 
         assert "first.toml" in str(caught.value)
         assert "second.toml" in str(caught.value)
+
+    def test_a_jurisdiction_naming_a_series_no_file_declares_is_refused(
+        self, tmp_path: Path
+    ) -> None:
+        """FR-007: no default series and no fallback to whichever one loaded first."""
+        root = _shipped_root(tmp_path)
+        timing = root / "tax" / "timing" / "ua.toml"
+        timing.write_text(
+            timing.read_text(encoding="utf-8").replace("ua_nbu_usd", "no_such_series"),
+            encoding="utf-8",
+        )
+
+        with pytest.raises(DeclarationError) as caught:
+            resolver.tax_rules_from_data_root(root, resolver.from_data_root(root))
+
+        assert "no_such_series" in str(caught.value)
+        assert "official_rate_series" in str(caught.value)
+
+    def test_a_series_quoting_the_tax_currency_the_wrong_way_round_is_refused(
+        self, tmp_path: Path
+    ) -> None:
+        """The guard whose message claims the largest disaster, so it is the one most worth
+        exercising: a series quoting USD per UAH would strike every base at the reciprocal of
+        the published rate and leave every figure plausible."""
+        root = _shipped_root(tmp_path)
+        shipped = root / "official_rates" / "ua_nbu_usd.toml"
+        shipped.write_text(
+            shipped.read_text(encoding="utf-8").replace(
+                'pair           = ["UAH", "USD"]', 'pair           = ["USD", "UAH"]'
+            ),
+            encoding="utf-8",
+        )
+
+        with pytest.raises(DeclarationError) as caught:
+            resolver.tax_rules_from_data_root(root, resolver.from_data_root(root))
+
+        assert "reciprocal" in str(caught.value)
+        assert "ua_nbu_usd" in str(caught.value)
 
     def test_an_absent_directory_is_an_empty_set_rather_than_a_load_failure(
         self, tmp_path: Path

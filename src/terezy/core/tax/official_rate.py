@@ -344,7 +344,8 @@ def strike_base(
             on_date=on_date,
             covers=window,
             reason=(
-                f"{series.id!r} declares no official rate for {on_date.isoformat()} "
+                f"{series.id!r} ({series.pair[0].value} per {series.pair[1].value}) declares "
+                f"no official rate for {on_date.isoformat()} "
                 + (
                     f"and no non-publication-day rule covering it; it covers "
                     f"{window[0].isoformat()} to {window[1].isoformat()}. "

@@ -31,8 +31,7 @@ from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.tolerance import is_close
-from terezy.core.routes import channels
-from terezy.core.routes.channels import Side
+from terezy.core.routes import channels, legs
 from terezy.core.tax import official_rate
 from tests import composed_registries, official_rates
 from tests.source_scan import executable_source
@@ -104,14 +103,29 @@ class TestNoCostFigureIsDerivedFromAnOfficialRate:
             assert "official_rate" not in behaviour, path
             assert "strike_base" not in behaviour, path
 
-    def test_the_side_of_a_channel_is_the_only_thing_that_prices_a_movement(self) -> None:
-        """A leg naming no channel has no rate to fall back on, which is what makes the
-        absence of an official-rate fallback structural rather than remembered."""
-        channel = composed_registries.channel()
-        buy, role = channels.side_for(channel, Currency.UAH, Currency.USD)
+    def test_a_leg_naming_an_unknown_channel_has_no_rate_to_fall_back_on(self) -> None:
+        """The refusal feature 002 wrote, still standing and still the only answer.
 
-        assert role is Side.BUY
-        assert is_close(channels.effective_rate(buy, channel.reference_rate, role=role), 45.0)
+        This is the half a source scan cannot make: the scan says ``core.routes`` never
+        *reaches* the official rate, and this says there is no rate at the one place a
+        substitution would be reached for. Asserting the message names no default is what
+        would fail if a later feature added the "reference rate" option FR-012 forbids.
+        """
+        with pytest.raises(KeyError) as caught:
+            legs.channel_for(
+                composed_registries.CHANNELS,
+                composed_registries.leg(
+                    index=0,
+                    from_venue="a",
+                    to_venue="b",
+                    from_ccy=Currency.UAH,
+                    to_ccy=Currency.USD,
+                    channel_id="misspelt",
+                ),
+            )
+
+        assert "no default channel" in str(caught.value)
+        assert "official_rate" not in str(caught.value)
 
 
 class TestNoTaxBaseIsDerivedFromAChannelRate:

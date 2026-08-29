@@ -1988,8 +1988,9 @@ class NonPublicationRuleTable(BaseModel):
 
     id: str
     kind: str
-    """The staleness kind the rule's citation ages under -- ``tax_rule``, because a rule is
-    read off a published text and changes by amendment rather than by drift."""
+    """The staleness kind the rule's citation ages under. ``tax_rule`` fits a rule read off a
+    published text, which changes by amendment rather than by drift; which kind a file names
+    is not pinned, only that it names a declared one."""
 
     source: str
     """Non-empty. **A paraphrase is not a citation and MUST NOT enter as one** (FR-011): the
@@ -2023,9 +2024,14 @@ class OfficialRateObservationTable(BaseModel):
     its unit currency. Strictly positive, checked by the loader."""
 
     kind: str
-    """The ``ObservationKind`` this value ages under -- ``official_rate``, 7 days.
+    """The ``ObservationKind`` this value ages under. ``official_rate`` for a published rate.
 
-    Per observation, because ``scripts/check_provenance.py`` treats each ``[[observation]]``
+    **Which kind is not pinned here and is not pinned anywhere**, on ``cpi_index``'s existing
+    precedent: any declared kind loads, so a file naming a slower-ageing one would age a rate
+    at that kind's threshold. What *is* enforced is that a kind is named and that it is
+    declared (FR-006, ``scripts/check_provenance.py``).
+
+    Per observation rather than per series, because the gate treats each ``[[observation]]``
     as a sourced table and requires a kind on each. The loader stamps it onto the citation and
     the core record carries no copy of it: the citation is what survives the merge a derived
     tax figure passes through.
