@@ -247,8 +247,9 @@ class AssessmentRules:
     """The declared series that strikes a base in :attr:`tax_currency`, or ``None``.
 
     ``None`` is a declared absence and not a permissive one: a taxable result in another
-    currency then comes back :class:`TaxCurrencyConversionUnavailable` naming the series the
-    jurisdiction did not declare, and no other series is picked for it by load order (FR-007).
+    currency then comes back :class:`TaxCurrencyConversionUnavailable` saying the jurisdiction
+    declared none -- there is no series for it to name -- and no other series is picked for it
+    by load order (FR-007).
     A realised *gain* in another currency does not reach that check at all -- it comes back
     :class:`ForeignGainNotStruckPerDate`, whose own reason says why.
 

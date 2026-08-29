@@ -2597,8 +2597,8 @@ def _official_rate_for(
     """The series this jurisdiction declares for its tax currency, checked both ways.
 
     ``None`` when the file names none, which is a declared absence rather than an oversight:
-    a foreign-currency taxable result then refuses naming the series that is missing, and no
-    other series is picked for it.
+    a foreign-currency taxable result then refuses saying this jurisdiction declared no series
+    -- there is none to name -- and no other series is picked for it.
     """
     named = declared.official_rate_series
     if named is None:

@@ -172,8 +172,8 @@ class TaxContext:
     which the ledger computes in its own base currency.
 
     What ``core.tax.year`` then does with a foreign-currency charge is not one thing. An income
-    event's is restated at the declared official rate for its date, or refuses naming the
-    series and the date when none is declared for it. A **gain**'s is refused before any
+    event's is restated at the declared official rate for its date, or is refused by name when
+    no such rate is declared. A **gain**'s is refused before any
     series is consulted, for the reason
     :class:`terezy.core.tax.year.ForeignGainNotStruckPerDate` gives. This module's docstring
     carries the assumption the restatement rests on, and why a non-proportional rule cannot
