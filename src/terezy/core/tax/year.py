@@ -707,7 +707,10 @@ class TaxCurrencyConversionUnavailable:
     unavailable: OfficialRateUnavailable
     """Which half is missing -- no series for the pair, or no rate on the date -- each naming
     what it has, which is not the same list: a jurisdiction that declared no series has no
-    series id to report and no date to report it against.
+    series id to report and no date to report it against. Which variant carries what is
+    asserted per field in ``tests/unit/test_official_rate_refusals.py``, because the prose
+    version of this sentence went false in five separate places before somebody wrote the
+    check.
 
     Carried rather than flattened into the reason, so a caller can act on it without parsing
     prose."""

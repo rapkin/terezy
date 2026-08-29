@@ -22,7 +22,9 @@ a declared channel produced.
 **Where it is struck**: `core.tax.year._items`, the one site in the engine where a taxable
 result in a currency the tax is not assessed in is already reachable and already refuses for
 want of this machinery ([research D2](./research.md)). The refusal is replaced by the
-conversion, or by a sharper refusal naming the series, the pair and the date.
+conversion, or by a sharper refusal carrying a typed reason — which names the series, the pair
+and the date where a declared series simply does not cover it, and says the jurisdiction
+declared no series where there is none to name.
 
 **What it deliberately refuses to convert**: a disposal's realised gain. That is a difference
 between two amounts on two dates, and striking it at one date's rate would delete exactly the

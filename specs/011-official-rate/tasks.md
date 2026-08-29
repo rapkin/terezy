@@ -16,8 +16,9 @@ counts, and every task below that adds behaviour names the test that must fail f
   Fails with `ImportError`.
 - [x] **T003** `tests/unit/test_official_rate_refusals.py` — SC-003: a gap in the middle, a
   date before the first observation, a date after the last, a series with no observations, a
-  pair the series does not quote, and the inverse direction. Every one names the series, the
-  pair and the date; none returns a number.
+  pair the series does not quote, and the inverse direction. The uncovered-date cases name the
+  series, the pair and the date; the pair cases name both pairs and no date, because there is
+  no date the question turned on. None returns a number.
 - [x] **T004** `src/terezy/core/tax/official_rate.py` — the records, `strike_base`,
   `observation_for`, `covered_window`, `provenance_of`, and the two refusals. Makes T002–T003
   pass.
@@ -73,9 +74,11 @@ counts, and every task below that adds behaviour names the test that must fail f
   rate marks the base, the charge and the liability; a marked amount survives a verified rate;
   an observation aged past 7 days reports staleness naming the observation and the threshold
   through `staleness_of_sources`; a fresh one reports none.
-- [x] **T020** `tests/contract/test_tax_declaration_loading.py` — update
-  `TestAForeignCurrencyTaxableEventRefuses`: with no series declared it still refuses, and the
-  refusal now names the series that is missing rather than a feature number.
+- [x] **T020** `tests/contract/test_tax_declaration_loading.py` — update the foreign-currency
+  case. **What landed differs from what this task predicted**: that ledger's taxable result is
+  a realised *gain*, so the class is now `TestAForeignCurrencyDisposalGainRefuses` and it
+  asserts `ForeignGainNotStruckPerDate` naming `fx-tax-asymmetry-f1` — a refusal that consults
+  no series and so names none (research D3).
 - [x] **T021** `src/terezy/core/results/tuple.py`, `src/terezy/core/decision/tuple_outcome.py`
   — the prose and the refusal text stop saying the official rate is what is missing, because
   after this feature it is not. Pinned by a test that asserts what the refusal now names.

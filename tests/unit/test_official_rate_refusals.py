@@ -18,7 +18,9 @@ inferred from the other.
 
 from __future__ import annotations
 
+from dataclasses import fields
 from datetime import date
+from typing import get_args
 
 import pytest
 
@@ -143,3 +145,60 @@ class TestAnAmountAlreadyInTheTaxCurrencyNeverAsks:
                 tax_currency=Currency.UAH,
                 on_date=MARCH_2,
             )
+
+
+class TestWhatEachRefusalCanName:
+    """Which of the series, the pair and the date each variant carries. Asserted, not described.
+
+    ⚙ **This exists because the prose version of it went false five times.** "The refusal names
+    the series, the pair and the date" is true of
+    :class:`~terezy.core.tax.official_rate.OfficialRateUndeclaredOnDate` and false of
+    :class:`~terezy.core.tax.official_rate.OfficialRateSeriesUnavailable`, which has no date
+    field at all and reports ``None`` for the series when the jurisdiction declared none. Six
+    review rounds found that sentence surviving in a new place each time, always written by
+    somebody who had just read a true copy of it.
+
+    A sentence cannot fail; this can. Prose making a claim about what a refusal names should
+    point here rather than restate it, and a new member of the union fails this test until
+    somebody says what it carries.
+    """
+
+    def test_the_union_has_exactly_the_two_members_this_test_knows_about(self) -> None:
+        """So a third variant cannot inherit either row's answer silently."""
+        assert set(get_args(official_rate.OfficialRateUnavailable.__value__)) == {
+            official_rate.OfficialRateSeriesUnavailable,
+            official_rate.OfficialRateUndeclaredOnDate,
+        }
+
+    def test_an_uncovered_date_names_the_series_the_pair_and_the_date(self) -> None:
+        outcome = _struck(date(2026, 3, 4))
+        assert isinstance(outcome, official_rate.OfficialRateUndeclaredOnDate), outcome
+
+        assert {field.name for field in fields(outcome)} == {
+            "series_id",
+            "pair",
+            "on_date",
+            "covers",
+            "reason",
+        }
+        assert outcome.series_id == "synthetic_official_usd"
+        assert outcome.pair == (Currency.UAH, Currency.USD)
+        assert outcome.on_date == date(2026, 3, 4)
+        assert "2026-03-04" in outcome.reason
+
+    def test_a_series_that_cannot_serve_the_pair_names_no_date_at_all(self) -> None:
+        outcome = official_rate.strike_base(
+            AMOUNT,
+            official_rates.series(DECLARED, pair=(Currency.USD, Currency.UAH)),
+            tax_currency=Currency.UAH,
+            on_date=MARCH_2,
+        )
+        assert isinstance(outcome, official_rate.OfficialRateSeriesUnavailable), outcome
+
+        assert {field.name for field in fields(outcome)} == {
+            "wanted",
+            "series_id",
+            "quotes",
+            "reason",
+        }
+        assert "2026-03-02" not in outcome.reason

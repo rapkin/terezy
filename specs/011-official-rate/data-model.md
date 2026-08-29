@@ -99,7 +99,7 @@ def provenance_of(series) -> Provenance          # every observation's citation,
 |---|---|---|
 | `tax.year.AssessmentRules` | `+ official_rate: OfficialRateSeries \| None` | The jurisdiction that declares its tax currency declares the series that serves it (FR-007). `None` is a declared absence and refuses by name. |
 | `tax.year.ChargeRef` | `+ conversion: TaxCurrencyConversion \| None` | FR-016: the struck base names its series, date, rate and unit where a reader of the statement meets it. `None` for a result already in the tax currency (FR-009, SC-010). |
-| `tax.year.TaxCurrencyConversionUnavailable` | `+ unavailable: OfficialRateUnavailable` | The refusal names the series, the pair and the date rather than only the two currencies. |
+| `tax.year.TaxCurrencyConversionUnavailable` | `+ unavailable: OfficialRateUnavailable` | The refusal carries the typed reason rather than only the two currencies. What that reason can name differs by variant — see above. |
 | `tax.year.ForeignGainNotStruckPerDate` | new member of `TaxYearRefused` | research D3. |
 
 Feature 001's `TaxCharge` and `TaxClass`, `Money`, `Provenance`, `SourceRef` and 002's
