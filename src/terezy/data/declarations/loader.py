@@ -1120,10 +1120,10 @@ def _non_empty_list[T](path: Path, field_path: str, values: list[T], why: str) -
     of a venue's currencies, of a regime's routes, of the two currencies a quote is between --
     and one message shape keeps them saying it the same way.
 
-    ⚙ **The callers are deliberately not enumerated.** They were, the list said three, and
-    there were six by the time anybody re-read it -- two of them added by the feature that
-    found the discrepancy. A count in prose beside a function nothing counts is a claim that
-    goes stale in silence.
+    ⚙ **The callers are deliberately not counted.** They were, and the count was already wrong
+    when somebody re-read it -- then the sentence written to replace it got its own count
+    wrong, and review caught that too. A number in prose beside a function that counts nothing
+    is a claim with no way to fail except by being read.
     """
     if not values:
         raise DeclarationError(
