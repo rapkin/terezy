@@ -47,6 +47,21 @@
 # `specs/011-official-rate/spec.md` under "Owner verification tasks", and are deliberately not
 # copied here.
 
+# ---------------------------------------------------------------------------
+# THE QUOTATION UNIT IS NOT CHECKED BY ANY GATE
+# ---------------------------------------------------------------------------
+#
+# `quotation_unit` is the only numeric leaf in `[series]`, and it is listed as structural in
+# `scripts/check_provenance.py` — which drops the citation requirement for this whole table,
+# not just for that field. So nothing verifies it, and a value read as 1 where the publisher
+# quotes per 100 is wrong by two orders of magnitude while every figure stays plausible.
+#
+# Whoever declares a series quoted per anything but 1: check the unit against the published
+# table by eye. The gate did not. Why the gap is not closed here — a `retrieved_on` for an
+# authority and a pair nobody retrieved would be a fabricated retrieval, which is worse than
+# an uncited field — is recorded at the exemption in that script, and closing it belongs with
+# the fetch script that will retrieve the published table this unit is read off.
+
 observation = []
 
 [series]

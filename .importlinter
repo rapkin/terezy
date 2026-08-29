@@ -101,9 +101,10 @@ forbidden_modules =
 allow_indirect_imports = False
 
 ; ⚙ `allow_indirect_imports = True` on the second contract, and only on it: it means DIRECT
-; imports only. `terezy.core.tax.year` reaches `terezy.core.routes.capacity` through
-; `terezy.core.ledger.engine`, which is a legitimate path about capacity pools and has nothing
-; to do with a rate. What this contract forbids is a tax module reaching for the module that
+; imports only. The chain that forces it is
+; `terezy.core.tax.year -> ledger.engine -> routes.capacity -> routes.legs -> routes.channels`
+; — four hops that exist for capacity pools and have nothing to do with a rate, and the last
+; of which is why forbidding the module indirectly is not available. What this contract forbids is a tax module reaching for the module that
 ; owns `reference_rate` — and the value-level claim, that no tax figure is derived from one,
 ; is asserted over the source in tests/contract/test_the_rate_you_are_taxed_at.py.
 

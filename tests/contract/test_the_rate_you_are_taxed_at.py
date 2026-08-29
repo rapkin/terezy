@@ -13,10 +13,13 @@ half deleted. So each has its own ``.importlinter`` contract, whose names
 
 **Why a source scan as well as the import contracts.** An import contract answers *can this
 module reach that one*; it cannot answer *is any tax figure derived from a reference rate*
-once the two live in one call site. The scan below reads executable source with prose stripped
-(``tests/source_scan.py``), because half the docstrings in this repository name the very thing
-it is looking for -- ``core.tax.official_rate``'s own module docstring says ``reference_rate``
-twice, explaining that it must never be used.
+once the two live in one call site.
+
+The scan reads executable source with prose stripped (``tests/source_scan.py``) rather than
+grepping, because a docstring naming the forbidden thing **in the course of forbidding it**
+is not a violation of it -- and this feature's own module is exactly that case. That is not
+asserted here in prose: ``test_the_official_rate_modules_prose_names_it_and_the_scan_still_passes``
+below proves both halves against the file itself, so a naive grep replacing the scan fails.
 """
 
 from __future__ import annotations
@@ -135,7 +138,13 @@ class TestNoTaxBaseIsDerivedFromAChannelRate:
     def test_no_tax_module_names_a_channel_or_its_reference_rate(self) -> None:
         for path in sorted(CORE_TAX.rglob("*.py")):
             behaviour = executable_source(path)
-            for forbidden in ("reference_rate", "FxChannel", "effective_rate", "side_for"):
+            for forbidden in (
+                "reference_rate",
+                "FxChannel",
+                "effective_rate",
+                "side_for",
+                "channel_for",
+            ):
                 assert forbidden not in behaviour, (path, forbidden)
 
     def test_the_official_rate_modules_prose_names_it_and_the_scan_still_passes(self) -> None:
@@ -158,6 +167,11 @@ class TestNoDisplayChoiceCanReachATaxFigure:
     there is nothing for a tax base to depend on. When the switch is built, this is the test
     it has to keep green, and the assertion below is what tells its author where to look.
     Measured over ``src/terezy/core/tax`` on 2026-08-29.
+
+    ⚙ **It matches on the word, so it is only as good as the name.** A presentation choice
+    called ``render_currency`` or ``shown_in`` would pass this scan. That is the honest limit
+    of asserting an absence: the check is that nothing here reads *the thing this project
+    calls a display currency*, and whoever names the switch owns keeping it findable.
     """
 
     def test_no_tax_module_reads_a_display_currency(self) -> None:

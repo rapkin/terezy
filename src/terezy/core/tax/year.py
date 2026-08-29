@@ -1014,6 +1014,21 @@ def _in_tax_currency(
     A **realised gain** never reaches the conversion. See
     :class:`ForeignGainNotStruckPerDate` for why converting one is the defect rather than the
     feature.
+
+    ⚠ **A hazard this function created and does not close, recorded 2026-08-30.** Before
+    feature 011 a foreign taxable result stopped here unconditionally, which made one state
+    structurally impossible: a run whose year is assessed in the tax currency while its other
+    tax figures are not. Restating the charge here removes that guard, and the figures the
+    restatement does *not* reach -- ``results.hurdle``'s ``total_tax`` and the ``TAX_CHARGE``
+    memos folded into the ledger -- stay in the currency they were charged in. Nothing types
+    that disagreement; ``results.tax_year.settle`` would meet it as a raised
+    ``CurrencyMismatchError`` from its cash check rather than a typed refusal.
+
+    Unreachable today three ways over -- no declared instrument is foreign,
+    ``decision.tuple_outcome`` refuses one that declares tax classes, and
+    ``results.project`` cannot fold a holding and its tax in two currencies at all. Whoever
+    makes any of those reachable owns this: the guard that used to make it impossible is
+    gone, and its replacement is not in this module.
     """
     if result.currency is rules.tax_currency:
         return charge, result, None
