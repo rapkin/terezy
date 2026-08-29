@@ -1,0 +1,99 @@
+# SYNTHETIC FIXTURE. Every payment in this file is invented.
+#
+# It exists for one fact (013 FR-020a, SC-018): that a source published its payments in an
+# order other than ascending by date is an observation about **the source**, not about the
+# money, and sorting the list is precisely the act that would delete it.
+#
+# MODELLED ON A REAL ISSUE AND DELIBERATELY NOT IT. Of the 32 ОВДП issues observed on
+# 2026-08-24, `UA4000235865` is the single counterexample to the pattern the other 31
+# follow: it publishes the repayment of principal one day BEFORE the final coupon, which
+# also makes its list the only one not in ascending date order. So the one real exception is
+# the one issue this form would have refused as published. The fixture is shaped like it —
+# principal a day before the final coupon, published after it — because the assertion is about
+# the mechanism and
+# not about that ISIN, and declaring a real ОВДП is out of this feature's scope.
+#
+# THE PAYMENTS BELOW ARE IN DATE ORDER, and `published_in_order` records that the source was
+# not. Ordering is settled at transcription, the same declared human step that turns kopecks
+# into hryvnia; the loader neither sorts nor accepts an unordered list. Declaring an order
+# identical to the ascending one is refused, so the field cannot become boilerplate.
+
+[instrument]
+id           = "enumerated_out_of_order"
+name         = "Synthetic issue published out of date order — TEST FIXTURE, payments invented"
+class        = "enumerated_schedule"
+currency     = "UAH"
+is_synthetic = true
+
+[instrument.schedule]
+face_value         = 1000.0
+covers_from        = "2026-04-01"
+day_count          = "act/365"
+published_in_order = ["2026-10-01", "2027-04-01", "2027-03-31"]
+kind               = "bond_terms"
+source             = "INFERENCE: SYNTHETIC FIXTURE — the face value is read off the largest payment and the coverage claim is invented. The published order records that the source listed the repayment of principal LAST, after a coupon dated a day later than it -- which is what makes the published list not ascending."
+retrieved_on       = "2026-08-29"
+verified_on        = ""
+
+  [[instrument.schedule.payment]]
+  on           = "2026-10-01"
+  amount       = 45.00
+  pays         = "coupon"
+  kind         = "bond_terms"
+  source       = "INFERENCE: SYNTHETIC FIXTURE — an invented amount, labelled by a human reading a list of numbers."
+  retrieved_on = "2026-08-29"
+  verified_on  = ""
+
+  [[instrument.schedule.payment]]
+  on           = "2027-03-31"
+  amount       = 1000.00
+  pays         = "principal_repayment"
+  kind         = "bond_terms"
+  source       = "INFERENCE: SYNTHETIC FIXTURE — the repayment of principal. It falls one day BEFORE the final coupon, and the source published it after that coupon; transcribing it into date order is what `published_in_order` records."
+  retrieved_on = "2026-08-29"
+  verified_on  = ""
+
+  [[instrument.schedule.payment]]
+  on           = "2027-04-01"
+  amount       = 45.00
+  pays         = "coupon"
+  kind         = "bond_terms"
+  source       = "INFERENCE: SYNTHETIC FIXTURE — the final coupon, paid the day after the principal."
+  retrieved_on = "2026-08-29"
+  verified_on  = ""
+
+[instrument.constraints]
+min_ticket   = 1000.0
+min_unit     = 1.0
+kind         = "venue_terms"
+source       = "SYNTHETIC FIXTURE — an invented minimum ticket of one bond."
+retrieved_on = "2026-08-29"
+verified_on  = ""
+
+[instrument.tax_classes]
+coupon        = "ua_government_bond"
+disposal_gain = "ua_government_bond"
+
+[[instrument.verification_task]]
+settles     = "face_value"
+question    = "What face value does this issue actually have?"
+searched    = "SYNTHETIC FIXTURE — nothing was searched; the value is invented."
+searched_on = "2026-08-29"
+
+[[instrument.verification_task]]
+settles     = "payment_kind"
+question    = "Which payments are coupons and which repay principal? Here the question has teeth: the repayment is not last."
+searched    = "SYNTHETIC FIXTURE — nothing was searched; the labels are invented."
+searched_on = "2026-08-29"
+
+[[instrument.verification_task]]
+settles     = "minor_unit_conversion"
+question    = "Do the published figures denote hryvnia or kopecks?"
+searched    = "SYNTHETIC FIXTURE — no conversion was performed; the figures are invented."
+searched_on = "2026-08-29"
+
+[[instrument.verification_task]]
+settles     = "coverage"
+question    = "Is this list complete from 2026-04-01 onwards?"
+searched    = "SYNTHETIC FIXTURE — the claim is invented."
+searched_on = "2026-08-29"

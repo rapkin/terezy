@@ -24,12 +24,19 @@ Four things this module is responsible for, in the order they happen:
    because it is where declared values *enter* the system and where their citation is
    attached; see ``tests/contract/test_money_construction_guard.py``.
 
-**Percent becomes a fraction exactly once, here.** Every ``_pct`` field passes through
-:func:`_as_fraction` and nothing else divides by 100 anywhere in the project. Doing it
-twice and not doing it at all are the two likeliest bugs in this layer, and both are
-invisible in the output -- a 15.5% coupon reading as 0.155% still produces a plausible
-schedule -- so the conversion is one named function with one caller per field and a
-worked assertion in the contract tests.
+**Percent becomes a fraction exactly once in this module**: every ``_pct`` field passes
+through :func:`_as_fraction`, which is the only division by 100 here. Doing it twice and
+not doing it at all are the two likeliest bugs in this layer, and both are invisible in
+the output -- a 15.5% coupon reading as 0.155% still produces a plausible schedule -- so
+the conversion is one named function with one caller per field and a worked assertion in
+the contract tests.
+
+⚙ The sentence used to claim that nothing else divided by 100 **anywhere in the project**,
+and feature 007 made it false: `core.inflation.series` turns a CPI observation published
+against the previous month = 100 into a growth factor. Corrected in 013 rather than
+restated, because a claim about another module is a test or it is not written --
+``tests/contract/test_nothing_is_inferred.py`` now holds the project-wide version, with
+each permitted site named beside its reason.
 
 **Provenance is per table.** Each sourced table becomes one ``SourceRef`` whose id names
 the file and the table, so a figure traces back to *where it was declared* rather than

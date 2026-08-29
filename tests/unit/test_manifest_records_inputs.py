@@ -65,6 +65,7 @@ MILTECH = "inzhur_miltech"
 FUND_C = "synthetic_fund_c"
 ENUMERATED_A = "ovdp_enumerated_a"
 ENUMERATED_MIRROR = "ovdp_enumerated_mirror"
+ENUMERATED_OUT_OF_ORDER = "enumerated_out_of_order"
 FIXTURE_PAYOUT_CLASS = "synthetic_fund_payout"
 FIXTURE_DISPOSAL_CLASS = "synthetic_fund_disposal"
 """⚙ Features 006 and 013 added declarations to the shipped data root: two fund files
@@ -203,6 +204,7 @@ class TestEveryDeclarationAndVersionThatFedTheRun:
             ("instrument", ISSUE_B),
             ("instrument", ENUMERATED_A),
             ("instrument", ENUMERATED_MIRROR),
+            ("instrument", ENUMERATED_OUT_OF_ORDER),
             ("fund", REIT),
             ("fund", MILTECH),
             ("fund", FUND_C),
@@ -243,6 +245,7 @@ class TestEveryDeclarationAndVersionThatFedTheRun:
             ISSUE_B: f"instruments/{ISSUE_B}.toml",
             ENUMERATED_A: f"instruments/{ENUMERATED_A}.toml",
             ENUMERATED_MIRROR: f"instruments/{ENUMERATED_MIRROR}.toml",
+            ENUMERATED_OUT_OF_ORDER: f"instruments/{ENUMERATED_OUT_OF_ORDER}.toml",
             REIT: f"instruments/{REIT}.toml",
             MILTECH: f"instruments/{MILTECH}.toml",
             FUND_C: f"instruments/{FUND_C}.toml",
@@ -269,6 +272,9 @@ class TestEveryDeclarationAndVersionThatFedTheRun:
             ISSUE_B: DATA_ROOT / "instruments" / f"{ISSUE_B}.toml",
             ENUMERATED_A: DATA_ROOT / "instruments" / f"{ENUMERATED_A}.toml",
             ENUMERATED_MIRROR: DATA_ROOT / "instruments" / f"{ENUMERATED_MIRROR}.toml",
+            ENUMERATED_OUT_OF_ORDER: (
+                DATA_ROOT / "instruments" / f"{ENUMERATED_OUT_OF_ORDER}.toml"
+            ),
             REIT: DATA_ROOT / "instruments" / f"{REIT}.toml",
             MILTECH: DATA_ROOT / "instruments" / f"{MILTECH}.toml",
             FUND_C: DATA_ROOT / "instruments" / f"{FUND_C}.toml",
