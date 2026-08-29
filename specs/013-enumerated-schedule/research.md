@@ -37,9 +37,9 @@ branching on `id` would be the Principle II violation).
   `if terms.issue_date is None` — the form test SC-003's scan is documented as unable to
   catch.
 
-## D2 — Three questions, asked of the terms, answered by each form
+## D2 — Four questions, asked of the terms, answered by each form
 
-**Decision.** A new module `core/instruments/terms.py` holds three free functions over
+**Decision.** A new module `core/instruments/terms.py` holds four free functions over
 `BondTerms | EnumeratedTerms` and is the **only** `match` on the form in `src/`:
 
 | Question | Function | Generative answers | Enumerated answers |
@@ -107,7 +107,7 @@ had.
 
 ## D5 — A payment kind determines a ledger movement and a taxable kind, in one closed mapping
 
-**Decision.** `PaymentKind` is a `StrEnum` in `core/instruments/interface.py` with two
+**Decision.** `PaymentKind` is an `Enum` in `core/instruments/interface.py` with two
 members today — `COUPON` and `PRINCIPAL_REPAYMENT` — and a single module-level mapping
 `PAYMENT_KINDS: Mapping[PaymentKind, tuple[EventKind, TaxableEventKind]]`.
 
@@ -117,27 +117,28 @@ FR-009 (an income kind with no declared class fails at load) and the instrument 
 event half. The set is closed and small, so a third kind — an amortising bond's fee, a
 step-up's makewhole — is one entry and one row in the mapping.
 
-## D6 — Units retire in proportion to face
+## D6 — A repayment retires its share of the repayments declared
 
 **Decision.** A `principal_repayment` event surrenders `quantity_held × (amount_per_unit /
-face_value)` units. Where the declared principal repayments would retire more units than the
-holding contains, `events` returns `InconsistentTerms` naming both figures.
+everything the repayments return per unit)`.
 
 **Rationale.** The Edge Cases make several principal repayments valid — an amortising
 schedule is representable — and each is a **disposal** in the ledger, consuming basis and
-realising a gain. The generative form redeems everything once at face, so the proportional
-rule reduces to *all of it* for a single repayment at face and matches the generative event
-exactly, which is what SC-002 needs. The arithmetic is over two declared amounts and infers
-nothing.
+realising a gain. This rule makes the stream as a whole retire the holding as a whole,
+once, whatever the shape: one repayment retires everything, which is exactly what the
+generative form's redemption does and what SC-002 needs; two equal ones retire half each.
 
-The refusal is required because `lots.consume` raises `LedgerInvariantError` on an
-over-disposal (`lots.py:493`) — a raise is the right answer to a programmer error and the
-wrong one to two declared facts that cannot both hold, which is what an over-amortising
-schedule is.
+**Alternatives rejected.**
 
-**Alternative rejected.** *Surrender everything on the last principal repayment.* "The last
-one" is a reading of position in the list, which is the shape FR-008 forbids for kinds and
-SC-014 scans for.
+- *Its share of the **face value***. This was the first decision and it was wrong, caught
+  by SC-005's relabelling: a schedule returning 1 050.00 against a declared face of 1 000.00
+  — a bond redeemed above par, which exists — would retire 1.05 units of every 1 held, and
+  `lots.consume` raises on an over-disposal (`lots.py:493`). It needed a typed refusal to
+  hold it back, and the refusal was covering for arithmetic run past the thing it was
+  describing. Face value is what a redemption is compared **with** (FR-025), never what it
+  is divided by; on the share-of-repayments rule the refusal is unnecessary and is gone.
+- *Surrender everything on the last principal repayment.* "The last one" is a reading of
+  position in the list, which is the shape FR-008 forbids for kinds and SC-014 scans for.
 
 ## D7 — Reinvestment refuses, and it refuses in the instrument
 

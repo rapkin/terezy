@@ -13,7 +13,7 @@ a declaration.
 
 ### `PaymentKind` — `core/instruments/interface.py`
 
-A `StrEnum`. Closed, and the closure is the point: FR-007 says a payment kind determines both
+An `Enum`. Closed, and the closure is the point: FR-007 says a payment kind determines both
 what the ledger records and which income kind the tax layer assesses, and FR-008 says nothing
 infers one.
 
@@ -92,12 +92,11 @@ FR-025, FR-026. Always present on a `Projection`, carrying a possibly-zero diffe
 
 | Field | Type | Meaning |
 |---|---|---|
-| `cost` | `Money` | What was paid, in full, exactly as stated. Nothing is amortised or reclassified (FR-024). |
+| `paid` | `Money` | What was paid, in full, exactly as stated. Nothing is amortised or reclassified (FR-024). Named `paid` rather than `cost`, which `tests/contract/test_cost_labels.py` forbids on a result record. |
 | `at_face` | `Money` | `face_value × quantity`. |
-| `difference` | `Money` | `cost − at_face`. Positive is a premium, negative a discount, zero is par and says so. |
+| `difference` | `Money` | `paid − at_face`. Positive is a premium, negative a discount, zero is par and says so. |
 | `tax_class_id` | `str` | The class the disposal is taxed under. |
-| `treatment` | `str` | The declared treatment of the category that class belongs to — `outside`, `nets`, `per_event`. |
-| `reason` | `str` | What that treatment means for this difference, in the output's own words. |
+| `governed_by` | `GovernedBy \| TreatmentUnstated` | The declared category and its treatment — `outside`, `nets`, `per_event` — with what it means for this difference; or a typed statement that the run was given no assessment rules, because those three are different claims and none is assumed. |
 
 ## Declaration files
 
@@ -131,9 +130,10 @@ verified_on  = ""
 [instrument.tax_classes]     # unchanged from the generative form
 
 [[instrument.verification_task]]
-settles         = "face_value"
-question        = "..."
-would_settle_it = "..."
+settles     = "face_value"
+question    = "..."
+searched    = "..."
+searched_on = "2026-08-29"
 ```
 
 **`pays`, not `kind`.** The provenance gate reads `kind` as the *observation* kind a table
@@ -173,5 +173,4 @@ failures.
 | Purchase, or declared opening lot, dated before `covers_from` | `InconsistentTerms`, naming both dates | FR-014, SC-008 |
 | Coupon policy `reinvest` | `InconsistentTerms`, naming the missing price and refusing to substitute face | FR-015, SC-009 |
 | Horizon ending before the last enumerated payment | `InconsistentTerms` | Edge Cases |
-| Declared principal repayments retiring more units than are held | `InconsistentTerms`, naming both figures | research D6 |
 | Quantity ≤ 0, cost ≤ 0, cost below the minimum ticket | as the generative form | unchanged |

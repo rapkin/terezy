@@ -13,7 +13,7 @@ payments, no coupon rate, and **no issue date**. This feature adds the enumerate
 that those issues can be declared without inventing the one fact that is not derivable.
 
 The shape, decided in [research.md](./research.md): **one declaration record, two `terms`
-records, one registry, three questions**. `InstrumentDeclaration.terms` becomes
+records, one registry, four questions**. `InstrumentDeclaration.terms` becomes
 `BondTerms | EnumeratedTerms`; `[instrument] class` selects the form as it already selects
 everything else; and the three sites that read a generative field today ask the terms a
 question both forms answer instead of reading a field only one has.
@@ -165,20 +165,26 @@ data/
 ### Tests
 
 ```text
-tests/worked_examples/test_enumerated_schedule.py        SC-001
-tests/worked_examples/test_enumerated_premium.py         SC-016
-tests/unit/test_enumerated_refusals.py                   SC-008, SC-009, SC-024
-tests/unit/test_enumerated_yield.py                      SC-011, SC-015
-tests/unit/test_payment_label_is_load_bearing.py         SC-005
-tests/unit/test_seed_lot_before_coverage.py              SC-008, SC-022
-tests/contract/test_enumerated_declaration_loading.py    SC-006, SC-019, SC-021
-tests/contract/test_enumerated_data_only.py              SC-004
-tests/contract/test_no_layer_knows_the_form.py           SC-003
-tests/contract/test_nothing_is_inferred.py               SC-014
-tests/contract/test_day_count_reaches_no_amount.py       SC-020
-tests/contract/test_no_accrued_interest.py               SC-023
-tests/contract/test_provenance_gate.py                   SC-013 (extended)
-tests/golden/test_enumerated_matches_generative.py       SC-002, SC-010, SC-017
+tests/worked_examples/test_enumerated_schedule.py         SC-001, SC-007
+tests/worked_examples/test_enumerated_premium.py          SC-016
+tests/unit/test_terms_vocabulary.py                       FR-007's one mapping
+tests/unit/test_conventions_statement.py                  FR-016's two statements
+tests/unit/test_terms_answer_both_forms.py                FR-011a's four questions
+tests/unit/test_enumerated_refusals.py                    SC-008, SC-009, SC-024
+tests/unit/test_units_retired_by_a_repayment.py           what a repayment surrenders
+tests/unit/test_enumerated_yield.py                       SC-010, SC-011, SC-015
+tests/unit/test_payment_label_is_load_bearing.py          SC-005
+tests/unit/test_seed_lot_before_coverage.py               SC-008, SC-022
+tests/unit/test_enumerated_marks_propagate.py             SC-012
+tests/unit/test_transcription_records_the_source_order.py SC-018
+tests/contract/test_enumerated_declaration_loading.py     SC-006, SC-019, SC-021
+tests/contract/test_enumerated_data_only.py               SC-004, SC-006's duplicate id
+tests/contract/test_no_layer_knows_the_form.py            SC-003
+tests/contract/test_nothing_is_inferred.py                SC-014
+tests/contract/test_day_count_reaches_no_amount.py        SC-020
+tests/contract/test_no_accrued_interest.py                SC-023
+tests/contract/test_provenance_gate.py                    SC-013 (extended)
+tests/golden/test_enumerated_matches_generative.py        SC-002, SC-017
 ```
 
 ## Phasing
