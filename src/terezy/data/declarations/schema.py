@@ -1724,8 +1724,8 @@ class TimingTable(BaseModel):
     Declared beside ``tax_currency`` because the two are one fact read twice: the currency a
     liability is assessed in, and the published series that says what a foreign amount is
     worth in it (011 FR-007). Omitted is a declared absence -- a foreign-currency taxable
-    result then refuses naming the series that is missing, and no other series is picked for
-    it by load order.
+    result then refuses saying this jurisdiction declared no series, there being none to name,
+    and no other series is picked for it by load order.
     """
 
     category: list[TimingCategoryTable]

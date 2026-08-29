@@ -173,11 +173,10 @@ class TaxContext:
 
     What ``core.tax.year`` then does with a foreign-currency charge is not one thing. An income
     event's is restated at the declared official rate for its date, or is refused by name when
-    no such rate is declared. A **gain**'s is refused before any
-    series is consulted, for the reason
-    :class:`terezy.core.tax.year.ForeignGainNotStruckPerDate` gives. This module's docstring
-    carries the assumption the restatement rests on, and why a non-proportional rule cannot
-    simply convert here.
+    no such rate is declared. A **gain**'s is refused before any series is consulted, for the
+    reason :class:`terezy.core.tax.year.ForeignGainNotStruckPerDate` gives. This module's
+    docstring carries the assumption the restatement rests on, and why a non-proportional rule
+    cannot simply convert here.
 
     A negative base is possible -- a realised loss -- and is passed through rather than
     clamped. See :mod:`terezy.core.tax.flat_rate` for what that means and does not mean.

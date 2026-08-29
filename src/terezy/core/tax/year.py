@@ -705,9 +705,12 @@ class TaxCurrencyConversionUnavailable:
     tax_currency: Currency
 
     unavailable: OfficialRateUnavailable
-    """Which half is missing -- the series, or the date -- naming the series, the pair and the
-    date. Carried rather than flattened into the reason, so a caller can act on it without
-    parsing prose."""
+    """Which half is missing -- no series for the pair, or no rate on the date -- each naming
+    what it has, which is not the same list: a jurisdiction that declared no series has no
+    series id to report and no date to report it against.
+
+    Carried rather than flattened into the reason, so a caller can act on it without parsing
+    prose."""
 
     reason: str
 

@@ -67,6 +67,10 @@ one fact and the one that drifts.
 say *before the first*, *after the last*, *inside a gap* or *nothing is declared at all*
 without the reader opening a file.
 
+The two do not carry the same list, and the difference is the point: only
+`OfficialRateUndeclaredOnDate` can name a series and a date. A jurisdiction that declared no
+series has neither, and says so.
+
 ## Functions
 
 ```python
