@@ -17,10 +17,11 @@
 # UAH, and every hryvnia figure needs an exchange-rate assumption the owner states. There
 # is no rate feed here and none is invented.
 #
-# **Six things the primary documents do not answer** are recorded as
+# **What the primary documents do not answer is recorded** as
 # `[[instrument.verification_task]]` entries, which carry no value field at all. A
 # projection needing one refuses by naming the task rather than filling in a plausible
-# number.
+# number. No count is written here: the header said six while the file listed five, and a
+# tally beside its own list is the sentence that goes stale first.
 #
 # **Fees are context, not modelled flows** (owner decision B). The management and
 # performance fee clauses are recorded as `[[instrument.fee_fact]]` so a reader can see what
@@ -42,8 +43,8 @@ terminates_on        = "2045-05-20"
   [instrument.nav]
   per_unit     = 10.9975
   kind         = "fund_terms"
-  source       = "https://www.inzhur.reit/offer/inzhur-reit — the net asset value per certificate shown on the fund page, accessed 2026-08-22. The certificate's nominal is 10.00 грн; this is the shown NAV, which is what a purchase and a buyback are priced against."
-  retrieved_on = "2026-08-22"
+  source       = "https://www.inzhur.reit/offer/inzhur-reit — the net asset value per certificate shown on the fund page, accessed 2026-08-22. The certificate's nominal is 10.00 грн; this is the shown NAV, which is what a purchase and a buyback are priced against. RE-OBSERVED UNCHANGED on 2026-08-24: data/observations/inzhur.toml, entry `inzhur-reit`, records nav 10.9975 from Inzhur's own asset endpoint, retrieved by scripts/fetch_inzhur.py. A seller's quotation, not an independent valuation."
+  retrieved_on = "2026-08-24"
   verified_on  = ""
 
   [instrument.declared_yield]
@@ -92,8 +93,8 @@ terminates_on        = "2045-05-20"
   live_entry_markup_pct  = 1.0
   live_exit_discount_pct = 0.0
   kind                   = "fund_terms"
-  source                 = "Регламент ЗНПІФ «ІНЖУР REIT» (ред. 07.05.2025) for the maxima — an entry markup of up to 1% of NAV and an exit discount of up to 1%. The LIVE settings are unverified inferences from observed prices and are recorded as such: the fund page's entry price of ≈ 11.11 грн against the shown NAV of 10.9975 is consistent with the 1% markup being charged (10.9975 × 1.01 = 11.107), while a secondary source claims zero; and Inzhur's news of 07.04.2025 states the buyback commission was cancelled, which is why the live exit discount is declared zero. Verification task 3 exists to settle both."
-  retrieved_on           = "2026-08-22"
+  source                 = "Регламент ЗНПІФ «ІНЖУР REIT» (ред. 07.05.2025), read 2026-08-22, for the maxima — an entry markup of up to 1% of NAV and an exit discount of up to 1% of NAV. The live prices are read from data/observations/inzhur.toml, entry `inzhur-reit`, which scripts/fetch_inzhur.py retrieved from https://www.inzhur.reit/_api/assets on 2026-08-24 — Inzhur's own published figures for an instrument it sells, a seller's quotation rather than an independent valuation. buy 11.1075, nav 10.9975, sell 11.0965, and BOTH LIVE PRICES ARE CLEAN MULTIPLES OF nav TO THE PUBLISHED FOUR DECIMALS: 10.9975 × 1.01 = 11.107475 → 11.1075, and 10.9975 × 1.009 = 11.0964775 → 11.0965. Inzhur Energy is struck on the same two multiples in the same retrieval, off a unit six hundred times larger: 6589.0098 × 1.01 → 6654.8999 and × 1.009 → 6648.3109. The six-digit RATIOS differ, 1.010002 here against 1.010000 there, and that is four-decimal rounding on an ~11 грн unit rather than a different multiple. ⚙ THE ARITHMETIC AND THE DOMAIN DISAGREE, AND NEITHER IS DISCARDED. The arithmetic makes nav the base BOTH prices are struck from: a price struck off some other current value would not land on a clean multiple of nav, and two independent funds do not land on the same pair of multiples by accident. The domain says a platform does not buy securities back above what they are worth, and 1.009 is above that base. No reconciliation is in hand, so both are written down and neither is dressed as the answer. ⚙ WHAT THIS REFUSES is the comfortable reading — that nav is a lagging official valuation while the live prices are struck off a current one. The multiples argue against it: an exact multiple of a figure is evidence that the figure IS the base, not that it is not. ENTRY: the entry multiple is exactly the 1% the регламент names, which is why the declared 1.0 stands and why the secondary source claiming zero is contradicted — but it is a multiple of the same unreconciled figure, so it is the best available reading and not a settled fact. Doubt about what nav is takes both halves or neither. EXIT: live_exit_discount_pct is 0.0 because 1.009 is not a discount from nav at all, not because a discount of zero was observed. WHAT IS OBSERVABLE WITHOUT RESOLVING ANY OF IT is the round trip between the two live prices: sell/buy = 1.009/1.01 = 0.999010, a spread of 0.0990%, identical on Energy. ⚙ WHAT THE DECLARED PAIR COSTS: 1% in and 0% out is a round trip of 1 - 1/1.01 = 0.9901%, against the 0.0990% the two live prices span — a factor of exactly ten, since 0.01/1.01 over 0.001/1.01 is 10. The safe direction, and written here so nobody reads the 0.0 as an optimistic exit. No fee structure is invented to close the gap: exact multiples are evidence about arithmetic, not about policy."
+  retrieved_on           = "2026-08-24"
   verified_on            = ""
 
   [instrument.liquidity.legal]
@@ -108,10 +109,10 @@ terminates_on        = "2045-05-20"
   [instrument.liquidity.practice]
   settlement_business_days = 0
   is_revocable             = true
-  note                     = "In practice Inzhur buys certificates back at NAV within hours, at zero commission. A REVOCABLE COMPANY PRACTICE, not an obligation: the company may stop the day it becomes expensive, which is precisely when an owner would need it. Every projection assuming this mode says so on its face."
+  note                     = "In practice Inzhur buys certificates back within hours at zero commission. A REVOCABLE COMPANY PRACTICE, not an obligation: the company may stop the day it becomes expensive, which is precisely when an owner would need it. Every projection assuming this mode says so on its face. ⚙ THIS NOTE USED TO SAY 'AT NAV' AND NO LONGER DOES: in the prices observed 2026-08-24 the buyback is not struck at the fund's published nav figure, and how that price relates to nav is the open verification task below. The withdrawn words were an inference about a field, not an observation of the price."
   kind                     = "fund_liquidity"
-  source                   = "https://www.inzhur.reit/offer/inzhur-reit and Inzhur news of 07.04.2025 announcing that the buyback commission was cancelled, accessed 2026-08-22."
-  retrieved_on             = "2026-08-22"
+  source                   = "https://www.inzhur.reit/offer/inzhur-reit and Inzhur news of 07.04.2025 announcing that the buyback commission was cancelled, accessed 2026-08-22, for the practice and its terms. data/observations/inzhur.toml, entry `inzhur-reit`, retrieved 2026-08-24 by scripts/fetch_inzhur.py, for the published buy/sell/nav prices that show where the buyback is actually struck."
+  retrieved_on             = "2026-08-24"
   verified_on              = ""
 
   [instrument.constraints]
@@ -157,9 +158,9 @@ terminates_on        = "2045-05-20"
   searched_on = "2026-08-22"
 
   [[instrument.verification_task]]
-  question    = "Whether the 1% entry markup and the 1% exit discount are currently charged: the live entry price of ≈ 11.11 грн suggests the markup is, while a secondary source claims zero. Check the live buy and sell prices in the investor cabinet."
-  searched    = "The fund page and a secondary broker listing"
-  searched_on = "2026-08-22"
+  question    = "What the `nav` figure Inzhur publishes for this fund IS, and how the two live prices relate to it. Both are struck as clean multiples of it to published precision — nav × 1.01 and nav × 1.009 — so the arithmetic makes nav the base; but a base the buyback prices ABOVE is what the business does not do. Neither the fund page nor the регламент says what the figure is. The fund's own statement of what it means, or of how the buyback price is set, is what closes it — AND IT CLOSES THE ENTRY HALF TOO, because the 1% markup reading is a multiple of the same figure. Until then the declaration records the observable 0.0990% round trip between buy and sell and claims nothing about the base."
+  searched    = "The fund page, a secondary broker listing, Регламент ЗНПІФ «ІНЖУР REIT» (ред. 07.05.2025), and the published buy/sell/nav prices observed 2026-08-24"
+  searched_on = "2026-08-24"
 
   [[instrument.verification_task]]
   question    = "The ІНЖУР КЕПІТАЛ investment-firm commission amount, if any."
