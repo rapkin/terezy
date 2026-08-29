@@ -460,8 +460,20 @@ file edited.
 - **Tax-currency conversion** — the record of one base being struck: the source amount, the
   series, the observation date used, the rate, the quotation unit, the resulting base, and
   the union of both sides' provenance. What FR-016 reports and what a hand check re-derives.
-- **Official-rate-unavailable reason** — the typed refusal naming the series, the pair and
-  the date for which no observation is declared. Not an error, not a zero, and not a number.
+- **Official-rate-unavailable reason** — the typed refusal. Not an error, not a zero, and not
+  a number. It is **two** entities rather than one, because they cannot name the same things
+  and the fix for each is a different sentence:
+  - *no rate on the date* — a declared series covers neither the event's date nor any rule
+    reaching it. Names the series, the pair and the date, and the window it does cover.
+  - *no series for the pair* — the jurisdiction declares none, or the one it declares quotes
+    something else. There is no series id to report where none is declared, and **no date to
+    report it against**: the question failed before a date was consulted.
+
+  ⚙ Corrected 2026-08-30, during implementation. This entry originally described only the
+  first and was the specification's only description of either, so the second refusal had no
+  entity and no requirement of its own. Which variant carries what is asserted per field in
+  `tests/unit/test_official_rate_refusals.py`; prose points there rather than restating it,
+  because restating it is what went wrong five times.
 - Reused unchanged: the provenance record, the money record and its currency tag, the tax
   class and charge records of feature 001, the channels and legs of feature 002.
 

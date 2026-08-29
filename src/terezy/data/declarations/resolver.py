@@ -2520,8 +2520,8 @@ def tuple_from_data_root(
 #
 # ⚙ **An absent directory is an empty set, not a load failure**, on `cpi`'s reading rather
 # than `composition`'s. A run that never strikes a foreign base needs no series, and the one
-# that does comes back typed-unavailable naming the pair and the date — which is more use to
-# the owner than a load error naming a directory.
+# that does comes back typed-unavailable, naming the pair it wanted and the event it failed on
+# — which is more use to the owner than a load error naming a directory.
 
 OFFICIAL_RATES_DIR = "official_rates"
 """Where declared official-rate series live under a data root. Cited; in `SOURCED_DIRS`."""

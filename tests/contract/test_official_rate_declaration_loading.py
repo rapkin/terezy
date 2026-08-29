@@ -409,7 +409,8 @@ class TestTheRelationsOneFileCannotSee:
         self, tmp_path: Path
     ) -> None:
         """A run that never strikes a foreign base needs none, and the refusal that does need
-        one names the pair and the date -- which is more use than an error naming a directory."""
+        one names the pair it wanted and the event it failed on -- which is more use than a
+        load error naming a directory."""
         assert resolver.official_rates_from_data_root(tmp_path, {}).series == {}
 
 

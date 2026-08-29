@@ -706,11 +706,14 @@ class TaxCurrencyConversionUnavailable:
 
     unavailable: OfficialRateUnavailable
     """Which half is missing -- no series for the pair, or no rate on the date -- each naming
-    what it has, which is not the same list: a jurisdiction that declared no series has no
-    series id to report and no date to report it against. Which variant carries what is
-    asserted per field in ``tests/unit/test_official_rate_refusals.py``, because the prose
-    version of this sentence went false in five separate places before somebody wrote the
-    check.
+    what it has, which is not the same list.
+
+    **Do not restate that list here or anywhere else.** Which variant carries which field is
+    asserted in ``tests/unit/test_official_rate_refusals.py``, and that a jurisdiction
+    declaring no series reports ``series_id`` as ``None`` is asserted in
+    ``tests/unit/test_tax_base_in_the_tax_currency.py``. Every prose copy of those facts
+    written on this feature went false, and each was written by somebody who had just read a
+    true one.
 
     Carried rather than flattened into the reason, so a caller can act on it without parsing
     prose."""
