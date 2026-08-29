@@ -150,12 +150,12 @@ class TestAnAmountAlreadyInTheTaxCurrencyNeverAsks:
 class TestWhatEachRefusalCanName:
     """Which of the series, the pair and the date each variant carries. Asserted, not described.
 
-    ⚙ **This exists because the prose version of it went false five times.** "The refusal names
-    the series, the pair and the date" is true of
+    ⚙ **This exists because the prose version of it kept going false.** "The refusal names the
+    series, the pair and the date" is true of
     :class:`~terezy.core.tax.official_rate.OfficialRateUndeclaredOnDate` and false of
     :class:`~terezy.core.tax.official_rate.OfficialRateSeriesUnavailable`, which has no date
-    field at all and reports ``None`` for the series when the jurisdiction declared none. Six
-    review rounds found that sentence surviving in a new place each time, always written by
+    field at all and reports ``None`` for the series when the jurisdiction declared none.
+    Review found that sentence surviving somewhere new on round after round, always written by
     somebody who had just read a true copy of it.
 
     A sentence cannot fail; this can. Prose making a claim about what a refusal names should

@@ -463,17 +463,20 @@ file edited.
 - **Official-rate-unavailable reason** — the typed refusal. Not an error, not a zero, and not
   a number. It is **two** entities rather than one, because they cannot name the same things
   and the fix for each is a different sentence:
-  - *no rate on the date* — a declared series covers neither the event's date nor any rule
-    reaching it. Names the series, the pair and the date, and the window it does cover.
+  - *no rate on the date* — a declared series has no observation for the event's date and no
+    declared rule reaching one. Names the series, the pair and the date, and the window it
+    does cover — or that it declares no observation at all, which is what the Ukrainian series
+    ships doing.
   - *no series for the pair* — the jurisdiction declares none, or the one it declares quotes
     something else. There is no series id to report where none is declared, and **no date to
     report it against**: the question failed before a date was consulted.
 
   ⚙ Corrected 2026-08-30, during implementation. This entry originally described only the
   first and was the specification's only description of either, so the second refusal had no
-  entity and no requirement of its own. Which variant carries what is asserted per field in
-  `tests/unit/test_official_rate_refusals.py`; prose points there rather than restating it,
-  because restating it is what went wrong five times.
+  entity and no requirement of its own. **The second still has no FR** — this correction gave
+  it an entity, not a requirement — which is the remaining gap in this section. Which variant
+  carries what is asserted per field in `tests/unit/test_official_rate_refusals.py`; prose
+  points there rather than restating it, because every prose copy of it went false.
 - Reused unchanged: the provenance record, the money record and its currency tag, the tax
   class and charge records of feature 001, the channels and legs of feature 002.
 
