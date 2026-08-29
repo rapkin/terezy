@@ -2167,7 +2167,7 @@ def tax_rules_from_data_root(
             "whichever holding happened to be projected first.",
             "declare data/tax/timing/<jurisdiction>.toml",
         )
-    rates = official_rates_from_data_root(root)
+    rates = official_rates_from_data_root(root, _resolved_kinds(root / KINDS_FILE)[0])
     built: dict[str, AssessmentRules] = {}
     declaring: dict[str, Path] = {}
     for path in files:
@@ -2542,15 +2542,32 @@ class OfficialRateDeclarations:
     has been discarded."""
 
 
-def official_rates_from_data_root(root: Path) -> OfficialRateDeclarations:
+def official_rates_from_data_root(
+    root: Path, kinds: Mapping[str, ObservationKind]
+) -> OfficialRateDeclarations:
     """Every official-rate series under a data root, refusing two files claiming one identity.
 
     Sorted, so a run does not depend on the order a filesystem happens to return.
+
+    ``kinds`` is required because a **rule** table's staleness kind is checked nowhere else.
+    `scripts/check_provenance.py` recognises a sourced table by its numeric leaves, and
+    `[non_publication_rule]` has none -- it is a citation and a list of dates -- so the gate
+    cannot see it, exactly as it cannot see `[series]`. Left unchecked, a misspelt kind loads
+    and then raises from `staleness.kind_for` when a figure it marked is aged: a crash at
+    report time for a file that could have been refused by name at load.
     """
     series: dict[str, OfficialRateSeries] = {}
     declaring: dict[str, Path] = {}
     for path in sorted((root / OFFICIAL_RATES_DIR).glob("*.toml")):
         declared = loader.official_rate_from_file(path)
+        if declared.rule is not None:
+            for source in declared.rule.provenance.sources:
+                _check_kind(
+                    source.kind,
+                    kinds,
+                    path=path,
+                    field_path=f"{loader.OFFICIAL_RATE_RULE_TABLE}.kind",
+                )
         if declared.id in series:
             raise DeclarationError(
                 path,

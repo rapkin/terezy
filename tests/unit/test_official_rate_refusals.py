@@ -56,6 +56,17 @@ class TestADateTheSeriesDoesNotCover:
         assert outcome.on_date == date(2026, 3, 4)
         assert outcome.covers == (MARCH_2, MARCH_5)
 
+    def test_the_reason_itself_names_the_series_the_pair_and_the_date(self) -> None:
+        """FR-010 names three things, and the reason is what a reader is shown. The record's
+        fields carry them too; asserting only those would leave the sentence free to drop
+        one -- and ``data/official_rates/ua_nbu_usd.toml``'s header claims all three."""
+        outcome = _struck(date(2026, 3, 4))
+        assert isinstance(outcome, official_rate.OfficialRateUndeclaredOnDate), outcome
+
+        assert "synthetic_official_usd" in outcome.reason
+        assert "UAH per USD" in outcome.reason
+        assert "2026-03-04" in outcome.reason
+
     def test_a_date_before_the_first_observation_refuses(self) -> None:
         outcome = _struck(date(2026, 3, 1))
 

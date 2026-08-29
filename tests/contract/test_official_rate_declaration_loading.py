@@ -35,6 +35,7 @@ import pytest
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
+from terezy.core.primitives.staleness import ObservationKind
 from terezy.core.tax import official_rate
 from terezy.data.declarations import loader, resolver
 from terezy.data.declarations.errors import DeclarationError
@@ -80,6 +81,13 @@ verified_on  = ""
 applies_to  = "{applies_to}"
 governed_by = "{governed_by}"
 """
+
+
+_A_DECLARED_KIND = ObservationKind(
+    id="tax_rule",
+    staleness_days=180,
+    note="SYNTHETIC FIXTURE -- a registry of one, so the refusal can list what would have worked.",
+)
 
 
 def _shipped_root(tmp_path: Path) -> Path:
@@ -335,7 +343,7 @@ class TestTheRelationsOneFileCannotSee:
         _file(root, _body(), name="second.toml")
 
         with pytest.raises(DeclarationError) as caught:
-            resolver.official_rates_from_data_root(tmp_path / "data")
+            resolver.official_rates_from_data_root(tmp_path / "data", {})
 
         assert "first.toml" in str(caught.value)
         assert "second.toml" in str(caught.value)
@@ -378,12 +386,33 @@ class TestTheRelationsOneFileCannotSee:
         assert "reciprocal" in str(caught.value)
         assert "ua_nbu_usd" in str(caught.value)
 
+    def test_a_rule_naming_an_undeclared_staleness_kind_is_refused(self, tmp_path: Path) -> None:
+        """The one sourced table in this feature the provenance gate structurally cannot see.
+
+        `check_provenance.py` recognises a sourced table by its numeric leaves, and
+        `[non_publication_rule]` has none — it is a citation and a list of dates. Unchecked,
+        a misspelt kind loads and then raises from `staleness.kind_for` when a figure it
+        marked is aged: a crash at report time for a file refusable by name at load.
+        """
+        root = tmp_path / "data" / "official_rates"
+        root.mkdir(parents=True)
+        rule = RULE.format(applies_to="2026-03-04", governed_by="2026-03-03")
+        _file(root, _body() + rule.replace('kind         = "tax_rule"', 'kind = "not_a_kind"'))
+
+        with pytest.raises(DeclarationError) as caught:
+            resolver.official_rates_from_data_root(
+                tmp_path / "data", {"tax_rule": _A_DECLARED_KIND}
+            )
+
+        assert "not_a_kind" in str(caught.value)
+        assert "tax_rule" in str(caught.value)
+
     def test_an_absent_directory_is_an_empty_set_rather_than_a_load_failure(
         self, tmp_path: Path
     ) -> None:
         """A run that never strikes a foreign base needs none, and the refusal that does need
         one names the pair and the date -- which is more use than an error naming a directory."""
-        assert resolver.official_rates_from_data_root(tmp_path).series == {}
+        assert resolver.official_rates_from_data_root(tmp_path, {}).series == {}
 
 
 class TestTheShippedUkrainianSeries:

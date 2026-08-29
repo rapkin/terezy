@@ -108,8 +108,9 @@ class TestNoCostFigureIsDerivedFromAnOfficialRate:
 
         This is the half a source scan cannot make: the scan says ``core.routes`` never
         *reaches* the official rate, and this says there is no rate at the one place a
-        substitution would be reached for. Asserting the message names no default is what
-        would fail if a later feature added the "reference rate" option FR-012 forbids.
+        substitution would be reached for. A later feature adding the "reference rate"
+        option FR-012 forbids would make the refusal stop happening, and it is the ``raises``
+        that fails then -- the two string assertions never run at all.
         """
         with pytest.raises(KeyError) as caught:
             legs.channel_for(

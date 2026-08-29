@@ -188,16 +188,8 @@ carries its own citation on its own observation.
 `data/official_rates` joins `SOURCED_DIRS`. The gate is fail-closed on unknown directories,
 so this is not optional.
 
-⚙ **What the exemption costs, found in review on 2026-08-29 and recorded rather than
-papered over.** `[series]` holds exactly one numeric leaf, so listing `quotation_unit` as
-structural drops the table's leaf count to zero — and with it the `source`, `retrieved_on`,
-`verified_on` and `kind` requirements for the whole table, not just for that field. Measured:
-removing the line produces four errors on the shipped file, not one. So the number that
-decides a tax base to within two orders of magnitude is invisible to the gate.
-
-Closing it means requiring a citation on a series' identity table, and that is a real
-question rather than a line in a list: the authority and the pair are not retrieved values,
-so a `retrieved_on` for them would be a fabricated retrieval — worse than an uncited field.
-It belongs with the fetch script, which retrieves the published table the unit is read off
-and is the first thing able to date it honestly. Stated at the exemption itself, where
-whoever next edits that list meets it.
+⚙ **The exemption is wider than it looks, and review on 2026-08-29 found the first draft of
+this note understating it.** It costs the whole `[series]` table its citation requirement,
+not one field. The measurement and what closing it would take are stated at the exemption
+itself in `scripts/check_provenance.py`, where whoever next edits that list meets them; they
+are deliberately not repeated here.

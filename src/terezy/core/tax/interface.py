@@ -33,7 +33,8 @@ three because they come apart, and this interface is where they would be collaps
 ⚙ **A charge is computed in the currency its base arrived in, which is not always the tax
 currency.** Feature 011 made that reachable: an event denominated in a foreign currency is
 charged here on its own amount, and ``core.tax.year`` restates the whole charge at the
-declared official rate for the event's date when it assembles the year. So a ``TaxCharge``
+declared official rate for the event's date when it assembles the year -- except for a
+realised disposal gain, which it refuses outright rather than converting. So a ``TaxCharge``
 leaving this module may be denominated in USD, and a rule that compared its base against the
 jurisdiction's tax currency -- or skipped a conversion on the strength of one -- would be
 wrong.
@@ -42,10 +43,16 @@ That ordering carries **one assumption, and it is this interface's to state**: r
 charge after the fact is only equivalent to charging the declared rates on a converted base
 because ``flat_rate`` is *linear* in its base. A rule with a bracket, a cap, a floor or an
 allowance stated in the tax currency would apply those thresholds to a foreign-magnitude base
-before ``year`` ever sees the figure, and the answer would be plausible and wrong. **Such a
-rule must strike its own base in the tax currency before applying a threshold**, and
-``core.tax.official_rate.strike_base`` is what it does that with. Recorded 2026-08-29, when
-``flat_rate`` was still the only rule.
+before ``year`` ever sees the figure, and the answer would be plausible and wrong.
+
+**Such a rule is not expressible against this signature, and that is the thing to know before
+writing one.** Striking a base in the tax currency needs the declared rate series and the
+currency itself; :data:`ChargeFn` passes an ``Event``, a ``TaxClass`` and a ``TaxContext``,
+and none of the three carries either -- a rule cannot even learn what the tax currency is. So
+the first non-proportional rule is a change to this interface (the series, or the assessment
+rules, reaching the rule), and only then a call to
+``core.tax.official_rate.strike_base``. Recorded 2026-08-29, when ``flat_rate`` was still the
+only rule and the question was therefore cheap to answer wrongly.
 """
 
 from __future__ import annotations
@@ -158,12 +165,14 @@ class TaxContext:
     """Which kind of income, so the rule can check the class actually covers it."""
 
     taxable_base: Money
-    """The amount the rates are applied to, in the currency the event was denominated in.
+    """The amount the rates are applied to, in whatever currency the caller struck it in.
 
-    **Not necessarily the tax currency**, and a rule may not assume it is: a foreign-currency
-    event is charged on its own amount and the charge is restated in the tax currency when the
-    year is assembled. See this module's docstring for the assumption that ordering rests on,
-    and for what a non-proportional rule must do instead.
+    **A rule may not assume it is the tax currency**, and may not assume which currency it is
+    at all: an income event is charged on its own amount, and a disposal on the realised gain,
+    which the ledger computes in its own base currency. A foreign-currency charge is restated
+    in the tax currency when the year is assembled. See this module's docstring for the
+    assumption that ordering rests on, and for why a non-proportional rule cannot simply
+    convert here.
 
     A negative base is possible -- a realised loss -- and is passed through rather than
     clamped. See :mod:`terezy.core.tax.flat_rate` for what that means and does not mean.

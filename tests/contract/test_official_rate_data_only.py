@@ -23,6 +23,7 @@ which is what the second test below asserts.
 from __future__ import annotations
 
 import shutil
+from collections.abc import Mapping
 from datetime import date
 from pathlib import Path
 
@@ -31,9 +32,10 @@ import pytest
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
+from terezy.core.primitives.staleness import ObservationKind
 from terezy.core.primitives.tolerance import is_close
 from terezy.core.tax import official_rate
-from terezy.data.declarations import resolver
+from terezy.data.declarations import loader, resolver
 
 pytestmark = pytest.mark.contract
 
@@ -96,6 +98,14 @@ verified_on  = ""
 """
 
 
+def _kinds(root: Path) -> Mapping[str, ObservationKind]:
+    """The declared thresholds, so a rule table's kind is checked against a real registry."""
+    return {
+        kind.id: kind
+        for kind in loader.observation_kinds_from_file(root / "observation_kinds.toml")
+    }
+
+
 def _scratch_root(tmp_path: Path, *, name: str, body: str) -> Path:
     """A copy of the shipped data root plus one declared official-rate file."""
     root = tmp_path / "data"
@@ -108,7 +118,7 @@ class TestASecondSeriesIsADataOnlyAddition:
     def test_it_loads_and_is_addressable_beside_the_first(self, tmp_path: Path) -> None:
         root = _scratch_root(tmp_path, name="aa_second.toml", body=SECOND_SERIES)
 
-        declared = resolver.official_rates_from_data_root(root)
+        declared = resolver.official_rates_from_data_root(root, _kinds(root))
 
         assert set(declared.series) == {"ua_nbu_usd", "xx_reserve_bank_usd"}
         assert declared.series["xx_reserve_bank_usd"].quotation_unit == 100.0
@@ -131,7 +141,9 @@ class TestADeclaredRuleReachesTheStruckBase:
         self, tmp_path: Path
     ) -> None:
         root = _scratch_root(tmp_path, name="xx_enumerated.toml", body=WITH_RULE)
-        series = resolver.official_rates_from_data_root(root).series["xx_enumerated_usd"]
+        series = resolver.official_rates_from_data_root(root, _kinds(root)).series[
+            "xx_enumerated_usd"
+        ]
 
         struck = official_rate.strike_base(
             Money(1_000.0, Currency.USD, prov.EMPTY),
@@ -151,7 +163,9 @@ class TestADeclaredRuleReachesTheStruckBase:
         as much a non-publication day as Sunday the 8th for all this rule knows, and it says
         nothing about it."""
         root = _scratch_root(tmp_path, name="xx_enumerated.toml", body=WITH_RULE)
-        series = resolver.official_rates_from_data_root(root).series["xx_enumerated_usd"]
+        series = resolver.official_rates_from_data_root(root, _kinds(root)).series[
+            "xx_enumerated_usd"
+        ]
 
         for governed, expected in ((SATURDAY, FRIDAY), (MONDAY, MONDAY)):
             struck = official_rate.strike_base(
