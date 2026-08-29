@@ -250,6 +250,15 @@ reinforces without closing:
 | **F1** | The FX tax asymmetry stays with the feature that introduces a real taxable foreign instrument. What 010 adds is the refusal in its place: a taxable event in a currency the tax is not assessed in names the missing official-rate machinery rather than converting at a channel rate (`tests/unit/test_rate_and_horizon_boundaries.py`). Unreachable through the shipped registry, which is a property of today's data. |
 | **H3** | Unmoved and worth naming: the new `data/access/` declarations are **not** in the run manifest's input references, so a result does not yet trace to the access file that priced its purchase. H3 asks for every data file's values to round-trip through the manifest, and this feature widened what a run reads without widening what it records. |
 
+**013-enumerated-schedule** closes **nothing**, and says so rather than inventing a row for
+itself. There is no row here for a declaration *form*, and writing one would be a row created
+to be flipped by the feature that created it. Two rows are **touched and not claimed**:
+
+| Row | How, and why the box does not move |
+|---|---|
+| **H1** | The data-only claim gains a second instrument **shape**. `tests/contract/test_enumerated_data_only.py` adds a third bond declared as its payments — a file this repository has never seen, in a scratch data root, differing in its schedule, its coverage claim, its face value and its day count — and runs the full pipeline on it with no engine edit. It sits **beside** H1 rather than strengthening it: H1's own claim is about four declaration kinds through the join, and this is one kind declared a second way. The two gaps H1 already records are untouched. |
+| **D1** | **Unchanged by design.** A reader will reasonably expect a schedule feature to move it and it does not: D1 is about a bond bought at a stated price and held to maturity reproducing a hand-computed schedule, and no generative declaration's behaviour changed. The enumerated form has its own hand-computed example (`tests/worked_examples/test_enumerated_schedule.py`), which is a second answer to a different question rather than a second proof of this one. ⚙ What *did* move is the golden's recorded digest, because a projection now reports the premium at purchase — one more true thing about every holding, and exactly the direction constitution 1.2.0 Principle V says a golden is supposed to move in. No amount, date, tax or rate changed with it. |
+
 ---
 
 ## On tolerance
