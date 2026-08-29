@@ -10,9 +10,9 @@ anything is decided by the declared tax category and by nothing this engine beli
 `exempt_securities` the treatment is `outside`: the provision it cites in
 `data/tax/timing/ua.toml` excludes both income *and* acquisition costs from the annual
 investment result, so the premium reduces nothing and an exempt loss buys no shield.
-Under a category that **nets**, the same premium reaches the year's base -- and that case is reachable inside this feature
-because FR-010's fixture, whose two income kinds carry different declared rates, lands in
-one.
+Under a category that **nets**, the same premium reaches the year's base -- and that
+case is reachable inside this feature because FR-010's fixture, whose two income kinds
+carry different declared rates, lands in one.
 
 ```
 enumerated_taxable_x, face 1 000.00, two coupons of 50.00, principal 1 000.00 on 2026-12-05
