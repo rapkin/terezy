@@ -45,10 +45,10 @@ terminates_on        = "2029-11-06"
 subscription_cutoff  = "2026-12-31"
 
   [instrument.nav]
-  per_unit     = 1006.97
+  per_unit     = 1006.9654
   kind         = "fund_terms"
-  source       = "https://www.inzhur.reit/offer/inzhur-miltech — the live entry price per certificate, accessed 2026-08-22, against a nominal of 1 000.00 грн. Read as the net asset value rather than as nominal-plus-markup, and the reasoning is stated because it is a judgement between two readings of one observation. The fund launched 12.08.2026 and this price was read 2026-08-22; ten days of the fund's own stated 25-29% on a nominal of 1 000.00 is about 6.8-7.9 грн, and the observed premium is 6.97 — so 'NAV has accreted and no markup is charged' fits the arithmetic, while 'nominal plus a 0.697% markup' fits nothing in particular. ⚙ NOTE THAT THIS IS THE LESS CONSERVATIVE READING and it is taken anyway, which is the opposite of what data/tax/ua.toml's rule B1 would do. B1 is a TIEBREAKER for when the evidence does not decide; here it does. The consequence of being wrong is visible: a NAV declared 0.697% high makes every exit 0.697% richer, because the exit prices off accreted NAV. Under the practice mode, where the live markup is zero, the purchase costs the same either way and the whole error lands on the exit; under the legal terms the maximum 1% markup scales NAV too, so the two readings cost 1 017.04 and 1 010.00 per unit and the error is smaller than the exit's but not nil. Verification task 1 exists to settle it against the live buy and sell prices."
-  retrieved_on = "2026-08-22"
+  source       = "data/observations/inzhur.toml, entry `inzhur-miltech` — Inzhur published the figure, scripts/fetch_inzhur.py retrieved it from https://www.inzhur.reit/_api/assets on 2026-08-24, and the observation file records it. A seller's quotation for an instrument it sells, not an independent valuation. ⚙ THE ARGUMENT THIS TABLE MADE WAS TESTED AND HELD, and it is kept rather than deleted so a reader can see that. It ran: the fund launched 12.08.2026 and the entry price of ≈ 1 006.97 was read on 2026-08-22 against a nominal of 1 000.00 грн; ten days of the fund's own stated 25-29% on that nominal is about 6.8-7.9 грн and the observed premium was 6.97, so 'NAV has accreted and no markup is charged' fitted the arithmetic while 'nominal plus a 0.697% markup' fitted nothing in particular — and it said plainly that this was the LESS CONSERVATIVE READING, taken anyway because the evidence decided rather than because data/tax/ua.toml's tiebreaker B1 pointed that way. The observation corroborates it directly and without the arithmetic: the endpoint publishes buy, sell and nav as three separate figures, and buy == nav == 1006.9654 to every published digit, so no entry markup is charged and this figure is the net asset value. The priced consequence of the other reading therefore becomes unlikely rather than excluded. ⚙ CORROBORATION AND NOT PROOF: buy == nav is a relationship between two fields of one endpoint, and the same retrieval shows that endpoint's nav does not carry one meaning across the platform — see [instrument.spread]. ⚙ WHAT IT DOES NOT SETTLE, AND THE TWO EXPLANATIONS CANNOT BOTH HOLD: 1 006.97 read on 2026-08-22 and 1 006.9654 published on 2026-08-24 are one figure to the precision of the earlier reading, while two further days of 25-29% on 1 000.00 would add about 1.4-1.6 грн. 2026-08-22 was a SATURDAY and 2026-08-24 a MONDAY, so a NAV struck on business days would have both readings carrying one Friday 21.08 strike and no movement would be expected — which explains the stillness. But that same strike breaks the accretion argument above: 12.08.2026 was a Wednesday, 21.08 is seven business days later, and seven business days of 25-29% on 1 000.00 is 4.79-5.56 грн, which is not the 6.97 observed, while ten CALENDAR days is 6.85-7.95, which is. CALENDAR ACCRETION EXPLAINS THE LAUNCH PREMIUM; A BUSINESS-DAY STRIKE EXPLAINS THE ABSENCE OF MOVEMENT; TOGETHER THEY DO NOT HOLD. Neither is asserted, and the verification task below is what closes it."
+  retrieved_on = "2026-08-24"
   verified_on  = ""
 
   [instrument.declared_yield]
@@ -66,10 +66,10 @@ subscription_cutoff  = "2026-12-31"
   entry_markup_max_pct   = 1.0
   exit_discount_max_pct  = 1.0
   live_entry_markup_pct  = 0.0
-  live_exit_discount_pct = 0.0
+  live_exit_discount_pct = 0.5
   kind                   = "fund_terms"
-  source                 = "Регламент ЗНПІФ «Inzhur MilTech» (ред. 15.07.2026) for the maxima — an entry markup of up to 1% of NAV and an exit discount of up to 1%. The LIVE settings are unverified inferences and recorded as such: the entry price of ≈ 1 006.97 against a nominal of 1 000.00 is consistent with no markup being charged, and Inzhur's zero-buyback-commission practice is assumed to extend to this fund. Verification tasks 1 and 3 exist to settle both, and until they are closed the live figures are the optimistic reading."
-  retrieved_on           = "2026-08-22"
+  source                 = "Регламент ЗНПІФ «Inzhur MilTech» (ред. 15.07.2026), read 2026-08-22, for the maxima — an entry markup of up to 1% of NAV and an exit discount of up to 1%. THE LIVE SETTINGS ARE NO LONGER INFERENCES: they are measured from data/observations/inzhur.toml, entry `inzhur-miltech`, which scripts/fetch_inzhur.py retrieved from https://www.inzhur.reit/_api/assets on 2026-08-24 — Inzhur's own published figures for an instrument it sells, a seller's quotation rather than an independent valuation. buy 1006.9654, nav 1006.9654, sell 1001.9306: entry markup (buy-nav)/nav = 0.0000%, exit discount (nav-sell)/nav = 0.5000%. ⚙ THE EXIT WAS DECLARED 0.0 AND THE PUBLISHED SELL PRICE IS 0.5% BELOW THE PUBLISHED nav, so every exit this engine costed for MilTech was half a percent better than the price the platform publishes. Whether that 0.5% is a commission, the регламент's discount or something else is not observed and is not named here. That is what the previous note meant by calling the live figures the optimistic reading, and it is the whole correction. ⚙ MILTECH IS THE FUND WHOSE TRIPLE FITS THE РЕГЛАМЕНТ'S SHAPE: sell sits BELOW nav, at 1006.9654 × 0.995 = 1001.93057 → 1001.9306, the published figure to its four decimals, and 0.5% is inside the 1% maximum — so 'a discount from net asset value' describes this price, which is the only reading on this platform that the регламент's own shape allows. It does not hold for every fund in the same retrieval: data/observations/inzhur.toml carries funds whose sell price is a clean multiple ABOVE their published nav, where a discount from NAV cannot reach. So the nav field is not assumed to carry one meaning across the platform, and this 0.5% holds only while MilTech's nav is the base the регламент names — which is the verification task below."
+  retrieved_on           = "2026-08-24"
   verified_on            = ""
 
   [instrument.liquidity.legal]
@@ -84,10 +84,10 @@ subscription_cutoff  = "2026-12-31"
   [instrument.liquidity.practice]
   settlement_business_days = 0
   is_revocable             = true
-  note                     = "Inzhur's observed practice of buying certificates back at NAV, same day, at zero commission, ASSUMED TO EXTEND TO THIS FUND. No post-launch statement confirming that has been found — verification task 3 — so this mode is doubly unverified here: a revocable practice, and one nobody has confirmed applies."
+  note                     = "SAME-DAY SETTLEMENT, ASSUMED. Inzhur's observed practice on the REIT is to buy certificates back same day at zero commission, and only the settlement half of that is assumed to extend to MilTech here. The price half does not: the endpoint observed 2026-08-24 publishes a MilTech sell price 0.5% below the published nav, so the buyback is not struck at nav. What accounts for the 0.5% is not observed. Nothing observed speaks to how fast a MilTech buyback settles, so the 0 stays an assumption — doubly marked, being a revocable practice nobody has confirmed applies to this fund."
   kind                     = "fund_liquidity"
-  source                   = "Inzhur news of 07.04.2025 announcing the cancelled buyback commission, and the launch news of 12.08.2026, accessed 2026-08-22."
-  retrieved_on             = "2026-08-22"
+  source                   = "Inzhur news of 07.04.2025 announcing the cancelled buyback commission, and the launch news of 12.08.2026, accessed 2026-08-22, for the practice on the REIT. data/observations/inzhur.toml, entry `inzhur-miltech`, retrieved 2026-08-24 by scripts/fetch_inzhur.py, for the published MilTech sell price that shows the price half does not carry over."
+  retrieved_on             = "2026-08-24"
   verified_on              = ""
 
   [instrument.constraints]
@@ -115,9 +115,9 @@ subscription_cutoff  = "2026-12-31"
   verified_on  = ""
 
   [[instrument.verification_task]]
-  question    = "Whether the 1% entry markup and the 1% exit discount are currently charged on MilTech: the entry price of ≈ 1 006.97 against a nominal of 1 000.00 suggests no markup, but that reading assumes NAV has accreted rather than a markup being applied. Verify the live buy and sell prices in the investor cabinet."
-  searched    = "The fund page and Регламент ЗНПІФ «Inzhur MilTech» (ред. 15.07.2026)"
-  searched_on = "2026-08-22"
+  question    = "What the `nav` figure Inzhur publishes for this fund IS, and on what schedule it is struck. Two declared values rest on the answer: per_unit takes it as the net asset value, and live_exit_discount_pct reads sell as a 0.5% discount from it. Nothing found says what the figure means. It is the same field from the same endpoint that ІНЖУР REIT records an open task against, and here it carries a second question of its own: the launch premium fits ten CALENDAR days of accretion while the stillness between the Saturday 2026-08-22 reading and the Monday 2026-08-24 one fits a business-day strike, and those two cannot both be true. The fund's own statement of what it publishes and when is what closes both."
+  searched    = "The fund page, Регламент ЗНПІФ «Inzhur MilTech» (ред. 15.07.2026), Проспект (15.07.2026), and the published buy/sell/nav prices observed 2026-08-24"
+  searched_on = "2026-08-24"
 
   [[instrument.verification_task]]
   question    = "The ІНЖУР КЕПІТАЛ investment-firm commission amount, if any."
@@ -125,9 +125,9 @@ subscription_cutoff  = "2026-12-31"
   searched_on = "2026-08-22"
 
   [[instrument.verification_task]]
-  question    = "A post-launch statement that the zero-buyback-commission practice covers MilTech and not only the REIT."
-  searched    = "Inzhur news of 07.04.2025 and the launch news of 12.08.2026"
-  searched_on = "2026-08-22"
+  question    = "How fast a MilTech buyback actually settles. The price half of the assumed practice is answered — the published sell price is 0.5% below the published nav, so the buyback is not struck at nav — but a price endpoint says nothing about settlement, and [instrument.liquidity.practice] still declares same-day on the strength of the REIT's behaviour alone."
+  searched    = "Inzhur news of 07.04.2025, the launch news of 12.08.2026, and the published buy/sell/nav prices observed 2026-08-24"
+  searched_on = "2026-08-24"
 
   [[instrument.verification_task]]
   question    = "Whether any organized secondary market exists for MilTech certificates."

@@ -40,8 +40,8 @@ canonical_encoding terezy-canonical-v3
 == inputs ==
 
 cpi_series           ua_cpi_monthly               cpi/ua.toml                              sha256:d75f814e2940eec463499e39ea2adea07da6149ff79bfac4681d08a051b26c7e
-fund                 inzhur_miltech               instruments/inzhur_miltech.toml          sha256:d80c52a1796787565e62fb3a65f2f2214630a602bb482e0497c1577d80576ea5
-fund                 inzhur_reit                  instruments/inzhur_reit.toml             sha256:95c2b5d997c2e9d686e730dbbe2b7ca5ab63ce8c5e219af74508fff142a76f4c
+fund                 inzhur_miltech               instruments/inzhur_miltech.toml          sha256:6861d9ab91687cd2e84bd812d5bd076bd13c5d9f13f6c5325b5c582c1e4bbe71
+fund                 inzhur_reit                  instruments/inzhur_reit.toml             sha256:0b62e717a8a1ec379a2355c03247b39433f8f1d3170acdc074f765785fa05f36
 fund                 synthetic_fund_c             instruments/synthetic_fund_c.toml        sha256:39ed338a5a88918dfd813a2b0401e6fca6172ad9c10eebf21c32d77c361a232a
 inflation_assumption owner_placeholder_inflation  inflation/owner-001.toml                 sha256:624e2b5124527c2b30bc4c0773b2d8c79e9ffcfd38b0f253ab5080c36cd71d6c
 instrument           ovdp_synthetic_a             instruments/ovdp_synthetic_a.toml        sha256:6d6fcafc9e3da360c2f2c523704b488065f253c2db5fce362b3ad72cd6b5e49e
