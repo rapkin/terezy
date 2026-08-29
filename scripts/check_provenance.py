@@ -44,7 +44,19 @@ DATA_ROOT = REPO_ROOT / "data"
 # unit at the venue the instrument is bought from, and that is a market quote: exactly the kind
 # of figure that gets believed without checking, and the number every purchase in a comparison
 # is sized by.
-SOURCED_DIRS = ("tax", "instruments", "routes", "channels", "cpi", "access", "observations")
+# `official_rates` joined in feature 011. Every `[[observation]]` is one date's published
+# legal reference — the single input that turns a foreign amount into a hryvnia tax base —
+# so an uncited one is the confidently-wrong number this project exists to refuse.
+SOURCED_DIRS = (
+    "tax",
+    "instruments",
+    "routes",
+    "channels",
+    "cpi",
+    "access",
+    "observations",
+    "official_rates",
+)
 
 # The directories exempt from the citation requirement, each BY NAME and WITH ITS REASON.
 # Together with SOURCED_DIRS this list is exhaustive: a directory under data/ that appears
@@ -194,6 +206,13 @@ STRUCTURAL_KEYS = frozenset(
         "rationale",
         "redirect_to",
         "observed_on",
+        # --- feature 011: the form a rate is quoted in, not a rate ---
+        # `quotation_unit` is the counterpart of a CPI series' `base` ("previous month =
+        # 100"), which is a string and therefore invisible to the numeric-leaf heuristic. It
+        # states how many units the values are quoted per, sits on the `[series]` identity
+        # table beside `pair`, and every `value` it scales carries its own citation on its own
+        # observation.
+        "quotation_unit",
     }
 )
 

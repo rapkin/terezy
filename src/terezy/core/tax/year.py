@@ -37,6 +37,9 @@ from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance
 from terezy.core.tax.interface import TaxCharge, TaxClass
+from terezy.core.tax.official_rate import (
+    OfficialRateSeries,
+)
 from terezy.core.tax.schedule import RateEntry, RateUndeclaredBefore, rate_on
 
 _NO_CASH_EFFECT: Final = -0.0
@@ -234,8 +237,20 @@ class AssessmentRules:
 
     jurisdiction_id: str
     tax_currency: Currency
-    """The currency a liability is assessed in. Stated rather than assumed: a taxable result
-    in another currency is refused, never converted (:class:`TaxCurrencyConversionUnavailable`)."""
+    """The currency a liability is assessed in. Stated rather than assumed."""
+
+    official_rate: OfficialRateSeries | None
+    """The declared series that strikes a base in :attr:`tax_currency`, or ``None``.
+
+    ``None`` is a declared absence and not a permissive one: a taxable result in another
+    currency then comes back :class:`TaxCurrencyConversionUnavailable` naming the series the
+    jurisdiction did not declare, and no other series is picked for it by load order (FR-007).
+
+    Never a channel. A channel is a market you transact in and decides an amount received; an
+    official rate is a legal reference nobody transacts at and decides a tax base. The two may
+    not stand in for each other in either direction, which ``.importlinter`` enforces as two
+    separate contracts because they are two separate requirements (FR-012, FR-013).
+    """
 
     categories: Mapping[str, IncomeCategory]
     category_of_class: Mapping[str, str]

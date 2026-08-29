@@ -1717,6 +1717,17 @@ class TimingTable(BaseModel):
 
     jurisdiction: str
     tax_currency: str
+
+    official_rate_series: str | None = None
+    """The official-rate series that serves this jurisdiction's tax currency, or omitted.
+
+    Declared beside ``tax_currency`` because the two are one fact read twice: the currency a
+    liability is assessed in, and the published series that says what a foreign amount is
+    worth in it (011 FR-007). Omitted is a declared absence -- a foreign-currency taxable
+    result then refuses naming the series that is missing, and no other series is picked for
+    it by load order.
+    """
+
     category: list[TimingCategoryTable]
     lot_method: list[LotMethodTable]
     class_: list[TimingClassTable] = Field(alias="class")
@@ -1904,3 +1915,155 @@ class AccessFile(BaseModel):
     """Non-empty, checked by the loader. A file declaring nothing is a file somebody started
     and did not finish, and reading it as "no instrument is reachable" would turn every tuple
     in the comparison into a refusal built out of a forgotten line."""
+
+
+# ---------------------------------------------------------------------------
+# 011-official-rate: the declared official-rate series
+# ---------------------------------------------------------------------------
+#
+# ⚙ **There is no field for a second side, and that absence is the mechanism.** An official
+# rate is one number: two sides is the defining property of an `FxChannel`, and a rate that
+# acquired a spread would be a channel with a government's name on it. Under
+# `extra="forbid"`, a `[observation.buy_side]` is therefore an unrecognised field rather
+# than a case the loader has to remember to reject.
+
+
+class OfficialRateSeriesTable(BaseModel):
+    """``[series]`` -- who publishes this rate, for which pair, and per how many units."""
+
+    model_config = STRICT
+
+    id: str
+    """``ua_nbu_usd``. Unique across every declared series; a collision is refused by the
+    resolver naming both files, because whichever loaded second would win by directory order
+    and every tax base would rest on the other one."""
+
+    authority: str
+    """The authority that publishes it. Half of the identity FR-002 requires, and the half
+    that makes a second country's series a data-only addition rather than a rewrite."""
+
+    pair: list[str]
+    """``["UAH", "USD"]`` -- price currency then unit currency, ``FxChannel.pair``'s order.
+
+    Typed as a list of ``str`` and resolved by the loader against ``Currency``, so the error
+    can name the file and list what would have worked.
+    """
+
+    quotation_unit: float
+    """How many units of the unit currency the value is stated per: ``1.0``, or ``100.0``.
+
+    **Declared explicitly and never defaulted** (FR-002). A published table that quotes some
+    currencies per 1 and others per 100 is normal, and a value read at the wrong unit is wrong
+    by two orders of magnitude while looking entirely plausible; a default here would make
+    that failure silent.
+    """
+
+
+class NonPublicationDayTable(BaseModel):
+    """One ``[[non_publication_rule.day]]`` row: this date's rate governs that date."""
+
+    model_config = STRICT
+
+    applies_to: str
+    """ISO date the publisher does not publish for. Checked by the loader **not** to be one
+    the series declares -- a rule redirecting a published date contradicts the publication."""
+
+    governed_by: str
+    """ISO date of the declared observation that governs it. Checked by the loader to be one,
+    so the lookup is total and a broken rule cannot masquerade as a missing date."""
+
+
+class NonPublicationRuleTable(BaseModel):
+    """``[non_publication_rule]`` -- which observation governs a date with no publication.
+
+    Optional: a series that declares none refuses on every date it does not cover, and the
+    absence of a rule is not permission to choose one (FR-010, FR-011).
+
+    **An explicitly enumerated mapping and nothing else.** A rule written in working days,
+    pre-holiday days or weekends cannot be declared against these fields, which is FR-018's
+    subject and why the Ukrainian series declares no rule at all.
+    """
+
+    model_config = STRICT
+
+    id: str
+    kind: str
+    """The staleness kind the rule's citation ages under -- ``tax_rule``, because a rule is
+    read off a published text and changes by amendment rather than by drift."""
+
+    source: str
+    """Non-empty. **A paraphrase is not a citation and MUST NOT enter as one** (FR-011): the
+    citation names a text that was read, and agreement between secondary sources restating a
+    rule is not a substitute for it."""
+
+    retrieved_on: str
+    verified_on: str
+
+    day: list[NonPublicationDayTable]
+    """The enumerated rows. Non-empty and free of duplicate ``applies_to`` dates, both checked
+    by the loader."""
+
+
+class OfficialRateObservationTable(BaseModel):
+    """One ``[[observation]]`` entry: a date, its published rate, and where it came from."""
+
+    model_config = STRICT
+
+    on_date: str
+    """The ISO date this rate is the official rate **for** -- not the date it was read.
+
+    Load-bearing beyond provenance: it must not be later than this observation's own
+    ``retrieved_on``, or the value is a forecast wearing an observation's clothes, and this
+    one would silently set a legal base. Checked against the file's own retrieval date rather
+    than against a clock, so the same file loads the same way in 2026 and in 2030.
+    """
+
+    value: float
+    """The published rate: units of the pair's price currency per ``quotation_unit`` units of
+    its unit currency. Strictly positive, checked by the loader."""
+
+    kind: str
+    """The ``ObservationKind`` this value ages under -- ``official_rate``, 7 days.
+
+    Per observation, because ``scripts/check_provenance.py`` treats each ``[[observation]]``
+    as a sourced table and requires a kind on each. The loader stamps it onto the citation and
+    the core record carries no copy of it: the citation is what survives the merge a derived
+    tax figure passes through.
+    """
+
+    source: str
+    """Non-empty. A published rate with no citation is the thing Principle I forbids, and this
+    is the one input that turns a foreign amount into a legal one."""
+
+    retrieved_on: str
+    verified_on: str
+    """Present, and empty for anything a script fetched. See the module docstring on why the
+    key may not be omitted: a forgotten line and a deliberate "not yet" must not look alike."""
+
+
+class OfficialRateFile(BaseModel):
+    """A whole ``data/official_rates/<series>.toml``: one series and its observations."""
+
+    model_config = STRICT
+
+    series: OfficialRateSeriesTable
+
+    non_publication_rule: NonPublicationRuleTable | None = None
+    """Omitted for a series that declares no rule, which is what ships for Ukraine (FR-017).
+    TOML has no null, so an omitted table is the only way a file can say *there is no rule
+    here*, and ``None`` means exactly that rather than standing in for one."""
+
+    observation: list[OfficialRateObservationTable]
+    """Strictly ascending by date, no duplicates -- both checked by the loader.
+
+    **Required with no default, and an empty series is written ``observation = []``.** That
+    keeps this model's zero-defaults rule intact where it matters: a file that simply forgot
+    its observations and a file declaring it has none must not look alike, and a default of
+    ``[]`` would make them identical.
+
+    **Gaps are permitted and so is emptiness**, and neither is an oversight. A date the
+    publisher did not publish for is a fact, and FR-010 forbids inventing one. An empty
+    declaration is the shape a fetch script writes into: the shipped Ukrainian series carries
+    no observation because no rate value may originate from an implementer's memory (FR-001),
+    and every date asked of it refuses by name until the publisher's values are fetched.
+    """

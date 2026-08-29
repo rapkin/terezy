@@ -30,8 +30,16 @@
 # a gap nobody downstream is told about.
 
 [timing]
-jurisdiction = "ua"
-tax_currency = "UAH"
+jurisdiction         = "ua"
+tax_currency         = "UAH"
+official_rate_series = "ua_nbu_usd"
+
+# `official_rate_series` names the published series that says what a foreign amount is worth
+# in the currency above. It is declared here rather than assumed because the tax role of
+# currency is distinct from the base and display roles (Principle VI), and because a base
+# struck from whichever series happened to load first would be a legal figure nobody named.
+# The series it points at declares no observation yet, so a foreign-currency taxable result
+# refuses by date — see `data/official_rates/ua_nbu_usd.toml`.
 
 # ---------------------------------------------------------------------------
 # The income categories: how a year of each is put together
