@@ -155,6 +155,7 @@ from terezy.core.routes.path import (
     exit_segments_of,
     segments_of,
 )
+from terezy.core.scenarios.early_exit import SpreadHolds
 from terezy.core.tax.interface import TaxClass
 
 if TYPE_CHECKING:  # pragma: no cover -- typing only
@@ -198,6 +199,15 @@ class Registries:
     streams: Mapping[str, IncomeStream]
     kinds: Mapping[str, ObservationKind]
     spendable: frozenset[SpendableEndpoint]
+
+    spread_holds: SpreadHolds
+    """The owner's declared belief that a quoted resale spread holds at a future exit date.
+
+    On the registries rather than on the question, because it is not a property of one question:
+    two questions asked on one day must not be able to disagree about how a platform's quote
+    behaves (015 FR-032). Required with no default -- an absent belief refuses at load, and a
+    default here would be the invented number the declaration exists to prevent.
+    """
 
     base_currency: Currency
     """The currency tax is assessed in (Principle VI's tax role).

@@ -1876,6 +1876,37 @@ class InflationAssumptionTable(BaseModel):
     """
 
 
+# ---------------------------------------------------------------------------
+# 015-the-question: the belief an early exit is struck under
+# ---------------------------------------------------------------------------
+#
+# No citation keys, and their absence is a stronger claim than `data/scenarios/inflation/`'s: a
+# platform that committed to its quoted buyback price would have declared a TERM, so there is
+# no source that could vouch for the belief rather than replace it.
+
+
+class EarlyExitTable(BaseModel):
+    """``[early_exit]`` -- that an observed resale spread holds at a future exit date."""
+
+    model_config = STRICT
+
+    id: str
+    owner_id: str
+    is_assumption: bool
+    """Must be ``true``; the loader refuses ``false``. The core field is ``Literal[True]``."""
+
+    rationale: str
+    """Why the owner is willing to assume it. Required and non-empty."""
+
+
+class EarlyExitFile(BaseModel):
+    """A whole ``data/scenarios/early_exit/<owner>.toml``: one owner's belief."""
+
+    model_config = STRICT
+
+    early_exit: EarlyExitTable
+
+
 class InflationAssumptionFile(BaseModel):
     """A whole ``data/scenarios/inflation/<owner>.toml``: one declared belief.
 
@@ -2171,10 +2202,19 @@ class AccessTable(BaseModel):
     price: AccessPriceTable | None = None
     """The unit quote, or omitted where the instrument declares its own price.
 
-    **The one omittable field in this model**, and the one default in it: TOML has no null, so
-    an omitted table is the only way to say *this instrument prices itself*. Which kinds may
-    omit it is not a matter of taste and is not checked here -- it is a relation between this
-    file and the instrument's own, so the resolver decides it and can name both files.
+    TOML has no null, so an omitted table is the only way to say *this instrument prices
+    itself*. Which kinds may omit it is not a matter of taste and is not checked here -- it is
+    a relation between this file and the instrument's own, so the resolver decides it and can
+    name both files.
+    """
+
+    resale_price: AccessPriceTable | None = None
+    """``[access.resale_price]`` -- what one unit sells for, where somebody has quoted it.
+
+    Omitted by every shipped declaration, which is what makes 015 FR-031's refusal the real
+    behaviour rather than a guard nothing reaches. Omittable for :attr:`price`'s reason and
+    with the opposite meaning: absent here says *nobody has quoted a resale price*, and the
+    early exit refuses by name.
     """
 
 

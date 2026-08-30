@@ -67,6 +67,7 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.routes.channels import FxChannel
     from terezy.core.routes.legs import Leg, Route
     from terezy.core.routes.venues import Venue
+    from terezy.core.scenarios.early_exit import SpreadHolds
     from terezy.core.scenarios.regimes import Regime
     from terezy.core.streams.streams import IncomeStream
     from terezy.core.tax import year as tax_year
@@ -2592,9 +2593,57 @@ def _check_access(
         _check_venue(venue_id, currency, venues, path=path, field_path=f"{prefix}.{field}")
     if entry.quote is not None:
         _check_kind(entry.quote.kind, kinds, path=path, field_path=f"{prefix}.price.kind")
+    if entry.resale_price is not None:
+        _check_kind(
+            entry.resale_price.kind, kinds, path=path, field_path=f"{prefix}.resale_price.kind"
+        )
     _check_access_price(
         entry, currency=currency, self_priced=self_priced, path=path, field_prefix=prefix
     )
+    _check_resale_price(
+        entry, currency=currency, self_priced=self_priced, path=path, field_prefix=prefix
+    )
+
+
+def _check_resale_price(
+    entry: InstrumentAccess,
+    *,
+    currency: Currency,
+    self_priced: bool,
+    path: Path,
+    field_prefix: str,
+) -> None:
+    """A resale price is optional, is in the instrument's currency, and is not a fund's.
+
+    Optional because its absence is the shipped state and the thing 015 FR-031 refuses by name:
+    an early exit that cannot be struck reports a missing declaration rather than a figure. A
+    **fund** may not declare one, on the purchase quote's reasoning: it prices its own exit from
+    its declared NAV and its declared exit discount, and a second price in a second file is one
+    fact in two places.
+    """
+    quote = entry.resale_price
+    if quote is None:
+        return
+    if self_priced:
+        raise DeclarationError(
+            path,
+            f"{field_prefix}.resale_price",
+            f"quotes a resale price for {entry.instrument_id!r}, which declares its own net "
+            "asset value and its own exit discount. The quote is refused rather than preferred "
+            "or ignored: an exit priced in two files is one fact in two places, and the day "
+            "either moved the figure would rest on whichever the code happened to read.",
+            "delete the [access.resale_price] table; the fund's own terms price its exit",
+        )
+    if quote.price.currency is not currency:
+        raise DeclarationError(
+            path,
+            f"{field_prefix}.resale_price.currency",
+            f"quotes a resale price for {entry.instrument_id!r} in {quote.price.currency.value}, "
+            f"and that instrument is declared in {currency.value}. The two are refused rather "
+            "than converted: there is no rate here, and inventing one would strike every early "
+            "exit of this instrument at a sum nobody declared.",
+            f"quote the resale price in {currency.value}, or correct the instrument's currency",
+        )
 
 
 def _check_access_price(
@@ -2677,6 +2726,57 @@ def _resolved_access(
     return access, declaring
 
 
+EARLY_EXIT_DIR = "scenarios/early_exit"
+"""Where the owner's early-exit belief lives, as a subdirectory of the scenarios directory.
+
+Nested for ``INFLATION_ASSUMPTION_DIR``'s reason: ``scenarios/*.toml`` is globbed and validated
+as scenario documents, and ``glob`` does not recurse.
+"""
+
+
+def _resolved_early_exit(root: Path, streams: Mapping[str, IncomeStream]) -> SpreadHolds:
+    """The one declared belief under a data root, checked against the streams' owner.
+
+    An absent directory is an **error**, not an absent belief (015 FR-032): reading it as
+    *the spread holds* would put a figure in the model that no file declares, which is the one
+    thing the declaration exists to prevent.
+    """
+    declared = sorted((root / EARLY_EXIT_DIR).glob("*.toml"))
+    if not declared:
+        raise DeclarationError(
+            root / EARLY_EXIT_DIR,
+            "",
+            f"contains no *.toml declarations. An empty {EARLY_EXIT_DIR} directory is reported "
+            "rather than read as 'the observed spread holds': a horizon means the money comes "
+            "out at its end, so every comparison can reach an early exit, and a run that "
+            "assumed the belief would report a figure no file declares.",
+            "check the data root, or declare what an early exit is struck under",
+        )
+    if len(declared) > 1:
+        raise DeclarationError(
+            root / EARLY_EXIT_DIR,
+            "",
+            f"holds {len(declared)} early-exit beliefs "
+            f"({', '.join(path.name for path in declared)}), and this engine resolves one. Two "
+            "beliefs cannot both be in force, and taking either would be choosing one by file "
+            "order.",
+            "keep one file per data root until multi-owner support lands",
+        )
+    owner_id, assumption = loader.early_exit_from_file(declared[0])
+    owners = sorted({stream.owner_id for stream in streams.values()})
+    if owner_id not in owners:
+        raise DeclarationError(
+            declared[0],
+            f"{loader.EARLY_EXIT_TABLE}.owner_id",
+            f"declares owner {owner_id!r}, but the income streams this belief is resolved with "
+            f"belong to {owners}. What a person is willing to assume about a future price is "
+            "his own statement, and one owner's belief marking another's figures would put two "
+            "people's assumptions in one comparison.",
+            f"name one of {owners}, or resolve this belief against that owner's streams",
+        )
+    return assumption
+
+
 def tuple_from_data_root(
     root: Path, *, base_currency: Currency, scenario_id: str | None
 ) -> TupleDeclarations:
@@ -2727,6 +2827,7 @@ def tuple_from_data_root(
             streams=covered.ramp.streams,
             kinds=covered.ramp.kinds,
             spendable=covered.spendable,
+            spread_holds=_resolved_early_exit(root, covered.ramp.streams),
             base_currency=covered.ramp.base_currency,
         ),
     )

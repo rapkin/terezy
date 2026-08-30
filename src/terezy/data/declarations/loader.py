@@ -108,6 +108,7 @@ from terezy.core.routes import capacity, legs
 from terezy.core.routes.channels import ChannelSide, FxChannel, Side, effective_rate
 from terezy.core.routes.legs import Leg, Route
 from terezy.core.routes.venues import Venue
+from terezy.core.scenarios.early_exit import SpreadHolds
 from terezy.core.scenarios.regimes import Regime, RegimeTransition
 from terezy.core.streams import streams
 from terezy.core.streams.streams import IncomeStream, Indexation
@@ -3900,6 +3901,62 @@ def inflation_assumption_from_file(path: Path) -> tuple[str, InflationAssumption
 
 
 # ---------------------------------------------------------------------------
+# 015-the-question: the belief an early exit is struck under
+# ---------------------------------------------------------------------------
+
+EARLY_EXIT_TABLE: Final = "early_exit"
+"""Root table of an early-exit belief file, and the prefix of every field path in one."""
+
+
+def early_exit_from_file(path: Path) -> tuple[str, SpreadHolds]:
+    """One ``data/scenarios/early_exit/<owner>.toml`` as its owner id and the declared belief.
+
+    ``inflation_assumption_from_file``'s shape, with **no citation read and none expected**: a
+    platform that committed to its quoted buyback price would have declared a term on the
+    access record, so a source here would replace the belief rather than vouch for it.
+    """
+    document = read_document(path)
+    table = _validate(schema.EarlyExitFile, document, path).early_exit
+    if not table.is_assumption:
+        raise DeclarationError(
+            path,
+            f"{EARLY_EXIT_TABLE}.is_assumption",
+            "is declared false. Whether a quoted spread still holds on a future date is nobody's "
+            "observation: a platform that committed to its price would have declared a term, "
+            "and the term would live on the access declaration beside the price. The field "
+            "exists to make the belief unmissable on every figure it touches, not to be "
+            "switched off -- which is why the core types it as a Literal admitting one value.",
+            "write is_assumption = true, or declare the committed price as an access term",
+        )
+    return (
+        _require_text(
+            path,
+            f"{EARLY_EXIT_TABLE}.owner_id",
+            table.owner_id,
+            "a belief about the future is one person's, and every declaration carries its "
+            "owner from the first commit (Principle VII)",
+        ),
+        SpreadHolds(
+            id=_require_text(
+                path,
+                f"{EARLY_EXIT_TABLE}.id",
+                table.id,
+                "every outcome computed through the belief names it, so a reader can find the "
+                "file the assumption is stated in",
+            ),
+            is_assumption=True,
+            rationale=_require_text(
+                path,
+                f"{EARLY_EXIT_TABLE}.rationale",
+                table.rationale,
+                "the rationale is what an assumption carries where an observation carries a "
+                "source: a figure conditional on an unexplained guess cannot be argued with",
+            ),
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
 # 009-tax-depth: the assessment rules, and the owner's positions on them
 # ---------------------------------------------------------------------------
 #
@@ -4396,7 +4453,8 @@ def access_from_file(path: Path) -> tuple[InstrumentAccess, ...]:
                     "the instrument's proceeds land at a named venue, and that venue is where "
                     "the exit route has to depart from (FR-004)",
                 ),
-                quote=_access_price(path, prefix, entry.price),
+                quote=_access_price(path, f"{prefix}.price", entry.price),
+                resale_price=_access_price(path, f"{prefix}.resale_price", entry.resale_price),
                 risk_class=_require_text(
                     path,
                     f"{prefix}.risk_class",
@@ -4410,23 +4468,22 @@ def access_from_file(path: Path) -> tuple[InstrumentAccess, ...]:
 
 
 def _access_price(
-    path: Path, prefix: str, declared: schema.AccessPriceTable | None
+    path: Path, field: str, declared: schema.AccessPriceTable | None
 ) -> VenueQuote | None:
-    """The declared unit quote and the kind it ages under, or ``None`` where the table is absent.
+    """One declared quote and the kind it ages under, or ``None`` where the table is absent.
 
-    ``None`` is the *statement* that this instrument prices itself, and it is returned here
-    without judgement: whether this kind of instrument is entitled to make that statement is a
-    relation between two files and belongs to the resolver.
+    ``field`` is the whole dotted path, because the same table shape is declared twice: what a
+    unit costs, and what it sells for (015 FR-031). ``None`` is a *statement* either way and is
+    returned without judgement -- whether this instrument is entitled to make it is a relation
+    between two files and belongs to the resolver.
 
-    ``check_kind=False`` is passed to :func:`_source_ref` because the kind is also carried
-    into the record and checked at the field it becomes -- the same reading a leg's
-    ``kind_of_observation`` gets, and the reason the error below names ``[access.price].kind``
-    rather than a table. The citation is stamped with it either way, and *resolving* the name
-    against the declared kinds is the resolver's, which reads a second file to do it.
+    ``check_kind=False`` is passed to :func:`_source_ref` because the kind is also carried into
+    the record and checked at the field it becomes -- the same reading a leg's
+    ``kind_of_observation`` gets. The citation is stamped with it either way, and *resolving*
+    the name against the declared kinds is the resolver's, which reads a second file to do it.
     """
     if declared is None:
         return None
-    field = f"{prefix}.price"
     return VenueQuote(
         price=Money(
             _positive(

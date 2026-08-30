@@ -1299,7 +1299,9 @@ class TestNoFieldDefaultStandsInForAValue:
     """
 
     OPTIONAL: Final[Mapping[str, frozenset[str]]] = {
-        "AccessTable": frozenset({"price"}),
+        # An omitted `[access.resale_price]` says *nobody has quoted what this sells for*, and
+        # 015 FR-031 refuses an early exit by name for it. Every shipped entry omits it.
+        "AccessTable": frozenset({"price", "resale_price"}),
         "ChannelSideTable": frozenset({"markup_bps", "premium_per_unit"}),
         "DistributionTable": frozenset({"peg"}),
         "EnumeratedScheduleTable": frozenset({"published_in_order"}),
