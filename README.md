@@ -19,18 +19,23 @@ decision is not the choice of ETF — it is that the domestic route costs **0%**
 a crypto ramp of **5–10% one way**, and that OVDP is taxed at **0%** against **23%**
 elsewhere.
 
-**Status:** two features in. **001 — the OVDP hurdle rate** is complete: an event-sourced
-ledger with tax lots, currency-tagged money whose provenance propagates through every
-derivation, declared instruments and tax classes, and a hand-verified after-tax return.
-**002 — the ramp** is complete: income streams, routes as chains of legs, two-sided FX
-channels, monthly limits that belong to a shared rail, war-end regimes kept apart from
-observed facts, and the number the whole product turns on — **the same acquisition costs
-6.67% funded from the hryvnia salary and exactly 0% funded from the dollar contract.**
+**Status.** The tuple is closed: an instrument bought through a funding route, taxed
+through a declared regime, and repatriated through an exit route is costed end to end as
+**one figure**, over a span that starts before the purchase and ends after the redemption
+because the ramp and the settlement are inside it. What the engine cannot yet do is
+**find** a good tuple — it costs the one you hand it. That is the decision layer, and it
+is the next thing.
 
-The number the tool currently produces is marked **unverified**, and that is the honest
-state: the OVDP yield it rests on is an owner-reported observation nobody has checked
-against a primary source. The arithmetic is verified; the input is not, and the output
-says so.
+`specs/features.toml` is the live state; `docs/REQUIRED_TESTS.md` is what is actually
+covered. Neither is summarised here, because a count beside a list it does not own is the
+sentence that goes stale first.
+
+Almost every input is still **synthetic and marked as such**, and every figure derived
+from one inherits the mark. The exceptions are the consumer price index, taken from
+Держстат; the Ukrainian tax rules, read from the primary text of the Tax Code and the
+laws that amended it; and Inzhur's published fund prices, retrieved from its own
+endpoint. So the arithmetic is checkable today and the answers are not yet about money
+anyone has.
 
 ## What it is, and what it is not
 
