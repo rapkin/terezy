@@ -175,10 +175,9 @@ class OneWayCost:
     project tolerance, and both sums are asserted: a leg cannot hide in either axis.
 
     **Within the tolerance rather than bit-for-bit.** The whole-candidate accumulators keep one
-    exact addition order, and these are accumulated **beside** them rather than summed into them
-    --
-    because the rounding of a sum of sums is not the rounding of one fold, and reconstructing the
-    total from the segments would move numbers 002 recorded.
+    exact addition order, and these are accumulated **beside** them rather than summed into
+    them -- because the rounding of a sum of sums is not the rounding of one fold, and
+    reconstructing the total from the segments would move numbers 002 recorded.
     """
 
 

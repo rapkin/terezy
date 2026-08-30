@@ -8,17 +8,12 @@ rather than two literals that drift.
 
 ## Why a premium has to say which way it is applied
 
-The two declared forms of a channel side have **different sign conventions**, and
-``core.routes.channels`` says so in as many words:
+The two declared forms of a channel side have **different sign conventions** --
+``premium_per_unit`` a signed offset, ``markup_bps`` a direction-free cost magnitude -- and
+:mod:`terezy.core.routes.channels` states both in as many words.
 
-* ``premium_per_unit`` is a **signed offset**. Both sides are ``reference + premium``, so
-  ``+3`` pays 45 against a reference of 42 and ``-2.5`` receives 39.5. The sign carries the
-  direction.
-* ``markup_bps`` is a **cost magnitude**. It costs 1.5% whichever way the money goes, so the
-  engine *adds* it on the buy side and *subtracts* it on the sell side. The number carries no
-  direction at all.
-
-So ``150.00 bps over reference 42.00 UAH per USD`` is the same eleven words for an edge that
+The consequence for a *picture* is the part that belongs here.
+``150.00 bps over reference 42.00 UAH per USD`` is the same eleven words for an edge that
 charges +1.5% and an edge that charges -1.5%: two different corridors drawn identically, and
 the sell-side one drawn in the opposite direction from what the engine charges. That is the
 mislabelled figure in picture form, in the one form where the declaration itself cannot

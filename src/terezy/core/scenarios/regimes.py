@@ -274,6 +274,11 @@ def routes_in_force(
 ) -> RoutesInForce:
     """The routes a scenario says exist on ``on_date``, with the assumption that decided it.
 
+    ``on_date`` is when the money moves, and it is **never** ``as_of``, which decides
+    staleness. Both are ``date``, so nothing catches the substitution: a run that passed the
+    as-of date here would select the regime in force on the day the question was asked and
+    compare against corridors the scenario says do not exist on the day the money moves.
+
     ``routes`` is **every** declared route, not a regime's own. Declarations do not come and go
     with a belief: the corridors are all declared, and the regime states which of them it
     believes in. What is returned is that narrowing, plus the ids it left out and the transition

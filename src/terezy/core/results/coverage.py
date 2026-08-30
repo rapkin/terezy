@@ -203,8 +203,8 @@ means nothing declared gets the money out from here, which is deficit 2 or defic
 class AnySpendableEndpoint(Enum):
     """The target of a missing **exit**: any one of the declared spendable endpoints.
 
-    FR-007 ⚙. For a missing *inbound* both
-    endpoints are determined -- the stream fixes one, the destination the other. For a missing
+    FR-007's ⚙ note. For a missing *inbound* both endpoints are determined -- the stream
+    fixes one, the destination the other. For a missing
     *exit* only the origin is: any declared spendable endpoint would satisfy the owner's rule,
     and picking one would be the report inventing a preference it has no basis for.
 

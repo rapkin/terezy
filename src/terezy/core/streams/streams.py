@@ -120,9 +120,9 @@ class IncomeStream:
     ``amount.currency`` is what decides whether a route has to convert, and it is what
     ``cost_one`` compares against the first leg of the route being costed.
 
-    There is deliberately no separate ``currency`` field, though ``data-model.md`` asks for
-    one: two fields stating one fact can disagree, a hand-built record with ``currency=UAH``
-    and ``amount`` in USD typechecks and is nonsense, and the mitigation on offer -- "the
+    There is deliberately no separate ``currency`` field: two fields stating one fact can
+    disagree, a hand-built record with ``currency=UAH`` and ``amount`` in USD typechecks and
+    is nonsense, and the mitigation on offer -- "the
     loader builds both from one declared value" -- puts the guarantee in a layer that cannot
     help anything constructing a stream in code. One fact, one place.
 

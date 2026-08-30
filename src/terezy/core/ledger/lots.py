@@ -21,10 +21,12 @@ quantity by summing its lots would satisfy C2 by construction and prove nothing.
 ``cost_base_ccy`` are equal in feature 001 -- everything is UAH -- and the field's whole
 purpose is the case where they differ (data-model.md). Storing them separately from the
 first commit means the invariant that matters is already asserted when FX arrives.
-Feature 001 has no conversion at all, and it cannot fake one: there is deliberately no
-currency conversion function anywhere in the core (asserted by C5), so a trade currency
-that is not the base currency is refused loudly here rather than converted at an invented
-rate. ``fx_rate_used`` is ``None`` precisely because no rate was used.
+Nothing here converts, and it cannot fake a conversion: ``money.convert`` is the only
+function that changes an amount's currency, and it demands a rate and that rate's own
+sources -- neither of which exists at a lot boundary. So a trade currency that is not the
+base currency is refused loudly here rather than converted at an invented rate, and a rate
+needed at this boundary goes through ``money.convert`` rather than a local multiplication
+that would drop the mark. ``fx_rate_used`` is ``None`` precisely because no rate was used.
 
 **Why consumption is a registry of ordering functions.** A selection method is an
 ordering over the lots held: FIFO consumes the oldest first, LIFO the newest. Both

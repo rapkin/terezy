@@ -83,8 +83,8 @@ class EventKind(Enum):
     """Tax **assessed**, and nothing else. A zero charge is still a charge and still an event.
 
     **It moves no cash, and that is defect B5's structural cure.** The predecessor deducted
-    tax from the portfolio at the moment of the trade -- invisible while every shipped class
-    is exempt and wrong the moment one is not. A charge is an *assessment memo*: what was
+    tax from the portfolio at the moment of the trade -- invisible wherever a class charges
+    nothing, and wrong wherever one charges. A charge is an *assessment memo*: what was
     charged, on which base, under which rule, accruing to which year. What moves money is a
     :attr:`TAX_PAYMENT`, dated by the declared due-date rule in the following year.
 
@@ -164,7 +164,7 @@ class CausationKind(Enum):
     "system" member, because such a member would become the place every event whose cause
     nobody tracked down ends up, and C6 would pass while meaning nothing. Every member here
     names a kind of *declaration* that can be resolved back to the file it was read from, and
-    that is the test a fourth member would have to pass.
+    that is the test a further member would have to pass.
     """
 
     INSTRUMENT_TERM = "instrument_term"
