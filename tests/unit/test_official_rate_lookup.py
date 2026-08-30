@@ -27,9 +27,8 @@ FIRST = date(2020, 1, 1)
 
 SMALL = 1_024
 LARGE = 8_192
-"""Eight times SMALL: three doublings, which is the whole of the bound asserted below."""
-
 DOUBLINGS = 3
+"""``LARGE`` is ``SMALL`` doubled this many times."""
 
 PROBES = 64
 """How many dates each series is asked about. Any number does; the comparison is between two

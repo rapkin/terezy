@@ -62,23 +62,20 @@ Per row, the shipped form `data/cpi/ua.toml` already uses:
 on_date      = "2026-08-31"
 value        = 44.5505
 kind         = "official_rate"
-source       = "…НБУ…; retrieved from <range URL>; units = 1; calcdate = 28.08.2026; …licence…"
+source       = "…НБУ…; retrieved from <range URL>; units = 1; calcdate = 28.08.2026"
 retrieved_on = "2026-08-31"
 verified_on  = ""
 ```
 
-`source` is the whole of FR-001, FR-009 and FR-025 in one string: the endpoint and its query, the
-publisher's stated unit **for that row**, the establishment date, and the two provisions the
-reuse is conditional on. Per row rather than inherited, because a self-citing row is a row whose
-provenance is true on its own — see spec.md, "Two alternatives, and why neither is taken".
+`source` carries the endpoint and its query (FR-001, and the attribution FR-025 conditions
+reuse on), the publisher's stated unit **for that row** and the establishment date (FR-009). The
+two statutory provisions live in the file **header**, which is where FR-025 puts them: they are
+a term on the file, not a fact about one date. Per row rather than inherited, because a
+self-citing row is a row whose provenance is true on its own — see spec.md, "Two alternatives,
+and why neither is taken".
 
 ## Invariants the landed file must satisfy
 
-Each is a test, not a sentence here:
-
-1. Strictly ascending `on_date`, no duplicates, one row per calendar day, zero missing.
-2. First `on_date` is `2019-12-28`; no row is dated after its own `retrieved_on`.
-3. `value > 0` on every row; every `source` non-empty and carrying the retrieval URL;
-   every `verified_on` present and empty.
-4. `[series].quotation_unit == 1.0`, and no `non_publication_rule` table.
-5. The file loads through `loader.official_rate_from_file` without error.
+Every one of them is an assertion over the landed file in
+`tests/contract/test_nbu_series_is_declared.py`, checked on 100% of the rows. Listing them
+here as well would be a second copy that nothing checks against the first.

@@ -36,10 +36,8 @@ Each scheme's total is the sum of its own lines and never a combined rate applie
 both rest on the *same* hryvnia base -- bit-for-bit, not within a tolerance, because the base
 is not computed twice from two roundings but struck from one rate on one date.
 
-Before this feature the shipped series carried no observation and this comparison could not be
-produced at all, on any dollar amount.
-``test_the_same_comparison_against_a_series_with_no_observations_refuses`` is that state, kept
-executable, so the difference between then and now is a test rather than a claim.
+The state this replaced is kept executable rather than described:
+``test_the_same_comparison_against_a_series_with_no_observations_refuses``.
 """
 
 from __future__ import annotations
@@ -219,7 +217,7 @@ class TestOneDollarCreditUnderTwoSchemes:
         assert is_close(personal.total.amount - fop.total.amount, fop.base.amount * gap)
 
     def test_the_same_comparison_against_a_series_with_no_observations_refuses(self) -> None:
-        """What the shipped data produced until this feature landed, kept executable.
+        """What the shipped data produced until this feature landed.
 
         The refusal is what made the comparison unanswerable: not badly answered, not
         approximately answered -- not produced at all.

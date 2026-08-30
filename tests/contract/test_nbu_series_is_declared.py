@@ -32,11 +32,10 @@ DATA_ROOT = REPO_ROOT / "data"
 SHIPPED = DATA_ROOT / "official_rates" / "ua_nbu_usd.toml"
 
 FIRST_QUOTED_PER_ONE_UNIT = date(2019, 12, 28)
-"""The publisher quotes USD per 100 units through 2019-12-27 and per 1 from this date.
+"""The first date the publisher quotes USD per one unit, retrieved at source on 2026-08-31.
 
-A series carries one ``quotation_unit``, this one declares 1.0, and an earlier date is
-therefore a **second series** rather than a longer one. Retrieved at source on 2026-08-31;
-it is the lower bound's whole argument.
+Why that is the series' lower bound rather than a preference is argued where a declarer meets
+it, in the file's own generated header.
 """
 
 ENDPOINT = "https://bank.gov.ua/NBU_Exchange/exchange_site"

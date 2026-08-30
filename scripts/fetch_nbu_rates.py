@@ -7,22 +7,18 @@ downloaded is not a number anyone has checked. Filling that field is an act the 
 against the publisher's own presentation of one date, and no automation may perform it
 (``scripts/fetch_cpi.py`` says the same for the price index).
 
-**It does declare**, unlike ``scripts/fetch_inzhur.py``, which writes an observation for a human
-to promote. That split exists because promoting one of Inzhur's observations is an act of
-judgement -- the instrument file carries a paragraph arguing which of two readings to take, and
-a fetcher rewriting it would delete the reasoning and keep the digits. Between the National
-Bank's register and this declaration there is no such paragraph: the authority publishes exactly
-one value per date, and there is no reading to argue. The judgement that does exist is the
+**It does declare**, where ``scripts/fetch_inzhur.py`` writes an observation for a human to
+promote. Promoting one of Inzhur's is an act of judgement between two readings of one figure;
+between the National Bank's register and this declaration there is no such judgement, because
+the authority publishes exactly one value per date. The judgement that does exist here is the
 quotation unit, and it is kept out of this script's hands by being a **refusal** rather than a
-choice -- see :func:`_rows`.
+choice -- see :func:`_row`.
 
 Why the range endpoint and not ``NBUStatService/v1/statdirectory/exchange``
 --------------------------------------------------------------------------
-The per-date endpoint does not state the quotation unit. This one gives ``units`` and
-``rate_per_unit`` per row, which is what makes the refusal above possible at all. USD is
-published per **100** units through 2019-12-27 and per **1** from 2019-12-28, so a fetch that
-ignored ``units`` and reached further back would write hundreds of rates a hundred times too
-large, every one of them looking exactly like a rate.
+The per-date endpoint does not state the quotation unit, so a script built on it could not
+perform the refusal above at all -- it would have to assume the unit. This one gives ``units``
+and ``rate_per_unit`` per row.
 
 Why the requested window is one day wider than the required one
 ---------------------------------------------------------------
@@ -221,10 +217,8 @@ def _row(entry: object, position: int) -> Row:
 def _rows(payload: object, *, first: date, last: date) -> tuple[tuple[Row, ...], tuple[date, ...]]:
     """Every row of the window, and the dates declined for not having arrived.
 
-    The completeness check is against ``first .. last`` and not against what came back. A range
-    shorter than the required one is a **shape surprise, not a set of gaps**: writing it would
-    turn one failed retrieval into a permanent, plausible hole in a legal series, and every date
-    inside it would then refuse for a reason naming the series rather than the fetch.
+    The completeness check is against ``first .. last`` and **not** against what came back, so
+    a short retrieval fails instead of silently narrowing the window it was asked for.
     """
     if not isinstance(payload, list):
         raise FetchError(
@@ -409,10 +403,8 @@ def _header(fetched: Fetched) -> list[str]:
 def _carried(row: Row, verified: Mapping[date, tuple[float, str]]) -> str:
     """The verification this row keeps: the stored one where the value is unchanged, else none.
 
-    ``verified_on`` on an official-rate observation means the owner compared **this
-    observation's** value to the publisher's own presentation of that date, on that day. So an
-    attestation is kept only while the number it was about is the number published, and a
-    restated value clears it.
+    An attestation was about a number, so a restated number clears it -- see
+    :func:`verifications` for what the field means.
     """
     attested = verified.get(row.on_date)
     return attested[1] if attested is not None and attested[0] == row.value else ""

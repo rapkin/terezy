@@ -195,18 +195,13 @@ class TestNoDisplayChoiceCanReachATaxFigure:
 
 
 class TestARealOfficialRateIsNotARepairForAnInventedChannelQuote:
-    """018 SC-010, and the one temptation this repository now actually contains.
+    """018 SC-010: the substitution this repository now actually contains the makings of.
 
-    ``data/official_rates/ua_nbu_usd.toml`` carries the National Bank's published figures for
-    every calendar day. One directory away, ``data/channels/uah_usd.toml`` declares three
-    channels whose ``reference_rate`` is **invented** and says so on every line. The cheapest-
-    looking repair in the tree is to point the second at the first, and it is the conflation
-    the two classes above forbid, arriving as a tidy-up: a channel is a market you transact in
-    and an official rate is a legal reference you never transact at, so substituting one would
-    reprice a ramp at a rate nobody was charged while every figure stayed plausible.
-
-    A requirement is what stops it, not a paragraph -- so this is that requirement, asserted
-    over the shipped files rather than over a fixture.
+    ``data/official_rates/ua_nbu_usd.toml`` carries real published figures for every calendar
+    day, and one directory away ``data/channels/uah_usd.toml`` declares three channels whose
+    ``reference_rate`` is invented and says so on every line. Pointing the second at the first
+    is the cheapest-looking repair in the tree and is the conflation the classes above forbid,
+    arriving as a tidy-up. What stops it is this, asserted over the shipped files.
     """
 
     CHANNELS = Path(__file__).resolve().parents[2] / "data" / "channels" / "uah_usd.toml"
