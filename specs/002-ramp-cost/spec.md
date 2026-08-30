@@ -270,6 +270,21 @@ against the existing ones with no source edit.
   arrival venue and indexation policy.
 - **FR-007**: A stream MAY declare an income-tax rate, and deployable capacity MUST be
   reported net of it, so the amount available to invest is never overstated.
+
+  ⚙ **Superseded by feature 012 (FR-015), and the second half of the sentence survives
+  intact.** `IncomeStream.income_tax_rate` is retired: a scalar cannot carry two components
+  with different commencement dates, an obligation triggered by a month elapsing rather than
+  by income arriving, or the choice of a whole taxation scheme. A stream names a declared
+  scheme instead, and deployable capacity is reported net of what that scheme charges — the
+  requirement's own purpose, unchanged. What *also* survives verbatim is this feature's
+  genuinely load-bearing decision, and 012 asserts it in the same words: **an undeclared
+  treatment is not a treatment that charges zero**, so the undeclared case still yields a
+  result with no net field at all (`tests/unit/test_deployable_capacity.py`).
+
+  ⚙ The relocation repairs a boundary rather than just moving a field. A rate is a public
+  legal fact about the Republic, and `data/README.md`'s citation exemption for per-owner data
+  is argued for an owner's statement about himself; it never covered one. After 012 the rates
+  live in `data/tax/schemes/`, cited.
 - **FR-008**: Access cost MUST be reported per `(destination × stream × route)`. A cost
   attributed to a destination alone MUST NOT be representable — not merely discouraged.
 - **FR-009**: A route that performs no conversion MUST report a conversion cost of exactly

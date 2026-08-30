@@ -14,7 +14,7 @@ US6 a second regime is data.
 
 ## Phase 1 — Setup
 
-- [ ] **T001** `tests/schemes.py` — synthetic fixtures for the whole feature: a scheme builder,
+- [x] **T001** `tests/schemes.py` — synthetic fixtures for the whole feature: a scheme builder,
   a rate-component builder, a periodic-component builder, a destination builder and a reading
   builder, every citation saying SYNTHETIC FIXTURE in its own text and every `verified_on`
   empty by default. No fixture reuses a shipped id.
@@ -25,21 +25,21 @@ US6 a second regime is data.
 
 **Blocking.** Nothing else in the feature can be written against a scheme that does not exist.
 
-- [ ] **T002** [US1] `tests/worked_examples/test_fop_scheme_charge.py` — SC-001: a synthetic
+- [x] **T002** [US1] `tests/worked_examples/test_fop_scheme_charge.py` — SC-001: a synthetic
   monthly dollar amount credited on a known date, a synthetic official rate for that date, the
   hryvnia base and both component charges checked against arithmetic written out beside the
   assertion; and the tax-currency case, where a hryvnia arrival is charged with
   `conversion is None` and no series consulted. Fails with `ImportError`.
-- [ ] **T003** [P] [US3] `tests/unit/test_scheme_refusals.py` — income before a rate
+- [x] **T003** [P] [US3] `tests/unit/test_scheme_refusals.py` — income before a rate
   component's earliest entry names the component and the date and is neither a zero nor a
   charge with the line absent; a credit date the series does not cover carries 011's own
   refusal whole; a series quoting another pair; a jurisdiction with no series at all. Fails
   with `ImportError`.
-- [ ] **T004** [P] [US4] `tests/unit/test_periodic_component.py` — a period with zero income
+- [x] **T004** [P] [US4] `tests/unit/test_periodic_component.py` — a period with zero income
   still charges the periodic component; a declared zero is charged as a zero **carrying its
   provenance**; a period with no amount in force refuses naming the period; and the three
   nils of `component_standing` come back as three distinct types. Fails with `ImportError`.
-- [ ] **T005** `src/terezy/core/tax/scheme.py` — `Verdict`, `ComponentRate`,
+- [x] **T005** `src/terezy/core/tax/scheme.py` — `Verdict`, `ComponentRate`,
   `ComponentAmount`, `DeclaredContext`, `RateComponent`, `PeriodicComponent`,
   `TaxationScheme`, `ComponentCharge`, `SchemeCharge`, `PeriodicCharge`, the four refusals,
   `rate_in_force`, `amount_in_force`, `charge_income`, `charge_period`, `charge_periods`,
@@ -50,23 +50,23 @@ US6 a second regime is data.
 
 ## Phase 3 — The declaration (US1, US2, US3, US6)
 
-- [ ] **T006** [US6] `tests/contract/test_scheme_declaration_loading.py` — SC-006's battery
+- [x] **T006** [US6] `tests/contract/test_scheme_declaration_loading.py` — SC-006's battery
   against a scratch data root, one case per rule in the contract: empty schedule, duplicate
   effective date, out-of-order entries, negative rate, negative amount, duplicate scheme id
   across files, duplicate component id within a scheme, unknown `period`, unknown
   `declared_for`, unknown currency, a scheme charging no component at all, a context block
   with no `not_applied_because`. Every case names the file and the field; no case substitutes
   a default. Fails with `AttributeError` on the missing loader.
-- [ ] **T007** `src/terezy/data/declarations/schema.py` — `SchemeTable`,
+- [x] **T007** `src/terezy/data/declarations/schema.py` — `SchemeTable`,
   `RateComponentTable`, `ComponentRateTable`, `PeriodicComponentTable`,
   `ComponentAmountTable`, `DeclaredContextTable`, `SchemeFile`.
-- [ ] **T008** `src/terezy/data/declarations/loader.py` — `scheme_from_file`, the schedule
+- [x] **T008** `src/terezy/data/declarations/loader.py` — `scheme_from_file`, the schedule
   folds shared between the two component kinds, `_as_fraction` applied exactly once outside
   the non-negative check, every refusal naming file and field path by component id.
-- [ ] **T009** `src/terezy/data/declarations/resolver.py` — `SCHEMES_DIR = "tax/schemes"`,
+- [x] **T009** `src/terezy/data/declarations/resolver.py` — `SCHEMES_DIR = "tax/schemes"`,
   `SchemeDeclarations`, `schemes_from_data_root(root, *, base_currency)` composing
   `ramp_from_data_root`, and the duplicate-identity refusal naming both files.
-- [ ] **T010** [US1] `data/tax/schemes/ua_fop_group_3.toml` — єдиний податок 5% effective
+- [x] **T010** [US1] `data/tax/schemes/ua_fop_group_3.toml` — єдиний податок 5% effective
   2016-01-01 (FR-009; dated by `data/tax/ua.toml`'s own **Rule B2**, which the entry's note
   states, with owner verification task 1 named); військовий збір 1% effective 2025-01-01 with
   the **rate** cited to № 4015-IX and the **commencement** cited to № 4113-IX and 4015-IX
@@ -74,13 +74,13 @@ US6 a second regime is data.
   № 4835-IX (FR-008a); ЄСВ as a periodic component declared explicitly at zero, sourced to the
   owner's own statement of 2026-08-23, `verified_on` empty (FR-021). Every quotation copied
   from `spec.md`; nothing retrieved.
-- [ ] **T011** [P] `data/tax/schemes/ua_personal_income.toml` — `declared_for = "reading"`:
+- [x] **T011** [P] `data/tax/schemes/ua_personal_income.toml` — `declared_for = "reading"`:
   ПДФО 18% effective 2022-09-19 under FR-009's own fallback rule with the inference recorded
   **on the entry** and owner verification task 5 named (FR-010a); військовий збір 5% effective
   2024-12-01 with its event-conditioned reversion as a `context` block (FR-010). Declares no
   ЄСВ component at all. The header states that this is **one** declaration consumed by every
   personal-income reading and copied by none, and that no stream may name it.
-- [ ] **T012** [US2] `tests/contract/test_scheme_declaration_loading.py` (same module) — the
+- [x] **T012** [US2] `tests/contract/test_scheme_declaration_loading.py` (same module) — the
   **shipped** root: both schemes load, the ФОП scheme's ЄСВ nil is a declared zero carrying
   the owner as its source and an empty verification date, and the personal-income scheme
   declares no ЄСВ component, so `component_standing` returns *not charged by this scheme* on
@@ -90,7 +90,7 @@ US6 a second regime is data.
 
 ## Phase 4 — Where the income is credited (US1, US6)
 
-- [ ] **T013** [US1] `tests/unit/test_crediting_destinations.py` — an INTERPRETED destination
+- [x] **T013** [US1] `tests/unit/test_crediting_destinations.py` — an INTERPRETED destination
   produces a charge carrying the row's grounds and citations; an UNSETTLED one produces a
   switch whose figure count is the number of computable readings; a reading naming a date the
   caller did not supply refuses naming the reading and the date name; a reading whose rate
@@ -98,32 +98,32 @@ US6 a second regime is data.
   with no row refuses in `NO_DECLARED_JUDGEMENT` naming both closures; a row whose every
   candidate is uncomputable refuses in `NO_CANDIDATE_IS_COMPUTABLE` naming them. Fails with
   `AttributeError`.
-- [ ] **T014** `src/terezy/core/tax/scheme.py` — `Reading`, `CreditingDestination`,
+- [x] **T014** `src/terezy/core/tax/scheme.py` — `Reading`, `CreditingDestination`,
   `ChargedUnderTheScheme`, `ReadingFigure`, `UncomputableCandidate`, `UnsettledDestination`,
   `RefusedState`, `CreditingDestinationRefused`, `ReadingDateUndeclared`, `ReadingRefused`,
   and `apply`. Makes T013 pass.
-- [ ] **T015** [P] `tests/contract/test_crediting_destination_loading.py` — the contract's
+- [x] **T015** [P] `tests/contract/test_crediting_destination_loading.py` — the contract's
   destination rules against a scratch root: a reading declaring both `scheme` and
   `uncomputable_because`, one declaring neither, an INTERPRETED row with two readings, an
   INTERPRETED row whose one reading is uncomputable, an UNSETTLED row with no readings, a row
   with empty `grounds`, a row whose venue is undeclared, a row whose scheme is undeclared, a
   duplicate `(scheme, venue)` pair across two files, a reading naming a scheme with
   `recognised_on` absent.
-- [ ] **T016** `src/terezy/data/declarations/schema.py`, `loader.py`, `resolver.py` —
+- [x] **T016** `src/terezy/data/declarations/schema.py`, `loader.py`, `resolver.py` —
   `DestinationTable`, `ReadingTable`, `DestinationFile`; `destinations_from_file`;
   `DESTINATIONS_DIR = "tax/destinations"` and the venue/scheme cross-checks in
   `schemes_from_data_root`.
-- [ ] **T017** `data/venues.toml` — `payoneer` and `foreign_bank_usd`, each with a note saying
+- [x] **T017** `data/venues.toml` — `payoneer` and `foreign_bank_usd`, each with a note saying
   what it is, that it exists because the tax question reaches it, and that no route is
   declared to or from it (research D13).
-- [ ] **T018** `data/tax/destinations/ua.toml` — the normative table, five rows, each carrying
+- [x] **T018** `data/tax/destinations/ua.toml` — the normative table, five rows, each carrying
   the recorded judgement and the citations `spec.md` states for it: `fop` INTERPRETED with one
   reading; `payoneer` UNSETTLED with three, the НБУ one carrying `departs_from_source`;
   `monobank_uah` UNSETTLED with one; `coinbase` UNSETTLED with one; `foreign_bank_usd`
   UNSETTLED with two. The header says the verdicts are expected to move and points at
   `features.toml`'s `crediting-destination-verdicts` and at owner verification task 6 — it
   does **not** restate a verdict's history, which is `spec.md`'s register's job.
-- [ ] **T019** [US6] `tests/contract/test_scheme_data_only.py` — SC-012 and SC-004: a second
+- [x] **T019** [US6] `tests/contract/test_scheme_data_only.py` — SC-012 and SC-004: a second
   synthetic scheme with a different component set, different schedules and a periodic
   component the first does not have produces complete results from a scratch root with zero
   source lines changed; a legislated change entered as one dated entry takes effect in the
@@ -134,40 +134,40 @@ US6 a second regime is data.
 
 ## Phase 5 — The stream migration (US2)
 
-- [ ] **T020** [US2] `tests/unit/test_deployable_capacity.py` — rewritten for the new shape.
+- [x] **T020** [US2] `tests/unit/test_deployable_capacity.py` — rewritten for the new shape.
   SC-005: the undeclared case still yields a result with **no net field at all**, its reason
   names the missing declaration, and no net figure quietly equals a gross one; the declared
   case is net of the scheme's charges with every term of `gross − charged = net` reachable;
   passing a charge for a stream that names no scheme, and omitting one for a stream that does,
   both raise.
-- [ ] **T021** [US2] `src/terezy/core/streams/streams.py` — `income_tax_rate` retired;
+- [x] **T021** [US2] `src/terezy/core/streams/streams.py` — `income_tax_rate` retired;
   `credited_to` and `tax_scheme` added; `DeployableCapacity` and `TaxTreatmentUndeclared`
   rewritten; `deployable` takes the charge. The module docstring's provenance section is
   rewritten: a stream no longer carries any legal rate, so the `money.scale` argument it makes
   no longer applies to one — the charge's own lines go through `scale_sourced` in
   `core/tax/scheme.py`.
-- [ ] **T022** `src/terezy/data/declarations/schema.py`, `loader.py`, `resolver.py` —
+- [x] **T022** `src/terezy/data/declarations/schema.py`, `loader.py`, `resolver.py` —
   `StreamTable` loses `income_tax_rate_pct` and gains `credited_to` (required) and
   `tax_scheme` (optional); `_stream` builds them; the venue check covers `credited_to`; the
   treatment check refuses a stream naming an unknown scheme or one whose `declared_for` is
   `"reading"`, naming the file, the stream and the treatment (FR-017).
-- [ ] **T023** [P] [US2] `tests/contract/test_declaration_loading.py`,
+- [x] **T023** [P] [US2] `tests/contract/test_declaration_loading.py`,
   `tests/contract/test_route_declaration_loading.py`, `tests/composed_registries.py`,
   `tests/coverage_registries.py`, `tests/diagram_registries.py`,
   `tests/invariants/route_graphs.py`, `tests/tuple_registries.py`,
   `tests/unit/test_stream_venue_mismatch.py` — every stream fixture and every stream
   declaration in a test gains `credited_to`; the `income_tax_rate_pct` cases become
   `tax_scheme` cases or are deleted with the reason.
-- [ ] **T024** [US2] `data/streams/owner-001.toml` — `income_tax_rate_pct` removed from both
+- [x] **T024** [US2] `data/streams/owner-001.toml` — `income_tax_rate_pct` removed from both
   streams; `credited_to = "monobank_uah"` on the salary and `credited_to = "fop"` with
   `tax_scheme = "ua_fop_group_3_non_vat"` on the contract income. The header's paragraph
   arguing the omitted rate is replaced by the two facts that are now declared and why neither
   is inferred from the other.
-- [ ] **T025** [US2] `tests/contract/test_declaration_loading.py` — SC-013a: the shipped
+- [x] **T025** [US2] `tests/contract/test_declaration_loading.py` — SC-013a: the shipped
   contract stream's routing origin and crediting destination differ and it charges under
   FR-025 rather than refusing; a stream declaring only one of the two fails at load naming the
   missing field.
-- [ ] **T026** [P] `data/README.md` and `scripts/check_provenance.py` — the `streams/` row and
+- [x] **T026** [P] `data/README.md` and `scripts/check_provenance.py` — the `streams/` row and
   the exemption argument stop covering a legal rate and say what the exemption now covers; the
   script's `EXEMPT_DIRS["streams"]` reason no longer names a field that does not exist. Add
   the `tax/schemes/` and `tax/destinations/` subdirectories to the `tax/` row (FR-018).
@@ -176,13 +176,13 @@ US6 a second regime is data.
 
 ## Phase 6 — The mandatory sale, and the two figures (US5)
 
-- [ ] **T027** [US5] `tests/worked_examples/test_base_versus_received.py` — SC-009: one
+- [x] **T027** [US5] `tests/worked_examples/test_base_versus_received.py` — SC-009: one
   credited amount, the hryvnia received produced by the **existing** costing path over the
   shipped `fop_usd_to_monobank_uah` route, the hryvnia base struck from the official rate;
   recomputing with the sale executed at a different market rate leaves the base bit-identical;
   the difference is signed and carries the not-part-of-the-base label on its face. Fails with
   `AttributeError`.
-- [ ] **T028** [US5] `src/terezy/core/tax/scheme.py` — `BaseVersusReceived` and
+- [x] **T028** [US5] `src/terezy/core/tax/scheme.py` — `BaseVersusReceived` and
   `base_versus_received`, taking two `Money` and importing nothing from `core.routes`
   (research D15).
 
@@ -190,12 +190,12 @@ US6 a second regime is data.
 
 ## Phase 7 — The standing properties (US4, US6)
 
-- [ ] **T029** `tests/contract/test_no_scheme_is_named_in_code.py` — SC-002's no-branch clause
+- [x] **T029** `tests/contract/test_no_scheme_is_named_in_code.py` — SC-002's no-branch clause
   and SC-011: an AST scan over `src/terezy/**/*.py` executable source finds no scheme id, no
   component id, no component name, no destination venue id and no declared date name; the scan
   names the modules it walked and proves itself falsifiable on a planted branch and inert on
   planted prose.
-- [ ] **T030** [P] `tests/contract/test_readings_never_blend.py` — SC-017 and SC-017a:
+- [x] **T030** [P] `tests/contract/test_readings_never_blend.py` — SC-017 and SC-017a:
   `UnsettledDestination` has no `Money` field, no `total` and no aggregate of any kind,
   asserted by enumerating `dataclasses.fields`; a figure lifted out of the tuple still names
   its reading and carries its citations; `ChargedUnderTheScheme` and `ReadingFigure` are
@@ -204,7 +204,7 @@ US6 a second regime is data.
   **one** declaration consumed by every reading that needs them, asserted by identity of the
   resolved scheme object rather than by equality of its rates; the НБУ reading reports its
   `departs_from_source` on the figure; and the shipped counts are three, two, one and one.
-- [ ] **T031** [P] `tests/contract/test_provenance_propagation.py` — SC-007 and SC-008: no tax
+- [x] **T031** [P] `tests/contract/test_provenance_propagation.py` — SC-007 and SC-008: no tax
   rate this feature consumes lives in per-owner data; exactly one shipped value is sourced to
   the owner's own statement and it marks every figure it touches; an unverified rate or
   official-rate observation marks 100% of charges derived from it, in both directions.
@@ -213,17 +213,17 @@ US6 a second regime is data.
 
 ## Phase 8 — Documentation and the graph
 
-- [ ] **T032** `docs/METHODOLOGY.md` — §13 rewritten for the new deployable formula (FR-018),
+- [x] **T032** `docs/METHODOLOGY.md` — §13 rewritten for the new deployable formula (FR-018),
   and a new §33: the scheme and its components, the credit-date base, the periodic component,
   the three nils, a worked example of each, the crediting destination and its labelled switch,
   base against received, and what refuses. In this change, not a follow-up (SC-015). Then
   `uv run python scripts/check_methodology_refs.py`, **read by exit code**.
-- [ ] **T033** [P] `docs/REQUIRED_TESTS.md` — E10's second exercise recorded beside its row
+- [x] **T033** [P] `docs/REQUIRED_TESTS.md` — E10's second exercise recorded beside its row
   (income, against a real statute) without re-flipping it; E8 left open with its structural
   prerequisite named; E7, E4, F1 and G6 left as they are, each with a sentence on what this
   feature did and did not do to them.
-- [ ] **T034** [P] `specs/features.toml` — 012 `in-progress`, and `done` only at landing.
-- [ ] **T035** [P] `specs/002-ramp-cost/spec.md` — a ⚙ cross-reference on FR-007 recording that
+- [x] **T034** [P] `specs/features.toml` — 012 `in-progress`, and `done` only at landing.
+- [x] **T035** [P] `specs/002-ramp-cost/spec.md` — a ⚙ cross-reference on FR-007 recording that
   this feature supersedes it (FR-018, the pattern 007 used for 001's FR-022).
 
 ---

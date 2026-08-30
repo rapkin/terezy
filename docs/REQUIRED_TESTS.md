@@ -103,7 +103,7 @@ xfailed, or deleted without an amendment.
 | E8 | The same scenario under jurisdiction A vs B differs only in the tax terms; the gross market outcome is bit-identical. | `[ ]` |
 | E9 | A residency change mid-simulation is applied by date, including positions held across the change. | `[ ]` |
 | E11 | A **zero** tax figure distinguishes *exempted* from *not applicable* when rendered. The engine already separates them — a taxable event's zero cites its tax class, a non-taxable row's zero cites nothing because there is nothing to cite — but a reader looking at a schedule table sees `0.00` on every row either way. A presentation requirement for the waterfall (spec §5.3), recorded here so the distinction the engine preserves is not thrown away at the last step. | `[ ]` |
-| E10 | A rate declared as a **dated schedule** changes on its effective date, so a legislated change is modelled rather than requiring a rebuild. **Closed by feature 006:** the scalar rate was removed, not deprecated, and `data/README.md` rule 3 and `SIMULATOR_SPEC.md` §4.5.1 are now satisfied. An event before a schedule's earliest cited entry is a typed refusal rather than a defaulted rate — see `docs/METHODOLOGY.md` §25.2 on why that refusal is what makes an honest schedule writable. | `[x]` `tests/worked_examples/test_rate_schedule_straddle.py`, with the boundary in `tests/unit/test_rate_lookup_boundary.py` and the refusals in `tests/unit/test_schedule_refusals.py` |
+| E10 | A rate declared as a **dated schedule** changes on its effective date, so a legislated change is modelled rather than requiring a rebuild. **Closed by feature 006:** the scalar rate was removed, not deprecated, and `data/README.md` rule 3 and `SIMULATOR_SPEC.md` §4.5.1 are now satisfied. An event before a schedule's earliest cited entry is a typed refusal rather than a defaulted rate — see `docs/METHODOLOGY.md` §25.2 on why that refusal is what makes an honest schedule writable. | `[x]` `tests/worked_examples/test_rate_schedule_straddle.py`, with the boundary in `tests/unit/test_rate_lookup_boundary.py` and the refusals in `tests/unit/test_schedule_refusals.py`. **Feature 012 exercised the same mechanism a second time, on income rather than on an instrument, against a real statute**: the ФОП військовий збір commences 1 January 2025 under a law that is not the one setting its rate, a projection straddling that date charges 1% from it and refuses by name before it (`tests/unit/test_scheme_refusals.py`), and a legislated change entered as one dated entry takes effect in the next run with no source line changed (`tests/contract/test_scheme_data_only.py`). The row stays flipped and is not re-flipped |
 
 ## F. FX, display currency, and asymmetry
 
@@ -279,3 +279,33 @@ does not mistake "per-date rates" for the same requirement. **E8** — a second 
 is unmoved, and 011's obligation to it is discharged structurally: a second official-rate
 series with a distinct identity is a data-only addition that loads and is addressable
 (`tests/contract/test_official_rate_data_only.py`).
+
+---
+
+**012-fop-group-3** closes no row and moves four notes.
+
+**E10** is exercised a second time and is not re-flipped — see its row: 006 closed it on an
+instrument's tax class, 012 ran the same mechanism on income against a statute whose rate and
+whose commencement come from different laws.
+
+**E8** — the same scenario under two jurisdictions — stays open, and 012's obligation to it is
+structural and discharged: a second taxation scheme with a distinct identity, a different
+component set and a periodic component the first does not have is a data-only addition that
+loads, charges and is addressable (`tests/contract/test_scheme_data_only.py`). What is still
+missing is a *second jurisdiction consumed in one comparison*, which no feature has built.
+
+**E7** — tax paid from cash in the following year — is untouched and was not attempted. 012
+records a liability against the period it accrues to and declares the reporting cadence 009
+will need; payment timing, filing and the cash movement that settles a liability stay where
+that row already puts them.
+
+**E4** — the three crypto scenarios — is untouched, and the resemblance is worth naming so
+nobody flips it. E4 is about disposing of a crypto **asset** under a regime that does not
+exist; 012's crypto-exchange destination is about where contract **income** is credited, and
+it produces one labelled personal-income figure. The 18% + 5% those two share is the same
+numbers from different places.
+
+**F1** is unmoved. 012 produces a different asymmetry from the one F1 names — a base fixed at
+the credit-date official rate against hryvnia received at a market rate on the sale date, with
+no holding period and no cost basis anywhere in it. Both come from the same conflation this
+project exists to refuse, and they are not the same test.

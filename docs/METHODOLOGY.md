@@ -1104,72 +1104,90 @@ running the identical projection with every source verified produces a byte-iden
 ### 13.1 The formula
 
 ```
-withheld = gross × income_tax_rate
-net      = gross − withheld
+gross   = the credited amount, in the tax currency  (§33.2)
+charged = what the named taxation scheme charges on it, line by line  (§33.1)
+net     = gross − charged
 ```
 
-`gross` is what an income stream declares arriving per its declared cadence;
-`income_tax_rate` is a fraction (`0.1`, never `10` — percent lives only in declaration
-files, §9). Both terms are reported alongside the net figure, so an amount available to
-invest always shows what it is net *of*. Implemented as `deployable(stream)` in
-`terezy.core.streams.streams`.
+`gross` is what an income stream declares arriving per its declared cadence, struck into the
+tax currency where it arrived in another one. `charged` is the sum of the scheme's component
+lines, never a blended percentage. Implemented as `deployable(stream, charged)` in
+`terezy.core.streams.capacity`.
 
 This exists for one reason: **the amount available to invest must never be overstated**
-(FR-007). Every funding decision downstream reads the net figure, so no other module has to
-remember to apply the rate — which is how a gross amount comes to be treated as investable.
+(002 FR-007). Every funding decision downstream reads the net figure, so no other module has
+to remember to apply the scheme — which is how a gross amount comes to be treated as
+investable.
 
-### 13.2 An undeclared rate produces no net figure at all
+**Feature 012 replaced a rate with a scheme.** `IncomeStream.income_tax_rate: float | None`
+was retired: a scalar cannot carry two components with different commencement dates, an
+obligation triggered by a month elapsing rather than by income arriving, or the choice of a
+whole scheme. A stream names a declared treatment instead, exactly as feature 006's
+instruments name tax classes.
 
-The rate is optional, and omitting it means **the owner has not stated one**. That is a
-different claim from stating zero, and the two get different types:
+### 13.2 An undeclared treatment produces no net figure at all
+
+The treatment is optional, and omitting it means **the owner has not named one**. That is a
+different claim from a scheme that charges nothing, and the two get different types:
 
 | declaration | result | net figure |
 | --- | --- | --- |
-| `income_tax_rate = 0.1` | `DeployableCapacity` | `gross × 0.9` |
-| `income_tax_rate = 0.0` | `DeployableCapacity` | exactly `gross` — because the owner said so |
-| omitted (`None`) | `IncomeTaxRateUndeclared` | **none: the record has no such field** |
+| `tax_scheme = "ua_fop_group_3_non_vat"` | `DeployableCapacity` | `gross − charged` |
+| a scheme whose components come to nothing | `DeployableCapacity` | exactly `gross` — because a declaration says so |
+| omitted (`None`) | `TaxTreatmentUndeclared` | **none: the record has no such field** |
 
 Returning the gross in the third case would produce a net figure that quietly equals the
-gross — right whenever the rate happens to be zero, wrong by the rate the rest of the time,
-and with nothing in the output to say which case a reader is looking at. So the third case is
-a typed value carrying the gross, the stream id and the reason *"no income-tax rate
+gross — right whenever the charge happens to be nil, wrong by the charge the rest of the
+time, and with nothing in the output to say which case a reader is looking at. So the third
+case is a typed value carrying the gross, the stream id and the reason *"no tax treatment
 declared"*, and carrying no net field for a caller to read. Same shape, and the same
 argument, as `RealTermsUnavailable` occupying the real-terms slot and `ExitCostUnknown`
 occupying the round-trip slot.
+
+**A charge and a declaration that disagree raise.** Supplying a charge for a stream that
+names no treatment, or omitting one for a stream that does, is a programmer error rather than
+a case with a default — both available defaults are wrong, one reporting a capacity the
+declaration does not support and the other reporting *nobody said* about a stream that did.
 
 **Nothing is clamped.** A declared rate above 1.0 produces a negative net figure and is
 reported as such; a range check belongs to the loader, where the error can name the file and
 the field. Softening a mis-entered declaration into a plausible zero is predecessor defect
 B13 in a new place.
 
-### 13.3 Why this arithmetic uses `money.scale` and not `money.scale_sourced`
+### 13.3 All three figures are in the tax currency, and they had to be
 
-The standing rule is that a factor which came from declared data goes through
-`scale_sourced`, so the declaration's mark cannot be dropped silently. The withholding rate
-is the one exception in the project, and the reason is that **a stream carries no source at
-all**: an owner's own salary is not an observation needing a citation but a statement of fact
-by the only person who can make it, and the exemption is argued in
-`specs/002-ramp-cost/contracts/declaration-schema.md`. The rate is not a *modelled* tax rate
-the engine applies to a taxable event — `SIMULATOR_SPEC.md` §4.2 puts the owner's own
-income-tax position outside the simulator — it exists so the deployable figure is not
-overstated, and nothing else.
+The identity cannot hold across two currencies: the arrival may be in dollars and the charge
+is in hryvnia, and `money.sub` raises rather than pretending otherwise. Both ways of forcing
+it into the stream's own currency are forbidden, in opposite directions:
 
-So there is no `Provenance` to merge: `scale_sourced(amount, factor, EMPTY)` would be the same
-arithmetic while implying a source was consulted. The gross's own provenance is carried
-through unchanged, and no mark is lost because there was never one to lose. **If a stream ever
-gains a citation, this is the line that has to change**, and the reason is recorded in the
-module.
+- converting the hryvnia charge back at the **official** rate is an official rate pricing a
+  realised amount (011 FR-012, §30.1);
+- putting it through the **sale channel** is a channel rate deciding a tax figure (§33.7).
+
+So `gross`, `charged` and `net` are all in the tax currency, the foreign arrival that
+produced them is on the conversion record beside them (`charge.conversion.amount`), and the
+number that is *not* claimed — how many dollars are left — is not claimed at all.
+
+**Where the legal rates went.** A stream carries no `source`/`retrieved_on`/`verified_on`,
+and that exemption is argued for an owner's statement about himself. It never covered a tax
+*rate*, which is a public legal fact about the Republic — and the retired scalar let one be
+written into per-owner data uncited. After 012 the owner declares *which regime he is in* and
+the regime's rates live in `data/tax/schemes/` with their citations, where the provenance
+gate reads them. There is consequently no arithmetic left in this module that applies a
+declared rate: the charge arrives already computed, its lines already carrying the citations
+of the entries that produced them, and `deployable` does one subtraction whose `money.sub`
+unions both sides' provenance.
 
 ### 13.4 Worked example
 
-An invented gross of 100 000 UAH monthly at an invented rate of 10% — round numbers chosen to
-be checkable by eye and deliberately unlike any real Ukrainian schedule, because this project
-may not enter a legal rate it has not observed:
+An invented gross of 100 000 UAH monthly under an invented scheme charging one component at
+10% — round numbers chosen to be checkable by eye and deliberately unlike any real Ukrainian
+schedule, because this project may not enter a legal rate it has not observed:
 
 ```
-gross    = 100 000.00 UAH  per month
-withheld = 100 000 × 0.1 =  10 000.00 UAH
-net      = 100 000 − 10 000 = 90 000.00 UAH  per month
+gross   = 100 000.00 UAH  per month
+charged = 100 000 × 0.1 =  10 000.00 UAH
+net     = 100 000 − 10 000 = 90 000.00 UAH  per month
 ```
 
 Checked in `tests/unit/test_deployable_capacity.py`.
@@ -3532,6 +3550,163 @@ and a tuple on a transcription of that bond's own computed schedule produce equa
 tie in the ranking, differing only in identity, provenance, the stated exclusions, the
 conventions statement and the causation detail prose.
 
+## 33. The taxation scheme: what a stream is charged, and where it is credited
+
+### 33.1 A scheme is a declared set of components, and one of them can be nothing
+
+A **taxation scheme** is what an income stream is under: an identity, a variant, a reporting
+cadence, and the set of separately named charges it levies. ФОП group 3, ФОП group 2 and a
+legal entity are three of them, and **which one applies is a declaration** — nothing in the
+engine knows any of their names.
+
+Two kinds of component, and they differ in two independent ways:
+
+| | trigger | base | asked about |
+| --- | --- | --- | --- |
+| **rate component** | income arriving | a share of the taxable base | a **date** |
+| **periodic component** | a period elapsing | a statutory sum | a **period** |
+
+A rate-shaped model of a periodic obligation gets the zero-income month wrong: it is owed in
+a month with nothing in it. There is no `rate` field on a periodic component and no `amount`
+on a rate one, so writing either as the other is an unrecognised field rather than a check
+somebody has to remember.
+
+```
+charged = Σ over the scheme's rate components of  base × (rate in force on the credit date)
+```
+
+**Summed, never blended.** There is no combined-rate field anywhere: 6% of the base is the
+same number as 5% + 1% and a different claim, and two components with independent legal lives
+cannot be unpicked from a blended figure afterwards. These two have independent legal lives —
+a different statute created one of them, on its own date.
+
+### 33.2 The base is the credited amount at the official rate on the credit date
+
+Feature 011's machinery, called unchanged and on a date this feature supplies (§30.2). The
+credit date is the caller's fact: there is no clock in the core, no ledger event to read a
+date off, and the date money is credited is not the date it is later sold on.
+
+An arrival **already in the tax currency consults no rate at all**, and the currency is
+checked before a series is touched — a false rate-unavailable reason on a figure that never
+needed a rate trains a reader to ignore the true ones.
+
+### 33.3 Three different ways a nil is nil
+
+| claim | what produces it |
+| --- | --- |
+| *this scheme charges no such component* | `ComponentNotDeclared` — the scheme does not declare it |
+| *it was charged and came to nothing* | a line of zero, **carrying the citation of the entry that produced it** |
+| *it is declared and nothing is in force* | `ComponentRateUndeclaredBefore` / `PeriodicAmountNotInForce` |
+
+Three types, so no caller can collapse them by accident. An uncited zero is the figure that
+gets believed without checking, which is why the second carries its provenance exactly as a
+non-zero value does — and the shipped ЄСВ nil is that case, sourced to **the owner's own
+statement of his position** rather than to a public text, and saying so on its face.
+
+### 33.4 A commencement is cited, and an end that is not a date is recorded
+
+An event dated before a component's earliest entry is a typed error naming the component and
+the date. It is **not** charged a rate of zero: *the schedule does not reach this date*, *the
+rate was nil* and *this scheme charges no such component* are three claims and only the first
+is true (§25.2 makes the same argument for an instrument's tax class).
+
+A schedule that declares a commencement and no end **asserts a permanent charge**. Where the
+end is real but is conditioned on an event rather than on a date, it is declared as recorded
+**context** on the component: visible, cited, and not applied, with the reason it is not
+applied required on the record. A comment could not do this — it cannot be rendered beside the
+figure it does not move.
+
+### 33.5 Worked example
+
+An invented monthly credit under an invented scheme, at an invented official rate; the shipped
+rates carry their citations in `data/tax/schemes/` and the values there are the owner's to
+verify.
+
+```
+credited        = 2 500.00 USD   on the credit date
+official rate   = 42.50 UAH per USD  for that date
+base            = 2 500.00 × 42.50 = 106 250.00 UAH
+
+component A 5%  = 106 250.00 × 0.05 =  5 312.50 UAH
+component B 1%  = 106 250.00 × 0.01 =  1 062.50 UAH
+charged         =  5 312.50 + 1 062.50 = 6 375.00 UAH
+```
+
+Checked in `tests/worked_examples/test_fop_scheme_charge.py`. The periodic component's own
+example — a statutory sum charged once per elapsed month, including a month with no income —
+is in `tests/unit/test_periodic_component.py`.
+
+### 33.6 Where the income is credited decides which reading applies
+
+The **crediting destination** is where income is credited for tax purposes. It is a declared
+fact on the stream and it is **not** the routing origin: `arrives_at` is the venue every
+funding route starts from, `credited_to` is the tax event's location, and neither is defaulted
+from the other in either direction. For the owner today they hold different values — routed
+through Deel, credited to a ФОП account — and a default either way would settle the tax
+treatment by accident.
+
+A normative table maps `(scheme × venue)` to a **verdict**, in feature 009's vocabulary:
+
+- **INTERPRETED** — answered an inference deep from provisions a reader can go and check.
+  Produces **a charge**, carrying the row's recorded judgement and its citations.
+- **UNSETTLED** — no authoritative answer. Produces a **labelled scenario switch**: one figure
+  per computable reading, each naming its reading and carrying that reading's own citations.
+  **None of them is the tax owed**, and there is nowhere on the switch for a number combining
+  two of them to live. What settles one is an індивідуальна податкова консультація of the
+  owner's own.
+- **no row at all** — a typed refusal naming the destination and the scheme. Two things close
+  it and they are different: find a source that reaches the destination, and add the row with
+  its reasoning.
+
+Each reading recognises income on a date whose **name** is declared — two readings of one
+destination can disagree about *when* income arises, and the caller supplies what each name is
+worth. A reading whose name the caller did not supply refuses by name rather than borrowing
+another reading's date, which would compute the reading it contests.
+
+A candidate that needs a rate nobody declared is **named on the switch as uncomputed with its
+reason**, never omitted: an omitted reading is how a switch comes to look complete when it is
+not. Where *every* candidate is uncomputable there is no switch at all — a switch of zero
+figures is a refusal wearing a switch's clothes.
+
+**The verdicts are expected to move.** They rest on administrative positions rather than
+statute. Moving one is a row in `data/tax/destinations/`, and nothing else: the verdict is a
+declared word, every reading computes from a declared scheme, and no destination or component
+name reaches the engine.
+
+### 33.7 The base against the hryvnia actually received
+
+The dollars on a ФОП account cannot be spent domestically; they are sold for hryvnia through a
+declared channel, on a different date, at a different rate. Two numbers:
+
+```
+base      = credited amount × official rate on the CREDIT date
+received  = what the declared sale produced on the SALE date  (§16, §17)
+difference = base − received      signed, and outside the taxable base
+```
+
+**Nothing nets them.** The base was fixed at the credit date and no market rate moves it;
+reporting only one of the two would hide whichever direction the exposure went in, and
+subtracting one from the other as a *deduction* would assert a relief nobody cited. The sale
+introduces no leg kind, no channel kind and no cost mechanism — it is an ordinary declared
+corridor, and what this feature contributes to it is the tax consequence, which is that there
+is none.
+
+Checked in `tests/worked_examples/test_base_versus_received.py`.
+
+### 33.8 What is not modelled here
+
+No deduction of any kind is applied to the base. The bank commission is answered at the
+INTERPRETED level — the income is the whole invoice amount including it — and its citation
+travels with the base; every other candidate deduction is an **absence, recorded** as an owner
+verification task. A modelled zero deduction and an unasked question are different claims.
+
+No payment timing, no filing deadline and no cash movement: a liability is recorded against
+the period it accrues to, and when it is paid is feature 009's (§28). The reporting cadence is
+declared and unused for exactly that reason — so the feature that models payment inherits a
+declared fact rather than guessing one.
+
+---
+
 ## 32. Where to look next
 
 | question | file |
@@ -3606,6 +3781,10 @@ conventions statement and the causation detail prose.
 | Can the day count reach an amount? | `tests/contract/test_day_count_reaches_no_amount.py` |
 | Is anything inferred that should be declared? | `tests/contract/test_nothing_is_inferred.py` |
 | Does any layer know there are two forms? | `tests/contract/test_no_layer_knows_the_form.py` |
+| What does a scheme charge on a month's income? | `tests/worked_examples/test_fop_scheme_charge.py` |
+| Is the base really the credit date's? | `tests/worked_examples/test_base_versus_received.py` |
+| Can a switch ever hold a blend? | `tests/contract/test_readings_never_blend.py` |
+| Does the engine know any scheme by name? | `tests/contract/test_no_scheme_is_named_in_code.py` |
 | What is still uncovered? | `docs/REQUIRED_TESTS.md` |
 
 ---
