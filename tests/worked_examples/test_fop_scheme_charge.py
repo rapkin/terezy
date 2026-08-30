@@ -11,6 +11,8 @@ credit date**, and that the base is a different number from anything a channel w
 
 from __future__ import annotations
 
+import dataclasses
+import inspect
 from datetime import date
 
 import pytest
@@ -153,3 +155,25 @@ class TestAnArrivalAlreadyInTheTaxCurrencyConsultsNoRate:
         assert charge.conversion is None
         assert_money_close(charge.base, Money(BASE, Currency.UAH, prov.EMPTY))
         assert_money_close(charge.total, Money(TOTAL, Currency.UAH, prov.EMPTY))
+
+
+class TestNothingIsDeductedFromTheBase:
+    """FR-014 and SC-016: the base is the **whole** credited amount.
+
+    For the bank commission this is answered at the INTERPRETED level -- practitioner
+    guidance reads the income as the whole invoice amount including it, not the net received
+    -- and that citation travels on the figure. Every other candidate deduction is an
+    **absence, recorded** as an owner verification task: a modelled zero deduction and an
+    unasked question are different claims, and only one of them is what this makes.
+    """
+
+    def test_the_base_is_the_credited_amount_at_the_rate_and_nothing_less(self) -> None:
+        assert _charged().base.amount == CREDITED * OFFICIAL_RATE
+
+    def test_there_is_no_deduction_to_apply_and_nowhere_to_put_one(self) -> None:
+        """Structural, because a deduction nobody cited must be unrepresentable rather than
+        merely not applied."""
+        names = {field.name for field in dataclasses.fields(schemes.SchemeCharge)}
+        assert not names & {"deduction", "deductions", "allowance", "expenses", "net", "gross"}
+        parameters = set(inspect.signature(schemes.charge_income).parameters)
+        assert parameters == {"scheme", "amount", "on_date", "series"}
