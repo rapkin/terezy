@@ -3263,10 +3263,9 @@ Ignoring the unit would give 4 980 000.00 — not a near miss.
 
 ### 30.4 A date with no declared rate refuses
 
-The publisher does not publish for every calendar day. Where no observation is declared for an
-event's date, the outcome is a **typed refusal naming the series, the currency pair and the
-date**, and the covered window so a reader can see whether the date is before it, after it or
-inside a gap.
+Where no observation is declared for an event's date, the outcome is a **typed refusal naming
+the series, the currency pair and the date**, and the covered window so a reader can see
+whether the date is before it, after it or inside a gap.
 
 Nothing interpolates, extrapolates, carries yesterday's value forward, or snaps to the nearest
 observation. Each of those produces a number that looks exactly like a correct number, and
@@ -3281,29 +3280,49 @@ rate beside the event's own, so a Friday rate applied to a Sunday event is visib
 implied. Where no rule is declared, the refusal stands: the absence of a rule is not permission
 to choose one.
 
-### 30.5 What the Ukrainian series does today, and why
+### 30.5 What the Ukrainian series covers, and where its edges come from
 
-It declares its identity, **no observations**, and **no rule**, so every date asked of it
-refuses.
+`ua_nbu_usd` declares the National Bank of Ukraine's official hryvnia-per-dollar rate for
+**every calendar day from 2019-12-28 to the date it was last retrieved**, and declares **no
+non-publication-day rule**. Both facts have reasons that are not preferences.
 
-*No observations*, because an official rate is a legal value and no legal value may originate
-from an implementer's or an agent's memory. The National Bank publishes through an open
-developer API and retrieving the series is a repository script's job, on
-`scripts/fetch_cpi.py`'s pattern: fetch, write an **empty** `verified_on`, never verify. What
-is committed today is the shape that script writes into.
+**The lower bound is the publisher's own quotation unit.** USD is published per **100** units
+through 2019-12-27 and per **1** from 2019-12-28. A series carries one `quotation_unit` for the
+whole of itself and this one declares `1.0`, so an earlier date cannot be carried here without
+either a lie about the unit or a value that is not the published one. Reaching back is a
+**second series** with its own id and `quotation_unit = 100.0` — a data-only addition — and
+none is declared. The fetch script reads the publisher's `units` on every row and **refuses the
+whole run** where one differs, rather than normalising: a value divided to fit a declared unit
+is no longer what the published table says, and re-deriving a base by eye against the
+publisher's own page would stop working.
 
-*No rule*, and this one is not waiting on a fetch. Which rate governs a day the National Bank
-does not set one is пункт 10 розділу III of the Положення that Постанова Правління НБУ від
-10.12.2019 № 148 approves, and its two підпункти are written entirely in working days,
-pre-holiday days, weekends and post-holiday working days. Nothing in this system can declare a
-working-day and holiday calendar, and the engine is forbidden from containing one, so the rule
-cannot be declared until a **declared, cited calendar** exists — a new kind of declaration with
-its own jurisdiction, provenance and amendment history. It is recorded as
-`specs/features.toml`'s `declared-working-day-calendar` entry and is deliberately not built.
+**The upper bound is the retrieval date, not the publisher's last available date.** The
+National Bank publishes one calendar day ahead. An observation dated after its own
+`retrieved_on` is refused at load — a rate for a date that has not arrived is a forecast
+wearing an observation's clothes — so the script asks for the day ahead and **declines** it,
+naming what it dropped. The next run picks it up as an ordinary observation.
 
-The calendar-free shortcut — *the latest observation on or before the event date* — is refused
-rather than adopted: it cannot tell a weekend from a gap in the series, and it would make the
-refusal unreachable for exactly the dates the refusal exists for.
+**Everything outside that window refuses**, under §30.4, naming the window in real dates. A
+projection cannot have a tax base: declared instrument payments reach into 2029, and no
+official rate for those dates exists or ever could before they arrive.
+
+**No rule is declared because there is no date for one to speak about.** A non-publication-day
+rule is a cited statement of which observation governs a date the publisher does *not* publish
+for, and the National Bank returns a rate for every calendar day, dated that day. The value
+against a Sunday is retrieved *from the authority, against that Sunday*; each observation's
+citation carries the publisher's `calcdate`, the working day whose establishment produced it,
+so a weekend value is visibly the publisher's carry rather than this repository's. Declaring it
+is entering a published fact; deriving it would be inventing one.
+
+The calendar-free shortcut — *the latest observation on or before the event date* — stays
+refused rather than adopted: it cannot tell a weekend from a gap in the series, and it would
+make the refusal unreachable for exactly the dates the refusal exists for.
+
+**Nobody has verified any of it.** Every `verified_on` is empty, so every tax figure struck
+through one of these rates renders marked. Filling one is an act the owner performs against the
+publisher's own presentation of *that date*; a re-fetch preserves an attestation whose value is
+unchanged and clears one whose value the publisher has restated, because the attestation was
+about a number.
 
 ### 30.6 What is **not** converted, and why that is the point
 
@@ -3330,7 +3349,7 @@ marked amount survives a fully verified rate — neither launders the other.
 
 Official rates age under their own declared kind, `official_rate`, whose threshold is declared
 with it (§18). What decays is the **retrieval**: a published rate for a date that has passed is
-a historical fact and does not go wrong, but the publisher adds a rate every working day, so a
+a historical fact and does not go wrong, but the publisher adds a rate every calendar day, so a
 series fetched long ago is short of its own end. Ageing a derived figure goes through each
 citation's own kind, because that is the only thing that survives the merge of provenance a tax
 base passes through.
@@ -3836,7 +3855,7 @@ route, and a `compose` refusal that is about the question rather than about one 
 | Does a monthly cap bind, and is the excess reported? | `tests/worked_examples/test_monthly_cap.py` |
 | Is anything silently clamped? | `tests/invariants/test_no_silent_clamping.py` |
 | Does the ledger agree with the comparison? | `tests/invariants/test_cost_execute_agreement.py` |
-| What is a dollar income worth for tax? | `tests/worked_examples/test_official_rate_base.py` |
+| What is a dollar income worth for tax? | `tests/worked_examples/test_official_rate_base.py`, and against the National Bank's own declared rates `tests/worked_examples/test_nbu_official_rate_base.py` |
 | What happens on a date the publisher skipped? | `tests/unit/test_official_rate_refusals.py` |
 | Is the tax rate kept apart from the trading rate? | `tests/contract/test_the_rate_you_are_taxed_at.py` |
 | What does the war ending change? | `tests/worked_examples/test_regime_transition.py` |

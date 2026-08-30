@@ -24,6 +24,7 @@ below proves both halves against the file itself, so a naive grep replacing the 
 
 from __future__ import annotations
 
+import tomllib
 from datetime import date
 from pathlib import Path
 
@@ -191,3 +192,60 @@ class TestNoDisplayChoiceCanReachATaxFigure:
         )
         assert isinstance(struck, official_rate.TaxCurrencyConversion), struck
         assert struck.base.currency is Currency.UAH
+
+
+class TestARealOfficialRateIsNotARepairForAnInventedChannelQuote:
+    """018 SC-010, and the one temptation this repository now actually contains.
+
+    ``data/official_rates/ua_nbu_usd.toml`` carries the National Bank's published figures for
+    every calendar day. One directory away, ``data/channels/uah_usd.toml`` declares three
+    channels whose ``reference_rate`` is **invented** and says so on every line. The cheapest-
+    looking repair in the tree is to point the second at the first, and it is the conflation
+    the two classes above forbid, arriving as a tidy-up: a channel is a market you transact in
+    and an official rate is a legal reference you never transact at, so substituting one would
+    reprice a ramp at a rate nobody was charged while every figure stayed plausible.
+
+    A requirement is what stops it, not a paragraph -- so this is that requirement, asserted
+    over the shipped files rather than over a fixture.
+    """
+
+    CHANNELS = Path(__file__).resolve().parents[2] / "data" / "channels" / "uah_usd.toml"
+    RATES = Path(__file__).resolve().parents[2] / "data" / "official_rates" / "ua_nbu_usd.toml"
+
+    def _channels(self) -> list[dict[str, object]]:
+        declared = tomllib.loads(self.CHANNELS.read_text(encoding="utf-8"))
+        found = declared["channel"]
+        assert isinstance(found, list), self.CHANNELS
+        assert found, self.CHANNELS
+        return found
+
+    def test_every_declared_reference_rate_is_still_the_invented_one(self) -> None:
+        for channel in self._channels():
+            assert channel["reference_rate"] == 42.0, channel["id"]
+
+    def test_every_declared_reference_rate_is_still_marked_synthetic_and_unverified(
+        self,
+    ) -> None:
+        """A real rate that arrived here would have to lose the marking to look right, so the
+        marking is the thing to hold: it is what a reader sees on every figure downstream."""
+        for channel in self._channels():
+            assert "SYNTHETIC" in str(channel["source"]), channel["id"]
+            assert channel["verified_on"] == "", channel["id"]
+
+    def test_no_channel_cites_the_national_bank_or_the_official_rate_series(self) -> None:
+        """The substitution's other shape: the same number, re-sourced. A channel quote
+        carrying the rate series' citation would read as observed and would not be."""
+        text = self.CHANNELS.read_text(encoding="utf-8")
+
+        assert "ua_nbu_usd" not in text
+        assert "bank.gov.ua" not in text
+        assert "Національний банк" not in text
+
+    def test_the_invented_reference_is_not_a_value_the_publisher_ever_published(self) -> None:
+        """So the fixture cannot be mistaken for a retrieved figure on any date. Checked
+        against the landed series rather than asserted, because that is what would change."""
+        declared = tomllib.loads(self.RATES.read_text(encoding="utf-8"))
+        published = {observation["value"] for observation in declared["observation"]}
+
+        assert published, "this claim is about a populated series"
+        assert 42.0 not in published
