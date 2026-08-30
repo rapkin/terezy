@@ -3703,6 +3703,14 @@ introduces no leg kind, no channel kind and no cost mechanism — it is an ordin
 corridor, and what this feature contributes to it is the tax consequence, which is that there
 is none.
 
+**The accepted limitation, stated with its name.** Modelling the sale as an ordinary corridor
+means the data records *that* one route leaves the account and not *why* — the compulsion is
+invisible. That costs nothing today, because a forced conversion and a chosen one price
+identically and the only thing compulsion changes is which routes exist, which a declared
+route registry already says. If a later feature needs to tell *nobody declared a route* from
+*the law forbids one*, that is §20.2's deficit vocabulary being extended rather than a new
+mechanism here.
+
 Checked in `tests/worked_examples/test_base_versus_received.py`.
 
 ### 33.8 What is not modelled here

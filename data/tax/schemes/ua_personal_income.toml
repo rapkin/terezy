@@ -29,6 +29,22 @@
 # they are unsettled, and what settles one is an індивідуальна податкова консультація of the
 # owner's own (task 6).
 #
+# ---------------------------------------------------------------------------
+# TWO OTHER SOURCES STATE THESE SAME NUMBERS AND ARE NOT THEIR SOURCE
+# ---------------------------------------------------------------------------
+#
+# Recorded because the lineage is what stops four entries becoming one. The 18% below is the
+# ПДФО biz.ligazakon.net states for a фізична особа не ФОП; the 5% is the levy Закон
+# № 4015-IX sets for ordinary personal income. Those two citations are what these rates rest
+# on. Separately: законопроєкт 10225-д proposes «18% податок на доходи фізичних осіб» plus
+# «5% військовий збір» for crypto (yankiv.com), and forbes.ua reports a bill setting 18% +
+# 1,5% on virtual-asset profit after a five-year preferential period. Both are DRAFTS about a
+# framework that does not exist, and neither is a source for anything here.
+#
+# The same coincidence reaches `docs/REQUIRED_TESTS.md`'s E4, whose `draft_18_5` scenario IS
+# draft 10225-д's rates on a crypto ASSET disposal — a different question from where contract
+# INCOME is credited. The same numbers from different places, and they must not be merged.
+#
 # This scheme declares NO ЄСВ component at all, which is a different claim from the ФОП
 # scheme's declared zero: *this scheme charges no such component* against *it was charged and
 # came to nothing*.
