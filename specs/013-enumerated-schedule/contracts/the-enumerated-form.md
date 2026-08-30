@@ -48,13 +48,30 @@ declaration a question both forms answer is not naming it and stays permitted ev
 ```python
 known_from(BondTerms | EnumeratedTerms) -> TermsKnownFrom
 day_count_of(BondTerms | EnumeratedTerms) -> str
+face_value_of(BondTerms | EnumeratedTerms) -> Money
+principal_returned(BondTerms | EnumeratedTerms, *, bought_on: date) -> Money
 conventions_of(BondTerms | EnumeratedTerms) -> ConventionsApplied | AmountsAsDeclared
 excludes_of(BondTerms | EnumeratedTerms) -> frozenset[str]
+narrowed(InstrumentDeclaration, type[T]) -> T
 ```
 
-Adding a third form means four arms and no call-site change. Adding a question that only one
-form can answer is the thing this contract exists to make visible: it would have to be a
-refusal in the answer, not an absence at the call site.
+Adding a third form means one more arm each and no call-site change. Adding a question that
+only one form can answer is the thing this contract exists to make visible: it would have to
+be a refusal in the answer, not an absence at the call site.
+
+**`face_value_of` and `principal_returned` are two questions and not one**, and confusing
+them was defect F2. `face_value_of` answers *what does the paper say a unit redeems at*;
+`principal_returned` answers *what will this holding actually get back*, and it is the one a
+purchase is measured against. For a bond that repays its face once they agree, which is why
+the confusion was latent.
+
+**What the union does and does not enumerate.** `InstrumentDeclaration.terms` being
+`BondTerms | EnumeratedTerms` makes `mypy --strict` list every site reading a term only one
+form declares — five of `BondTerms`' seven fields. It lists **no** site reading `day_count`
+or `face_value`, because both forms declare those, and it is `face_value` that F2 read.
+Those two are sealed by `tests/contract/test_no_layer_knows_the_form.py` instead.
+`provenance` is shared as well and deliberately unsealed: it is the citation rather than a
+term.
 
 ## 4. The day count reaches no amount
 

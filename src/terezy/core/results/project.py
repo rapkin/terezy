@@ -395,7 +395,8 @@ def _governed_by(
         return TreatmentUnstated(
             reason=(
                 "this instrument declares no tax class for a disposal, so nothing here can "
-                "say what governs the difference between what was paid and face. It is the "
+                "say what governs the difference between what was paid and what comes "
+                "back. It is the "
                 "declaration that is incomplete rather than the rules: a class named and "
                 "unmapped is a different fault, and reported as one."
             )

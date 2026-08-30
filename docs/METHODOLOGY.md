@@ -3318,82 +3318,6 @@ base passes through.
 
 ---
 
-## 31. Where to look next
-
-| question | file |
-| --- | --- |
-| Is the schedule right? | `tests/worked_examples/test_ovdp_schedule.py` |
-| Is the reinvestment right? | `tests/worked_examples/test_coupon_reinvestment.py` |
-| Are the day counts right? | `tests/worked_examples/test_day_count.py` |
-| What does a whole run produce? | `tests/golden/ovdp_synthetic_a.golden.txt` |
-| Does the ledger conserve? | `tests/invariants/test_ledger_conservation.py` |
-| What does a loss year cost if I do not file it? | `tests/worked_examples/test_loss_carryforward.py` |
-| What does each basis method actually consume? | `tests/worked_examples/test_four_lot_methods.py` |
-| When does the tax money leave? | `tests/worked_examples/test_tax_payment.py` |
-| What happens if the cash is not there? | `tests/unit/test_insufficient_cash.py` |
-| Can a figure hide which method produced it? | `tests/contract/test_method_is_never_implicit.py` |
-| Is an unsettled reading of the law visible on the figure? | `tests/contract/test_unsettled_is_labelled.py` |
-| Is the run reproducible? | `tests/invariants/test_determinism.py` |
-| Does the mark survive? | `tests/contract/test_provenance_propagation.py` |
-| Is a new instrument really data-only? | `tests/contract/test_data_only_extensibility.py` |
-| Does the ramp cost differ by stream? | `tests/worked_examples/test_two_streams.py` |
-| Is deployable capacity honest? | `tests/unit/test_deployable_capacity.py` |
-| Does a monthly cap bind, and is the excess reported? | `tests/worked_examples/test_monthly_cap.py` |
-| Is anything silently clamped? | `tests/invariants/test_no_silent_clamping.py` |
-| Does the ledger agree with the comparison? | `tests/invariants/test_cost_execute_agreement.py` |
-| What is a dollar income worth for tax? | `tests/worked_examples/test_official_rate_base.py` |
-| What happens on a date the publisher skipped? | `tests/unit/test_official_rate_refusals.py` |
-| Is the tax rate kept apart from the trading rate? | `tests/contract/test_the_rate_you_are_taxed_at.py` |
-| What does the war ending change? | `tests/worked_examples/test_regime_transition.py` |
-| Can an assumption be mistaken for an observation? | `tests/unit/test_transition_is_an_assumption.py` |
-| Which comparisons can the declared registry support? | `tests/worked_examples/test_coverage_table.py` |
-| Which observation should I make next? | `tests/unit/test_coverage_deficits.py` |
-| Does the audit agree with what costing actually does? | `tests/invariants/test_coverage_costing_agreement.py` |
-| Can a cost figure leak into the coverage report? | `tests/contract/test_coverage_no_figures.py` |
-| What does a chain nobody declared end to end cost? | `tests/worked_examples/test_composed_arithmetic.py` |
-| Does a composed round trip need a declared way out? | `tests/worked_examples/test_composed_exit_chain.py` |
-| Do two hops over one card share its limit? | `tests/worked_examples/test_composed_pool.py` |
-| Is the search a search rather than a router? | `tests/invariants/test_composition_search.py` |
-| Could enumeration order reach the output? | `tests/invariants/test_composition_order.py` |
-| Is a chain costed by the same function as a route? | `tests/contract/test_composed_same_costing.py` |
-| Is the declared graph what I think it is? | `tests/golden/route_graph_wartime.mmd` |
-| What does a destination with no way out look like? | `tests/golden/route_graph_normalized.mmd` |
-| What does one costed route look like? | `tests/golden/costed_path_p2p.mmd` |
-| Is there a second number-rendering rule? | `tests/contract/test_diagram_one_number_rule.py` |
-| Do the marks survive the picture? | `tests/contract/test_diagram_marks.py` |
-| Can a hostile venue name break a diagram? | `tests/unit/test_diagram_escaping.py` |
-| What does a seeded lot realise on disposal? | `tests/worked_examples/test_seeded_disposal.py` |
-| Does a guessed cost reach the tax figure? | `tests/contract/test_estimated_basis_propagates.py` |
-| Do the seeded ledgers still conserve? | `tests/invariants/test_ledger_conservation.py` |
-| Do the three goal modes agree? | `tests/invariants/test_goal_mode_consistency.py` |
-| Is the goal arithmetic right? | `tests/worked_examples/test_goal_arithmetic.py` |
-| What happens when a goal cannot be met? | `tests/unit/test_goal_feasibility.py` |
-| Which rate applied, and when does a run stop? | `tests/worked_examples/test_rate_schedule_straddle.py` |
-| Can two tax classes on one instrument collide? | `tests/worked_examples/test_two_tax_classes.py` |
-| What does relying on the legal floor cost? | `tests/worked_examples/test_fund_liquidity.py` |
-| What survives the spread and the tax? | `tests/worked_examples/test_declared_yield.py` |
-| What happens when the peg's ceiling binds? | `tests/worked_examples/test_pegged_distribution.py` |
-| Can a fund be asked for a Sharpe ratio? | `tests/contract/test_assumption_driven_refusal.py` |
-| Is the deflation arithmetic right? | `tests/worked_examples/test_deflation_arithmetic.py` |
-| What happens when prices fall? | `tests/worked_examples/test_falling_prices.py` |
-| Is the subtraction approximation really absent? | `tests/contract/test_no_subtraction_approximation.py` |
-| What does a CPI gap do to a real figure? | `tests/unit/test_cpi_coverage.py` |
-| Can an assumption be mistaken for an observation? | `tests/contract/test_two_figures_never_blend.py` |
-| Does a stale price index reach the real figure? | `tests/unit/test_cpi_staleness.py` |
-| What does a whole tuple cost, end to end? | `tests/worked_examples/test_full_round_trip.py` |
-| Are all three seams really anchored? | `tests/unit/test_chaining_refusals.py` |
-| Is the benchmark the same figure it ranks? | `tests/contract/test_the_hurdle_is_a_tuple.py` |
-| Is a new instrument, route, tax class and jurisdiction data-only? | `tests/contract/test_h1_data_only.py` |
-| Does the ramp difference reach the holding? | `tests/unit/test_two_streams_two_outcomes.py` |
-| What does a bond declared as its payments pay? | `tests/worked_examples/test_enumerated_schedule.py` |
-| Do the two declaration forms really agree? | `tests/golden/test_enumerated_matches_generative.py` |
-| Does a payment's declared label move a figure? | `tests/unit/test_payment_label_is_load_bearing.py` |
-| What does a premium at purchase do? | `tests/worked_examples/test_enumerated_premium.py` |
-| Can the day count reach an amount? | `tests/contract/test_day_count_reaches_no_amount.py` |
-| Is anything inferred that should be declared? | `tests/contract/test_nothing_is_inferred.py` |
-| Does any layer know there are two forms? | `tests/contract/test_no_layer_knows_the_form.py` |
-| What is still uncovered? | `docs/REQUIRED_TESTS.md` |
-
 ## 31. A bond declared as the payments it will make
 
 ### 31.1 Why there are two forms and not one
@@ -3607,6 +3531,82 @@ The property this buys is asserted end to end by
 and a tuple on a transcription of that bond's own computed schedule produce equal figures and
 tie in the ranking, differing only in identity, provenance, the stated exclusions, the
 conventions statement and the causation detail prose.
+
+## 32. Where to look next
+
+| question | file |
+| --- | --- |
+| Is the schedule right? | `tests/worked_examples/test_ovdp_schedule.py` |
+| Is the reinvestment right? | `tests/worked_examples/test_coupon_reinvestment.py` |
+| Are the day counts right? | `tests/worked_examples/test_day_count.py` |
+| What does a whole run produce? | `tests/golden/ovdp_synthetic_a.golden.txt` |
+| Does the ledger conserve? | `tests/invariants/test_ledger_conservation.py` |
+| What does a loss year cost if I do not file it? | `tests/worked_examples/test_loss_carryforward.py` |
+| What does each basis method actually consume? | `tests/worked_examples/test_four_lot_methods.py` |
+| When does the tax money leave? | `tests/worked_examples/test_tax_payment.py` |
+| What happens if the cash is not there? | `tests/unit/test_insufficient_cash.py` |
+| Can a figure hide which method produced it? | `tests/contract/test_method_is_never_implicit.py` |
+| Is an unsettled reading of the law visible on the figure? | `tests/contract/test_unsettled_is_labelled.py` |
+| Is the run reproducible? | `tests/invariants/test_determinism.py` |
+| Does the mark survive? | `tests/contract/test_provenance_propagation.py` |
+| Is a new instrument really data-only? | `tests/contract/test_data_only_extensibility.py` |
+| Does the ramp cost differ by stream? | `tests/worked_examples/test_two_streams.py` |
+| Is deployable capacity honest? | `tests/unit/test_deployable_capacity.py` |
+| Does a monthly cap bind, and is the excess reported? | `tests/worked_examples/test_monthly_cap.py` |
+| Is anything silently clamped? | `tests/invariants/test_no_silent_clamping.py` |
+| Does the ledger agree with the comparison? | `tests/invariants/test_cost_execute_agreement.py` |
+| What is a dollar income worth for tax? | `tests/worked_examples/test_official_rate_base.py` |
+| What happens on a date the publisher skipped? | `tests/unit/test_official_rate_refusals.py` |
+| Is the tax rate kept apart from the trading rate? | `tests/contract/test_the_rate_you_are_taxed_at.py` |
+| What does the war ending change? | `tests/worked_examples/test_regime_transition.py` |
+| Can an assumption be mistaken for an observation? | `tests/unit/test_transition_is_an_assumption.py` |
+| Which comparisons can the declared registry support? | `tests/worked_examples/test_coverage_table.py` |
+| Which observation should I make next? | `tests/unit/test_coverage_deficits.py` |
+| Does the audit agree with what costing actually does? | `tests/invariants/test_coverage_costing_agreement.py` |
+| Can a cost figure leak into the coverage report? | `tests/contract/test_coverage_no_figures.py` |
+| What does a chain nobody declared end to end cost? | `tests/worked_examples/test_composed_arithmetic.py` |
+| Does a composed round trip need a declared way out? | `tests/worked_examples/test_composed_exit_chain.py` |
+| Do two hops over one card share its limit? | `tests/worked_examples/test_composed_pool.py` |
+| Is the search a search rather than a router? | `tests/invariants/test_composition_search.py` |
+| Could enumeration order reach the output? | `tests/invariants/test_composition_order.py` |
+| Is a chain costed by the same function as a route? | `tests/contract/test_composed_same_costing.py` |
+| Is the declared graph what I think it is? | `tests/golden/route_graph_wartime.mmd` |
+| What does a destination with no way out look like? | `tests/golden/route_graph_normalized.mmd` |
+| What does one costed route look like? | `tests/golden/costed_path_p2p.mmd` |
+| Is there a second number-rendering rule? | `tests/contract/test_diagram_one_number_rule.py` |
+| Do the marks survive the picture? | `tests/contract/test_diagram_marks.py` |
+| Can a hostile venue name break a diagram? | `tests/unit/test_diagram_escaping.py` |
+| What does a seeded lot realise on disposal? | `tests/worked_examples/test_seeded_disposal.py` |
+| Does a guessed cost reach the tax figure? | `tests/contract/test_estimated_basis_propagates.py` |
+| Do the seeded ledgers still conserve? | `tests/invariants/test_ledger_conservation.py` |
+| Do the three goal modes agree? | `tests/invariants/test_goal_mode_consistency.py` |
+| Is the goal arithmetic right? | `tests/worked_examples/test_goal_arithmetic.py` |
+| What happens when a goal cannot be met? | `tests/unit/test_goal_feasibility.py` |
+| Which rate applied, and when does a run stop? | `tests/worked_examples/test_rate_schedule_straddle.py` |
+| Can two tax classes on one instrument collide? | `tests/worked_examples/test_two_tax_classes.py` |
+| What does relying on the legal floor cost? | `tests/worked_examples/test_fund_liquidity.py` |
+| What survives the spread and the tax? | `tests/worked_examples/test_declared_yield.py` |
+| What happens when the peg's ceiling binds? | `tests/worked_examples/test_pegged_distribution.py` |
+| Can a fund be asked for a Sharpe ratio? | `tests/contract/test_assumption_driven_refusal.py` |
+| Is the deflation arithmetic right? | `tests/worked_examples/test_deflation_arithmetic.py` |
+| What happens when prices fall? | `tests/worked_examples/test_falling_prices.py` |
+| Is the subtraction approximation really absent? | `tests/contract/test_no_subtraction_approximation.py` |
+| What does a CPI gap do to a real figure? | `tests/unit/test_cpi_coverage.py` |
+| Can an assumption be mistaken for an observation? | `tests/contract/test_two_figures_never_blend.py` |
+| Does a stale price index reach the real figure? | `tests/unit/test_cpi_staleness.py` |
+| What does a whole tuple cost, end to end? | `tests/worked_examples/test_full_round_trip.py` |
+| Are all three seams really anchored? | `tests/unit/test_chaining_refusals.py` |
+| Is the benchmark the same figure it ranks? | `tests/contract/test_the_hurdle_is_a_tuple.py` |
+| Is a new instrument, route, tax class and jurisdiction data-only? | `tests/contract/test_h1_data_only.py` |
+| Does the ramp difference reach the holding? | `tests/unit/test_two_streams_two_outcomes.py` |
+| What does a bond declared as its payments pay? | `tests/worked_examples/test_enumerated_schedule.py` |
+| Do the two declaration forms really agree? | `tests/golden/test_enumerated_matches_generative.py` |
+| Does a payment's declared label move a figure? | `tests/unit/test_payment_label_is_load_bearing.py` |
+| What does a premium at purchase do? | `tests/worked_examples/test_enumerated_premium.py` |
+| Can the day count reach an amount? | `tests/contract/test_day_count_reaches_no_amount.py` |
+| Is anything inferred that should be declared? | `tests/contract/test_nothing_is_inferred.py` |
+| Does any layer know there are two forms? | `tests/contract/test_no_layer_knows_the_form.py` |
+| What is still uncovered? | `docs/REQUIRED_TESTS.md` |
 
 ---
 

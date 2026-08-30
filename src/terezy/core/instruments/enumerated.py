@@ -322,8 +322,13 @@ def _units_retired(payment: ScheduledPayment, *, principal: float, quantity: flo
     is a bond redeemed above par. A schedule returning 1 050.00 against a declared face of
     1 000.00 repays the whole of each unit and realises a gain; measured against face it
     would retire 1.05 units of every 1 held, which is not a bond -- it is arithmetic run
-    past the thing it was describing. Face value is what the redemption is compared *with*
-    (FR-025), never what it is divided by.
+    past the thing it was describing.
+
+    ⚙ Face value is not what a repayment is divided by, and since FR-025 was amended it is
+    not what a **purchase** is compared with either -- that is
+    `terms.principal_returned`, which this denominator now comes from. The two readings
+    were separate for one commit and the review found the day they disagreed; there is one
+    call now, and this note used to cite FR-025 for a role face value no longer plays in it.
 
     ⚙ **Arithmetic over declared amounts, not an inference.** It reads no position in the
     list and no relative size: a repayment is a repayment because the declaration says so

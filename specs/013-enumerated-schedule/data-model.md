@@ -59,17 +59,23 @@ them, and a file that supplies one fails on the unrecognised field (SC-019).
 terms: BondTerms | EnumeratedTerms
 ```
 
-This one line is FR-002's mechanism for **five of the six** terms. Every existing
+This one line is FR-002's mechanism for the terms **only one form declares**. Every existing
 `declaration.terms.issue_date`, `.coupon_rate`, `.periodicity`, `.business_day_rule` and
 `.maturity_date` stops type-checking, and `mypy --strict` enumerates those sites — the type
 checker, not a reviewer.
 
-⚙ **`.day_count` is the exception, and it is the one FR-011a cares most about**: both forms
-carry one, so a sealed module reading `declaration.terms.day_count` directly type-checks and
-silently stops asking the declaration. Nothing in the toolchain objects. That gap is closed
-by an assertion instead — `tests/contract/test_no_layer_knows_the_form.py` forbids the read
-inside the seal — and it is recorded here because the union's promise reads as total and is
-not.
+⚙ **It reaches five of `BondTerms`' seven fields, and the two it does not are the exceptions
+that matter.** `day_count` and `face_value` are declared by **both** forms, so a sealed
+module reading either directly type-checks and silently stops asking the declaration, and
+nothing in the toolchain objects. `face_value` is not hypothetical: reading it in
+`core/results/project.py` **was** the F2 defect, a premium measured against the nominal face
+of a partly-repaid issue. Both gaps are closed by assertion instead —
+`tests/contract/test_no_layer_knows_the_form.py` forbids either read inside the seal, and
+`core/instruments/terms.py` offers `day_count_of`, `face_value_of` and `principal_returned`
+to ask instead. Recorded here because the union's promise reads as total and is not.
+
+(`provenance` is shared too and is deliberately unsealed: it is the citation rather than a
+term, and a results module reading it is what makes a figure traceable.)
 
 ### `AmountsAsDeclared` — `core/primitives/conventions.py`
 

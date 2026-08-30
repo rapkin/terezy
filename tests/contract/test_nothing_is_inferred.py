@@ -13,18 +13,29 @@ Five derivations, each a one-line temptation in a loader:
 4. computing a **coupon rate** from an amount and an interval;
 5. inferring a **coverage window** from where a published list happens to begin.
 
-**What these scans do not catch, measured rather than assumed** (2026-08-30). The
-derivation walk reads assignments, annotated assignments, augmented assignments and
-**keyword arguments** -- the last being how a value actually reaches a frozen record here.
-It does not read a walrus, a tuple target, or a value computed in one function and returned
-into the field by another; and it keys on the field's *name*, so a derivation assigned to
-``rate`` and passed on as ``coupon_rate`` is invisible. ``LAST_OR_LARGEST`` misses
-``max(payments, key=attrgetter("amount"))``. None of these is closed, and the reason is
-worth stating: each costs a whole-program dataflow to catch, and what actually keeps the
-door shut is that nothing needs to walk through it -- the coupon rate is a *declared* field
-of one form and absent from the other, so there is no site that wants one. These scans are
-the second lock, not the first, and a lock whose limits are written down is a lock; one that
-reads as complete is a promise.
+**What these scans do not catch, measured rather than assumed** (2026-08-30; re-measured
+after a review found the list naming four of at least nine). The derivation walk reads
+assignments, annotated assignments, augmented assignments and **keyword arguments** -- the
+last being how a value actually reaches a frozen record here. Every one of these is missed,
+probed rather than reasoned about:
+
+* a walrus, a tuple target, a ``for`` target, a ``with ... as`` binding, a comprehension
+  target, and a parameter default ``def f(coupon_rate=a / b)``;
+* a dict splat, ``Record(**{"coupon_rate": a / b})`` -- the only one of them with a
+  plausible loader shape;
+* a value computed in one function and returned into the field by another;
+* and, because the walk keys on the field's **name**, a quotient assigned to ``rate`` and
+  passed on as ``coupon_rate``.
+
+``LAST_OR_LARGEST`` likewise misses ``max(payments, key=attrgetter("amount"))``.
+
+None is closed, and the reason is worth stating rather than leaving as an omission: each
+costs a whole-program dataflow to catch, and what actually keeps the door shut is that
+nothing needs to walk through it -- ``coupon_rate`` is a *declared* field of one form and
+absent from the other, and ``covers_from`` is required wherever it exists, so no consumer
+has a reason to derive either. These scans are the second lock, not the first. A lock whose
+limits are written down is a lock; one that reads as complete is a promise, and this
+paragraph opened with *measured rather than assumed* while listing under half of them.
 
 ⚙ **The fourth is here for a second reason** (FR-003c). A coupon rate derived from a day
 count, one coupon amount and the spacing between two coupons yields an extrapolated issue

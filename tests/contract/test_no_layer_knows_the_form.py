@@ -46,6 +46,7 @@ from pathlib import Path
 import pytest
 
 from terezy.core.instruments import registry
+from terezy.core.instruments import terms as instrument_terms
 from tests import source_scan
 
 pytestmark = pytest.mark.contract
@@ -140,36 +141,83 @@ def test_the_scan_would_catch_a_module_that_learned_the_form(tmp_path: Path) -> 
     ), "asking a declaration a question both forms answer must stay permitted (FR-011a)"
 
 
-READS_A_SHARED_TERM = re.compile(r"terms\.day_count(?!_of)\b")
-"""The one generative-term read the type checker cannot catch, because both forms carry it.
+READS_A_SHARED_TERM = re.compile(r"terms\.(?:day_count|face_value)(?!_of)\b")
+"""The reads the type checker cannot catch, because **both** forms declare the field.
 
-Reading ``declaration.terms.day_count`` type-checks against either form, so nothing in the
-toolchain objects -- and the site has silently stopped asking the declaration, which is what
-FR-011a requires of it. ``day_count_of`` is the only permitted spelling inside the seal,
-and the lookahead is what lets ``instrument_terms.day_count_of(...)`` through -- it ends in
-the same characters.
+``BondTerms`` and ``EnumeratedTerms`` share three fields. Two of them are *terms*:
+
+* ``day_count`` -- a convention of computation, which every figure that annualises needs;
+* ``face_value`` -- the redemption amount a unit is declared to repay.
+
+Reading either through ``declaration.terms`` type-checks against both forms, so nothing in
+the toolchain objects and the site has silently stopped asking the declaration, which is
+what FR-011a requires of it. ``day_count_of`` and ``face_value_of`` are the only permitted
+spellings inside the seal, and the lookahead is what lets them through -- they end in the
+same characters.
+
+⚙ **``face_value`` is here because the read was real, not hypothetical.** Until the fix
+round, ``core/results/project.py`` read ``declaration.terms.face_value`` directly under a
+docstring justifying it in exactly these words -- *both forms state one and mean the same
+thing by it* -- and that read **is** defect F2: it measured a purchase against the nominal
+face and reported a discount of everything a previous holder had already been repaid. The
+read was removed and the seal then closed over the *other* shared term only, which would
+have let F2 walk back in past every gate.
+
+⚙ **``provenance`` is the third shared field and is deliberately not sealed.** It is the
+citation rather than a term: it means the same thing in both forms, carries no form-specific
+reading, and a results module reading it is what makes a figure traceable -- ``_at_purchase``
+reads it on purpose.
 """
 
 
-def test_no_sealed_module_reads_the_one_term_both_forms_carry() -> None:
+def test_no_sealed_module_reads_a_term_both_forms_carry() -> None:
     offenders = {
         path.relative_to(SOURCE_ROOT).as_posix()
         for path in _sealed_files()
         if READS_A_SHARED_TERM.search(source_scan.executable_source(path))
     }
     assert not offenders, (
-        "a sealed module reads a declaration's day count directly instead of asking for it "
-        f"(FR-011a): {offenders}. It type-checks against both forms, which is exactly why "
-        "the union does not catch it -- ask `instrument_terms.day_count_of` instead"
+        "a sealed module reads a term both declaration forms carry directly instead of "
+        f"asking for it (FR-011a): {offenders}. It type-checks against either form, which "
+        "is exactly why the union does not catch it -- ask `instrument_terms.day_count_of` "
+        "or `face_value_of`, and for what a *purchase* is measured against, "
+        "`principal_returned`"
     )
 
 
-def test_that_scan_would_catch_the_read_it_forbids() -> None:
-    assert READS_A_SHARED_TERM.search("year_fraction = conventions.day_count(terms.day_count)\n")
-    assert READS_A_SHARED_TERM.search("if declaration.terms.day_count == '30/360':\n")
-    assert not READS_A_SHARED_TERM.search(
-        "year_fraction = conventions.day_count(instrument_terms.day_count_of(terms))\n"
-    ), "asking the declaration must stay permitted (FR-011a)"
+@pytest.mark.parametrize(
+    "planted",
+    [
+        "year_fraction = conventions.day_count(terms.day_count)\n",
+        "if declaration.terms.day_count == '30/360':\n",
+        # The F2 read, verbatim from `project.py` before the fix round removed it.
+        "at_face = money.scale_sourced(declaration.terms.face_value, holding.quantity)\n",
+        "currency = declaration.terms.face_value.currency\n",
+    ],
+)
+def test_that_scan_would_catch_the_read_it_forbids(planted: str) -> None:
+    assert READS_A_SHARED_TERM.search(planted), planted
+
+
+@pytest.mark.parametrize(
+    "asking",
+    [
+        "year_fraction = conventions.day_count(instrument_terms.day_count_of(terms))\n",
+        "face = instrument_terms.face_value_of(declaration.terms)\n",
+        "back = instrument_terms.principal_returned(terms, bought_on=holding.purchased_on)\n",
+    ],
+)
+def test_and_would_let_the_question_through(asking: str) -> None:
+    """Asking the declaration must stay permitted (FR-011a), and the two ``_of`` spellings
+    end in the same characters as the fields they replace -- which is what the lookahead is
+    for and what would otherwise make this seal unusable."""
+    assert not READS_A_SHARED_TERM.search(asking), asking
+
+
+def test_the_questions_the_refusal_names_all_exist() -> None:
+    """A refusal that names an answer which does not exist sends a reader nowhere."""
+    for question in ("day_count_of", "face_value_of", "principal_returned"):
+        assert hasattr(instrument_terms, question), question
 
 
 def test_the_instrument_layer_is_deliberately_outside_the_seal() -> None:

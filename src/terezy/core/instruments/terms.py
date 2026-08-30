@@ -151,6 +151,29 @@ def payments_after(
     return tuple(payment for payment in payments if payment.on > bought_on)
 
 
+def face_value_of(terms: DeclaredTerms) -> Money:
+    """The redemption amount one unit is declared to repay. Both forms state one.
+
+    ⚙ **It is not what a purchase is measured against, and that is the whole reason this
+    function carries a warning rather than being a bare passthrough.** Measuring a premium
+    against face is defect F2, found on this branch: a schedule that has already repaid part
+    of its principal reports a discount of everything the previous holder was repaid.
+    :func:`principal_returned` is the question a purchase asks; this one answers *what does
+    the paper say a unit redeems at*, which is a different question and has a narrower set of
+    honest uses -- none of them arithmetic on what somebody paid.
+
+    It exists so the two forms stay symmetric and so a sealed module has something to ask
+    instead of reading the field: ``face_value`` is one of two **terms** both forms declare,
+    so a direct read of it type-checks and no gate objects (see
+    ``tests/contract/test_no_layer_knows_the_form.py``).
+    """
+    match terms:
+        case BondTerms() | EnumeratedTerms():
+            return terms.face_value
+        case _:  # pragma: no cover -- mypy proves this unreachable
+            assert_never(terms)
+
+
 def principal_returned(terms: DeclaredTerms, *, bought_on: date) -> Money:
     """What one unit returns as principal to a buyer who acquires it on this date.
 
