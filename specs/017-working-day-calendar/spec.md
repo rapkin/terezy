@@ -522,11 +522,11 @@ without a calendar.
   that gap was established by deleting the exemption line and **counting** the four errors it
   produced, rather than by reasoning about what the gate ought to do.
   **SATISFIED ON `main` BY `e6def2f`, and the delta was empty.** No calendar directory existed
-  yet, so the change is a guard rather than a repair. Measured 2026-08-30, the survey FR-006b
-  asks for found 124 numberless tables already exempt from both checks; the widened predicate
-  reaches 29 of them — every `[[verification_task]]`, whose `searched_on` dates a search rather
-  than an observation, and three fund identity tables — and all three key names are exempted
-  with their reasons, leaving the finding set over the shipped tree byte-identical. The fund
+  yet, so the change is a guard rather than a repair. Measured 2026-08-30, the survey FR-006b asks
+  for found the widened predicate reaching **29** tables the old one did not: every
+  `[[verification_task]]`, whose `searched_on` dates a search rather than an observation, and
+  three fund identity tables. All three key names are exempted with their reasons, leaving the
+  finding set over the shipped tree byte-identical. The fund
   one is a **recorded hole rather than a judgement**: `terminates_on` and `subscription_cutoff`
   are `fund_terms` observations that `[instrument]` has nowhere to cite, since `FundTable` is
   `extra="forbid"`.
