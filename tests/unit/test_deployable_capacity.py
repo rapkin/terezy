@@ -171,6 +171,23 @@ class TestTheTwoStatesCannotBeMixedUpByACaller:
         with pytest.raises(ValueError, match="names the tax treatment"):
             capacity_module.deployable(_stream(treatment="synthetic_scheme"), charged=None)
 
+    def test_a_charge_struck_on_another_amount_raises(self) -> None:
+        """Every term of such a capacity is internally consistent, which is the danger."""
+        charged = _charged(gross=GROSS)
+        with pytest.raises(ValueError, match="was struck on"):
+            capacity_module.deployable(
+                _stream(treatment=charged.scheme_id, gross=GROSS + 1.0), charged=charged
+            )
+
+    def test_a_charge_struck_in_another_currency_raises(self) -> None:
+        charged = _charged(gross=GROSS)
+        stream = dataclasses.replace(
+            _stream(treatment=charged.scheme_id),
+            amount=Money(GROSS, Currency.USD, STREAM_SOURCES),
+        )
+        with pytest.raises(ValueError, match="was struck on"):
+            capacity_module.deployable(stream, charged=charged)
+
 
 class TestADeclaredTreatmentIsAppliedAndShown:
     """FR-015's arithmetic, hand-computed, with every term of it reachable."""
