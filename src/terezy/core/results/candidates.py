@@ -117,6 +117,23 @@ class Question:
     recorded is the *fact* of which world was searched.
     """
 
+    subjects: frozenset[str]
+    """The declared instrument ids this question is about (015 FR-008).
+
+    Enumeration considers these and no others, so a question about two of nine is never
+    answered about nine. **Resolved ids**, never a group word: what a group is belongs to 015,
+    and it is a fact about ``data/groups.toml`` and the labels instruments carry rather than
+    about a candidate.
+
+    Not inferred from :attr:`plans`, because FR-003 refuses an instrument with no plan precisely
+    so that *not asked about* and *forgotten* stay distinguishable. An id here that the registry
+    does not declare yields nothing and raises nothing; 015 FR-009 reports it by name one layer
+    up, because a word the owner wrote and a curated typo are different mistakes.
+
+    A ``frozenset`` because the field is a membership test: an order here would be a second,
+    silent ordering beside :func:`terezy.core.decision.candidates._ordered`'s.
+    """
+
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class PlannedCandidate:
