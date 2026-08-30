@@ -72,7 +72,12 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
-from terezy.core.results.composed import CompositionRefused, Enumeration, SegmentBound
+from terezy.core.results.composed import (
+    CompositionRefused,
+    Enumeration,
+    SegmentBound,
+    Unaskable,
+)
 from terezy.core.results.coverage import Destination, SpendableEndpoint
 from terezy.core.routes.legs import Route, RouteDirection
 from terezy.core.routes.path import Candidate, ComposedPath, FundingPath
@@ -366,6 +371,7 @@ def _refusal(
     """
     if bound.max_segments < 1:
         return CompositionRefused(
+            case=Unaskable.BOUND_ADMITS_NOTHING,
             reason=(
                 f"the declared segment bound is {bound.max_segments}, which admits no candidate "
                 "at all -- not even a declared route. A bound of 1 is how composition is turned "
@@ -377,6 +383,7 @@ def _refusal(
         )
     if direction == "exit" and not spendable:
         return CompositionRefused(
+            case=Unaskable.NO_SPENDABLE_ENDPOINT,
             reason=(
                 "no spendable endpoint was declared, so an exit chain has nowhere to end. "
                 "Enumerating none would say the registry declares no way out, when what is "
@@ -390,6 +397,7 @@ def _refusal(
         destination.currency,
     ):
         return CompositionRefused(
+            case=Unaskable.ALREADY_ARRIVED,
             reason=(
                 f"stream {stream.id!r} already arrives as {destination.currency.value} at venue "
                 f"{destination.venue_id!r}, which is the destination asked for. There is nothing "

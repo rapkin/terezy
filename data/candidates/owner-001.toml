@@ -1,0 +1,45 @@
+# How many candidates one enumeration may produce before it refuses.
+#
+# **Owner policy, not an observation** — the same class as `data/composition/`, `data/objectives/`
+# and `data/strategies/`, and the reason there are no citation keys here. How many options this
+# person is willing to have enumerated is a fact about him, not about the corridors. Every
+# *number* that describes the world lives on a leg, in `data/routes/`, cited.
+#
+# **Per-owner, beside `data/composition/`**, not at the root beside curated `venues.toml`. The
+# two files are different knobs on the same search and are separate because they are answered
+# differently: the bound says how far ONE candidate may reach, and this says how many the whole
+# enumeration may hold before enumeration is the wrong primitive.
+#
+# **No default, deliberately.** A registry with no declared ceiling fails at load naming this
+# file and this field, by the rule that refuses a default staleness threshold (002 FR-028) and
+# a default segment bound (004 FR-006): a forgotten line must never read as a chosen policy. A
+# permissive default would let a registry that has outgrown enumeration keep enumerating, and a
+# run that took minutes would be indistinguishable from one the owner asked for.
+#
+# **Exceeding it REFUSES; it never truncates** (014 FR-019). A truncated candidate set answers a
+# different question from the one asked, with an audit trail that looks impeccable — and every
+# later pass (dominance, an objective, a stability check) would be computed over a silently
+# partial set, which is the false optimum Principle I names as this project's reason for
+# existing. `max_candidates = 0` is not a way to switch enumeration off; it would refuse every
+# question with the registry blameless, and it is refused at load as a broken declaration.
+#
+# `scripts/check_provenance.py` therefore does not scan this directory — but **not** because it
+# is absent from `SOURCED_DIRS`. That gate is fail-closed over the whole data tree: a directory
+# in neither list is an error, never a blind spot. `candidates` is named in `EXEMPT_DIRS` **with
+# this reason recorded beside it**, which is the only way a directory is permitted to go
+# unscanned. If a number that describes the world ever has to live here, it moves to a sourced
+# directory instead of the exemption widening to cover it.
+#
+# **Why a thousand.** Two orders of magnitude above what the declarations connect today, and
+# below what the same declared bound of three would produce on a dense graph of the seven venues
+# already declared — so a registry that densifies trips this line and the owner hears about it,
+# rather than waiting on a search with more machinery than subject. It is a stated preference and
+# nothing computes it; raising it costs enumeration time and lowers nothing, lowering it refuses
+# questions the registry can answer, and either way the ceiling in force travels with the
+# refusal that names it.
+
+[owner]
+id = "owner-001"
+
+[candidates]
+max_candidates = 1000

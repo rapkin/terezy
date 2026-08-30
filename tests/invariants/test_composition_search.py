@@ -31,7 +31,12 @@ from itertools import pairwise, permutations
 import pytest
 from hypothesis import given, settings
 
-from terezy.core.results.composed import CompositionRefused, Enumeration, SegmentBound
+from terezy.core.results.composed import (
+    CompositionRefused,
+    Enumeration,
+    SegmentBound,
+    Unaskable,
+)
 from terezy.core.results.coverage import Destination
 from terezy.core.routes import compose
 from terezy.core.routes.legs import Route, RouteDirection
@@ -260,6 +265,7 @@ class TestTheQuestionsTheSearchRefusesToAnswer:
             spendable=world.spendable,
         )
         assert isinstance(result, CompositionRefused)
+        assert result.case is Unaskable.BOUND_ADMITS_NOTHING
         assert "0" in result.reason
 
     def test_an_exit_question_with_nowhere_declared_spendable_is_refused(self) -> None:
@@ -276,6 +282,7 @@ class TestTheQuestionsTheSearchRefusesToAnswer:
             spendable=frozenset(),
         )
         assert isinstance(result, CompositionRefused)
+        assert result.case is Unaskable.NO_SPENDABLE_ENDPOINT
         assert "spendable" in result.reason
 
     def test_a_destination_the_money_already_arrived_at_is_refused(self) -> None:
@@ -295,6 +302,7 @@ class TestTheQuestionsTheSearchRefusesToAnswer:
             spendable=world.spendable,
         )
         assert isinstance(result, CompositionRefused)
+        assert result.case is Unaskable.ALREADY_ARRIVED
         assert result.stream_id == world.stream.id
 
     def test_nothing_connecting_is_an_empty_enumeration_and_not_a_refusal(self) -> None:
@@ -312,6 +320,53 @@ class TestTheQuestionsTheSearchRefusesToAnswer:
         )
         assert isinstance(result, Enumeration)
         assert result.candidates == ()
+
+    def test_every_declared_case_is_produced_by_a_site_that_can_actually_fire(self) -> None:
+        """014 FR-014a, and the half the three tests above cannot assert between them.
+
+        Each of those pins one site to one case. None of them would notice a *fourth* member
+        added to :class:`Unaskable` with nothing constructing it -- a caller matching
+        exhaustively would then carry an arm that can never be taken, and a reader would
+        believe `compose` refuses a question it has never refused.
+
+        The three refusals are rebuilt here rather than shared with those tests, because a
+        fixture shared with the thing it checks proves only that one source self-consistent.
+        """
+        world = _two_hop_world()
+        refusals = [
+            compose.compose(
+                routes=world.routes,
+                stream=world.stream,
+                destination=world.destination,
+                direction="inbound",
+                regime_id=REGIME,
+                bound=SegmentBound(max_segments=0),
+                spendable=world.spendable,
+            ),
+            compose.compose(
+                routes=world.routes,
+                stream=world.stream,
+                destination=world.destination,
+                direction="exit",
+                regime_id=REGIME,
+                bound=SegmentBound(max_segments=3),
+                spendable=frozenset(),
+            ),
+            compose.compose(
+                routes=world.routes,
+                stream=world.stream,
+                destination=Destination(
+                    venue_id=world.stream.arrives_at, currency=world.stream.amount.currency
+                ),
+                direction="inbound",
+                regime_id=REGIME,
+                bound=SegmentBound(max_segments=3),
+                spendable=world.spendable,
+            ),
+        ]
+        refused = [item for item in refusals if isinstance(item, CompositionRefused)]
+        assert len(refused) == len(refusals), refusals
+        assert {item.case for item in refused} == set(Unaskable)
 
 
 def _two_hop_world() -> CompositionRegistry:
