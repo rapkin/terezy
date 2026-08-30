@@ -230,12 +230,12 @@ US6 a second regime is data.
 
 ## Phase 9 — Close
 
-- [ ] **T036** Full gates, each **read by exit code**: `ruff check` and `ruff format --check`,
+- [x] **T036** Full gates, each **read by exit code**: `ruff check` and `ruff format --check`,
   `mypy`, `pytest --cov`, `lint-imports`, `check_provenance.py`, `check_methodology_refs.py`.
   Any golden whose recorded input digest moves — the coverage golden is the expected one, from
   the two new venues — is regenerated deliberately with the changed lines quoted in the commit
   message.
-- [ ] **T037** `/condense` over the branch diff: one fact, one place, in prose and in code,
+- [x] **T037** `/condense` over the branch diff: one fact, one place, in prose and in code,
   re-reading every comment the branch touched.
 - [ ] **T038** `/code-review` over the diff that will actually land, iterating until clean.
 
@@ -321,3 +321,50 @@ Recorded because the next feature to touch this area will meet the same things.
   optional field defaults to `None` and nothing else, because `None` is *the key was not
   written* while `[]` is a value. The first draft used `= []` to get better error messages;
   the lists are required or `| None` now, and the messages come from the loader instead.
+
+---
+
+## What the review found, and it is the half worth reading
+
+Two independent reviewers over the same diff, one of them mutation-proving every finding.
+Twenty-four in total; the gates were green throughout, which is the point.
+
+**Three were wrong numbers waiting to happen.**
+
+- An **interpreted row labelled its charge with the row's scheme** while computing under the
+  reading's. The two are the same string in shipped data, so nothing showed it — until a
+  verdict flip, the operation this feature advertises as cheap, produced *the tax owed* at
+  18% + 5% labelled as the ФОП scheme. Two fields now, and the resolver refuses an interpreted
+  row whose reading names a scheme declared only for a labelled what-if: the prohibition was
+  enforced at the stream's door and open at the verdict's.
+- A scheme charging **no rate component** — legal, since a scheme may declare only periodic
+  ones — emitted an **uncited, unmarked zero** total beside a base that was marked. A sum of
+  nothing rests on nothing.
+- `deployable` accepted a charge computed **under another scheme, or for another crediting
+  destination**, and reported it as this stream's capacity. Every term of such a figure is
+  internally consistent, which is what makes it undetectable.
+
+**Eight tests passed for the wrong reason**, and every one was repaired rather than
+supplemented. The two shapes worth carrying forward:
+
+- **`str(error)` begins with `tmp_path`, and pytest names `tmp_path` after the test.** So
+  `assert "amount" in str(error)` inside `test_an_amount_on_a_rate_component_...` passes on
+  the directory name alone. Every loading assertion on this branch now reads `field_path`,
+  `problem` or `remedy`.
+- **Fixtures that default several identities to one string make a whole class of mutation
+  unwritable *to test*, not unwritable to make.** All three scheme ids that meet at `apply`
+  defaulted to `synthetic_scheme`, so an engine charging every reading under its row's scheme
+  passed the entire suite — and would have charged every shipped unsettled reading at 5% + 1%
+  where the law says 18% + 5%.
+
+**A test caught a defect in the branch's own legal transcription.**
+`test_no_legal_value_from_memory.py` asserts that every guillemet-quoted passage in the two
+new data directories appears verbatim in `spec.md`. It found a consolidated абзац assembled
+from two laws' texts — a quotation that appears in no source as written. That is the
+mechanical form of Principle I's *no legal value from memory*, and it is worth having on any
+feature whose values come from one already-reviewed document.
+
+⚙ **The one measurement that decided which repairs were real**: every fix was checked by
+mutating `src/` in a scratchpad copy and confirming the named test goes red. Seven mutations
+that previously passed the suite are now caught. Two repairs looked complete and were not
+until that check was run.
