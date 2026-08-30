@@ -55,7 +55,7 @@ import pathlib
 import re
 import sys
 
-SPEC_REFS = {"4.3", "4.4", "4.7", "4.8"}
+SPEC_REFS = {"4.3", "4.4", "4.7", "4.8", "4.10"}
 text = pathlib.Path("docs/METHODOLOGY.md").read_text()
 sections = {m.group(1) for m in re.finditer(r"^## (\d+)\.", text, re.M)}
 subs = {m.group(1) for m in re.finditer(r"^### (\d+\.\d+)", text, re.M)}

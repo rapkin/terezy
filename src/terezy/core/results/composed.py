@@ -20,6 +20,7 @@ invented number the first time it was reused.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 
 from terezy.core.routes.path import Candidate
 
@@ -88,6 +89,33 @@ class Enumeration:
     """
 
 
+class Unaskable(Enum):
+    """Which of the three questions could not be asked, as a value rather than as a sentence.
+
+    A closed set beside :attr:`CompositionRefused.reason` rather than instead of it: the words
+    are for a reader and this is for a caller, and the two halves fail differently. A sentence
+    edited for clarity must not change what any caller does, and today it would -- the only way
+    to tell the three apart was to search the text for a substring.
+
+    The distinction is worth a field because the remedies are **opposite**.
+    :attr:`BOUND_ADMITS_NOTHING` and :attr:`NO_SPENDABLE_ENDPOINT` are about the *question* and
+    are answered by changing it; :attr:`ALREADY_ARRIVED` is about one
+    ``(stream, destination)`` pair and is answered by nothing at all, because the money is
+    already where it was wanted. A caller that read the second as the first would report a
+    corridor nobody declared where the registry is complete.
+    """
+
+    BOUND_ADMITS_NOTHING = "bound_admits_nothing"
+    """The declared segment bound is below one, so no candidate is admissible at all."""
+
+    NO_SPENDABLE_ENDPOINT = "no_spendable_endpoint"
+    """An exit enumeration was asked for and the owner has declared nowhere money counts as
+    spent, so a chain has nowhere to end."""
+
+    ALREADY_ARRIVED = "already_arrived"
+    """The stream already arrives, in the currency asked for, at the destination asked for."""
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class CompositionRefused:
     """No enumeration was produced, and this says why. Returned *instead of* an
@@ -101,6 +129,10 @@ class CompositionRefused:
     **It is not "no candidates".** That answer is an :class:`Enumeration` with an empty tuple,
     and conflating the two would report a registry gap where the registry is fine.
     """
+
+    case: Unaskable
+    """Which of the three fired. See :class:`Unaskable` for why this is a field and not a
+    reading of :attr:`reason`."""
 
     reason: str
     """Why no enumeration was produced, in the output's own words -- naming the input that did

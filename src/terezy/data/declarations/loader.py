@@ -99,6 +99,7 @@ from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance, SourceRef
 from terezy.core.primitives.staleness import ObservationKind
+from terezy.core.results.candidates import CandidateCeiling
 from terezy.core.results.composed import SegmentBound
 from terezy.core.results.coverage import SpendableEndpoint
 from terezy.core.results.goal import Goal
@@ -3097,6 +3098,51 @@ def composition_from_file(path: Path) -> tuple[str, SegmentBound]:
             "chain that many",
         )
     return owner_id, SegmentBound(max_segments=file.composition.max_segments)
+
+
+# ---------------------------------------------------------------------------
+# 014-candidates: how many candidates one enumeration may produce
+# ---------------------------------------------------------------------------
+#
+# `composition`'s reading, unchanged: an owner's own policy, no citation read and none
+# expected, and **no default** -- a forgotten line must never read as a chosen one.
+#
+# The one refusal this loader owns is `max_candidates < 1`. A ceiling of zero admits nothing
+# at all, so every run would refuse with the registry blameless; unlike the segment bound,
+# there is no reading of a small number here that turns the feature off, because refusing is
+# what exceeding the ceiling already does.
+
+CANDIDATES_TABLE: Final = "candidates"
+"""Root table of a candidate-ceiling file, and the prefix of every field path in one."""
+
+
+def candidates_from_file(path: Path) -> tuple[str, CandidateCeiling]:
+    """One ``data/candidates/<owner>.toml`` as its owner id and the declared ceiling.
+
+    Returns the owner id beside the ceiling rather than folding it into the record, on
+    :func:`composition_from_file`'s reasoning: the ceiling is a number and the owner is a
+    property of the *file*.
+    """
+    document = read_document(path)
+    file = _validate(schema.CandidatesFile, document, path)
+    owner_id = _require_text(
+        path,
+        f"{OWNER_TABLE}.id",
+        file.owner.id,
+        "the candidate ceiling is one person's policy about his own registry, and it is "
+        "resolved against that person's income streams (Principle VII)",
+    )
+    if file.candidates.max_candidates < 1:
+        raise DeclarationError(
+            path,
+            f"{CANDIDATES_TABLE}.max_candidates",
+            f"declares {file.candidates.max_candidates}, and an enumeration that may hold no "
+            "candidate at all refuses every question -- including the ones the registry answers "
+            "perfectly well. A ceiling is a statement about when enumeration has stopped being "
+            "the right primitive, not a way to switch it off.",
+            "write the largest number of candidates you are willing to have enumerated",
+        )
+    return owner_id, CandidateCeiling(max_candidates=file.candidates.max_candidates)
 
 
 # ---------------------------------------------------------------------------

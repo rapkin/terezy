@@ -59,6 +59,7 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.primitives.currency import Currency
     from terezy.core.primitives.money import Money
     from terezy.core.primitives.staleness import ObservationKind
+    from terezy.core.results.candidates import CandidateCeiling
     from terezy.core.results.composed import SegmentBound
     from terezy.core.results.coverage import SpendableEndpoint
     from terezy.core.results.goal import Goal
@@ -1719,6 +1720,132 @@ def composition_from_data_root(
             root, base_currency=base_currency, scenario_id=scenario_id
         ),
         composition_file=declared[0],
+    )
+
+
+# ---------------------------------------------------------------------------
+# 014-candidates: how many candidates one enumeration may produce
+# ---------------------------------------------------------------------------
+#
+# One new declaration and the same relation `composition` cannot check about itself: **the
+# owner owns the streams the ceiling is resolved with**. How many options this person is shown
+# is a fact about *this* person (Principle VII), and because exceeding the ceiling refuses
+# rather than truncates, somebody else's number would decide whether he is shown any at all.
+
+CANDIDATES_DIR = "candidates"
+"""Where the per-owner candidate ceiling lives under a data root.
+
+**Per-owner, beside `composition/`**, for that directory's reason unchanged (014 research D9).
+"""
+
+
+@dataclass(frozen=True, slots=True)
+class CandidateDeclarations:
+    """Every declaration an enumeration needs: the composition set, plus the candidate ceiling.
+
+    A record beside :class:`CompositionDeclarations` rather than more fields on it: a data root
+    with no ceiling must still be able to compose candidates, and folding the ceiling in would
+    make every existing caller require a file this feature invented.
+    """
+
+    composition: CompositionDeclarations
+    """The routes, venues, streams, spendable endpoints, regimes and the segment bound -- one
+    owner's registry, already checked against itself."""
+
+    ceiling: CandidateCeiling
+    """The declared maximum number of candidates one enumeration may produce (FR-019)."""
+
+    candidates_file: Path
+    """Which file declared the ceiling. Not decoration: it is what lets a later failure still
+    name the file after the TOML has been discarded."""
+
+
+def _check_candidates_owner(
+    owner_id: str,
+    streams: Mapping[str, IncomeStream],
+    *,
+    path: Path,
+) -> None:
+    """The ceiling must belong to the owner whose streams it is resolved with (Principle VII).
+
+    Only one half of :func:`_check_spendable_owner`'s check, and the other half is not missing:
+    the input is an already-resolved :class:`CompositionDeclarations`, so no run holding a
+    second owner's streams can reach here. A guard that cannot fire reads as protection.
+    """
+    owners = sorted({stream.owner_id for stream in streams.values()})
+    if owner_id not in owners:
+        raise DeclarationError(
+            path,
+            f"{loader.OWNER_TABLE}.id",
+            f"declares owner {owner_id!r}, but the income streams this ceiling is resolved "
+            f"with belong to {owners}. How many options a search may produce is one person's "
+            "stated policy, and exceeding the ceiling refuses rather than truncates -- so a "
+            "ceiling belonging to somebody else would decide whether this owner is shown any "
+            "options at all.",
+            f"name one of {owners}, or resolve this ceiling against that owner's streams",
+        )
+
+
+def resolve_candidates(
+    *, composition: CompositionDeclarations, candidates_file: Path
+) -> CandidateDeclarations:
+    """The composition declarations plus a resolved ceiling, checked against their owner.
+
+    Takes the resolved :class:`CompositionDeclarations` rather than the paths that produced
+    them, on :func:`resolve_composition`'s own reasoning: the ceiling is checked against the
+    *streams*, which are already resolved by then, and re-resolving them here would give a data
+    root two chances to disagree with itself.
+    """
+    owner_id, ceiling = loader.candidates_from_file(candidates_file)
+    _check_candidates_owner(owner_id, composition.coverage.ramp.streams, path=candidates_file)
+    return CandidateDeclarations(
+        composition=composition, ceiling=ceiling, candidates_file=candidates_file
+    )
+
+
+def candidates_from_data_root(
+    root: Path, *, base_currency: Currency, scenario_id: str | None
+) -> CandidateDeclarations:
+    """Every declaration an enumeration needs, under one data root.
+
+    :func:`composition_from_data_root`'s families, plus ``candidates/*.toml``.
+
+    **An empty directory is an error, not an absent ceiling.** FR-019 refuses a default, and the
+    absence of the file is the absence of the policy: reading it as *no limit* would let a
+    registry that has outgrown enumeration keep enumerating, which is the one thing the ceiling
+    exists to report.
+
+    Exactly one file: two ceilings cannot both be in force, and merging them -- by taking
+    either, or the smaller, or the larger -- would let one person decide whether the other is
+    shown any options at all.
+    """
+    declared = sorted((root / CANDIDATES_DIR).glob("*.toml"))
+    if not declared:
+        raise DeclarationError(
+            root / CANDIDATES_DIR,
+            "",
+            f"contains no *.toml declarations. An empty {CANDIDATES_DIR} directory is reported "
+            "rather than read as 'enumerate as many as it takes': FR-019 refuses a default, and "
+            "the absence of the file is the absence of the policy. A run that quietly enumerated "
+            "without limit would hide exactly the finding the ceiling exists to deliver.",
+            "check the data root, or declare how many candidates one enumeration may produce",
+        )
+    if len(declared) > 1:
+        raise DeclarationError(
+            root / CANDIDATES_DIR,
+            "",
+            f"holds {len(declared)} candidate-ceiling declarations "
+            f"({', '.join(path.name for path in declared)}), and this engine resolves one. "
+            "There is exactly one owner today (spec Assumptions), and two ceilings cannot both "
+            "be in force: merging them would let one person decide whether the other is shown "
+            "any options at all.",
+            "keep one file per data root until multi-owner support lands",
+        )
+    return resolve_candidates(
+        composition=composition_from_data_root(
+            root, base_currency=base_currency, scenario_id=scenario_id
+        ),
+        candidates_file=declared[0],
     )
 
 
