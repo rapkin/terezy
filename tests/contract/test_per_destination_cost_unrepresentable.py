@@ -34,6 +34,16 @@ and not a cost of reaching one; banning the word outright would push such helper
 shapes. The patterns below name the ways a *destination* is spelt, and the return-type scan
 closes the gap from the other end.
 
+*A tax charge is not an access cost.* Feature 012's ``core.tax.scheme.apply`` takes a
+**crediting destination** -- where income is credited for the purpose of deciding which
+reading of the law applies -- which 012 FR-024a keeps deliberately distinct from the routing
+origin every funding route starts at. It prices no corridor and carries no ``sent`` or
+``arrived``, so the triple would be the wrong key: demanding it there is the same error as
+demanding it on ``Holding.cost``, recorded below. The accommodation is a **name**, not an
+exemption -- that parameter is called ``credited_to``, and its charge record's lines are
+``lines`` rather than ``components`` -- so this scan's spellings stay exactly as strict as
+they were for anything that does price a corridor.
+
 *A declaration record may name a destination -- a computed cost may not.* ``Route`` is a
 corridor from one venue to another; naming its ``destination`` is what a route **is**, and a
 ``Leg`` naming its ``to_venue`` likewise. What FR-008 forbids is a *cost figure* keyed by a
