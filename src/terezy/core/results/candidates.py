@@ -247,9 +247,8 @@ class CandidateSet:
     FR-024, so a candidate set never looks cleaner than the registry behind it. The outcomes'
     own marks stay on the outcomes, where 010 already puts them.
 
-    ⚙ **A known gap, recorded rather than closed:** 010's refusal records carry a reason and no
-    provenance, so *which* unverified value caused a particular drop is not traceable from the
-    drop itself. Closing it is a change to 010's union and is the ``provenance-on-a-refusal``
+    A known gap: 010's refusal records carry no provenance, so *which* unverified value caused a
+    particular drop is not traceable from the drop. That is the ``provenance-on-a-refusal``
     future entry.
     """
 

@@ -1743,10 +1743,9 @@ CANDIDATES_DIR = "candidates"
 class CandidateDeclarations:
     """Every declaration an enumeration needs: the composition set, plus the candidate ceiling.
 
-    ⚙ **A record beside :class:`CompositionDeclarations` rather than more fields on it**, on the
-    precedent that record itself sets against :class:`CoverageDeclarations`. A data root with no
-    ceiling must still be able to compose candidates, and folding the ceiling into the bound
-    would make every existing caller require a file this feature invented.
+    A record beside :class:`CompositionDeclarations` rather than more fields on it: a data root
+    with no ceiling must still be able to compose candidates, and folding the ceiling in would
+    make every existing caller require a file this feature invented.
     """
 
     composition: CompositionDeclarations
@@ -1769,10 +1768,9 @@ def _check_candidates_owner(
 ) -> None:
     """The ceiling must belong to the owner whose streams it is resolved with (Principle VII).
 
-    ⚙ **Only one half of :func:`_check_spendable_owner`'s check is here, and the other half is
-    not missing**, for the reason :func:`_check_composition_owner` records: this function takes
-    an already-resolved :class:`CompositionDeclarations`, which has been through the refusal of
-    a run holding a second owner's streams.
+    Only one half of :func:`_check_spendable_owner`'s check, and the other half is not missing:
+    the input is an already-resolved :class:`CompositionDeclarations`, so no run holding a
+    second owner's streams can reach here. A guard that cannot fire reads as protection.
     """
     owners = sorted({stream.owner_id for stream in streams.values()})
     if owner_id not in owners:
@@ -1817,10 +1815,9 @@ def candidates_from_data_root(
     registry that has outgrown enumeration keep enumerating, which is the one thing the ceiling
     exists to report.
 
-    ⚙ **Exactly one file, and a second is refused by name**, on features 003's and 004's
-    precedent. Two ceilings cannot both be in force, and merging them -- by taking either, or
-    the smaller, or the larger -- would let one person decide whether the other is shown any
-    options.
+    Exactly one file: two ceilings cannot both be in force, and merging them -- by taking
+    either, or the smaller, or the larger -- would let one person decide whether the other is
+    shown any options at all.
     """
     declared = sorted((root / CANDIDATES_DIR).glob("*.toml"))
     if not declared:

@@ -1,19 +1,10 @@
 """SC-014 and FR-024: a candidate set never looks cleaner than the registry behind it.
 
-Principle I's propagation rule applied to the set rather than to a figure. Enumeration reads
-two sourced families -- the legs of every route it puts in a candidate, and the venue quote of
-every access entry it considers -- and both marks travel onto the set with the merged staleness
-verdict beside them.
+Walked rather than sampled: a sampled assertion passes while one sourced family is silently
+dropped, and a dropped mark is this project's top-severity defect.
 
-**Walked rather than sampled.** The first test does not check that *a* source arrived; it checks
-that every source behind every route and every quote the walk touched is on the set. A sampled
-assertion passes while one family is silently dropped, and a dropped mark is the top-severity
-defect this project names.
-
-⚙ **The half this deliberately does not close.** 010's refusal records carry a reason and no
-provenance, so *which* unverified value caused a particular drop is not traceable from the drop
-itself. That is the `provenance-on-a-refusal` future entry -- a change to 010's union, made and
-reviewed there -- and the set-level mark here is what keeps the set honest in the meantime.
+What these do not cover is the per-drop half -- 010's refusal records carry no provenance --
+which is the `provenance-on-a-refusal` future entry.
 """
 
 from __future__ import annotations
@@ -41,7 +32,6 @@ def _set(as_of: date = fixtures.AS_OF) -> CandidateSet:
 
 
 def test_every_source_behind_every_route_and_quote_the_walk_read_is_on_the_set() -> None:
-    """FR-024, walked over both families rather than sampled from either."""
     registries = fixtures.shipped()
     enumerated = _set()
     expected: set[object] = set()
@@ -62,19 +52,13 @@ def test_every_source_behind_every_route_and_quote_the_walk_read_is_on_the_set()
 
 
 def test_the_shipped_registry_marks_its_set_unverified() -> None:
-    """Every shipped access quote is a synthetic fixture with an empty `verified_on`, so a set
-    built over it reports the mark. A set that came back clean would be claiming a verification
-    nobody performed."""
+    """A set that came back clean would claim a verification nobody performed."""
     assert prov.is_unverified(_set().provenance)
 
 
 def test_a_value_aged_past_its_kinds_threshold_reports_stale() -> None:
-    """The other half of the verdict, and it moves with `as_of` alone.
-
-    Asked far enough in the future that every declared threshold is passed, so the assertion
-    does not rest on which particular kind expires first -- a fact the declarations own and may
-    change.
-    """
+    """Asked far enough ahead that every declared threshold is passed, so the assertion does
+    not rest on which kind expires first -- a fact the declarations own and may change."""
     fresh = _set()
     aged = _set(as_of=fixtures.AS_OF + timedelta(days=20 * 365))
     assert not staleness.any_stale(fresh.staleness)
@@ -83,8 +67,7 @@ def test_a_value_aged_past_its_kinds_threshold_reports_stale() -> None:
 
 
 def test_the_verdict_assesses_the_sources_the_provenance_carries() -> None:
-    """A verdict over a narrower set than the mark would report *fresh* for a source nobody
-    aged, which is the strict reading `staleness_of_sources` exists to preserve."""
+    """A verdict narrower than the mark would report *fresh* for a source nobody aged."""
     enumerated = _set()
     assessed = set(enumerated.staleness.assessed)
     carried = {source.id for source in enumerated.provenance.sources if source.kind}

@@ -24,12 +24,10 @@ The arithmetic a reader can check, worked on the shipped registry as loaded on 2
   candidates = 9 x (1 x 1 x 1)  +  9 x (0 x 1 x 1)  =  9
   pairs yielding none = 18 - 9 = 9, every one of them contract_usd
 
-**The nine that yield nothing are a finding about the registry, not about this feature.** The
-only declared corridors that turn dollars into hryvnia -- `fop_usd_to_monobank_uah` and
-`binance_p2p_to_monobank` -- are declared in the `exit` direction, and an inbound enumeration
-cannot see them. Whether the remedy is a declared inbound corridor or a different reading of
-direction is feature 003's audit to answer; what must not happen is that a comparison quietly
-contains nine options and nothing says the other nine were never asked.
+The nine that yield nothing are a finding about the registry: its two USD-to-UAH corridors are
+declared in the `exit` direction, and an inbound enumeration cannot see them. The remedy is
+feature 003's audit to answer; what must not happen is a comparison quietly holding nine
+options with nothing saying the other nine were never asked.
 """
 
 from __future__ import annotations
@@ -78,11 +76,8 @@ class TestTheShippedRegistryYieldsWhatItsDeclarationsConnect:
         )
 
     def test_the_dollar_stream_contributes_nothing_and_says_why(self) -> None:
-        """The finding this feature exists to make visible, asserted by **record**.
-
-        Every one of them is `NothingConnects` on the way in -- an absent corridor, whose remedy
-        is a declaration -- and not `NothingNeedsToConnect`, whose remedy is nothing at all.
-        """
+        """Asserted by record: an absent corridor, whose remedy is a declaration, and not
+        money already where it was wanted, whose remedy is nothing at all."""
         pairs = _set().no_candidate
         assert {pair.stream_id for pair in pairs} == {fixtures.CONTRACT}
         assert all(isinstance(pair.why, NothingConnects) for pair in pairs), pairs
@@ -91,7 +86,6 @@ class TestTheShippedRegistryYieldsWhatItsDeclarationsConnect:
         }
 
     def test_the_two_populations_partition_the_pairs(self) -> None:
-        """FR-009's first identity, on the shipped numbers."""
         enumerated = _set()
         pairs_with_a_candidate = {
             (candidate.key.instrument_id, candidate.key.stream_id)

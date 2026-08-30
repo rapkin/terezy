@@ -6,16 +6,12 @@ instrument's `proceeds_to` is itself a declared spendable endpoint, the money ha
 back out: there are no exit legs to walk and none to charge for, and the candidate exists and is
 evaluated like any other.
 
-**This is not this feature's decision to make.** It is feature 003's FR-002 (owner decision,
-2026-08-23) and `EXIT_BY_IDENTITY` is where it already lives; what this feature adds is a caller
-that uses the solution rather than merely citing it. `compose` cannot produce it -- `exit_chain_of`
-states in as many words that it never returns the sentinel -- which is exactly why FR-002 needs
-a carve-out and why FR-004's prohibition is on the **default** rather than on a way out that
-happens to have no segments.
+It is feature 003's FR-002 (owner decision, 2026-08-23), and `compose` cannot produce the
+sentinel -- which is why FR-002 needs a carve-out here and why FR-004's prohibition is on the
+**default** rather than on a way out with no segments.
 
-**Unreachable in the shipped registry**, where every `proceeds_to` is `inzhur` and the only
-spendable endpoint is `monobank_uah`. So the fixture moves one instrument's proceeds, and the
-first test proves the move is what did it.
+The shipped registry reaches this nowhere, so the fixture moves one instrument's proceeds and
+the first test proves the move is what did it.
 """
 
 from __future__ import annotations

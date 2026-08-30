@@ -3,23 +3,9 @@
 014 FR-019: the ceiling is **declared data with no default**, on the precedent of 004's segment
 bound and 002's staleness threshold -- *a forgotten line must never read as a chosen policy*.
 
-The construction is ``tests/contract/test_composition_declaration.py``'s, restated rather than
-imported so neither battery can break the other: **every broken variant is a mutation of the
-shipped file**, so each case also proves ``data/candidates/owner-001.toml`` contains what the
-test thinks it contains. A battery written against an invented template keeps passing after the
-shipped format changes underneath it.
-
-**The distinction this battery is about is not the same as the segment bound's.** A bound of 1
-is a *choice* -- composition off. There is no equivalent choice here: a ceiling of 1 is a
-registry that may produce one candidate, and a ceiling of 0 admits nothing at all and is a
-broken registry. What the two declarations share is the refusal of a **missing** line, and that
-is the half asserted here.
-
-**The last tests are the provenance gate, confirmed rather than assumed.** How many candidates
-this person will let a search produce is his own policy; there is no observed value here for a
-source to vouch for. The gate is fail-closed over the data tree, so being absent from
-``SOURCED_DIRS`` is an *error* rather than an exemption -- ``candidates`` goes unscanned only
-because it is named in ``EXEMPT_DIRS`` with its reason. Both halves are asserted.
+Every broken variant is a mutation of the shipped file, so each case also proves
+``data/candidates/owner-001.toml`` contains what the test thinks it does. A battery written
+against an invented template keeps passing after the shipped format changes underneath it.
 """
 
 from __future__ import annotations
@@ -47,12 +33,8 @@ CEILING = DATA_ROOT / "candidates" / "owner-001.toml"
 
 
 def _is_comment(line: str) -> bool:
-    """Whether a line is a TOML comment.
-
-    The shipped fixture argues for its own number in prose that quotes its own field names, so a
-    naive text search would edit the explanation instead of the declaration -- leaving the file
-    valid and the test asserting an error that never came.
-    """
+    """The shipped fixture argues for its number in prose quoting its own field names, so a
+    naive search would edit the explanation and leave the file valid."""
     return line.lstrip().startswith("#")
 
 
@@ -144,11 +126,8 @@ def test_the_shipped_ceiling_admits_the_shipped_registry() -> None:
 
 
 def test_a_missing_max_candidates_is_refused(tmp_path: Path) -> None:
-    """FR-019's whole content: a forgotten line must never read as a chosen policy.
-
-    A permissive default would let a registry that has outgrown enumeration keep enumerating,
-    and a run that took minutes would be indistinguishable from a run the owner asked for.
-    """
+    """A permissive default would let a registry that has outgrown enumeration keep going, and
+    a run that took minutes would look like one the owner asked for."""
     path = _written(tmp_path, _drop_line(CEILING.read_text(encoding="utf-8"), "max_candidates"))
     with pytest.raises(DeclarationError) as caught:
         loader.candidates_from_file(path)
@@ -282,12 +261,8 @@ def _provenance_module() -> ModuleType:
 
 
 def test_the_candidates_directory_is_exempt_by_name_and_never_sourced() -> None:
-    """Both halves, because the gate is fail-closed and only one of them is an exemption.
-
-    Absent from ``SOURCED_DIRS`` is an **error** under a fail-closed gate, not a way to be out
-    of scope. If this directory ever has to move into ``SOURCED_DIRS``, a number describing the
-    world leaked into a policy file, and that is the finding this test exists to make loud.
-    """
+    """Both halves: under a fail-closed gate, absent from ``SOURCED_DIRS`` is an error rather
+    than a way to be out of scope. A move into it means a world-describing number leaked."""
     module: Any = _provenance_module()
     assert "candidates" not in module.SOURCED_DIRS
     assert "candidates" in module.EXEMPT_DIRS
