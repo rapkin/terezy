@@ -2756,16 +2756,12 @@ def schemes_from_data_root(root: Path, *, base_currency: Currency) -> SchemeDecl
         schemes[declared.id] = declared
         scheme_files[declared.id] = path
 
-    official_rates = {
-        scheme.jurisdiction_id: (
-            _official_rate_for(
-                timing[scheme.jurisdiction_id][1], timing[scheme.jurisdiction_id][0], rates
-            )
-            if scheme.jurisdiction_id in timing
-            else None
+    official_rates: dict[str, OfficialRateSeries | None] = {}
+    for scheme in schemes.values():
+        found = timing.get(scheme.jurisdiction_id)
+        official_rates[scheme.jurisdiction_id] = (
+            None if found is None else _official_rate_for(found[1], found[0], rates)
         )
-        for scheme in schemes.values()
-    }
 
     destinations: dict[tuple[str, str], CreditingDestination] = {}
     destination_files: dict[tuple[str, str], Path] = {}
