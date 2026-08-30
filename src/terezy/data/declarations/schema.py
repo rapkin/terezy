@@ -544,8 +544,8 @@ class TaxFile(BaseModel):
 # rather than bent -- a ``= None`` default is permitted **only** where the core field it
 # feeds is itself ``X | None`` and ``None`` means *the owner declared nothing*, never
 # where it would stand in for a number, a date or a policy. So ``minimum``,
-# ``monthly_cap``, ``income_tax_rate_pct`` and ``partner_route`` may be omitted, because
-# ``Leg.minimum``, ``Leg.monthly_cap``, ``IncomeStream.income_tax_rate`` and
+# ``monthly_cap``, ``tax_scheme`` and ``partner_route`` may be omitted, because
+# ``Leg.minimum``, ``Leg.monthly_cap``, ``IncomeStream.tax_scheme`` and
 # ``Route.partner_route`` are all "``None`` means none was declared" in the core; while
 # ``fee_pct``, ``verified_on``, ``staleness_days`` and ``policy`` have no default and a
 # file that omits one fails.
@@ -920,15 +920,31 @@ class StreamTable(BaseModel):
     """``monthly``, ``biweekly`` or ``semimonthly``."""
 
     arrives_at: str
-    """Venue id where the money lands. A route whose ``origin`` differs from this is a
-    mismatch, reported rather than assumed away."""
+    """Venue id where the money lands -- the **routing origin**. A route whose ``origin``
+    differs from this is a mismatch, reported rather than assumed away."""
 
-    income_tax_rate_pct: float | None = None
-    """Income tax withheld at source, as a **percentage**, or omitted.
+    credited_to: str
+    """Venue id where the income is credited for tax purposes -- the **tax event's
+    location**, and a different declared fact from :attr:`arrives_at` (012 FR-024a).
 
-    Omitting it means **the owner has not stated one**, which is a different claim from
-    stating zero: ``streams.deployable`` then returns ``IncomeTaxRateUndeclared``, which has
-    no net field at all, rather than a net figure that quietly equals the gross (FR-007).
+    Required, which is what makes *a declaration supplying only one fails at load* true in
+    both directions with one mechanism. Neither is defaulted from the other: they answer
+    different questions, and for the owner today they hold different values.
+    """
+
+    tax_scheme: str | None = None
+    """The id of the declared taxation scheme this income is under, or omitted.
+
+    Omitting it means **the owner has not named one**, which is a different claim from a
+    scheme that charges nothing: ``capacity.deployable`` then returns
+    ``TaxTreatmentUndeclared``, which has no net field at all, rather than a net figure that
+    quietly equals the gross (012 FR-016).
+
+    ⚙ **This is where the legal rates left per-owner data.** The retired
+    ``income_tax_rate_pct`` let a public legal fact about the Republic be written, uncited,
+    into a file whose citation exemption was argued for an owner's statement about himself.
+    What a stream declares now is *which regime he is in*; the regime's rates are curated and
+    cited in ``data/tax/schemes/``.
     """
 
     indexation: IndexationTable
@@ -2252,3 +2268,241 @@ class OfficialRateFile(BaseModel):
     no observation because no rate value may originate from an implementer's memory (FR-001),
     and every date asked of it refuses by name until the publisher's values are fetched.
     """
+
+
+# ---------------------------------------------------------------------------
+# 012-fop-group-3: the taxation scheme, and where income is credited
+# ---------------------------------------------------------------------------
+#
+# ⚙ **There is no `rate_pct` on a periodic component and no `amount` on a rate component,
+# and that absence is the mechanism.** A periodic obligation's trigger is a period elapsing
+# and its base is a statutory sum; a rate component's trigger is income arriving and its base
+# is a percentage. Under `extra="forbid"`, writing one as the other is an unrecognised field
+# rather than a case the loader has to remember to reject (012 FR-019).
+
+
+class ComponentRateTable(BaseModel):
+    """One ``[[scheme.rate_component.rate]]``: a dated rate with its own citation."""
+
+    model_config = STRICT
+
+    effective_from: str
+    """ISO date, inclusive, and exactly the date this entry's citation attests.
+
+    The one field in this feature where an agent's memory could put an invented legal fact
+    into a data file and leave every gate green. The levy this feature declares is the
+    sharpest case in the repository: its rate is one statute's and its commencement is
+    another's, so an entry citing the first for the second would carry a date its own source
+    contradicts.
+    """
+
+    rate_pct: float
+    """A percentage, divided by 100 exactly once at the loader, after the non-negative check
+    so the error quotes what the file wrote."""
+
+    note: str
+    kind: str
+    source: str
+    retrieved_on: str
+    verified_on: str
+
+
+class ComponentAmountTable(BaseModel):
+    """One ``[[scheme.periodic_component.amount]]``: a dated statutory sum."""
+
+    model_config = STRICT
+
+    effective_from: str
+    amount: float
+    currency: str
+    """Declared per entry rather than inherited from the scheme: a statutory sum is money and
+    money carries its currency, and inheriting one would let a scheme assessed in one
+    currency silently charge a sum stated in another."""
+
+    note: str
+    kind: str
+    source: str
+    retrieved_on: str
+    verified_on: str
+
+
+class DeclaredContextTable(BaseModel):
+    """A cited fact recorded on a component and deliberately **not** applied.
+
+    ``not_applied_because`` is required and non-empty. A provision declared beside a schedule
+    and silently ignored is indistinguishable from an oversight, and the whole point of
+    recording a termination conditioned on an event is that its absence must not read as a
+    claim that the charge is permanent (012 FR-008a).
+    """
+
+    model_config = STRICT
+
+    id: str
+    statement: str
+    not_applied_because: str
+    kind: str
+    source: str
+    retrieved_on: str
+    verified_on: str
+
+
+class RateComponentTable(BaseModel):
+    """``[[scheme.rate_component]]`` -- one separately named charge levied on the base."""
+
+    model_config = STRICT
+
+    id: str
+    name: str
+    """The name the law uses for it. What an output reports, because putting a charge under
+    another charge's name is a mislabelling no downstream reader could detect (012 FR-006)."""
+
+    rate: list[ComponentRateTable]
+    """Oldest first, no duplicate dates, never sorted -- all checked by the loader, which is
+    also where ``rate = []`` is refused naming the component."""
+
+    context: list[DeclaredContextTable] | None = None
+    """Cited facts recorded beside this schedule and deliberately not applied.
+
+    Omitted means **nothing is recorded**, which is the only other state there is: unlike a
+    schedule, there is no third reading between *nothing was declared* and *this is what was
+    declared*.
+    """
+
+
+class PeriodicComponentTable(BaseModel):
+    """``[[scheme.periodic_component]]`` -- one charge owed per elapsed period."""
+
+    model_config = STRICT
+
+    id: str
+    name: str
+    period: str
+    """``month``. A closed set resolved against the core, and closed at one member because
+    ``core.primitives.periods`` enumerates months and nothing else."""
+
+    amount: list[ComponentAmountTable]
+    context: list[DeclaredContextTable] | None = None
+
+
+class SchemeTable(BaseModel):
+    """``[scheme]`` -- the identity of one taxation scheme and everything it charges."""
+
+    model_config = STRICT
+
+    id: str
+    """Unique across ``data/tax/schemes/``; a collision is refused naming both files."""
+
+    name: str
+    jurisdiction: str
+    tax_currency: str
+    variant: str
+    """Which of the law's alternative rate sets this file declares (012 FR-002).
+
+    Named even where a scheme has one variant in this repository, so declaring the second is
+    a file rather than a schema change the day its rate is cited. The variant the owner is in
+    is a fact about him and lives in per-owner data; the rates of every variant are public
+    legal facts and live here.
+    """
+
+    reporting_cadence: str
+    declared_for: str
+    """``stream`` or ``reading``. A ``reading`` scheme exists only inside a labelled what-if
+    and may not be named by an income stream (012 FR-010a)."""
+
+    rate_component: list[RateComponentTable] | None = None
+    periodic_component: list[PeriodicComponentTable] | None = None
+    """Either may be omitted -- a scheme charging only rates declares no periodic component
+    and vice versa -- and omitting **both** is refused by the loader, which can say that a
+    scheme charging nothing at all is a file nobody meant to write."""
+
+
+class SchemeFile(BaseModel):
+    """A whole ``data/tax/schemes/<id>.toml``: one scheme."""
+
+    model_config = STRICT
+
+    scheme: SchemeTable
+
+
+class ReadingTable(BaseModel):
+    """``[[destination.reading]]`` -- one candidate treatment at a crediting destination."""
+
+    model_config = STRICT
+
+    id: str
+    label: str
+    """Which reading this is, in the words a reader will see beside the figure."""
+
+    scheme: str | None = None
+    """A declared scheme, or omitted. Exactly one of this and :attr:`uncomputable_because` is
+    declared, checked by the loader."""
+
+    recognised_on: str | None = None
+    """The **name** of the date this reading recognises income on -- a declared string, not a
+    date. Present exactly when :attr:`scheme` is.
+
+    Two readings of one destination can disagree about *when* income arises, and the caller
+    supplies what each name is worth. Nothing in the engine compares the name against a
+    literal, which is what keeps a second date name a data-only addition.
+    """
+
+    uncomputable_because: str | None = None
+    """Why this candidate cannot be computed here, in its own words.
+
+    A treatment needing a rate nobody declared is not computable and must not be computed --
+    and is also not thereby invisible, because an omitted reading is how a switch comes to
+    look complete when it is not. Declaring the reason rather than pointing at an undeclared
+    scheme is what keeps *an unresolvable reference fails at load* intact everywhere else.
+    """
+
+    departs_from_source: str | None = None
+    """Where this system deliberately computes something other than what the source does.
+
+    Rendered on the figure. A departure nothing reports is a departure that becomes a silent
+    absorption, which is the one thing a cited divergence may not become.
+    """
+
+    kind: str
+    source: str
+    retrieved_on: str
+    verified_on: str
+
+
+class DestinationTable(BaseModel):
+    """``[[destination]]`` -- one row of the normative crediting-destination table."""
+
+    model_config = STRICT
+
+    scheme: str
+    venue: str
+    verdict: str
+    """``interpreted`` or ``unsettled``. A declared word, so moving a verdict is one edit in
+    one file and never a source change."""
+
+    grounds: str
+    """The row's recorded judgement: why this verdict, on which source. Deciding whether a
+    source's proposition *reaches* a destination is not mechanical, and this is where that
+    judgement is written down once instead of being narrated in several places."""
+
+    resolution_path: str
+    """What closes the question. For an unsettled row it is what a reader must go and get."""
+
+    kind: str
+    source: str
+    retrieved_on: str
+    verified_on: str
+
+    reading: list[ReadingTable]
+    """Non-empty, checked by the loader: a row with no candidate says nothing about the
+    destination it names, which is what a missing row already says."""
+
+
+class DestinationFile(BaseModel):
+    """A whole ``data/tax/destinations/<jurisdiction>.toml``: the rows of one table."""
+
+    model_config = STRICT
+
+    destination: list[DestinationTable]
+    """Required with no default, on ``OfficialRateFile.observation``'s reading: a file that
+    forgot its rows and a file declaring it has none must not look alike, and an empty table
+    is written ``destination = []``."""

@@ -191,7 +191,8 @@ SALARY = IncomeStream(
     cadence="monthly",
     arrives_at=SALARY_VENUE,
     indexation=Indexation(policy="cpi", rate=None),
-    income_tax_rate=None,
+    credited_to=SALARY_VENUE,
+    tax_scheme=None,
 )
 """The hryvnia salary. ``amount`` is zero and ``income_tax_rate`` is ``None`` because both are
 honestly unstated: nothing in composition or costing reads either -- the amount to move is passed

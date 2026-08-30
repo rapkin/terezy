@@ -313,6 +313,7 @@ currency   = "UAH"
 amount     = 0.0
 cadence    = "monthly"
 arrives_at = "monobank_uah"
+credited_to = "monobank_uah"
 
   [stream.indexation]
   policy = "none"

@@ -84,7 +84,8 @@ def stream(stream_id: str, currency: Currency, arrives_at: str) -> IncomeStream:
         cadence="monthly",
         arrives_at=arrives_at,
         indexation=Indexation(policy="none", rate=None),
-        income_tax_rate=None,
+        credited_to=arrives_at,
+        tax_scheme=None,
     )
 
 

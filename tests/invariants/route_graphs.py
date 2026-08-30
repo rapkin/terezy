@@ -114,7 +114,8 @@ SALARY_UAH = IncomeStream(
     cadence="monthly",
     arrives_at=ORIGIN_VENUE,
     indexation=Indexation(policy="cpi", rate=None),
-    income_tax_rate=None,
+    credited_to=ORIGIN_VENUE,
+    tax_scheme=None,
 )
 """The hryvnia salary. The stream that has to cross the ramp to reach a dollar asset.
 
@@ -133,7 +134,8 @@ CONTRACT_USD = IncomeStream(
     cadence="monthly",
     arrives_at=ORIGIN_VENUE,
     indexation=Indexation(policy="none", rate=None),
-    income_tax_rate=None,
+    credited_to=ORIGIN_VENUE,
+    tax_scheme=None,
 )
 """The dollar contract income. The stream that needs no conversion at all, which is the
 whole of §4.2's structural point."""
@@ -870,7 +872,8 @@ COVERAGE_SALARY = IncomeStream(
     cadence="monthly",
     arrives_at=HOME_VENUE,
     indexation=Indexation(policy="cpi", rate=None),
-    income_tax_rate=None,
+    credited_to=HOME_VENUE,
+    tax_scheme=None,
 )
 COVERAGE_CONTRACT = IncomeStream(
     id="contract_usd",
@@ -879,7 +882,8 @@ COVERAGE_CONTRACT = IncomeStream(
     cadence="monthly",
     arrives_at=CONTRACT_VENUE,
     indexation=Indexation(policy="none", rate=None),
-    income_tax_rate=None,
+    credited_to=CONTRACT_VENUE,
+    tax_scheme=None,
 )
 COVERAGE_STREAMS: Mapping[str, IncomeStream] = {
     COVERAGE_SALARY.id: COVERAGE_SALARY,
@@ -1251,7 +1255,8 @@ def composition_registries(draw: st.DrawFn) -> CompositionRegistry:
             cadence="monthly",
             arrives_at=COMPOSE_ORIGIN,
             indexation=Indexation(policy="none", rate=None),
-            income_tax_rate=None,
+            credited_to=COMPOSE_ORIGIN,
+            tax_scheme=None,
         ),
         spendable=frozenset(
             {SpendableEndpoint(venue_id=COMPOSE_TARGET, currency=currencies[COMPOSE_TARGET])}

@@ -299,15 +299,15 @@ class TestTheShippedFilesLoad:
             "routes/monobank_to_binance_p2p.toml#route.leg[0]"
         }
 
-    def test_an_omitted_income_tax_rate_is_none_and_not_zero(self) -> None:
-        """FR-007's distinction, at the boundary where it is decided.
+    def test_an_omitted_tax_scheme_is_none_and_not_a_scheme_charging_zero(self) -> None:
+        """012 FR-016's distinction, at the boundary where it is decided.
 
-        The field is absent from the shipped file, so the core sees ``None`` -- *the owner
-        has not stated a rate* -- rather than ``0.0``, which would claim that nothing is
-        withheld.
+        The salary names no scheme, so the core sees ``None`` -- *the owner has not named a
+        treatment* -- rather than a scheme charging nothing, which would claim his
+        employment income is untaxed. The contract income names one.
         """
         streams = loader.streams_from_file(STREAMS)
-        assert [stream.income_tax_rate for stream in streams] == [None, None]
+        assert [stream.tax_scheme for stream in streams] == [None, "ua_fop_group_3_non_vat"]
         assert [stream.amount.amount for stream in streams] == [0.0, 0.0]
         assert streams[0].amount.currency is Currency.UAH
         assert streams[1].amount.currency is Currency.USD
@@ -576,7 +576,7 @@ class TestDuplicateIdentifiers:
         root = _root(tmp_path)
         _edit(
             root / "streams" / "owner-001.toml",
-            'id         = "contract_usd"',
+            'id          = "contract_usd"',
             'id         = "salary_uah"',
         )
         with pytest.raises(DeclarationError) as raised:
@@ -730,7 +730,7 @@ class TestUnknownDeclaredName:
         assert "inzhur" in raised.value.problem
 
     def test_an_unknown_cadence_names_the_known_ones(self, tmp_path: Path) -> None:
-        broken = _broken(tmp_path, STREAMS, 'cadence    = "monthly"', 'cadence    = "every_month"')
+        broken = _broken(tmp_path, STREAMS, 'cadence     = "monthly"', 'cadence    = "every_month"')
         with pytest.raises(DeclarationError) as raised:
             loader.streams_from_file(broken)
         _assert_names_file_and_field(
@@ -911,12 +911,14 @@ class TestAvailabilityWindows:
         )
 
 
-class TestStreamIndexationAndTaxRate:
-    """A stream's declared growth and withholding: converted once, and never invented.
+class TestStreamIndexationAndTaxTreatment:
+    """A stream's declared growth and its declared treatment: read once, never invented.
 
-    ``rate_pct`` and ``income_tax_rate_pct`` are the two ``_pct`` fields outside the routes,
-    so they are where "divided by 100 exactly once" is checked for the per-owner file -- and
-    where the difference between *declared zero* and *nobody said* is enforced (FR-007).
+    ``indexation.rate_pct`` is the one ``_pct`` field left in the per-owner file, so this is
+    where "divided by 100 exactly once" is checked for it -- and where the two venues of
+    012 FR-024a are checked to be read separately rather than one from the other. **No tax
+    rate is read here at all any more**: 012 moved every legal rate out of per-owner data and
+    into ``data/tax/schemes/``, where a citation is required.
     """
 
     def test_a_fixed_rate_indexation_with_no_rate_is_refused(self, tmp_path: Path) -> None:
@@ -949,15 +951,22 @@ class TestStreamIndexationAndTaxRate:
         assert indexation.policy == "fixed_rate"
         assert indexation.rate == 0.08
 
-    def test_a_declared_income_tax_rate_becomes_a_fraction(self, tmp_path: Path) -> None:
-        """A declared rate is a claim; ``0.0`` and absence are different claims (FR-007)."""
-        broken = _broken(
-            tmp_path,
-            STREAMS,
-            'cadence    = "monthly"',
-            'cadence    = "monthly"\nincome_tax_rate_pct = 23.0',
-        )
-        assert loader.streams_from_file(broken)[0].income_tax_rate == 0.23
+    def test_the_two_venues_are_read_separately_and_neither_is_inferred(self) -> None:
+        """012 FR-024a: the routing origin and the crediting destination are two facts.
+
+        The shipped contract stream is the case that makes the distinction bite -- routed
+        through Deel, credited to the ФОП account -- and reading one as the other would put
+        it under a different reading of the law.
+        """
+        salary, contract = loader.streams_from_file(STREAMS)
+        assert (salary.arrives_at, salary.credited_to) == ("monobank_uah", "monobank_uah")
+        assert (contract.arrives_at, contract.credited_to) == ("deel", "fop")
+
+    def test_a_stream_missing_its_crediting_destination_fails_at_load(self, tmp_path: Path) -> None:
+        broken = _broken(tmp_path, STREAMS, 'credited_to = "monobank_uah"', "")
+        with pytest.raises(DeclarationError) as raised:
+            loader.streams_from_file(broken)
+        assert "credited_to" in str(raised.value)
 
 
 class TestChannelSideForms:
@@ -1332,7 +1341,7 @@ class TestStreamArrivalVenue:
         root = _root(tmp_path)
         _edit(
             root / "streams" / "owner-001.toml",
-            'arrives_at = "monobank_uah"',
+            'arrives_at  = "monobank_uah"',
             'arrives_at = "monobank"',
         )
         with pytest.raises(DeclarationError) as raised:
@@ -1349,7 +1358,7 @@ class TestStreamArrivalVenue:
         # so pointing a USD stream at it is the mismatch under test.
         _edit(
             root / "streams" / "owner-001.toml",
-            'arrives_at = "deel"',
+            'arrives_at  = "deel"',
             'arrives_at = "inzhur"',
         )
         with pytest.raises(DeclarationError) as raised:
@@ -1480,7 +1489,7 @@ class TestTheBatteryCoversTheContract:
             "TestUnknownDeclaredName",
             "TestChannelExactlyWhenTheLegConverts",
             "TestAvailabilityWindows",
-            "TestStreamIndexationAndTaxRate",
+            "TestStreamIndexationAndTaxTreatment",
             "TestChannelSideForms",
             "TestOutOfRangeAndNegativeNumbers",
             "TestPartnerRoute",

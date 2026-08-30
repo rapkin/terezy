@@ -69,6 +69,7 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.tax import year as tax_year
     from terezy.core.tax.interface import TaxClass
     from terezy.core.tax.official_rate import OfficialRateSeries
+    from terezy.core.tax.scheme import CreditingDestination, TaxationScheme
     from terezy.data.declarations.loader import ScenarioDeclaration
 
 INSTRUMENTS_DIR = "instruments"
@@ -975,7 +976,12 @@ def _resolved_routes(
 def _resolved_streams(
     paths: Sequence[Path], venues: Mapping[str, Venue]
 ) -> tuple[dict[str, IncomeStream], dict[str, Path]]:
-    """Declared income streams by id, each landing at a venue that can hold its currency."""
+    """Declared income streams by id, each naming venues that can hold the stream's currency.
+
+    **Both venues are checked and neither is derived from the other** (012 FR-024a). They
+    answer different questions -- where a funding route starts, and where the income is
+    credited for tax -- and for the owner's contract income they hold different values.
+    """
     streams: dict[str, IncomeStream] = {}
     files: dict[str, Path] = {}
     for path in paths:
@@ -994,6 +1000,13 @@ def _resolved_streams(
                 venues,
                 path=path,
                 field_path=f"stream[{stream.id}].arrives_at",
+            )
+            _check_venue(
+                stream.credited_to,
+                stream.amount.currency,
+                venues,
+                path=path,
+                field_path=f"stream[{stream.id}].credited_to",
             )
             streams[stream.id] = stream
             files[stream.id] = path
@@ -2642,3 +2655,173 @@ def _official_rate_for(
             f"name a series quoting {declared.tax_currency.value} per another currency",
         )
     return found
+
+
+# ---------------------------------------------------------------------------
+# 012-fop-group-3: the taxation scheme, and where income is credited
+# ---------------------------------------------------------------------------
+#
+# Three relations a per-file validator structurally cannot check:
+#
+# **Two files declaring one scheme identity.** Whichever loaded second would win by directory
+# order, and every charge would rest on the other one.
+#
+# **A destination row's scheme and venue.** A row naming a scheme nobody declares computes
+# nothing; a row naming a venue nobody declares records a judgement about a place this model
+# cannot name.
+#
+# **A stream's declared treatment.** Whether it exists, and whether it is a scheme a stream is
+# allowed to name — a `reading` scheme exists only inside a labelled what-if.
+
+SCHEMES_DIR = "tax/schemes"
+"""Where declared taxation schemes live. A subdirectory of `tax/`, which `check_provenance`
+walks recursively and the rate-pack glob does not."""
+
+DESTINATIONS_DIR = "tax/destinations"
+"""Where the normative crediting-destination tables live."""
+
+
+@dataclass(frozen=True, slots=True)
+class SchemeDeclarations:
+    """Every declared taxation scheme and crediting destination under one data root."""
+
+    ramp: RampDeclarations
+    """The venues and streams the rows above are checked against, resolved once."""
+
+    schemes: Mapping[str, TaxationScheme]
+    """By their own declared id, never by file name or load order."""
+
+    destinations: Mapping[tuple[str, str], CreditingDestination]
+    """Keyed ``(scheme id, venue id)``. A missing key is not an error here: it is what
+    ``core.tax.scheme.apply`` refuses on, naming the destination and the scheme."""
+
+    scheme_files: Mapping[str, Path]
+    destination_files: Mapping[tuple[str, str], Path]
+
+
+def schemes_from_data_root(root: Path, *, base_currency: Currency) -> SchemeDeclarations:
+    """Every scheme and destination under a data root, with every reference checked.
+
+    Composes ``ramp_from_data_root`` rather than taking venues and streams as arguments,
+    because all three checks below need them and a caller assembling the pieces by hand is a
+    caller who can assemble two-thirds of them.
+
+    Sorted, so a run does not depend on the order a filesystem happens to return.
+    """
+    ramp = ramp_from_data_root(root, base_currency=base_currency)
+    schemes: dict[str, TaxationScheme] = {}
+    scheme_files: dict[str, Path] = {}
+    for path in sorted((root / SCHEMES_DIR).glob("*.toml")):
+        declared = loader.scheme_from_file(path)
+        if declared.id in schemes:
+            raise DeclarationError(
+                path,
+                f"{loader.SCHEME_TABLE}.id",
+                f"declares the scheme id {declared.id!r}, which "
+                f"{scheme_files[declared.id].name} already declares. Two schemes cannot share "
+                "an identity: whichever loaded second would win by directory order, and every "
+                "charge under that name would rest on the other one's components with nothing "
+                "in the output to say which.",
+                f"give one of {scheme_files[declared.id].name} and {path.name} a distinct id",
+            )
+        schemes[declared.id] = declared
+        scheme_files[declared.id] = path
+
+    destinations: dict[tuple[str, str], CreditingDestination] = {}
+    destination_files: dict[tuple[str, str], Path] = {}
+    for path in sorted((root / DESTINATIONS_DIR).glob("*.toml")):
+        for row in loader.destinations_from_file(path):
+            key = (row.scheme_id, row.venue_id)
+            if key in destinations:
+                raise DeclarationError(
+                    path,
+                    loader.DESTINATION_TABLE,
+                    f"records how {row.scheme_id!r} income credited at {row.venue_id!r} is "
+                    f"treated, which {destination_files[key].name} already records. One "
+                    "destination under one scheme has one verdict: two rows for it are not "
+                    "merged and neither wins, because whichever the lookup reached first "
+                    "would decide a legal position by file order.",
+                    f"delete the row from {destination_files[key].name} or from {path.name}",
+                )
+            _check_destination(row, schemes, ramp.venues, path=path, key=key)
+            destinations[key] = row
+            destination_files[key] = path
+
+    for stream in ramp.streams.values():
+        _check_treatment(stream, schemes, path=ramp.stream_files[stream.id])
+
+    return SchemeDeclarations(
+        ramp=ramp,
+        schemes=schemes,
+        destinations=destinations,
+        scheme_files=scheme_files,
+        destination_files=destination_files,
+    )
+
+
+def _check_destination(
+    row: CreditingDestination,
+    schemes: Mapping[str, TaxationScheme],
+    venues: Mapping[str, Venue],
+    *,
+    path: Path,
+    key: tuple[str, str],
+) -> None:
+    """A row's scheme, its venue and every reading's scheme, checked against what exists."""
+    field_prefix = f"{loader.DESTINATION_TABLE}[{key[0]}/{key[1]}]"
+    for named, field in (
+        (row.scheme_id, "scheme"),
+        *((reading.scheme_id, f"reading[{reading.id}].scheme") for reading in row.readings),
+    ):
+        if named is None:
+            continue
+        if named not in schemes:
+            raise DeclarationError(
+                path,
+                f"{field_prefix}.{field}",
+                f"names the taxation scheme {named!r}, which no file in data/{SCHEMES_DIR} "
+                "declares. A reading that cannot resolve its scheme computes nothing, and "
+                "there is no default scheme to fall back to: a charge under a scheme nobody "
+                f"declared is a legal figure nobody wrote down. Declared schemes: "
+                f"{sorted(schemes)}.",
+                f"declare {named!r} in data/{SCHEMES_DIR}, or name a scheme that exists",
+            )
+    if row.venue_id not in venues:
+        raise DeclarationError(
+            path,
+            f"{field_prefix}.venue",
+            f"records a judgement about income credited at {row.venue_id!r}, which "
+            "data/venues.toml does not declare. A row about a place this model cannot name "
+            "is a row nothing can ever reach.",
+            f"declare the venue, or name one of: {sorted(venues)}",
+        )
+
+
+def _check_treatment(
+    stream: IncomeStream, schemes: Mapping[str, TaxationScheme], *, path: Path
+) -> None:
+    """A stream's declared treatment: it must exist, and it must be one a stream may name."""
+    named = stream.tax_scheme
+    if named is None:
+        return
+    found = schemes.get(named)
+    if found is None:
+        raise DeclarationError(
+            path,
+            f"stream[{stream.id}].tax_scheme",
+            f"names the tax treatment {named!r}, which no file in data/{SCHEMES_DIR} "
+            "declares. There is no default treatment and none is substituted: a stream "
+            "charged under a scheme nobody declared would be charged at rates nobody wrote "
+            f"down. Declared schemes: {sorted(schemes)}.",
+            f"declare {named!r} in data/{SCHEMES_DIR}, or name a scheme that exists",
+        )
+    if found.declared_for != "stream":
+        raise DeclarationError(
+            path,
+            f"stream[{stream.id}].tax_scheme",
+            f"names {named!r}, which is declared for a reading rather than for a stream. "
+            "Such a scheme exists only inside a labelled what-if that says on its face it is "
+            "not the tax owed; naming it here would make its rates somebody's actual "
+            "treatment, which no source in this repository supports.",
+            'name a scheme whose declared_for is "stream"',
+        )

@@ -109,6 +109,7 @@ from terezy.core.routes.venues import Venue
 from terezy.core.scenarios.regimes import Regime, RegimeTransition
 from terezy.core.streams import streams
 from terezy.core.streams.streams import IncomeStream, Indexation
+from terezy.core.tax import scheme as scheme_module
 from terezy.core.tax import year as tax_year
 from terezy.core.tax.interface import TaxableEventKind, TaxClass
 from terezy.core.tax.official_rate import (
@@ -2138,10 +2139,14 @@ def streams_from_file(path: Path) -> tuple[IncomeStream, ...]:
     no currency field, because two fields stating one fact can disagree and a record with
     ``currency = UAH`` and an amount in dollars would typecheck while being nonsense.
 
-    An omitted ``income_tax_rate_pct`` becomes ``None``, which means *the owner has not
-    stated a rate* -- a different claim from stating zero, and the reason ``deployable``
-    returns a record with no net field at all rather than a net figure that quietly equals
-    the gross (FR-007).
+    An omitted ``tax_scheme`` becomes ``None``, which means *the owner has not named a
+    treatment* -- a different claim from a scheme that charges nothing, and the reason
+    ``capacity.deployable`` returns a record with no net field at all rather than a net
+    figure that quietly equals the gross (012 FR-016).
+
+    ``arrives_at`` and ``credited_to`` are both required and neither is derived from the
+    other. Whether each names a declared venue, and whether ``tax_scheme`` names a declared
+    scheme a stream is allowed to name, are relations and belong to the resolver.
     """
     document = read_document(path)
     declared = _validate(schema.StreamFile, document, path).stream
@@ -2198,21 +2203,15 @@ def _stream(path: Path, entry: schema.StreamTable) -> IncomeStream:
             "a stream lands at a named venue, and a route whose origin differs from it is a "
             "mismatch that is reported rather than assumed away",
         ),
-        indexation=_indexation(path, entry.indexation, field_prefix=f"{field_prefix}.indexation"),
-        income_tax_rate=(
-            None
-            if entry.income_tax_rate_pct is None
-            else _as_fraction(
-                _non_negative(
-                    path,
-                    f"{field_prefix}.income_tax_rate_pct",
-                    entry.income_tax_rate_pct,
-                    "a negative income-tax rate would be a payment to the owner rather than "
-                    "a withholding. Zero is a real declaration -- it says nothing is "
-                    "withheld -- and is why omitting the field means something different",
-                )
-            )
+        credited_to=_require_text(
+            path,
+            f"{field_prefix}.credited_to",
+            entry.credited_to,
+            "the venue income is credited at decides which reading of the law applies to it, "
+            "and it is a different fact from where a funding route starts (012 FR-024a)",
         ),
+        indexation=_indexation(path, entry.indexation, field_prefix=f"{field_prefix}.indexation"),
+        tax_scheme=entry.tax_scheme,
     )
 
 
@@ -4604,3 +4603,465 @@ def official_rate_from_file(path: Path) -> OfficialRateSeries:
         ),
         observations=tuple(observations),
     )
+
+
+# ---------------------------------------------------------------------------
+# 012-fop-group-3: the taxation scheme, and where income is credited
+# ---------------------------------------------------------------------------
+#
+# The scheme an income stream is under, rather than the tax class an instrument's income
+# falls in. Nothing here knows which components exist: a scheme charges exactly what it
+# declares, and the two component kinds differ in what they are asked -- a date, or a period.
+#
+# What is *not* here, because it needs a second file: whether two files declare one scheme
+# identity, whether a destination's scheme and venue exist, and whether a stream's declared
+# treatment does. All three are relations and live in the resolver.
+
+SCHEME_TABLE: Final = "scheme"
+"""The identity table of a scheme file, and the prefix of every field path in it."""
+
+DESTINATION_TABLE: Final = "destination"
+"""The array of rows in a crediting-destination file."""
+
+_PERIODS: Final[Mapping[str, scheme_module.Period]] = {"month": "month"}
+"""The periods a periodic component can be owed per. One member; see ``scheme.Period``."""
+
+_DECLARED_FOR: Final[Mapping[str, scheme_module.DeclaredFor]] = {
+    "stream": "stream",
+    "reading": "reading",
+}
+
+_VERDICTS: Final[Mapping[str, scheme_module.Verdict]] = {
+    member.value: member for member in scheme_module.Verdict
+}
+
+
+def _recorded_context(
+    path: Path, declared: list[schema.DeclaredContextTable], *, field_prefix: str
+) -> tuple[scheme_module.DeclaredContext, ...]:
+    """Cited facts recorded beside a schedule and deliberately not applied."""
+    recorded: list[scheme_module.DeclaredContext] = []
+    for position, entry in enumerate(declared):
+        entry_prefix = f"{field_prefix}.context[{position}]"
+        recorded.append(
+            scheme_module.DeclaredContext(
+                id=_require_text(
+                    path,
+                    f"{entry_prefix}.id",
+                    entry.id,
+                    "a recorded fact is named so a figure can point at it",
+                ),
+                statement=_require_text(
+                    path,
+                    f"{entry_prefix}.statement",
+                    entry.statement,
+                    "a recorded fact carries the provision in its own words, because a "
+                    "declaration carrying half a provision is the same defect as a citation "
+                    "to a proposition the source does not make",
+                ),
+                not_applied_because=_require_text(
+                    path,
+                    f"{entry_prefix}.not_applied_because",
+                    entry.not_applied_because,
+                    "a provision declared beside a schedule and silently not applied is "
+                    "indistinguishable from an oversight",
+                ),
+                provenance=prov.of(
+                    [
+                        _source_ref(
+                            path,
+                            entry_prefix,
+                            source=entry.source,
+                            retrieved_on=entry.retrieved_on,
+                            verified_on=entry.verified_on,
+                            kind=entry.kind,
+                        )
+                    ]
+                ),
+            )
+        )
+    return tuple(recorded)
+
+
+def _ascending(path: Path, field_path: str, effective_from: date, previous: date | None) -> None:
+    """Refuse a duplicate or an out-of-order effective date, in the file's own order.
+
+    The schedule is read in the order it is written and is never sorted: a file whose order
+    disagrees with its dates is one a human misreads, and reordering it here would make that
+    file loadable.
+    """
+    if previous is None:
+        return
+    if effective_from == previous:
+        raise DeclarationError(
+            path,
+            field_path,
+            f"declares {effective_from.isoformat()} for the second time. One date has one "
+            "value: two entries for it are not merged and neither wins, because whichever "
+            "the fold reached first would decide a legal figure by file order.",
+            "delete the duplicate entry",
+        )
+    if effective_from < previous:
+        raise DeclarationError(
+            path,
+            field_path,
+            f"is {effective_from.isoformat()}, before the previous entry's "
+            f"{previous.isoformat()}. The schedule is read in the order it is written and is "
+            "not silently sorted.",
+            "write the entries oldest first",
+        )
+
+
+def _rate_component(path: Path, entry: schema.RateComponentTable) -> scheme_module.RateComponent:
+    """One rate component and its dated schedule, refusing an empty or disordered one."""
+    field_prefix = f"{SCHEME_TABLE}.rate_component[{entry.id}]"
+    identifier = _require_text(
+        path, f"{field_prefix}.id", entry.id, "a component is referred to by id"
+    )
+    if not entry.rate:
+        raise DeclarationError(
+            path,
+            f"{field_prefix}.rate",
+            "declares no rate at all. A component with an empty schedule charges nothing on "
+            "every date and says so nowhere, which is the silent zero this whole feature "
+            "exists to refuse.",
+            f"declare at least one [[{SCHEME_TABLE}.rate_component.rate]], or delete the component",
+        )
+    schedule: list[scheme_module.ComponentRate] = []
+    for position, rate in enumerate(entry.rate):
+        entry_prefix = f"{field_prefix}.rate[{position}]"
+        effective_from = _parse_date(path, f"{entry_prefix}.effective_from", rate.effective_from)
+        _ascending(
+            path,
+            f"{entry_prefix}.effective_from",
+            effective_from,
+            schedule[-1].effective_from if schedule else None,
+        )
+        schedule.append(
+            scheme_module.ComponentRate(
+                effective_from=effective_from,
+                rate=_as_fraction(
+                    _non_negative(
+                        path,
+                        f"{entry_prefix}.rate_pct",
+                        rate.rate_pct,
+                        "a component charges a share of the base, and a negative rate would "
+                        "be a refund rather than a charge",
+                    )
+                ),
+                provenance=prov.of(
+                    [
+                        _source_ref(
+                            path,
+                            entry_prefix,
+                            source=rate.source,
+                            retrieved_on=rate.retrieved_on,
+                            verified_on=rate.verified_on,
+                            kind=rate.kind,
+                        )
+                    ]
+                ),
+            )
+        )
+    return scheme_module.RateComponent(
+        id=identifier,
+        name=_require_text(
+            path,
+            f"{field_prefix}.name",
+            entry.name,
+            "a component is reported under the name the law uses for it",
+        ),
+        schedule=tuple(schedule),
+        context=_recorded_context(path, entry.context or [], field_prefix=field_prefix),
+    )
+
+
+def _periodic_component(
+    path: Path, entry: schema.PeriodicComponentTable
+) -> scheme_module.PeriodicComponent:
+    """One periodic component and its dated schedule of statutory sums."""
+    field_prefix = f"{SCHEME_TABLE}.periodic_component[{entry.id}]"
+    identifier = _require_text(
+        path, f"{field_prefix}.id", entry.id, "a component is referred to by id"
+    )
+    if not entry.amount:
+        raise DeclarationError(
+            path,
+            f"{field_prefix}.amount",
+            "declares no amount at all. A periodic component with an empty schedule owes "
+            "nothing for every period and says so nowhere.",
+            f"declare at least one [[{SCHEME_TABLE}.periodic_component.amount]], or delete "
+            "the component",
+        )
+    schedule: list[scheme_module.ComponentAmount] = []
+    for position, amount in enumerate(entry.amount):
+        entry_prefix = f"{field_prefix}.amount[{position}]"
+        effective_from = _parse_date(path, f"{entry_prefix}.effective_from", amount.effective_from)
+        _ascending(
+            path,
+            f"{entry_prefix}.effective_from",
+            effective_from,
+            schedule[-1].effective_from if schedule else None,
+        )
+        sources = prov.of(
+            [
+                _source_ref(
+                    path,
+                    entry_prefix,
+                    source=amount.source,
+                    retrieved_on=amount.retrieved_on,
+                    verified_on=amount.verified_on,
+                    kind=amount.kind,
+                )
+            ]
+        )
+        schedule.append(
+            scheme_module.ComponentAmount(
+                effective_from=effective_from,
+                amount=Money(
+                    _non_negative(
+                        path,
+                        f"{entry_prefix}.amount",
+                        amount.amount,
+                        "a periodic component owes a statutory sum, and a negative one would "
+                        "be a payment to the taxpayer",
+                    ),
+                    _currency(path, f"{entry_prefix}.currency", amount.currency),
+                    sources,
+                ),
+                provenance=sources,
+            )
+        )
+    return scheme_module.PeriodicComponent(
+        id=identifier,
+        name=_require_text(
+            path,
+            f"{field_prefix}.name",
+            entry.name,
+            "a component is reported under the name the law uses for it",
+        ),
+        period=_closed_value(path, f"{field_prefix}.period", entry.period, _PERIODS, "period"),
+        schedule=tuple(schedule),
+        context=_recorded_context(path, entry.context or [], field_prefix=field_prefix),
+    )
+
+
+def scheme_from_file(path: Path) -> scheme_module.TaxationScheme:
+    """One ``data/tax/schemes/<id>.toml`` as a :class:`TaxationScheme`.
+
+    Every refusal below is a property of this one file read in isolation, and every one names
+    the file and the offending component or field: a scheme charging no component at all, an
+    empty schedule, two entries on one effective date, a schedule running backwards, a
+    negative rate or amount, two components sharing an id, an unknown period, currency or
+    ``declared_for``, and a recorded fact with no reason it is not applied.
+
+    **A rate written on a periodic component, or an amount on a rate component, is refused by
+    the schema** rather than here: neither field exists on the other table, so ``extra="forbid"``
+    makes writing one an unrecognised field instead of a check somebody has to remember.
+    """
+    document = read_document(path)
+    file = _validate(schema.SchemeFile, document, path)
+    declared = file.scheme
+    if not declared.rate_component and not declared.periodic_component:
+        raise DeclarationError(
+            path,
+            SCHEME_TABLE,
+            "declares no component at all. A scheme charges exactly the components it "
+            "declares, so one that declares none charges nothing on every income and every "
+            "period -- which is a file nobody meant to write rather than a tax-free regime.",
+            f"declare a [[{SCHEME_TABLE}.rate_component]] or a "
+            f"[[{SCHEME_TABLE}.periodic_component]]",
+        )
+    rate_components = tuple(_rate_component(path, entry) for entry in declared.rate_component or [])
+    periodic_components = tuple(
+        _periodic_component(path, entry) for entry in declared.periodic_component or []
+    )
+    # Across BOTH kinds, because `component_standing` looks a component up by id alone: two
+    # components sharing one would make which of them answered depend on scan order.
+    declared_ids = [component.id for component in rate_components]
+    declared_ids.extend(component.id for component in periodic_components)
+    _no_duplicates(path, f"{SCHEME_TABLE}.rate_component.id", declared_ids)
+    return scheme_module.TaxationScheme(
+        id=_require_text(
+            path,
+            f"{SCHEME_TABLE}.id",
+            declared.id,
+            "a scheme is named by an income stream and by every reading that consumes it, "
+            "and two schemes declaring one id are refused across the whole data root",
+        ),
+        name=_require_text(path, f"{SCHEME_TABLE}.name", declared.name, "a scheme is named"),
+        jurisdiction_id=_require_text(
+            path,
+            f"{SCHEME_TABLE}.jurisdiction",
+            declared.jurisdiction,
+            "a scheme belongs to the jurisdiction whose tax currency its base is struck in",
+        ),
+        tax_currency=_currency(path, f"{SCHEME_TABLE}.tax_currency", declared.tax_currency),
+        variant=_require_text(
+            path,
+            f"{SCHEME_TABLE}.variant",
+            declared.variant,
+            "a scheme names which of the law's alternative rate sets it declares, so the "
+            "second is a file rather than a schema change the day its rate is cited",
+        ),
+        reporting_cadence=_require_text(
+            path,
+            f"{SCHEME_TABLE}.reporting_cadence",
+            declared.reporting_cadence,
+            "a scheme declares the cadence it reports and pays on, so the feature that "
+            "models payment inherits a declared fact rather than guessing one",
+        ),
+        declared_for=_closed_value(
+            path,
+            f"{SCHEME_TABLE}.declared_for",
+            declared.declared_for,
+            _DECLARED_FOR,
+            "declaration audience",
+        ),
+        rate_components=rate_components,
+        periodic_components=periodic_components,
+    )
+
+
+def _reading(path: Path, entry: schema.ReadingTable, *, field_prefix: str) -> scheme_module.Reading:
+    """One candidate treatment, declared either as a scheme or as a reason it is not one."""
+    entry_prefix = f"{field_prefix}.reading[{entry.id}]"
+    names_a_scheme = entry.scheme is not None
+    if names_a_scheme == (entry.uncomputable_because is not None):
+        raise DeclarationError(
+            path,
+            entry_prefix,
+            "declares both a scheme and a reason it cannot be computed, or neither. A "
+            "candidate is one or the other: a declared scheme gets a computed, labelled "
+            "figure, and everything else is named on the switch as uncomputed with the "
+            "reason -- so that an omitted reading can never make a switch look complete.",
+            "declare exactly one of scheme and uncomputable_because",
+        )
+    if names_a_scheme and entry.recognised_on is None:
+        raise DeclarationError(
+            path,
+            f"{entry_prefix}.recognised_on",
+            "names a scheme and no date name. A reading computes on a declared date, and "
+            "two readings of one destination can disagree about which; borrowing another "
+            "reading's date would compute the reading this one contests.",
+            "declare recognised_on",
+        )
+    if not names_a_scheme and entry.recognised_on is not None:
+        raise DeclarationError(
+            path,
+            f"{entry_prefix}.recognised_on",
+            "names a date for a candidate that is declared uncomputable. Nothing reads it, "
+            "and a field nothing reads is a field a reader believes is doing something.",
+            "delete recognised_on, or declare the scheme this reading computes",
+        )
+    return scheme_module.Reading(
+        id=_require_text(path, f"{entry_prefix}.id", entry.id, "a reading is named"),
+        label=_require_text(
+            path,
+            f"{entry_prefix}.label",
+            entry.label,
+            "a figure states which reading produced it, in words a reader will see",
+        ),
+        scheme_id=entry.scheme,
+        uncomputable_because=entry.uncomputable_because,
+        recognised_on=entry.recognised_on,
+        departs_from_source=entry.departs_from_source,
+        provenance=prov.of(
+            [
+                _source_ref(
+                    path,
+                    entry_prefix,
+                    source=entry.source,
+                    retrieved_on=entry.retrieved_on,
+                    verified_on=entry.verified_on,
+                    kind=entry.kind,
+                )
+            ]
+        ),
+    )
+
+
+def destinations_from_file(path: Path) -> tuple[scheme_module.CreditingDestination, ...]:
+    """One ``data/tax/destinations/<jurisdiction>.toml`` as the rows of a normative table.
+
+    The table is normative rather than illustrative: a destination it does not name cannot be
+    resolved by reasoning about it, and refuses instead. So every row carries the judgement
+    that put it there, and a row with empty grounds is refused here.
+    """
+    document = read_document(path)
+    file = _validate(schema.DestinationFile, document, path)
+    rows: list[scheme_module.CreditingDestination] = []
+    for position, entry in enumerate(file.destination):
+        field_prefix = f"{DESTINATION_TABLE}[{position}]"
+        verdict = _closed_value(
+            path, f"{field_prefix}.verdict", entry.verdict, _VERDICTS, "verdict"
+        )
+        if not entry.reading:
+            raise DeclarationError(
+                path,
+                f"{field_prefix}.reading",
+                "declares no reading at all. A row with no candidate says nothing about the "
+                "destination it names, which is what a missing row already says.",
+                f"declare at least one [[{DESTINATION_TABLE}.reading]], or delete the row",
+            )
+        readings = tuple(
+            _reading(path, reading, field_prefix=field_prefix) for reading in entry.reading
+        )
+        _no_duplicates(path, f"{field_prefix}.reading.id", [reading.id for reading in readings])
+        if verdict is scheme_module.Verdict.INTERPRETED and (
+            len(readings) != 1 or readings[0].scheme_id is None
+        ):
+            raise DeclarationError(
+                path,
+                f"{field_prefix}.verdict",
+                "is interpreted and the row does not carry exactly one computable reading. "
+                "An interpreted destination produces a charge, and a charge cannot be two "
+                "figures or none; a row with competing candidates is unsettled, and a row "
+                "whose only candidate is uncomputable has nothing to charge.",
+                "declare one computable reading, or declare the verdict unsettled",
+            )
+        rows.append(
+            scheme_module.CreditingDestination(
+                scheme_id=_require_text(
+                    path,
+                    f"{field_prefix}.scheme",
+                    entry.scheme,
+                    "a row records how one scheme's income is treated at one destination",
+                ),
+                venue_id=_require_text(
+                    path,
+                    f"{field_prefix}.venue",
+                    entry.venue,
+                    "a row names the venue the income is credited at",
+                ),
+                verdict=verdict,
+                grounds=_require_text(
+                    path,
+                    f"{field_prefix}.grounds",
+                    entry.grounds,
+                    "the table is normative, so every row records the judgement that put it "
+                    "there rather than leaving it to be re-derived",
+                ),
+                resolution_path=_require_text(
+                    path,
+                    f"{field_prefix}.resolution_path",
+                    entry.resolution_path,
+                    "a row states what would close the question, because an unsettled "
+                    "verdict with no way out is a gap rather than a finding",
+                ),
+                readings=readings,
+                provenance=prov.of(
+                    [
+                        _source_ref(
+                            path,
+                            field_prefix,
+                            source=entry.source,
+                            retrieved_on=entry.retrieved_on,
+                            verified_on=entry.verified_on,
+                            kind=entry.kind,
+                        )
+                    ]
+                ),
+            )
+        )
+    return tuple(rows)

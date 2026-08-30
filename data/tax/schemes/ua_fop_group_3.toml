@@ -1,0 +1,111 @@
+# ФОП, третя група, не платник ПДВ — the scheme the owner's contract income lands in.
+#
+# Constitution Principle I: no tax value comes from an implementer's or an agent's memory.
+# Every rate, date and provision below is quoted from the primary text named beside it, and
+# `verified_on` is empty throughout — retrieved and cited is not verified, and the mark
+# propagates to every figure derived from it.
+#
+# ---------------------------------------------------------------------------
+# ONE RATE, THREE LAWS — and why each entry cites its own
+# ---------------------------------------------------------------------------
+#
+# The військовий збір's **rate** is Закон № 4015-IX's. Its **commencement** is Закон
+# № 4113-IX's, which replaced the «з 1 жовтня 2024 року» 4015-IX's own text names. Its
+# **end** is Закон № 4835-IX's. A system holding *1% from 1 January 2025* under a citation
+# to 4015-IX would hold a rate whose own cited source contradicts its date, and nothing
+# downstream could detect it. So the entry cites both laws for what each one supplies, and
+# **4015-IX is cited for neither date**.
+#
+# ---------------------------------------------------------------------------
+# THE END IS RECORDED AND NOT APPLIED
+# ---------------------------------------------------------------------------
+#
+# The levy runs «по 31 грудня третього календарного року, наступного за роком, у якому буде
+# припинено або скасовано воєнний стан». That is a legal fact of exactly the same standing
+# as the commencement — and it is **not a date**: it is conditioned on an event nothing in
+# this system models. A schedule that declares a commencement and no end asserts a permanent
+# charge, and this one is not permanent, so the provision is declared as a `context` block:
+# visible, cited, and not applied. The modelling question lives where it already lives,
+# `specs/features.toml`'s `martial-law-ends-one-belief-two-places`.
+#
+# There is no reversion rate for this payer class: the charge simply stops. The 1,5% that
+# абзац шостий підпункту 1.3 restores is a different charge on a different payer, and it is
+# declared in `ua_personal_income.toml` where it belongs.
+
+[scheme]
+id                = "ua_fop_group_3_non_vat"
+name              = "ФОП, третя група, не платник ПДВ"
+jurisdiction      = "ua"
+tax_currency      = "UAH"
+variant           = "non_vat_payer"
+reporting_cadence = "quarterly"
+declared_for      = "stream"
+
+# The VAT-payer variant's 3% is NOT entered: the owner is not one, no citation for it was
+# retrieved, and a legal value nothing consumes is a value nobody checks. `variant` above is
+# what makes the second variant a data-only addition the day its rate is cited.
+
+  [[scheme.rate_component]]
+  id   = "ediniy_podatok"
+  name = "єдиний податок"
+
+    [[scheme.rate_component.rate]]
+    effective_from = "2016-01-01"
+    rate_pct       = 5.0
+    note           = "DATED BY RULE B2 of data/tax/ua.toml, and the entry says so because the date is not the legal commencement. № 909-VIII's розділ II, пункт 1 commences the change «з дня набрання чинності Законом України \"Про Державний бюджет України на 2016 рік\", але не раніше 1 січня 2016 року», with three named exceptions — підпунктів 3 та 10 пункту 45, підпункту 2 пункту 52, and пункту 58 розділу I — none of which is пункт 81. So the 5% has stood in this wording since AT EARLIEST 1 січня 2016 and AT LATEST the commencement of that budget law; which of the two it is needs the budget law read, and that read is owner verification task 1. Rule B2 applies because the choice changes no figure this feature can produce: either date precedes every period the owner's projections reach, so the date decides only how far back a run is possible. The moment this component gains a second entry, rule B1 applies to it instead."
+    kind           = "tax_rule"
+    source         = "Підпункт 2 пункту 293.3 статті 293 ПКУ — «5 відсотків доходу - у разі включення податку на додану вартість до складу єдиного податку». Read in the consolidated Code at https://zakon.rada.gov.ua/laws/show/2755-17/print, which marks it «{Підпункт 2 пункту 293.3 статті 293 із змінами, внесеними згідно із Законом № 909-VIII від 24.12.2015}». The change itself is № 909-VIII розділ I, пункт 81, підпункт 1 — «у підпункті 2 цифру і слово \"4 відсотки\" замінити цифрою і словом \"5 відсотків\"» — at https://zakon.rada.gov.ua/laws/show/909-19/print."
+    retrieved_on   = "2026-08-25"
+    verified_on    = ""
+
+  [[scheme.rate_component]]
+  id   = "viyskovyi_zbir"
+  name = "військовий збір"
+
+    [[scheme.rate_component.rate]]
+    effective_from = "2025-01-01"
+    rate_pct       = 1.0
+    note           = "THE RATE AND THE DATE COME FROM DIFFERENT LAWS, and № 4015-IX may be cited for NEITHER date: its own text says «з 1 жовтня 2024 року» and «по 31 грудня року, у якому», and both were replaced. № 4113-IX's commencement clause singles its substitution out — «Цей Закон набирає чинності з першого числа місяця, наступного за місяцем його опублікування, крім підпункту 2 пункту 6 розділу I цього Закону, який набирає чинності з дня, наступного за днем опублікування цього Закону» — and its own transitional clause applies the substitution «з дня набрання чинності Законом України … від 10 жовтня 2024 року № 4015-IX». So «з 1 жовтня 2024 року» was never operative for any period, and 1 січня 2025 is not merely the current start but the only one that ever applied. Income dated before it is refused naming this component and the date, never charged a rate of zero: 'the schedule does not reach this date' and 'the rate was nil' are different claims and only the first is true. A cited pre-commencement nil is available and deliberately not built — 4113-IX's «встановлюється з 1 січня 2025 року» is itself a statement that these payers owed nothing before that date — because nothing in this feature needs it and it would add a fourth state to the three a nil already has."
+    kind           = "tax_rule"
+    source         = "RATE: Закон України № 4015-IX від 10.10.2024, підпункт 3 підпункту 1.3 пункту 16-1 підрозділу 10 розділу XX ПКУ — «для платників, зазначених у підпункті 3 підпункту 1.1 цього пункту, - 1 відсоток від доходу, визначеного згідно із статтею 292 цього Кодексу» (https://zakon.rada.gov.ua/laws/show/4015-IX/print). COMMENCEMENT: Закон України № 4113-IX від 04.12.2024, підпункт 2 пункту 6 розділу I — «у пункті 16-1: … у підпункті 1.1 … в абзаці п'ятому слова і цифри \"з 1 жовтня 2024 року\" замінити словами і цифрами \"з 1 січня 2025 року\"» (https://zakon.rada.gov.ua/laws/show/4113-IX/print). Both carried by the consolidated ПКУ at https://zakon.rada.gov.ua/laws/show/2755-17/print, станом на 24.08.2026."
+    retrieved_on   = "2026-08-24"
+    verified_on    = ""
+
+    [[scheme.rate_component.context]]
+    id                  = "termination_on_the_end_of_martial_law"
+    statement           = "Абзац п'ятий підпункту 1.1 пункту 16-1 підрозділу 10 розділу ХХ ПКУ, as it now stands: «Військовий збір для платників збору, зазначених у підпунктах 2 та 3 цього підпункту, встановлюється з 1 січня 2025 року по 31 грудня третього календарного року, наступного за роком, у якому буде припинено або скасовано воєнний стан, введений Указом Президента України \"Про введення воєнного стану в Україні\" від 24 лютого 2022 року № 64/2022». There is no reversion rate for this payer class: the charge stops and nothing replaces it."
+    not_applied_because = "It is conditioned on an EVENT and not on a date, and nothing in this system models the end of martial law. The same event is already a declared belief in data/scenarios/war_end.toml, where it switches the route set — so a schedule keyed by it would no longer be a pure fold over dates. That modelling question is specs/features.toml's `martial-law-ends-one-belief-two-places`; this entry states the fact so that the absence of an end date is never read as a claim that the levy is permanent."
+    kind                = "tax_rule"
+    source              = "Закон України № 4835-IX від 07.04.2026, пункт 1 розділу I — «В абзаці п'ятому підпункту 1.1 слова і цифри \"по 31 грудня року, у якому\" замінити словами і цифрами \"по 31 грудня третього календарного року, наступного за роком, у якому\"» — commencing «з дня, наступного за днем його опублікування» (Голос України, 14.04.2026). Read at https://zakon.rada.gov.ua/laws/show/4835-IX/print and in the consolidated ПКУ at https://zakon.rada.gov.ua/laws/show/2755-17/print, станом на 24.08.2026, whose amendment block under абзац п'ятий names both № 4113-IX and № 4835-IX."
+    retrieved_on        = "2026-08-25"
+    verified_on         = ""
+
+  [[scheme.periodic_component]]
+  id     = "esv"
+  name   = "єдиний внесок на загальнообов'язкове державне соціальне страхування"
+  period = "month"
+
+# ЄСВ is DECLARED EXPLICITLY AT ZERO rather than omitted, and the difference is the point.
+# An omitted component is invisible; a declared zero can be argued with. The nil is a
+# property of THIS SCHEME rather than the output of an exemption the engine evaluated: a
+# scheme charges exactly the components it declares, and this one declares a zero.
+#
+# It is a PERIODIC component and not a rate, because two things differ from a rate and they
+# are independent: the trigger is a month elapsing rather than income arriving, and the base
+# is a statutory sum rather than a percentage. A rate-shaped model gets the zero-income month
+# wrong.
+#
+# The statutory ЄСВ monthly minimum amounts are RECORDED AS ABSENT rather than sought: no
+# scheme declared in this repository charges the component, and the first one that does
+# declares them with its own citations or refuses naming the period. They were never supplied
+# and are not guessable.
+
+    [[scheme.periodic_component.amount]]
+    effective_from = "2026-08-23"
+    amount         = 0.0
+    currency       = "UAH"
+    note           = "THE ONE VALUE IN THIS FEATURE WHOSE SOURCE IS THE OWNER RATHER THAN A PUBLIC TEXT, and it says so on its face so it is never read as a curated legal fact. Every figure resting on it renders marked until owner verification task 2 replaces the source with a legal citation for a ФОП group 3 scheme carrying no ЄСВ; closing that task changes no number. Dated from the day the owner stated it, because that is the only date the source attests — a period before it refuses naming the period and the missing amount, which is the honest answer to a question about a month he has said nothing about. The ЄСВ second-employment exemption of частина шоста статті 4 Закону № 2464-VI is recorded context for whoever declares a scheme that needs it and is deliberately not modelled here: it would need an engine that evaluated a condition per period, which is the branch a declared scheme buys its way out of."
+    kind           = "tax_rule"
+    source         = "The owner, stating his own tax position (2026-08-23). Not a public text. The legal ground for a group-3 scheme carrying no ЄСВ is owner verification task 2 in specs/012-fop-group-3/spec.md."
+    retrieved_on   = "2026-08-23"
+    verified_on    = ""
