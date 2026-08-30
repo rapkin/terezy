@@ -19,8 +19,10 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from terezy.core.primitives.currency import Currency
+from terezy.core.results.candidates import CandidateSet
 from terezy.data.declarations import loader, resolver
 from terezy.data.declarations.errors import DeclarationError
+from tests import candidate_registries as candidates
 
 if TYPE_CHECKING:  # pragma: no cover -- typing only
     from types import ModuleType
@@ -105,19 +107,21 @@ def test_the_shipped_data_root_resolves_for_the_ceiling() -> None:
 
 
 def test_the_shipped_ceiling_admits_the_shipped_registry() -> None:
-    """A ceiling below what the declarations already connect would refuse every run.
+    """A ceiling below what the declarations actually connect would refuse every run.
 
-    Asserted against the registry rather than against the number, so densifying the registry
-    past the declared ceiling fails here -- which is exactly the finding FR-019 exists to
+    Measured by **enumerating**, not by multiplying instruments and streams: the count the
+    ceiling is compared against is ways in x ways out x run plans, and a registry densified
+    with corridors moves it while a pair count does not. So this is what fails the day the
+    declarations outgrow the declared ceiling -- which is the finding FR-019 exists to
     deliver, arriving at the owner rather than at a reader of the data file.
     """
     declarations = _resolve(DATA_ROOT)
-    instruments = len(declarations.composition.coverage.ramp.streams) * len(
-        resolver.tuple_from_data_root(
-            DATA_ROOT, base_currency=Currency.UAH, scenario_id=None
-        ).access
+    registries = candidates.shipped()
+    enumerated = candidates.enumerated(
+        registries, ceiling_=declarations.ceiling, question_=candidates.question(registries)
     )
-    assert declarations.ceiling.max_candidates >= instruments
+    assert isinstance(enumerated, CandidateSet), enumerated
+    assert declarations.ceiling.max_candidates >= len(enumerated.candidates)
 
 
 # ---------------------------------------------------------------------------

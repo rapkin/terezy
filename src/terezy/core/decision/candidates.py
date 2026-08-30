@@ -189,14 +189,9 @@ def survey(
             ),
         )
     streams = sorted({key.stream_id for key in keys})
-    unfunded = [stream_id for stream_id in streams if stream_id not in question.amounts]
-    if unfunded:
-        raise ValueError(
-            f"the question states no amount for {unfunded}, and the enumerated set is funded "
-            f"from {streams}. An amount is stated per stream with no default anywhere "
-            "(FR-005), so a missing one is an incomplete question rather than a fact about "
-            "the money -- and defaulting it to zero would score a real option at nothing."
-        )
+    # Before the missing-amount check below, and deliberately: a caller holding a two-stream set
+    # naturally supplies one amount, because one is all `compare` takes. Raising first would hand
+    # him a construction error where the record naming the real gap belongs.
     if len(streams) > 1:
         return MoreThanOneStreamInTheSet(
             stream_ids=tuple(streams),
@@ -207,6 +202,13 @@ def survey(
                 "and reviewed there; scoring per stream here would produce one ranking per "
                 "stream and no ranking of the set."
             ),
+        )
+    if streams[0] not in question.amounts:
+        raise ValueError(
+            f"the question states no amount for {streams[0]!r}, which is the stream the "
+            "enumerated set is funded from. An amount is stated per stream with no default "
+            "anywhere (FR-005), so a missing one is an incomplete question rather than a fact "
+            "about the money -- and defaulting it to zero would score a real option at nothing."
         )
     return CandidateSurvey(
         enumerated=enumerated,

@@ -167,6 +167,20 @@ class TestTwoStreamsAreRefusedRatherThanConverted:
             fixtures.CONTRACT,
         }
 
+    def test_the_typed_refusal_wins_over_the_missing_amount_raise(self) -> None:
+        """A caller with a two-stream set naturally supplies one amount, because one is all
+        `compare` takes. The record naming the real gap must reach him, not a construction
+        error about the amount he was never able to state usefully."""
+        registries = self._both_streams_connect()
+        result = survey(
+            registries=registries,
+            routes=registries.routes,
+            question=fixtures.question(registries, amounts={fixtures.SALARY: fixtures.AMOUNT_UAH}),
+            ceiling=fixtures.ceiling(10_000),
+            benchmark=fixtures.benchmark_key(registries, OVDP),
+        )
+        assert isinstance(result, MoreThanOneStreamInTheSet), result
+
     def test_it_is_refused_naming_both_streams(self) -> None:
         registries = self._both_streams_connect()
         result = _survey(registries, fixtures.benchmark_key(registries, OVDP))

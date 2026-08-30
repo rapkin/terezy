@@ -24,12 +24,14 @@ from typing import TYPE_CHECKING, get_args
 import pytest
 
 from terezy.core.decision.candidates import drop_tally, dropped, evaluated, survey
+from terezy.core.decision.tuple_outcome import currency_of
 from terezy.core.instruments.interface import DateRange
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.results.candidates import CandidateSet, CandidateSurvey
 from terezy.core.results.tuple import TupleRefused
+from terezy.core.routes import cost
 from terezy.core.routes.legs import Route
 from terezy.core.routes.path import (
     EXIT_BY_IDENTITY,
@@ -46,7 +48,7 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
 
     from terezy.core.decision.tuple_outcome import Registries
     from terezy.core.results.candidates import Question
-    from terezy.core.results.tuple import InstrumentPlan
+    from terezy.core.results.tuple import InstrumentPlan, Tuple
 
 BOND_CLASS = "ua_government_bond"
 OVDP = "ovdp_synthetic_a"
@@ -304,37 +306,94 @@ def test_each_planted_case_still_closes_the_second_identity(refusal: str) -> Non
 
 
 class TestTheThreeNoLoopCanReach:
-    """Each recorded reason, checked as the property that makes it a property."""
+    """Each recorded reason, checked as the property that makes it a property.
+
+    Compared as **junctions** -- ``(venue, currency)`` -- because that is what the refusals
+    standing in for them compare. A venue-only check would pass on exactly the currency-mismatched
+    chain that reaches ``SeamDoesNotChain``, and a shipped registry with one currency could never
+    tell the two apart.
+
+    Run over several narrowings of the shipped registry rather than over it alone, so "no loop
+    can reach this" is checked against more than one shape of world. That is still not every
+    registry: the claim rests on `compose` anchoring both ends exactly, and these are the
+    executable half of it.
+    """
 
     @staticmethod
-    def _shipped_keys() -> tuple[object, ...]:
-        enumerated = fixtures.enumerated(fixtures.shipped())
+    def _worlds() -> list[Registries]:
+        shipped = fixtures.shipped()
+        instruments = sorted(shipped.access)
+        return [
+            shipped,
+            # Two currencies, so a venue-only comparison and a junction one are no longer the
+            # same assertion on this input.
+            _a_foreign_taxable_bond(),
+            fixtures.with_access(shipped, OVDP, proceeds_to="monobank_uah"),
+            replace(
+                shipped,
+                access={key: shipped.access[key] for key in instruments[:3]},
+            ),
+            tuples.with_new_route(
+                shipped,
+                tuples.route(
+                    "test_second_way_in",
+                    origin="monobank_uah",
+                    destination="inzhur",
+                    direction="inbound",
+                    fee_pct=0.02,
+                ),
+            ),
+        ]
+
+    @staticmethod
+    def _keys(registries: Registries) -> tuple[Tuple, ...]:
+        enumerated = fixtures.enumerated(registries)
         assert isinstance(enumerated, CandidateSet), enumerated
         return tuple(item.key for item in enumerated.candidates)
 
+    def test_the_worlds_are_not_all_the_same_world(self) -> None:
+        """The control: four narrowings that really do produce different sets."""
+        sizes = {len(self._keys(world)) for world in self._worlds()}
+        assert len(sizes) > 1, sizes
+
     def test_a_way_in_is_always_costed_from_the_stream_the_key_names(self) -> None:
-        for key in self._shipped_keys():
-            assert key.route_in.stream_id == key.stream_id  # type: ignore[attr-defined]
+        """``FundedFromAnotherStream`` compares exactly these two ids."""
+        for world in self._worlds():
+            for key in self._keys(world):
+                assert key.route_in.stream_id == key.stream_id
 
-    def test_both_chains_are_anchored_at_the_venues_the_access_entry_declares(self) -> None:
-        registries = fixtures.shipped()
-        for key in self._shipped_keys():
-            access = registries.access[key.instrument_id]  # type: ignore[attr-defined]
-            way_in = segments_of(key.route_in)  # type: ignore[attr-defined]
-            assert registries.routes[way_in[-1]].destination == access.bought_at
-            way_out = key.route_out  # type: ignore[attr-defined]
-            if way_out is not EXIT_BY_IDENTITY:
+    def test_both_seams_meet_as_junctions_and_not_merely_as_venues(self) -> None:
+        """``SeamDoesNotChain``'s two anchors: where the way in arrives against where the
+        purchase happens, and where the proceeds land against where the way out departs."""
+        for world in self._worlds():
+            for key in self._keys(world):
+                access = world.access[key.instrument_id]
+                declared = (
+                    world.funds.get(key.instrument_id) or world.instruments[key.instrument_id]
+                )
+                purchase = (access.bought_at, currency_of(declared).value)
+                proceeds = (access.proceeds_to, currency_of(declared).value)
+                way_in = segments_of(key.route_in)
+                _, arrives = cost.junctions_of(world.routes[way_in[-1]])
+                assert arrives == purchase
+                way_out = key.route_out
+                if way_out is EXIT_BY_IDENTITY:
+                    assert proceeds in cost.spendable_junctions(world.spendable)
+                    continue
                 assert isinstance(way_out, ExitChain)
-                first = exit_segments_of(way_out)[0]
-                assert registries.routes[first].origin == access.proceeds_to
+                departs, _ = cost.junctions_of(world.routes[exit_segments_of(way_out)[0]])
+                assert departs == proceeds
 
-    def test_every_way_out_ends_somewhere_the_owner_declared_spendable(self) -> None:
-        registries = fixtures.shipped()
-        endpoints = {endpoint.venue_id for endpoint in registries.spendable}
-        for key in self._shipped_keys():
-            way_out = key.route_out  # type: ignore[attr-defined]
-            if way_out is EXIT_BY_IDENTITY:
-                continue
-            assert isinstance(way_out, ExitChain)
-            last = exit_segments_of(way_out)[-1]
-            assert registries.routes[last].destination in endpoints
+    def test_every_way_out_ends_at_a_declared_spendable_junction(self) -> None:
+        """``NoExitRouteDeclared`` fires on ``(venue, currency) not in spendable_junctions``,
+        so that is what is compared -- hryvnia at a venue the owner never spends from and
+        dollars at one he does are both failures, and a venue check sees neither."""
+        for world in self._worlds():
+            endpoints = cost.spendable_junctions(world.spendable)
+            for key in self._keys(world):
+                way_out = key.route_out
+                if way_out is EXIT_BY_IDENTITY:
+                    continue
+                assert isinstance(way_out, ExitChain)
+                _, arrives = cost.junctions_of(world.routes[exit_segments_of(way_out)[-1]])
+                assert arrives in endpoints

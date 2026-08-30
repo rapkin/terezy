@@ -222,7 +222,14 @@ class TestTheArtefactCannotBeGreenAndWrong:
         ]
         result = _surveyed()
         assert result.enumerated.pairs_considered == len(declared) * len(registries.streams)
-        assert len(result.enumerated.candidates) + len(result.enumerated.no_candidate) == (
+        # Over PAIRS, not candidates. One candidate per connecting pair is a property of this
+        # registry, not of the accounting -- a second corridor or a second run plan makes the
+        # two counts differ while FR-009 still holds.
+        enumerated_pairs = {
+            (candidate.key.instrument_id, candidate.key.stream_id)
+            for candidate in result.enumerated.candidates
+        }
+        assert len(enumerated_pairs) + len(result.enumerated.no_candidate) == (
             result.enumerated.pairs_considered
         )
 

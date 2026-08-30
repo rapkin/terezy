@@ -172,9 +172,13 @@ def test_a_registry_offering_two_ways_in_yields_both_and_invents_no_third(
     assert {id(item.key.route_in) for item in mine} <= identities
 
 
-def test_the_composed_enumeration_is_asked_with_the_regimes_route_set() -> None:
-    """A narrowing that reached `compose` and not the evaluation would put a corridor in a set
-    the registry does not declare, which is the seam FR-018's third clause guards."""
+def test_narrowing_the_route_set_removes_the_candidates_that_needed_it() -> None:
+    """The corridors a regime disbelieves in produce nothing, rather than being composed anyway.
+
+    The *other* half of that seam -- composing over a route set wider than the registry
+    declares -- is `tests/unit/test_candidate_refusals.py::TestARouteTheRegistryDoesNotDeclare`,
+    where it refuses as a whole rather than dropping one identical candidate per pair.
+    """
     registries = fixtures.shipped()
     narrowed = {key: value for key, value in registries.routes.items() if key != "inzhur_direct"}
     enumerated = fixtures.enumerated(replace(registries, routes=narrowed), routes=narrowed)
