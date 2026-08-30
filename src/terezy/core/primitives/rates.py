@@ -102,10 +102,9 @@ class RealRate:
     -- so assigning one into the other's slot is a mypy strict error rather than a bug
     somebody has to notice. See the module docstring.
 
-    ⚙ **Feature 007 filled the slot and gave the record the four fields that make a real
-    figure self-describing.** Every one of them answers a question FR-010 or FR-011 requires
-    the figure to answer without reference to where it was found: what it rests on, what it
-    is real against, over what span, and whose sources it inherits.
+    The fields beyond ``value`` make a real figure self-describing, as FR-010 and FR-011
+    require: what it rests on, what it is real against, over what span, and whose sources it
+    inherits -- each answerable without reference to where the figure was found.
 
     Keyword-only, because ``value`` and ``basis`` are now neighbours and a positional
     construction would let a caller put a rate where a basis belongs the day the field order

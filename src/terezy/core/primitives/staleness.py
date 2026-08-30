@@ -64,8 +64,7 @@ class ObservationKind:
     """
 
     id: str
-    """The name a declaration uses -- ``p2p_premium``, ``bank_fee_schedule``,
-    ``regulatory_limit``, ``bond_terms``, ``tax_rule``."""
+    """The name a declaration uses, as declared in ``data/observation_kinds.toml``."""
 
     staleness_days: int
     """How many days after retrieval a value of this kind is still current.

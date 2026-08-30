@@ -563,8 +563,7 @@ class ObservationKindTable(BaseModel):
     model_config = STRICT
 
     id: str
-    """``p2p_premium``, ``bank_fee_schedule``, ``regulatory_limit``, ``bond_terms``,
-    ``tax_rule``, ``venue_terms``. Every sourced table in the project names one of these."""
+    """One of the kinds declared in ``data/observation_kinds.toml``."""
 
     staleness_days: int
     """Days after which a value of this kind is reported stale. **No default** (FR-028): a
@@ -595,7 +594,7 @@ class VenueTable(BaseModel):
     model_config = STRICT
 
     id: str
-    """``monobank_uah``, ``binance``, ``coinbase``, ``ibkr_usd``, ``inzhur``."""
+    """One of the venues declared in ``data/venues.toml``."""
 
     name: str
     """Human-readable and non-empty. For a fixture it says so in words."""
