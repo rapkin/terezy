@@ -30,9 +30,10 @@ computed in is the currency anything is shown in. Principle VI's three roles com
 this interface is where they would be collapsed first.
 
 **A charge is computed in the currency its base arrived in, which is not always the tax
-currency.** An event denominated in a foreign currency is charged here on its own amount, and ``core.tax.year`` restates the whole charge at the
-declared official rate for the event's date when it assembles the year -- except for a
-realised disposal gain, which it refuses outright rather than converting. So a ``TaxCharge``
+currency.** An event denominated in a foreign currency is charged here on its own amount, and
+``core.tax.year`` restates the whole charge at the declared official rate for the event's date
+when it assembles the year -- except for a realised disposal gain, which it refuses outright
+rather than converting. So a ``TaxCharge``
 leaving this module may be denominated in USD, and a rule that compared its base against the
 jurisdiction's tax currency -- or skipped a conversion on the strength of one -- would be
 wrong.

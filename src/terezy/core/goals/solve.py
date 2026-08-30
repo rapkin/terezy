@@ -33,11 +33,7 @@ is what that sentence asks for. Comparisons between two *declared* numbers stay 
 arithmetic separates them, so there is nothing for a bound to absorb.
 
 **The conventions travel in the result**, not in this docstring (FR-014's second half). See
-:class:`~terezy.core.results.goal.Conventions`: end-of-period contributions, monthly
-compounding, the twelfth root of the annual rate, and monthly anniversaries for the calendar.
-
-**Pure, and there is no clock.** Every date is an argument or a declaration, which is what
-makes a solved date the same figure a year from now as it is today.
+:class:`~terezy.core.results.goal.Conventions`.
 """
 
 from __future__ import annotations

@@ -126,8 +126,9 @@ class EventKind(Enum):
     liability is settled *from cash* on the date the declared timing rule names -- a date that
     is data, never a constant here.
 
-    **An ordinary ledger citizen**, on a declared seed's precedent: it goes through the same fold and is counted by every conservation property without one of
-    them being taught it exists. If a property fails only for ledgers containing a payment,
+    **An ordinary ledger citizen**, on a declared seed's precedent: it goes through the same
+    fold and is counted by every conservation property without one of them being taught it
+    exists. If a property fails only for ledgers containing a payment,
     the event is wrong -- not the invariant (009 research.md D2).
 
     Distinct from :attr:`FEE`, which is a cost of transacting allocated to the disposal it
@@ -175,21 +176,22 @@ class CausationKind(Enum):
     ROUTE_TERM = "route_term"
     """A declared term of a funding route -- a leg's fee, a channel's premium, a spread.
 
-    **Not the catch-all the class docstring forbids.** A route term is resolvable to a declaration exactly as an
-    instrument term is: ``id`` is the route id and ``detail`` names the component that
-    charged. FR-005 requires every fee to be an explicit recorded line, and a ramp fee is
-    charged by neither an instrument term nor a tax rule -- so without this member such a fee
-    would have to claim a cause it does not have, which is worse than a widened set: a
-    traceable figure pointing at the wrong declaration.
+    **Not the catch-all the class docstring forbids.** A route term is resolvable to a declaration
+    exactly as an instrument term is: ``id`` is the route id and ``detail`` names the component that
+    charged. FR-005 requires every fee to be an explicit recorded line, and a ramp fee is charged by
+    neither an instrument term nor a tax rule -- so without this member such a fee would have to
+    claim a cause it does not have, which is worse than a widened set: a traceable figure pointing
+    at the wrong declaration.
     """
 
     SEED_DECLARATION = "seed_declaration"
     """A declared opening lot: what the owner already held when the projection started.
 
-    **It passes the test the class docstring sets rather than widening it**: a seed declaration is *a kind of declaration resolvable
-    back to the file it was read from* -- ``id`` is the declaration reference the loader
-    built from the file and the entry (``seeds/owner-001.toml#seed[0]``), so a reader who
-    asks where an opening lot came from is sent to the line that declares it.
+    **It passes the test the class docstring sets rather than widening it**: a seed
+    declaration is *a kind of declaration resolvable back to the file it was read from* --
+    ``id`` is the declaration reference the loader built from the file and the entry
+    (``seeds/owner-001.toml#seed[0]``), so a reader who asks where an opening lot came from is
+    sent to the line that declares it.
 
     What it is emphatically not is the catch-all the docstring forbids. It cannot become the
     place an untracked event ends up, because exactly one function produces it

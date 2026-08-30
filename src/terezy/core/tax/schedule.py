@@ -94,7 +94,7 @@ class RateUndeclaredBefore:
 def rate_on(tax_class: TaxClass, on_date: date) -> RateEntry | RateUndeclaredBefore:
     """The entry in force on ``on_date``: the latest ``effective_from`` on or before it.
 
-    Pure, and the date is an argument -- there is no clock in the core, and a schedule
+    The date is an argument -- there is no clock in the core, and a schedule
     read against "now" would produce a different answer tomorrow from the same inputs.
 
     The boundary is **inclusive**: an entry effective 2024-12-01 governs an event on

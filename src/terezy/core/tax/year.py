@@ -781,7 +781,7 @@ def statements(
 ) -> tuple[AnnualStatement, ...] | TaxYearRefused:
     """Fold a ledger's charges into one statement per ``(tax year x income category)``.
 
-    Pure, and there is no clock anywhere in it: every year comes from an event's own date and
+    Every year comes from an event's own date and
     every deadline from a declared rule. The same ledger yields the same statements for ever,
     which is what makes a tax figure checkable a year from now.
 

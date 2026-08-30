@@ -12,10 +12,7 @@ money sits in, which route it took, or which allocation is better. Keeping the t
 keeps that distinction legible -- a goal is the bar a later recommendation is measured
 against, not the thing that does the measuring.
 
-**Three closed forms, no root finder** (008 research.md D4). FR-014 requires each solved
-figure to reproduce hand-computed arithmetic, which is only checkable when the engine and
-the hand are evaluating the *same* model. An iterative solver converges to a number while
-the hand computation checks a different model, and the project tolerance quietly absorbs
-the difference between the two. So the conventions the arithmetic depends on travel in the
-result rather than living implicitly in this code.
+The conventions the arithmetic depends on travel in the result rather than living
+implicitly in this code; why there is no root finder is argued in
+:mod:`terezy.core.goals.solve`.
 """

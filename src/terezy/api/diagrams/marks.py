@@ -88,9 +88,9 @@ class Mark(Enum):
     EXIT_BY_IDENTITY = "exit-identity"
     """The destination **is** a declared spendable endpoint, so there is no way out to cost.
 
-    Not the same claim as an exit that happened to be free: the money is already where it needed to come
-    back out to, so there are no exit legs at all -- which is why it renders on the *venue* and
-    never as an edge. See :mod:`terezy.api.diagrams.path`.
+    Not the same claim as an exit that happened to be free: the money is already where it
+    needed to come back out to, so there are no exit legs at all -- which is why it renders on
+    the *venue* and never as an edge. See :mod:`terezy.api.diagrams.path`.
     """
 
     EXIT_COST_UNKNOWN = "exit-unknown"

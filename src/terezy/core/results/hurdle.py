@@ -298,7 +298,7 @@ def real_terms(
 ) -> RealTerms:
     """Both real figures for one nominal rate over one window. The only place a slot is filled.
 
-    Pure: no clock, no I/O. Everything nullable inside :class:`Deflation` is nullable because
+    Everything nullable inside :class:`Deflation` is nullable because
     its absence is a *reported reason* rather than an error -- the whole point of FR-012 -- and
     ``nominal`` is nullable for the same reason, so that "there is nothing to deflate" is a
     named answer instead of an unrepresentable state.

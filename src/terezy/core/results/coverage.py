@@ -1,15 +1,11 @@
 """What the declared route graph can and cannot support: the coverage report's records.
 
-FR-001: *the system MUST produce, for every declared destination x every declared income
-stream x every declared regime, a verdict: **comparison-ready** or **not comparison-ready**.*
-FR-003 adds the three distinguished deficits, FR-007 the missing declaration precise enough to
-write the file from, FR-009 the blocked-pair count, and FR-017 the rule that makes this module
-unusual: **the output carries no cost figures at all.**
+FR-001, FR-003, FR-007, FR-009, and FR-017 -- the rule that makes this module unusual:
+**the output carries no cost figures at all.**
 
-Feature 002's ``results/ramp.py`` is this module's sibling and its precedent: frozen records
-carrying data, free functions in ``core/routes/`` computing them, no behaviour on either. What
-follows are the four decisions the *shapes* here carry rather than leaving to a rule a reader
-has to remember.
+``results/ramp.py`` is this module's sibling and its precedent: frozen records carrying data,
+free functions in ``core/routes/`` computing them. What follows are the decisions the *shapes*
+here carry rather than leaving to a rule a reader has to remember.
 
 **No field can hold a number that came from money.** Not one record below has a ``Money``, a
 ``Provenance``, a ``StalenessVerdict`` or a bare ``float`` in it. Integers -- counts and
@@ -293,7 +289,7 @@ class Deficit:
     """One reason a pair is not comparison-ready, and the observation that would fix it."""
 
     kind: DeficitKind
-    """Which of FR-003's three. Never a bare "missing route"."""
+    """Which deficit this is (FR-003). Never a bare "missing route"."""
 
     missing: MissingDeclaration
     """What to go observe."""

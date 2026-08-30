@@ -19,9 +19,9 @@ from typing import Final
 # The share measured on 2026-08-30, to the hundredth of a point. A tree may sit below its
 # ceiling and may not rise above it.
 CEILING: Final[dict[str, float]] = {
-    "src/terezy": 32.82,
+    "src/terezy": 32.37,
     "tests": 25.95,
-    "scripts": 27.50,
+    "scripts": 26.44,
 }
 
 

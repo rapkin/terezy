@@ -26,9 +26,6 @@ available here is reinvestment, which is exactly the number FR-025 forbids inven
 :class:`NoExitTermsDeclared` is the instrument's own way out being unavailable. They call for
 different actions -- declare a route, versus wait for termination or accept the discount --
 so a reader must be able to tell them apart without reading prose (FR-008).
-
-Frozen records, free functions, tagged unions matched with ``match``. Formatting is not a
-result: no percent signs, no currency symbols, no rounding for display.
 """
 
 from __future__ import annotations
@@ -116,7 +113,7 @@ does not fill is a gap nothing else catches.
 class PartContribution:
     """What one part of the round trip contributed, and which call produced it.
 
-    **Never summed across parts.** The six are in three different currencies in the general
+    **Never summed across parts.** They are in three different currencies in the general
     case -- the way in charges in the stream's, the instrument lives in its own, the way out
     delivers in the endpoint's -- and adding them would be the currency conflation Principle
     VI puts at top severity. They are reported side by side so a reader can see which term
@@ -125,7 +122,7 @@ class PartContribution:
     """
 
     part: Part
-    """Which of the six."""
+    """Which part charged."""
 
     amount: Money
     """Signed as the ledger signs things: negative for money leaving, positive for money
@@ -300,7 +297,8 @@ class TupleOutcome:
     """
 
     parts: tuple[PartContribution, ...]
-    """Each term's contribution, separately (FR-005). Six entries, in journey order."""
+    """Each term's contribution, separately (FR-005). One entry per :data:`Part`, in journey
+    order."""
 
     arrivals: tuple[Arrival, ...]
     """Every dated amount that reached a spendable endpoint, in date order.
@@ -489,7 +487,7 @@ class RateNotComparable:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class DeclarationMissing:
-    """One of the tuple's four parts has no declaration, and the join will not assume one.
+    """One of the tuple's parts has no declaration, and the join will not assume one.
 
     FR-006. Never an outcome computed with the missing part at zero, free or instantaneous:
     those are the three flattering defaults, and a comparison built on any of them recommends
@@ -497,7 +495,7 @@ class DeclarationMissing:
     """
 
     part: Literal["instrument", "access", "route_in", "route_out", "tax_class"]
-    """Which of the four parts the declaration belongs to."""
+    """Which part the declaration belongs to."""
 
     what: str
     """The declaration that is missing, named so the remedy is a file rather than a search."""
@@ -522,7 +520,7 @@ class SeamDoesNotChain:
     """
 
     seam: Literal["route_in_to_purchase", "proceeds_to_route_out"]
-    """Which of the two seams failed."""
+    """Which seam failed."""
 
     left: str
     """Where the money is, as ``venue/currency`` -- the end of the way in, or where the

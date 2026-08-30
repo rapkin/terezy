@@ -1,4 +1,4 @@
-"""What one fund holding produced, and the six ways a run can honestly produce nothing.
+"""What one fund holding produced, and the ways a run can honestly produce nothing.
 
 The result shape for :mod:`terezy.core.instruments.fund`. It exists for one reason beyond
 recording amounts: **the two-class split has to be visible**. A projection that taxed a
@@ -6,10 +6,9 @@ distribution at 14% and a redemption at 23% and then reported one total would be
 the ledger and useless to the reader, which is what FR-007's per-class subtotals are for
 (research.md D4).
 
-**Every figure here is read off the ledger**, exactly as ``results.project`` does: the
-events are folded, the charges are computed against what the fold realised, the charges are
-woven back in, and the whole thing is folded again. Nothing is read off the instrument's own
-arithmetic, because a figure that came into existence twice can disagree with itself.
+**Every figure here is read off the ledger**, through the same two folds
+``results.project`` describes. Nothing is read off the instrument's own arithmetic, because a
+figure that came into existence twice can disagree with itself.
 
 **No statistical metric, and no field one could sit in.** Both Inzhur funds are
 assumption-driven, so :func:`statistical_metric` returns a typed refusal and there is
@@ -22,7 +21,7 @@ inside it, the result is a :class:`RangeProjection` -- two complete projections,
 end -- rather than one figure at a midpoint nobody declared (research.md D11). There is no
 midpoint helper in this module or in any other.
 
-**Six typed refusals**, none of them an exception. Each carries the reason, and the reason
+Every refusal is typed, none of them an exception. Each carries the reason, and the reason
 reaches the output.
 """
 
@@ -217,7 +216,7 @@ FundRefusal = (
     | AwaitingVerification
     | RateUndeclaredBefore
 )
-"""The six ways a fund run honestly produces no figure. Match exhaustively."""
+"""Every way a fund run honestly produces no figure. Match exhaustively."""
 
 
 # ---------------------------------------------------------------------------

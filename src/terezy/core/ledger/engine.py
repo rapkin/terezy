@@ -27,9 +27,9 @@ day early -- leaves the closing balance correct and every intermediate balance w
 the engine can hand back a snapshot per date, and both entry points share one per-event
 step: two implementations would be two answers.
 
-Free functions over frozen records. Nothing here performs I/O, formats anything, or
-constructs ``Money``: every amount is derived through ``core.primitives.money``, which is
-how the mark on an unverified yield reaches the balance and the realised gain (FR-015).
+Nothing here constructs ``Money``: every amount is derived through ``core.primitives.money``,
+which is how the mark on an unverified yield reaches the balance and the realised gain
+(FR-015).
 """
 
 from __future__ import annotations
