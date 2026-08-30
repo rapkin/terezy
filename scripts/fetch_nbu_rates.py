@@ -71,7 +71,6 @@ SERIES_ID: Final = "ua_nbu_usd"
 AUTHORITY: Final = "Національний банк України"
 PRICE_CURRENCY: Final = "UAH"
 UNIT_CURRENCY: Final = "USD"
-CURRENCY_CODE: Final = "USD"
 QUOTATION_UNIT: Final = 1.0
 OBSERVATION_KIND: Final = "official_rate"
 """Every constant above is what ``data/official_rates/ua_nbu_usd.toml`` declares. This script
@@ -180,10 +179,10 @@ def _row(entry: object, position: int) -> Row:
             f"unrecognised {extra}. The publisher changed the response's shape -- read it "
             "before changing this script, and do not route around a field nobody looked at."
         )
-    if entry["cc"] != CURRENCY_CODE:
+    if entry["cc"] != UNIT_CURRENCY:
         raise FetchError(
             f"row {position} is quoted for {entry['cc']!r} and this series declares "
-            f"{CURRENCY_CODE!r}. A second currency is a second series with its own id, never "
+            f"{UNIT_CURRENCY!r}. A second currency is a second series with its own id, never "
             "another row on this one."
         )
     on_date = _published_date(entry["exchangedate"], field=f"row {position} exchangedate")
