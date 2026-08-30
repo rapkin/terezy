@@ -1,10 +1,6 @@
 """Day-count, periodicity and business-day conventions: registries of functions.
 
-FR-021: *coupon periodicity, the day-count convention, and the rule applied when a
-coupon date falls on a non-business day MUST all be declared **per issue** in the
-instrument's data file. They MUST NOT be fixed in the engine... an unrecognised
-convention name MUST fail at load time naming the file and the value -- never fall back
-to a default convention.*
+FR-021.
 
 **Why the algorithms are code and only the choice is data**, since this looks like a
 Principle II violation and is not. Principle II requires that adding an *instrument*, a
@@ -13,12 +9,6 @@ convention is none of those four -- it is an algorithm, and adding an algorithm 
 by nature. What must stay data-only is the *choice* of convention per issue, and it does:
 a second OVDP issue using a different day count is a new file and no engine edit, which
 is SC-012 (research.md, "A boundary worth naming explicitly").
-
-**Registries are mappings of functions**, per owner decision D-E. No classes, no
-subclass dispatch, no registration decorator with global side effects. A ``dict`` from a
-declared name to a plain function is the whole mechanism, and its key set is the exact
-list of conventions this engine implements -- readable, testable, and impossible to
-extend at a distance.
 
 **There is no fallback convention, anywhere.** The three lookup functions below take a
 name and either return the implementation or raise naming the value and listing what is
@@ -144,11 +134,9 @@ def shift_months(anchor: date, months: int) -> date:
     quarterly bond maturing on a 31st has coupons on the 31st of every long month rather
     than sliding to the 30th once it has passed a short one.
 
-    ⚙ **Public since feature 008**, which measures a goal's contribution schedule in
-    monthly anniversaries of the date the goal is evaluated from. A bond's month and a
-    goal's month are the same month, and two implementations of this clamping rule would
-    be two answers to "what is one month after 31 January" -- so there is one, here, and
-    the goal solver imports it rather than writing its own.
+    Public because a bond's month and a goal's contribution month are the same month, and
+    two implementations of this clamping rule would be two answers to "what is one month
+    after 31 January".
     """
     month_index = anchor.month - 1 + months
     year = anchor.year + month_index // _MONTHS_IN_YEAR
@@ -220,12 +208,10 @@ def _is_weekend(day: date) -> bool:
 def is_business_day(day: date) -> bool:
     """Whether a date is a business day -- that is, not a weekend.
 
-    ⚙ **Made public by feature 006**, which needs to count *forward* N business days to a
-    settlement date rather than merely adjust one off a weekend. Exposed here rather than
-    reimplemented beside the caller so that "what counts as a business day" has one home:
-    the day public holidays arrive as declared data, one function changes and every
-    settlement date changes with it. The weekends-only limitation and its reason are
-    :func:`_is_weekend`'s, unchanged.
+    Public so that counting *forward* N business days to a settlement date does not
+    reimplement "what counts as a business day" beside its caller: the day public holidays
+    arrive as declared data, one function changes and every settlement date changes with
+    it.
     """
     return not _is_weekend(day)
 
@@ -337,12 +323,8 @@ class ConventionsApplied:
 
     day_count: str
     """The declared day-count convention that turned each accrual period into a fraction
-    of a year, and therefore fixed each coupon's size **on this schedule**.
-
-    ⚙ That last clause is the correction 013 forced (FR-016). The sentence used to be
-    unqualified, and it was never a claim about day counts in general -- it is a claim about
-    what happened to *these* rows, which is exactly what :class:`AmountsAsDeclared` exists to
-    deny for a schedule whose amounts were declared rather than computed.
+    of a year, and therefore fixed each coupon's size **on this schedule** -- a claim about
+    these rows, not about day counts in general (013 FR-016).
     """
 
     business_day_rule: str

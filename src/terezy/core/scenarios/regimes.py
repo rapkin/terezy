@@ -1,7 +1,6 @@
 """Regimes: which routes exist on a date, and the stated assumption that decides it.
 
-FR-019: *a scenario MAY declare a transition date and a route set per regime.* FR-020: *a
-transition date MUST be presented as a stated assumption, never as a known fact.*
+FR-019 and FR-020.
 
 ## What a regime is, and what it is not
 
@@ -57,9 +56,6 @@ declared way out it excludes. In each case there is no honest regime to return, 
 one would mean inventing the owner's belief for them. So these raise, on the precedent of
 ``cost._route_for`` and ``legs.cost_fn_for``: the data layer validates the declaration and can
 name the file and the row, and reaching here incoherent means that validation was bypassed.
-
-**No clock.** ``on_date`` is a parameter -- the date the money moves. Never ``as_of``, which
-decides staleness, and never a wall clock.
 """
 
 from __future__ import annotations
@@ -278,19 +274,13 @@ def routes_in_force(
 ) -> RoutesInForce:
     """The routes a scenario says exist on ``on_date``, with the assumption that decided it.
 
-    The selection function. Pure: no clock, no I/O, no state. ``on_date`` is when the money
-    moves -- never ``as_of``, which decides staleness, and never a wall clock, because a regime
-    that changed with the wall time would make yesterday's run unreproducible.
-
     ``routes`` is **every** declared route, not a regime's own. Declarations do not come and go
     with a belief: the corridors are all declared, and the regime states which of them it
     believes in. What is returned is that narrowing, plus the ids it left out and the transition
     responsible, so an output can show the belief beside the figures it changed
     (:func:`stated_assumption`).
 
-    Raises on a scenario that does not describe one chain of regimes, on a regime naming a route
-    nobody declared, and on a regime that includes a route while excluding the exit route that
-    route declares as its partner. See this module's docstring for why those raise.
+    See this module's docstring for why the refusals below raise.
     """
     _checked(transitions, regimes)
     regime_id, decided_by = _regime_on(transitions, on_date)

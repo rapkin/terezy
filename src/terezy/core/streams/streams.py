@@ -1,10 +1,7 @@
 """An income stream as declared, and how much of it can actually be deployed.
 
-002 FR-006: *income streams MUST be declared data carrying currency, amount, cadence, arrival
-venue and indexation policy.* 002 FR-007 -- *a stream MAY declare an income-tax rate* -- is
-**superseded by 012 FR-015**: a stream names a declared taxation scheme instead, exactly as
-feature 006's instruments name tax classes, and deployable capacity is reported net of what
-that scheme charges.
+002 FR-006 and 012 FR-015: a stream is declared data naming a declared taxation scheme, and
+deployable capacity is reported net of what that scheme charges.
 
 **Why a stream is a term in a cost at all.** ``SIMULATOR_SPEC.md`` §4.2: money that
 *arrives* in dollars needs no hryvnia-to-dollar conversion to reach a dollar asset, so
@@ -15,13 +12,7 @@ destination alone (Principle VI, FR-008). The stream is the term that carries th
 
 ## An undeclared treatment is not a treatment that charges zero
 
-What the distinction produces is one module over, in :mod:`terezy.core.streams.capacity`,
-which states why it is there. The distinction itself belongs here, beside the field.
-
-This module's one genuinely load-bearing decision, and it is the no-silent-default rule
-(Principle IV) applied to an optional field. It survived the migration off the scalar
-verbatim, because a schema change is exactly what deletes a carefully argued distinction by
-accident.
+The no-silent-default rule (Principle IV) applied to an optional field.
 
 :attr:`IncomeStream.tax_scheme` may be omitted, and omitting it means **the owner has not
 stated one**. That is a different claim from a scheme that charges nothing: a stream naming
@@ -34,33 +25,16 @@ charged", which nobody has claimed.
 So the figure comes back as a **tagged union**: a capacity when a treatment was named, and
 an explicitly-empty slot when none was, the second carrying no net field at all. There is
 nothing on it for a caller to mistake for a figure -- the same shape, and the same reason, as
-``ExitCostUnknown`` occupying the round-trip slot. Both records and the function that returns
-them are in :mod:`terezy.core.streams.capacity`, which states why they are not here.
+``ExitCostUnknown`` occupying the round-trip slot.
 
-## Where the legal values went, and why the boundary is sharper for it
+## No citations on a stream
 
 A stream carries **no** ``source``/``retrieved_on``/``verified_on``, and the argument for
 that exemption is in ``contracts/declaration-schema.md``: an owner's own salary is not an
 observation needing a citation but a statement of fact by the only person who can make it.
-
-That argument holds for an amount and a cadence. It never held for a **tax rate**, which is a
-public legal fact about the Republic rather than a statement about the owner -- and the
-retired scalar let one be written into per-owner data uncited. After 012 the owner declares
-*which scheme he is in* (a fact about him, uncited, correctly) and the scheme's rates live in
-``data/tax/schemes/`` with their sources (public facts, cited, correctly). So there is no
-longer any arithmetic in this module that applies a declared rate: the charge arrives already
-computed, its lines already carrying the citations of the entries that produced them, and
-what is left to do is one subtraction.
-
-## No behaviour on the records, and nothing about routes
-
-Frozen records carrying data, free functions beside them (owner decision D-E). And nothing
-in this module imports ``terezy.core.routes``: a stream is per-owner data while a route is a
-curated public fact, and that Principle VII boundary is the reason this package exists
-separately (see this package's ``__init__``). The one place the two meet -- whether a route
-starts where a stream's money actually lands -- lives in ``terezy.core.routes.cost``, which
-already holds both and is where a refusal gets reported.
-
+It holds for an amount and a cadence; it would not hold for a legal rate, which is why the
+scheme's rates live in ``data/tax/schemes/`` with their sources and no arithmetic in this
+module applies a declared rate.
 """
 
 from __future__ import annotations
@@ -146,20 +120,15 @@ class IncomeStream:
     ``amount.currency`` is what decides whether a route has to convert, and it is what
     ``cost_one`` compares against the first leg of the route being costed.
 
-    A separate ``currency`` field was written first, because ``data-model.md`` asks for both.
-    It was removed: two fields stating one fact can disagree, a hand-built record with
-    ``currency=UAH`` and ``amount`` in USD typechecks and is nonsense, and the mitigation on
-    offer -- "the loader builds both from one declared value" -- puts the guarantee in a layer
-    that does not exist yet and cannot help anything constructing a stream in code. One fact,
-    one place.
+    There is deliberately no separate ``currency`` field, though ``data-model.md`` asks for
+    one: two fields stating one fact can disagree, a hand-built record with ``currency=UAH``
+    and ``amount`` in USD typechecks and is nonsense, and the mitigation on offer -- "the
+    loader builds both from one declared value" -- puts the guarantee in a layer that cannot
+    help anything constructing a stream in code. One fact, one place.
 
     In the declaration files this is ``0.0`` -- the honest placeholder, because
     ``SIMULATOR_SPEC.md`` §11 item 3 records that the owner's real monthly figures have not
     been stated. A zero produces a zero result rather than a made-up one.
-
-    ⚙ A second string literal sat under this field until 2026-08-30, saying the same thing in
-    different words. Only the first was an attribute docstring; the second was a dead
-    expression nothing rendered, and the two had already drifted apart.
     """
 
     cadence: Cadence

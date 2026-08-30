@@ -1,10 +1,8 @@
 """Where a number came from, and the monoid that carries it through every figure.
 
-This module is the mechanism behind FR-015 -- *a value with an empty verification date
-MUST be marked as unverified, and every figure computed from it MUST carry that mark* --
-and behind the constitution's Principle I clause that a derived figure losing its
-parent's mark is a defect. The constitution puts that failure in its top severity class,
-and no gate can detect it, which is exactly why the mechanism has to be structural.
+This module is the mechanism behind FR-015 and constitution Principle I. No gate can
+detect a derived figure that lost its parent's mark, which is why the mechanism has to be
+structural rather than a rule to remember.
 
 The structure is a commutative monoid:
 
@@ -35,11 +33,7 @@ from typing import Final
 
 @dataclass(frozen=True, slots=True)
 class SourceRef:
-    """One cited origin for one or more observed values.
-
-    A record carrying only data; ``is_verified`` is a free function below rather than a
-    property, per owner decision D-E.
-    """
+    """One cited origin for one or more observed values."""
 
     id: str
     """Stable and unique within a run.

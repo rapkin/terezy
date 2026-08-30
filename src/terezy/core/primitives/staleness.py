@@ -1,10 +1,6 @@
 """How old an observation is allowed to be, per kind of observation, with no clock.
 
-FR-025: *staleness MUST surface. A value whose verification or retrieval date has aged past
-its threshold MUST be reported as stale on every figure derived from it. A silently stale
-route cost invalidates every comparison built on it.* FR-028 adds the shape: the threshold
-is **per kind of value**, declared with the kind, and a kind with no threshold **fails at
-load** rather than defaulting to a permissive one.
+FR-025 and FR-028.
 
 **Why per kind and not one number for the project.** A peer-to-peer premium moves with
 demand and can shift within a week. A bank's published tariff changes on the bank's own
@@ -59,8 +55,7 @@ from terezy.core.primitives.provenance import Provenance, SourceRef
 class ObservationKind:
     """One sort of thing the owner observes, and how fast it goes out of date.
 
-    Declared in ``data/observation_kinds.toml``; every sourced table in the project names
-    one. A record carrying only data, per owner decision D-E.
+    Declared in ``data/observation_kinds.toml``; every sourced table names one.
     """
 
     id: str
@@ -275,8 +270,7 @@ def staleness_of_sources(
     a caller passed the provenance of every table its figure rests on is that caller's
     property to assert, against the declarations rather than against the provenance it built
     -- two sides from one source prove only that source self-consistent. It is asserted for
-    the join in ``tests/contract/test_marks_survive_the_join.py``, and the two tables that
-    were missing when nobody did are why the sentence is here.
+    the join in ``tests/contract/test_marks_survive_the_join.py``.
 
     A source whose kind is empty is **not aged and not listed in** :attr:`assessed`. That is
     the strict reading: it says nobody could check this rather than claiming it is current,
@@ -342,7 +336,7 @@ def any_stale(verdict: StalenessVerdict) -> bool:
 class Ageing:
     """The two things ageing an observation needs, kept together so neither can go missing.
 
-    ⚙ **Added by feature 007**, and a record rather than two parameters for one reason:
+    A record rather than two parameters for one reason:
     where ageing is *optional*, two separate optional parameters can be half-supplied.
     Passing ``kinds`` and forgetting ``as_of`` would age nothing and say nothing about not
     having done so -- a silent :data:`UNASSESSED` wearing a caller's intention to check. One
@@ -351,9 +345,6 @@ class Ageing:
     Functions where ageing is *required* -- ``routes.cost.cost_one`` and everything under it
     -- keep taking the two separately, because there the type checker already forbids omitting
     either and a wrapper would be ceremony.
-
-    ``as_of`` is an input to the run and is recorded in the manifest. There is no clock here
-    and there may never be one: the same inputs must give the same verdict for ever.
     """
 
     kinds: Mapping[str, ObservationKind]

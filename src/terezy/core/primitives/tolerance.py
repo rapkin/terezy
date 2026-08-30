@@ -1,10 +1,6 @@
 """The single project tolerance. Every comparison of money imports it from here.
 
-FR-002: *each cash flow MUST reproduce hand-computed arithmetic within a single
-project-wide precision tolerance that is defined in exactly one place. No individual
-comparison may define its own tolerance; one that requires a looser tolerance MUST state
-why where the comparison is made.* The constitution puts it in Principle IV and calls a
-test that invents its own tolerance a defect.
+FR-002, and constitution Principle IV.
 
 **Why a tolerance exists at all.** Money is float64 (owner decision D-A), so the
 specification's "reproduces a hand-computed schedule exactly" cannot be taken
@@ -103,8 +99,7 @@ def tied_groups(ordered: Sequence[float]) -> tuple[tuple[int, ...], ...]:
     Requires the sequence to be ordered, so tied entries are adjacent and one pass suffices.
     Groups of one are not ties and are not reported.
 
-    ⚙ **One copy, and it is here rather than in either caller.** This loop lived twice -- once
-    over round-trip costs and once over tuple returns -- and two implementations of "what
+    **One copy, and it is here rather than in either caller.** Two implementations of "what
     counts as a tie" that drifted apart would report a strict winner in one comparison and a
     tie in the other, over the same two numbers. It sits beside :data:`TOLERANCE` because the
     rule *is* the tolerance rule; the callers supply the figures they order by.
