@@ -938,7 +938,8 @@ def _hand_built_cost(*, buy_premium: float = 3.0) -> RampCost:
         cadence="monthly",
         arrives_at="monobank_uah",
         indexation=Indexation(policy="cpi", rate=None),
-        income_tax_rate=None,
+        credited_to="monobank_uah",
+        tax_scheme=None,
     )
     outcome = ranking.rank(
         [FundingPath(destination_id="binance", stream_id=stream.id, route_id=inbound.id)],

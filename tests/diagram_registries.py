@@ -1042,7 +1042,8 @@ def _chain_registry() -> tuple[
             cadence="monthly",
             arrives_at="alpha",
             indexation=Indexation(policy="none", rate=None),
-            income_tax_rate=None,
+            credited_to="alpha",
+            tax_scheme=None,
         )
     }
     return venues, routes, streams

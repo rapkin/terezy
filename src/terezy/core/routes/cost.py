@@ -1256,7 +1256,7 @@ def cost_one(
     ``amount`` and ``streams`` are separate arguments and the amount must be in the named
     stream's currency; a disagreement raises. The amount is deliberately not read off the
     stream: what to move is a decision (a whole month's arrival, a part of it, a figure from
-    :func:`terezy.core.streams.streams.deployable`), while the stream says where money lands
+    :func:`terezy.core.streams.capacity.deployable`), while the stream says where money lands
     and in what currency. What the two may not do is disagree about the currency, because then
     the cost would be attributed to a stream that never delivered the money being costed --
     and the stream is the term that carries the finding (FR-008).

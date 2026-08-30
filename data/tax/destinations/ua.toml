@@ -1,0 +1,192 @@
+# Where the owner's ФОП income is credited, and what each destination is worth.
+#
+# ---------------------------------------------------------------------------
+# THIS TABLE IS NORMATIVE, AND IT IS EXPECTED TO MOVE
+# ---------------------------------------------------------------------------
+#
+# Deciding whether a source's proposition *reaches* a destination is a judgement, not a
+# derivation. Every row therefore carries the judgement that put it there, in `grounds`, and
+# a destination this file has no row for is **refused** rather than reasoned about.
+#
+# These verdicts are the least settled thing in feature 012. They rest on administrative
+# positions rather than statute — practitioner reports of ДПС consultations, and
+# consultations that bind only the taxpayer who asked for them (п. 52.2 ст. 52 ПКУ). Three of
+# them moved while the specification was being written. **What closes one is an індивідуальна
+# податкова консультація of the owner's own**, which is his action and not a research task:
+# `specs/012-fop-group-3/spec.md`'s owner verification task 6.
+#
+# Moving one is deliberately cheap and that is the design: a verdict is a declared word here,
+# every reading computes from a declared scheme, and no destination or component name reaches
+# the engine. A change is a row here, a row in the register beside the spec's table, and a
+# line in task 6 — never a source-code change.
+#
+# **The history of a verdict is not written here.** It lives once, in the register beside the
+# normative table in `specs/012-fop-group-3/spec.md`. Five review rounds found stale verdict
+# history in five different places because a verdict that moved needed five edits; a copy in
+# this header would be the sixth.
+#
+# ---------------------------------------------------------------------------
+# WHAT A READING IS, AND WHAT A DATE NAME IS
+# ---------------------------------------------------------------------------
+#
+# A reading either names a declared scheme and the **name** of the date it recognises income
+# on, or states why it cannot be computed. The date names used below are `credited` — the
+# date funds reach the destination — and `repatriated` — the date they reach a ФОП account at
+# a bank in Ukraine. They are strings a caller supplies dates for; nothing in the engine
+# compares against either.
+
+# ---------------------------------------------------------------------------
+# The ФОП's own foreign-currency account at a bank in Ukraine — INTERPRETED
+# ---------------------------------------------------------------------------
+
+[[destination]]
+scheme          = "ua_fop_group_3_non_vat"
+venue           = "fop"
+verdict         = "interpreted"
+grounds         = "The guidance answers this destination one inference deep from provisions a reader can go and check — п. 292.6 ПКУ (the date of income is the date of crediting) and п. 292.5 ПКУ (foreign-currency income converts at the official NBU rate on the date of income) — and cites no ДПС consultation. INTERPRETED rather than SETTLED because it is an inference from statute rather than a statement of it. THE VERDICT IS DELIBERATELY NARROWED to an account at a bank IN UKRAINE: neither cited source states where the bank is, and reading 'Ukrainian' into that silence would be an unmarked inference. The narrowing makes the confident claim smaller rather than larger; everything the guidance may or may not cover falls to the foreign-bank row below, where the answer is a switch rather than a charge. This is also the row FR-024a sharpens: the owner's income is ROUTED through Deel, which this row does not cover, and CREDITED here, which it does."
+resolution_path = "Nothing is needed for the owner's own case as declared. A ДПС consultation would raise it from INTERPRETED to a numbered position, but the reading is computable and citable as it stands."
+kind            = "tax_rule"
+source          = "https://id-legalgroup.com/blog/vidobrazhennia-dokhodu-fopom-3-hrupy-otrymanoho-vid-nerezydenta-v-inozemnij-valiuti-viacheslav-komornyj-podatkovyj-konsultant-id-legal-group/ (ФОП group 3 income from a non-resident in foreign currency; cites п. 292.5, п. 292.6 and п. 291.4 ст. 291 ПКУ and references no ДПС consultation) and https://factor.academy/blog/deklaraciya-fop-3-grupi-za-1-kvartal-2025-inozemnij-valyutnij-doxid/ — «дата отримання доходу платника ЄП = дата надходження коштів такому платнику у грошовій (готівковій або безготівковій) формі» and «дохід в іноземній валюті перераховується у гривні за офіційним курсом гривні до інвалюти, встановленим НБУ на дату отримання такого доходу», describing a «валютний рахунок ФОП». Accessed 2026-08-23, re-read 2026-08-24 and 2026-08-25."
+retrieved_on    = "2026-08-25"
+verified_on     = ""
+
+  [[destination.reading]]
+  id            = "fop_scheme_at_the_credit_date"
+  label         = "The ФОП scheme, income recognised on the date the funds are credited"
+  scheme        = "ua_fop_group_3_non_vat"
+  recognised_on = "credited"
+  kind          = "tax_rule"
+  source        = "п. 292.6 ПКУ (the date of income is the date of crediting) and п. 292.5 ПКУ (foreign-currency income at the official NBU rate on the date of income), as cited and applied by id-legalgroup and factor.academy above. The base is the WHOLE credited amount: the bank commission is not deducted, because the guidance reads the income as the whole invoice amount including it (id-legalgroup, citing п. 292.5, п. 292.6 and п. 291.4 ст. 291 ПКУ). Every other candidate deduction is an absence recorded rather than a modelled zero — owner verification task 3."
+  retrieved_on  = "2026-08-25"
+  verified_on   = ""
+
+# ---------------------------------------------------------------------------
+# An account in an international payment system — UNSETTLED, three readings
+# ---------------------------------------------------------------------------
+
+[[destination]]
+scheme          = "ua_fop_group_3_non_vat"
+venue           = "payoneer"
+verdict         = "unsettled"
+grounds         = "The source addresses this destination, which is why there is a switch at all — and it numbers nothing on the side a charge would rest on, which is why no reading here may be the tax owed. The ДПС position is reported as living «у своїх роз'ясненнях та індивідуальних податкових консультаціях (ІПК)» with NO NUMBER GIVEN for any of them. The article does cite «Положення … №5» by number, but for the НБУ COUNTER-reading; a number on the other side of a disagreement does not make this side checkable. The source is about Payoneer and nothing wider: «закордонн», «Wise», «за кордоном» and «рахунок за межами» appear zero times, and its argument turns on ДПС «визнає Payoneer небанківською установою» — which by construction says nothing about a foreign BANK, whose row is separate and rests on its own documents."
+resolution_path = "An індивідуальна податкова консультація (ст. 52 ПКУ) of the owner's own. Worth following first: лист ДПСУ № 5064/Г, retrieved for the foreign-bank row below, states the same repatriation condition for a foreign BANK account, and whether it reaches a non-bank payment system is exactly what ДПС distinguishes when it calls Payoneer a «небанківська установа»."
+kind            = "tax_rule"
+source          = "https://yankiv.com/dps-protiv-nbu-payoneer-fop-2025/ (29.09.2025) — «датою отримання доходу ФОП є дата зарахування коштів на рахунок у системі Payoneer, а не на банківський рахунок в Україні», conditioned on «щоб ці кошти вважалися доходом підприємця, їх необхідно перерахувати на український банківський рахунок ФОП (у форматі IBAN) до кінця звітного періоду», failing which «вони оподатковуються як дохід фізичної особи за значно вищими ставками: 18% ПДФО та 5% військового збору». Accessed 2026-08-24, re-fetched 2026-08-25."
+retrieved_on    = "2026-08-25"
+verified_on     = ""
+
+  [[destination.reading]]
+  id            = "dps_on_the_payment_system_credit"
+  label         = "The ДПС reading («Стратегія 1») — income on the date funds reach the payment-system balance"
+  scheme        = "ua_fop_group_3_non_vat"
+  recognised_on = "credited"
+  kind          = "tax_rule"
+  source        = "https://yankiv.com/dps-protiv-nbu-payoneer-fop-2025/ — «датою отримання доходу ФОП є дата зарахування коштів на рахунок у системі Payoneer, а не на банківський рахунок в Україні», reported as ДПС's position in its роз'яснення and ІПК, none of them numbered."
+  retrieved_on  = "2026-08-25"
+  verified_on   = ""
+
+  [[destination.reading]]
+  id                  = "nbu_on_the_repatriation"
+  label               = "The НБУ reading («Стратегія 2») — the same scheme and components, on the date the funds reach the ФОП's Ukrainian account"
+  scheme              = "ua_fop_group_3_non_vat"
+  recognised_on       = "repatriated"
+  departs_from_source = "The source computes this reading's base as «гривнева сума, що надійшла на рахунок за курсом банку на момент зарахування» — the BANK's rate. This system computes it at the OFFICIAL rate for this reading's own date instead, per п. 292.5. A channel rate in a tax base is categorically forbidden (011 FR-013) and the three currency roles exist to keep exactly that apart; the article's shortcut is a practitioner's convenience. The divergence is declared here rather than silently absorbed."
+  kind                = "tax_rule"
+  source              = "https://yankiv.com/dps-protiv-nbu-payoneer-fop-2025/ — «Датою отримання доходу вважається день зарахування коштів з Payoneer на ваш рахунок ФОП в українському банку», resting on «Положення … №5», which is the only NUMBERED document the article cites — and it numbers the counter-reading rather than the charge."
+  retrieved_on        = "2026-08-25"
+  verified_on         = ""
+
+  [[destination.reading]]
+  id            = "non_repatriation_personal_income"
+  label         = "The non-repatriation reading — personal income, if the funds are not moved to a Ukrainian ФОП account within the reporting period"
+  scheme        = "ua_personal_income"
+  recognised_on = "credited"
+  kind          = "tax_rule"
+  source        = "https://yankiv.com/dps-protiv-nbu-payoneer-fop-2025/ — «вони оподатковуються як дохід фізичної особи за значно вищими ставками: 18% ПДФО та 5% військового збору». The rates themselves are the one declaration in data/tax/schemes/ua_personal_income.toml, consumed here and not copied. This reading is conditional on the owner's own conduct; declaring that conduct as a fact would NOT collapse the switch to one figure, because nothing numbers the position on which the other two rest."
+  retrieved_on  = "2026-08-25"
+  verified_on   = ""
+
+# ---------------------------------------------------------------------------
+# A personal, non-ФОП account or card — UNSETTLED, one reading
+# ---------------------------------------------------------------------------
+
+[[destination]]
+scheme          = "ua_fop_group_3_non_vat"
+venue           = "monobank_uah"
+verdict         = "unsettled"
+grounds         = "One source reaches this destination and it EXCLUDES the ФОП scheme rather than contesting it, so there is no second reading to compute — the switch holds one figure, and that is what the criterion produces rather than a thinner version of it. The source numbers nothing behind «Категорично ні», so the one figure is still not the tax owed: one labelled what-if is the honest shape of *the source is unambiguous and nobody can check it*. biz.ligazakon does not help here — its proposition is about a таxpayer status («не ФОП») plus CRYPTO income, and neither half matches a ФОП whose contract income lands somewhere personal."
+resolution_path = "An індивідуальна податкова консультація (ст. 52 ПКУ) of the owner's own. The cheapest of the four: nothing about the substance is disputed, only unnumbered."
+kind            = "tax_rule"
+source          = "https://yankiv.com/dps-protiv-nbu-payoneer-fop-2025/ — «Чи можна виводити кошти на особисту картку?» / «Категорично ні. Це призведе до оподаткування доходу за сукупною ставкою 23% замість пільгових 6%.» (an FAQ heading and its answer, two blocks on the page, joined here and marked as such), and on the same page «кошти залишилися на Payoneer або виведені на особисту картку … оподатковуються як дохід фізичної особи за значно вищими ставками: 18% ПДФО та 5% військового збору». Accessed 2026-08-24, re-fetched 2026-08-25."
+retrieved_on    = "2026-08-25"
+verified_on     = ""
+
+  [[destination.reading]]
+  id            = "personal_income_on_a_personal_card"
+  label         = "Personal income — the ФОП scheme is excluded here rather than contested"
+  scheme        = "ua_personal_income"
+  recognised_on = "credited"
+  kind          = "tax_rule"
+  source        = "https://yankiv.com/dps-protiv-nbu-payoneer-fop-2025/ — «оподатковуються як дохід фізичної особи за значно вищими ставками: 18% ПДФО та 5% військового збору». The rates are the one declaration in data/tax/schemes/ua_personal_income.toml, consumed here and not copied."
+  retrieved_on  = "2026-08-25"
+  verified_on   = ""
+
+# ---------------------------------------------------------------------------
+# A crypto-exchange account — UNSETTLED, one reading
+# ---------------------------------------------------------------------------
+
+[[destination]]
+scheme          = "ua_fop_group_3_non_vat"
+venue           = "coinbase"
+verdict         = "unsettled"
+grounds         = "The source's QUESTION is this destination in as many words, and its answer excludes the ФОП scheme: «Чи включається до доходу ФОП кошти отримані підприємцем за надані послуги на рахунок відкритий на платформі Binance?» — «Ні, не включаються. Binance – це сервіс обміну криптовалют. ФОП може отримувати оплату за надані послуги лише у грошовій формі і лише на рахунки відкриті в українському банку. А оплата за послуги у криптовалюті не є доходом ФОП, а є доходом фізособи.» So there is nothing to contest and the switch holds one figure. It numbers nothing ON THE DESTINATION PROPOSITION: its three citations attach elsewhere — ЗІР 107.01.02 to selling crypto, ЗІР 104.08 to the general system's crypto bookkeeping, п. 168.2.1 / ЗІР 103.02 to the general declare-and-pay duty — and a number on a neighbouring proposition does not make this one checkable. THE ANSWER'S ACCOUNT-LOCATION LIMB IS DELIBERATELY NOT EXTENDED to the payment-system or foreign-bank rows: its own chain runs entirely through crypto, that limb carries no citation of its own, and better-attested material points the other way at the foreign-bank row."
+resolution_path = "An індивідуальна податкова консультація (ст. 52 ПКУ) of the owner's own."
+kind            = "tax_rule"
+source          = "https://7eminar.ua/news/4193-ci-je-doxodom-fopa-kosti-u-viglyadi-kriptovalyuti (23.01.2025), an editorial Q&A. Retrieved 2026-08-27."
+retrieved_on    = "2026-08-27"
+verified_on     = ""
+
+  [[destination.reading]]
+  id            = "personal_income_at_a_crypto_exchange"
+  label         = "Personal income — the ФОП scheme is excluded here rather than contested"
+  scheme        = "ua_personal_income"
+  recognised_on = "credited"
+  kind          = "tax_rule"
+  source        = "https://7eminar.ua/news/4193-ci-je-doxodom-fopa-kosti-u-viglyadi-kriptovalyuti — «Тому, такий ФОП повинен включити такі кошти до оподаткованого доходу фізособи і сплатити з такого доходу ПДФО та ВЗ.» The rates are the one declaration in data/tax/schemes/ua_personal_income.toml, consumed here and not copied. What is modelled is contract income in DOLLARS credited to an account at the exchange — data/routes/deel_to_coinbase.toml declares the leg USD → USD — so the four sources this feature cites about a ФОП settling IN crypto do not reach it, and the загальна система at the 15% penalty rate is that consequence and therefore not a candidate."
+  retrieved_on  = "2026-08-27"
+  verified_on   = ""
+
+# ---------------------------------------------------------------------------
+# A bank account outside Ukraine — UNSETTLED, two readings
+# ---------------------------------------------------------------------------
+
+[[destination]]
+scheme          = "ua_fop_group_3_non_vat"
+venue           = "foreign_bank_usd"
+verdict         = "unsettled"
+grounds         = "The only row here whose readings rest on ДПС documents this project has RETRIEVED AND READ rather than seen reported — and it is UNSETTLED for exactly that reason: the two documents point different ways, and neither binds this owner. An ІПК binds nobody but the taxpayer who asked for it — «індивідуальна податкова консультація має індивідуальний характер і може використовуватися виключно платником податків, якому надано таку консультацію» (п. 52.2 ст. 52 ПКУ, quoted from ІПК № 100/ІПК itself) — and a лист in reply to one person's звернення binds this owner no more. THE TWO READINGS ARE NOT SYMMETRICALLY SUPPORTED, and saying so is the point of retrieving the documents: № 5064/Г states its proposition in terms, while ІПК № 100/ІПК does NOT — asked squarely whether such income bears ПДФО, ВЗ and ЄСВ, it recites the єдиний-податок machinery and concludes only that a ФОП «можуть здійснювати зовнішньоекономічну діяльність за умови дотримання вимог розділу XIV Кодексу», and reading that silence as the earlier position is factor.academy's inference rather than the document's words. A third document factor.academy cited for the personal-income position, ІПК № 177/ІПК/99-00-04-01-04-06 від 27.01.2023, was retrieved and is a consultation for a Товариство «щодо сплати земельного податку»: it is struck, and the personal-income reading rests on № 5064/Г alone."
+resolution_path = "An індивідуальна податкова консультація (ст. 52 ПКУ) of the owner's own. Here two ДПС documents were retrieved and they point different ways, so what is needed is not a first number but one addressed to him."
+kind            = "tax_rule"
+source          = "Лист ДПСУ від 04.07.2022 № 5064/Г/99-00-24-03-03-09 «Щодо оподаткування зарубіжних доходів ФОП» (https://document.vobu.ua/doc/14135) and ІПК від 21.01.2022 № 100/ІПК/99-00-04-03-03-06 (https://ipk.vobu.ua/view/25359-100-IPK-99-00-04-03-03-06), both retrieved in full 2026-08-27 from the public ІПК register at https://ipk.vobu.ua/ and its companion document archive. The practitioner articles that led to them: https://factor.academy/blog/fop-otrimu-koshti-na-rahunok-v-inozemnomu-banku/ (10.03.2024) and https://bip.net.ua/articles/fop-otrimuye-dohid-na-rahunok-v-inozemnomu-banku/. The ДПС's own page on the question (zp.tax.gov.ua/media-ark/news-ark/708956.html) returns HTTP 403 to automated retrieval, so nothing rests on it."
+retrieved_on    = "2026-08-27"
+verified_on     = ""
+
+  [[destination.reading]]
+  id            = "foreign_income_personal"
+  label         = "Personal income as іноземний дохід — the current ДПС position, conditional on the funds not being moved to a Ukrainian entrepreneurial account"
+  scheme        = "ua_personal_income"
+  recognised_on = "credited"
+  kind          = "tax_rule"
+  source        = "Лист ДПСУ від 04.07.2022 № 5064/Г/99-00-24-03-03-09 (https://document.vobu.ua/doc/14135) — «якщо кошти, отримані від нерезидента на рахунок, підкритий у іноземному банку, не зараховані на рахунок для здійснення підприємницької діяльності у банку в Україні, то такі кошти не включаються до доходу фізичної особи – підприємця платника єдиного податку», taxed instead as «іноземний дохід» under п. 170.11 ст. 170, п. 164.4 ст. 164 and п. 16-1 підрозділу 10 розділу ХХ ПКУ. («підкритий» is the document's own typo.) The rates are the one declaration in data/tax/schemes/ua_personal_income.toml, consumed here and not copied."
+  retrieved_on  = "2026-08-27"
+  verified_on   = ""
+
+  [[destination.reading]]
+  id            = "fop_scheme_on_a_foreign_account"
+  label         = "The ФОП scheme at the credit date — the reading factor.academy argues for, calling the fiscal approach «неправомірний»"
+  scheme        = "ua_fop_group_3_non_vat"
+  recognised_on = "credited"
+  kind          = "tax_rule"
+  source        = "https://factor.academy/blog/fop-otrimu-koshti-na-rahunok-v-inozemnomu-banku/ (10.03.2024) — «кошти, отримані у валюті на рахунок, відкритий за кордоном, слід оподатковувати за тими правилами, що і доходи, отримані на рахунки, відкриті в українських банках у валюті… на дату надходження валюти слід кількість отриманої валюти помножити на курс НБУ… сплатити податок (2/3/5 %)», noting «в законодавстві України не існує і прямої заборони на отримання ФОП доходів на іноземний банківський рахунок, навіть для єдиноподатників». It rests on ІПК від 21.01.2022 № 100/ІПК/99-00-04-03-03-06 (https://ipk.vobu.ua/view/25359-100-IPK-99-00-04-03-03-06), which answers a ФОП of the third group asking about «дохід від своєї діяльності за договором про надання послуг, укладеним з нерезидентом» credited to «рахунок в іноземному банку» — but which does NOT state this position: reading its silence as the earlier position is factor's inference, recorded on the row's grounds."
+  retrieved_on  = "2026-08-27"
+  verified_on   = ""

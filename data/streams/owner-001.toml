@@ -18,15 +18,24 @@
 # zero result rather than a made-up one; inventing a salary would put a number in every
 # downstream figure that nobody declared.
 #
-# **`income_tax_rate_pct` is omitted from both streams, and omission is a claim.** It means
-# *the owner has not stated a rate* — which is different from stating zero. So
-# `streams.deployable` returns `IncomeTaxRateUndeclared`, a record with no net field at all,
-# rather than a net figure that quietly equals the gross. Declaring `0.0` here would be
-# worse than leaving it out: it would assert that nothing is withheld from a Ukrainian
-# salary, which is false, and it is not mine to assert on the owner's behalf. The field is
-# exempt from the citation requirement for the reason the contract gives — §4.2 puts the
-# owner's own income-tax position outside the simulator, and this field exists only so the
-# deployable figure is not overstated.
+# **`arrives_at` and `credited_to` are two facts, and neither is inferred from the other.**
+# `arrives_at` is the ROUTING ORIGIN — the venue the owner first controls the money at, and
+# the node every funding route starts from. `credited_to` is the TAX EVENT'S LOCATION — where
+# the income is credited for the purpose of deciding which reading of the law applies. For the
+# contract income they hold different values: it is routed through Deel and credited to the
+# ФОП account. A default in either direction would settle the tax treatment by accident.
+#
+# **`tax_scheme` names a declared scheme; omitting it is a claim.** It means *the owner has
+# not named a treatment* — which is different from a scheme that charges nothing. So
+# `capacity.deployable` returns `TaxTreatmentUndeclared`, a record with no net field at all,
+# rather than a net figure that quietly equals the gross.
+#
+# **No tax RATE lives in this file any more, and that is feature 012 repairing a boundary.**
+# The citation exemption below is argued for an owner's statement about himself; it never
+# covered a rate, which is a public legal fact about the Republic. What he declares here is
+# WHICH REGIME HE IS IN; the regime's rates are curated and cited in `data/tax/schemes/`.
+# The salary stream names no scheme, because his employment-income position has not been
+# stated and inventing one is not mine to do.
 #
 # **Why two streams in two currencies.** §4.2: money that *arrives* in dollars needs no
 # hryvnia-to-dollar conversion to reach a dollar asset. That is the whole of G1 and the
@@ -34,23 +43,32 @@
 # alone (FR-008). One stream would make the finding untestable.
 
 [[stream]]
-id         = "salary_uah"
-owner_id   = "owner-001"
-currency   = "UAH"
-amount     = 0.0
-cadence    = "monthly"
-arrives_at = "monobank_uah"
+id          = "salary_uah"
+owner_id    = "owner-001"
+currency    = "UAH"
+amount      = 0.0
+cadence     = "monthly"
+arrives_at  = "monobank_uah"
+credited_to = "monobank_uah"
+# Routed and credited to the same place, which is what a domestic salary does. Declaring it
+# twice rather than defaulting one from the other is the point of FR-024a: the two questions
+# happen to have one answer here and do not for the stream below.
 
   [stream.indexation]
   policy = "cpi"
 
 [[stream]]
-id         = "contract_usd"
-owner_id   = "owner-001"
-currency   = "USD"
-amount     = 0.0
-cadence    = "monthly"
-arrives_at = "deel"
+id          = "contract_usd"
+owner_id    = "owner-001"
+currency    = "USD"
+amount      = 0.0
+cadence     = "monthly"
+arrives_at  = "deel"
+credited_to = "fop"
+tax_scheme  = "ua_fop_group_3_non_vat"
+# The ФОП account in dollars. Ukrainian currency restrictions mean the dollars must be sold
+# for hryvnia before they can be spent domestically — and the tax is assessed at the official
+# rate on the CREDIT date, not the sale date, so the sale moves no tax figure at all.
 
   [stream.indexation]
   policy = "none"

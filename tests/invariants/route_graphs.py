@@ -114,16 +114,18 @@ SALARY_UAH = IncomeStream(
     cadence="monthly",
     arrives_at=ORIGIN_VENUE,
     indexation=Indexation(policy="cpi", rate=None),
-    income_tax_rate=None,
+    credited_to=ORIGIN_VENUE,
+    tax_scheme=None,
 )
 """The hryvnia salary. The stream that has to cross the ramp to reach a dollar asset.
 
-``amount`` is ``0.0`` and ``income_tax_rate`` is ``None`` because both are honestly unknown:
+``amount`` is ``0.0`` and ``tax_scheme`` is ``None`` because both are honestly unknown:
 ``SIMULATOR_SPEC.md`` §11 item 3 records that the owner's monthly figures have not been
-stated, and ``None`` says *no rate has been declared* rather than asserting a zero one. No
-costing reads either field -- the amount to move is passed to ``cost_one`` explicitly -- so a
-fixture that invented them would be inventing numbers nothing needs. The tests that do need
-a stated amount or rate declare their own, and say there that they invented it.
+stated, and ``None`` says *no treatment has been named* rather than asserting a scheme that
+charges nothing. No costing reads either field -- the amount to move is passed to ``cost_one``
+explicitly -- so a fixture that invented them would be inventing numbers nothing needs. The
+tests that do need a stated amount or a charge declare their own, and say there that they
+invented it.
 """
 
 CONTRACT_USD = IncomeStream(
@@ -133,7 +135,8 @@ CONTRACT_USD = IncomeStream(
     cadence="monthly",
     arrives_at=ORIGIN_VENUE,
     indexation=Indexation(policy="none", rate=None),
-    income_tax_rate=None,
+    credited_to=ORIGIN_VENUE,
+    tax_scheme=None,
 )
 """The dollar contract income. The stream that needs no conversion at all, which is the
 whole of §4.2's structural point."""
@@ -870,7 +873,8 @@ COVERAGE_SALARY = IncomeStream(
     cadence="monthly",
     arrives_at=HOME_VENUE,
     indexation=Indexation(policy="cpi", rate=None),
-    income_tax_rate=None,
+    credited_to=HOME_VENUE,
+    tax_scheme=None,
 )
 COVERAGE_CONTRACT = IncomeStream(
     id="contract_usd",
@@ -879,7 +883,8 @@ COVERAGE_CONTRACT = IncomeStream(
     cadence="monthly",
     arrives_at=CONTRACT_VENUE,
     indexation=Indexation(policy="none", rate=None),
-    income_tax_rate=None,
+    credited_to=CONTRACT_VENUE,
+    tax_scheme=None,
 )
 COVERAGE_STREAMS: Mapping[str, IncomeStream] = {
     COVERAGE_SALARY.id: COVERAGE_SALARY,
@@ -1251,7 +1256,8 @@ def composition_registries(draw: st.DrawFn) -> CompositionRegistry:
             cadence="monthly",
             arrives_at=COMPOSE_ORIGIN,
             indexation=Indexation(policy="none", rate=None),
-            income_tax_rate=None,
+            credited_to=COMPOSE_ORIGIN,
+            tax_scheme=None,
         ),
         spendable=frozenset(
             {SpendableEndpoint(venue_id=COMPOSE_TARGET, currency=currencies[COMPOSE_TARGET])}

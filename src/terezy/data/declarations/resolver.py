@@ -43,6 +43,7 @@ from terezy.core.decision.tuple_outcome import Registries
 from terezy.core.instruments import registry as instrument_registry
 from terezy.core.primitives import money
 from terezy.core.routes.venues import can_hold
+from terezy.core.tax.scheme import Verdict
 from terezy.core.tax.year import AssessmentRules
 from terezy.data.declarations import loader
 from terezy.data.declarations.errors import DeclarationError
@@ -69,6 +70,7 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.tax import year as tax_year
     from terezy.core.tax.interface import TaxClass
     from terezy.core.tax.official_rate import OfficialRateSeries
+    from terezy.core.tax.scheme import CreditingDestination, TaxationScheme
     from terezy.data.declarations.loader import ScenarioDeclaration
 
 INSTRUMENTS_DIR = "instruments"
@@ -975,7 +977,12 @@ def _resolved_routes(
 def _resolved_streams(
     paths: Sequence[Path], venues: Mapping[str, Venue]
 ) -> tuple[dict[str, IncomeStream], dict[str, Path]]:
-    """Declared income streams by id, each landing at a venue that can hold its currency."""
+    """Declared income streams by id, each naming venues that can hold the stream's currency.
+
+    **Both venues are checked and neither is derived from the other** (012 FR-024a). They
+    answer different questions -- where a funding route starts, and where the income is
+    credited for tax -- and for the owner's contract income they hold different values.
+    """
     streams: dict[str, IncomeStream] = {}
     files: dict[str, Path] = {}
     for path in paths:
@@ -994,6 +1001,13 @@ def _resolved_streams(
                 venues,
                 path=path,
                 field_path=f"stream[{stream.id}].arrives_at",
+            )
+            _check_venue(
+                stream.credited_to,
+                stream.amount.currency,
+                venues,
+                path=path,
+                field_path=f"stream[{stream.id}].credited_to",
             )
             streams[stream.id] = stream
             files[stream.id] = path
@@ -2162,6 +2176,35 @@ citation exemption a belief needs without pretending to be a scenario document.
 """
 
 
+def _timing_by_jurisdiction(root: Path) -> dict[str, tuple[loader.TimingDeclaration, Path]]:
+    """Every ``data/tax/timing/<jurisdiction>.toml``, keyed by the jurisdiction it declares.
+
+    Hoisted because two entry points need it -- the assessment rules a tax year is assembled
+    from, and the official-rate series a taxation scheme's base is struck at -- and reading
+    the directory twice would let the duplicate-jurisdiction refusal exist in one of them and
+    not the other.
+
+    An empty directory is **not** refused here: whether a run can proceed without assessment
+    rules is the caller's question and they answer it differently.
+    """
+    declared: dict[str, tuple[loader.TimingDeclaration, Path]] = {}
+    for path in sorted((root / TAX_TIMING_DIR).glob("*.toml")):
+        timing = loader.timing_from_file(path)
+        if timing.jurisdiction_id in declared:
+            already = declared[timing.jurisdiction_id][1]
+            raise DeclarationError(
+                path,
+                f"{loader.TIMING_TABLE}.jurisdiction",
+                f"declares rules for {timing.jurisdiction_id!r}, which {already.name} already "
+                "declares. Two rule sets cannot govern one jurisdiction: whichever loaded "
+                "second would win by directory order, and every liability would rest on the "
+                "other one.",
+                f"merge {already.name} and {path.name}",
+            )
+        declared[timing.jurisdiction_id] = (timing, path)
+    return declared
+
+
 def tax_rules_from_data_root(
     root: Path, declarations: Declarations
 ) -> Mapping[str, AssessmentRules]:
@@ -2171,8 +2214,8 @@ def tax_rules_from_data_root(
     class references resolve against **the same** rate packs the run will charge with: reading
     the files twice would let a reference resolve here and fail at the charge, or the reverse.
     """
-    files = sorted((root / TAX_TIMING_DIR).glob("*.toml"))
-    if not files:
+    timing = _timing_by_jurisdiction(root)
+    if not timing:
         raise DeclarationError(
             root / TAX_TIMING_DIR,
             "",
@@ -2184,21 +2227,9 @@ def tax_rules_from_data_root(
         )
     rates = official_rates_from_data_root(root, _resolved_kinds(root / KINDS_FILE)[0])
     built: dict[str, AssessmentRules] = {}
-    declaring: dict[str, Path] = {}
-    for path in files:
-        declared = loader.timing_from_file(path)
-        if declared.jurisdiction_id in built:
-            raise DeclarationError(
-                path,
-                f"{loader.TIMING_TABLE}.jurisdiction",
-                f"declares rules for {declared.jurisdiction_id!r}, which "
-                f"{declaring[declared.jurisdiction_id].name} already declares. Two rule sets "
-                "cannot govern one jurisdiction: whichever loaded second would win by "
-                "directory order, and every liability would rest on the other one.",
-                f"merge {declaring[declared.jurisdiction_id].name} and {path.name}",
-            )
+    for jurisdiction, (declared, path) in timing.items():
         _check_timing_classes(path, declared, declarations)
-        built[declared.jurisdiction_id] = AssessmentRules(
+        built[jurisdiction] = AssessmentRules(
             jurisdiction_id=declared.jurisdiction_id,
             tax_currency=declared.tax_currency,
             official_rate=_official_rate_for(path, declared, rates),
@@ -2207,7 +2238,6 @@ def tax_rules_from_data_root(
             timing={rule.category_id: rule for rule in declared.timing},
             methods={standing.method: standing for standing in declared.methods},
         )
-        declaring[declared.jurisdiction_id] = path
     return built
 
 
@@ -2642,3 +2672,258 @@ def _official_rate_for(
             f"name a series quoting {declared.tax_currency.value} per another currency",
         )
     return found
+
+
+# ---------------------------------------------------------------------------
+# 012-fop-group-3: the taxation scheme, and where income is credited
+# ---------------------------------------------------------------------------
+#
+# Three relations a per-file validator structurally cannot check:
+#
+# **Two files declaring one scheme identity.** Whichever loaded second would win by directory
+# order, and every charge would rest on the other one.
+#
+# **A destination row's scheme and venue.** A row naming a scheme nobody declares computes
+# nothing; a row naming a venue nobody declares records a judgement about a place this model
+# cannot name.
+#
+# **A stream's declared treatment.** Whether it exists, and whether it is a scheme a stream is
+# allowed to name — a `reading` scheme exists only inside a labelled what-if.
+
+SCHEMES_DIR = "tax/schemes"
+"""Where declared taxation schemes live. A subdirectory of `tax/`, which `check_provenance`
+walks recursively and the rate-pack glob does not."""
+
+DESTINATIONS_DIR = "tax/destinations"
+"""Where the normative crediting-destination tables live."""
+
+
+@dataclass(frozen=True, slots=True)
+class SchemeDeclarations:
+    """Every declared taxation scheme and crediting destination under one data root."""
+
+    ramp: RampDeclarations
+    """The venues and streams the rows above are checked against, resolved once."""
+
+    schemes: Mapping[str, TaxationScheme]
+    """By their own declared id, never by file name or load order."""
+
+    official_rates: Mapping[str, OfficialRateSeries | None]
+    """The series each scheme's jurisdiction declares for its tax currency, by jurisdiction id.
+
+    Resolved here rather than left to the caller, because picking a series by hand is exactly
+    how a base comes to be struck from one the jurisdiction did not name -- which is the
+    refusal 011 already writes for the case, and which a caller cannot be relied on to avoid.
+    ``None`` where the jurisdiction names no series, which is a declared absence: a
+    foreign-currency charge under that scheme then refuses saying so.
+    """
+
+    destinations: Mapping[tuple[str, str], CreditingDestination]
+    """Keyed ``(scheme id, venue id)``. A missing key is not an error here: it is what
+    ``core.tax.scheme.apply`` refuses on, naming the destination and the scheme."""
+
+    scheme_files: Mapping[str, Path]
+    destination_files: Mapping[tuple[str, str], Path]
+
+
+def schemes_from_data_root(root: Path, *, base_currency: Currency) -> SchemeDeclarations:
+    """Every scheme and destination under a data root, with every reference checked.
+
+    Composes ``ramp_from_data_root`` rather than taking venues and streams as arguments,
+    because all three checks below need them and a caller assembling the pieces by hand is a
+    caller who can assemble two-thirds of them.
+
+    Sorted, so a run does not depend on the order a filesystem happens to return.
+    """
+    ramp = ramp_from_data_root(root, base_currency=base_currency)
+    timing = _timing_by_jurisdiction(root)
+    rates = official_rates_from_data_root(root, _resolved_kinds(root / KINDS_FILE)[0])
+    schemes: dict[str, TaxationScheme] = {}
+    scheme_files: dict[str, Path] = {}
+    for path in sorted((root / SCHEMES_DIR).glob("*.toml")):
+        declared = loader.scheme_from_file(path)
+        if declared.id in schemes:
+            raise DeclarationError(
+                path,
+                f"{loader.SCHEME_TABLE}.id",
+                f"declares the scheme id {declared.id!r}, which "
+                f"{scheme_files[declared.id].name} already declares. Two schemes cannot share "
+                "an identity: whichever loaded second would win by directory order, and every "
+                "charge under that name would rest on the other one's components with nothing "
+                "in the output to say which.",
+                f"give one of {scheme_files[declared.id].name} and {path.name} a distinct id",
+            )
+        _check_tax_currency(declared, timing, path=path)
+        schemes[declared.id] = declared
+        scheme_files[declared.id] = path
+
+    official_rates: dict[str, OfficialRateSeries | None] = {}
+    for scheme in schemes.values():
+        found = timing.get(scheme.jurisdiction_id)
+        official_rates[scheme.jurisdiction_id] = (
+            None if found is None else _official_rate_for(found[1], found[0], rates)
+        )
+
+    destinations: dict[tuple[str, str], CreditingDestination] = {}
+    destination_files: dict[tuple[str, str], Path] = {}
+    for path in sorted((root / DESTINATIONS_DIR).glob("*.toml")):
+        for position, row in enumerate(loader.destinations_from_file(path)):
+            key = (row.scheme_id, row.venue_id)
+            if key in destinations:
+                already = destination_files[key]
+                where = (
+                    "this file already records it above"
+                    if already == path
+                    else f"{already.name} already records it"
+                )
+                raise DeclarationError(
+                    path,
+                    f"{loader.DESTINATION_TABLE}[{position}]",
+                    f"records how {row.scheme_id!r} income credited at {row.venue_id!r} is "
+                    f"treated, and {where}. One destination under one scheme has one verdict: "
+                    "two rows for it are not merged and neither wins, because whichever the "
+                    "lookup reached first would decide a legal position by file order.",
+                    "delete one of the two rows",
+                )
+            _check_destination(row, schemes, ramp.venues, path=path, key=key)
+            destinations[key] = row
+            destination_files[key] = path
+
+    for stream in ramp.streams.values():
+        _check_treatment(stream, schemes, path=ramp.stream_files[stream.id])
+
+    return SchemeDeclarations(
+        ramp=ramp,
+        schemes=schemes,
+        official_rates=official_rates,
+        destinations=destinations,
+        scheme_files=scheme_files,
+        destination_files=destination_files,
+    )
+
+
+def _check_tax_currency(
+    scheme: TaxationScheme,
+    timing: Mapping[str, tuple[loader.TimingDeclaration, Path]],
+    *,
+    path: Path,
+) -> None:
+    """A scheme assesses in the currency its jurisdiction assesses in, or it is refused.
+
+    Checked only where the jurisdiction declares timing rules at all: a scheme in a
+    jurisdiction with none has nothing to disagree with, and refusing it here would demand a
+    tax year nobody is assembling.
+    """
+    declared = timing.get(scheme.jurisdiction_id)
+    if declared is None or declared[0].tax_currency is scheme.tax_currency:
+        return
+    raise DeclarationError(
+        path,
+        f"{loader.SCHEME_TABLE}.tax_currency",
+        f"is {scheme.tax_currency.value} and jurisdiction {scheme.jurisdiction_id!r} assesses "
+        f"tax in {declared[0].tax_currency.value} ({declared[1].name}). The series that "
+        "jurisdiction names quotes its own tax currency, so this scheme would refuse every "
+        "foreign arrival for want of a pair -- and, worse, would charge an arrival already in "
+        f"{scheme.tax_currency.value} with no rate consulted at all, producing a base in a "
+        "currency the jurisdiction does not assess in and no sign that anything was wrong.",
+        f'declare tax_currency = "{declared[0].tax_currency.value}", or move the scheme to a '
+        "jurisdiction that assesses in the one it names",
+    )
+
+
+def _check_destination(
+    row: CreditingDestination,
+    schemes: Mapping[str, TaxationScheme],
+    venues: Mapping[str, Venue],
+    *,
+    path: Path,
+    key: tuple[str, str],
+) -> None:
+    """A row's scheme, its venue and every reading's scheme, checked against what exists."""
+    field_prefix = f"{loader.DESTINATION_TABLE}[{key[0]}/{key[1]}]"
+    # `is_reading` is carried rather than inferred from the field label. The comparison it
+    # replaced -- `field != "scheme"` -- was in fact unreachable-safe, since a reading's label
+    # always begins `reading[`; what is wrong with it is that its correctness depended on how
+    # a message string happens to be spelled, and the next edit to that spelling would not
+    # look like a behaviour change to anyone making it.
+    for named, field, is_reading in (
+        (row.scheme_id, "scheme", False),
+        *((reading.scheme_id, f"reading[{reading.id}].scheme", True) for reading in row.readings),
+    ):
+        if named is None:
+            continue
+        if named in schemes:
+            if is_reading and row.verdict is Verdict.INTERPRETED:
+                _check_interpreted_reading(schemes[named], path=path, field_prefix=field_prefix)
+            continue
+        raise DeclarationError(
+            path,
+            f"{field_prefix}.{field}",
+            f"names the taxation scheme {named!r}, which no file in data/{SCHEMES_DIR} "
+            "declares. A reading that cannot resolve its scheme computes nothing, and "
+            "there is no default scheme to fall back to: a charge under a scheme nobody "
+            f"declared is a legal figure nobody wrote down. Declared schemes: "
+            f"{sorted(schemes)}.",
+            f"declare {named!r} in data/{SCHEMES_DIR}, or name a scheme that exists",
+        )
+    if row.venue_id not in venues:
+        raise DeclarationError(
+            path,
+            f"{field_prefix}.venue",
+            f"records a judgement about income credited at {row.venue_id!r}, which "
+            "data/venues.toml does not declare. A row about a place this model cannot name "
+            "is a row nothing can ever reach.",
+            f"declare the venue, or name one of: {sorted(venues)}",
+        )
+
+
+def _check_interpreted_reading(named: TaxationScheme, *, path: Path, field_prefix: str) -> None:
+    """An interpreted row may not charge under a scheme declared only for a reading.
+
+    An interpreted destination produces **the tax owed**, and a ``declared_for = "reading"``
+    scheme exists only inside a labelled what-if that says on its face it is not. Refusing an
+    income stream from naming such a scheme and then letting one reach the same figure through
+    a verdict would be the prohibition enforced at one door and open at the other -- and
+    moving a verdict is one word in one file, which is exactly how it would happen.
+    """
+    if named.declared_for == "stream":
+        return
+    raise DeclarationError(
+        path,
+        f"{field_prefix}.verdict",
+        f"is interpreted and its reading charges under {named.id!r}, which is declared for a "
+        "reading rather than for a stream. An interpreted row produces the tax owed, and "
+        "those rates exist only inside a labelled what-if that says on its face they are not "
+        "it -- which is why an income stream may not name that scheme either.",
+        "declare the verdict unsettled, or point the reading at a scheme declared for a stream",
+    )
+
+
+def _check_treatment(
+    stream: IncomeStream, schemes: Mapping[str, TaxationScheme], *, path: Path
+) -> None:
+    """A stream's declared treatment: it must exist, and it must be one a stream may name."""
+    named = stream.tax_scheme
+    if named is None:
+        return
+    found = schemes.get(named)
+    if found is None:
+        raise DeclarationError(
+            path,
+            f"stream[{stream.id}].tax_scheme",
+            f"names the tax treatment {named!r}, which no file in data/{SCHEMES_DIR} "
+            "declares. There is no default treatment and none is substituted: a stream "
+            "charged under a scheme nobody declared would be charged at rates nobody wrote "
+            f"down. Declared schemes: {sorted(schemes)}.",
+            f"declare {named!r} in data/{SCHEMES_DIR}, or name a scheme that exists",
+        )
+    if found.declared_for != "stream":
+        raise DeclarationError(
+            path,
+            f"stream[{stream.id}].tax_scheme",
+            f"names {named!r}, which is declared for a reading rather than for a stream. "
+            "Such a scheme exists only inside a labelled what-if that says on its face it is "
+            "not the tax owed; naming it here would make its rates somebody's actual "
+            "treatment, which no source in this repository supports.",
+            'name a scheme whose declared_for is "stream"',
+        )

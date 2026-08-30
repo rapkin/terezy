@@ -1,0 +1,94 @@
+# The personal-income rates every UNSETTLED crediting-destination reading consumes.
+#
+# ---------------------------------------------------------------------------
+# ONE DECLARATION, CONSUMED BY EVERY READING THAT NEEDS IT, COPIED BY NONE
+# ---------------------------------------------------------------------------
+#
+# Four crediting destinations have no authoritative answer, and every one of their switches
+# holds at least one reading at personal-income rates. Those rates are declared HERE, once.
+# A copy per destination would be four entries to keep in step for one pair of legal facts,
+# and the copy is what goes stale.
+#
+# ---------------------------------------------------------------------------
+# NO STREAM MAY NAME THIS SCHEME
+# ---------------------------------------------------------------------------
+#
+# `declared_for = "reading"`, and the loader refuses an income stream that names it. No
+# personal-income stream is modelled in this repository: these rates exist only inside a
+# labelled what-if that says on its face it is not the tax owed. An employment stream would
+# need its own declaration and its own commencement research, and neither is in scope.
+#
+# ---------------------------------------------------------------------------
+# THE 18% RESTS ON ONE ARTICLE AND ONE STATED INFERENCE
+# ---------------------------------------------------------------------------
+#
+# Recorded on the entry rather than only in prose, because a rate whose only home is a table
+# is the one a plan drops. Both halves are owner verification task 5, which is load-bearing:
+# the inference is the same size at every destination whose switch consumes this rate, so
+# closing it moves all of them. What no verification can close is the READINGS themselves —
+# they are unsettled, and what settles one is an індивідуальна податкова консультація of the
+# owner's own (task 6).
+#
+# ---------------------------------------------------------------------------
+# TWO OTHER SOURCES STATE THESE SAME NUMBERS AND ARE NOT THEIR SOURCE
+# ---------------------------------------------------------------------------
+#
+# Recorded because the lineage is what stops four entries becoming one. The 18% below is the
+# ПДФО biz.ligazakon.net states for a фізична особа не ФОП; the 5% is the levy Закон
+# № 4015-IX sets for ordinary personal income. Those two citations are what these rates rest
+# on. Separately: законопроєкт 10225-д proposes «18% податок на доходи фізичних осіб» plus
+# «5% військовий збір» for crypto (yankiv.com), and forbes.ua reports a bill setting 18% +
+# 1,5% on virtual-asset profit after a five-year preferential period. Both are DRAFTS about a
+# framework that does not exist, and neither is a source for anything here.
+#
+# The same coincidence reaches `docs/REQUIRED_TESTS.md`'s E4, whose `draft_18_5` scenario IS
+# draft 10225-д's rates on a crypto ASSET disposal — a different question from where contract
+# INCOME is credited. The same numbers from different places, and they must not be merged.
+#
+# This scheme declares NO ЄСВ component at all, which is a different claim from the ФОП
+# scheme's declared zero: *this scheme charges no such component* against *it was charged and
+# came to nothing*.
+
+[scheme]
+id                = "ua_personal_income"
+name              = "Оподаткування доходу фізичної особи — ПДФО та військовий збір"
+jurisdiction      = "ua"
+tax_currency      = "UAH"
+variant           = "general"
+reporting_cadence = "annual"
+declared_for      = "reading"
+
+  [[scheme.rate_component]]
+  id   = "pdfo"
+  name = "податок на доходи фізичних осіб"
+
+    [[scheme.rate_component.rate]]
+    effective_from = "2022-09-19"
+    rate_pct       = 18.0
+    note           = "DATED BY THE SOURCE'S OWN PUBLICATION DATE, under the rule that where a citation establishes only that a rate is in force as of the source's own date, the entry is declared effective from that date and earlier income refuses rather than being charged at a backdated entry. THE INFERENCE, STATED: the article gives this rate for a фізична особа **не ФОП** «від операцій з криптовалютою», and says something different about a ФОП — «ФОП на єдиному податку І-ІІІ групи використовувати криптовалюти в розрахунках не можна», with «примусове переведення на загальну систему оподаткування та сплата єдиного податку за штрафною ставкою - 15 %». Carrying the 18% into a personal-income READING is one inference: such a reading is precisely NOT the ФОП's єдиний-податок income. The inference is the same size at every destination whose switch consumes this entry, because the article names no destination at all. The primary Tax Code article, the rate's effective date and the inference are owner verification task 5 — load-bearing. taxer.ua served only a JavaScript shell on 2026-08-24, so this is the single article the 18% rests on."
+    kind           = "tax_rule"
+    source         = "https://biz.ligazakon.net/analitycs/214027_fop-ta-kriptovalyuta-operats-rozrakhunki-ta-podatki-v-ukran (19.09.2022) — «Дохід фізичної особи (не ФОП), який отриманий від операцій з криптовалютою, оподатковуються заставкою 18%+ військовим збором 1,5 %»."
+    retrieved_on   = "2026-08-24"
+    verified_on    = ""
+
+  [[scheme.rate_component]]
+  id   = "viyskovyi_zbir"
+  name = "військовий збір"
+
+    [[scheme.rate_component.rate]]
+    effective_from = "2024-12-01"
+    rate_pct       = 5.0
+    note           = "THE DATE IS ONE DERIVATION AND IT IS STATED IN FULL, because № 4015-IX's text does not name it. Розділ II п. 1 commences the law «з дня, наступного за днем його опублікування» with a closed list of exceptions — «крім пунктів 3, 4, 9-13 … пункту 6 … підпункту 1 пункту 8 … розділу І цього Закону та підпункту 2 пункту 4 розділу II … які набирають чинності з 1 січня 2025 року» — and the п. 16-1 rewrite is розділ I пункт 18, підпункт 3, which is not on that list. The page's own publication record gives Голос України від 30.11.2024. Day after publication ⇒ 1 грудня 2024. Розділ II п. 2 confirms it for THIS PAYER CLASS specifically: «Доходи платників військового збору - осіб, визначених пунктом 162.1 статті 162 Податкового кодексу України, нараховані за наслідками податкових періодів до набрання чинності цим Законом, оподатковуються за ставкою військового збору, що діяла до набрання чинності цим Законом, незалежно від дати їх фактичної виплати (надання), крім випадків, прямо передбачених Податковим кодексом України.» — п. 162.1 is exactly підпункт 1 підпункту 1.1, the class this 5% applies to, so the clause is narrower and more on point rather than a general transitional rule. The practitioner article that names this levy (biz.ligazakon.net, 19.09.2022) states 1,5% — the rate in force when it was written, superseded by № 4015-IX; that supersession, not the article's silence, is why the statute's rate is the one used."
+    kind           = "tax_rule"
+    source         = "Закон України № 4015-IX від 10.10.2024, підпункт 1 підпункту 1.3 пункту 16-1 підрозділу 10 розділу XX ПКУ — «для платників, зазначених у підпункті 1 підпункту 1.1 цього пункту, - 5 відсотків від об'єкта оподаткування, визначеного підпунктом 1 підпункту 1.2 цього пункту». Read at https://zakon.rada.gov.ua/laws/show/4015-IX/print. The consolidated Code adds a tail № 4113-IX inserted — «, крім доходів, які оподатковуються за ставкою, визначеною підпунктом 4 цього підпункту» — the military-service rate, which no reading here touches."
+    retrieved_on   = "2026-08-24"
+    verified_on    = ""
+
+    [[scheme.rate_component.context]]
+    id                  = "reversion_on_the_end_of_martial_law"
+    statement           = "Абзац шостий підпункту 1.3 пункту 16-1 підрозділу 10 розділу ХХ ПКУ, as it now stands: «Починаючи з 1 січня року, наступного за третім календарним роком після року, у якому буде припинено або скасовано воєнний стан, … ставка збору для платників, зазначених у підпункті 1 підпункту 1.1 цього пункту, становить 1,5 відсотка …». This is a REVERSION for this payer class, and it is a DIFFERENT FACT from the ФОП group-3 levy's termination in ua_fop_group_3.toml: that one simply ends with no reversion rate. Both hang off the same event and № 4835-IX moved both by the same three years; conflating them would put a 1,5% floor under a charge that ceases."
+    not_applied_because = "It is conditioned on an EVENT and not on a date, exactly as the ФОП levy's termination is, and nothing in this system models the end of martial law. specs/features.toml's `martial-law-ends-one-belief-two-places` is where that modelling question lives."
+    kind                = "tax_rule"
+    source              = "Закон України № 4835-IX від 07.04.2026, пункт 2 розділу I — «В абзаці шостому підпункту 1.3 слова \"за роком, у якому\" замінити словами \"за третім календарним роком після року, у якому\"». Read at https://zakon.rada.gov.ua/laws/show/4835-IX/print and in the consolidated ПКУ at https://zakon.rada.gov.ua/laws/show/2755-17/print, станом на 24.08.2026."
+    retrieved_on        = "2026-08-25"
+    verified_on         = ""

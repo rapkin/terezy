@@ -316,6 +316,7 @@ currency   = "UAH"
 amount     = 0.0
 cadence    = "monthly"
 arrives_at = "inzhur"
+credited_to = "inzhur"
 
   [stream.indexation]
   policy = "none"

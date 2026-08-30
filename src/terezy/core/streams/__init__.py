@@ -25,7 +25,8 @@ USD acquisition is nearly free funded from USD contract income and 5-10% expensi
 from a UAH salary (``SIMULATOR_SPEC.md`` §4.3.1). The stream is the term that makes that
 difference computable, which is why ``FundingPath`` cannot be constructed without one.
 
-The records and the deployable-capacity function arrive with User Story 2 (T024). This
-package is created ahead of them so the boundary above exists before anything is tempted
-to put a stream in ``routes``.
+**Two modules, and the seam between them is an enforced contract rather than taste.**
+``streams`` holds the declaration -- what a route needs to know about where money lands --
+and ``capacity`` holds what survives the tax. ``capacity`` states which contract makes the
+split mandatory.
 """

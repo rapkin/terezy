@@ -20,10 +20,10 @@ route      monobank_to_binance_card           sha256:4835af0b2feef59bd56cfda2e43
 route      monobank_to_binance_p2p            sha256:bbc3d7bd9c338891f1f6bdba323cb21059230ae7e5aa2cc7538419759cd7ff51
 route      monobank_to_binance_p2p_double     sha256:e23f102032c347bbbd87a396d0bdcd1393c907ab90840779c33feb48dab8e693
 file       channels/uah_usd                   sha256:9af2c88cdb5740cd1d5c028233740e571a33d713f597ad58d603cf868b2309b5
-file       streams/owner-001                  sha256:31804f35d44753be121f9f944bcdbe2778fe9f7d100e4aecf56a0a2f4844688a
+file       streams/owner-001                  sha256:ec2ffe28b28ce1cd0482682c32a3e47da28a0148260b1b3944d13228cbb046fe
 file       spendable/owner-001                sha256:61c7032c91239c7ead90e912b644978b0f399da6da8b06cbdbb8c26c2250646c
 file       observation_kinds                  sha256:4674f6e924fc71f46f1561fb4d28a2168d82b6358320e75861d89da9cc79133b
-file       venues                             sha256:4a49969b706b27bebdc4b10c8d293a1732296f083ec687824df02e659d02016c
+file       venues                             sha256:c503a87a3733bffd9b45fd92aa3d11eec7a0b7d709135c267d8b137700972304
 
 ## ranking -- lexicographic on (round trip, ceiling desc, latency)
 

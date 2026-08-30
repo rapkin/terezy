@@ -1322,12 +1322,28 @@ class TestNoFieldDefaultStandsInForAValue:
         "OfficialRateFile": frozenset({"non_publication_rule"}),
         # A timing table for a jurisdiction whose taxable events are all in the base
         # currency needs no rate series, and saying so by omission is the same shape
-        # `StreamTable.income_tax_rate_pct` already has: omitted means not stated, which is
-        # a different claim from stated-as-nothing.
+        # `StreamTable.tax_scheme` has: omitted means not stated, which is a different claim
+        # from stated-as-nothing.
         "TimingTable": frozenset({"official_rate_series"}),
         "RouteTable": frozenset({"partner_route"}),
         "SeedTable": frozenset({"reason"}),
-        "StreamTable": frozenset({"income_tax_rate_pct"}),
+        "StreamTable": frozenset({"tax_scheme"}),
+        # A reading declares exactly one of `scheme` and `uncomputable_because`, and
+        # `recognised_on` accompanies the first; `departs_from_source` is present only where
+        # this system knowingly computes something other than what its source does. Each
+        # absence is a declaration, and the loader refuses every combination that is not.
+        "ReadingTable": frozenset(
+            {"scheme", "recognised_on", "uncomputable_because", "departs_from_source"}
+        ),
+        # A scheme charging only rates declares no periodic component and vice versa, so
+        # each list may be absent; omitting BOTH is the loader's refusal, because only it can
+        # say that a scheme charging nothing at all is a file nobody meant to write. A
+        # `context` list is absent when nothing is recorded beside a schedule, which is the
+        # only other state there is -- unlike a schedule, there is no third reading between
+        # nothing was declared and this is what was declared.
+        "SchemeTable": frozenset({"rate_component", "periodic_component"}),
+        "RateComponentTable": frozenset({"context"}),
+        "PeriodicComponentTable": frozenset({"context"}),
     }
 
     @staticmethod

@@ -65,3 +65,32 @@ currencies = ["USD", "UAH"]
 # and (fop, UAH) are two destinations with a declared conversion between them, which is
 # what the mandatory sale actually is. Whether that sale is legally compulsory is not
 # modelled: what is declared is that a corridor exists and what it costs.
+
+# --- Added 2026-08-30 (feature 012). Places income can be CREDITED, not places it routes ---
+#
+# Both exist because the tax question reaches them: `data/tax/destinations/ua.toml` records
+# what the owner's income would be worth credited at each, and that table is normative — a
+# destination it has no row for refuses rather than being reasoned about.
+#
+# **Neither carries a declared route, in or out, and nothing reports that.** The coverage
+# audit is scoped to declared spendable endpoints and the corridors that reach them, so it
+# says nothing about a venue nothing routes to; what does show them is the route diagram,
+# where they render as isolated nodes carrying no mark. That is a true picture of this
+# registry — no money moves to either place in the shipped data — and it is stated here
+# because a reader meeting two unmarked nodes deserves to know they are unmarked on purpose.
+
+[[venue]]
+id         = "payoneer"
+name       = "Payoneer — an international payment system, dollars only"
+currencies = ["USD"]
+# ДПС treats it as a «небанківська установа», which is the whole of why the treatment of
+# income credited here is disputed. The dispute is in the destinations table; this row only
+# says the place exists and what it can hold.
+
+[[venue]]
+id         = "foreign_bank_usd"
+name       = "A bank account outside Ukraine, dollars"
+currencies = ["USD"]
+# A category rather than a named bank, because the two ДПС documents that reach it are about
+# «рахунок, відкритий у іноземному банку» in general and name no institution. Declaring a
+# particular bank would be narrower than the sources.

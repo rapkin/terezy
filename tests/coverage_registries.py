@@ -71,11 +71,14 @@ def venue(venue_id: str, *currencies: Currency) -> Venue:
 def stream(stream_id: str, currency: Currency, arrives_at: str) -> IncomeStream:
     """One income stream: a currency, and the venue it lands at.
 
-    ``amount`` is zero and ``income_tax_rate`` is ``None`` for the reason
+    ``amount`` is zero and ``tax_scheme`` is ``None`` for the reason
     ``tests/invariants/route_graphs.py`` gives: both are honestly unstated, nothing in coverage
     reads either, and a fixture that invented them would be inventing numbers no assertion
-    needs. What coverage *does* read is ``arrives_at`` and ``amount.currency`` -- the two
-    together are what an inbound route has to match to carry this stream's money.
+    needs. ``credited_to`` repeats ``arrives_at`` because coverage asks nothing about where
+    income is credited for tax; the two are separate fields precisely so a fixture that made
+    them equal cannot make anything infer that they always are. What coverage *does* read is
+    ``arrives_at`` and ``amount.currency`` -- the two together are what an inbound route has
+    to match to carry this stream's money.
     """
     return IncomeStream(
         id=stream_id,
@@ -84,7 +87,8 @@ def stream(stream_id: str, currency: Currency, arrives_at: str) -> IncomeStream:
         cadence="monthly",
         arrives_at=arrives_at,
         indexation=Indexation(policy="none", rate=None),
-        income_tax_rate=None,
+        credited_to=arrives_at,
+        tax_scheme=None,
     )
 
 
