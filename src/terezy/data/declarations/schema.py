@@ -1144,9 +1144,9 @@ class SpendableFile(BaseModel):
 # maturity and no face value, and forcing them into one model would mean a table of
 # optional fields where every combination is loadable and only two are meaningful.
 #
-# ⚙ **``[[instrument.verification_task]]`` carries no numeric leaf and therefore no
-# citation**, deliberately. It is the record of a question nobody has answered; a source
-# would be a source for *what*?
+# **``[[instrument.verification_task]]`` carries no citation**, deliberately. It is the
+# record of a question nobody has answered; a source would be a source for *what*? Its one
+# date -- when the search ran -- is exempted by name in ``scripts/check_provenance.py``.
 
 
 class FundNavTable(BaseModel):
@@ -1206,7 +1206,7 @@ class PegCapTable(BaseModel):
 class PegTable(BaseModel):
     """``[instrument.distribution.peg]`` -- what the payout is sized in, and its ceiling.
 
-    Carries no numeric leaf of its own and therefore no citation: the currency is a
+    Carries no observed value of its own and therefore no citation: the currency is a
     reference to the core's enum, and every number lives on a dated cap entry that cites
     itself.
     """
@@ -1851,9 +1851,9 @@ class InflationAssumptionFile(BaseModel):
 # `data/tax/timing/<jurisdiction>.toml` is **cited law**: which category a class belongs to,
 # whether that category nets, what a loss in it does, when the money is due, and what each
 # basis method stands on. It sits under `data/tax/`, so `scripts/check_provenance.py` requires
-# a citation on every table carrying a number -- which is why the deadlines are declared as
-# month and day integers rather than as an `"08-01"` string. The gate counts numeric leaves,
-# and a legal value that reaches the engine as text would sit outside it.
+# a citation on every table carrying an observed value -- which is why the deadlines are
+# declared as month and day integers rather than as an `"08-01"` string. The gate recognises
+# numbers and full ISO dates, and a legal value spelled any other way would sit outside it.
 #
 # `data/scenarios/tax/<owner>.toml` is the **owner's own**: whether he filed, and which branch
 # of an unanswered legal question this run takes. It carries `is_assumption = true` where an
@@ -2051,7 +2051,7 @@ class TaxPositionsFile(BaseModel):
 # carries. Keying by (instrument, venue) now would also need a venue term on the tuple, and
 # building it for a second venue nobody has declared would be speculation.
 #
-# ⚙ **``[[access]]`` itself carries no numeric leaf and therefore no citation**, deliberately.
+# **``[[access]]`` itself carries no observed value and therefore no citation**, deliberately.
 # A venue id, an instrument id and a risk-class label are references and statements, not
 # observations -- the same reading ``[instrument.tax_classes]`` and ``data/venues.toml``
 # already carry. The one observed value, the unit price, is a *venue quote* and lives in its

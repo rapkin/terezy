@@ -8,7 +8,7 @@ or an agent's memory. Every value carries ``value``, ``source``, ``retrieved_on`
 This script enforces the *mechanical* half of that rule at commit time, so a rate
 without a citation cannot reach main:
 
-    error   -- a numeric leaf under a rate-bearing table with no ``source``
+    error   -- an observed value under a rate-bearing table with no ``source``
     error   -- a ``source``/``retrieved_on``/``verified_on`` of the wrong shape
     warning -- an empty ``verified_on`` (expected and permitted; it must render marked)
 
@@ -39,18 +39,16 @@ DATA_ROOT = REPO_ROOT / "data"
 # believed without checking.
 #
 # `access` joined in feature 010. Most of an `[[access]]` entry is references — an instrument
-# id, two venue ids, a risk-class label — and cites nothing, which the numeric-leaf heuristic
-# below gets right on its own. Its one observed value is `[access.price]`, the price of one
-# unit at the venue the instrument is bought from, and that is a market quote: exactly the kind
-# of figure that gets believed without checking, and the number every purchase in a comparison
-# is sized by.
+# id, two venue ids, a risk-class label — and cites nothing, which the predicate below gets
+# right on its own. Its one observed value is `[access.price]`, the price of one unit at the
+# venue the instrument is bought from, and that is a market quote: exactly the kind of figure
+# that gets believed without checking, and the number every purchase in a comparison is sized
+# by.
 # `official_rates` joined in feature 011. Every `[[observation]]` is one date's published
 # legal reference — the single input that turns a foreign amount into a hryvnia tax base —
 # so an uncited one is the confidently-wrong number this project exists to refuse.
 #
-# ⚙ Feature 012 added `tax/schemes/` and `tax/destinations/` and needed no entry here,
-# because the walk below is `rglob` and both sit under `tax`. What it did move is the
-# `streams` exemption's reason: the rates a stream used to carry are in `tax/schemes/` now.
+# A subdirectory of a sourced directory needs no entry of its own: the walk below is `rglob`.
 SOURCED_DIRS = (
     "tax",
     "instruments",
@@ -64,9 +62,7 @@ SOURCED_DIRS = (
 
 # The directories exempt from the citation requirement, each BY NAME and WITH ITS REASON.
 # Together with SOURCED_DIRS this list is exhaustive: a directory under data/ that appears
-# in neither is an **error**, never a blind spot. The gate used to be an allowlist, which
-# is fail-open -- the place a future rate was most likely to land (a new directory) was
-# exactly the place the gate could not see.
+# in neither is an **error**, never a blind spot (`unknown_directories` below).
 EXEMPT_DIRS: dict[str, str] = {
     "scenarios": (
         "the owner's own stated beliefs -- regimes, transitions, event probabilities. An "
@@ -195,10 +191,10 @@ STRUCTURAL_KEYS = frozenset(
         "frequency",
         "latency_days",
         # --- feature 002: identifiers and references, not observations ---
-        # They must not trip the "this table carries observed values" heuristic, which
-        # counts numeric leaves. `index` is the only numeric one, and it is a position in a
-        # chain rather than a measurement; the rest are here because the contract names them
-        # and because a reader scanning this set should see the whole declaration surface.
+        # They must not trip the "this table carries observed values" predicate. `index` is
+        # the only one it would reach, and it is a position in a chain rather than a
+        # measurement; the rest are here because the contract names them and because a reader
+        # scanning this set should see the whole declaration surface.
         "direction",
         "provider",
         "partner_route",
@@ -223,11 +219,11 @@ STRUCTURAL_KEYS = frozenset(
         # beside `pair`, and every `value` it scales carries its own citation on its own
         # observation.
         #
-        # ⚙ **What this actually exempts is the whole `[series]` table, not one field**, and
-        # that is worth stating because the heuristic above makes it invisible: `[series]`
-        # holds exactly one numeric leaf, so listing it here drops the table's numeric-leaf
-        # count to zero and with it the `source`, `retrieved_on`, `verified_on` and `kind`
-        # requirements. Measured 2026-08-29: removing this line produces four errors on
+        # **What this actually exempts is the whole `[series]` table, not one field**, and
+        # that is worth stating because the predicate above makes it invisible: `[series]`
+        # carries exactly one observed value, so listing it here leaves the table with none
+        # and drops the `source`, `retrieved_on`, `verified_on` and `kind` requirements with
+        # it. Measured 2026-08-30: removing this line produces four errors on
         # `data/official_rates/ua_nbu_usd.toml`, not one.
         #
         # A STATED GAP, therefore: `quotation_unit` decides a tax base to within two orders of
@@ -238,6 +234,16 @@ STRUCTURAL_KEYS = frozenset(
         # whoever builds the fetch script, which retrieves the published table the unit is read
         # off and is the first thing that can date it honestly.
         "quotation_unit",
+        # --- feature 017: dates that are not observations ---
+        # The date a search was run, on a `[[verification_task]]` -- the record of a question
+        # nobody answered. It carries no value, so there is nothing for a source to vouch for.
+        "searched_on",
+        # A fund's term end and its subscription close scope the `[instrument]` table the way
+        # `available_until` scopes a route. A STATED GAP all the same, `quotation_unit`'s shape
+        # above: a citation could vouch for either, and closing it is a schema change --
+        # `FundTable` is `extra="forbid"`, so `[instrument]` has nowhere to put a `source`.
+        "terminates_on",
+        "subscription_cutoff",
     }
 )
 
@@ -267,9 +273,25 @@ def _is_numeric(value: object) -> bool:
     return isinstance(value, int | float) and not isinstance(value, bool)
 
 
+def _is_dated(value: object) -> bool:
+    """A date, however the file spells it: a TOML date literal or an ISO string."""
+    return isinstance(value, dt.date | dt.time) or (
+        isinstance(value, str) and DATE_RE.match(value) is not None
+    )
+
+
 def _has_observed_value(table: dict[str, Any]) -> bool:
-    """True if this table carries at least one observed numeric value."""
-    return any(_is_numeric(value) and key not in STRUCTURAL_KEYS for key, value in table.items())
+    """True if this table carries at least one observed value -- a number or a date.
+
+    A date is sometimes the observation rather than the scope of one: a working-day
+    classification is a date and a label and holds no number. `check_table` gates the citation
+    requirement and the observation-kind check on this one answer, so a table it does not
+    recognise passes uncited and unkinded together.
+    """
+    return any(
+        (_is_numeric(value) or _is_dated(value)) and key not in STRUCTURAL_KEYS
+        for key, value in table.items()
+    )
 
 
 def _check_date_field(
@@ -459,11 +481,11 @@ def check_table(
 # 013-enumerated-schedule: what is inferred is declared, and the declaration is checked
 # ---------------------------------------------------------------------------
 #
-# Everything above this line is **shape**: a table with a numeric leaf needs a citation, a
-# date needs to look like a date. What follows is the gate's first **relation** -- that an
-# inferred value has a task saying what would settle it -- and it is worth naming rather
-# than sliding in, because the two are different kinds of check and the second is the one a
-# future reader will wonder how to extend.
+# Everything above this line is **shape**: a table carrying an observed value needs a
+# citation, a date needs to look like a date. What follows is the gate's first **relation**
+# -- that an inferred value has a task saying what would settle it -- and it is worth naming
+# rather than sliding in, because the two are different kinds of check and the second is the
+# one a future reader will wonder how to extend.
 #
 # Why here rather than in the loader: FR-022 asks for the gate, and the gate is what a
 # person maintaining a declaration by hand runs. The loader checks that a task is

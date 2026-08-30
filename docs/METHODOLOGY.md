@@ -3218,9 +3218,9 @@ unit and others per 100 is ordinary, and a value read at the wrong unit is wrong
 of magnitude while looking entirely plausible. A series that omits it fails at load.
 
 What load-time checking does *not* do is verify the unit is the published one. The provenance
-gate recognises a sourced table by its numeric leaves, and `quotation_unit` is the only one in
-a series' identity table — listing it as structural drops that table's citation requirement
-altogether. So the unit is declared, non-defaulted, positive and **uncited**: a wrong one is
+gate recognises a sourced table by the observed values it carries, and `quotation_unit` is
+the only one in a series' identity table — listing it as structural drops that table's
+citation requirement altogether. So the unit is declared, non-defaulted, positive and **uncited**: a wrong one is
 caught by a reader or not at all. The data file's own header says so where a declarer meets
 it, and `scripts/check_provenance.py` records why the gap is not closed here.
 

@@ -120,7 +120,7 @@ def test_a_root_level_file_is_scanned_rather_than_invisible(tmp_path: Path) -> N
 # 013-enumerated-schedule: the gate's first relation
 # ---------------------------------------------------------------------------
 #
-# Everything above is shape -- a table with a numeric leaf needs a citation. SC-013 asks
+# Everything above is shape -- a table carrying an observed value needs a citation. SC-013 asks
 # for a *relation*: an inferred value must have a source saying it is an inference and a
 # task saying what would settle it. The two halves fail separately because the fixes
 # differ.
@@ -222,3 +222,60 @@ def test_a_malformed_schedule_does_not_hide_a_missing_verification_task(
     assert outcome.returncode == 1, outcome.stdout
     for inference in sorted(INFERENCES):
         assert inference in outcome.stdout
+
+
+# ---------------------------------------------------------------------------
+# 017 FR-006: an observation is not always a number
+# ---------------------------------------------------------------------------
+#
+# ``check_table`` gates the citation loop **and** the observation-kind check on one predicate,
+# so a table that predicate does not recognise passes uncited *and* with an unvalidated kind
+# at once. A working-day classification is a date and a label and holds no number at all,
+# which is why both halves are asserted below rather than only the citation.
+
+PLANTED = "observations/planted_classification.toml"
+
+PLANTED_ROW = """[[classification]]
+on           = "2026-01-01"
+label        = "a date, a label, and no number anywhere"
+kind         = "tax_rule"
+source       = "planted by tests/contract/test_provenance_gate.py"
+retrieved_on = "2026-08-30"
+verified_on  = ""
+"""
+
+
+def _planted(tmp_path: Path, row: str) -> subprocess.CompletedProcess[str]:
+    root = _scratch_root(tmp_path)
+    (root / PLANTED).write_text(row, encoding="utf-8")
+    return _run(root)
+
+
+def test_a_numberless_table_is_reached_by_the_gate(tmp_path: Path) -> None:
+    """Cited and correctly kinded, the row passes -- and the gate says so by naming it
+    unverified, which is the two failures below being the gate reading the row rather than
+    the gate never opening the file."""
+    outcome = _planted(tmp_path, PLANTED_ROW)
+    assert outcome.returncode == 0, outcome.stdout
+    assert "planted_classification.toml: [classification[0]] is unverified" in outcome.stdout
+
+
+def test_a_numberless_table_without_a_citation_is_an_error(tmp_path: Path) -> None:
+    outcome = _planted(
+        tmp_path,
+        PLANTED_ROW.replace(
+            'source       = "planted by tests/contract/test_provenance_gate.py"\n', ""
+        ),
+    )
+    assert outcome.returncode == 1, outcome.stdout
+    assert "carries observed values but has no 'source'" in outcome.stdout
+
+
+def test_a_numberless_table_naming_an_undeclared_kind_is_an_error(tmp_path: Path) -> None:
+    """The other half of the same predicate. A citation vouches for the value; the kind is
+    what decides when it goes stale, and neither is asked for without the other."""
+    outcome = _planted(
+        tmp_path, PLANTED_ROW.replace('kind         = "tax_rule"', 'kind         = "no_such_kind"')
+    )
+    assert outcome.returncode == 1, outcome.stdout
+    assert "names the observation kind 'no_such_kind'" in outcome.stdout
