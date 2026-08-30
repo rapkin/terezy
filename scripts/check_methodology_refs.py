@@ -57,18 +57,27 @@ bad = sorted({m.group(1) for m in re.finditer(r"§(\d+(?:\.\d+)?)", text)} - kno
 # `.py` under one of these six.
 CITED_IN = ("docs", "data", "specs", "tests", "scripts", "src")
 
-# Six spellings, counted in the tree on 2026-08-24 -- 29 references in 20 files:
+# The backticks are optional because some references carry none; markdown writes them singly
+# and reStructuredText doubles them. How many references there are is printed rather than
+# written here -- the two counts this file used to state had both gone stale.
 #
-#     `docs/METHODOLOGY.md` §   12     ``docs/METHODOLOGY.md`` §    1
-#     ``METHODOLOGY`` §          6     METHODOLOGY §                6
-#     `METHODOLOGY` §            2     docs/METHODOLOGY.md §        2
+# ⚙ **Three shapes used to slip, and two are now caught.** Three stale `§33` pointers survived
+# this script exiting 0, because the pattern required exactly one space before the `§`. A
+# column-aligned cell or a diff marker (`METHODOLOGY.md      + §NN`) hid one, and a second
+# reference in the same sentence (`§NN.N and §MM`) hid another, because only the first sits
+# next to the word. Hence the whitespace run, the optional table or diff marker, and the
+# continuation list -- each with a planted dangling reference proving it now exits 1.
 #
-# So the backticks are **optional**, which is the part that earns the looseness: eight
-# references carry none, and requiring at least one drops the count to 21. They come in ones
-# and twos because markdown writes them singly and reStructuredText doubles them. Requiring
-# the two sides to *match* would cost nothing today -- also 29 -- and is not imposed only
-# because nothing would be gained by it.
-REFERENCE = re.compile(r"`{0,2}METHODOLOGY(?:\.md)?`{0,2} §(\d+(?:\.\d+)?)")
+# The third shape stays open and cannot be closed here: a `§` in a file that never names
+# METHODOLOGY. Measured 2026-08-30, the tree holds 210 such references and most of them point
+# at `SIMULATOR_SPEC.md`, whose numbering collides with this document's -- so a scan that
+# claimed them would report `§4.3.1` as dangling and be wrong. Attribution is the missing
+# input, not reach.
+REFERENCE = re.compile(
+    r"`{0,2}METHODOLOGY(?:\.md)?`{0,2}[^\S\n]+(?:[|+*-][^\S\n]+)?§(\d+(?:\.\d+)?)"
+    r"((?:[^\S\n]*(?:,|and|&|\u2013|--)[^\S\n]*§\d+(?:\.\d+)?)*)"
+)
+CONTINUED = re.compile(r"§(\d+(?:\.\d+)?)")
 
 # `docs/reference/` is read-only input material (`CLAUDE.md`), and it holds the predecessor's
 # own `METHODOLOGY.md`. A reference added there would be checked against this document's
@@ -83,17 +92,21 @@ CITING = sorted(
     if not any(path == skip or skip in path.parents for skip in SKIP)
 )
 badx = []
+refs = 0
 for other in CITING:
     for m in REFERENCE.finditer(other.read_text()):
-        if m.group(1) not in known:
-            badx.append((str(other), m.group(1)))
+        for section in (m.group(1), *CONTINUED.findall(m.group(2))):
+            refs += 1
+            if section not in known:
+                badx.append((str(other), section))
 dupes = [h for h in sorted(subs) if len(re.findall(rf"^### {re.escape(h)} ", text, re.M)) > 1]
 dupsec = [h for h in sorted(sections, key=int) if len(re.findall(rf"^## {h}\. ", text, re.M)) > 1]
 print(  # noqa: T201
     "unresolved in METHODOLOGY :", bad or "none"
 )
 print(  # noqa: T201
-    f"unresolved cross-file     : {badx or 'none'}  (scanned {len(CITING)} file(s))"
+    f"unresolved cross-file     : {badx or 'none'}"
+    f"  ({refs} reference(s) in {len(CITING)} scanned file(s))"
 )
 print(  # noqa: T201
     "duplicate ## numbers      :", dupsec or "none"
