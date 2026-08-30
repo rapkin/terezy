@@ -348,3 +348,38 @@ alike — the distinction `income_tax_rate`'s own docstring spends four paragrap
 The salary stream declares `credited_to = "monobank_uah"` and names no scheme, so nothing
 reads its destination. That is not a latent FR-026b switch: the destination is read only where
 a scheme is named.
+
+## D18 — The variant is one scheme per file, and the owner names the scheme
+
+**Decision**: `TaxationScheme.variant` is a curated field naming which of the law's
+alternative rate sets a file declares. The owner declares which variant he is in by naming
+*that scheme* on his stream, in per-owner data. There is no separate `variant` field on a
+stream.
+
+**Why, given that FR-002 says the variant "is declared as per-owner data"**: it is — the
+`tax_scheme` he names *is* the variant, and the requirement's own second half is satisfied
+exactly ("the rates of every variant are public legal facts and live in curated tax data with
+citations", one file per variant, each cited). The alternative reading puts a `variant` string
+on the stream beside the scheme id, and the two can then disagree: a stream naming the non-VAT
+scheme and `variant = "vat_payer"` typechecks and is nonsense. That is the same trade
+`IncomeStream` already made when a separate `currency` field was removed in favour of
+`amount.currency`.
+
+⚙ **The requirement pulls both ways in two sentences and this records which one was followed.**
+FR-002's opening — *"The declaration MUST name which variant of the regime applies"* — and the
+sentence in *The verified legal facts* — *"The regime declaration names which variant applies
+(FR-002)"* — both put the field on the regime, which is where it is. The clause about per-owner
+data is satisfied by the reference rather than by a second copy of the answer.
+
+## D19 — A gap FR-026 and FR-010a do not close, closed here
+
+**Finding, not a design choice.** FR-010a says the personal-income rates "MUST NOT be declared
+as a treatment any stream can name", and the loader enforces exactly that. Nothing in the
+specification says the same rates may not be reached **through a verdict**: an INTERPRETED row
+whose one reading names that scheme produces `ChargedUnderTheScheme` — the tax owed, carrying
+no *not the tax owed* label anywhere — and moving a verdict is the operation this feature
+advertises as cheap.
+
+Closed by refusing such a row at the **resolver**, not the loader: `declared_for` is another
+file's fact, so a per-file validator structurally cannot see it. Found by review, and worth
+recording because the prohibition read as enforced while being open at the other door.
