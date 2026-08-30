@@ -73,11 +73,13 @@ class TestTheCeilingRefusesAndNeverTruncates:
         assert isinstance(result, CandidateSet), result
         assert len(result.candidates) == reached
 
-    def test_the_refusal_carries_no_candidates_at_all(self) -> None:
-        """A truncated list is never produced, so there is nowhere for one to be attached."""
+    def test_a_ceiling_of_one_returns_no_set_rather_than_one_candidate(self) -> None:
+        """The refusal *replaces* the set. A truncating implementation would return a
+        ``CandidateSet`` of one here and satisfy every count on it."""
         result = _run(fixtures.shipped(), ceiling=fixtures.ceiling(1))
+        assert not isinstance(result, CandidateSet), result
         assert isinstance(result, CeilingExceeded), result
-        assert not hasattr(result, "candidates")
+        assert result.reached > result.ceiling
 
 
 class TestARunPlanIsNeverInvented:

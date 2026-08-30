@@ -351,10 +351,26 @@ class TestTheThreeNoLoopCanReach:
         assert isinstance(enumerated, CandidateSet), enumerated
         return tuple(item.key for item in enumerated.candidates)
 
-    def test_the_worlds_are_not_all_the_same_world(self) -> None:
-        """The control: four narrowings that really do produce different sets."""
-        sizes = {len(self._keys(world)) for world in self._worlds()}
-        assert len(sizes) > 1, sizes
+    def test_the_worlds_cover_more_than_one_currency_and_the_identity_exit(self) -> None:
+        """The control, and it guards **coverage** rather than variety.
+
+        Set sizes alone would not: the two-currency world yields the same nine candidates the
+        shipped one does, so a fixture that quietly stopped producing a dollar candidate would
+        leave the sizes unchanged and silently degrade every junction assertion below back to a
+        single-currency check -- which is the exact degradation those assertions exist to
+        prevent.
+        """
+        currencies: set[str] = set()
+        identity_exits = 0
+        for world in self._worlds():
+            for key in self._keys(world):
+                _, arrives = cost.junctions_of(world.routes[segments_of(key.route_in)[-1]])
+                currencies.add(arrives[1])
+                if key.route_out is EXIT_BY_IDENTITY:
+                    identity_exits += 1
+        assert len(currencies) > 1, currencies
+        assert identity_exits > 0
+        assert len({len(self._keys(world)) for world in self._worlds()}) > 1
 
     def test_a_way_in_is_always_costed_from_the_stream_the_key_names(self) -> None:
         """``FundedFromAnotherStream`` compares exactly these two ids."""

@@ -24,6 +24,7 @@ from terezy.core.results.candidates import CandidateSet
 from terezy.core.routes.path import candidate_id, exit_segments_of
 from terezy.data.declarations import resolver
 from tests import candidate_registries as fixtures
+from tests import tuple_registries as tuples
 
 if TYPE_CHECKING:  # pragma: no cover -- typing only
     from collections.abc import Mapping
@@ -73,11 +74,33 @@ def test_a_registry_whose_files_sort_differently_returns_the_same_sequence(
 def test_the_sequence_is_the_one_fr016s_five_terms_imply() -> None:
     """The ordering **rule**, computed here from the declarations rather than read off the
     output. Asserting only that two runs agree pins determinism and says nothing about *which*
-    order; a sort that happened to match the order candidates were built in would satisfy that
-    and stop matching the day the build order changed.
+    order.
+
+    Run over a registry where the middle terms actually discriminate. On the shipped
+    declarations every candidate shares its stream, its way in, its way out and its plan
+    position, so four of FR-016's five terms are inert and the assertion is really about
+    ``instrument_id`` alone. A second inbound corridor and a second run plan give the way-in
+    term and the position term something to order.
     """
-    produced = _enumerate(fixtures.shipped()).candidates
+    registries = tuples.with_new_route(
+        fixtures.shipped(),
+        tuples.route(
+            "test_second_way_in",
+            origin="monobank_uah",
+            destination="inzhur",
+            direction="inbound",
+            fee_pct=0.02,
+        ),
+    )
+    plans = dict(fixtures.one_plan_each(registries))
+    plans[REIT] = (
+        fixtures.fund_plan(registries.funds[REIT], exit_on=date(2027, 6, 30)),
+        fixtures.fund_plan(registries.funds[REIT], exit_on=date(2028, 1, 17)),
+    )
+    produced = _enumerate(registries, plans).candidates
     assert produced
+    assert len({candidate_id(item.key.route_in) for item in produced}) > 1
+    assert len({item.plan_position for item in produced}) > 1
     expected = sorted(
         produced,
         key=lambda item: (

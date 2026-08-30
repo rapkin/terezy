@@ -79,11 +79,13 @@ class TestTheBenchmarkIsAMemberOfTheSet:
         assert isinstance(result, BenchmarkNotACandidate), result
         assert result.occurrences == 0
 
-    def test_the_refusal_carries_no_comparison_for_a_reader_to_use_anyway(self) -> None:
+    def test_the_refusal_replaces_the_survey_rather_than_weakening_it(self) -> None:
+        """A ``CandidateSurvey`` whose comparison was built around an appended benchmark is what
+        this returns *instead of*, so the type is the assertion."""
         registries = fixtures.shipped()
         outsider = replace(fixtures.benchmark_key(registries, OVDP), route_out=FROM_THE_DECLARATION)
         result = _survey(registries, outsider)
-        assert not hasattr(result, "comparison")
+        assert not isinstance(result, CandidateSurvey), result
 
     def test_a_benchmark_naming_an_undeclared_route_is_refused_by_the_route_it_names(
         self,

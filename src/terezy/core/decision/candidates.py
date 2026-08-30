@@ -531,8 +531,11 @@ def _within_the_ceiling(
     reached -- and *how far past* is what tells the owner whether the remedy is a tighter
     question or a different primitive.
     """
+    # Indexed, never `.get(..., ())`: :func:`_plans_stand_up` has already refused an
+    # instrument in ``reach`` with no plans, so a default here could only hide that ordering
+    # changing -- by counting a reachable instrument as contributing no candidates at all.
     reached = sum(
-        len(ways_in) * len(ways_out) * len(question.plans.get(instrument_id, ()))
+        len(ways_in) * len(ways_out) * len(question.plans[instrument_id])
         for (instrument_id, _), (ways_in, ways_out) in reach.items()
     )
     if reached <= ceiling.max_candidates:
