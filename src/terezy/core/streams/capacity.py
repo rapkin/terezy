@@ -20,9 +20,7 @@ has any business knowing what an official rate is.
 
 ## An undeclared treatment is not a treatment that charges zero
 
-The load-bearing decision, carried over from 002's scalar verbatim because a schema change is
-exactly what deletes a carefully argued distinction by accident. The argument is at
-:mod:`terezy.core.streams.streams`, where the field it is about lives.
+The argument is at :mod:`terezy.core.streams.streams`, beside the field it is about.
 """
 
 from __future__ import annotations
@@ -37,11 +35,12 @@ from terezy.core.tax.scheme import ChargedUnderTheScheme, SchemeCharge
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class DeployableCapacity:
-    """How much of one stream's arrival can actually be invested, and what was withheld.
+    """How much of one stream's arrival can actually be invested, and what it is net of.
 
-    Every term of ``net = gross - withheld`` is present, so the figure can be checked by
-    reading it rather than trusted: an amount available to invest that did not show what it
-    was net *of* would be exactly as opaque as the gross figure it replaced.
+    Every term of the identity is reachable -- the gross is ``charge.base``, what was charged
+    is ``charge.total`` -- so the figure can be checked by reading it rather than trusted: an
+    amount available to invest that did not show what it was net *of* would be exactly as
+    opaque as the gross it replaced.
     """
 
     stream_id: str

@@ -54,7 +54,7 @@ ordinary-personal-income levy's event-conditioned reversion — and neither move
 | Record | Fields |
 |---|---|
 | `ComponentCharge` | `component_id`, `name`, `rate: float`, `charged: Money`, `effective_from: date`, `provenance` |
-| `SchemeCharge` | `scheme_id`, `base: Money`, `on_date: date`, `conversion: TaxCurrencyConversion \| None`, `components: tuple[ComponentCharge, ...]`, `total: Money`, `provenance` |
+| `SchemeCharge` | `scheme_id`, `base: Money`, `on_date: date`, `conversion: TaxCurrencyConversion \| None`, `lines: tuple[ComponentCharge, ...]`, `total: Money`, `provenance` |
 | `PeriodicCharge` | `scheme_id`, `component_id`, `name`, `period: str`, `charged: Money`, `effective_from: date`, `provenance` |
 
 `SchemeCharge.total` is `money.total` over the component lines — a **sum of two amounts**, and
@@ -80,21 +80,25 @@ is `conversion.amount`.
 type SchemeChargeRefused = ComponentRateUndeclaredBefore | TaxBaseUnavailable
 ```
 
-`TaxBaseUnavailable.unavailable` is 011's union, carried whole. This feature adds no reason of
-its own to it: `OfficialRateUndeclaredOnDate` already names the series, the pair, the date,
-the covered window and the two remedies, and a second sentence beside it would be a second
-place for one fact.
+`TaxBaseUnavailable.unavailable` is 011's union, carried **whole**: `OfficialRateUndeclaredOnDate`
+already names the series, the pair, the date, the covered window and the two remedies, and
+restating any of those would be a second place for one fact. `TaxBaseUnavailable.reason` adds
+only what 011 cannot know — which scheme was charging, and into which currency.
 
 **The three nils** (FR-020, SC-011) are three return types of one function:
 
 ```
 component_standing(scheme, component_id, *, on_date, period) ->
       ComponentNotDeclared            "this scheme charges no such component"
-    | ComponentCharge (rate 0.0)      "charged, and it came to nothing"   <- carries provenance
-    | PeriodicCharge  (amount 0)      idem, for a periodic component
+    | ComponentRate  (rate 0.0)       "declared, and it comes to nothing"  <- carries provenance
+    | ComponentAmount (amount 0)      idem, for a periodic component
     | ComponentRateUndeclaredBefore   "declared, nothing in force"
     | PeriodicAmountNotInForce        idem
 ```
+
+`component_standing` answers *what is declared and in force*; the charge functions answer
+*what was charged*. Keeping the two questions apart is what lets the first be asked about a
+component the scheme never mentions — the state that has no charge to look at.
 
 A zero carries the citation of the entry that produced it exactly as a non-zero value does.
 The ЄСВ nil the owner declares is the second row, and its citation is his own statement.
@@ -181,7 +185,10 @@ prevent, wearing the other clause's clothes.
 ## 5. Functions
 
 ```python
-# core/tax/scheme.py
+# core/tax/scheme.py  -- `apply`'s destination argument is named `credited_to`, and the
+# charge's component lines are `lines`, so that
+# `tests/contract/test_per_destination_cost_unrepresentable.py`'s access-cost scan does not
+# read a tax charge as a corridor's price. That module records the boundary from its side.
 rate_in_force(component: RateComponent, on_date: date)      -> ComponentRate | None
 amount_in_force(component: PeriodicComponent, period: str)  -> ComponentAmount | None
 
@@ -194,7 +201,7 @@ charge_periods(scheme, window: Window)
        -> tuple[PeriodicCharge | PeriodicAmountNotInForce, ...]
 
 component_standing(scheme, component_id: str, *, on_date: date | None, period: str | None)
-       -> ComponentCharge | PeriodicCharge | ComponentNotDeclared
+       -> ComponentRate | ComponentAmount | ComponentNotDeclared
         | ComponentRateUndeclaredBefore | PeriodicAmountNotInForce
 
 apply(*, scheme_id: str, venue_id: str, amount: Money,

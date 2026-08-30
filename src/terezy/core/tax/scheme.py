@@ -8,12 +8,16 @@ not be a branch in here (Principle II).
 
 ## Nothing in this module knows what it is charging
 
-No component id, no component name, no scheme id and no date name appears in the code below.
 A scheme charges exactly the components it declares; a destination's verdict is a declared
-word; a reading recognises income on a date whose *name* is declared and whose *value* the
-caller supplies. That is what makes a second scheme, a moved verdict and a legislated rate
-change data-only changes, and it is asserted over this file's executable source rather than
-promised here.
+word from a closed set; a reading recognises income on a date whose *name* is declared and
+whose *value* the caller supplies. That is what makes a second scheme, a moved verdict and a
+legislated rate change data-only changes.
+
+Both halves are asserted rather than promised here: no declared id reaches this file's
+executable source (``tests/contract/test_no_scheme_is_named_in_code.py``), and renaming every
+declared date name changes no figure (``tests/contract/test_scheme_data_only.py``) -- the
+second because the shipped date names are ordinary English words, which a source scan would
+find in refusal messages rather than in branches.
 
 ## Why this is a second charge record and not a generalised ``TaxCharge``
 
@@ -22,8 +26,7 @@ promised here.
 податок is neither, and writing one into a field named personal income tax is a
 mislabelling no downstream reader could detect (012 FR-006).
 
-Generalising that record instead would reach ``tax.year``'s netting and carryforward fold,
-``AssessedLiability``, ``results.tax_year`` and two golden files, for a feature that
+Generalising that record instead would reach everything that folds one, for a feature that
 assembles no annual liability at all. **The seam that would force the merge**: an income
 stream that has to be netted into one annual liability beside instrument charges. 012 FR-004
 puts that out of scope -- this module records a liability against the period it accrues to
@@ -34,9 +37,9 @@ and models no payment, no filing and no cash movement.
 The base is struck in the **tax** currency, at the official rate for the credit date, through
 :func:`terezy.core.tax.official_rate.strike_base` called unchanged. The hryvnia the owner
 actually receives comes from a channel on the sale date and is not computed here at all --
-:func:`base_versus_received` takes it as an argument. Nothing in this module imports
-``core.routes``, and ``.importlinter``'s ``no-tax-base-from-a-channel`` contract covers the
-whole ``core.tax`` package, this file included.
+:func:`base_versus_received` takes it as an argument. Nothing here imports ``core.routes`` or
+reads a ``reference_rate``, asserted over this file's executable source in
+``tests/worked_examples/test_base_versus_received.py``.
 """
 
 from __future__ import annotations
@@ -300,9 +303,10 @@ class ComponentRateUndeclaredBefore:
 class TaxBaseUnavailable:
     """The base could not be struck in the tax currency, and 011 says why.
 
-    :attr:`unavailable` is carried whole rather than paraphrased: it already names the
-    series, the pair, the date, the window it covers and the two remedies, and a second
-    sentence beside it would be a second place for one fact.
+    :attr:`unavailable` is carried **whole**: it already names the series, the pair, the date,
+    the window it covers and the two remedies, and restating any of those here would be a
+    second place for one fact. :attr:`reason` adds only what 011 cannot know -- which scheme
+    was charging, and into which currency.
     """
 
     scheme_id: str
@@ -460,23 +464,7 @@ def charge_income(
     for component in scheme.rate_components:
         entry = rate_in_force(component, on_date)
         if entry is None:
-            earliest = component.schedule[0].effective_from
-            return ComponentRateUndeclaredBefore(
-                scheme_id=scheme.id,
-                component_id=component.id,
-                component_name=component.name,
-                on_date=on_date,
-                earliest_declared=earliest,
-                reason=(
-                    f"component {component.id!r} of scheme {scheme.id!r} does not reach "
-                    f"{on_date.isoformat()}: its earliest entry takes effect "
-                    f"{earliest.isoformat()}. Refused rather than charged at zero or at the "
-                    "earliest rate -- 'the schedule does not reach this date', 'the rate was "
-                    "nil' and 'this scheme charges no such component' are three claims and "
-                    "only the first is true here. Find a source for the rate in force on the "
-                    "event's date and add it as a dated entry."
-                ),
-            )
+            return _rate_not_in_force(scheme, component, on_date)
         in_force.append((component, entry))
 
     struck = _struck(scheme, amount, on_date, series)
@@ -503,6 +491,32 @@ def charge_income(
         lines=charges,
         total=money.total([line.charged for line in charges], base.currency),
         provenance=prov.merge_all([base.provenance, *(line.provenance for line in charges)]),
+    )
+
+
+def _rate_not_in_force(
+    scheme: TaxationScheme, component: RateComponent, on_date: date
+) -> ComponentRateUndeclaredBefore:
+    """The refusal both the charge and the standing return, built in one place.
+
+    Two copies would be two refusal messages for one situation, and the reader would have no
+    way to tell which of them fired.
+    """
+    earliest = component.schedule[0].effective_from
+    return ComponentRateUndeclaredBefore(
+        scheme_id=scheme.id,
+        component_id=component.id,
+        component_name=component.name,
+        on_date=on_date,
+        earliest_declared=earliest,
+        reason=(
+            f"component {component.id!r} of scheme {scheme.id!r} does not reach "
+            f"{on_date.isoformat()}: its earliest entry takes effect {earliest.isoformat()}. "
+            "Refused rather than charged at zero or at the earliest rate -- 'the schedule "
+            "does not reach this date', 'the rate was nil' and 'this scheme charges no such "
+            "component' are three claims and only the first is true here. Find a source for "
+            "the rate in force on the event's date and add it as a dated entry."
+        ),
     )
 
 
@@ -592,19 +606,7 @@ def component_standing(
             entry = rate_in_force(rate_component, on_date)
             if entry is not None:
                 return entry
-            earliest = rate_component.schedule[0].effective_from
-            return ComponentRateUndeclaredBefore(
-                scheme_id=scheme.id,
-                component_id=rate_component.id,
-                component_name=rate_component.name,
-                on_date=on_date,
-                earliest_declared=earliest,
-                reason=(
-                    f"component {rate_component.id!r} of scheme {scheme.id!r} does not reach "
-                    f"{on_date.isoformat()}: its earliest entry takes effect "
-                    f"{earliest.isoformat()}."
-                ),
-            )
+            return _rate_not_in_force(scheme, rate_component, on_date)
     for periodic in scheme.periodic_components:
         if periodic.id == component_id:
             if period is None:

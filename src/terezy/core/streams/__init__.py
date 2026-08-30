@@ -26,8 +26,7 @@ from a UAH salary (``SIMULATOR_SPEC.md`` §4.3.1). The stream is the term that m
 difference computable, which is why ``FundingPath`` cannot be constructed without one.
 
 **Two modules, and the seam between them is an enforced contract rather than taste.**
-``streams`` holds the declaration -- what a route needs to know about where money lands.
-``capacity`` holds what survives the tax, which means it knows what an official rate is, and
-``core.routes`` may not reach that even through two hops (011 FR-012). The module docstrings
-say which side of the line each is on.
+``streams`` holds the declaration -- what a route needs to know about where money lands --
+and ``capacity`` holds what survives the tax. ``capacity`` states which contract makes the
+split mandatory.
 """

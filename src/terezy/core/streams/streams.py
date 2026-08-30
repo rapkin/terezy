@@ -15,13 +15,8 @@ destination alone (Principle VI, FR-008). The stream is the term that carries th
 
 ## An undeclared treatment is not a treatment that charges zero
 
-What that distinction produces lives one module over, in
-:mod:`terezy.core.streams.capacity`, and the split is 011's doing rather than tidiness: a
-deployable figure is net of a charge struck at an official rate, ``core.routes`` imports this
-module for :class:`IncomeStream`, and ``.importlinter``'s ``official-rate-never-prices-a-leg``
-forbids ``core.routes`` from reaching ``core.tax.official_rate`` even through two hops. The
-declaration a route needs and the computation that consumes a tax charge are two things, and
-keeping them in two modules is what keeps that prohibition enforced rather than relaxed.
+What the distinction produces is one module over, in :mod:`terezy.core.streams.capacity`,
+which states why it is there. The distinction itself belongs here, beside the field.
 
 This module's one genuinely load-bearing decision, and it is the no-silent-default rule
 (Principle IV) applied to an optional field. It survived the migration off the scalar
