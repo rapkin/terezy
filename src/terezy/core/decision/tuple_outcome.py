@@ -1426,6 +1426,7 @@ def _assemble(
         undeployed=undeployed,
         routes=_standing(routed, way_out_costs),
         risk_class=prepared.access.risk_class,
+        sold_early=projected.sold_early if isinstance(projected, Projection) else None,
         rests_on=_rests_on(
             prepared, projected, span=span, horizon=horizon, continuation=continuation
         ),

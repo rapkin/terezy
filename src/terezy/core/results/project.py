@@ -44,7 +44,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
-from datetime import date
 from typing import assert_never
 
 from terezy.core.errors import (
@@ -78,7 +77,7 @@ from terezy.core.results import hurdle as hurdle_figures
 from terezy.core.results import schedule as schedule_rows
 from terezy.core.results.hurdle import CashFlow, HurdleRate
 from terezy.core.results.schedule import CashFlowSchedule, ChargedOn
-from terezy.core.scenarios.early_exit import SpreadHolds
+from terezy.core.scenarios.early_exit import SoldEarly
 from terezy.core.tax import registry as tax_registry
 from terezy.core.tax import year as tax_year
 from terezy.core.tax.interface import TaxableEventKind, TaxCharge, TaxClass, TaxContext
@@ -168,32 +167,6 @@ class PurchasePremium:
 
     governed_by: GovernedBy | TreatmentUnstated
     """The category treatment that decides what the difference does, or why nobody said."""
-
-
-@dataclass(frozen=True, slots=True, kw_only=True)
-class SoldEarly:
-    """The position closed by a sale at the horizon's end rather than by its own terms.
-
-    015 FR-029, and ``FundProjection.exit_line``'s shape for a bond: a reported line saying
-    what the early exit did, so a reader is never left to infer it from a date. Its absence is
-    the ordinary case -- the window reached maturity, no spread was paid, and no figure carries
-    the assumption's mark.
-    """
-
-    on: date
-    """The horizon's last day, which is when the money comes out."""
-
-    units: float
-    """What was still held: the purchase plus every reinvestment, less what payments retired."""
-
-    price_per_unit: Money
-    """The declared resale quote, carrying its own citation."""
-
-    proceeds: Money
-    """``units x price_per_unit``. Gross: the disposal's tax is charged like any other."""
-
-    assumption: SpreadHolds
-    """The belief the figure rests on, named so a reader can find the file (FR-032)."""
 
 
 @dataclass(frozen=True, slots=True)

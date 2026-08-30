@@ -106,18 +106,33 @@ reserve      = []
   consumption_method = "fifo"
   coupon_policy      = "hold_cash"
 
+  # The two Inzhur funds are planned SEPARATELY, and it is not a stylistic choice. Each states
+  # its own yield RANGE and a chosen point has to lie inside the fund's own range, so one plan
+  # for the group could not be a point inside both — their ranges do not overlap. A plan keyed
+  # by an instrument id wins over its subject's, which is what lets the group keep the plan a
+  # new member would inherit while an instrument whose own terms differ states its own.
   [[question.plan]]
-  subject            = "inzhur"
+  subject            = "inzhur_reit"
   kind               = "fund"
   consumption_method = "fifo"
   liquidity_mode     = "practice"
   buyback            = "available"
   exit_on            = "2028-01-17"
 
-    # Both Inzhur funds state a RANGE rather than a figure, and a tuple has one outcome. The
-    # low end is chosen deliberately: it is the least flattering figure the range admits, where
-    # a midpoint would be a point nobody stated.
     [question.plan.yield_point]
-    rate_pct      = 12.0
+    rate_pct      = 9.5
     is_assumption = true
-    rationale     = "OWNER'S CHOICE inside a range the fund itself states — the low end, so the figure is the least flattering one the range admits rather than a midpoint nobody stated. Not observed and not a forecast."
+    rationale     = "OWNER'S CHOICE inside the range this fund itself states — the low end, so the figure is the least flattering one the range admits rather than a midpoint nobody stated. Not observed and not a forecast."
+
+  [[question.plan]]
+  subject            = "inzhur_miltech"
+  kind               = "fund"
+  consumption_method = "fifo"
+  liquidity_mode     = "practice"
+  buyback            = "available"
+  exit_on            = "2028-01-17"
+
+    [question.plan.yield_point]
+    rate_pct      = 25.0
+    is_assumption = true
+    rationale     = "OWNER'S CHOICE inside the range this fund itself states — the low end, so the figure is the least flattering one the range admits rather than a midpoint nobody stated. Not observed and not a forecast."

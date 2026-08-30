@@ -44,6 +44,7 @@ from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.results import project
+from terezy.core.results.coverage import IMPLICIT_REGIME_ID
 from terezy.core.results.project import Projection
 from terezy.data import manifest
 from terezy.data.declarations import resolver
@@ -51,6 +52,10 @@ from terezy.data.declarations.errors import DeclarationError
 from tests import declared_terms, synthetic
 
 UAH = Currency.UAH
+
+AS_OF = date(2026, 8, 30)
+"""When the question is asked. Decides staleness and nothing else, and 015 puts it on the
+manifest rather than in the declaration it answers."""
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DATA_ROOT = REPO_ROOT / "data"
@@ -114,6 +119,16 @@ def _projection(declarations: resolver.Declarations, holding: Holding) -> Projec
     return outcome
 
 
+def _projected(record: manifest.RunManifest) -> manifest.ProjectedRun:
+    """The single-projection half of a manifest, which a projection's manifest always has.
+
+    ``None`` is 015's shape for an **answer**: many instruments over many horizons and no one
+    holding, which a field on the record proper would have forced it to invent.
+    """
+    assert record.projection is not None, record
+    return record.projection
+
+
 def _manifest(root: Path = DATA_ROOT) -> manifest.RunManifest:
     declarations = resolver.from_data_root(root)
     holding = _holding(declarations)
@@ -124,6 +139,8 @@ def _manifest(root: Path = DATA_ROOT) -> manifest.RunManifest:
         horizon=DateRange(start=holding.purchased_on, end=HORIZON_END),
         assumptions=synthetic.assumptions(),
         seed=None,
+        as_of=AS_OF,
+        regime_id=IMPLICIT_REGIME_ID,
         inflation=resolver.inflation_from_data_root(root),
     )
 
@@ -160,10 +177,12 @@ class TestNothingAboutAManifestCanBeOmitted:
         assert record.code_version
         assert record.encoding == manifest.ENCODING
         assert record.owner_id == "owner-1"
-        assert record.projected_instrument_id == ISSUE_A
-        assert record.holding.quantity == 10.0
-        assert record.horizon.end == HORIZON_END
-        assert record.assumptions.consumption_method == "fifo"
+        assert _projected(record).instrument_id == ISSUE_A
+        assert _projected(record).holding.quantity == 10.0
+        assert _projected(record).horizon.end == HORIZON_END
+        assert record.as_of == AS_OF
+        assert record.regime_id == IMPLICIT_REGIME_ID
+        assert _projected(record).assumptions.consumption_method == "fifo"
         assert record.seed is None
 
     def test_the_seed_is_recorded_as_absent_rather_than_left_unset(self) -> None:
@@ -187,6 +206,8 @@ class TestNothingAboutAManifestCanBeOmitted:
             horizon=DateRange(start=holding.purchased_on, end=HORIZON_END),
             assumptions=synthetic.assumptions(),
             seed=None,
+            as_of=AS_OF,
+            regime_id=IMPLICIT_REGIME_ID,
         )
         assert record.result_digest == manifest.digest_of_projection(result)
         assert record.result_digest.startswith(f"{manifest.ALGORITHM}:")
@@ -228,7 +249,7 @@ class TestEveryDeclarationAndVersionThatFedTheRun:
         files were present is part of what the run's answer rested on.
         """
         record = _manifest()
-        assert record.projected_instrument_id == ISSUE_A
+        assert _projected(record).instrument_id == ISSUE_A
         assert ISSUE_B in {ref.id for ref in record.inputs}
 
     def test_the_inputs_are_ordered_by_kind_and_id_and_not_by_the_filesystem(self) -> None:
@@ -436,6 +457,8 @@ class TestAManifestCannotDescribeARunThatDidNotHappen:
                 horizon=DateRange(start=holding.purchased_on, end=HORIZON_END),
                 assumptions=synthetic.assumptions(),
                 seed=None,
+                as_of=AS_OF,
+                regime_id=IMPLICIT_REGIME_ID,
             )
 
     def test_a_file_that_cannot_be_read_names_itself(self, tmp_path: Path) -> None:

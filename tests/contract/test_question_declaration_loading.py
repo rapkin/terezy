@@ -91,7 +91,7 @@ def test_the_shipped_question_loads() -> None:
     assert question.every_declared_instrument is False
     assert len(question.horizons) == 3
     assert sorted(question.amounts) == [CONTRACT, SALARY]
-    assert sorted(question.plans) == ["inzhur", "ovdp"]
+    assert sorted(question.plans) == ["inzhur_miltech", "inzhur_reit", "ovdp"]
 
 
 def test_the_shipped_data_root_resolves_for_the_answer() -> None:

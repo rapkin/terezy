@@ -138,6 +138,9 @@ class Declarations:
     checked before this record exists.
     """
 
+    groups_file: Path
+    """Which file declared the vocabulary, so the manifest can name it after the TOML is gone."""
+
 
 def _refuse_duplicate(
     kind: str,
@@ -257,6 +260,7 @@ def resolve(
         funds=funds,
         fund_files=fund_files_by_id,
         groups=groups,
+        groups_file=groups_file,
     )
 
 
@@ -2534,6 +2538,9 @@ class TupleDeclarations:
     access_files: Mapping[str, Path]
     """Which file declared each entry, so a later failure can still name it."""
 
+    early_exit_file: Path
+    """Which file declared the spread-holds belief every early-exit figure rests on."""
+
     registries: Registries
     """The same set again, flattened into the record the pure core takes.
 
@@ -2735,7 +2742,9 @@ as scenario documents, and ``glob`` does not recurse.
 """
 
 
-def _resolved_early_exit(root: Path, streams: Mapping[str, IncomeStream]) -> SpreadHolds:
+def _resolved_early_exit(
+    root: Path, streams: Mapping[str, IncomeStream]
+) -> tuple[SpreadHolds, Path]:
     """The one declared belief under a data root, checked against the streams' owner.
 
     An absent directory is an **error**, not an absent belief (015 FR-032): reading it as
@@ -2775,7 +2784,7 @@ def _resolved_early_exit(root: Path, streams: Mapping[str, IncomeStream]) -> Spr
             "people's assumptions in one comparison.",
             f"name one of {owners}, or resolve this belief against that owner's streams",
         )
-    return assumption
+    return assumption, declared[0]
 
 
 def tuple_from_data_root(
@@ -2806,6 +2815,7 @@ def tuple_from_data_root(
             "a mistyped path is indistinguishable from one emptied by a real gap.",
             "check the data root, or declare how each instrument is reached",
         )
+    early_exit, early_exit_file = _resolved_early_exit(root, covered.ramp.streams)
     access, declaring = _resolved_access(
         files,
         instruments=instruments.instruments,
@@ -2818,6 +2828,7 @@ def tuple_from_data_root(
         coverage=covered,
         access=access,
         access_files=declaring,
+        early_exit_file=early_exit_file,
         registries=Registries(
             instruments=instruments.instruments,
             funds=instruments.funds,
@@ -2828,7 +2839,7 @@ def tuple_from_data_root(
             streams=covered.ramp.streams,
             kinds=covered.ramp.kinds,
             spendable=covered.spendable,
-            spread_holds=_resolved_early_exit(root, covered.ramp.streams),
+            spread_holds=early_exit,
             base_currency=covered.ramp.base_currency,
         ),
     )

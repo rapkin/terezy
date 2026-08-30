@@ -78,10 +78,12 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 from typing import Final, Literal, assert_never
 
 import terezy
+from terezy.core.instruments.access import InstrumentAccess
 from terezy.core.instruments.fund import FundDeclaration
 from terezy.core.instruments.interface import (
     Assumptions,
@@ -94,8 +96,12 @@ from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.provenance import Provenance
 from terezy.core.primitives.rates import RealRate
 from terezy.core.results import canonical
+from terezy.core.results.answer import Answer
 from terezy.core.results.project import Projection
+from terezy.core.results.question import Question
+from terezy.core.routes.legs import Route
 from terezy.core.tax.interface import TaxClass
+from terezy.data.declarations import resolver
 from terezy.data.declarations.errors import DeclarationError
 from terezy.data.declarations.resolver import Declarations, InflationDeclarations
 
@@ -126,7 +132,27 @@ Carried in the value rather than only in this constant so that a stored digest c
 compared against one taken with a different algorithm by accident.
 """
 
-InputKind = Literal["cpi_series", "fund", "inflation_assumption", "instrument", "tax_class"]
+InputKind = Literal[
+    "access",
+    "candidate_ceiling",
+    "channel",
+    "composition",
+    "cpi_series",
+    "early_exit_assumption",
+    "fund",
+    "group_vocabulary",
+    "inflation_assumption",
+    "instrument",
+    "observation_kind",
+    "official_rate_series",
+    "question",
+    "route",
+    "scenario",
+    "spendable",
+    "stream",
+    "tax_class",
+    "venue",
+]
 """What kind of declaration an :class:`InputRef` describes. A closed set, not a free string.
 
 ⚙ ``"fund"`` joined with feature 006. Kept distinct from ``"instrument"`` rather than folded
@@ -142,6 +168,12 @@ version.
 
 Listed alphabetically because :func:`input_refs` sorts by ``(kind, id)``, so the order here is
 the order a manifest reads in.
+
+Widened by feature 015 from the five a single projection reads to every family an **answer**
+reads. SC-008 requires the manifest to name every file the run read, walked from the loader's
+inputs rather than sampled: a run that read a route, an access entry and a question and recorded
+none of them is a result that does not trace to what produced it, which Principle III says is
+not a result.
 """
 
 
@@ -259,6 +291,27 @@ class InputRef:
 
 
 @dataclass(frozen=True, slots=True)
+class ProjectedRun:
+    """What a run of a *single* projection was: one holding, one window, one set of choices."""
+
+    instrument_id: str
+    """Which declared instrument was projected, of the ones :attr:`RunManifest.inputs` lists."""
+
+    holding: Holding
+    """The purchase, recorded as the record itself rather than as a summary.
+
+    FR-012 asks the result to record its inputs; the inputs are small, frozen and already
+    typed, so storing them beats storing a rendering of them that could disagree.
+    """
+
+    horizon: DateRange
+    """The window the run was asked about."""
+
+    assumptions: Assumptions
+    """The modelling choices the run was given -- consumption method, coupon policy."""
+
+
+@dataclass(frozen=True, slots=True)
 class RunManifest:
     """Everything needed to say what a run was, and to recognise its output again.
 
@@ -276,21 +329,28 @@ class RunManifest:
     owner_id: str
     """Whose run this was. Present from day one per Principle VII."""
 
-    projected_instrument_id: str
-    """Which declared instrument was projected, of the ones :attr:`inputs` lists."""
+    as_of: date
+    """When the question was asked. Decides staleness and nothing else.
 
-    holding: Holding
-    """The purchase, recorded as the record itself rather than as a summary.
-
-    FR-012 asks the result to record its inputs; the inputs are small, frozen and already
-    typed, so storing them beats storing a rendering of them that could disagree.
+    On the manifest rather than in the declaration it answers (015 FR-006): a file whose
+    horizons moved with the calendar would be a different question every day under one digest,
+    so reproducibility is preserved by recording the clock here instead of putting one there.
     """
 
-    horizon: DateRange
-    """The window the run was asked about."""
+    regime_id: str
+    """Which world the run searched. ``IMPLICIT_REGIME_ID`` where no scenario was in force.
 
-    assumptions: Assumptions
-    """The modelling choices the run was given -- consumption method, coupon policy."""
+    A result is only reproducible if the world it assumed is recorded, and *every route at once*
+    is itself an assumption worth naming.
+    """
+
+    projection: ProjectedRun | None
+    """The single-projection facts, or ``None`` where the run projected many.
+
+    Four fields that are true of **one** holding over **one** window. An answer has many
+    instruments and many horizons and no single holding, and leaving them on the record proper
+    would have forced it to invent one (015 research D12).
+    """
 
     inputs: tuple[InputRef, ...]
     """Every declaration the run was given, sorted by kind and id.
@@ -473,6 +533,8 @@ def of_run(
     horizon: DateRange,
     assumptions: Assumptions,
     seed: int | None,
+    as_of: date,
+    regime_id: str,
     inflation: InflationDeclarations | None = None,
 ) -> RunManifest:
     """The manifest of one projection: its inputs, their versions, and its digest.
@@ -501,10 +563,14 @@ def of_run(
         code_version=terezy.__version__,
         encoding=ENCODING,
         owner_id=holding.owner_id,
-        projected_instrument_id=holding.instrument_id,
-        holding=holding,
-        horizon=horizon,
-        assumptions=assumptions,
+        as_of=as_of,
+        regime_id=regime_id,
+        projection=ProjectedRun(
+            instrument_id=holding.instrument_id,
+            holding=holding,
+            horizon=horizon,
+            assumptions=assumptions,
+        ),
         inputs=(
             input_refs(declarations)
             if inflation is None
@@ -534,3 +600,136 @@ def _reported_provenance(result: Projection) -> Provenance:
         if isinstance(figure, RealRate):
             sources.append(figure.provenance)
     return prov.merge_all(sources)
+
+
+# ---------------------------------------------------------------------------
+# 015-the-question: the manifest of a whole answer
+# ---------------------------------------------------------------------------
+
+
+def _ref(kind: InputKind, identifier: str, path: Path, sources: Provenance) -> InputRef:
+    """One input reference, so every family below names its file and version the same way."""
+    return InputRef(
+        kind=kind,
+        id=identifier,
+        file=file_name(path),
+        version=file_version(path),
+        unverified_sources=_unverified_ids(sources),
+    )
+
+
+def answer_input_refs(declarations: resolver.AnswerDeclarations) -> tuple[InputRef, ...]:
+    """Every file an answer's run read, as input references (015 FR-025, row H3).
+
+    Walked from the loader's own declaration maps rather than by globbing the data root, which
+    is what makes SC-008's claim -- *every file the run **read** appears* -- checkable at all: a
+    glob would name files nothing consulted and would say nothing about the ones it missed.
+    """
+    coverage = declarations.candidates.composition.coverage
+    ramp = coverage.ramp
+    refs = [
+        *input_refs(declarations.tuples.instruments),
+        *(
+            _ref("question", identifier, path, prov.EMPTY)
+            for identifier, path in declarations.question_files.items()
+        ),
+        *(
+            _ref(
+                "access",
+                identifier,
+                declarations.tuples.access_files[identifier],
+                _access_prov(entry),
+            )
+            for identifier, entry in declarations.tuples.access.items()
+        ),
+        *(
+            _ref("route", identifier, ramp.route_files[identifier], _route_prov(route))
+            for identifier, route in ramp.routes.items()
+        ),
+        *(
+            _ref("stream", identifier, ramp.stream_files[identifier], stream.amount.provenance)
+            for identifier, stream in ramp.streams.items()
+        ),
+        _ref(
+            "group_vocabulary",
+            resolver.GROUPS_FILE,
+            declarations.tuples.instruments.groups_file,
+            prov.EMPTY,
+        ),
+        _ref(
+            "composition",
+            declarations.candidates.composition.composition_file.stem,
+            declarations.candidates.composition.composition_file,
+            prov.EMPTY,
+        ),
+        _ref(
+            "candidate_ceiling",
+            declarations.candidates.candidates_file.stem,
+            declarations.candidates.candidates_file,
+            prov.EMPTY,
+        ),
+        _ref(
+            "spendable",
+            coverage.spendable_file.stem,
+            coverage.spendable_file,
+            prov.EMPTY,
+        ),
+        _ref(
+            "early_exit_assumption",
+            declarations.tuples.registries.spread_holds.id,
+            declarations.tuples.early_exit_file,
+            prov.EMPTY,
+        ),
+    ]
+    return tuple(sorted(refs, key=lambda ref: (ref.kind, ref.id)))
+
+
+def _access_prov(entry: InstrumentAccess) -> Provenance:
+    """Both quotes an access entry may carry: what a unit costs, and what it sells for."""
+    return prov.merge_all(
+        quote.price.provenance for quote in (entry.quote, entry.resale_price) if quote is not None
+    )
+
+
+def _route_prov(route: Route) -> Provenance:
+    """Every fee, premium and window a route's legs declare."""
+    return prov.merge_all(leg.provenance for leg in route.legs)
+
+
+def digest_of_answer(result: Answer) -> str:
+    """The digest of a whole answer: every section, every figure, every stated exclusion.
+
+    A function of the canonical form alone, so provenance -- which the canonical form omits by
+    design -- cannot move it. Two runs of one question over one registry agree bit for bit.
+    """
+    return digest(canonical.of_answer(result))
+
+
+def of_answer(
+    *,
+    declarations: resolver.AnswerDeclarations,
+    question: Question,
+    as_of: date,
+    result: Answer | None,
+) -> RunManifest:
+    """The manifest of one answered question: its inputs, their versions, and its digest.
+
+    ``projection`` is ``None``: an answer holds many instruments over many horizons and no
+    single holding, and inventing one to fill the field would be a false record rather than an
+    incomplete one.
+
+    ``result`` is ``None`` where the question itself refused, and the digest then records that
+    the run produced no answer rather than a digest of nothing.
+    """
+    return RunManifest(
+        code_version=terezy.__version__,
+        encoding=ENCODING,
+        owner_id=question.owner_id,
+        as_of=as_of,
+        regime_id=question.regime_id,
+        projection=None,
+        inputs=answer_input_refs(declarations),
+        seed=None,
+        result_digest=digest(("refused",)) if result is None else digest_of_answer(result),
+        unverified_sources=_unverified_ids(prov.EMPTY if result is None else result.provenance),
+    )
