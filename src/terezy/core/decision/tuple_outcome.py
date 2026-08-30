@@ -470,7 +470,7 @@ def _instrument_side(
                 "free, and the record would still read as a coherent journey (FR-004)."
             ),
         )
-    currency = _currency_of(declared)
+    currency = currency_of(declared)
     unresolved = _unresolved_class(declared, registries.tax_classes)
     if unresolved is not None:
         return unresolved
@@ -546,8 +546,13 @@ def _declaration(instrument_id: str, registries: Registries) -> Declared | Decla
     )
 
 
-def _currency_of(declared: Declared) -> Currency:
-    """What the instrument trades and pays in, from whichever declaration kind it is."""
+def currency_of(declared: Declared) -> Currency:
+    """What the instrument trades and pays in, from whichever declaration kind it is.
+
+    Public because feature 014 anchors an enumeration's two ``Destination`` records on it -- the
+    venue a purchase happens at, in the currency the instrument trades in -- and a second copy
+    of *which field of which declaration kind holds the currency* is one fact in two places.
+    """
     match declared:
         case InstrumentDeclaration():
             return declared.currency
