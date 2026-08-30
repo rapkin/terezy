@@ -31,10 +31,11 @@ gross because a declaration says so. Returning the gross in both cases would rep
 figure that quietly equals the gross -- a number the owner would read as "nothing is
 charged", which nobody has claimed.
 
-So :func:`deployable` returns a tagged union: :class:`DeployableCapacity` when a treatment
-was named, and :class:`TaxTreatmentUndeclared` when none was, the latter carrying no net
-field at all. There is nothing on it for a caller to mistake for a figure -- the same shape,
-and the same reason, as ``ExitCostUnknown`` occupying the round-trip slot.
+So the figure comes back as a **tagged union**: a capacity when a treatment was named, and
+an explicitly-empty slot when none was, the second carrying no net field at all. There is
+nothing on it for a caller to mistake for a figure -- the same shape, and the same reason, as
+``ExitCostUnknown`` occupying the round-trip slot. Both records and the function that returns
+them are in :mod:`terezy.core.streams.capacity`, which states why they are not here.
 
 ## Where the legal values went, and why the boundary is sharper for it
 
@@ -49,7 +50,7 @@ retired scalar let one be written into per-owner data uncited. After 012 the own
 ``data/tax/schemes/`` with their sources (public facts, cited, correctly). So there is no
 longer any arithmetic in this module that applies a declared rate: the charge arrives already
 computed, its lines already carrying the citations of the entries that produced them, and
-:func:`deployable` does one subtraction whose ``money.sub`` unions both sides' provenance.
+what is left to do is one subtraction.
 
 ## No behaviour on the records, and nothing about routes
 
@@ -162,7 +163,7 @@ class IncomeStream:
     """
 
     cadence: Cadence
-    """How often :attr:`amount` arrives. Carried on every deployable figure below, so a
+    """How often :attr:`amount` arrives. Carried on every deployable figure, so a
     monthly number cannot be read as an annual one."""
 
     arrives_at: str
@@ -192,8 +193,9 @@ class IncomeStream:
     """The id of the declared taxation scheme this income is under, or ``None``.
 
     ``None`` means **the owner has not named one**, which is *not* a scheme that charges
-    nothing. See the module docstring: the two are different claims and :func:`deployable`
-    returns different types for them, so no net figure can quietly equal a gross one.
+    nothing. See the module docstring: the two are different claims and
+    :mod:`terezy.core.streams.capacity` returns different types for them, so no net figure
+    can quietly equal a gross one.
 
     A scheme declared for a *reading* rather than for a stream may not be named here, and a
     scheme no file declares fails at load naming the file, the stream and the treatment. There

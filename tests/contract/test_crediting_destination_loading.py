@@ -280,8 +280,13 @@ class TestReferencesResolvedAcrossFiles:
         )
         error = self._resolve(root)
 
-        assert "ua.toml" in str(error)
-        assert "second.toml" in str(error)
+        # The message body, not `str(error)`: the rendered string opens with the error's own
+        # path, which `sorted()` fixes, so asserting `ua.toml` there is asserting nothing.
+        assert error.file.name in {"ua.toml", "second.toml"}
+        assert "second.toml" in error.problem or "this file already records it above" in (
+            error.problem
+        )
+        assert error.field_path.startswith("destination[")
 
     def test_two_files_declaring_one_scheme_identity_name_both(self, tmp_path: Path) -> None:
         root = self._root(tmp_path)
@@ -291,8 +296,12 @@ class TestReferencesResolvedAcrossFiles:
         )
         error = self._resolve(root)
 
-        assert "ua_fop_group_3.toml" in str(error)
-        assert "copy.toml" in str(error)
+        # The *other* file has to be in the message body; the error's own path is already
+        # there by construction and says nothing about the collision.
+        assert error.file.name in {"ua_fop_group_3.toml", "copy.toml"}
+        other = "copy.toml" if error.file.name == "ua_fop_group_3.toml" else "ua_fop_group_3.toml"
+        assert other in error.problem
+        assert error.field_path == "scheme.id"
 
     def test_a_stream_naming_a_treatment_nobody_declares_is_refused(self, tmp_path: Path) -> None:
         root = self._root(tmp_path)
