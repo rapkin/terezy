@@ -1827,8 +1827,8 @@ def _due_on(rule: TimingRule, tax_year: int) -> date | None:
     The year is ``tax_year + 1`` because that is what the declared rule *means*: a deadline of
     1 August is 1 August of the year after the one being declared. The non-business-day
     convention is the declared one, resolved through ``primitives.conventions`` exactly as an
-    instrument's coupon date is -- the same registry, the same four names, and an unrecognised
-    one refused at load rather than here (FR-008).
+    instrument's coupon date is -- the same registry, and an unrecognised name refused at load
+    rather than here (FR-008).
     """
     if rule.settlement is SettlementBehaviour.WITHHELD_AT_SOURCE:
         return None
