@@ -1461,10 +1461,10 @@ def observation_kinds_from_file(path: Path) -> tuple[ObservationKind, ...]:
 def venues_from_file(path: Path) -> tuple[Venue, ...]:
     """Every venue declared in ``data/venues.toml``, in file order.
 
-    A venue table carries no observed numeric value -- an id, a name and a set of currency
-    codes -- so no citation is read, and :class:`~terezy.core.routes.venues.Venue` has no
-    provenance field to carry one. Every *number* attached to a venue lives on a leg, in
-    ``data/routes/``, with its own source.
+    A venue table carries no observed value -- an id, a name and a set of currency codes,
+    no number and no date -- so no citation is read, and
+    :class:`~terezy.core.routes.venues.Venue` has no provenance field to carry one. Every
+    *number* attached to a venue lives on a leg, in ``data/routes/``, with its own source.
 
     The currency set is required non-empty. A venue that can hold nothing is a place money
     cannot sit, and every leg touching it would fail the can-hold check for a reason that
@@ -3820,8 +3820,8 @@ def inflation_assumption_from_file(path: Path) -> tuple[str, InflationAssumption
 # ---------------------------------------------------------------------------
 #
 # Two loaders, split by what the file *is*. `data/tax/timing/` is cited law and every table
-# carrying a number needs a citation; `data/scenarios/tax/` is the owner's own statements and
-# needs none, on the exemption `data/scenarios/` already carries.
+# carrying an observed value needs a citation; `data/scenarios/tax/` is the owner's own
+# statements and needs none, on the exemption `data/scenarios/` already carries.
 #
 # Every closed set below is resolved against the core's own enums rather than re-listed here,
 # so a value the engine cannot act on fails at load naming the file, the field, and what would

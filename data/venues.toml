@@ -11,9 +11,9 @@
 # `observation_kinds.toml` — one flat list at the data root, because a venue is a
 # structural identifier rather than a directory of sourced observations.
 #
-# **No citation keys, and that is deliberate.** A venue table carries no observed numeric
-# value — an id, a name, and a set of currency codes — so there is nothing here for a
-# source to vouch for, and `core.routes.venues.Venue` has no provenance field to carry
+# **No citation keys, and that is deliberate.** A venue table carries no observed value —
+# an id, a name, and a set of currency codes, no number and no date — so there is nothing
+# here for a source to vouch for, and `core.routes.venues.Venue` has no provenance field to carry
 # one. The same reading as feature 001's `[instrument.tax_classes]`, which holds
 # references rather than observations and cites nothing. Every *number* attached to a
 # venue lives on a leg, in `data/routes/`, with its own citation.

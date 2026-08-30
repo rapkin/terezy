@@ -612,8 +612,8 @@ class VenueTable(BaseModel):
 class VenuesFile(BaseModel):
     """The whole of ``data/venues.toml``.
 
-    No citation keys: a venue table carries no observed numeric value, and
-    ``core.routes.venues.Venue`` has no provenance field to carry one. Every number
+    No citation keys: a venue table carries no observed value -- no number and no date --
+    and ``core.routes.venues.Venue`` has no provenance field to carry one. Every number
     attached to a venue lives on a leg, in ``data/routes/``, with its own source.
     """
 

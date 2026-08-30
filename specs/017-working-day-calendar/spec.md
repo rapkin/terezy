@@ -499,16 +499,19 @@ without a calendar.
   its own first uncovered hole.
 - **FR-006**: The provenance gate MUST require **both a citation and a declared observation
   kind** on every classification row.
-  **Neither follows from listing the directory in `SOURCED_DIRS`, and the gap is measurable
-  rather than supposed**: `scripts/check_provenance.py:270-272` decides that a table "carries
-  observed values" by counting **numeric leaves** not in `STRUCTURAL_KEYS`, and
-  `check_table:416` gates **both** `_check_kind_field` **and** the citation loop behind that one
-  predicate. A classification row is a date and a label and holds no number at all, so under
-  today's gate a calendar directory would be scanned and every row would pass **uncited and with
-  an unvalidated kind**. An uncited holiday is precisely the legal value from memory Principle I
-  forbids, and this is the one gate that would otherwise be believed to catch it. The same
-  script refuses an unlisted directory outright (`check_provenance.py:593`), so the directory
-  MUST also be listed by name with its reason.
+  **Neither followed from listing the directory in `SOURCED_DIRS`, and the gap was measured
+  rather than supposed**: `_has_observed_value` decided that a table "carries observed values"
+  by counting **numeric leaves** not in `STRUCTURAL_KEYS`, and `check_table` gated **both**
+  `_check_kind_field` **and** the citation loop behind that one predicate. A classification row
+  is a date and a label and holds no number at all, so a calendar directory would have been
+  scanned and every row would have passed **uncited and with an unvalidated kind**. An uncited
+  holiday is precisely the legal value from memory Principle I forbids, and this is the one gate
+  that would otherwise be believed to catch it. **SATISFIED ON `main` BY `e6def2f`**: the
+  predicate now counts dates in either TOML spelling, and a planted row of dates and labels
+  fails the gate with its `source` removed and fails it again on an undeclared `kind`
+  (`tests/contract/test_provenance_gate.py`). The same script still refuses an unlisted
+  directory outright (`unknown_directories`), so the directory MUST be listed by name with its
+  reason.
 - **FR-006a**: Because the predicate FR-006 changes is shared by **every** entry in
   `SOURCED_DIRS`, the fix MUST be measured as a **delta over the gate's full finding set**: the
   complete set of findings is recorded before the change and after it, and the difference MUST
@@ -518,9 +521,18 @@ without a calendar.
   see a narrowing at all. This is the mechanical form the `quotation_unit` precedent used:
   that gap was established by deleting the exemption line and **counting** the four errors it
   produced, rather than by reasoning about what the gate ought to do.
-- **FR-006b**: FR-006 and FR-006a describe a **live defect on `main` that has nothing to do
-  with calendars**, and are being fixed ahead of this feature rather than inside it — including
-  a survey of what else under `data/` is numberless and therefore already exempt without saying
+  **SATISFIED ON `main` BY `e6def2f`, and the delta was empty.** No calendar directory existed
+  yet, so the change is a guard rather than a repair. Measured 2026-08-30, the survey FR-006b
+  asks for found 124 numberless tables already exempt from both checks; the widened predicate
+  reaches 29 of them — every `[[verification_task]]`, whose `searched_on` dates a search rather
+  than an observation, and three fund identity tables — and all three key names are exempted
+  with their reasons, leaving the finding set over the shipped tree byte-identical. The fund
+  one is a **recorded hole rather than a judgement**: `terminates_on` and `subscription_cutoff`
+  are `fund_terms` observations that `[instrument]` has nowhere to cite, since `FundTable` is
+  `extra="forbid"`.
+- **FR-006b**: FR-006 and FR-006a described a **live defect on `main` that had nothing to do
+  with calendars**, and were fixed ahead of this feature rather than inside it — including a
+  survey of what else under `data/` is numberless and therefore already exempt without saying
   so. This feature states them because they are its preconditions, and inherits the fix.
 - **FR-007**: Loading a calendar MUST fail loudly — naming the file and the offending field or
   date — on a malformed value, an unrecognised field, a missing required field, a missing
@@ -757,7 +769,9 @@ line reference either: the line it was on no longer says it.
   row's citation fails the provenance gate — **demonstrated by measurement, the way the
   `quotation_unit` gap was measured**: the gate is run against a calendar file with a row's
   `source` deleted and the failure count recorded, so FR-006's fix is shown to bite rather than
-  assumed to. (FR-005, FR-006)
+  assumed to. The predicate half of that fix already landed with its own planted-row tests
+  (`e6def2f`); what SC-005 adds is the same demonstration on a real calendar file. (FR-005,
+  FR-006)
 - **SC-006**: A second calendar with a different rest pattern and a different week start,
   declared purely as data, loads and classifies dates by *its* pattern with zero source lines
   changed, and the first calendar's answers are unchanged. (FR-001, Story 4)

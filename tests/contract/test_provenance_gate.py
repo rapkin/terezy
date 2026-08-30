@@ -94,8 +94,8 @@ def test_the_argued_exemptions_are_by_name_with_a_reason(tmp_path: Path) -> None
 def test_a_root_level_file_is_scanned_rather_than_invisible(tmp_path: Path) -> None:
     """``venues.toml`` sits at the data root, outside every directory.
 
-    It carries no observed numeric value today, so it passes -- and it must be *scanned*
-    to pass, not skipped: a numeric leaf added to it without a citation is an error, which
+    It carries no observed value today, so it passes -- and it must be *scanned*
+    to pass, not skipped: an observed value added to it without a citation is an error, which
     is the difference between "checked and clean" and "never looked at".
     """
     root = _scratch_root(tmp_path)
@@ -264,6 +264,19 @@ def test_a_numberless_table_without_a_citation_is_an_error(tmp_path: Path) -> No
     outcome = _planted(
         tmp_path,
         PLANTED_ROW.replace(
+            'source       = "planted by tests/contract/test_provenance_gate.py"\n', ""
+        ),
+    )
+    assert outcome.returncode == 1, outcome.stdout
+    assert "carries observed values but has no 'source'" in outcome.stdout
+
+
+def test_a_bare_toml_date_literal_is_an_observation_too(tmp_path: Path) -> None:
+    """The other half of `_is_dated`, which no shipped file reaches: every date under `data/`
+    is a quoted string today, so the literal spelling is only ever exercised here."""
+    outcome = _planted(
+        tmp_path,
+        PLANTED_ROW.replace('on           = "2026-01-01"', "on           = 2026-01-01").replace(
             'source       = "planted by tests/contract/test_provenance_gate.py"\n', ""
         ),
     )

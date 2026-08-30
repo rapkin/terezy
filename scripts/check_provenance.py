@@ -31,7 +31,7 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DATA_ROOT = REPO_ROOT / "data"
 
-# Directories whose numeric values are legal, tax, fee or market observations and
+# Directories whose observed values are legal, tax, fee or market observations and
 # therefore require a citation.
 #
 # `channels` joined in feature 002: a two-sided rate is the most decision-relevant
@@ -156,7 +156,14 @@ KIND_KEY = "kind"
 LEG_KIND_KEY = "kind_of_observation"
 LEG_TABLE_RE = re.compile(r"\.leg\[\d+\]$")
 
+# What a declared date field must look like. Safe to TIGHTEN: a stricter pattern here
+# reports more malformed dates.
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+# What counts as a date when deciding whether a table carries an observation. Safe only to
+# LOOSEN, which is why it is not `DATE_RE`: a calendar-accuracy check added there would
+# otherwise excuse `"2026-13-01"`'s table from needing a citation.
+DATED_RE = re.compile(r"^\d{4}-\d{2}-\d{2}([T ].*)?$")
 
 # Keys that are structural rather than observed values.
 STRUCTURAL_KEYS = frozenset(
@@ -192,9 +199,8 @@ STRUCTURAL_KEYS = frozenset(
         "latency_days",
         # --- feature 002: identifiers and references, not observations ---
         # They must not trip the "this table carries observed values" predicate. `index` is
-        # the only one it would reach, and it is a position in a chain rather than a
-        # measurement; the rest are here because the contract names them and because a reader
-        # scanning this set should see the whole declaration surface.
+        # the only one it reaches -- a position in a chain, not a measurement; the rest are
+        # listed because the contract names them.
         "direction",
         "provider",
         "partner_route",
@@ -213,35 +219,31 @@ STRUCTURAL_KEYS = frozenset(
         "is_assumption",
         "rationale",
         "redirect_to",
-        "observed_on",
         # --- feature 011: the form a rate is quoted in, not a rate ---
         # How many units the values are quoted per. It sits on the `[series]` identity table
         # beside `pair`, and every `value` it scales carries its own citation on its own
         # observation.
         #
-        # **What this actually exempts is the whole `[series]` table, not one field**, and
-        # that is worth stating because the predicate above makes it invisible: `[series]`
-        # carries exactly one observed value, so listing it here leaves the table with none
-        # and drops the `source`, `retrieved_on`, `verified_on` and `kind` requirements with
-        # it. Measured 2026-08-30: removing this line produces four errors on
-        # `data/official_rates/ua_nbu_usd.toml`, not one.
-        #
-        # A STATED GAP, therefore: `quotation_unit` decides a tax base to within two orders of
-        # magnitude and this gate cannot see it. Closing it means requiring a citation on a
-        # series' identity table, which is a real question rather than a line here — the
-        # authority and the pair are not retrieved values, so a `retrieved_on` for them would
-        # be a fabricated retrieval, and that is worse than an uncited field. It belongs with
-        # whoever builds the fetch script, which retrieves the published table the unit is read
-        # off and is the first thing that can date it honestly.
+        # **This exempts the whole `[series]` table, not one field**: it carries exactly one
+        # observed value, so listing it here leaves the table with none and drops the
+        # `source`, `retrieved_on`, `verified_on` and `kind` requirements with it. Measured
+        # 2026-08-30: removing this line produces four errors on
+        # `data/official_rates/ua_nbu_usd.toml`, not one. A STATED GAP, argued and recorded
+        # where a declarer meets it, in that file's own header.
         "quotation_unit",
         # --- feature 017: dates that are not observations ---
         # The date a search was run, on a `[[verification_task]]` -- the record of a question
         # nobody answered. It carries no value, so there is nothing for a source to vouch for.
         "searched_on",
-        # A fund's term end and its subscription close scope the `[instrument]` table the way
-        # `available_until` scopes a route. A STATED GAP all the same, `quotation_unit`'s shape
-        # above: a citation could vouch for either, and closing it is a schema change --
-        # `FundTable` is `extra="forbid"`, so `[instrument]` has nowhere to put a `source`.
+        # The date an observation was made, beside the value it dates. What a source vouches
+        # for is the value; this says when it was true, as `retrieved_on` says when it was
+        # read. A table whose *only* leaf is this one is dated evidence of nothing.
+        "observed_on",
+        # A fund's term end and subscription close. **Both are observations** -- declared
+        # `fund_terms` in `data/observation_kinds.toml` -- so this is a hole, not a judgement,
+        # and closing it is a schema change: `FundTable` is `extra="forbid"`, leaving
+        # `[instrument]` nowhere to put a `source`. Argued and recorded where a declarer meets
+        # it, in each fund's own header.
         "terminates_on",
         "subscription_cutoff",
     }
@@ -274,9 +276,9 @@ def _is_numeric(value: object) -> bool:
 
 
 def _is_dated(value: object) -> bool:
-    """A date, however the file spells it: a TOML date literal or an ISO string."""
+    """A date, however the file spells it: a TOML date or time literal, or an ISO string."""
     return isinstance(value, dt.date | dt.time) or (
-        isinstance(value, str) and DATE_RE.match(value) is not None
+        isinstance(value, str) and DATED_RE.match(value) is not None
     )
 
 
@@ -624,7 +626,7 @@ def unknown_directories(data_root: Path) -> list[Finding]:
             entry,
             "",
             "is a directory this gate does not know. Every directory under data/ must be "
-            "named: in SOURCED_DIRS if its numeric values are observations needing a "
+            "named: in SOURCED_DIRS if its observed values -- numbers or dates -- need a "
             "citation, or in EXEMPT_DIRS with the reason they do not. An unlisted "
             "directory is an error, never a blind spot -- a gate that passes over what it "
             "never looked at is fail-open.",
@@ -648,8 +650,8 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     # Root-level files are scanned too, fail-closed: venues.toml lives at the root and
-    # carries no observed numeric value today -- and it has to be *looked at* for that to
-    # mean anything. The kinds file is excluded here because declared_kinds below is its
+    # carries no observed value today -- and it has to be *looked at* for that to mean
+    # anything. The kinds file is excluded here because declared_kinds below is its
     # own, stricter validator (its numeric leaf is a threshold policy, not an observation).
     root_files = sorted(path for path in data_root.glob("*.toml") if path.name != KINDS_FILE)
     paths = (

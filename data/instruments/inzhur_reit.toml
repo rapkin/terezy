@@ -26,6 +26,19 @@
 # **Fees are context, not modelled flows** (owner decision B). The management and
 # performance fee clauses are recorded as `[[instrument.fee_fact]]` so a reader can see what
 # the declared net yield is net of; nothing accrues from them.
+#
+# ---------------------------------------------------------------------------
+# THE TERM END IS NOT CHECKED BY ANY GATE
+# ---------------------------------------------------------------------------
+#
+# `terminates_on` is a `fund_terms` observation, read off the регламент like every term
+# below and ageing on the same 365-day clock (`data/observation_kinds.toml`). It sits on
+# `[instrument]`, which carries no citation keys: `FundTable` is `extra="forbid"`, so there
+# is nowhere to put a `source`. `scripts/check_provenance.py` exempts it by name and cannot
+# see it — a hole in that gate, not a judgement that it needs no citation.
+#
+# Whoever changes it: check it against the регламент by eye, because the gate will not. It
+# is the binding term of a refusal, so a wrong one moves money.
 
 [instrument]
 id                   = "inzhur_reit"

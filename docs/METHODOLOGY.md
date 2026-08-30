@@ -2889,8 +2889,8 @@ overstate the outcome by exactly the tax.
 
 `data/tax/timing/<jurisdiction>.toml` declares the categories with their netting treatment and
 carryforward rule, the deadlines and settlement behaviour, and what the sources say about each
-basis method. Every table carrying a number is cited and every `verified_on` is empty, so
-every figure resting on one renders marked.
+basis method. Every table carrying an observed value is cited and every `verified_on` is
+empty, so every figure resting on one renders marked.
 
 **The mark travels on the money**, not only on the record that holds the rule. A netting
 treatment is why the year's operations were summed into one base at all, and a deadline is why
@@ -3220,9 +3220,10 @@ of magnitude while looking entirely plausible. A series that omits it fails at l
 What load-time checking does *not* do is verify the unit is the published one. The provenance
 gate recognises a sourced table by the observed values it carries, and `quotation_unit` is
 the only one in a series' identity table — listing it as structural drops that table's
-citation requirement altogether. So the unit is declared, non-defaulted, positive and **uncited**: a wrong one is
-caught by a reader or not at all. The data file's own header says so where a declarer meets
-it, and `scripts/check_provenance.py` records why the gap is not closed here.
+citation requirement altogether. So the unit is declared, non-defaulted, positive and
+**uncited**: a wrong one is caught by a reader or not at all. The data file's own header
+says so where a declarer meets it, and `scripts/check_provenance.py` records why the gap is
+not closed here.
 
 **The date is the one the taxable event already carries.** This machinery introduces no second
 notion of when a taxable event happened: two modules with their own opinion about that is how

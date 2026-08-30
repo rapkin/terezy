@@ -33,6 +33,20 @@
 # loss, of return of capital, of the target and of the upside are the owner's assumptions
 # and belong to the decision layer (`SIMULATOR_SPEC.md` §11 item 6). Nothing here weights
 # anything by a probability.
+#
+# ---------------------------------------------------------------------------
+# THE TERM END AND THE SUBSCRIPTION CUTOFF ARE NOT CHECKED BY ANY GATE
+# ---------------------------------------------------------------------------
+#
+# `terminates_on` and `subscription_cutoff` are `fund_terms` observations, read off the
+# регламент like every term below and ageing on the same 365-day clock
+# (`data/observation_kinds.toml`). They sit on `[instrument]`, which carries no citation
+# keys: `FundTable` is `extra="forbid"`, so there is nowhere to put a `source`.
+# `scripts/check_provenance.py` exempts both by name and cannot see them — a hole in that
+# gate, not a judgement that they need no citation.
+#
+# Whoever changes either: check it against the регламент by eye, because the gate will not.
+# `terminates_on` is the binding term of a refusal, so a wrong one moves money.
 
 [instrument]
 id                   = "inzhur_miltech"
