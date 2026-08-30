@@ -1308,6 +1308,24 @@ class TestNoFieldDefaultStandsInForAValue:
         "FundTable": frozenset({"subscription_cutoff", "distribution"}),
         "GoalTable": frozenset({"monthly_contribution", "target_sum", "target_date"}),
         "IndexationTable": frozenset({"rate_pct"}),
+        # A question states exactly one of a subject list and the every-instrument token, and
+        # the loader refuses both and neither: omission must never read as *everything*. On a
+        # run plan every absence is a positive declaration a named refusal reports -- no chosen
+        # point inside a stated range is `TwoFiguresNotOne`, no exchange-rate assumption is
+        # `PegUnsizable` -- and the fields of the kind a plan is not are refused rather than
+        # ignored. `exit_on` is deliberately NOT here: *hold to the fund's own end* is a choice
+        # (014 FR-003), so it is required with a closed vocabulary.
+        "QuestionTable": frozenset({"subjects", "every_declared_instrument"}),
+        "QuestionPlanTable": frozenset(
+            {
+                "coupon_policy",
+                "liquidity_mode",
+                "buyback",
+                "exit_on",
+                "yield_point",
+                "exchange_rate",
+            }
+        ),
         "LegTable": frozenset(
             {
                 "channel",

@@ -1467,6 +1467,137 @@ class FundFile(BaseModel):
 # blank.
 
 
+# ---------------------------------------------------------------------------
+# 015-the-question: the question itself
+# ---------------------------------------------------------------------------
+#
+# No citation keys anywhere below: a question is one person's stated preference, not an
+# observation about the world. `data/questions/` is named in `EXEMPT_DIRS` with that reason.
+#
+# The `| None = None` defaults here all mean *the owner stated none*, and every one of them is
+# a positive declaration a refusal names rather than a value the loader supplies: a fund run
+# with no chosen point inside its stated range refuses as `TwoFiguresNotOne`, and one with no
+# exchange-rate assumption refuses as `PegUnsizable`. `exit_on` is the exception and is
+# REQUIRED with a closed vocabulary, because *hold to the fund's own end* is a choice rather
+# than the absence of one (014 FR-003).
+
+
+class QuestionAmountTable(BaseModel):
+    """One ``[[question.amount]]``: what leaves one stream, in that stream's own currency."""
+
+    model_config = STRICT
+
+    stream: str
+    amount: float
+    currency: str
+    """Must be what the named stream declares. Refused rather than converted (015 FR-004)."""
+
+
+class QuestionHorizonTable(BaseModel):
+    """One ``[[question.horizon]]``: a window the answer holds one section for."""
+
+    model_config = STRICT
+
+    start: str
+    end: str
+
+
+class QuestionReserveTable(BaseModel):
+    """One ``[[question.reserve]]``: an amount the owner may need back, and by when."""
+
+    model_config = STRICT
+
+    amount: float
+    currency: str
+    by: str
+
+
+class QuestionChosenPointTable(BaseModel):
+    """``[question.plan.yield_point]`` -- the owner's chosen point inside a stated range."""
+
+    model_config = STRICT
+
+    rate_pct: float
+    is_assumption: bool
+    rationale: str
+
+
+class QuestionExchangeRateTable(BaseModel):
+    """``[question.plan.exchange_rate]`` -- the owner's own stated rate (015 FR-021a).
+
+    Stating one is the owner's act; *finding* one is what FR-021 forbids the engine to do.
+    Without it a fund whose payouts are sized in one currency and paid in another refuses
+    permanently, for a reason this feature would otherwise have forbidden itself from supplying.
+    """
+
+    model_config = STRICT
+
+    uah_per_unit: float
+    is_assumption: bool
+    rationale: str
+
+
+class QuestionPlanTable(BaseModel):
+    """One ``[[question.plan]]``: how one **subject** is to be run."""
+
+    model_config = STRICT
+
+    subject: str
+    """The word the owner wrote, not an instrument id: a plan for ``ovdp`` runs every issue the
+    label reaches, which is what stops the file growing an entry per issue when 016 lands."""
+
+    kind: str
+    """``bond`` or ``fund``. Declared rather than inferred from which fields are present, so a
+    typo is refused instead of quietly selecting the other kind's plan."""
+
+    consumption_method: str
+
+    coupon_policy: str | None = None
+    """Bond plans only. A fund declaring one is refused."""
+
+    liquidity_mode: str | None = None
+    buyback: str | None = None
+    exit_on: str | None = None
+    """Fund plans only, and required on one: a date, or ``termination``."""
+
+    yield_point: QuestionChosenPointTable | None = None
+    exchange_rate: QuestionExchangeRateTable | None = None
+
+
+class QuestionTable(BaseModel):
+    """``[question]`` -- the whole of one asked question."""
+
+    model_config = STRICT
+
+    id: str
+    asked_on: str
+    regime: str
+    continuation: str
+    benchmark: str
+
+    amount: list[QuestionAmountTable]
+    horizon: list[QuestionHorizonTable]
+    plan: list[QuestionPlanTable]
+    reserve: list[QuestionReserveTable]
+    """Written ``reserve = []`` where the question states no need. Required, so a forgotten
+    section and a stated absence are different files."""
+
+    subjects: list[str] | None = None
+    every_declared_instrument: bool | None = None
+    """Exactly one of the two is stated; neither and both are refused (015 FR-007). Omission
+    must not mean *everything*, because the absence of two of the owner's four words is the
+    most useful thing the answer says today."""
+
+
+class QuestionFile(BaseModel):
+    """A whole ``data/questions/<id>.toml``: one owner, one question."""
+
+    model_config = STRICT
+
+    owner: OwnerTable
+    question: QuestionTable
+
+
 class CompositionTable(BaseModel):
     """``[composition]`` -- the owner's policy on how far a chain may run."""
 

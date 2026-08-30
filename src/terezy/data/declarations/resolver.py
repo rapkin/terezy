@@ -64,6 +64,7 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.results.composed import SegmentBound
     from terezy.core.results.coverage import SpendableEndpoint
     from terezy.core.results.goal import Goal
+    from terezy.core.results.question import Question
     from terezy.core.routes.channels import FxChannel
     from terezy.core.routes.legs import Leg, Route
     from terezy.core.routes.venues import Venue
@@ -3211,3 +3212,144 @@ def _check_treatment(
             "treatment, which no source in this repository supports.",
             'name a scheme whose declared_for is "stream"',
         )
+
+
+# ---------------------------------------------------------------------------
+# 015-the-question: the questions, and the bundle one verb takes
+# ---------------------------------------------------------------------------
+#
+# Three relations a per-file validator structurally cannot check, and every one of them is a
+# **typo in an artefact under review** rather than a fact about the money (015 FR-004):
+#
+# 1. an amount for a stream the registry does not declare;
+# 2. a declared stream the question states no amount for -- the case that fails *silently*
+#    today, because such a stream's pairs yield no candidate and never reach `survey`;
+# 3. an amount whose currency the named stream does not deliver.
+#
+# What is deliberately NOT checked here: whether a subject word names anything. A question is
+# the owner's own vocabulary and its gaps are the answer's content (FR-009), which is the
+# asymmetry with an instrument naming an undeclared group.
+
+QUESTIONS_DIR = "questions"
+"""Where the owner's questions live under a data root. Per-owner, beside `candidates/`."""
+
+
+@dataclass(frozen=True, slots=True)
+class AnswerDeclarations:
+    """Everything the answer verb reads: the registries, the two policies, and the questions.
+
+    ``Registries`` alone cannot carry it. The **candidate ceiling** comes from `data/candidates/`
+    and the **segment bound** from `data/composition/`, and 014's `survey` takes both as its own
+    arguments -- so a verb that could not receive them could not call it.
+    """
+
+    tuples: TupleDeclarations
+    """The registries every candidate is evaluated against, and which file declared each."""
+
+    candidates: CandidateDeclarations
+    """The segment bound and the candidate ceiling, with the coverage set behind them."""
+
+    questions: Mapping[str, Question]
+    """Every declared question by its own id."""
+
+    question_files: Mapping[str, Path]
+    """Which file declared each question, so the manifest can name it after the TOML is gone."""
+
+
+def _check_question(
+    question: Question,
+    streams: Mapping[str, IncomeStream],
+    *,
+    path: Path,
+) -> None:
+    """One question against the streams it names and the streams it does not."""
+    owners = sorted({stream.owner_id for stream in streams.values()})
+    if question.owner_id not in owners:
+        raise DeclarationError(
+            path,
+            f"{loader.OWNER_TABLE}.id",
+            f"declares owner {question.owner_id!r}, but the income streams this question is "
+            f"resolved with belong to {owners}. A question is one person's, and answering it "
+            "from another person's money would put two people's facts in one comparison.",
+            f"name one of {owners}, or resolve this question against that owner's streams",
+        )
+    for stream_id, amount in question.amounts.items():
+        field = f"{loader.QUESTION_TABLE}.amount"
+        if stream_id not in streams:
+            raise DeclarationError(
+                path,
+                f"{field}.stream",
+                f"states an amount for {stream_id!r}, which no declaration under "
+                f"{STREAMS_DIR}/ declares. The money has to leave somewhere: an amount for a "
+                "stream nobody declared would be deployed by nothing and would silently "
+                "disappear from the comparison.",
+                f"name one of {sorted(streams)}, or declare that stream",
+            )
+        declared = streams[stream_id].amount.currency
+        if amount.currency is not declared:
+            raise DeclarationError(
+                path,
+                f"{field}.currency",
+                f"states {stream_id!r}'s amount in {amount.currency.value}, and that stream "
+                f"delivers {declared.value}. The two are refused rather than converted: there "
+                "is no rate here, and in an artefact under review a mismatched currency is a "
+                "typo rather than a fact about the money.",
+                f"write the amount in {declared.value}",
+            )
+    for stream_id in sorted(streams):
+        if stream_id not in question.amounts:
+            raise DeclarationError(
+                path,
+                f"{loader.QUESTION_TABLE}.amount",
+                f"states no amount for the declared stream {stream_id!r}. This is the case that "
+                "fails silently: a stream with no stated amount whose pairs yield no candidate "
+                "never reaches the comparison, so nothing raises and the answer is simply "
+                "missing a stream nobody mentioned. In a file under review an omitted amount is "
+                "a typo, not a decision to leave that money out.",
+                f"state an amount for {stream_id!r}",
+            )
+
+
+def answer_from_data_root(
+    root: Path, *, base_currency: Currency, scenario_id: str | None
+) -> AnswerDeclarations:
+    """Every declaration the answer verb reads, under one data root.
+
+    An empty ``questions/`` directory is an **error**, on ``composition``'s precedent: a run
+    that answered nothing would be indistinguishable from a mistyped path.
+    """
+    files = sorted((root / QUESTIONS_DIR).glob("*.toml"))
+    if not files:
+        raise DeclarationError(
+            root / QUESTIONS_DIR,
+            "",
+            f"contains no *.toml declarations. An empty {QUESTIONS_DIR} directory is reported "
+            "rather than read as 'nothing was asked': the two are indistinguishable to "
+            "everything downstream, and one of them is a mistyped path.",
+            "check the data root, or declare a question",
+        )
+    tuples = tuple_from_data_root(root, base_currency=base_currency, scenario_id=scenario_id)
+    candidates = candidates_from_data_root(
+        root, base_currency=base_currency, scenario_id=scenario_id
+    )
+    questions: dict[str, Question] = {}
+    declaring: dict[str, Path] = {}
+    for path in files:
+        declared = loader.question_from_file(path)
+        if declared.id in questions:
+            raise _refuse_duplicate(
+                "question",
+                declared.id,
+                f"{loader.QUESTION_TABLE}.id",
+                declaring[declared.id],
+                path,
+            )
+        _check_question(declared, tuples.registries.streams, path=path)
+        questions[declared.id] = declared
+        declaring[declared.id] = path
+    return AnswerDeclarations(
+        tuples=tuples,
+        candidates=candidates,
+        questions=questions,
+        question_files=declaring,
+    )

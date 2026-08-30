@@ -1,0 +1,123 @@
+# The owner's question, as he stated it on 2026-08-30:
+#
+#   "I have 50,000 UAH. I may need 20,000 UAH within six months. Compare cash, OVDP, Inzhur and
+#    BTC over 1, 3 and 12 months, including access, exit, taxes, inflation, liquidity and
+#    adverse scenarios."
+#
+# **A question is a declaration** — owner decision, 2026-08-30, taken against a
+# command-line-arguments-are-canonical alternative. This file is diffable, citable and
+# reproducible from a commit; it gets the run manifest's SHA-256 identity for free; and a new
+# kind of question is a schema field rather than a CLI option plus an API parameter plus a call
+# site. Flags remain as sugar that builds the same record in memory.
+#
+# **No citation keys, and their absence is the design.** What one person wants to know is a
+# statement about him, not an observation of the world. `data/questions/` is named in
+# `EXEMPT_DIRS` of `scripts/check_provenance.py` **with that reason recorded beside it**, which
+# is the only way a directory is permitted to go unscanned under a fail-closed gate.
+#
+# **`as_of` is deliberately not a field here** (015 FR-006). It decides staleness and nothing
+# else, so a file whose horizons moved with the calendar would be a different question every day
+# under one digest. It is a parameter of the verb, and the manifest records both.
+#
+# ## Two of the four words resolve to nothing, and that is the answer
+#
+# `ovdp` and `inzhur` are declared groups. `cash` and `btc` are declared by nothing at all —
+# there is no instrument representing a hryvnia balance held at a venue, and none representing
+# a held BTC position — so they land in the answer's undeclared population, by the words he
+# wrote. Both are owner verification tasks in `specs/015-the-question/spec.md`: a cash
+# instrument's terms and a BTC instrument's terms and tax class are market and legal values
+# that must come from cited sources entered as data, and are not an implementer's to invent.
+#
+# ## The facts below the owner still has to confirm
+#
+# The 50 000 UAH is taken to be at `monobank_uah` and therefore funded through the `salary_uah`
+# stream's routing origin; "within six months" is read as 2027-02-28; and the horizons run from
+# 2026-09-01 rather than from the day the question is answered, because a question that moved
+# with the calendar would not be one question. All three are verification task 3.
+#
+# ## Two of the six "including" terms are excluded rather than computed
+#
+# A tuple has no real-terms rate at all — the slot exists on feature 001's hurdle and nowhere
+# in `TupleOutcome` — and income tax on the stated amount is a question about a *stream*, which
+# charging here would charge him twice for money he already holds. Both reach the answer as
+# typed exclusions rather than as silent absences (015 FR-023a). "Adverse scenarios" is one
+# regime per question by design: comparing under two is two questions and a reading across
+# them, which is verification task 4.
+
+[owner]
+id = "owner-001"
+
+[question]
+id           = "fifty-thousand-hryvnia"
+asked_on     = "2026-08-30"
+
+# The shipped registry declares no scenario in force, and the answer says so in the regime's
+# own words rather than by leaving the field out.
+regime       = "(no regime declared)"
+
+# Proceeds arriving before a horizon's end sit as cash and earn nothing. Reinvestment would
+# need a rate, an instrument, an entry cost and a tax treatment, none of them declared.
+continuation = "hold_as_cash"
+
+# Everything is ranked against one issue. Named by instrument id: more than one candidate for
+# it refuses rather than settling by file order which figure the rest are measured against.
+benchmark    = "ovdp_synthetic_a"
+
+# The four words he said, in the order he said them. `subjects` and `every_declared_instrument`
+# are mutually exclusive and one of them is required: omission must never read as *everything*.
+subjects     = ["cash", "ovdp", "inzhur", "btc"]
+
+# He states no other need; an empty list says so rather than leaving the section out.
+reserve      = []
+
+  [[question.amount]]
+  stream   = "salary_uah"
+  amount   = 50000.0
+  currency = "UAH"
+
+  # The dollar stream releases nothing for this question. An amount is required for every
+  # declared stream, because a stream with no stated amount is the case that fails silently:
+  # its pairs yield no candidate, nothing raises, and the answer is missing a stream nobody
+  # mentioned.
+  [[question.amount]]
+  stream   = "contract_usd"
+  amount   = 1.0
+  currency = "USD"
+
+  # One, three and twelve months from 2026-09-01.
+  [[question.horizon]]
+  start = "2026-09-01"
+  end   = "2026-10-01"
+
+  [[question.horizon]]
+  start = "2026-09-01"
+  end   = "2026-12-01"
+
+  [[question.horizon]]
+  start = "2026-09-01"
+  end   = "2027-09-01"
+
+  # A plan per SUBJECT, not per instrument. That is what stops this file growing an entry per
+  # issue when feature 016 declares 24 real ОВДП: a new issue joins the group by carrying the
+  # label, and nothing here changes.
+  [[question.plan]]
+  subject            = "ovdp"
+  kind               = "bond"
+  consumption_method = "fifo"
+  coupon_policy      = "hold_cash"
+
+  [[question.plan]]
+  subject            = "inzhur"
+  kind               = "fund"
+  consumption_method = "fifo"
+  liquidity_mode     = "practice"
+  buyback            = "available"
+  exit_on            = "2028-01-17"
+
+    # Both Inzhur funds state a RANGE rather than a figure, and a tuple has one outcome. The
+    # low end is chosen deliberately: it is the least flattering figure the range admits, where
+    # a midpoint would be a point nobody stated.
+    [question.plan.yield_point]
+    rate_pct      = 12.0
+    is_assumption = true
+    rationale     = "OWNER'S CHOICE inside a range the fund itself states — the low end, so the figure is the least flattering one the range admits rather than a midpoint nobody stated. Not observed and not a forecast."

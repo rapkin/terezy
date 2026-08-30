@@ -57,7 +57,7 @@ import tomllib
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Final, Literal, assert_never, cast
+from typing import TYPE_CHECKING, Any, Final, Literal, assert_never, cast, get_args
 
 from pydantic import BaseModel, ValidationError
 
@@ -70,12 +70,16 @@ from terezy.core.inflation.series import (
 from terezy.core.instruments import registry as instrument_registry
 from terezy.core.instruments.access import InstrumentAccess, VenueQuote
 from terezy.core.instruments.fund import (
+    BuybackAvailability,
     CapEntry,
+    ChosenPoint,
     DeclaredYield,
     DistributionTerms,
+    ExchangeRateAssumption,
     FeeFact,
     FundDeclaration,
     LegalTerms,
+    LiquidityMode,
     LiquidityTerms,
     ObservedPractice,
     Peg,
@@ -85,7 +89,9 @@ from terezy.core.instruments.fund import (
 from terezy.core.instruments.groups import InstrumentGroup
 from terezy.core.instruments.interface import (
     PAYMENT_KINDS,
+    Assumptions,
     BondTerms,
+    DateRange,
     EnumeratedTerms,
     InstrumentConstraints,
     InstrumentDeclaration,
@@ -103,7 +109,10 @@ from terezy.core.primitives.staleness import ObservationKind
 from terezy.core.results.candidates import CandidateCeiling
 from terezy.core.results.composed import SegmentBound
 from terezy.core.results.coverage import SpendableEndpoint
+from terezy.core.results.fund import FundAssumptions
 from terezy.core.results.goal import Goal
+from terezy.core.results.question import Question, Reserve
+from terezy.core.results.tuple import ContinuationAssumption, InstrumentPlan
 from terezy.core.routes import capacity, legs
 from terezy.core.routes.channels import ChannelSide, FxChannel, Side, effective_rate
 from terezy.core.routes.legs import Leg, Route
@@ -5365,3 +5374,443 @@ def destinations_from_file(path: Path) -> tuple[scheme_module.CreditingDestinati
             )
         )
     return tuple(rows)
+
+
+# ---------------------------------------------------------------------------
+# 015-the-question: the question itself
+# ---------------------------------------------------------------------------
+#
+# `composition`'s reading, unchanged: an owner's own statement, no citation read and none
+# expected, and **no default** anywhere. What this loader owns is every refusal a *single*
+# file can carry. Whether a subject word names anything, whether the benchmark is among the
+# subjects and whether an amount's stream exists are relations across files and belong to the
+# resolver and the verb -- and a word naming nothing is not a refusal at all, but the answer's
+# own content (FR-009).
+
+QUESTION_TABLE: Final = "question"
+"""Root table of a question file, and the prefix of every field path in one."""
+
+BOND_PLAN: Final = "bond"
+FUND_PLAN: Final = "fund"
+PLAN_KINDS: Final = (BOND_PLAN, FUND_PLAN)
+"""What a run plan may be for. Closed: a typo selects nothing rather than the other kind."""
+
+HOLD_TO_TERMINATION: Final = "termination"
+"""What a fund plan writes where the holding runs to the fund's own end.
+
+A stated value rather than an omitted key, because *hold to termination* is a **choice**: it
+picks one of the fund's two declared ways out, and 014 FR-003 refuses a default for exactly
+that. An absent key would make the choice the thing that happens when nobody thought about it.
+"""
+
+
+def question_from_file(path: Path) -> Question:
+    """One ``data/questions/<id>.toml`` as the question it declares."""
+    document = read_document(path)
+    file = _validate(schema.QuestionFile, document, path)
+    table = file.question
+    prefix = QUESTION_TABLE
+    owner_id = _require_text(
+        path,
+        f"{OWNER_TABLE}.id",
+        file.owner.id,
+        "a question is one person's, and every declaration carries its owner from the first "
+        "commit (Principle VII)",
+    )
+    subjects = _question_subjects(path, table)
+    return Question(
+        id=_require_text(
+            path,
+            f"{prefix}.id",
+            table.id,
+            "the run manifest records which question produced an answer, so two questions are "
+            "two results rather than one",
+        ),
+        owner_id=owner_id,
+        asked_on=_parse_date(path, f"{prefix}.asked_on", table.asked_on),
+        regime_id=_require_text(
+            path,
+            f"{prefix}.regime",
+            table.regime,
+            "every candidate's segments belong to one regime's route set, and which world was "
+            "searched is half of what the answer means (014 FR-023)",
+        ),
+        continuation=_continuation(path, f"{prefix}.continuation", table.continuation),
+        amounts=_question_amounts(path, table),
+        subjects=subjects,
+        every_declared_instrument=table.every_declared_instrument is True,
+        horizons=_question_horizons(path, table),
+        benchmark_instrument_id=_require_text(
+            path,
+            f"{prefix}.benchmark",
+            table.benchmark,
+            "a ranking with no benchmark invites its own head to be read as a winner (010 FR-011)",
+        ),
+        plans=_question_plans(path, table),
+        reserves=_question_reserves(path, table),
+    )
+
+
+def _continuation(path: Path, field_path: str, value: str) -> ContinuationAssumption:
+    """The declared continuation assumption as the core's closed enum member."""
+    for member in ContinuationAssumption:
+        if member.value == value:
+            return member
+    raise DeclarationError(
+        path,
+        field_path,
+        f"declares {value!r}, which is not a continuation assumption this engine implements. "
+        "What proceeds arriving before a horizon's end do until it has no default anywhere in "
+        "the stack, so an unrecognised name is refused rather than read as the nearest one.",
+        f"write one of {sorted(member.value for member in ContinuationAssumption)}",
+    )
+
+
+def _question_subjects(path: Path, table: schema.QuestionTable) -> tuple[str, ...]:
+    """The words the owner wrote, refusing a blank, a repeat, and the two silent readings.
+
+    Neither ``subjects`` nor ``every_declared_instrument`` is refused because omission must not
+    mean *everything*; both are refused because a list beside the token would leave which one
+    was in force to be settled by whichever the code read first.
+    """
+    prefix = QUESTION_TABLE
+    stated = table.subjects is not None
+    everything = table.every_declared_instrument is not None
+    if stated == everything:
+        raise DeclarationError(
+            path,
+            f"{prefix}.subjects",
+            (
+                "declares both a subject list and every_declared_instrument"
+                if stated
+                else "declares neither a subject list nor every_declared_instrument"
+            )
+            + ". Exactly one of the two says what the question is about (FR-007): omission must "
+            "not read as *everything*, because the absence of a subject the owner named is the "
+            "most useful thing an answer can say.",
+            "write subjects = [...], or every_declared_instrument = true",
+        )
+    if table.subjects is None:
+        if table.every_declared_instrument is False:
+            raise DeclarationError(
+                path,
+                f"{prefix}.every_declared_instrument",
+                "is declared false, which states nothing at all: it is neither a subject list "
+                "nor the every-instrument token. A question that is about nothing has no "
+                "answer to give.",
+                "write subjects = [...], or every_declared_instrument = true",
+            )
+        return ()
+    if not table.subjects:
+        raise DeclarationError(
+            path,
+            f"{prefix}.subjects",
+            "is empty. A question about nothing enumerates nothing, and an empty list is not "
+            "the way to ask about everything the registry declares.",
+            "name what the question is about, or write every_declared_instrument = true",
+        )
+    seen: list[str] = []
+    for position, word in enumerate(table.subjects):
+        field = f"{prefix}.subjects[{position}]"
+        subject = _require_text(
+            path, field, word, "a subject is what the question is about, and a blank names it"
+        )
+        if subject in seen:
+            raise DeclarationError(
+                path,
+                field,
+                f"names {subject!r} twice. A duplicated subject would be counted twice in the "
+                "line that says how many of the named subjects an answer reached, which is the "
+                "one line that speaks to what was actually asked (FR-010).",
+                f"name {subject!r} once",
+            )
+        seen.append(subject)
+    return tuple(seen)
+
+
+def _question_amounts(path: Path, table: schema.QuestionTable) -> Mapping[str, Money]:
+    """What leaves each stream, in that stream's own currency, refusing a repeat."""
+    prefix = f"{QUESTION_TABLE}.amount"
+    if not table.amount:
+        raise DeclarationError(
+            path,
+            prefix,
+            "states no amount. A question about no money has nothing to compare: enumeration "
+            "sizes every purchase from the amount the stream releases, and defaulting it to "
+            "zero would score every real option at nothing.",
+            "state an amount for the stream the money leaves",
+        )
+    amounts: dict[str, Money] = {}
+    for position, entry in enumerate(table.amount):
+        field = f"{prefix}[{position}]"
+        stream_id = _require_text(
+            path, f"{field}.stream", entry.stream, "an amount belongs to a named income stream"
+        )
+        if stream_id in amounts:
+            raise DeclarationError(
+                path,
+                f"{field}.stream",
+                f"states a second amount for {stream_id!r}. Two amounts for one stream are two "
+                "questions: whichever loaded last would size every purchase, and nothing in the "
+                "answer would say which.",
+                f"state one amount for {stream_id!r}",
+            )
+        amounts[stream_id] = Money(
+            _positive(
+                path,
+                f"{field}.amount",
+                entry.amount,
+                "an amount of zero or below deploys nothing and scores every option at nothing",
+            ),
+            _currency(path, f"{field}.currency", entry.currency),
+            prov.EMPTY,
+        )
+    return amounts
+
+
+def _question_horizons(path: Path, table: schema.QuestionTable) -> tuple[DateRange, ...]:
+    """The windows, in declared order, refusing an empty list and two identical horizons."""
+    prefix = f"{QUESTION_TABLE}.horizon"
+    if not table.horizon:
+        raise DeclarationError(
+            path,
+            prefix,
+            "declares no horizon. Every figure in an answer is measured over one, and a "
+            "question with none has no section to put an answer in.",
+            "declare at least one [[question.horizon]]",
+        )
+    horizons: list[DateRange] = []
+    for position, entry in enumerate(table.horizon):
+        field = f"{prefix}[{position}]"
+        window = DateRange(
+            start=_parse_date(path, f"{field}.start", entry.start),
+            end=_parse_date(path, f"{field}.end", entry.end),
+        )
+        if window.end < window.start:
+            raise DeclarationError(
+                path,
+                f"{field}.end",
+                f"is {window.end.isoformat()}, before the start {window.start.isoformat()}. A "
+                "window that runs backwards measures nothing.",
+                "correct whichever of the two dates is wrong",
+            )
+        if window in horizons:
+            raise DeclarationError(
+                path,
+                field,
+                f"repeats the window {window.start.isoformat()} to {window.end.isoformat()}. "
+                "Two identical sections are not two answers, and the cross-horizon reading "
+                "would key two rows the same.",
+                "delete the duplicate, or correct its dates",
+            )
+        horizons.append(window)
+    return tuple(horizons)
+
+
+def _question_reserves(path: Path, table: schema.QuestionTable) -> tuple[Reserve, ...]:
+    """What the owner may need back, and when. An empty list is a stated absence."""
+    prefix = f"{QUESTION_TABLE}.reserve"
+    return tuple(
+        Reserve(
+            amount=Money(
+                _positive(
+                    path,
+                    f"{prefix}[{position}].amount",
+                    entry.amount,
+                    "a reserve of zero or below is not a need and its verdict would be "
+                    "covered by every candidate that arrives at all",
+                ),
+                _currency(path, f"{prefix}[{position}].currency", entry.currency),
+                prov.EMPTY,
+            ),
+            by=_parse_date(path, f"{prefix}[{position}].by", entry.by),
+        )
+        for position, entry in enumerate(table.reserve)
+    )
+
+
+def _question_plans(
+    path: Path, table: schema.QuestionTable
+) -> Mapping[str, tuple[InstrumentPlan, ...]]:
+    """One or more run plans per subject, in the order the owner wrote them."""
+    prefix = f"{QUESTION_TABLE}.plan"
+    if not table.plan:
+        raise DeclarationError(
+            path,
+            prefix,
+            "supplies no run plan. There is no default anywhere in the stack for a consumption "
+            "method, a coupon policy, a liquidity mode, a buyback availability or an exit date "
+            "(014 FR-003), so a question that supplies none can run nothing.",
+            "declare a [[question.plan]] for each subject",
+        )
+    plans: dict[str, list[InstrumentPlan]] = {}
+    for position, entry in enumerate(table.plan):
+        field = f"{prefix}[{position}]"
+        subject = _require_text(
+            path, f"{field}.subject", entry.subject, "a run plan is a plan for a named subject"
+        )
+        plans.setdefault(subject, []).append(_question_plan(path, field, entry))
+    return {subject: tuple(supplied) for subject, supplied in plans.items()}
+
+
+def _question_plan(
+    path: Path, field: str, entry: schema.QuestionPlanTable
+) -> Assumptions | FundAssumptions:
+    """One run plan, of the kind it declares itself to be."""
+    kind = entry.kind
+    if kind not in PLAN_KINDS:
+        raise DeclarationError(
+            path,
+            f"{field}.kind",
+            f"declares {kind!r}, and a run plan is for a {BOND_PLAN!r} or a {FUND_PLAN!r}. "
+            "Which one is declared rather than inferred from the fields present, so a typo is "
+            "refused instead of quietly selecting the other kind's plan.",
+            f"write one of {sorted(PLAN_KINDS)}",
+        )
+    consumption = _require_text(
+        path,
+        f"{field}.consumption_method",
+        entry.consumption_method,
+        "which lots a disposal consumes changes the gain and the tax on it, and there is no "
+        "default anywhere in the stack",
+    )
+    fund_only = {
+        "liquidity_mode": entry.liquidity_mode,
+        "buyback": entry.buyback,
+        "exit_on": entry.exit_on,
+    }
+    if kind == BOND_PLAN:
+        for name, value in (("yield_point", entry.yield_point), *fund_only.items()):
+            _refuse_field_of_the_other_kind(path, field, name, value, kind=BOND_PLAN)
+        if entry.exchange_rate is not None:
+            _refuse_field_of_the_other_kind(
+                path, field, "exchange_rate", entry.exchange_rate, kind=BOND_PLAN
+            )
+        return Assumptions(
+            consumption_method=consumption,
+            coupon_policy=_require_text(
+                path,
+                f"{field}.coupon_policy",
+                entry.coupon_policy or "",
+                "what a coupon does when it arrives changes the answer, and there is no "
+                "default anywhere in the stack (014 FR-003)",
+            ),
+        )
+    _refuse_field_of_the_other_kind(
+        path, field, "coupon_policy", entry.coupon_policy, kind=FUND_PLAN
+    )
+    for name, value in fund_only.items():
+        if value is None:
+            raise DeclarationError(
+                path,
+                f"{field}.{name}",
+                f"is absent from a {FUND_PLAN!r} plan. A liquidity mode, whether the "
+                "discretionary buyback is on offer and when the owner asks to exit are three "
+                "stated choices with no default anywhere in the stack (014 FR-003), and each "
+                "of them changes the figure.",
+                f"state {name} on this plan",
+            )
+    return FundAssumptions(
+        liquidity_mode=_literal(
+            path,
+            f"{field}.liquidity_mode",
+            fund_only["liquidity_mode"] or "",
+            get_args(LiquidityMode),
+        ),
+        buyback=_literal(
+            path, f"{field}.buyback", fund_only["buyback"] or "", get_args(BuybackAvailability)
+        ),
+        exit_on=(
+            None
+            if entry.exit_on == HOLD_TO_TERMINATION
+            else _parse_date(path, f"{field}.exit_on", entry.exit_on or "")
+        ),
+        yield_point=(
+            None
+            if entry.yield_point is None
+            else ChosenPoint(
+                rate=_as_fraction(entry.yield_point.rate_pct),
+                is_assumption=_is_assumption(
+                    path, f"{field}.yield_point.is_assumption", entry.yield_point.is_assumption
+                ),
+                rationale=_require_text(
+                    path,
+                    f"{field}.yield_point.rationale",
+                    entry.yield_point.rationale,
+                    "a point chosen inside a stated range is the owner's assumption, and a "
+                    "figure conditional on an unexplained guess cannot be argued with",
+                ),
+            )
+        ),
+        exchange_rate=(
+            None
+            if entry.exchange_rate is None
+            else ExchangeRateAssumption(
+                uah_per_unit=_positive(
+                    path,
+                    f"{field}.exchange_rate.uah_per_unit",
+                    entry.exchange_rate.uah_per_unit,
+                    "a rate of zero or below values the whole payout at nothing or less",
+                ),
+                is_assumption=_is_assumption(
+                    path,
+                    f"{field}.exchange_rate.is_assumption",
+                    entry.exchange_rate.is_assumption,
+                ),
+                rationale=_require_text(
+                    path,
+                    f"{field}.exchange_rate.rationale",
+                    entry.exchange_rate.rationale,
+                    "an owner-stated rate is a belief about the future, and every figure "
+                    "computed through it inherits the mark (015 FR-021a)",
+                ),
+            )
+        ),
+        consumption_method=consumption,
+    )
+
+
+def _refuse_field_of_the_other_kind(
+    path: Path, field: str, name: str, value: object, *, kind: str
+) -> None:
+    """A plan carrying a field its declared kind has no use for is a plan of the wrong kind."""
+    if value is None:
+        return
+    raise DeclarationError(
+        path,
+        f"{field}.{name}",
+        f"is declared on a {kind!r} plan, which has no {name}. It is refused rather than "
+        "ignored: a field that is silently dropped is a stated choice that does nothing, and "
+        "the run would proceed under settings the owner believes are in force.",
+        f"delete {name}, or correct this plan's kind",
+    )
+
+
+def _is_assumption(path: Path, field_path: str, value: bool) -> Literal[True]:
+    """``is_assumption`` on a stated belief. There is no observed case."""
+    if not value:
+        raise DeclarationError(
+            path,
+            field_path,
+            "is declared false. A point chosen inside a stated range and a rate for a date "
+            "that has not happened are both assumptions: the field exists to make the claim "
+            "unmissable on every figure it touches, not to be switched off -- which is why the "
+            "core types it as a Literal admitting one value.",
+            "write is_assumption = true",
+        )
+    return True
+
+
+def _literal[T: str](path: Path, field_path: str, value: str, allowed: tuple[T, ...]) -> T:
+    """A declared name that must be one of a closed set the core admits."""
+    for member in allowed:
+        if member == value:
+            return member
+    raise DeclarationError(
+        path,
+        field_path,
+        f"declares {value!r}, which is not one of {sorted(allowed)}. There is no default and "
+        "no nearest match: each of these changes the figure, and picking one would answer a "
+        "question nobody asked.",
+        f"write one of {sorted(allowed)}",
+    )
