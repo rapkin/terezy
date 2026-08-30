@@ -227,14 +227,19 @@ class TestARealOfficialRateIsNotARepairForAnInventedChannelQuote:
             assert "SYNTHETIC" in str(channel["source"]), channel["id"]
             assert channel["verified_on"] == "", channel["id"]
 
-    def test_no_channel_cites_the_national_bank_or_the_official_rate_series(self) -> None:
-        """The substitution's other shape: the same number, re-sourced. A channel quote
-        carrying the rate series' citation would read as observed and would not be."""
-        text = self.CHANNELS.read_text(encoding="utf-8")
+    def test_no_channel_quote_is_sourced_to_the_tax_series(self) -> None:
+        """The substitution's other shape: the same number, re-sourced.
 
-        assert "ua_nbu_usd" not in text
-        assert "bank.gov.ua" not in text
-        assert "Національний банк" not in text
+        Scoped to the **series and the statistics endpoint it is fetched from**, not to the
+        National Bank generally. ``FxChannel.id`` names ``nbu_official`` among the channels a
+        declarer may legitimately declare, and such a channel would carry its own two-sided
+        quote with its own citation. What is forbidden is a channel quote that takes its
+        number from the legal reference nobody transacts at.
+        """
+        for channel in self._channels():
+            source = str(channel["source"])
+            assert "ua_nbu_usd" not in source, channel["id"]
+            assert "NBU_Exchange/exchange_site" not in source, channel["id"]
 
     def test_the_invented_reference_is_not_a_value_the_publisher_ever_published(self) -> None:
         """So the fixture cannot be mistaken for a retrieved figure on any date. Checked
