@@ -99,9 +99,9 @@ the narrowing the caller's (research D4) — and because that seam is what makes
 
 ```python
 class Unaskable(Enum):
-    BOUND_ADMITS_NOTHING  = "bound_admits_nothing"
+    BOUND_ADMITS_NOTHING = "bound_admits_nothing"
     NO_SPENDABLE_ENDPOINT = "no_spendable_endpoint"
-    ALREADY_ARRIVED       = "already_arrived"
+    ALREADY_ARRIVED = "already_arrived"
 ```
 `CompositionRefused` gains `case: Unaskable`. The first two are about the **question**; the
 third is about one pair and is the opposite of a gap.

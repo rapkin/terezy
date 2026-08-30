@@ -13,9 +13,10 @@ dependency on each other.
 
 ## Phase 1 — the two pieces of work outside this feature's module
 
-- [ ] **T001 (test)** `tests/unit/test_chaining_refusals.py` — extend: each of `compose`'s
-      three refusals reports its own `Unaskable` case, and the three are distinct. Fails today:
-      the field does not exist.
+- [ ] **T001 (test)** `tests/invariants/test_composition_search.py` — extend
+      `TestTheQuestionsTheSearchRefusesToAnswer`, which already exercises all three and today
+      tells them apart by searching `reason` for a substring: each refusal reports its own
+      `Unaskable` case, and the three are distinct. Fails today — the field does not exist.
 - [ ] **T002** `src/terezy/core/results/composed.py` — add `Unaskable` (three members) and
       `CompositionRefused.case`. FR-014a, research D2.
 - [ ] **T003** `src/terezy/core/routes/compose.py` — set `case=` at each of `_refusal`'s three
