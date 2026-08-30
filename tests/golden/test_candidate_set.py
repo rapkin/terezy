@@ -31,7 +31,7 @@ from __future__ import annotations
 import hashlib
 import os
 from pathlib import Path
-from typing import Final
+from typing import Final, assert_never
 
 import pytest
 
@@ -40,6 +40,7 @@ from terezy.core.primitives.rates import NominalRate
 from terezy.core.results.candidates import (
     CandidateSet,
     CandidateSurvey,
+    NoCandidateReason,
     NothingConnects,
     NothingNeedsToConnect,
 )
@@ -133,16 +134,25 @@ def _render(result: CandidateSurvey) -> str:
     ]
 
     lines += ["", "[no candidate]  instrument | stream | reason"]
-    for pair in enumerated.no_candidate:
-        match pair.why:
-            case NothingConnects():
-                why = f"nothing connects ({pair.why.side})"
-            case NothingNeedsToConnect():
-                why = "nothing needs to connect"
-        lines.append(f"{pair.instrument_id} | {pair.stream_id} | {why}")
+    lines += [
+        f"{pair.instrument_id} | {pair.stream_id} | {_why(pair.why)}"
+        for pair in enumerated.no_candidate
+    ]
 
     lines += ["", f"[digest]  {_digest(result)}", ""]
     return "\n".join(lines)
+
+
+def _why(reason: NoCandidateReason) -> str:
+    """The typed reason as one rendered word, matched exhaustively so a third member shows up
+    here as a type error rather than as a blank cell."""
+    match reason:
+        case NothingConnects():
+            return f"nothing connects ({reason.side})"
+        case NothingNeedsToConnect():
+            return "nothing needs to connect"
+        case _:  # pragma: no cover -- mypy proves this unreachable
+            assert_never(reason)
 
 
 def _digest(result: CandidateSurvey) -> str:
