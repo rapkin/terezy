@@ -3632,9 +3632,21 @@ component B 1%  = 106 250.00 × 0.01 =  1 062.50 UAH
 charged         =  5 312.50 + 1 062.50 = 6 375.00 UAH
 ```
 
-Checked in `tests/worked_examples/test_fop_scheme_charge.py`. The periodic component's own
-example — a statutory sum charged once per elapsed month, including a month with no income —
-is in `tests/unit/test_periodic_component.py`.
+Checked in `tests/worked_examples/test_fop_scheme_charge.py`.
+
+The periodic component's own example is the one that shows why it is not a rate. An invented
+statutory sum of 1 760.00 UAH a month, over a quarter in which the *second* month brought in
+nothing at all:
+
+```
+2026-01  income 12 000.00 UAH   charged 1 760.00 UAH
+2026-02  income      0.00 UAH   charged 1 760.00 UAH   <- the month a rate gets wrong
+2026-03  income  9 500.00 UAH   charged 1 760.00 UAH
+                                total   5 280.00 UAH
+```
+
+The income column is there to be ignored: no income reaches `charge_periods` at all, because
+the trigger is the month. Checked in `tests/unit/test_periodic_component.py`.
 
 ### 33.6 Where the income is credited decides which reading applies
 

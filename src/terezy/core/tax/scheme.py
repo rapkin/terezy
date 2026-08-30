@@ -250,7 +250,14 @@ class SchemeCharge:
     """What the rates were applied to, in the tax currency."""
 
     on_date: date
-    """The date the rates were read on, and the date the base was struck at."""
+    """The date the rates were read on, and the date the base was struck at.
+
+    This is what records the liability against the period it accrues to (012 FR-004). A
+    period is not carried beside it: the date determines the period under any declared
+    cadence, and a second field holding a fold of the first is a second place for one truth
+    -- and it would have to be folded by whichever cadence, which is the feature that models
+    payment rather than this one.
+    """
 
     conversion: TaxCurrencyConversion | None
     """011's record of the base being struck, or ``None`` when the arrival was already in the
