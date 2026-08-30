@@ -95,7 +95,7 @@ class TestEveryObservationCarriesItsProvenance:
             (source,) = observation.provenance.sources
             assert ENDPOINT in source.citation, observation.on_date
             assert "valcode=usd" in source.citation, observation.on_date
-            assert "units = 1" in source.citation, observation.on_date
+            assert "units = 1;" in source.citation, observation.on_date
             assert "calcdate = " in source.citation, observation.on_date
 
     def test_every_observation_was_retrieved_and_none_of_them_verified(

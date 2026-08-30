@@ -146,10 +146,9 @@ not tell them apart. The CPI series is recorded for the same reason from the oth
 real figure is only reproducible if the manifest says which series deflated it, at which
 version.
 
-⚙ ``"official_rate"`` joined with feature 018. A tax base struck at an official rate rests on a
-declared series at a declared version, and until the series carried observations no manifest
-could name either -- which was invisible while every such base refused, and is a reproducibility
-hole the moment one does not (Principle III).
+``"official_rate"`` is kept distinct from ``"cpi_series"`` although both are dated observation
+series: a tax base struck at an official rate is only reproducible if the manifest says which
+*legal* series struck it, and a manifest that called the two one thing could not.
 
 Listed alphabetically because :func:`input_refs` sorts by ``(kind, id)``, so the order here is
 the order a manifest reads in.

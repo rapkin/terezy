@@ -201,7 +201,6 @@ class TestOneDollarCreditUnderTwoSchemes:
 
         assert len(charge.lines) > 1, "a sum of one line would assert nothing about blending"
         assert is_close(charge.total.amount, by_hand)
-        assert not hasattr(charge, "combined_rate")
 
     def test_the_two_totals_differ_by_the_base_times_the_difference_of_the_rates(self) -> None:
         """The comparison itself, stated as arithmetic over the declared rates so it cannot

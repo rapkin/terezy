@@ -186,7 +186,11 @@ class TestASurpriseInTheResponseWritesNothingAtAll:
         declared unit is wrong by two orders of magnitude while every figure stays plausible."""
         rows = [_row(day) for day in _days()]
         rows[3] = _row(_days()[3], units=100, rate=_value(_days()[3]) * 100)
-        self._refused(_payload(rows), out, saying=("31.12.2019", "100", "1.0", "quotation_unit"))
+        self._refused(
+            _payload(rows),
+            out,
+            saying=("31.12.2019", "per 100 units", "quotation_unit = 1.0"),
+        )
 
     def test_a_range_shorter_than_the_required_window_refuses(self, out: Path) -> None:
         """A short range is a shape surprise, not a set of gaps: writing it would turn one
@@ -228,6 +232,42 @@ class TestASurpriseInTheResponseWritesNothingAtAll:
 
     def test_an_empty_response_refuses(self, out: Path) -> None:
         self._refused(b"[]", out, saying=("no rows",))
+
+
+class TestAClockBehindTheLowerBoundIsRefusedRatherThanSatisfied:
+    """An empty window is complete against every response, which is the wrong kind of pass.
+
+    With a retrieval date before the series' first date, every row the publisher returns is
+    ahead of the window and is declined, and the completeness check then compares an empty
+    list against an empty list. Without the guard the run reports a complete window of zero
+    observations and dies on the first row it tries to render -- a traceback where FR-004
+    promises a refusal naming what surprised it.
+    """
+
+    def test_it_refuses_naming_the_clock_and_the_lower_bound(self, out: Path) -> None:
+        before = out.read_bytes()
+        with pytest.raises(fetch_nbu_rates.FetchError) as caught:
+            _fetched(_complete(), today=FIRST - timedelta(days=1))
+
+        assert FIRST.isoformat() in str(caught.value)
+        assert (FIRST - timedelta(days=1)).isoformat() in str(caught.value)
+        assert "clock" in str(caught.value)
+        assert out.read_bytes() == before
+
+    def test_the_whole_run_exits_non_zero_rather_than_raising(self, out: Path) -> None:
+        """The guard has to be reached inside ``main``'s ``except FetchError``, not past it."""
+        before = out.read_bytes()
+
+        assert _run(_complete(), out, today=FIRST - timedelta(days=1)) == 1
+        assert out.read_bytes() == before
+
+    def test_the_lower_bound_itself_is_a_window_of_one_day(self, out: Path) -> None:
+        """The boundary the guard must not swallow: one day is a window, zero days is not."""
+        assert _run(_payload([_row(FIRST)]), out, today=FIRST) == 0
+        series = loader.official_rate_from_file(out)
+
+        assert len(series.observations) == 1
+        assert series.observations[0].on_date == FIRST
 
 
 class TestThePublishersDayAheadRateIsDeclined:
@@ -329,7 +369,7 @@ class TestWhatItWritesIsADeclarationTheLoaderAccepts:
             (source,) = observation.provenance.sources
             assert fetch_nbu_rates.ENDPOINT in source.citation
             assert "valcode=usd" in source.citation
-            assert "units = 1" in source.citation
+            assert "units = 1;" in source.citation
             assert CALCDATE in source.citation
             assert source.verified_on is None
             assert source.kind == "official_rate"
@@ -346,8 +386,8 @@ class TestWhatItWritesIsADeclarationTheLoaderAccepts:
         assert marker, "the declaration must have a [series] table for this to be its header"
 
         assert "2939-VI" in header
-        assert "835" in header
-        assert "10-1" in header
+        assert "№ 835" in header
+        assert "ст. 10-1 " in header
         assert "будь-яка" in header
         assert "гіперпосилання" in header
         assert "NOTICE" in header

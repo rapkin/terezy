@@ -1648,8 +1648,8 @@ class GoalFile(BaseModel):
 # Two declarations of opposite epistemic kinds, which is why they are two files in two
 # directories rather than two tables in one.
 #
-# `data/cpi/*.toml` is the most heavily *cited* declaration in the project: one source per
-# observation, 411 of them in the shipped Ukrainian series, every `verified_on` empty because
+# `data/cpi/*.toml` carries one source per *observation*: 411 of them in the shipped
+# Ukrainian price series, every `verified_on` empty because
 # a number that was downloaded is not a number anyone has checked. It lives in `SOURCED_DIRS`
 # and `scripts/check_provenance.py` reports every one of those empties as a warning, which is
 # correct and expected.
@@ -2204,8 +2204,8 @@ class NonPublicationRuleTable(BaseModel):
     absence of a rule is not permission to choose one (FR-010, FR-011).
 
     **An explicitly enumerated mapping and nothing else.** A rule written in working days,
-    pre-holiday days or weekends cannot be declared against these fields, which is FR-018's
-    subject and why the Ukrainian series declares no rule at all.
+    pre-holiday days or weekends cannot be declared against these fields, because evaluating
+    one needs a working-day and holiday calendar and nothing declares one (FR-018).
     """
 
     model_config = STRICT

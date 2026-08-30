@@ -98,6 +98,11 @@ class TestALookupDoesNotReachEveryObservation:
         small = _reaches_per_probe(SMALL)
         large = _reaches_per_probe(LARGE)
 
+        # Every other assertion here is an upper bound, so a harness that stopped counting --
+        # a fast path inside `bisect_left`, or `observations` re-wrapped as a plain tuple --
+        # would satisfy all of them at zero reaches while measuring nothing.
+        assert small > 0, "the harness counted no reaches at all, so it measured nothing"
+
         assert large <= small + DOUBLINGS, (small, large)
 
     @pytest.mark.parametrize("count", [SMALL, LARGE])

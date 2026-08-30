@@ -262,6 +262,13 @@ def _rows(payload: object, *, first: date, last: date) -> tuple[tuple[Row, ...],
 
 def fetch(*, today: date) -> Fetched:
     """Retrieve the window. Raises :class:`FetchError` rather than returning a partial one."""
+    if today < FIRST_DATE:
+        raise FetchError(
+            f"the retrieval date {today.isoformat()} is before {FIRST_DATE.isoformat()}, the "
+            "first date this series can carry. The window would be empty, and an empty window "
+            "is complete against every response -- so the completeness check below would pass "
+            "over nothing. This is a wrong clock, not a short retrieval."
+        )
     url = _url(start=FIRST_DATE, end=today + timedelta(days=1))
     raw = _get(url)
     try:

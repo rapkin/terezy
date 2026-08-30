@@ -331,8 +331,7 @@ def test_the_line_for_a_file_states_how_many_of_its_values_are_unverified(
         text for text in _lines(_run(root), "warning") if "official_rates/ua_nbu_usd.toml" in text
     ]
 
-    assert str(expected) in line
-    assert "unverified" in line
+    assert f"{expected} unverified" in line
 
 
 def test_the_whole_output_grows_by_one_line_for_a_file_however_long_it_is(

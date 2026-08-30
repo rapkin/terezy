@@ -313,9 +313,9 @@ class TestOneFileReadInIsolation:
     def test_a_series_with_no_observations_loads_when_it_says_so(self, tmp_path: Path) -> None:
         """The one place this departs from ``cpi_from_file``, which refuses an empty series.
 
-        An official-rate file is the declared shape a fetch script writes into, and the
-        Ukrainian series ships that way today: no value may be invented to populate it, and
-        every date asked of it refuses by name meanwhile (FR-017, plan research D6).
+        An official-rate file is the declared shape a fetch script writes into before it has
+        run: no value may be invented to populate it, and every date asked of such a series
+        refuses by name meanwhile (FR-017).
         """
         series = loader.official_rate_from_file(_file(tmp_path, EMPTY_SERIES))
 
