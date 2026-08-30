@@ -15,15 +15,21 @@ from datetime import date
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
+from terezy.core.decision.candidates import enumerate_candidates
 from terezy.core.instruments.fund import ChosenPoint
 from terezy.core.instruments.interface import Assumptions, DateRange
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
-from terezy.core.results.candidates import CandidateCeiling, Question
+from terezy.core.results.candidates import (
+    CandidateCeiling,
+    CandidateSet,
+    EnumerationRefused,
+    Question,
+)
 from terezy.core.results.coverage import IMPLICIT_REGIME_ID, SpendableEndpoint
 from terezy.core.results.fund import FundAssumptions
-from terezy.core.results.tuple import HOLD_AS_CASH
+from terezy.core.results.tuple import HOLD_AS_CASH, Tuple
 from terezy.data.declarations import resolver
 
 if TYPE_CHECKING:  # pragma: no cover -- typing only
@@ -32,6 +38,7 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.decision.tuple_outcome import Registries
     from terezy.core.results.composed import SegmentBound
     from terezy.core.results.tuple import InstrumentPlan
+    from terezy.core.routes.legs import Route
 
 REPO_ROOT: Final = Path(__file__).resolve().parents[1]
 DATA_ROOT: Final = REPO_ROOT / "data"
@@ -133,6 +140,37 @@ def question(
         bound=bound if bound is not None else declarations().composition.bound,
         regime_id=regime_id,
     )
+
+
+def enumerated(
+    registries: Registries,
+    *,
+    question_: Question | None = None,
+    ceiling_: CandidateCeiling | None = None,
+    routes: Mapping[str, Route] | None = None,
+) -> CandidateSet | EnumerationRefused:
+    """``enumerate_candidates`` with the shipped wiring. Argument plumbing and nothing else.
+
+    Deliberately thin: a fixture that decided anything the function under test decides would
+    let a suite pass on the fixture's judgement rather than on the engine's.
+    """
+    return enumerate_candidates(
+        registries=registries,
+        routes=registries.routes if routes is None else routes,
+        question=question(registries) if question_ is None else question_,
+        ceiling=ceiling(10_000) if ceiling_ is None else ceiling_,
+    )
+
+
+def benchmark_key(registries: Registries, instrument_id: str, **kwargs: object) -> Tuple:
+    """The enumerated candidate for one instrument, to be named as a comparison's benchmark.
+
+    Read out of the set rather than built, which is FR-022 in the fixture: a benchmark
+    constructed beside the set is exactly the privileged side channel 010 FR-012 forbids.
+    """
+    result = enumerated(registries, **kwargs)  # type: ignore[arg-type]
+    assert isinstance(result, CandidateSet), result
+    return next(item.key for item in result.candidates if item.key.instrument_id == instrument_id)
 
 
 def ceiling(max_candidates: int) -> CandidateCeiling:
