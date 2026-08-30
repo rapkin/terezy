@@ -93,9 +93,10 @@ uv run mypy                                   # strict
 uv run lint-imports                           # architecture boundaries
 uv run python scripts/check_provenance.py     # citations on curated data
 uv run python scripts/check_prose_budget.py   # prose share ratchet (not in CI)
+uv run python scripts/check_enumerations.py  # prose lists vs the sets they list (not in CI)
 ```
 
-Every one but the last is blocking in CI. Run them all before claiming a change is done.
+Every one but the last two is blocking in CI. Run them all before claiming a change is done.
 
 ## Non-negotiables, in the form you will actually hit them
 

@@ -31,8 +31,7 @@ class Venue:
     """One place money can sit. Curated, shared, declared data."""
 
     id: str
-    """Unique across every venue declaration -- ``monobank_uah``, ``binance``,
-    ``coinbase``, ``ibkr_usd``, ``inzhur``. A duplicate is a load-time failure."""
+    """Unique across every venue declaration; a duplicate is a load-time failure."""
 
     name: str
     """Human-readable, non-empty. For a synthetic fixture it says so in words."""
