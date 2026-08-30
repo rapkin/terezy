@@ -13,7 +13,7 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import date
 from pathlib import Path
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Final, Literal
 
 from terezy.core.decision.candidates import enumerate_candidates
 from terezy.core.instruments.fund import ChosenPoint, FundDeclaration
@@ -90,11 +90,20 @@ def low_end(declared: FundDeclaration) -> ChosenPoint:
     return ChosenPoint(rate=declared.declared_yield.low, is_assumption=True, rationale=RATIONALE)
 
 
+LOW_END: Final = "low_end"
+"""Ask :func:`fund_plan` for the bottom of the fund's own range.
+
+A sentinel rather than ``None``, because ``None`` is a stated value here -- *no point was
+chosen* -- and a default that swallowed it would leave a suite unable to reach
+``TwoFiguresNotOne`` while looking as though it had.
+"""
+
+
 def fund_plan(
     declared: FundDeclaration,
     *,
     exit_on: date | None = FUND_EXIT,
-    yield_point: ChosenPoint | None = None,
+    yield_point: ChosenPoint | None | Literal["low_end"] = LOW_END,
     liquidity_mode: str = "practice",
     buyback: str = "available",
 ) -> FundAssumptions:
@@ -103,7 +112,7 @@ def fund_plan(
         liquidity_mode=liquidity_mode,  # type: ignore[arg-type]
         buyback=buyback,  # type: ignore[arg-type]
         exit_on=exit_on,
-        yield_point=low_end(declared) if yield_point is None else yield_point,
+        yield_point=low_end(declared) if yield_point == LOW_END else yield_point,
         exchange_rate=None,
         consumption_method="fifo",
     )
