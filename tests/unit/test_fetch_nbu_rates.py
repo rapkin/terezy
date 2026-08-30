@@ -163,8 +163,8 @@ class TestTheSameResponseOnTheSameDayRendersTheSameBytes:
         )
         assert 'retrieved_on = "2020-01-04"' in earlier
         assert 'retrieved_on = "2020-01-05"' in _rendered()
-        assert f"value        = {_value(FIRST)}" in earlier
-        assert f"value        = {_value(FIRST)}" in _rendered()
+        assert f"value        = {_value(FIRST)}\n" in earlier
+        assert f"value        = {_value(FIRST)}\n" in _rendered()
 
 
 class TestASurpriseInTheResponseWritesNothingAtAll:
@@ -244,15 +244,13 @@ class TestAClockBehindTheLowerBoundIsRefusedRatherThanSatisfied:
     promises a refusal naming what surprised it.
     """
 
-    def test_it_refuses_naming_the_clock_and_the_lower_bound(self, out: Path) -> None:
-        before = out.read_bytes()
+    def test_it_refuses_naming_the_clock_and_the_lower_bound(self) -> None:
         with pytest.raises(fetch_nbu_rates.FetchError) as caught:
             _fetched(_complete(), today=FIRST - timedelta(days=1))
 
         assert FIRST.isoformat() in str(caught.value)
         assert (FIRST - timedelta(days=1)).isoformat() in str(caught.value)
         assert "clock" in str(caught.value)
-        assert out.read_bytes() == before
 
     def test_the_whole_run_exits_non_zero_rather_than_raising(self, out: Path) -> None:
         """The guard has to be reached inside ``main``'s ``except FetchError``, not past it."""
@@ -321,10 +319,13 @@ class TestWhatARerunDoesToAVerificationSomebodyPerformed:
 
         assert _verifications_in(rendered)[FIRST] == ""
 
-    def test_a_verification_of_a_date_no_longer_published_simply_does_not_appear(self) -> None:
-        rendered = _rendered(verified={date(1999, 1, 1): (1.0, "2026-08-31")})
+    def test_a_verification_of_a_date_no_longer_published_adds_no_row(self) -> None:
+        """The response decides which dates exist; a stored attestation only decides whether
+        one of them keeps its verification."""
+        rendered = _verifications_in(_rendered(verified={date(1999, 1, 1): (1.0, "2026-08-31")}))
 
-        assert "1999-01-01" not in rendered
+        assert sorted(rendered) == _days()
+        assert set(rendered.values()) == {""}
 
     def test_a_rerun_reads_the_verifications_off_the_file_it_is_about_to_replace(
         self, out: Path
@@ -399,8 +400,7 @@ class TestWhatItWritesIsADeclarationTheLoaderAccepts:
         assert _run(_complete(), out) == 0
         header = out.read_text(encoding="utf-8").partition("[[observation]]")[0]
 
-        assert "2019-12-28" in header
-        assert TODAY.isoformat() in header
+        assert f"COVERAGE: {FIRST.isoformat()} .. {TODAY.isoformat()}" in header
         assert "fetch_nbu_rates.py" in header
         assert "hand-edit" in header
 

@@ -412,9 +412,8 @@ confirm the digest moves.
 
 - **FR-012**: Every date outside the covered window MUST produce `OfficialRateUndeclaredOnDate`
   naming the series id, the pair, the requested date and the covered window
-  (`OfficialRateUndeclaredOnDate`'s `reason`, in `core/tax/official_rate.py` — named rather
-  than given as a line span, which this feature's own edit to that module would have shifted).
-  This feature changes no refusal's shape; it changes what
+  (`OfficialRateUndeclaredOnDate`'s `reason`, in `core/tax/official_rate.py`). This feature
+  changes no refusal's shape; it changes what
   the window sentence says, from *"declares no observation at all"* to real dates.
 
 **The publication cadence, and why 017 is not needed**
