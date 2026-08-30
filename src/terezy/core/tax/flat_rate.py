@@ -7,7 +7,7 @@ PIT and the military levy do to investment income, and every case that is more c
 than this (foreign withholding credits, loss offset, annualisation) is a *different rule*,
 which arrives as another entry in the registry rather than as a branch here.
 
-⚙ **Feature 006 made the rates a dated schedule** (research.md D1, required test E10). The
+**The rates are a dated schedule** (research.md D1, required test E10). The
 selection is one call to :func:`terezy.core.tax.schedule.rate_on`, and the date it selects
 on is the date the ledger event occurred -- so a run whose events straddle a legislated
 change charges the old rate before it and the new rate from it, with no branch here and no

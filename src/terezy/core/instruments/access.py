@@ -26,11 +26,9 @@ declared, and a mismatch is refused naming both sides.
   instrument, reached this way -- and not of the security. It is carried into every outcome
   and **scored nowhere** (research.md D9).
 
-⚙ **Why a separate declaration rather than four keys on the instrument file.** The argument
-the risk class makes above is the argument for all of them, and it does not need a second
-one: every field here is a property of the **option** rather than of the security. The venue
-that sells it, the venue its proceeds land at, the price *at that venue* and how risky
-reaching it that way is are all things that change if the same instrument is reached
+**Why a separate declaration rather than four keys on the instrument file.** The argument
+the risk class makes above is the argument for all of them: every field here is a property of
+the **option** rather than of the security, and changes if the same instrument is reached
 elsewhere, while the instrument's own file states what the paper carries.
 
 **Today that is one row per instrument, and the resolver enforces it.** The registry is keyed
@@ -41,9 +39,8 @@ that the shape becomes declarable when a second venue is declared, in one file, 
 touching the instrument's terms. Building the key for a venue nobody has declared would be
 speculation, which is the opposite of what this project does.
 
-No behaviour, per owner decision D-E. The record is data; whether it resolves against the
-declared venues and instruments is the resolver's question, where the file and the field can
-be named.
+Whether this resolves against the declared venues and instruments is the resolver's question,
+where the file and the field can be named.
 """
 
 from __future__ import annotations

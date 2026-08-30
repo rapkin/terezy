@@ -1,8 +1,6 @@
 """The tax-rule registry: a mapping from a declared rule name to its implementation.
 
-*"Registries are mappings of functions, not subclass dispatch"* (owner decision D-E).
-This is that mapping, and the key set is the exact list of rule kinds the engine
-implements.
+The key set is the exact list of rule kinds the engine implements.
 
 **Why this is a third module rather than living in ``interface.py``.** The contract in
 ``specs/001-ovdp-hurdle-rate/contracts/taxrule-interface.md`` writes ``REGISTRY`` beside

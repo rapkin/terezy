@@ -26,8 +26,7 @@ currency conversion function anywhere in the core (asserted by C5), so a trade c
 that is not the base currency is refused loudly here rather than converted at an invented
 rate. ``fx_rate_used`` is ``None`` precisely because no rate was used.
 
-**Why consumption is a registry of ordering functions.** *"Registries are mappings of
-functions, not subclass dispatch"* (owner decision D-E). A selection method is an
+**Why consumption is a registry of ordering functions.** A selection method is an
 ordering over the lots held: FIFO consumes the oldest first, LIFO the newest. Both
 produce a *different hand-computable tax* on the same position, which is why the method is
 configured rather than assumed, and why there is no default -- E6 in
@@ -210,9 +209,8 @@ class Disposal:
 class LotMethod(Enum):
     """The four basis methods, as a closed set. **No default anywhere** (FR-020).
 
-    ⚙ **Feature 009 added the two that 001 left out**, and put them here rather than in a tax
-    module because two of them already lived here: four methods split across two modules is
-    how a fifth ends up in a third (research.md D10).
+    All four live here rather than two of them in a tax module: four methods split across
+    two modules is how a fifth ends up in a third (research.md D10).
 
     The value strings are the data contract -- what a scenario declares and what
     :data:`SELECTION_FNS` is keyed by. The enum exists beside them so that a **figure** cannot
@@ -282,10 +280,10 @@ Selection = tuple[tuple[Lot, float], ...]
 SelectionFn = Callable[[tuple[Lot, ...], float, str | None], Selection | LotRefusal]
 """A basis method: ``(lots, quantity, the lot named by the disposal) -> what to consume``.
 
-⚙ **Feature 009 widened this from an ordering.** FIFO and LIFO are orderings, and average
-cost is not -- it takes a share of *every* lot -- and specific-lot is not either, since it
-depends on what the disposal named. Keeping the narrower shape would have forced two of the
-four methods to be expressed as something they are not.
+**A selection, not an ordering.** FIFO and LIFO are orderings; average cost is not -- it
+takes a share of *every* lot -- and specific-lot is not either, since it depends on what the
+disposal named. The narrower shape would force two of the four methods to be expressed as
+something they are not.
 """
 
 
@@ -577,7 +575,7 @@ def consume(
     and a ledger that let it through would report a negative position (C2) and a basis
     consumed that was never paid.
 
-    ⚙ **A refusal from the selection is raised here** rather than returned (009). The typed
+    **A refusal from the selection is raised here** rather than returned. The typed
     refusals are values at :func:`basis_consumed`, where the four methods can be checked
     directly; by the time a stream is being folded, a disposal that contradicts the run's
     method is a stream this engine cannot fold at all -- the same class of thing as a

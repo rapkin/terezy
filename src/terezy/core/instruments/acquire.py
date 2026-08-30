@@ -3,7 +3,7 @@
 Shared rather than written twice, because a purchase is not a term of either declaration
 form -- the two bond forms open a lot the same way, and this is where they do it.
 
-⚙ **A fund keeps its own** (`core.instruments.fund`), byte-identical today, and that is a
+**A fund keeps its own** (`core.instruments.fund`), byte-identical today, and that is a
 recorded duplicate rather than an oversight: a fund purchase is priced from its declared NAV
 plus an entry markup, so what it will need from a shared helper is not yet what these two
 need. Unifying all three is a decision about the fund's shape and belongs to whoever changes

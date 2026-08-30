@@ -74,11 +74,9 @@ caller, and would then need a value at each of them -- a default with extra step
 distinguishable on inspection, which is what FR-008 asks for, and indistinguishable to
 ``merge``, which is what FR-007 asks for.
 
-⚙ ``SourceRef`` *does* carry a ``kind``, added by feature 010, and it is a different thing:
-the ``ObservationKind`` the citation's table declared, which is what lets a merged provenance
-be aged at all. It discriminates nothing about this mark, and the argument above is unchanged
-by it -- but a reader who met the old heading concluded the record had no ``kind`` field, so
-the heading says which kind it is talking about.
+``SourceRef`` *does* carry a ``kind``, and it is a different thing: the ``ObservationKind``
+the citation's table declared, which is what lets a merged provenance be aged at all. It
+discriminates nothing about this mark.
 """
 
 
@@ -252,10 +250,9 @@ def seed_cost(lot: SeedLot) -> Money:
     the amount and the basis in two fields, and nothing in the type system stops a caller
     building one whose ``cost`` has empty provenance beside a ``basis`` that says *estimated* --
     a caller ``core.errors`` and the resolver both already anticipate, since each keeps a
-    refusal for seeds "assembled without going through a file at all". Before this function
-    existed the mark reached the gain only because the loader happened to attach it at
-    construction, so a hand-built lot folded into an unmarked gain and an unmarked tax while
-    the declaration said the cost was a guess.
+    refusal for seeds "assembled without going through a file at all". Left to the loader
+    attaching the mark at construction, a hand-built lot folds into an unmarked gain and an
+    unmarked tax while the declaration says the cost was a guess.
 
     So the join is made here, in the module that owns the declaration, and
     :func:`opening_events` is the only path a seed takes into the ledger. The mark is merged
@@ -340,11 +337,10 @@ def _inconsistency(
                 "instrument would be a confident answer about something that does not exist."
             ),
         )
-    # ⚙ The question is *the earliest date from which this instrument's terms are known*,
-    # and it is asked of the declaration rather than read off a field. This site used to
-    # read an issue date, which was never what it needed -- it needed a date it could
-    # compare an acquisition against, and it asked for the only spelling that existed. A
-    # declaration that states its terms from a coverage start answers the same question.
+    # The question is *the earliest date from which this instrument's terms are known*, and
+    # it is asked of the declaration rather than read off a field: what is needed is a date
+    # to compare an acquisition against, and a declaration stating its terms from a coverage
+    # start answers that as well as one naming the day the paper was issued.
     known = terms.known_from(declaration.terms)
     if lot.acquired_on < known.on:
         return InconsistentTerms(

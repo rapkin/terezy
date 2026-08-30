@@ -5,7 +5,7 @@ declared as data under ``data/instruments/``; this package holds only the interf
 and the class-level mechanics (contractual schedules, NAV series, outcome
 distributions) that the data drives.
 
-⚙ **Two declaration kinds live here, and only one of them implements the interface.**
+**Two declaration kinds live here, and only one of them implements the interface.**
 ``fixed_income`` does; ``fund`` does not, because a fund's projection needs inputs a bond
 has no use for, refuses in ways a bond cannot, and can answer with *two* results where the
 interface returns one. That is a second kind under the same concept rather than a fifth

@@ -82,13 +82,11 @@ class EventKind(Enum):
     TAX_CHARGE = "tax_charge"
     """Tax **assessed**, and nothing else. A zero charge is still a charge and still an event.
 
-    ⚙ **Feature 009 took the cash out of this kind, and that is defect B5's structural
-    cure.** The predecessor deducted tax from the portfolio at the moment of the trade; this
-    engine did the same in miniature, giving the charge event the negated charge as its cash
-    effect -- invisible while every shipped class was exempt and wrong the moment one was
-    not. A charge is now an *assessment memo*: it records what was charged, on which base,
-    under which rule, accruing to which year, and it moves no money at all. What money does
-    is a :attr:`TAX_PAYMENT`, dated by the declared due-date rule in the following year.
+    **It moves no cash, and that is defect B5's structural cure.** The predecessor deducted
+    tax from the portfolio at the moment of the trade -- invisible while every shipped class
+    is exempt and wrong the moment one is not. A charge is an *assessment memo*: what was
+    charged, on which base, under which rule, accruing to which year. What moves money is a
+    :attr:`TAX_PAYMENT`, dated by the declared due-date rule in the following year.
 
     The rule is enforced, not merely intended: :func:`check_shape` refuses a charge event
     whose amount is anything but zero, so "tax deducted at event time" is unrepresentable in
@@ -101,7 +99,7 @@ class EventKind(Enum):
     DISTRIBUTION = "distribution"
     """A payout from a collective-investment fund. Cash only; it touches no lot.
 
-    ⚙ **Added by feature 006.** Distinct from ``COUPON`` even though both are cash into
+    Distinct from ``COUPON`` even though both are cash into
     the account against a holding that stays put, because they are not the same claim and
     are not taxed alike: a coupon is contractual interest on a debt instrument, and a
     fund distribution is a share of what the fund earned, charged under a different class
@@ -112,7 +110,7 @@ class EventKind(Enum):
     REDEMPTION = "redemption"
     """Cash in against fund units surrendered -- a disposal, like a bond's repayment.
 
-    ⚙ **Added by feature 006**, and deliberately not spelled ``PRINCIPAL_REPAYMENT``. A
+    Deliberately not spelled ``PRINCIPAL_REPAYMENT``. A
     fund buying its certificates back is not repaying principal: there is no principal,
     the price is NAV less whatever discount the terms allow, and the amount can be less
     than what was put in. The kind reaches the canonical form and every rendered
@@ -123,13 +121,12 @@ class EventKind(Enum):
     TAX_PAYMENT = "tax_payment"
     """The money leaving to settle one annual tax statement, on its declared due date.
 
-    ⚙ **Added by feature 009**, and the other half of what :attr:`TAX_CHARGE` stopped doing.
+    The other half of what :attr:`TAX_CHARGE` deliberately does not do.
     A charge accrues to a tax year; the year's charges are assembled afterwards; and the
     liability is settled *from cash* on the date the declared timing rule names -- a date that
     is data, never a constant here.
 
-    **An ordinary ledger citizen**, on the precedent feature 008 set for a declared seed: it
-    goes through the same fold and is counted by every conservation property without one of
+    **An ordinary ledger citizen**, on a declared seed's precedent: it goes through the same fold and is counted by every conservation property without one of
     them being taught it exists. If a property fails only for ledgers containing a payment,
     the event is wrong -- not the invariant (009 research.md D2).
 
@@ -160,9 +157,7 @@ class EventKind(Enum):
 class CausationKind(Enum):
     """The kinds of declaration that are allowed to cause an event.
 
-    The first two are exactly the two FR-008 names -- *"each such record MUST identify the
-    instrument term or tax rule that generated it"* -- and ``ROUTE_TERM`` joined them with
-    feature 002, which charges fees no instrument and no tax rule charges.
+    The first two are exactly the two FR-008 names.
 
     What the set is closed *against* is a **catch-all**: there is no "owner action" and no
     "system" member, because such a member would become the place every event whose cause
@@ -180,12 +175,7 @@ class CausationKind(Enum):
     ROUTE_TERM = "route_term"
     """A declared term of a funding route -- a leg's fee, a channel's premium, a spread.
 
-    ⚙ **The third member, added with feature 002.** The docstring above warns against a third
-    cause, and the warning stands as written: what it forbids is a *catch-all* -- "an owner
-    action", "the system" -- which would become the place every event whose cause nobody
-    tracked down ends up, leaving C6 passing while meaning nothing.
-
-    This is the opposite of that. A route term is resolvable to a declaration exactly as an
+    **Not the catch-all the class docstring forbids.** A route term is resolvable to a declaration exactly as an
     instrument term is: ``id`` is the route id and ``detail`` names the component that
     charged. FR-005 requires every fee to be an explicit recorded line, and a ramp fee is
     charged by neither an instrument term nor a tax rule -- so without this member such a fee
@@ -196,8 +186,7 @@ class CausationKind(Enum):
     SEED_DECLARATION = "seed_declaration"
     """A declared opening lot: what the owner already held when the projection started.
 
-    ⚙ **The fourth member, added with feature 008.** It passes the test the docstring above
-    sets rather than widening it: a seed declaration is *a kind of declaration resolvable
+    **It passes the test the class docstring sets rather than widening it**: a seed declaration is *a kind of declaration resolvable
     back to the file it was read from* -- ``id`` is the declaration reference the loader
     built from the file and the entry (``seeds/owner-001.toml#seed[0]``), so a reader who
     asks where an opening lot came from is sent to the line that declares it.
@@ -238,7 +227,7 @@ class LotRef:
     Set on a lot-opening event, where it is the identity of the lot being created.
 
     On a disposal it is the lot the disposal **chose**, or ``None`` where the configured
-    method chooses instead. ⚙ Feature 009 made the first case real: naming a lot asks for
+    method chooses instead. The first case is real: naming a lot asks for
     specific-lot selection, and ``lots.basis_consumed`` refuses the naming under any other
     method rather than ignoring it, because ignoring it would tax a different basis.
     """
@@ -466,9 +455,9 @@ def _check_closing(event: Event) -> None:
 def _check_assesses_without_settling(event: Event) -> None:
     """A tax charge records an assessment and moves no money. Defect B5, made unrepresentable.
 
-    ⚙ **Feature 009.** The check is the cure: a rule that lives only in a docstring is one the
-    next tax path forgets, and with this here a stream that deducts tax at trade time cannot
-    be folded at all -- by any caller, including one written after this comment (FR-001).
+    The check is the cure: a rule that lives only in a docstring is one the next tax path
+    forgets, and with this here a stream that deducts tax at trade time cannot be folded at
+    all, by any caller (FR-001).
 
     The zero is compared as a magnitude, so both ``0.0`` and ``-0.0`` pass: the sign of a zero
     carries no information about the money.
@@ -488,7 +477,7 @@ def _check_assesses_without_settling(event: Event) -> None:
 def _check_settles(event: Event) -> None:
     """A tax payment takes money out, or it is a payment of nothing.
 
-    ⚙ **Feature 009.** A positive amount would be a refund, which nothing here models
+    A positive amount would be a refund, which nothing here models
     (FR-011), and a payment event that could credit the account would let a wrongly-signed
     liability *add* cash while every conservation property stayed green.
 

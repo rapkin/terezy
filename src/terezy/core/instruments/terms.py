@@ -143,10 +143,9 @@ def payments_after(
     the paper that morning, which is the same convention a bond declared by its terms applies
     to a coupon dated on its purchase.
 
-    ⚙ **Here rather than in the schedule generator, because two things need it and they must
+    **Here rather than in the schedule generator, because two things need it and they must
     not disagree** -- what the generator *emits*, and what :func:`principal_returned` says the
-    buyer gets back. They were one set for one commit and a review found the day they were
-    not: the answer to "what does this holding receive" has to be given once.
+    buyer gets back. The answer to "what does this holding receive" has to be given once.
     """
     return tuple(payment for payment in payments if payment.on > bought_on)
 
@@ -154,10 +153,10 @@ def payments_after(
 def face_value_of(terms: DeclaredTerms) -> Money:
     """The redemption amount one unit is declared to repay. Both forms state one.
 
-    ⚙ **It is not what a purchase is measured against, and that is the whole reason this
+    **It is not what a purchase is measured against, and that is the whole reason this
     function carries a warning rather than being a bare passthrough.** Measuring a premium
-    against face is defect F2, found on this branch: a schedule that has already repaid part
-    of its principal reports a discount of everything the previous holder was repaid.
+    against face is defect F2: a schedule that has already repaid part of its principal
+    reports a discount of everything the previous holder was repaid.
     :func:`principal_returned` is the question a purchase asks; this one answers *what does
     the paper say a unit redeems at*, which is a different question and has a narrower set of
     honest uses -- none of them arithmetic on what somebody paid.

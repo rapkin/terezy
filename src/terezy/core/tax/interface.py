@@ -7,10 +7,9 @@ an implementer's or an agent's memory.** Every rate arrives in a ``TaxClass`` lo
 date and verification date. A rate literal in a Python file is a defect regardless of
 whether it happens to be correct -- including ``0.0``, and including an effective date.
 
-Per owner decision D-E the interface is a function signature plus records of data. Note
-what the signature does *not* do: it takes the ``TaxClass`` as an **argument** rather than
-closing over it. A rule is a stateless function; there is nothing to construct and nothing
-to configure.
+Note what the signature does *not* do: it takes the ``TaxClass`` as an **argument** rather
+than closing over it. A rule is a stateless function; there is nothing to construct and
+nothing to configure.
 
 **Three obligations that shape the records below.**
 
@@ -27,12 +26,11 @@ source: foreign withholding creditable against PIT but **not** against the levy 
 expressed against a blended figure at all.
 
 *Tax currency is not display currency.* No code here may assume the currency a charge is
-computed in is the currency anything is displayed in. The three roles Principle VI names are
-three because they come apart, and this interface is where they would be collapsed first.
+computed in is the currency anything is shown in. Principle VI's three roles come apart, and
+this interface is where they would be collapsed first.
 
-⚙ **A charge is computed in the currency its base arrived in, which is not always the tax
-currency.** Feature 011 made that reachable: an event denominated in a foreign currency is
-charged here on its own amount, and ``core.tax.year`` restates the whole charge at the
+**A charge is computed in the currency its base arrived in, which is not always the tax
+currency.** An event denominated in a foreign currency is charged here on its own amount, and ``core.tax.year`` restates the whole charge at the
 declared official rate for the event's date when it assembles the year -- except for a
 realised disposal gain, which it refuses outright rather than converting. So a ``TaxCharge``
 leaving this module may be denominated in USD, and a rule that compared its base against the
@@ -130,17 +128,14 @@ class TaxClass:
     rates: tuple[RateEntry, ...]
     """The class's rates as a **dated schedule**, sorted by effective date, non-empty.
 
-    ⚙ **Feature 006 replaced feature 001's scalar ``pit_rate`` / ``levy_rate`` pair with
-    this field**, closing the gap `data/README.md` rule 3 recorded and required test E10
-    named. The scalar was removed rather than kept alongside: two code paths reading a
-    rate would mean the older one kept working, and nothing would ever force the
-    migration (research.md D1).
+    A schedule rather than a scalar pair, and no scalar beside it: two code paths reading a
+    rate would mean the older one kept working (research.md D1, required test E10).
 
     **Provenance lives on each entry, not on the class.** The rate before a legislated
     change and the rate after it are two observations from two sources with two
     verification dates, and one mark for both would let a checked figure vouch for an
-    unchecked one. That is why this record no longer carries a ``provenance`` field: a
-    charge takes its citation from the entry that produced it.
+    unchecked one. This record carries no ``provenance`` field of its own: a charge takes its
+    citation from the entry that produced it.
 
     Sorted and non-empty are enforced at the data boundary, where the file can be named;
     :func:`terezy.core.tax.schedule.rate_on` relies on both.

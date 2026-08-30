@@ -13,25 +13,11 @@ reading of the declaration files, which is the half of FR-020 that would otherwi
 diagram drift from the numbers it depicts. When a figure is awkward to render, the fix is
 here; a helper in ``core`` is refused by the layer contract, and rightly.
 
-**The three decisions that do the real work**, each of them a way the picture could have
-been less honest than the tables:
-
-* **One number rule** (:mod:`terezy.api.diagrams.numbers`, FR-022). Results carry floats and
-  the project's canonical float form is hexadecimal, so "the diagram shows the result's
-  figure" was undefined until a human-readable rule existed. There is exactly one, on the
-  model of the single project tolerance, and a contract test greps for a second.
-* **Marks live in label text** (:mod:`terezy.api.diagrams.marks`, FR-015). A mark carried by
-  a colour is lost the moment the text is diffed, re-themed, or read as a golden file -- and
-  golden files are one of the two places this output lands. ``classDef`` styling may add
-  emphasis on top; it may never be the only carrier.
-* **Node ids are positional** (:mod:`terezy.api.diagrams.mermaid`, FR-018). Deriving a
-  Mermaid id from a declared id means sanitising, and sanitising maps ``binance-p2p`` and
-  ``binance_p2p`` onto one identifier -- two venues silently merged into one node, with
-  nothing in the output to say so.
-
-**No new dependency.** The Mermaid text is a few kinds of line, written by hand
-(research.md D10). A rendering library would put a third party between a declaration and
-its picture and make the escaping someone else's semantics.
+Three decisions do the real work, each of them a way the picture could have been less honest
+than the tables, and each argued where it lives: the one number rule
+(:mod:`terezy.api.diagrams.numbers`), marks in label text
+(:mod:`terezy.api.diagrams.marks`), and positional node ids
+(:mod:`terezy.api.diagrams.mermaid`).
 """
 
 from __future__ import annotations

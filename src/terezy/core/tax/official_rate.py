@@ -1,8 +1,6 @@
 """The official rate: the third currency role, and the one number nobody transacts at.
 
-Constitution Principle VI gives currency three roles -- **base** (UAH), **tax** (UAH at the
-official rate on the transaction date) and **display** (user-switchable) -- and says that
-conflating any two of them is a defect. This module is the tax role.
+This module is the **tax** currency role of constitution Principle VI.
 
 ## An official rate is not a channel, and the difference is the whole feature
 
@@ -32,13 +30,10 @@ The one sanctioned escape is a **declared** non-publication-day rule: a cited st
 which observation governs a date the publisher does not publish for. It is data, and this
 module contains no notion of a weekend, a public holiday or a banking calendar (FR-011).
 
-⚙ **A rule written in working days or public holidays cannot be declared against these
+**A rule written in working days or public holidays cannot be declared against these
 records at all**, because evaluating one needs a working-day and holiday calendar and nothing
 declares one. That is the constraint this module imposes; which series it bites and what it
 costs them is stated where the absence lives, in the declaration file.
-
-**No clock, no I/O.** Every date is an argument; ``as_of`` belongs to staleness and is a run
-input recorded in the manifest.
 """
 
 from __future__ import annotations

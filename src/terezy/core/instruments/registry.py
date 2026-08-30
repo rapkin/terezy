@@ -1,11 +1,9 @@
 """The instrument registry: which declaration kinds project as an **event stream**.
 
-*"Registries are mappings of functions, not subclass dispatch"* (owner decision D-E).
 The key set of :data:`REGISTRY` is readable in one line and impossible to extend at a
 distance -- no registration decorator, no import-time side effect, no subclass scan.
 
-⚙ **:data:`REGISTRY` is not the list of everything this engine calls an instrument**, and
-reading it that way was a real mistake in feature 006's plan before it was corrected. It is
+**:data:`REGISTRY` is not the list of everything this engine calls an instrument.** It is
 the dispatch for declaration kinds whose projection *is* a stream of ledger events, which is
 what :class:`~terezy.core.instruments.interface.InstrumentOps` describes. A
 collective-investment fund is a declared instrument class and is deliberately **not** here;
@@ -47,7 +45,7 @@ issue date and a maturity date."""
 ENUMERATED_SCHEDULE: Final = "enumerated_schedule"
 """A bond declared by the payments it will make: the schedule *is* the declaration.
 
-⚙ **A second entry, and not a second interface** (013). It takes the same arguments, returns
+**A second entry, and not a second interface.** It takes the same arguments, returns
 the same event stream, and fails with the same union, so it belongs in this mapping where a
 fund does not -- the three mismatches recorded below hold for none of it. Why the two forms
 are kept apart rather than merged is argued where the records are, in
@@ -96,10 +94,10 @@ def ops_for(instrument_class: str) -> InstrumentOps:
 
 
 # ---------------------------------------------------------------------------
-# 006-inzhur-instruments: the declaration kinds, which are not all instruments
+# The declaration kinds, which are not all instruments
 # ---------------------------------------------------------------------------
 #
-# ⚙ **A fund is a declared instrument class, and it is deliberately NOT in `REGISTRY`.**
+# **A fund is a declared instrument class, and it is deliberately NOT in `REGISTRY`.**
 # `InstrumentOps` is the `Instrument` plugin interface of Principle II, and a fund does not
 # satisfy it. Three concrete mismatches, none of them cosmetic:
 #
