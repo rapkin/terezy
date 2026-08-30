@@ -218,6 +218,10 @@ def _rows(payload: object, *, first: date, last: date) -> tuple[tuple[Row, ...],
 
     The completeness check is against ``first .. last`` and **not** against what came back, so
     a short retrieval fails instead of silently narrowing the window it was asked for.
+
+    Rows are sorted rather than required to arrive in order: every row is self-dated, so the
+    order carries no information, and the check above is over the *set* -- which a reordering
+    cannot satisfy wrongly.
     """
     if not isinstance(payload, list):
         raise FetchError(
