@@ -52,6 +52,13 @@ SHORT = 12
 """Passages shorter than this are skipped: «5 %» and «ФОП» carry no proposition, and a
 containment test over them would pass on any document mentioning either."""
 
+SUBSTANTIAL = 80
+"""What counts as a quoted **provision** rather than a quoted word.
+
+Not a second filter -- every passage above :data:`SHORT` is checked. This is the length the
+count below measures, so the scan's strength is a stated number instead of an impression.
+"""
+
 
 def _normalised(text: str) -> str:
     """Whitespace collapsed, TOML escapes undone, markdown emphasis stripped.
@@ -79,11 +86,19 @@ def _passages() -> list[tuple[str, str]]:
 
 
 def test_the_scan_reaches_both_declaration_directories_and_finds_passages() -> None:
-    """A scan over no passages passes for ever and protects nothing."""
+    """A scan over no passages passes for ever and protects nothing.
+
+    The **substantial** count is asserted beside the total, because a containment test over
+    ``«неправомірний»`` establishes that one word is somewhere in a long document and nothing
+    more. What carries the check is the long passages -- the quoted provisions -- and this
+    says how many of those the scan is actually holding.
+    """
     passages = _passages()
     files = {name for name, _ in passages}
     assert files == {"ua_fop_group_3.toml", "ua_personal_income.toml", "ua.toml"}
-    assert len(passages) >= 20
+    assert len(passages) >= 40
+    substantial = [passage for _, passage in passages if len(passage) >= SUBSTANTIAL]
+    assert len(substantial) >= 15
 
 
 def test_every_quoted_legal_passage_is_in_the_specification_that_read_it() -> None:
