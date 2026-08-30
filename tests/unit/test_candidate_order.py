@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING
 from terezy.core.decision.candidates import enumerate_candidates
 from terezy.core.primitives.currency import Currency
 from terezy.core.results.candidates import CandidateSet
+from terezy.core.routes.path import candidate_id, exit_segments_of
 from terezy.data.declarations import resolver
 from tests import candidate_registries as fixtures
 
@@ -67,6 +68,27 @@ def test_a_registry_whose_files_sort_differently_returns_the_same_sequence(
     assert [item.key for item in _enumerate(shuffled).candidates] == [
         item.key for item in _enumerate(fixtures.shipped()).candidates
     ]
+
+
+def test_the_sequence_is_the_one_fr016s_five_terms_imply() -> None:
+    """The ordering **rule**, computed here from the declarations rather than read off the
+    output. Asserting only that two runs agree pins determinism and says nothing about *which*
+    order; a sort that happened to match the order candidates were built in would satisfy that
+    and stop matching the day the build order changed.
+    """
+    produced = _enumerate(fixtures.shipped()).candidates
+    assert produced
+    expected = sorted(
+        produced,
+        key=lambda item: (
+            item.key.instrument_id,
+            item.key.stream_id,
+            candidate_id(item.key.route_in),
+            exit_segments_of(item.key.route_out),  # type: ignore[arg-type]
+            item.plan_position,
+        ),
+    )
+    assert list(produced) == expected
 
 
 class TestARunPlansOrderIsItsPositionInTheCallersSequence:

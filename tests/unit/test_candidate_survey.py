@@ -180,6 +180,24 @@ class TestTwoStreamsAreRefusedRatherThanConverted:
         assert question.amounts[fixtures.CONTRACT].currency is fixtures.USD
 
 
+def test_a_question_stating_no_amount_for_the_funding_stream_raises() -> None:
+    """A caller's incomplete question, not a fact about the money, so it raises rather than
+    joining a registry gap in a typed column. Defaulting it to zero would score a real option
+    at nothing and rank it last with nothing on the record to say why."""
+    registries = fixtures.shipped()
+    benchmark = fixtures.benchmark_key(registries, OVDP)
+    with pytest.raises(ValueError, match="no amount"):
+        survey(
+            registries=registries,
+            routes=registries.routes,
+            question=fixtures.question(
+                registries, amounts={fixtures.CONTRACT: fixtures.AMOUNT_USD}
+            ),
+            ceiling=fixtures.ceiling(10_000),
+            benchmark=benchmark,
+        )
+
+
 def test_an_amount_in_a_currency_its_stream_does_not_deliver_raises() -> None:
     """SC-020's second half: 010's existing behaviour for a caller's construction error.
 

@@ -64,13 +64,30 @@ def test_no_module_constructs_or_matches_a_feasibility_verdict_of_its_own() -> N
     assert offenders == {"core/decision/candidates.py": ["DeclarationMissing"]}, offenders
 
 
-def test_no_module_raises_for_a_business_outcome() -> None:
-    """Principle IV: every degraded outcome is a typed value. ``raise`` is for a programmer
-    error, and this feature has none of its own to report."""
-    for path in MODULES:
-        tree = ast.parse(strip_prose(path.read_text(encoding="utf-8")))
-        raises = [node for node in ast.walk(tree) if isinstance(node, ast.Raise)]
-        assert not raises, path
+def test_the_only_raise_is_the_one_a_caller_construction_error_earns() -> None:
+    """Principle IV: every degraded outcome is a typed value, and ``raise`` is for a caller's
+    mistake -- an incomplete question -- never for a fact about the money.
+
+    The permitted raise is **named** rather than excluded by a pattern, so a second one is a
+    failure here and has to be argued for in review. A count alone would let the second replace
+    the first; the exception type and the message are pinned too.
+    """
+    raised = {
+        str(path.relative_to(SOURCE_ROOT)): [
+            node
+            for node in ast.walk(ast.parse(strip_prose(path.read_text(encoding="utf-8"))))
+            if isinstance(node, ast.Raise)
+        ]
+        for path in MODULES
+    }
+    assert raised["core/results/candidates.py"] == [], "a record must never raise"
+    permitted = raised["core/decision/candidates.py"]
+    assert len(permitted) == 1, permitted
+    call = permitted[0].exc
+    assert isinstance(call, ast.Call)
+    assert isinstance(call.func, ast.Name)
+    assert call.func.id == "ValueError"
+    assert "no amount" in ast.unparse(call)
 
 
 def test_no_module_names_a_rate_a_channel_or_a_conversion() -> None:

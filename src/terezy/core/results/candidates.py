@@ -234,9 +234,10 @@ class CandidateSet:
     pairs_considered: int
     """How many ``(instrument, stream)`` pairs the registry offered.
 
-    Counted from the declarations rather than from the loop, which is what makes FR-009's first
-    identity -- *pairs considered = pairs enumerated + pairs yielding no candidate* -- a check
-    rather than a tautology. A pair dropped on the floor by the walk fails it.
+    Counted from the declarations -- every instrument with both an access entry and a
+    declaration, times every declared stream -- rather than from the walk's own output. The
+    two agree by construction while the walk visits every pair, and FR-009's first identity is
+    what would catch a walk that stopped early or lost one.
     """
 
     provenance: Provenance

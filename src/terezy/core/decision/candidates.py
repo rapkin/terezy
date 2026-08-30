@@ -189,6 +189,14 @@ def survey(
             ),
         )
     streams = sorted({key.stream_id for key in keys})
+    unfunded = [stream_id for stream_id in streams if stream_id not in question.amounts]
+    if unfunded:
+        raise ValueError(
+            f"the question states no amount for {unfunded}, and the enumerated set is funded "
+            f"from {streams}. An amount is stated per stream with no default anywhere "
+            "(FR-005), so a missing one is an incomplete question rather than a fact about "
+            "the money -- and defaulting it to zero would score a real option at nothing."
+        )
     if len(streams) > 1:
         return MoreThanOneStreamInTheSet(
             stream_ids=tuple(streams),
