@@ -3727,7 +3727,92 @@ declared fact rather than guessing one.
 
 ---
 
-## 33. Where to look next
+## 33. The candidate set: what the declarations offer, and what fell out of it
+
+Every section above costs a tuple somebody handed the engine. This one **finds** them:
+`SIMULATOR_SPEC.md` §4.10.2's *"infeasible candidates are dropped with the reason recorded,
+because 'your preferred plan is impossible in March' is itself an output"*, at the tuple level.
+
+### 33.1 What a candidate is, and what it is made of
+
+A candidate is §29's `Tuple`, unchanged — the five declared terms — with one number beside it:
+which of the caller's supplied run plans produced it. Both route terms are read off what §21's
+`compose` emitted for the pair. Enumeration never chains two routes, extends a chain, or
+decides that two routes join; every rule about what connects lives in §21.
+
+The **one** construction it makes is the identity exit. Where an instrument's `proceeds_to` is
+itself a declared spendable endpoint, the money has already come back out: there are no exit
+legs to walk and none to charge for, and `compose` cannot emit that case because it is a fact
+about the owner's declared list rather than anything a search can find (§20).
+
+### 33.2 The question, and why every count carries it
+
+A candidate set is enumerated for one stated question: an amount **per income stream in that
+stream's own currency**, one horizon, an as-of date, a continuation assumption, the run plans
+per instrument, the declared segment bound and one named regime.
+
+Nothing converts one stream's amount into another's. That would need a rate valuing one
+currency in another *for a return*, and neither declared rate is one: a channel rate is a
+transaction price (§16) and an official rate is a legal reference for what an income was worth
+on a date (§30). Reusing either conflates a currency role rather than filling this one.
+
+The whole question travels with every count, because the question is what determines it.
+Refusals turn on the amount, on the horizon and on the as-of date, so two runs over one
+registry drop different candidates — and a drop count reported without its inputs is a figure
+more confident than they are.
+
+### 33.3 Three columns, and the two identities between them
+
+    pairs considered      = pairs enumerated + pairs yielding no candidate
+    candidates enumerated = evaluated        + dropped
+
+Both are asserted, not described. The third column exists because a `Tuple` cannot be built
+without a way in, so §29's union was never asked whether one exists — it was handed one. A pair
+the routes do not connect is the **absence** of an option, and folding it into the drop count
+would give a reader a number to divide by that means nothing.
+
+That column carries a typed reason, and the two members call for opposite actions:
+
+| reason | what it means | the remedy |
+| --- | --- | --- |
+| nothing connects | no declared route, within the bound, reaches the buying venue or leaves the venue the proceeds land at | declare a corridor |
+| nothing needs to connect | the stream already arrives where the purchase happens | none — the money is already there |
+
+Which one fired is read from `compose`'s refusal **record**, never by matching its words: a
+sentence edited for clarity must not reclassify a pair whose remedy is the opposite one.
+
+### 33.4 Pruning is §29's, and nothing else
+
+A candidate is dropped only for a member of §29's typed refusal union. There is no feasibility
+rule here, no pre-screen and no early exit that skips evaluation: every candidate is evaluated
+in full, so nothing is ever excluded by an estimate. That is what makes the search version of
+this checkable later — a label-correcting implementation must produce the same non-dominated
+set brute force produces, on a registry small enough to run both.
+
+The dropped records are kept whole, with their keys, and the per-reason tally is **derived**
+from them on demand rather than stored beside them. Each group names the instruments, streams,
+routes and missing declarations its members implicate, so the remedy is readable without
+opening every record.
+
+### 33.5 The ceiling refuses; it never truncates
+
+How many candidates one enumeration may produce is declared data with no default, in
+`data/candidates/`, on the precedent of the segment bound (§21) and the staleness threshold
+(§18). Exceeding it returns **no** candidates and names both the ceiling and the count reached.
+
+A reader's instinct is to cap and carry on, and it is exactly backwards. A truncated set
+answers a different question from the one asked, with an audit trail that looks impeccable, and
+every later pass over it — dominance, an objective, a stability check — would be a false
+optimum. The ceiling exists to say *enumerating this registry has stopped being the right
+primitive*, which is a finding the owner acts on and a silent cap would hide.
+
+The other whole-enumeration refusals are the same shape: a reachable instrument with no
+supplied run plan, two identical plans for one instrument, a way in or out naming an undeclared
+route, and a `compose` refusal that is about the question rather than about one pair.
+
+---
+
+## 34. Where to look next
 
 | question | file |
 | --- | --- |
@@ -3758,6 +3843,12 @@ declared fact rather than guessing one.
 | Which comparisons can the declared registry support? | `tests/worked_examples/test_coverage_table.py` |
 | Which observation should I make next? | `tests/unit/test_coverage_deficits.py` |
 | Does the audit agree with what costing actually does? | `tests/invariants/test_coverage_costing_agreement.py` |
+| What options do the declarations actually offer? | `tests/worked_examples/test_candidate_enumeration.py` |
+| Does every discard land in the right column? | `tests/worked_examples/test_candidate_accounting.py` |
+| Is a pair that connects nothing counted as a rejection? | `tests/unit/test_no_candidate_column.py` |
+| Can every one of the seventeen refusals actually be reached? | `tests/unit/test_seventeen_refusals_through_the_loop.py` |
+| Does enumeration build a route chain of its own? | `tests/contract/test_candidates_construct_nothing.py` |
+| What does the whole candidate set look like? | `tests/golden/candidate_set.golden.txt` |
 | Can a cost figure leak into the coverage report? | `tests/contract/test_coverage_no_figures.py` |
 | What does a chain nobody declared end to end cost? | `tests/worked_examples/test_composed_arithmetic.py` |
 | Does a composed round trip need a declared way out? | `tests/worked_examples/test_composed_exit_chain.py` |

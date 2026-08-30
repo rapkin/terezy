@@ -141,7 +141,7 @@ Compliance tests for Principle II. May not be skipped without an amendment.
 
 | # | Example | Test |
 |---|---|---|
-| I1 | Feasibility pruning drops infeasible candidates with a recorded reason, and the count of dropped candidates is reported. | `[ ]` |
+| I1 | Feasibility pruning drops infeasible candidates with a recorded reason, and the count of dropped candidates is reported. **Closed at the tuple level**, which is the level `SIMULATOR_SPEC.md` §4.3.4's feasibility list is written at. §4.10.2's *allocation* candidates are a second population, pruned again under a rule feature 014 does not build (its *The one place the framing genuinely breaks*): monthly capacity is a shared rail resource, so two candidates each feasible alone can be jointly infeasible the moment a strategy holds both. Do not read this row as covering that. | `[x]` `tests/unit/test_seventeen_refusals_through_the_loop.py`, `tests/worked_examples/test_candidate_accounting.py`, `tests/unit/test_drop_tally.py` |
 | I2 | Two objectives over the same candidate set produce different rankings, and each run's manifest records which objective was used. | `[ ]` |
 | I3 | A binding constraint reports a non-zero shadow cost; a non-binding one reports zero. | `[ ]` |
 | I4 | The naive baseline (100% OVDP; 50/50 OVDP + VWCE) is always scored and always shown, and a synthetic case where nothing beats it produces the honest verdict. | `[ ]` |
@@ -309,3 +309,14 @@ numbers from different places.
 the credit-date official rate against hryvnia received at a market rate on the sale date, with
 no holding period and no cost basis anywhere in it. Both come from the same conflation this
 project exists to refuse, and they are not the same test.
+
+---
+
+**014-candidates** closes **I1** — see its row for what "at the tuple level" excludes. Three
+rows it presses on without closing:
+
+| Row | How, and why the box does not move |
+|---|---|
+| **B12** | The row's shape again, one layer above 004's: enumeration is where a candidate generator quietly acquires an opinion. Nothing here is pruned by score, by cost, by bound or by ordering — every candidate is evaluated in full, and a scan asserts this feature's modules construct, match on and raise no feasibility verdict of their own (`tests/contract/test_candidates_add_no_rule.py`). The set's own order is lexicographic over declared terms and the caller's plan sequence, never a composite (`tests/unit/test_candidate_order.py`). Still a whole-engine row: one more ordering that does not use a score. |
+| **J4** | Touched and deliberately not claimed. A lock-up longer than the horizon reaches `CannotSpanHorizon`, and this feature makes every such candidate visible in one report rather than one at a time — planted and asserted in `tests/unit/test_seventeen_refusals_through_the_loop.py`. What the row asks for still does not exist: a declared `lock_up_months` term compared against a horizon. 006 did not claim it and neither does this. |
+| **E5** | Pressed on at the level of a *set* rather than a figure: a candidate set carries the union of the marks on every declaration enumeration itself read — the legs of every route it put in a candidate, and the venue quote of every access entry it considered — so a set never looks cleaner than the registry behind it (`tests/unit/test_candidate_marks.py`, walked over both families rather than sampled). **The per-drop half is open and recorded**: 010's refusal records carry no provenance, so which unverified value caused a particular drop is not traceable from the drop. That is the `provenance-on-a-refusal` future entry. |
