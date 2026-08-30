@@ -32,8 +32,7 @@ module contains no notion of a weekend, a public holiday or a banking calendar (
 
 **A rule written in working days or public holidays cannot be declared against these
 records at all**, because evaluating one needs a working-day and holiday calendar and nothing
-declares one. That is the constraint this module imposes; which series it bites and what it
-costs them is stated where the absence lives, in the declaration file.
+declares one. That is the constraint this module imposes on what a rule may say.
 """
 
 from __future__ import annotations
@@ -156,9 +155,9 @@ class OfficialRateSeries:
 
     **Gaps are permitted, and so is emptiness.** A date the publisher did not publish for is
     a fact and inventing one is forbidden; and a series with no observations at all is the
-    declared shape a fetch script writes into, which is what ships for Ukraine today. Both
-    are reported by the request that wanted a rate, naming the date it asked about -- which
-    is more use than a load error naming a directory.
+    declared shape a fetch script writes into before it has run. Both are reported by the
+    request that wanted a rate, naming the date it asked about -- which is more use than a
+    load error naming a directory.
     """
 
 

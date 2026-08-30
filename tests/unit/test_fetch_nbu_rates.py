@@ -336,13 +336,21 @@ class TestWhatItWritesIsADeclarationTheLoaderAccepts:
 
     def test_the_header_names_both_provisions_and_says_what_each_one_does(self, out: Path) -> None:
         """FR-025. The operative term is addressed to a reuser; the hyperlink wording is the
-        text of a notice the publisher displays. Neither is asserted to be the other."""
+        text of a notice the publisher displays. Neither is asserted to be the other.
+
+        The header is taken as the text before ``[series]``, which is the first thing the file
+        declares -- so a provision that had drifted into a row's citation would fail this.
+        """
         assert _run(_complete(), out) == 0
-        header = out.read_text(encoding="utf-8").partition("observation = [")[0]
+        header, marker = out.read_text(encoding="utf-8").partition("[series]")[:2]
+        assert marker, "the declaration must have a [series] table for this to be its header"
 
         assert "2939-VI" in header
         assert "835" in header
-        assert "10" in header
+        assert "10-1" in header
+        assert "будь-яка" in header
+        assert "гіперпосилання" in header
+        assert "NOTICE" in header
 
     def test_the_header_states_the_coverage_window_and_forbids_hand_editing(
         self, out: Path
