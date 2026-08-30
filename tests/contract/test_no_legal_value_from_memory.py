@@ -23,6 +23,30 @@ one specification. These two are not: their values have a single provenance and 
 document. When the owner verifies a value, the specification's source table moves with it,
 which is the direction the coupling is meant to work in — and if a later feature changes a
 rate here without changing the record of where it came from, this is what says so.
+
+## Four holes in this scan, measured rather than assumed
+
+Recorded because a check whose reach is not written down is one a reader over-trusts. None is
+fixed here: each would be a larger piece of work than the feature this scan was written for,
+and knowing where a guard stops is worth more than a guard that quietly stops somewhere else.
+
+1. **Attribution is invisible.** The scan reads quoted spans anywhere in a file and never
+   which ``source`` or which provision they sit under, so a passage moved under the **wrong
+   citation** passes. That is the defect this feature's own history is about. It is covered
+   for exactly one entry, by
+   ``test_crediting_destination_loading.py::test_the_levy_entry_cites_each_law_for_the_half_it_supplies``,
+   which partitions the citation at its own labels — and that is the pattern the other
+   entries lack.
+2. **Containment is substring containment.** A truncated span of a longer passage passes
+   under any provision: ``«від доходу, визначеного згідно із статтею 292»`` is 45 characters,
+   is in the specification, and is quotable anywhere.
+3. **Guillemets are the only trigger.** No straight-quoted Cyrillic passage sits outside them
+   in these files today — measured 2026-08-30 — and nothing checks that it stays so. A future
+   file using straight quotes is invisible to this scan.
+4. **The glob is directory-wide, not this feature's two files.** A scheme file added by a
+   later feature must therefore have its quotations in *this* specification, which is almost
+   certainly not what its author intended. The failure below says so in as many words rather
+   than leaving them to work it out.
 """
 
 from __future__ import annotations
@@ -95,7 +119,13 @@ def test_the_scan_reaches_both_declaration_directories_and_finds_passages() -> N
     """
     passages = _passages()
     files = {name for name, _ in passages}
-    assert files == {"ua_fop_group_3.toml", "ua_personal_income.toml", "ua.toml"}
+    assert files == {"ua_fop_group_3.toml", "ua_personal_income.toml", "ua.toml"}, (
+        f"the scan found quoted passages in {sorted(files)}. It reads whole directories, not "
+        "this feature's three files — so a scheme or destination file added by a LATER "
+        "feature lands in it, and its quotations would have to be in feature 012's "
+        "specification to pass, which is almost certainly not what its author meant. Scope "
+        "the scan to that feature's own record, or widen this set deliberately."
+    )
     assert len(passages) >= 40
     substantial = [passage for _, passage in passages if len(passage) >= SUBSTANTIAL]
     assert len(substantial) >= 15
@@ -108,7 +138,8 @@ def test_every_quoted_legal_passage_is_in_the_specification_that_read_it() -> No
         "these passages are quoted in curated tax data and appear nowhere in "
         f"specs/012-fop-group-3/spec.md: {strays}. Every legal value in these files was "
         "copied from that specification, which read the primary texts; one that is not "
-        "there came from somewhere nobody reviewed."
+        "there came from somewhere nobody reviewed. If this is a later feature's file, the "
+        "scan's scope is the problem rather than the passage — see hole 4 above."
     )
 
 

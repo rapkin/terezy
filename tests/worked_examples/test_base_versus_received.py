@@ -97,7 +97,7 @@ def _received(*, root: Path = DATA_ROOT) -> Money:
     return outcome.one_way.arrived
 
 
-def _base(*, rate: float = OFFICIAL_RATE) -> Money:
+def _base(*, rate: float = OFFICIAL_RATE, root: Path = DATA_ROOT) -> Money:
     """The taxable base: the credited dollars at the official rate on the credit date.
 
     The series is synthetic and the shipped one is not consulted, because the shipped
@@ -106,7 +106,7 @@ def _base(*, rate: float = OFFICIAL_RATE) -> Money:
     arithmetic; that the jurisdiction's own series is the one resolved for a run is asserted
     in ``tests/contract/test_crediting_destination_loading.py``.
     """
-    declared = resolver.schemes_from_data_root(DATA_ROOT, base_currency=Currency.UAH)
+    declared = resolver.schemes_from_data_root(root, base_currency=Currency.UAH)
     assert declared.official_rates["ua"] is not None
     charge = schemes.charge_income(
         declared.schemes["ua_fop_group_3_non_vat"],
@@ -168,7 +168,10 @@ class TestTheSaleMovesNoTaxFigure:
         moved = _received(root=root)
         assert moved.amount != _received().amount
 
-        assert _base().amount.hex() == Money(BASE, Currency.UAH, prov.EMPTY).amount.hex()
+        # Both bases computed, one from each root: the claim is that the run whose channel
+        # moved produces the same base as the run whose channel did not.
+        assert _base(root=root).amount.hex() == _base().amount.hex()
+        assert _base(root=root).amount.hex() == Money(BASE, Currency.UAH, prov.EMPTY).amount.hex()
 
     def test_the_gap_is_reported_beside_the_two_figures_and_never_applied_to_either(
         self,

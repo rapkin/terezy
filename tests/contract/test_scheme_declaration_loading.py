@@ -232,8 +232,10 @@ class TestOneFileReadInIsolation:
         )
         error = _load_error(_file(tmp_path, body))
 
-        assert error.field_path == "scheme.component.id"
-        assert "'levy' more than once" in error.problem
+        # The field path names a table the file actually has, and the message names both
+        # positions the duplicate is written in.
+        assert error.field_path == "scheme.rate_component[levy].id"
+        assert "scheme.rate_component[levy] and scheme.rate_component[levy]" in error.problem
 
     def test_a_rate_component_and_a_periodic_one_may_not_share_an_id(self, tmp_path: Path) -> None:
         body = (
@@ -245,11 +247,11 @@ class TestOneFileReadInIsolation:
         )
         error = _load_error(_file(tmp_path, body))
 
-        # Across BOTH kinds, and the field path says so: `component_standing` looks a
+        # Across BOTH kinds, and the message names both tables: `component_standing` looks a
         # component up by id alone, so a rate component and a periodic one sharing one would
         # make which of them answered depend on scan order.
-        assert error.field_path == "scheme.component.id"
-        assert "'same' more than once" in error.problem
+        assert error.field_path == "scheme.rate_component[same].id"
+        assert "scheme.rate_component[same] and scheme.periodic_component[same]" in error.problem
 
     def test_an_unknown_period_is_refused_and_the_refusal_lists_what_would_work(
         self, tmp_path: Path

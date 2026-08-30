@@ -2841,14 +2841,17 @@ def _check_destination(
 ) -> None:
     """A row's scheme, its venue and every reading's scheme, checked against what exists."""
     field_prefix = f"{loader.DESTINATION_TABLE}[{key[0]}/{key[1]}]"
-    for named, field in (
-        (row.scheme_id, "scheme"),
-        *((reading.scheme_id, f"reading[{reading.id}].scheme") for reading in row.readings),
+    # `is_reading` is carried rather than inferred from the field label: a label is a string
+    # built for a message, and a reading whose id ended in `.scheme` would have escaped a
+    # comparison against one.
+    for named, field, is_reading in (
+        (row.scheme_id, "scheme", False),
+        *((reading.scheme_id, f"reading[{reading.id}].scheme", True) for reading in row.readings),
     ):
         if named is None:
             continue
         if named in schemes:
-            if field != "scheme" and row.verdict is Verdict.INTERPRETED:
+            if is_reading and row.verdict is Verdict.INTERPRETED:
                 _check_interpreted_reading(schemes[named], path=path, field_prefix=field_prefix)
             continue
         raise DeclarationError(

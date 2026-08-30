@@ -4846,6 +4846,38 @@ def _periodic_component(
     )
 
 
+def _no_shared_component_id(
+    path: Path,
+    rates: tuple[scheme_module.RateComponent, ...],
+    periodics: tuple[scheme_module.PeriodicComponent, ...],
+) -> None:
+    """No two components of a scheme share an id, **across both kinds**.
+
+    Checked across the kinds because ``component_standing`` looks a component up by id alone:
+    two sharing one would make which of them answered depend on scan order. And reported
+    naming **the tables the duplicate is actually written in** -- the file has a
+    ``rate_component`` and a ``periodic_component`` array and no ``component`` one, so a path
+    naming a table nobody wrote sends the reader looking for it.
+    """
+    kinds: dict[str, list[str]] = {}
+    for rate_component in rates:
+        kinds.setdefault(rate_component.id, []).append("rate_component")
+    for periodic_component in periodics:
+        kinds.setdefault(periodic_component.id, []).append("periodic_component")
+    for identifier, tables in kinds.items():
+        if len(tables) == 1:
+            continue
+        where = " and ".join(f"{SCHEME_TABLE}.{table}[{identifier}]" for table in tables)
+        raise DeclarationError(
+            path,
+            f"{SCHEME_TABLE}.{tables[0]}[{identifier}].id",
+            f"declares the component id {identifier!r}, which {where} both declare. A "
+            "component is looked up by id alone, so two sharing one would make which of them "
+            "answered depend on the order they were scanned in.",
+            "give one of them a distinct id",
+        )
+
+
 def _amounts_in_the_tax_currency(
     path: Path, scheme: scheme_module.TaxationScheme
 ) -> scheme_module.TaxationScheme:
@@ -4907,11 +4939,7 @@ def scheme_from_file(path: Path) -> scheme_module.TaxationScheme:
     periodic_components = tuple(
         _periodic_component(path, entry) for entry in declared.periodic_component or []
     )
-    # Across BOTH kinds, because `component_standing` looks a component up by id alone: two
-    # components sharing one would make which of them answered depend on scan order.
-    declared_ids = [component.id for component in rate_components]
-    declared_ids.extend(component.id for component in periodic_components)
-    _no_duplicates(path, f"{SCHEME_TABLE}.component.id", declared_ids)
+    _no_shared_component_id(path, rate_components, periodic_components)
     return _amounts_in_the_tax_currency(
         path,
         scheme_module.TaxationScheme(
@@ -5008,8 +5036,14 @@ def _reading(path: Path, entry: schema.ReadingTable, *, field_prefix: str) -> sc
             entry.label,
             "a figure states which reading produced it, in words a reader will see",
         ),
-        scheme_id=entry.scheme,
-        # Each of the three is optional and each, once written, must say something. An empty
+        scheme_id=_optional_text(
+            path,
+            f"{entry_prefix}.scheme",
+            entry.scheme,
+            "a reading computes under a declared scheme, and a key written blank is "
+            "misdiagnosed downstream as a scheme nobody declared",
+        ),
+        # Each of the others is optional and each, once written, must say something. An empty
         # string is not the absence of a declaration -- the absent key is -- and every one of
         # these is read as a claim downstream: an uncomputable candidate is named on a switch
         # WITH ITS REASON, a reading computes on the date its name selects, and a declared
