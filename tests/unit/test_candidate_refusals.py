@@ -25,9 +25,12 @@ from terezy.core.results.candidates import (
     DuplicateRunPlan,
     NoPlanSupplied,
     QuestionDoesNotStandUp,
+    UndeclaredRouteSupplied,
 )
 from terezy.core.results.composed import SegmentBound, Unaskable
+from terezy.core.routes.path import segments_of
 from tests import candidate_registries as fixtures
+from tests import tuple_registries as tuples
 
 if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.decision.tuple_outcome import Registries
@@ -117,6 +120,57 @@ class TestARunPlanIsNeverInvented:
         result = _run(registries, question=fixtures.question(registries, plans=plans))
         assert isinstance(result, DuplicateRunPlan), result
         assert (result.instrument_id, result.positions) == (OVDP, (0, 1))
+
+
+class TestARouteTheRegistryDoesNotDeclare:
+    """FR-018's third clause, reached by the seam its record names.
+
+    The route set composed over and the ``Registries`` evaluated against arrive as separate
+    arguments -- 004 FR-017 makes narrowing to one regime the caller's job -- so a caller can
+    compose over a corridor the evaluation has never heard of. Left unchecked that produces one
+    identical ``DeclarationMissing`` per candidate: a page of drops all saying the same thing
+    about the question and nothing about any candidate.
+    """
+
+    def test_composing_over_a_route_the_registry_lacks_refuses_as_a_whole(self) -> None:
+        registries = fixtures.shipped()
+        extra = tuples.route(
+            "test_route_the_registry_lacks",
+            origin="monobank_uah",
+            destination="inzhur",
+            direction="inbound",
+        )
+        wider = {**registries.routes, extra.id: extra}
+        result = enumerate_candidates(
+            registries=registries,
+            routes=wider,
+            question=fixtures.question(registries),
+            ceiling=fixtures.ceiling(10_000),
+        )
+        assert isinstance(result, UndeclaredRouteSupplied), result
+        assert result.route_ids == (extra.id,)
+        assert result.part == "route_in"
+
+    def test_the_same_registry_and_route_set_produces_a_set(self) -> None:
+        """The control: the refusal above is the *disagreement*, not the extra corridor."""
+        registries = fixtures.shipped()
+        extra = tuples.route(
+            "test_route_the_registry_lacks",
+            origin="monobank_uah",
+            destination="inzhur",
+            direction="inbound",
+        )
+        agreed = tuples.with_new_route(registries, extra)
+        result = enumerate_candidates(
+            registries=agreed,
+            routes=agreed.routes,
+            question=fixtures.question(agreed),
+            ceiling=fixtures.ceiling(10_000),
+        )
+        assert isinstance(result, CandidateSet), result
+        assert extra.id in {
+            name for item in result.candidates for name in segments_of(item.key.route_in)
+        }
 
 
 class TestAQuestionThatDoesNotStandUpRefusesRatherThanEmptying:

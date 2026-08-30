@@ -1,9 +1,8 @@
 """The candidate set, the three columns it accounts for, and the refusals that replace it.
 
-014 FR-008: an enumeration separates and separately counts **three** populations -- candidates
-evaluated, candidates dropped with a typed reason, and ``(instrument, stream)`` pairs that
-yielded no candidate at all. The third is the one nothing before this feature had a place for,
-and the one a reader would otherwise fold into the second and divide by.
+014 FR-008: an enumeration separates and separately counts candidates evaluated, candidates
+dropped with a typed reason, and ``(instrument, stream)`` pairs that yielded no candidate at
+all. The third is the one a reader would otherwise fold into the second and divide by.
 
 **Nothing here holds a figure this feature computed.** Every amount and rate reachable from a
 candidate came out of feature 010's ``evaluate``; both route terms came out of feature 004's
@@ -66,7 +65,7 @@ class Question:
     different candidates, so a drop count reported without the inputs that produced it is a
     figure more confident than its inputs.
 
-    Stated over the *whole* question rather than over the subset of the seventeen that are
+    Stated over the *whole* question rather than over the subset of the union that is
     amount-sensitive: which members those are is a fact the union owns and may change, and a
     list here would be a second copy of it going quietly out of step.
     """
@@ -419,7 +418,7 @@ class DropGroup:
     refusal: str
     """The refusal record's type name -- structural, not a reading of its ``reason`` text.
 
-    Taken from the record rather than written out as a seventeen-arm match, so a change to 010's
+    Taken from the record rather than written out as a hand-written match, so a change to 010's
     union groups itself instead of leaving a second copy of the union's membership here.
     """
 

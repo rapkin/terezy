@@ -8,16 +8,14 @@ the reason recorded, because 'your preferred plan is impossible in March' is its
 
 Both route terms of every candidate are read off what
 :func:`terezy.core.routes.compose.compose` emitted. Nothing here builds a chain, extends one, or
-decides that two routes join, and there is no rule here about what connects to what -- every one
-of them stays in feature 004 (FR-002). The **single** permitted construction is the identity
-exit, and it is about the *absence* of a chain rather than about what connects: ``compose``
-states in as many words that it never emits :data:`~terezy.core.routes.path.EXIT_BY_IDENTITY`,
-because that case is the owner's declared spendable list rather than anything a search can find.
+decides that two routes join, and no rule about what connects lives here (FR-002). The
+**single** permitted construction is the identity exit, and it is about the *absence* of a chain
+rather than about what connects.
 
 ## It adds no feasibility rule either
 
-Pruning is feature 010's seventeen typed refusals, reached by ``compare``'s own loop, and this
-module contains no pre-screen, no cheap filter and no early exit that skips evaluation (FR-006,
+Pruning is feature 010's typed refusals, reached by ``compare``'s own loop, and this module
+contains no pre-screen, no cheap filter and no early exit that skips evaluation (FR-006,
 FR-007). Two of ``compose``'s own guards -- a segment bound below one, a stream that already
 arrives where the purchase happens -- are deliberately **not** re-checked before calling it: a
 second copy of a rule is where the drift happens.
@@ -25,20 +23,18 @@ second copy of a rule is where the drift happens.
 ## Three columns, because a pair can fail in a way no candidate-level reason can carry
 
 A ``Tuple`` cannot exist without a ``route_in``, so 010 was never asked whether a way in exists;
-it was handed one. There is no ``NoRouteInDeclared`` in its union and there should not be,
-because the fact is about an ``(instrument, stream)`` pair rather than about a candidate. So a
-pair that yields nothing is its own population, with its own typed reasons, and it is never
-counted among the drops -- a drop count that folded in combinations which were never real is a
-figure a reader divides by and gets a meaningless answer (FR-008).
+it was handed one, and the fact is about an ``(instrument, stream)`` pair rather than about a
+candidate. So a pair that yields nothing is its own population and is never counted among the
+drops: a drop count folding in combinations that were never real is a figure a reader divides
+by and gets a meaningless answer (FR-008).
 
 ## Enumeration, not search
 
-At the measured registry size the whole space is nine candidates, and a search that prunes nine
-is a search with more machinery than subject. Every candidate is evaluated in full, so nothing
-is ever excluded by an estimate -- which is what makes the label-correcting version checkable
-later: it must produce the same non-dominated set this one produces by brute force. When that
-stops being true, :class:`~terezy.core.results.candidates.CandidateCeiling` says so by refusing
-(FR-019), and the refusal is the signal rather than a silent cap.
+Every candidate is evaluated in full, so nothing is ever excluded by an estimate -- which is
+what makes the label-correcting version checkable later against this one on a registry small
+enough to run both. When enumeration stops being the right primitive,
+:class:`~terezy.core.results.candidates.CandidateCeiling` says so by refusing (FR-019); the
+refusal is the signal, and a silent cap would hide it.
 
 Pure: no clock, no I/O, no state. ``as_of`` and the horizon are the caller's.
 """
@@ -93,7 +89,7 @@ from terezy.core.routes.path import (
 )
 
 if TYPE_CHECKING:  # pragma: no cover -- typing only
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Iterable, Mapping, Sequence
 
     from terezy.core.instruments.access import InstrumentAccess
     from terezy.core.primitives.currency import Currency
@@ -249,7 +245,7 @@ def drop_tally(refused: Sequence[RefusedTuple]) -> tuple[DropGroup, ...]:
 
     FR-011. **Derived on demand and stored nowhere**, so a tally can never disagree with the
     records it summarises. Grouped by the refusal record's type name rather than by a
-    seventeen-arm match, so a change to 010's union groups itself instead of leaving a second
+    hand-written match, so a change to 010's union groups itself instead of leaving a second
     copy of that union's membership here -- and by the *type*, never by the ``reason`` text.
     """
     groups: dict[str, list[RefusedTuple]] = {}
@@ -345,15 +341,17 @@ def _walk(
             )
             if not isinstance(ways_out, tuple):
                 return ways_out
-            side = _empty_side(ways_in.candidates, ways_out)
-            if side is not None:
+            absent = _nothing_connects(
+                ways_in.candidates,
+                ways_out,
+                instrument_id=instrument_id,
+                stream_id=stream_id,
+                access=access,
+            )
+            if absent is not None:
                 empty.append(
                     PairYieldedNoCandidate(
-                        instrument_id=instrument_id,
-                        stream_id=stream_id,
-                        why=_nothing_connects(
-                            side, instrument_id=instrument_id, stream_id=stream_id, access=access
-                        ),
+                        instrument_id=instrument_id, stream_id=stream_id, why=absent
                     )
                 )
                 continue
@@ -394,69 +392,56 @@ def _ways_out(
         spendable=registries.spendable,
     )
     if isinstance(enumerated, CompositionRefused):
-        # Every exit refusal is about the question: the third case is inbound-only, and the
-        # first two are true of every pair at once.
-        return _about_the_question(enumerated) or _unexpected(enumerated)
+        # Every exit refusal is about the question. `ALREADY_ARRIVED` is constructed under
+        # `direction == "inbound"` only, so the two that remain are true of every pair at once.
+        return _question_refusal(enumerated)
     return tuple(exit_chain_of(candidate) for candidate in enumerated.candidates)
+
+
+def _question_refusal(refusal: CompositionRefused) -> QuestionDoesNotStandUp:
+    """``compose``'s words carried onto a whole-enumeration refusal. One construction site."""
+    return QuestionDoesNotStandUp(
+        refusal=refusal,
+        reason=(
+            "the whole enumeration is refused rather than any candidate: "
+            f"{refusal.reason} That is true of every pair at once, so a set built around it "
+            "would be shaped by the broken input rather than by the declarations."
+        ),
+    )
 
 
 def _about_the_question(refusal: CompositionRefused) -> QuestionDoesNotStandUp | None:
     """Whether ``compose`` refused about the *question* rather than about this one pair.
 
-    FR-014a: read off the record, never off its text. A bound admitting nothing and an exit with
-    nowhere declared to end are true of every pair at once, so enumerating the rest would report
-    a set shaped by a broken registry as though it were an answer. *The money is already where
-    it was wanted* is the opposite -- one pair, nothing missing -- and belongs in the
-    no-candidate column.
+    FR-014a: read off the record, never off its text. *The money is already where it was
+    wanted* is one pair with nothing missing, and belongs in the no-candidate column; the other
+    two are true of every pair at once, so enumerating the rest would report a set shaped by a
+    broken input as though it were an answer.
     """
     match refusal.case:
         case Unaskable.BOUND_ADMITS_NOTHING | Unaskable.NO_SPENDABLE_ENDPOINT:
-            return QuestionDoesNotStandUp(
-                refusal=refusal,
-                reason=(
-                    "the whole enumeration is refused rather than any candidate: "
-                    f"{refusal.reason} That is true of every pair at once, so a set built "
-                    "around it would be shaped by the broken input rather than by the "
-                    "declarations."
-                ),
-            )
+            return _question_refusal(refusal)
         case Unaskable.ALREADY_ARRIVED:
             return None
         case _:  # pragma: no cover -- mypy proves this unreachable
             assert_never(refusal.case)
 
 
-def _unexpected(refusal: CompositionRefused) -> QuestionDoesNotStandUp:
-    """An exit refusal that is not about the question, which no case of ``Unaskable`` produces.
-
-    ``ALREADY_ARRIVED`` is constructed under ``direction == "inbound"`` only, so this arm exists
-    to keep the *type* total without claiming the situation is reachable. It refuses the whole
-    enumeration rather than guessing which column the pair belonged in.
-    """
-    return QuestionDoesNotStandUp(
-        refusal=refusal,
-        reason=(
-            "the exit enumeration was refused for a reason that is not about the question: "
-            f"{refusal.reason} Which column the pair belongs in cannot be decided from here, so "
-            "the whole enumeration refuses rather than putting it in the likelier one."
-        ),
-    )
-
-
-def _empty_side(ways_in: Sequence[Candidate], ways_out: Sequence[ExitChain]) -> str | None:
-    """Which enumeration came back empty, in journey order, or ``None`` if both connect."""
-    if not ways_in:
-        return "route_in"
-    if not ways_out:
-        return "route_out"
-    return None
-
-
 def _nothing_connects(
-    side: str, *, instrument_id: str, stream_id: str, access: InstrumentAccess
-) -> NothingConnects:
-    """FR-013's reason, naming the venue whose corridor is missing so the remedy is obvious."""
-    if side == "route_in":
+    ways_in: Sequence[Candidate],
+    ways_out: Sequence[ExitChain],
+    *,
+    instrument_id: str,
+    stream_id: str,
+    access: InstrumentAccess,
+) -> NothingConnects | None:
+    """FR-013's reason where one side came back empty, or ``None`` if both connect.
+
+    The side is named because the remedies differ: a corridor into the buying venue, or one out
+    of the venue the proceeds land at. Reported in journey order, so a pair missing both is sent
+    to the first thing that has to exist.
+    """
+    if not ways_in:
         return NothingConnects(
             side="route_in",
             reason=(
@@ -467,16 +452,18 @@ def _nothing_connects(
                 "declaration rather than a different amount."
             ),
         )
-    return NothingConnects(
-        side="route_out",
-        reason=(
-            f"no declared exit route, within the bound, carries money from {access.proceeds_to!r} "
-            f"-- where {instrument_id!r} releases its proceeds -- to any declared spendable "
-            "endpoint. An asset that cannot be liquidated into spendable base currency is not "
-            "worth its stated value (Principle VI), so there is no candidate rather than a "
-            "candidate with an unpriced way out."
-        ),
-    )
+    if not ways_out:
+        return NothingConnects(
+            side="route_out",
+            reason=(
+                f"no declared exit route, within the bound, carries money from "
+                f"{access.proceeds_to!r} -- where {instrument_id!r} releases its proceeds -- to "
+                "any declared spendable endpoint. An asset that cannot be liquidated into "
+                "spendable base currency is not worth its stated value (Principle VI), so there "
+                "is no candidate rather than a candidate with an unpriced way out."
+            ),
+        )
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -649,10 +636,9 @@ def _sources_read(
     """Every declared table **enumeration itself** read, with the kind each ages under.
 
     FR-024. Two families: the legs of every route a candidate is built from, and the venue quote
-    of every access entry the walk considered. The instrument terms, the tax classes and the
-    fund liquidity tables are read by 010's ``evaluate`` and are marked on its outcomes, so
-    merging them here as well would be one fact in two places -- and would stop this mark saying
-    what *enumeration* rested on.
+    of every access entry the walk considered. What 010's ``evaluate`` reads is marked on its
+    outcomes, so merging those here as well would be one fact in two places -- and would stop
+    this mark saying what *enumeration* rested on.
     """
     read = [
         (leg.provenance, leg.kind_of_observation)
@@ -667,6 +653,6 @@ def _sources_read(
     return tuple(read)
 
 
-def _sorted_distinct(values: object) -> tuple[str, ...]:
+def _sorted_distinct(values: Iterable[str]) -> tuple[str, ...]:
     """The distinct strings an iterable yields, sorted -- the shape every tally field takes."""
-    return tuple(sorted(set(values)))  # type: ignore[call-overload]
+    return tuple(sorted(set(values)))
