@@ -2175,6 +2175,35 @@ citation exemption a belief needs without pretending to be a scenario document.
 """
 
 
+def _timing_by_jurisdiction(root: Path) -> dict[str, tuple[loader.TimingDeclaration, Path]]:
+    """Every ``data/tax/timing/<jurisdiction>.toml``, keyed by the jurisdiction it declares.
+
+    Hoisted because two entry points need it -- the assessment rules a tax year is assembled
+    from, and the official-rate series a taxation scheme's base is struck at -- and reading
+    the directory twice would let the duplicate-jurisdiction refusal exist in one of them and
+    not the other.
+
+    An empty directory is **not** refused here: whether a run can proceed without assessment
+    rules is the caller's question and they answer it differently.
+    """
+    declared: dict[str, tuple[loader.TimingDeclaration, Path]] = {}
+    for path in sorted((root / TAX_TIMING_DIR).glob("*.toml")):
+        timing = loader.timing_from_file(path)
+        if timing.jurisdiction_id in declared:
+            already = declared[timing.jurisdiction_id][1]
+            raise DeclarationError(
+                path,
+                f"{loader.TIMING_TABLE}.jurisdiction",
+                f"declares rules for {timing.jurisdiction_id!r}, which {already.name} already "
+                "declares. Two rule sets cannot govern one jurisdiction: whichever loaded "
+                "second would win by directory order, and every liability would rest on the "
+                "other one.",
+                f"merge {already.name} and {path.name}",
+            )
+        declared[timing.jurisdiction_id] = (timing, path)
+    return declared
+
+
 def tax_rules_from_data_root(
     root: Path, declarations: Declarations
 ) -> Mapping[str, AssessmentRules]:
@@ -2184,8 +2213,8 @@ def tax_rules_from_data_root(
     class references resolve against **the same** rate packs the run will charge with: reading
     the files twice would let a reference resolve here and fail at the charge, or the reverse.
     """
-    files = sorted((root / TAX_TIMING_DIR).glob("*.toml"))
-    if not files:
+    timing = _timing_by_jurisdiction(root)
+    if not timing:
         raise DeclarationError(
             root / TAX_TIMING_DIR,
             "",
@@ -2197,21 +2226,9 @@ def tax_rules_from_data_root(
         )
     rates = official_rates_from_data_root(root, _resolved_kinds(root / KINDS_FILE)[0])
     built: dict[str, AssessmentRules] = {}
-    declaring: dict[str, Path] = {}
-    for path in files:
-        declared = loader.timing_from_file(path)
-        if declared.jurisdiction_id in built:
-            raise DeclarationError(
-                path,
-                f"{loader.TIMING_TABLE}.jurisdiction",
-                f"declares rules for {declared.jurisdiction_id!r}, which "
-                f"{declaring[declared.jurisdiction_id].name} already declares. Two rule sets "
-                "cannot govern one jurisdiction: whichever loaded second would win by "
-                "directory order, and every liability would rest on the other one.",
-                f"merge {declaring[declared.jurisdiction_id].name} and {path.name}",
-            )
+    for jurisdiction, (declared, path) in timing.items():
         _check_timing_classes(path, declared, declarations)
-        built[declared.jurisdiction_id] = AssessmentRules(
+        built[jurisdiction] = AssessmentRules(
             jurisdiction_id=declared.jurisdiction_id,
             tax_currency=declared.tax_currency,
             official_rate=_official_rate_for(path, declared, rates),
@@ -2220,7 +2237,6 @@ def tax_rules_from_data_root(
             timing={rule.category_id: rule for rule in declared.timing},
             methods={standing.method: standing for standing in declared.methods},
         )
-        declaring[declared.jurisdiction_id] = path
     return built
 
 
@@ -2691,6 +2707,16 @@ class SchemeDeclarations:
     schemes: Mapping[str, TaxationScheme]
     """By their own declared id, never by file name or load order."""
 
+    official_rates: Mapping[str, OfficialRateSeries | None]
+    """The series each scheme's jurisdiction declares for its tax currency, by jurisdiction id.
+
+    Resolved here rather than left to the caller, because picking a series by hand is exactly
+    how a base comes to be struck from one the jurisdiction did not name -- which is the
+    refusal 011 already writes for the case, and which a caller cannot be relied on to avoid.
+    ``None`` where the jurisdiction names no series, which is a declared absence: a
+    foreign-currency charge under that scheme then refuses saying so.
+    """
+
     destinations: Mapping[tuple[str, str], CreditingDestination]
     """Keyed ``(scheme id, venue id)``. A missing key is not an error here: it is what
     ``core.tax.scheme.apply`` refuses on, naming the destination and the scheme."""
@@ -2709,6 +2735,8 @@ def schemes_from_data_root(root: Path, *, base_currency: Currency) -> SchemeDecl
     Sorted, so a run does not depend on the order a filesystem happens to return.
     """
     ramp = ramp_from_data_root(root, base_currency=base_currency)
+    timing = _timing_by_jurisdiction(root)
+    rates = official_rates_from_data_root(root, _resolved_kinds(root / KINDS_FILE)[0])
     schemes: dict[str, TaxationScheme] = {}
     scheme_files: dict[str, Path] = {}
     for path in sorted((root / SCHEMES_DIR).glob("*.toml")):
@@ -2724,8 +2752,20 @@ def schemes_from_data_root(root: Path, *, base_currency: Currency) -> SchemeDecl
                 "in the output to say which.",
                 f"give one of {scheme_files[declared.id].name} and {path.name} a distinct id",
             )
+        _check_tax_currency(declared, timing, path=path)
         schemes[declared.id] = declared
         scheme_files[declared.id] = path
+
+    official_rates = {
+        scheme.jurisdiction_id: (
+            _official_rate_for(
+                timing[scheme.jurisdiction_id][1], timing[scheme.jurisdiction_id][0], rates
+            )
+            if scheme.jurisdiction_id in timing
+            else None
+        )
+        for scheme in schemes.values()
+    }
 
     destinations: dict[tuple[str, str], CreditingDestination] = {}
     destination_files: dict[tuple[str, str], Path] = {}
@@ -2753,9 +2793,38 @@ def schemes_from_data_root(root: Path, *, base_currency: Currency) -> SchemeDecl
     return SchemeDeclarations(
         ramp=ramp,
         schemes=schemes,
+        official_rates=official_rates,
         destinations=destinations,
         scheme_files=scheme_files,
         destination_files=destination_files,
+    )
+
+
+def _check_tax_currency(
+    scheme: TaxationScheme,
+    timing: Mapping[str, tuple[loader.TimingDeclaration, Path]],
+    *,
+    path: Path,
+) -> None:
+    """A scheme assesses in the currency its jurisdiction assesses in, or it is refused.
+
+    Checked only where the jurisdiction declares timing rules at all: a scheme in a
+    jurisdiction with none has nothing to disagree with, and refusing it here would demand a
+    tax year nobody is assembling.
+    """
+    declared = timing.get(scheme.jurisdiction_id)
+    if declared is None or declared[0].tax_currency is scheme.tax_currency:
+        return
+    raise DeclarationError(
+        path,
+        f"{loader.SCHEME_TABLE}.tax_currency",
+        f"is {scheme.tax_currency.value} and jurisdiction {scheme.jurisdiction_id!r} assesses "
+        f"tax in {declared[0].tax_currency.value} ({declared[1].name}). A scheme striking its "
+        "base in a currency the jurisdiction does not assess in would consult the wrong "
+        "official-rate series -- or the right one in the wrong direction -- and every figure "
+        "would stay plausible.",
+        f'declare tax_currency = "{declared[0].tax_currency.value}", or move the scheme to a '
+        "jurisdiction that assesses in the one it names",
     )
 
 

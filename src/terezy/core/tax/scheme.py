@@ -417,10 +417,12 @@ def _struck(
                 series_id=None,
                 quotes=None,
                 reason=(
-                    f"jurisdiction {scheme.jurisdiction_id!r} declares no official-rate series, "
-                    f"so an amount in {amount.currency.value} has no base in "
-                    f"{scheme.tax_currency.value}. Declare a series quoting the pair and name it "
-                    "from the jurisdiction's timing declaration."
+                    f"no official-rate series was supplied for an amount in "
+                    f"{amount.currency.value} under scheme {scheme.id!r}, so it has no base in "
+                    f"{scheme.tax_currency.value}. The series a jurisdiction uses is the one "
+                    "its timing declaration names, resolved once and passed in; a caller that "
+                    "picked one itself would be striking a base from a series the "
+                    "jurisdiction did not name."
                 ),
             ),
             reason=_base_reason(scheme, amount, on_date),

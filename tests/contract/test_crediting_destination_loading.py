@@ -401,3 +401,37 @@ class TestTheShippedTable:
         assert "4113-IX" in citation
         assert "4015-IX" in citation
         assert "з 1 жовтня 2024 року" in citation
+
+
+class TestTheSeriesIsResolvedRatherThanChosenByACaller:
+    """The base is struck at the series the jurisdiction NAMES, and nobody picks one by hand.
+
+    Picking a series is exactly how a base comes to rest on one the jurisdiction did not name,
+    which 011 already writes a refusal for and which a caller cannot be relied on to avoid.
+    """
+
+    def test_the_shipped_scheme_resolves_the_series_its_jurisdiction_names(self) -> None:
+        declared = resolver.schemes_from_data_root(DATA_ROOT, base_currency=Currency.UAH)
+        series = declared.official_rates["ua"]
+        assert series is not None
+        assert series.id == "ua_nbu_usd"
+        assert series.pair == (Currency.UAH, Currency.USD)
+
+    def test_a_scheme_assessing_in_another_currency_than_its_jurisdiction_is_refused(
+        self, tmp_path: Path
+    ) -> None:
+        root = tmp_path / "data"
+        shutil.copytree(DATA_ROOT, root)
+        scheme = root / "tax" / "schemes" / "ua_fop_group_3.toml"
+        scheme.write_text(
+            scheme.read_text(encoding="utf-8").replace(
+                'tax_currency      = "UAH"', 'tax_currency      = "USD"', 1
+            ),
+            encoding="utf-8",
+        )
+        with pytest.raises(DeclarationError) as caught:
+            resolver.schemes_from_data_root(root, base_currency=Currency.UAH)
+
+        assert "tax_currency" in str(caught.value)
+        assert "UAH" in str(caught.value)
+        assert "ua.toml" in str(caught.value)
