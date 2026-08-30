@@ -103,7 +103,7 @@ def fund_plan(
     declared: FundDeclaration,
     *,
     exit_on: date | None = FUND_EXIT,
-    yield_point: ChosenPoint | None | Literal["low_end"] = LOW_END,
+    yield_point: ChosenPoint | Literal["low_end"] | None = LOW_END,
     liquidity_mode: str = "practice",
     buyback: str = "available",
 ) -> FundAssumptions:
