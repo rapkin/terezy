@@ -180,7 +180,8 @@ currency        = "UAH"
 amount          = 0.0
 cadence         = "monthly"
 arrives_at      = "monobank_uah"
-income_tax_rate_pct = 0.0
+credited_to     = "monobank_uah"
+tax_scheme      = "ua_fop_group_3_non_vat"   # optional
 
   [stream.indexation]
   policy   = "cpi"
@@ -196,23 +197,27 @@ a declaration the engine ignores. Named in the spec's Out of scope alongside F1.
 owner's actual monthly figures have not been stated. A zero produces a zero result rather
 than a made-up one.
 
-`income_tax_rate_pct` may be omitted — and omitting it means **the owner has not stated
-one**, which is different from zero. Since there are no defaults, the field is optional in
-the schema and `None` in the core, and the output says "no income-tax rate declared" rather
-than showing a net figure that quietly equals the gross.
+`tax_scheme` may be omitted — and omitting it means **the owner has not named one**, which is
+different from a scheme that charges nothing. Since there are no defaults, the field is
+optional in the schema and `None` in the core, and the output says "no tax treatment
+declared" rather than showing a net figure that quietly equals the gross.
+
+`arrives_at` and `credited_to` are **both required and neither is derived from the other**
+(012 FR-024a). `arrives_at` is the routing origin — the venue every funding route for this
+stream starts from. `credited_to` is the tax event's location, read to decide which reading
+of the law applies. For the owner's contract income they hold different values.
 
 Streams carry no `source`/`verified_on`: an owner's own salary is not an observation needing
 a citation, it is a statement of fact by the only person who can make it. This is the same
 exemption `data/scenarios/` already has.
 
-⚙ **The exemption covers `income_tax_rate_pct` too, and that needs saying rather than
-inheriting silently.** It looks like a tax rate, and every other tax rate in this project
-must carry a citation (Principle I). It is exempt because it is not a *modelled* rate: §4.2
-puts the owner's own income-tax position outside the simulator entirely — the tool takes
-net-of-income-tax amounts as input, and this field exists only so the deployable figure is
-not overstated. A rate the engine *applies to a taxable event* would need a source; a rate
-the owner states about his own payslip does not. If that ever changes, this sentence is the
-thing to revisit.
+⚙ **The exemption used to cover a tax RATE, and feature 012 removed the rate rather than the
+exemption.** `income_tax_rate_pct` was a public legal fact about the Republic sitting,
+uncited, in a file whose exemption is argued for the owner's statements about himself — and
+no gate looked at it. 012 retired the field: what a stream declares now is *which regime he
+is in*, and the regime's rates live in `data/tax/schemes/` with their citations, where the
+provenance gate reads them (012 FR-002, FR-015). The exemption is unchanged and now covers
+only what the argument above actually reaches.
 
 ## Enforced rules
 

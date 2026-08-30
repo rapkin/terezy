@@ -2399,9 +2399,12 @@ class SchemeTable(BaseModel):
     """Which of the law's alternative rate sets this file declares (012 FR-002).
 
     Named even where a scheme has one variant in this repository, so declaring the second is
-    a file rather than a schema change the day its rate is cited. The variant the owner is in
-    is a fact about him and lives in per-owner data; the rates of every variant are public
-    legal facts and live here.
+    a file rather than a schema change the day its rate is cited.
+
+    **A variant is one scheme per file, not a second dimension inside one.** Which variant
+    the owner is in is a fact about him, and he states it by naming *this scheme* on his
+    stream -- so it is declared once, in per-owner data, and cannot disagree with itself. The
+    rates of every variant are public legal facts and live here, cited.
     """
 
     reporting_cadence: str
