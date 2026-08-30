@@ -76,9 +76,10 @@ class TestARunPlansOrderIsItsPositionInTheCallersSequence:
     def _two_plans(first_exit: date, second_exit: date) -> dict[str, tuple[InstrumentPlan, ...]]:
         registries = fixtures.shipped()
         plans = dict(fixtures.one_plan_each(registries))
+        declared = registries.funds[REIT]
         plans[REIT] = (
-            fixtures.fund_plan(exit_on=first_exit),
-            fixtures.fund_plan(exit_on=second_exit),
+            fixtures.fund_plan(declared, exit_on=first_exit),
+            fixtures.fund_plan(declared, exit_on=second_exit),
         )
         return plans
 

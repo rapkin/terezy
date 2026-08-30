@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
 from terezy.core.decision.candidates import enumerate_candidates
-from terezy.core.instruments.fund import ChosenPoint
+from terezy.core.instruments.fund import ChosenPoint, FundDeclaration
 from terezy.core.instruments.interface import Assumptions, DateRange
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
@@ -49,11 +49,16 @@ USD: Final = Currency.USD
 SALARY: Final = "salary_uah"
 CONTRACT: Final = "contract_usd"
 
-OUTLAY_ON: Final = date(2026, 1, 14)
-"""When the money leaves. One day before issue A's issue date, which the shipped domestic
-route's one-day latency then lands on."""
+OUTLAY_ON: Final = date(2026, 4, 1)
+"""When the money leaves.
 
-HORIZON_END: Final = date(2028, 3, 31)
+On or after every shipped instrument's issue date and schedule start, so a bond bought here is
+bought into terms that are already complete. An earlier outlay refuses most of the registry as
+``InstrumentRefused`` before anything else can be exercised, which would leave a battery
+measuring the date rather than what it planted.
+"""
+
+HORIZON_END: Final = date(2030, 6, 30)
 AS_OF: Final = date(2026, 8, 23)
 HORIZON: Final = DateRange(start=OUTLAY_ON, end=HORIZON_END)
 
@@ -67,20 +72,29 @@ FUND_EXIT: Final = date(2028, 1, 17)
 """When a fund holding is exited: the date issue A's principal comes back, so the tuples are
 compared over one span as well as over one horizon."""
 
-YIELD_POINT: Final = ChosenPoint(
-    rate=0.25,
-    is_assumption=True,
-    rationale="TEST FIXTURE -- the low end of a fund's own stated range, chosen so the figure "
-    "is the least flattering one the range admits rather than a midpoint nobody stated.",
+HOLD_TO_MATURITY: Final = Assumptions(consumption_method="fifo", coupon_policy="hold_cash")
+
+RATIONALE: Final = (
+    "TEST FIXTURE -- the low end of this fund's own stated range, so the figure is the least "
+    "flattering one the range admits rather than a midpoint nobody stated."
 )
 
-HOLD_TO_MATURITY: Final = Assumptions(consumption_method="fifo", coupon_policy="hold_cash")
+
+def low_end(declared: FundDeclaration) -> ChosenPoint:
+    """The bottom of one fund's own declared range.
+
+    Read from the declaration rather than written out, so no fixture point can wander outside
+    the range its fund states -- which refuses as ``InstrumentRefused`` and would give a suite
+    a drop it never planted.
+    """
+    return ChosenPoint(rate=declared.declared_yield.low, is_assumption=True, rationale=RATIONALE)
 
 
 def fund_plan(
+    declared: FundDeclaration,
     *,
     exit_on: date | None = FUND_EXIT,
-    yield_point: ChosenPoint | None = YIELD_POINT,
+    yield_point: ChosenPoint | None = None,
     liquidity_mode: str = "practice",
     buyback: str = "available",
 ) -> FundAssumptions:
@@ -89,7 +103,7 @@ def fund_plan(
         liquidity_mode=liquidity_mode,  # type: ignore[arg-type]
         buyback=buyback,  # type: ignore[arg-type]
         exit_on=exit_on,
-        yield_point=yield_point,
+        yield_point=low_end(declared) if yield_point is None else yield_point,
         exchange_rate=None,
         consumption_method="fifo",
     )
@@ -113,7 +127,11 @@ def one_plan_each(registries: Registries) -> dict[str, tuple[InstrumentPlan, ...
     none of them wants by accident.
     """
     return {
-        instrument_id: (fund_plan() if instrument_id in registries.funds else HOLD_TO_MATURITY,)
+        instrument_id: (
+            (fund_plan(registries.funds[instrument_id]),)
+            if instrument_id in registries.funds
+            else (HOLD_TO_MATURITY,)
+        )
         for instrument_id in sorted(registries.access)
     }
 

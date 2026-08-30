@@ -7,13 +7,13 @@ and a sentence can:
     candidates enumerated = evaluated        + dropped
 
 The arithmetic on the shipped registry, worked on 2026-08-30 under this module's own question
-(an outlay on 2026-01-14, a horizon ending 2028-03-31, one plan per instrument):
+(an outlay on 2026-04-01, a horizon ending 2030-06-30, one plan per instrument):
 
     18 pairs considered  =   9 pairs enumerated  +  9 pairs yielding no candidate
-     9 candidates        =   4 evaluated         +  5 dropped
+     9 candidates        =   7 evaluated         +  2 dropped
 
 The **second** line is the one that moves with the question. Refusals across 010's union turn on
-the amount, on the horizon and on `as_of`, so 4 and 5 are facts about *this* question rather
+the amount, on the horizon and on `as_of`, so 7 and 2 are facts about *this* question rather
 than about the registry -- which is why FR-012 puts the whole question on the record beside
 every count, and why the identities are asserted against the set rather than against the
 numbers above. Both are derived here; the literals are the reader's check on the derivation.
@@ -63,8 +63,8 @@ class TestTheThreePopulationsPartitionEverythingConsidered:
 
     def test_candidates_enumerated_equals_evaluated_plus_dropped(self) -> None:
         result = _survey()
-        assert len(evaluated(result.comparison)) == 4
-        assert len(dropped(result.comparison)) == 5
+        assert len(evaluated(result.comparison)) == 7
+        assert len(dropped(result.comparison)) == 2
         assert len(evaluated(result.comparison)) + len(dropped(result.comparison)) == len(
             result.enumerated.candidates
         )
