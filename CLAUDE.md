@@ -92,9 +92,10 @@ uv run ruff check . && uv run ruff format .
 uv run mypy                                   # strict
 uv run lint-imports                           # architecture boundaries
 uv run python scripts/check_provenance.py     # citations on curated data
+uv run python scripts/check_prose_budget.py   # prose share ratchet (not in CI)
 ```
 
-All are blocking in CI. Run them before claiming a change is done.
+Every one but the last is blocking in CI. Run them all before claiming a change is done.
 
 ## Non-negotiables, in the form you will actually hit them
 
@@ -164,33 +165,26 @@ the test path. That file is how we know what is actually covered.
 
 ## Documentation is part of the feature
 
-An undocumented formula is an incomplete feature. Every metric carries a plain-language
-definition; every tax figure links to its rule, source and verification date;
-`docs/METHODOLOGY.md` is updated in the same change as the formula it describes.
-
-**A comment describes its own subject and nothing else.** This is the rule that keeps the
-rest honest, and it is not a style preference — it is what stops prose going stale. A
-docstring explaining why *this* function does what it does can only become false when the
-function changes. A docstring claiming what the registry contains, what another module does,
-or how many cases exist elsewhere becomes false the moment anything else moves, and nothing
-checks it. **A claim about behaviour outside the thing you are annotating is a test, or it is
-not written.**
-
-On 2026-08-23 one day's reviews found seven pieces of prose that had become false: a count
-that said three where its own list said four, "a fund implements `Instrument`" over a dead
-method, "a declared name can never forge a label field" over an open hole, a docstring
-teaching a rule the code never had, and a section of `METHODOLOGY.md` silently reverted by a
-merge. Every one was caught by expensive review. Half of `core/` is prose; that is where the
-staleness lives.
+The prose discipline is constitutional — read it there rather than here. What it means in
+practice:
 
 **Prose earns its place by preventing a named defect.** A decision taken against an obvious
 alternative, a trap with a name, a gap stated with its date. Restating what the code says
-earns nothing, and restating the constitution earns less — it is already written down, and
-the copy is what drifts.
+earns nothing, and restating the constitution earns less: the copy is what drifts.
 
-**Prefer the mechanical form.** Where a claim is worth making, it is usually worth asserting:
-`scripts/check_methodology_refs.py`, a scan that pins how many places construct a record, an
-`emitted == applied` equality. A check cannot go stale silently; a sentence can.
+**Prefer the mechanical form.** A claim worth making is usually worth asserting — a scan
+that pins how many places construct a record, an `emitted == applied` equality. A check
+cannot go stale silently; a sentence can. That is why an enumeration of things declared
+elsewhere is a check, or it is not written.
+
+**`⚙` is retired.** Nothing reads it and nothing defines it; measured on 2026-08-30, the
+blocks it introduced ran three times the length of ordinary prose and were five times as
+likely to be changelog. Do not add one. Where you touch one, keep the decision it carries
+and drop the marker and the history.
+
+**Run `uv run python scripts/check_prose_budget.py`** before claiming a change is done. It
+is a ratchet, not a cap: it fails only when a tree's prose share rises above the ceiling
+recorded in the script, so deleting is never required and adding prose faster than code is.
 
 Reviews treat prose that makes an unverifiable claim about elsewhere as a finding, at the
 same weight as a guard whose message is false — because it is the same defect.

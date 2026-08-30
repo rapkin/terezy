@@ -1,6 +1,17 @@
 <!--
 Sync Impact Report
 ==================
+Version change: 1.2.0 → 1.3.0 (2026-08-30)
+Rationale: MINOR — guidance materially expanded. "Documentation is part of the feature"
+gains a prose discipline: a comment states a contract or an inferable-only reason, no
+comment narrates a change, a prose enumeration of things declared elsewhere is a check or
+it is not written, and prose volume is ratcheted by scripts/check_prose_budget.py. Added
+because the restraining rules existed only in CLAUDE.md, which is subordinate, while this
+document carried only the obligation to document — and measurement on 2026-08-30 found
+32.8% of src/ is prose, a third of it restating code, another module, or this file.
+Invalidates no spec, plan or test; the `⚙` convention it retires is enforced by nothing.
+No principle was removed or redefined.
+
 Version change: 1.1.0 → 1.2.0 (2026-08-24)
 Rationale: MINOR — guidance materially expanded. Principle V gains "a golden file is
 evidence, never a freeze": a golden's authority is over results, and its recorded input
@@ -290,10 +301,27 @@ while an object invites hidden state.
 `abc` sits in the core's forbidden imports in `.importlinter`, so the no-hierarchies rule
 is mechanically enforced rather than merely stated.
 
-**Documentation is part of the feature.** An undocumented formula is an incomplete
-feature. Every metric carries a plain-language definition; every tax figure links to
-its rule, its source and its verification date; `docs/METHODOLOGY.md` is updated in
-the same change as the formula it describes.
+**Documentation is part of the feature, and it is a cost.** An undocumented formula is
+an incomplete feature; so is one buried in prose nobody can afford to read. Every metric
+carries a plain-language definition; every tax figure links to its rule, its source and
+its verification date; `docs/METHODOLOGY.md` is updated in the same change as the formula
+it describes.
+
+Beyond that, prose is held to the same standard as code:
+
+- **A comment states its subject's contract, or the reason for a choice a reader could
+  not infer. Nothing else.** Not what the next lines plainly say, not what another module
+  does, not what this document already says.
+- **No comment narrates a change.** Not what a previous version did, not which review
+  found what, not what a paragraph used to say. The commit message holds that, and holds
+  it without being read as a claim about the present.
+- **A prose enumeration of things declared elsewhere is a check, or it is not written.**
+  A sentence counting cases, listing kinds, or naming what a registry contains is false
+  the moment anything else moves, and nothing sees it.
+- **Prose volume is ratcheted, not capped.** `scripts/check_prose_budget.py` records the
+  comment-and-docstring share of each source tree and fails when it rises. Deleting is
+  never required; adding prose faster than code is. Raising a ceiling is a deliberate
+  edit, and the commit message says what the added prose prevents.
 
 **Defect severity.** Wrong numbers, silently-swallowed failures, and lost provenance
 are the top severity class regardless of how small the code change is. A silent
@@ -343,4 +371,4 @@ skipped, marked expected-to-fail, or deleted without an amendment.
 **Runtime guidance.** Day-to-day development guidance for coding agents lives in
 `CLAUDE.md`, which is subordinate to this document and may not contradict it.
 
-**Version**: 1.2.0 | **Ratified**: 2026-08-21 | **Last Amended**: 2026-08-24
+**Version**: 1.3.0 | **Ratified**: 2026-08-21 | **Last Amended**: 2026-08-30
