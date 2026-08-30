@@ -40,8 +40,6 @@ fixed in the engine).
 A :class:`CpiSeries` declares what it measures -- the economy, the index, the periodicity,
 the base -- so a second series for a second country is a data-only addition that loads and is
 addressable (FR-002, G13). Nothing in this module or above it holds "the" series.
-
-**No clock, no I/O, no network.** Every date is an argument; ``as_of`` is an input to the run.
 """
 
 from __future__ import annotations
@@ -342,8 +340,6 @@ def staleness_of_observations(
     forty-five days is the re-fetch prompt. *"Does the series reach the end of my window?"* is
     :func:`coverage`. Both can fire on one run, they mean different things, and reporting one
     as the other would make a re-fetch look like a data gap or the reverse.
-
-    ``as_of`` is an input to the run and is recorded in the manifest. There is no clock here.
     """
     return staleness.merge_all(
         staleness.staleness_of(observation.provenance, kinds, kind=observation.kind, as_of=as_of)

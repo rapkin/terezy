@@ -1,12 +1,10 @@
 """The ``Instrument`` plugin interface: function signatures gathered into a record.
 
-One of the four plugin interfaces permitted by constitution Principle II. Per owner
-decision D-E it is a **set of function signatures**, not a class: there is no base class
-to inherit, no protocol to implement, and nothing to construct. An instrument kind is a
-frozen record of three functions, and dispatch is a mapping
+One of the four plugin interfaces permitted by constitution Principle II. An instrument
+kind is a frozen record of three functions, and dispatch is a mapping
 (``terezy.core.instruments.registry``).
 
-⚙ **What this interface covers is a projection that produces a stream of ledger events.**
+**What this interface covers is a projection that produces a stream of ledger events.**
 That is not every declared instrument: a collective-investment fund
 (``terezy.core.instruments.fund``) is a declared kind whose projection returns a result
 record instead -- and, for a fund stating a range, two of them. It is therefore not in
@@ -36,10 +34,6 @@ declaration in the holding -- which crosses the boundary above -- or to pass it.
 passed. The same applies to ``tax_classes`` and ``constraints``, which the contract wrote
 as zero-argument functions; a module of free functions has nothing to close over, so the
 declaration is their argument too.
-
-**Purity is part of the interface.** Every function here is a pure function of its
-arguments: no I/O, no clock, no randomness. Called twice with equal arguments it returns
-equal results, which is what makes determinism (C4) achievable at all.
 """
 
 from __future__ import annotations
@@ -101,10 +95,10 @@ class BondTerms:
 
 
 # ---------------------------------------------------------------------------
-# 013-enumerated-schedule: the second thing a declaration can say about a bond
+# The second thing a declaration can say about a bond
 # ---------------------------------------------------------------------------
 #
-# ⚙ **Two epistemic situations, not two encodings of one.** `BondTerms` says *I know this
+# **Two epistemic situations, not two encodings of one.** `BondTerms` says *I know this
 # issue's full terms*, and every figure derived from it is checkable on paper against the
 # contract. `EnumeratedTerms` says *I am buying a stream of dated payments on the secondary
 # market; the issue's history is neither known to me nor relevant to what I will receive*.
@@ -233,7 +227,7 @@ class EnumeratedTerms:
     that would otherwise be needed: the yield would then disagree with the schedule it was
     computed from.
 
-    ⚙ **It is an input to no figure describing the instrument's own terms** (FR-003b) -- not
+    **It is an input to no figure describing the instrument's own terms** (FR-003b) -- not
     an amount, and **not a rate**. The boundary is *return figures versus issue terms*, and
     the difference is the whole door: a day count plus one coupon amount plus the interval
     between two coupons yields a **coupon rate**, and a coupon rate plus the spacing yields
@@ -248,12 +242,12 @@ class EnumeratedTerms:
     Ordering is settled at transcription -- the same declared human step that turns kopecks
     into hryvnia -- and the loader neither sorts nor accepts an unordered list (FR-006).
 
-    ⚙ **An observation about the source, not about the money**, and the one that silently
+    **An observation about the source, not about the money**, and the one that silently
     disappears: that an issuer publishes a repayment of principal after a coupon dated later
     than it is a fact about how the endpoint reports, and sorting the list is precisely the
     act that would delete it.
 
-    ⚙ **Its reach is the dates, and that is a stated limit rather than the whole of what a
+    **Its reach is the dates, and that is a stated limit rather than the whole of what a
     source can do** (recorded 2026-08-30). Two payments of different kinds on one date are
     indistinguishable here, so a source that published *those two* the other way round
     records nothing: the declared order would equal the ascending one and the loader refuses
@@ -316,7 +310,7 @@ class InstrumentDeclaration:
     terms: BondTerms | EnumeratedTerms
     """What this declaration says about the paper -- in one of the two forms it can say it.
 
-    ⚙ **A union, and the union is the mechanism** (FR-002). Code reading a generative-only
+    **A union, and the union is the mechanism** (FR-002). Code reading a generative-only
     term cannot type-check against a declaration that states none, so `mypy --strict` is what
     enumerates the sites that must change rather than a reviewer noticing. Which form a file
     is in is settled by :attr:`instrument_class`, the one dispatch key this record permits;

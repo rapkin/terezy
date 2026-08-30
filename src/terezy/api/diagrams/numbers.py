@@ -1,7 +1,7 @@
 """**The** rule for putting a number on a diagram. There is one, and this is it.
 
-FR-022, added on external review. The review found a gap that had been invisible because it
-was a gap in a *definition* rather than in behaviour: results carry ``float``, this project's
+FR-022, and the gap it closes was invisible because it was a gap in a *definition* rather
+than in behaviour: results carry ``float``, this project's
 canonical float form is hexadecimal (``METHODOLOGY`` §12.2, chosen so determinism means
 bit-identity), and no human-readable decimal rendering rule existed anywhere. So SC-006's
 "every figure on a diagram equals the input's figure" compared diagram text against a form

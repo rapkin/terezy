@@ -1,16 +1,6 @@
 """Nominal and real rates as unrelated types, so one can never stand in for the other.
 
-FR-022: *the hurdle-rate figure MUST be reported in nominal terms in this feature, and
-MUST state on its face that it is nominal and excludes inflation. The result structure
-MUST carry a defined, currently-unpopulated place for the corresponding
-inflation-adjusted figure... The system MUST NOT present a nominal figure as though it
-were a real one.*
-
-⚙ **Feature 007 populated that place, and the last sentence is the one that did not
-change.** The nominal figures are still nominal and still say so; what is new is that the
-reserved slot now holds two real figures beside them -- one deflated by declared
-observations, one by a declared assumption -- and that the two may never be mixed into one
-number or mistaken for the nominal ones.
+FR-022, FR-010, FR-011: a nominal figure may never be presented as a real one.
 
 **These three records are not a hierarchy, and that is the entire design** (research.md
 D4). ``NominalRate`` and ``RealRate`` share no base class and no protocol, so assigning
@@ -26,11 +16,7 @@ three very different claims about inflation. A single ``Rate`` with a
 wrong string.
 
 **Why this matters more than it looks.** A nominal 15.5% against double-digit inflation
-is a materially different proposition from a real 15.5%. Feature 001 left the gap open on
-purpose and said so on the output's face rather than implying otherwise; feature 007
-closes it, and the shape of these types is what carried the promise across the two: the
-slot's *type* changed occupant without the result changing shape, and a nominal figure
-still cannot be assigned into it.
+is a materially different proposition from a real 15.5%.
 
 A **nominal** rate carries a value and nothing else -- no provenance field. It is a
 *derived* figure, and the union of its inputs' provenance is carried by the result record
@@ -38,7 +24,7 @@ that holds it (``HurdleRate.provenance``), which is also the level at which a re
 the question. Duplicating the mark on every intermediate would create a second place for
 it to disagree with itself.
 
-⚙ **The real rate is the one exception, added by feature 007, and the exception is the
+**The real rate is the one exception, and the exception is the
 point** (007 FR-013). A real figure rests on inputs the holding does not have: every CPI
 observation that deflated it, or a declared inflation assumption. Those sources are not in
 ``HurdleRate.provenance`` and must not be put there -- doing so would make the *nominal*
@@ -98,13 +84,7 @@ class NominalRate:
 class RealRate:
     """An annualised rate in real terms: purchasing power, net of inflation.
 
-    Unrelated to :class:`NominalRate` by design -- no shared base class, no shared protocol
-    -- so assigning one into the other's slot is a mypy strict error rather than a bug
-    somebody has to notice. See the module docstring.
-
-    The fields beyond ``value`` make a real figure self-describing, as FR-010 and FR-011
-    require: what it rests on, what it is real against, over what span, and whose sources it
-    inherits -- each answerable without reference to where the figure was found.
+    Unrelated to :class:`NominalRate` by design. See the module docstring.
 
     Keyword-only, because ``value`` and ``basis`` are now neighbours and a positional
     construction would let a caller put a rate where a basis belongs the day the field order
@@ -195,10 +175,8 @@ class RealTermsUnavailable:
     reason: str
     """Why no real figure is available, in the output's own words.
 
-    ⚙ **Specific since feature 007.** Feature 001 carried one sentence here for every case,
-    because there was only one case. FR-012 replaces it: the reason names the uncovered
-    months, the absent series, the absent nominal figure, or the absent assumption -- because
-    a refusal that names what is missing is an instruction, and one that does not is a shrug.
-    The sentences are built by the named functions in ``core.results.hurdle``, so every result
-    says it the same way and none of them can improvise.
+    The reason names the uncovered months, the absent series, the absent nominal figure, or
+    the absent assumption (FR-012) -- because a refusal that names what is missing is an
+    instruction, and one that does not is a shrug. The sentences are built by named functions
+    in ``core.results.hurdle``, so none of them can improvise.
     """

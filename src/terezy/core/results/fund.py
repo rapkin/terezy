@@ -1,4 +1,4 @@
-"""What one fund holding produced, and the six ways a run can honestly produce nothing.
+"""What one fund holding produced, and the ways a run can honestly produce nothing.
 
 The result shape for :mod:`terezy.core.instruments.fund`. It exists for one reason beyond
 recording amounts: **the two-class split has to be visible**. A projection that taxed a
@@ -6,10 +6,9 @@ distribution at 14% and a redemption at 23% and then reported one total would be
 the ledger and useless to the reader, which is what FR-007's per-class subtotals are for
 (research.md D4).
 
-**Every figure here is read off the ledger**, exactly as ``results.project`` does: the
-events are folded, the charges are computed against what the fold realised, the charges are
-woven back in, and the whole thing is folded again. Nothing is read off the instrument's own
-arithmetic, because a figure that came into existence twice can disagree with itself.
+**Every figure here is read off the ledger**, through the same two folds
+``results.project`` describes. Nothing is read off the instrument's own arithmetic, because a
+figure that came into existence twice can disagree with itself.
 
 **No statistical metric, and no field one could sit in.** Both Inzhur funds are
 assumption-driven, so :func:`statistical_metric` returns a typed refusal and there is
@@ -22,7 +21,7 @@ inside it, the result is a :class:`RangeProjection` -- two complete projections,
 end -- rather than one figure at a midpoint nobody declared (research.md D11). There is no
 midpoint helper in this module or in any other.
 
-**Six typed refusals**, none of them an exception. Each carries the reason, and the reason
+Every refusal is typed, none of them an exception. Each carries the reason, and the reason
 reaches the output.
 """
 
@@ -200,11 +199,10 @@ class AwaitingVerification:
     searched_on: date | None
     """When the document was searched, or ``None`` where the declaration records no task.
 
-    ⚙ ``None`` rather than a stand-in. This field used to fall back to the fund's
-    termination date when no matching :class:`~terezy.core.instruments.fund.VerificationTask`
-    was declared, which put a fabricated date in an audit field — the date would have read
-    as "somebody looked on this day" when nobody had. A missing task is itself a defect in
-    the declaration, and the refusal now says so instead of dressing it up.
+    ``None`` rather than a stand-in. Falling back to the fund's termination date when no
+    matching :class:`~terezy.core.instruments.fund.VerificationTask` is declared would put a
+    fabricated date in an audit field, reading as "somebody looked on this day" when nobody
+    had. A missing task is itself a defect in the declaration, and the refusal says so.
     """
 
     reason: str
@@ -218,7 +216,7 @@ FundRefusal = (
     | AwaitingVerification
     | RateUndeclaredBefore
 )
-"""The six ways a fund run honestly produces no figure. Match exhaustively."""
+"""Every way a fund run honestly produces no figure. Match exhaustively."""
 
 
 # ---------------------------------------------------------------------------
@@ -1071,12 +1069,11 @@ def _interleave(
 def _tax_event(taxed: Event, charge: TaxCharge, *, sequence: int) -> Event:
     """The ledger line for one charge: an assessment recorded, and no cash moved.
 
-    ⚙ **Feature 009 took the cash out of this line**, which is where defect B5 actually bit:
-    a fund's classes charge real rates, so this line really did deduct tax from the account on
-    the day of the payout (FR-001). The amount is now
-    :func:`terezy.core.tax.year.memo_amount` -- the charge's own money at no magnitude, so the
-    rate entry's citation still travels with it -- and the liability leaves cash as a
-    ``TAX_PAYMENT`` later.
+    **No cash moves on this line**, which is where defect B5 bit: a fund's classes charge real
+    rates, so deducting tax from the account on the day of the payout is a live risk here
+    (FR-001). The amount is :func:`terezy.core.tax.year.memo_amount` -- the charge's own money
+    at no magnitude, so the rate entry's citation still travels with it -- and the liability
+    leaves cash as a ``TAX_PAYMENT`` later.
 
     Every tax figure this projection reports is read off the ``TaxCharge`` records rather than
     off a balance, so what moves is the **cash**, which now holds the gross until the tax is
@@ -1165,9 +1162,9 @@ def _assemble(
 def _net_proceeds(state: LedgerState, total_tax: Money, currency: Currency) -> Money:
     """Every inflow less every outflow **less the tax assessed**: what the holding returned.
 
-    ⚙ **The tax is subtracted explicitly since feature 009**: a charge no longer debits the
-    account on the day the income arrived, so summing the events alone would turn this field
-    into a pre-tax figure while it still called itself after tax -- in the field feeding
+    **The tax is subtracted explicitly**: a charge does not debit the account on the day the
+    income arrived, so summing the events alone would turn this field into a pre-tax figure
+    while it still called itself after tax -- in the field feeding
     :func:`beside_hurdle`, where a taxed fund would gain against an exempt bond overnight.
 
     **An outcome, not a cash timeline.** It states what the holding returns once its tax is

@@ -26,9 +26,6 @@ available here is reinvestment, which is exactly the number FR-025 forbids inven
 :class:`NoExitTermsDeclared` is the instrument's own way out being unavailable. They call for
 different actions -- declare a route, versus wait for termination or accept the discount --
 so a reader must be able to tell them apart without reading prose (FR-008).
-
-Frozen records, free functions, tagged unions matched with ``match``. Formatting is not a
-result: no percent signs, no currency symbols, no rounding for display.
 """
 
 from __future__ import annotations
@@ -116,7 +113,7 @@ does not fill is a gap nothing else catches.
 class PartContribution:
     """What one part of the round trip contributed, and which call produced it.
 
-    **Never summed across parts.** The six are in three different currencies in the general
+    **Never summed across parts.** They are in three different currencies in the general
     case -- the way in charges in the stream's, the instrument lives in its own, the way out
     delivers in the endpoint's -- and adding them would be the currency conflation Principle
     VI puts at top severity. They are reported side by side so a reader can see which term
@@ -125,7 +122,7 @@ class PartContribution:
     """
 
     part: Part
-    """Which of the six."""
+    """Which part charged."""
 
     amount: Money
     """Signed as the ledger signs things: negative for money leaving, positive for money
@@ -300,7 +297,8 @@ class TupleOutcome:
     """
 
     parts: tuple[PartContribution, ...]
-    """Each term's contribution, separately (FR-005). Six entries, in journey order."""
+    """Each term's contribution, separately (FR-005). One entry per :data:`Part`, in journey
+    order."""
 
     arrivals: tuple[Arrival, ...]
     """Every dated amount that reached a spendable endpoint, in date order.
@@ -425,7 +423,7 @@ an instrument, an entry cost, a tax treatment. None of them is declared, and inv
 them is the number this feature is most likely to reach for (research.md D4). A second member
 arrives with the declaration that gives it something to mean.
 
-⚙ **It changes no figure, and that is worth stating rather than hiding.** The rate is an
+**It changes no figure, and that is worth stating rather than hiding.** The rate is an
 internal rate of return over dated flows, and cash earns nothing, so holding proceeds from
 termination to the horizon moves neither an arrival nor a date. The assumption is still
 recorded on every outcome that rests on it, because *reinvest* would move both -- and a
@@ -489,7 +487,7 @@ class RateNotComparable:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class DeclarationMissing:
-    """One of the tuple's four parts has no declaration, and the join will not assume one.
+    """One of the tuple's parts has no declaration, and the join will not assume one.
 
     FR-006. Never an outcome computed with the missing part at zero, free or instantaneous:
     those are the three flattering defaults, and a comparison built on any of them recommends
@@ -497,7 +495,7 @@ class DeclarationMissing:
     """
 
     part: Literal["instrument", "access", "route_in", "route_out", "tax_class"]
-    """Which of the four parts the declaration belongs to."""
+    """Which part the declaration belongs to."""
 
     what: str
     """The declaration that is missing, named so the remedy is a file rather than a search."""
@@ -522,7 +520,7 @@ class SeamDoesNotChain:
     """
 
     seam: Literal["route_in_to_purchase", "proceeds_to_route_out"]
-    """Which of the two seams failed."""
+    """Which seam failed."""
 
     left: str
     """Where the money is, as ``venue/currency`` -- the end of the way in, or where the
@@ -596,11 +594,9 @@ class RouteInCapExceeded:
     nothing, and it is temporary by construction: when a planning feature brings staggered
     entry this becomes a split rather than something to unwind.
 
-    ⚙ **What it replaces is worse than a wrong refusal.** Before this record existed the join
-    read ``RampCost.ceiling`` nowhere at all: a 5 000.00 monthly cap against a 10 000.00 outlay
-    produced a complete outcome that bought ten units and reported 13 100.00 coming home, with
-    no refusal, no fallback line and no binding constraint named anywhere -- the silent
-    execution of an infeasible plan that Principle VI puts at the highest severity.
+    Without it a monthly cap below the outlay is read nowhere at all, and the join returns a
+    complete outcome buying more units than the rail will carry -- the silent execution of an
+    infeasible plan that Principle VI puts at the highest severity.
     """
 
     path: Candidate
@@ -630,7 +626,7 @@ class WayOutCapExceeded:
     the inbound case. Only this record can say **which release** could not go home, which is
     the first thing a reader needs and the thing the inbound record has no field for.
 
-    ⚙ **It checks one movement against the ceiling, not a month's worth against it.** Several
+    **It checks one movement against the ceiling, not a month's worth against it.** Several
     releases can fall in one month and share one rail's allowance; adding them up is the
     capacity accumulator's job (FR-012, FR-015), and a tuple carries no accumulator. So this
     is the *loosest* honest check -- it fires only where a single release alone exceeds the
@@ -736,7 +732,7 @@ class BelowMinimumTicket:
     shortfall: Money
     reason: str
 
-    # ⚙ ``required``/``actual``/``shortfall`` rather than ``minimum``/``arrived``: it is the
+    # ``required``/``actual``/``shortfall`` rather than ``minimum``/``arrived``: it is the
     # vocabulary ``errors.InfeasiblePurchase`` and ``ramp.RouteUnusable`` already use for the
     # same shape of statement, and one word per concept across three records is worth more than
     # a locally prettier name.
@@ -868,7 +864,7 @@ class InstrumentDemandsCash:
     Unreachable while every declared class charges a **fraction** of the income it taxes: the
     charge is netted on that income's own date, so the date nets to zero at worst.
 
-    ⚙ **Strictly above 100%, and not at it.** At exactly 100% the date nets to zero,
+    **Strictly above 100%, and not at it.** At exactly 100% the date nets to zero,
     ``_released_by_date`` drops it, and the holding simply sends nothing home on it -- which
     ``tests/unit/test_rate_and_horizon_boundaries.py`` pins from both sides, at 50+50 for the
     dropped date and at 90+90 for this refusal. Which side of the boundary the declared rates

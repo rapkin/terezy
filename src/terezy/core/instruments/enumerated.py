@@ -120,7 +120,7 @@ def _check_feasible(
     reading: a reader fixing a purchase below the minimum ticket does not need to be told
     simultaneously that their horizon is short.
 
-    ⚙ **Written as early returns rather than as a tuple of results, and the difference is
+    **Written as early returns rather than as a tuple of results, and the difference is
     not style.** A tuple evaluates every check before the first is read, and the horizon
     check reads the *last date this holding receives* -- which does not exist when the
     receivable check is the one that should have fired. Ordering guards by which answers a
@@ -318,19 +318,16 @@ def _units_retired(payment: ScheduledPayment, *, principal: float, quantity: flo
     which is exactly what the generative form's redemption does; two equal ones retire half
     each.
 
-    ⚙ **Its share of the repayments, not its share of the face value**, and the difference
+    **Its share of the repayments, not its share of the face value**, and the difference
     is a bond redeemed above par. A schedule returning 1 050.00 against a declared face of
     1 000.00 repays the whole of each unit and realises a gain; measured against face it
     would retire 1.05 units of every 1 held, which is not a bond -- it is arithmetic run
     past the thing it was describing.
 
-    ⚙ Face value is not what a repayment is divided by, and since FR-025 was amended it is
-    not what a **purchase** is compared with either -- that is
-    `terms.principal_returned`, which this denominator now comes from. The two readings
-    were separate for one commit and the review found the day they disagreed; there is one
-    call now, and this note used to cite FR-025 for a role face value no longer plays in it.
+    The denominator comes from `terms.principal_returned`, in one call, so that what a
+    repayment is divided by and what a **purchase** is compared with cannot disagree.
 
-    ⚙ **Arithmetic over declared amounts, not an inference.** It reads no position in the
+    **Arithmetic over declared amounts, not an inference.** It reads no position in the
     list and no relative size: a repayment is a repayment because the declaration says so
     (FR-008), and how much of a unit it retires follows from figures that are on the page.
     """

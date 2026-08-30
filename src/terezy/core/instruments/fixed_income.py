@@ -56,18 +56,14 @@ hidden. Sizing it on the net amount needs the charge to be known before the sche
 exists, which is a different pipeline than the one research.md D3 chose.
 
 **Reinvestment is caused by an instrument term, and the policy is named in the detail.**
-``CausationKind`` admits no "the owner decided something" member, by design; the data
-model refuses a *catch-all* precisely so that no event can be attributed to a vague cause
-nobody tracked down, and every member of it names a kind of declaration. So a reinvestment
-names the term that priced it, as the purchase already names the term it acquired, and its
+``CausationKind`` admits no "the owner decided something" member, so a reinvestment names
+the term that priced it, as the purchase already names the term it acquired, and its
 ``detail`` states the declared policy, the coupon that funded it and the remainder retained.
 
 **No cash deposit funds the purchase.** The cash balance goes negative on the purchase
 date and recovers as coupons arrive, and that is the honest ledger for a feature whose
-spec says "the purchase is taken as given". Inventing a funding deposit would require an
-event caused by an owner action, and ``CausationKind`` has no such member -- every member
-of it names a kind of *declaration* -- precisely so that no event can be attributed to a
-vague cause nobody tracked down.
+spec says "the purchase is taken as given". Inventing a funding deposit would need an event
+caused by an owner action, and there is no such ``CausationKind`` member.
 
 **Deliberately absent rather than stubbed**: secondary-market sale before maturity, the
 thin-market haircut that would apply to one, accrued interest settled at purchase,

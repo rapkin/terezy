@@ -9,12 +9,12 @@ is expensive**, and an edge-labelled path is that sentence drawn.
 FR-008 is absolute: the renderer computes, derives, aggregates and re-rounds nothing. The only
 transformation it applies is :mod:`terezy.api.diagrams.numbers`, once, at each site.
 
-**The result carries no per-leg attribution today**, and the diagram says only what the result
-says. ``OneWayCost.components`` is the whole route's charge split into three terms, not one
-figure per leg, so the *edges* carry the **declared** figures -- each leg's fees, and the quote
-its channel applies -- and the computed one-way and round-trip figures live in their own
-labelled nodes. That is FR-008's second half working as intended: an edge shows a figure with
-its provenance state, or it shows none.
+The diagram says only what the result says. ``OneWayCost.components`` is the whole route's
+charge split into three terms and ``by_segment`` splits it per declared route, neither of them
+per leg, so the *edges* carry the **declared** figures -- each leg's fees, and the quote its
+channel applies -- and the computed figures live in their own labelled nodes. That is FR-008's
+second half working as intended: an edge shows a figure with its provenance state, or it shows
+none.
 
 **The channel premium is on the edges here too, and this is the diagram where it matters most.**
 Every fee on the §4.3.1 corridor is declared zero and the whole 6.67% is the ``p2p`` channel's
@@ -23,11 +23,6 @@ picture that exists to show where a cost comes from, would answer the question i
 answer with a zero. The figures node above it does not repair that: a total at the top does not
 survive someone looking at one edge. It is the same argument the registry graph makes, with
 more force rather than less, which is why ``channels`` is a required parameter here as well.
-
-Feature 004 is landing in parallel and may give ``RampCost`` a composed path and a per-segment
-attribution. **Nothing here anticipates it.** Rendering what a type might carry is how a
-special case gets written that later has to be deleted; when a composed candidate is an
-ordinary costed result, it renders through this same door.
 
 ## Labelling, which is the rule this project already broke once
 
@@ -44,13 +39,9 @@ with **no round-trip figure anywhere** on the diagram.
 
 ## Staleness comes out of the verdict the result carries
 
-``render_path`` takes no ``kinds`` and no ``as_of``, and needs neither: ``OneWayCost.staleness``
-is the verdict feature 002 already computed, under **each observation's** own declared threshold
--- the leg's fee schedule, the channel's reference rate, each channel side -- at the run's as-of
-date. An edge is stale here when any source behind it appears in that verdict's stale list: the
-result's own verdict, read rather than recomputed. The quote's sources are part of "behind it",
-because matching only the leg's own left a stale premium invisible on the edge that charges it.
-A source the verdict never assessed is reported as unassessed rather than as current
+``render_path`` takes no ``kinds`` and no ``as_of``, and needs neither: it reads
+``OneWayCost.staleness``, the verdict the costing already produced. See :func:`_is_stale`. A
+source the verdict never assessed is reported as unassessed rather than as current
 (``marks.UNASSESSED``): "nobody checked" and "checked and clean" are different claims.
 
 ## A refusal is a refusal
@@ -122,8 +113,8 @@ believe the two spellings meant two things.
 def _is_stale(provenance: Provenance, verdict: StalenessVerdict) -> bool:
     """Whether any source behind this edge is in the result's stale list.
 
-    Read out of the verdict rather than recomputed. The verdict was produced by feature 002's
-    ``cost._aged`` under each observation's own declared kind -- the leg's fee schedule, the
+    Read out of the verdict rather than recomputed. The verdict was produced by
+    ``routes.cost._aged`` under each observation's own declared kind -- the leg's fee schedule, the
     channel's reference rate, each channel side -- at the run's as-of date. Ageing them again
     here would need a second as-of date and a second kind registry, and two computations of one
     fact eventually disagree.

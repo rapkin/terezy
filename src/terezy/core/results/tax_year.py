@@ -218,7 +218,7 @@ def settle(
 ) -> Settlement | SettlementRefused:
     """Weave each year's payment into the stream on its declared due date, and fold.
 
-    Pure, and no clock: ``horizon_end`` is an input, every due date comes from a declared
+    ``horizon_end`` is an input, every due date comes from a declared
     rule, and the same inputs give the same settled stream for ever.
 
     **Payments sort last on their date.** A payment settles a *previous* year's assessment, so

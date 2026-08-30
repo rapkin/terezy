@@ -324,7 +324,7 @@ class Unreachable:
 
 
 Feasibility = Met | Missed | Unreachable
-"""The verdict on a fully declared goal. Match exhaustively; there is no fourth answer."""
+"""The verdict on a fully declared goal. Match exhaustively."""
 
 
 @dataclass(frozen=True, slots=True)

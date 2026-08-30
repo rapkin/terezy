@@ -38,19 +38,13 @@ from terezy.core.primitives.provenance import Provenance
 
 
 class Mark(Enum):
-    """The states a diagram element can carry. A **closed** set of eight.
-
-    ⚙ **Six when this feature was specified, eight since feature 004 landed.** ``COMPOSED`` and
-    ``EXIT_BY_IDENTITY`` are states that did not exist when data-model.md enumerated the
-    vocabulary; each is recorded on its member below. Growing a closed set is a code change
-    reviewed against the claim the set exists to support -- that every state is pairwise
-    distinguishable -- which is what ``tests/contract/test_diagram_marks.py`` asserts, over
-    whatever the set currently is.
+    """The states a diagram element can carry. A **closed** set.
 
     Closed for the reason every enumeration in this project is closed: a free-form mark
     vocabulary would let one call site invent a token, and "every state is pairwise
-    distinguishable" -- the claim SC-004 makes -- would become unprovable. Adding a seventh is
-    a code change reviewed against that claim.
+    distinguishable" -- the claim SC-004 makes -- would become unprovable. Growing the set is
+    a code change reviewed against that claim, which
+    ``tests/contract/test_diagram_marks.py`` asserts over whatever the set currently is.
 
     Deliberately not a ``str`` subclass, on the same reasoning as
     ``core.primitives.currency.Currency``: a string-valued enum compares equal to a bare
@@ -73,10 +67,10 @@ class Mark(Enum):
     picture of the owner's actual options (FR-014)."""
 
     COMPOSED = "composed"
-    """⚙ The way in is a **chain of declared routes**, not one declared route (004 FR-013).
+    """The way in is a **chain of declared routes**, not one declared route (004 FR-013).
 
-    Added when feature 004 landed, and it is a mark rather than a caption word because this
-    feature's own specification says so: *"composed paths are visibly distinct candidates, so
+    A mark rather than a caption word because this feature's own specification says so:
+    *"composed paths are visibly distinct candidates, so
     when such results exist, their composed nature is one more mark the diagram must carry"*
     (spec.md, Assumptions). The chain exists only at query time -- nobody declared it end to end
     -- and a reader who cannot tell it from a declared corridor would go looking for a file that
@@ -92,12 +86,11 @@ class Mark(Enum):
     Feature 002's FR-030 made visual: an explicitly absent edge, never an omission."""
 
     EXIT_BY_IDENTITY = "exit-identity"
-    """⚙ The destination **is** a declared spendable endpoint, so there is no way out to cost.
+    """The destination **is** a declared spendable endpoint, so there is no way out to cost.
 
-    Added with feature 004, which introduced the state (its ``path.EXIT_BY_IDENTITY``). Not the
-    same claim as an exit that happened to be free: the money is already where it needed to come
-    back out to, so there are no exit legs at all -- which is why it renders on the *venue* and
-    never as an edge. See :mod:`terezy.api.diagrams.path`.
+    Not the same claim as an exit that happened to be free: the money is already where it
+    needed to come back out to, so there are no exit legs at all -- which is why it renders on
+    the *venue* and never as an edge. See :mod:`terezy.api.diagrams.path`.
     """
 
     EXIT_COST_UNKNOWN = "exit-unknown"

@@ -1,13 +1,9 @@
 """Money: float64, currency-tagged, provenance-carrying. The only way to combine it.
 
-Three requirements meet in this one record, and each of them is the reason for one of
-its three fields.
-
 **float64** (owner decision D-A). Money is a ``float``, not a ``Decimal``. The
 consequence is that the specification's "reproduces a hand-computed schedule exactly"
 is implemented as "within the project tolerance", and that tolerance is defined once, in
-``terezy.core.primitives.tolerance``, and imported. Nothing in this module compares
-amounts for financial equality -- see the note on ``compare`` below.
+``terezy.core.primitives.tolerance``, and imported.
 
 **Currency-tagged** (FR-006, FR-007, C5). Every amount states its denomination, and
 every combining function here refuses a mismatch by raising. A currency mismatch is a
@@ -247,7 +243,7 @@ def from_pegged_term(
 ) -> Money:
     """Size a term denominated in one currency into money paid in another.
 
-    ⚙ **Added by feature 006** for owner decision A: a Ukrainian commercial lease is
+    A Ukrainian commercial lease is
     priced in USD-equivalent terms and settled in hryvnia, so the fund's income is
     *declared* in one currency and *paid* in another. The USD-equivalent figure is a term
     of the lease, not a dollar anyone holds -- it is a
@@ -261,18 +257,9 @@ def from_pegged_term(
     already exists, and this creates money from a term that was never money.
 
     ``rate`` is **units of ``paid_in`` per one unit of ``sized_in``**, stated in the
-    parameter names because an inverted rate is the classic FX defect: every figure stays
-    plausible and every one is wrong by the rate squared. What rate to apply -- a market
+    parameter names for the reason :func:`convert` gives. What rate to apply -- a market
     quote, an owner's assumption, a lease's capped ceiling -- is the caller's decision and
     deliberately not this function's.
-
-    **Sizing into the same currency is refused.** A term already denominated in what it is
-    paid in is not pegged to anything, and accepting it here would let a lost currency pass
-    through while collecting a rate's provenance it never used.
-
-    **A rate of zero or less is refused**, exactly as in :func:`convert`: neither is a
-    rate, and both would produce something that looks like money. A declined question, not
-    a clamp.
     """
     if sized_in is paid_in:
         raise ValueError(

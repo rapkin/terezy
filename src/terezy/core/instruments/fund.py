@@ -321,7 +321,7 @@ class FundDeclaration:
     nav_per_unit: Money
     """The declared net asset value of one unit, with its own citation.
 
-    ⚙ **Not in data-model.md's table, and needed.** Every figure in a fund projection is a
+    **Not in data-model.md's table, and needed.** Every figure in a fund projection is a
     price times a number of units: the entry markup, the exit discount and the pegged
     distribution all size from NAV, so without it the spread FR-024 asks to be modelled
     carefully has nothing to be a percentage *of*. It is a declared, cited term like any
@@ -512,7 +512,7 @@ def purchase_price_per_unit(declaration: FundDeclaration, plan: ExecutionPlan) -
 def entry_price_for(declaration: FundDeclaration, mode: LiquidityMode) -> Money:
     """The same price, resolved from the assumed mode rather than from a built plan.
 
-    ⚙ **Added by feature 010, and it delegates rather than repeating.** The join has to size a
+    **It delegates rather than repeating.** The join has to size a
     purchase from an arriving amount *before* there is an execution plan -- the plan is built
     inside the projection, which cannot start until the quantity is known -- and the one thing
     it must not do is compute the markup itself. Two functions over one body means the price
@@ -544,10 +544,9 @@ def cap_on(peg: Peg, on_date: date) -> CapEntry | None:
     than sizing the payment at the full assumed rate, because treating an undeclared ceiling
     as an absent one is choosing the favourable reading in silence.
 
-    ⚙ This paragraph used to say the caller treated the rate as unbounded "while saying
-    so", which was never what the code did. Declaring a ceiling of zero would be different
-    again -- it would size every payment at nothing -- which is why zero is refused at the
-    data boundary and cannot stand in for "not declared".
+    A declared ceiling of zero is a different thing again -- it would size every payment at
+    nothing -- which is why zero is refused at the data boundary and cannot stand in for "not
+    declared".
     """
     for entry in reversed(peg.cap):
         if entry.effective_from <= on_date:

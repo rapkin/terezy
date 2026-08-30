@@ -11,19 +11,12 @@ for the ledger part and adds the derived figures beside it, which is the option 
 model left open for this phase (data-model.md, "Canonical form", the ⚙ note). The ledger
 keeps one signature and one meaning.
 
-Everything here follows the rules the ledger's canonical module already establishes, and
-they are repeated because they are easy to break by accident:
-
-* **Amounts are ``float.hex()``**, exact and round-trippable, so a digest over this form
-  asserts bit-identity rather than agreement to some number of decimals (research.md D5).
-* **No serialisation and no hashing.** These are nested tuples of primitives. The digest
-  lives in ``terezy.data.manifest``, because hashing implies serialisation and ``hashlib``
-  is on the core's forbidden-imports list.
-* **Provenance is deliberately excluded.** It identifies *sources*, so filling in a
-  ``verified_on`` later would change the digest even though no computed amount moved --
-  and C4 would then fail on a documentation update, leaving no honest way to fix it except
-  to stop trusting C4. The unverified *mark* is a separate claim, asserted separately by
-  E5. Do not add provenance here to make some other test easier.
+The rules of the form are ``terezy.core.ledger.canonical``'s. The one worth repeating here,
+because it is the one an editor of this module is tempted to break: **provenance is
+deliberately excluded.** It identifies *sources*, so filling in a ``verified_on`` later would
+change the digest even though no computed amount moved -- and C4 would then fail on a
+documentation update, leaving no honest way to fix it except to stop trusting C4. The
+unverified *mark* is a separate claim, asserted separately by E5.
 """
 
 from __future__ import annotations
@@ -131,7 +124,7 @@ def of_real_figure(value: RealRate | RealTermsUnavailable) -> Canonical:
     produce the same bytes, and those are opposite statements. The reason is included because
     it is part of what the result *says*.
 
-    ⚙ **The basis, the series and the window are in the digest, and they have to be** (007
+    **The basis, the series and the window are in the digest, and they have to be** (007
     FR-010, FR-011). The same value deflated by observed CPI and by a declared assumption is
     two different claims, and the same value over two different windows is two different
     facts; a digest that agreed between them would report two results as one. Provenance stays
@@ -172,12 +165,10 @@ def of_hurdle_rate(value: HurdleRate) -> tuple[Canonical, ...]:
     iteration order of a ``frozenset``, which is not guaranteed stable across interpreter
     runs.
 
-    ``accounts_for`` was originally omitted, which quietly broke the mechanism its own
-    constant claims: naming what is included beside what is excluded is supposed to mean a
-    later feature cannot move a term from one set to the other without a reviewer seeing
-    both edits. With only ``excludes`` in the digest, a term added to ``accounts_for``
-    alone -- a *claim that the figure is now net of something* -- moved nothing. It does
-    now.
+    ``accounts_for`` is in the digest as well as ``excludes``, so that a term moved from one
+    set to the other moves the digest. With only ``excludes`` in it, a term added to
+    ``accounts_for`` alone -- a *claim that the figure is now net of something* -- would move
+    nothing.
     """
     return (
         ledger_canonical.of_number(value.nominal_ytm.value),
@@ -224,11 +215,6 @@ def of_projection(value: Projection) -> tuple[Canonical, ...]:
     The ledger is included in full rather than summarised. The figures are a *claim* about
     those events, and a digest covering only the conclusions would agree between a correct
     projection and an incorrect one that happened to land on the same number.
-
-    ⚙ **The purchase figure was added by 013 and moved every recorded digest**, which is what
-    a golden is for: its input digests are witnesses rather than terms, and a projection that
-    says one more true thing about every holding is *supposed* to change them (constitution
-    1.2.0, Principle V). No amount, date, tax or rate moved with it.
     """
     return (
         ledger_canonical.of_result(value.ledger),

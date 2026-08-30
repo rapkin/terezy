@@ -19,14 +19,4 @@ Two consequences of the split that are worth stating where the code lives:
   ``data/scenarios/`` already is. Nothing here may therefore be given a fabricated source
   to satisfy a provenance check.
 
-**Why a stream matters to a cost at all.** Principle VI: access cost is never quoted per
-instrument or per destination, only per ``(instrument x income stream x route)``. The same
-USD acquisition is nearly free funded from USD contract income and 5-10% expensive funded
-from a UAH salary (``SIMULATOR_SPEC.md`` §4.3.1). The stream is the term that makes that
-difference computable, which is why ``FundingPath`` cannot be constructed without one.
-
-**Two modules, and the seam between them is an enforced contract rather than taste.**
-``streams`` holds the declaration -- what a route needs to know about where money lands --
-and ``capacity`` holds what survives the tax. ``capacity`` states which contract makes the
-split mandatory.
 """

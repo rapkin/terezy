@@ -1,11 +1,9 @@
 """What an enumeration of composed candidates is, and what a refusal to enumerate one is.
 
-FR-007: *within the declared bound, enumeration MUST be exhaustive ... and **the bound in force
-MUST be recorded alongside the results**, so a corridor's absence is attributable to the bound
-rather than mistaken for a registry gap.* That second sentence is why this module exists at all:
-a bare tuple of candidates cannot say how far the search was allowed to look, and "you have not
-declared that corridor" and "you told me not to look that far" are different findings the owner
-acts on differently.
+FR-007 requires the bound in force to be recorded alongside the results, and that is why this
+module exists at all: a bare tuple of candidates cannot say how far the search was allowed to
+look, and "you have not declared that corridor" and "you told me not to look that far" are
+different findings the owner acts on differently.
 
 **An empty candidate tuple is a legitimate answer.** It means the registry declares nothing that
 connects, which is a real fact and the coverage report's news to deliver (feature 003), not this
@@ -50,7 +48,7 @@ class SegmentBound:
 class Enumeration:
     """Every candidate the declarations connect, for one question, with the bound that shaped it.
 
-    ⚙ **:class:`SegmentBound` lives here rather than in the module that enumerates with it**,
+    **:class:`SegmentBound` lives here rather than in the module that enumerates with it**,
     which is a departure from data-model.md and a cycle rather than a preference. ``compose``
     returns this record, so it imports this module; had the bound stayed there, this module
     would have had to import back. The bound also *belongs* here on its own merits -- FR-007

@@ -1,15 +1,11 @@
 """What the declared route graph can and cannot support: the coverage report's records.
 
-FR-001: *the system MUST produce, for every declared destination x every declared income
-stream x every declared regime, a verdict: **comparison-ready** or **not comparison-ready**.*
-FR-003 adds the three distinguished deficits, FR-007 the missing declaration precise enough to
-write the file from, FR-009 the blocked-pair count, and FR-017 the rule that makes this module
-unusual: **the output carries no cost figures at all.**
+FR-001, FR-003, FR-007, FR-009, and FR-017 -- the rule that makes this module unusual:
+**the output carries no cost figures at all.**
 
-Feature 002's ``results/ramp.py`` is this module's sibling and its precedent: frozen records
-carrying data, free functions in ``core/routes/`` computing them, no behaviour on either. What
-follows are the four decisions the *shapes* here carry rather than leaving to a rule a reader
-has to remember.
+``results/ramp.py`` is this module's sibling and its precedent: frozen records carrying data,
+free functions in ``core/routes/`` computing them. What follows are the decisions the *shapes*
+here carry rather than leaving to a rule a reader has to remember.
 
 **No field can hold a number that came from money.** Not one record below has a ``Money``, a
 ``Provenance``, a ``StalenessVerdict`` or a bare ``float`` in it. Integers -- counts and
@@ -39,7 +35,7 @@ forward note kept out of the type system rather than out of a code review: a two
 a hole in *this* feature, and feature 004 adds its annotation **beside** the verdict rather
 than by changing what :class:`Ready` means.
 
-⚙ **Where these records live, against what data-model.md says.** ``data-model.md`` heads
+**Where these records live, against what data-model.md says.** ``data-model.md`` heads
 :class:`SpendableEndpoint` and :class:`Destination` with ``core/routes/coverage.py``. They are
 defined here instead, with every other record, because ``core/routes/coverage.py`` *builds*
 :class:`Ready`, :class:`NotReady` and :class:`CoverageReport` -- so defining the two inputs
@@ -168,12 +164,11 @@ means nothing carries this stream's money to this destination, which is deficit 
 class SatisfiedByIdentity(Enum):
     """The exit slot, filled by the destination **being** a declared spendable endpoint.
 
-    ⚙ **Owner decision, 2026-08-23.** FR-002 originally required a declared exit route from
-    every destination without exception, and the first implementation obeyed it literally: the
-    hryvnia balance on the owner's own salary rail came out as a hole, because no route *out*
-    of it is declared. The money is already where it needed to come back out to. Requiring a
-    way out of the place money is spent from would have made the salary rail the first finding
-    in the first real report, and it would have been wrong.
+    **Owner decision, 2026-08-23.** FR-002 read literally requires a declared exit route from
+    every destination without exception, which makes the hryvnia balance on the owner's own
+    salary rail a hole, because no route *out* of it is declared. The money is already where it
+    needed to come back out to, and requiring a way out of the place money is spent from would
+    have made the salary rail the first finding in the first real report.
 
     So the exit half of the owner's rule is satisfied **by identity** when the destination is
     itself in the declared spendable set. The mirror of :class:`SatisfiedByArrival` on the
@@ -181,7 +176,7 @@ class SatisfiedByIdentity(Enum):
     "already spendable" is explicitly not the same claim as "a declared route gets the money
     out", and so the two halves of the rule read the same way in the record and in a ``match``.
 
-    ⚙ **It supersedes declared exits, exactly as arrival supersedes declared inbound routes,
+    **It supersedes declared exits, exactly as arrival supersedes declared inbound routes,
     and that is a real consequence.** A spendable destination that also declares exits shows
     this sentinel and not those routes: the verdict rests on the money already being there, and
     nothing is *relied on*. Where those exits leave a destination no stream can reach they are
@@ -208,8 +203,8 @@ means nothing declared gets the money out from here, which is deficit 2 or defic
 class AnySpendableEndpoint(Enum):
     """The target of a missing **exit**: any one of the declared spendable endpoints.
 
-    FR-007 ⚙, and it is a correction from external review. For a missing *inbound* both
-    endpoints are determined -- the stream fixes one, the destination the other. For a missing
+    FR-007's ⚙ note. For a missing *inbound* both endpoints are determined -- the stream
+    fixes one, the destination the other. For a missing
     *exit* only the origin is: any declared spendable endpoint would satisfy the owner's rule,
     and picking one would be the report inventing a preference it has no basis for.
 
@@ -294,7 +289,7 @@ class Deficit:
     """One reason a pair is not comparison-ready, and the observation that would fix it."""
 
     kind: DeficitKind
-    """Which of FR-003's three. Never a bare "missing route"."""
+    """Which deficit this is (FR-003). Never a bare "missing route"."""
 
     missing: MissingDeclaration
     """What to go observe."""
@@ -587,7 +582,7 @@ class RegistryDimensionEmpty:
     sorted -- not the first one found. Reporting one at a time would make an owner with an
     empty data root fix four things in four runs.
 
-    ⚙ ``spendable`` is a dimension of *this* feature rather than of feature 002's registry, and
+    ``spendable`` is a dimension of *this* feature rather than of feature 002's registry, and
     FR-020 does not name it. Including it is a deliberate widening, recorded in plan.md's
     Complexity Tracking: an empty spendable list makes every exit deficit 3, which is a report
     full of confident wrong verdicts -- exactly the outcome FR-020 exists to forbid.

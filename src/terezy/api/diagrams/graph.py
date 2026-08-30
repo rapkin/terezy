@@ -45,7 +45,7 @@ FR-008 forbids the renderer to compute a *figure*. These are not figures.
   declared ``kind_of_observation`` and against the caller's ``as_of``. The threshold is
   feature 002's, applied by feature 002's function -- not a rule invented here (FR-013).
 
-⚙ **``channels``, ``kinds`` and ``as_of`` are on the signature and were not in
+**``channels``, ``kinds`` and ``as_of`` are on the signature and were not in
 ``contracts/rendering.md`` as first written.** The contract's parameter list carried none of
 them and could not satisfy its own guarantees. ``kinds`` and ``as_of`` because FR-013's
 staleness is ``as_of - retrieved_on`` against a *declared per-kind* threshold; making them
