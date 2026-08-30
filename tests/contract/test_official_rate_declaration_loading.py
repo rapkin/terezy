@@ -27,7 +27,7 @@ battery of broken files proves nothing about the file the project actually uses.
 from __future__ import annotations
 
 import shutil
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
@@ -425,33 +425,50 @@ class TestTheShippedUkrainianSeries:
         assert series.quotation_unit == 1.0
 
     def test_it_declares_no_non_publication_day_rule(self) -> None:
-        """FR-017, and it is not an oversight: пункт 10 розділу III is written in working days
-        and pre-holiday days, so declaring it needs a declared, cited working-day and holiday
-        calendar -- a feature (``declared-working-day-calendar``), not a data entry (FR-018)."""
+        """FR-017, and it is not an oversight: the National Bank returns an official rate for
+        every calendar day, dated that day, so there is no date the publisher does not publish
+        for and nothing for a rule to say. The observations below carry every one of them."""
         assert loader.official_rate_from_file(SHIPPED).rule is None
 
-    def test_a_base_struck_against_it_refuses_naming_the_series_the_pair_and_the_date(
-        self,
-    ) -> None:
-        """SC-014: the missing rule is something a run reports, not something a spec says.
+    def test_a_base_struck_on_a_date_it_covers_names_the_rate_it_used(self) -> None:
+        """The rate is read off the declaration rather than restated here: a literal copied
+        out of a real series is a rate with no citation the moment the file moves."""
+        series = loader.official_rate_from_file(SHIPPED)
+        covered = series.observations[len(series.observations) // 2]
 
-        **What ships is stronger than FR-017's sentence and demonstrates less of it.** FR-017
-        says "every date the National Bank does not publish for refuses"; this series declares
-        no observation at all yet, because no rate value may originate from an implementer's
-        memory and retrieval is the fetch script's job (FR-001, plan research D6). So *every*
-        date refuses, and the refusal says the window is empty rather than naming a hole in a
-        published run. The published-window case is exercised against synthetic series in
-        ``tests/unit/test_official_rate_refusals.py``.
-        """
         outcome = official_rate.strike_base(
             Money(1_000.0, Currency.USD, prov.EMPTY),
-            loader.official_rate_from_file(SHIPPED),
+            series,
             tax_currency=Currency.UAH,
-            on_date=date(2026, 3, 8),
+            on_date=covered.on_date,
+        )
+
+        assert isinstance(outcome, official_rate.TaxCurrencyConversion), outcome
+        assert outcome.series_id == "ua_nbu_usd"
+        assert outcome.rate_date == covered.on_date
+        assert outcome.rate == covered.value
+        assert outcome.applied_rule is None
+
+    def test_a_base_struck_outside_it_refuses_naming_the_series_the_pair_and_the_window(
+        self,
+    ) -> None:
+        """SC-003 against the shipped file. Populating a series is exactly the change that
+        makes a refusal look like a bug, and the window sentence is what says it is not."""
+        series = loader.official_rate_from_file(SHIPPED)
+        before = series.observations[0].on_date - timedelta(days=1)
+
+        outcome = official_rate.strike_base(
+            Money(1_000.0, Currency.USD, prov.EMPTY),
+            series,
+            tax_currency=Currency.UAH,
+            on_date=before,
         )
 
         assert isinstance(outcome, official_rate.OfficialRateUndeclaredOnDate), outcome
         assert outcome.series_id == "ua_nbu_usd"
         assert outcome.pair == (Currency.UAH, Currency.USD)
-        assert outcome.on_date == date(2026, 3, 8)
-        assert outcome.covers is None
+        assert outcome.on_date == before
+        assert outcome.covers == (
+            series.observations[0].on_date,
+            series.observations[-1].on_date,
+        )
