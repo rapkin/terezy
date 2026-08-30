@@ -230,6 +230,14 @@ class InstrumentTable(BaseModel):
     exist, instead of by pydantic naming a key it cannot place in a file.
     """
 
+    groups: list[str]
+    """``[instrument] groups`` -- the declared groups this instrument is in (015 FR-007a).
+
+    Required and possibly empty. A key that could be omitted would make *in no group* the
+    thing that happens when nobody thought about it, which is the shrink FR-008a says no
+    downstream check can see.
+    """
+
 
 class InstrumentFile(BaseModel):
     """A whole ``data/instruments/<id>.toml`` document: exactly one instrument."""
@@ -396,6 +404,14 @@ class EnumeratedInstrumentTable(BaseModel):
     per-entry checks then loop zero times -- which is correct division of labour and was not
     what this docstring said: it claimed "required and non-empty" and attributed to the
     schema an enforcement that lives in the gate.
+    """
+
+    groups: list[str]
+    """``[instrument] groups`` -- the declared groups this instrument is in (015 FR-007a).
+
+    Required and possibly empty. A key that could be omitted would make *in no group* the
+    thing that happens when nobody thought about it, which is the shrink FR-008a says no
+    downstream check can see.
     """
 
 
@@ -620,6 +636,36 @@ class VenuesFile(BaseModel):
     model_config = STRICT
 
     venue: list[VenueTable]
+
+
+# ---------------------------------------------------------------------------
+# 015-the-question: the group vocabulary a question is written in
+# ---------------------------------------------------------------------------
+#
+# A root-level curated file beside `venues.toml`, and for that file's reason: the label lives
+# on the curated instrument declaration, so the vocabulary it resolves against cannot be
+# per-owner without a curated file depending on one person's registry. No citation keys -- an
+# id and a name are references, not observations, exactly as a venue's are.
+
+
+class GroupTable(BaseModel):
+    """One ``[[group]]`` entry: a label an instrument may declare itself into."""
+
+    model_config = STRICT
+
+    id: str
+    """What a question names. Unique across the file."""
+
+    name: str
+    """Human-readable and non-empty. Nothing dispatches on it."""
+
+
+class GroupsFile(BaseModel):
+    """The whole of ``data/groups.toml``."""
+
+    model_config = STRICT
+
+    group: list[GroupTable]
 
 
 class ChannelSideTable(BaseModel):
@@ -1388,6 +1434,8 @@ class FundTable(BaseModel):
     tax_classes: dict[str, str]
     fee_fact: list[FeeFactTable]
     verification_task: list[VerificationTaskTable]
+    groups: list[str]
+    """``[instrument] groups`` -- ``InstrumentTable.groups``' key, on a fund, for its reason."""
 
 
 class FundFile(BaseModel):

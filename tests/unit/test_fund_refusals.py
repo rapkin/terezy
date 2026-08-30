@@ -158,6 +158,7 @@ def _declaration(**overrides: object) -> FundDeclaration:
         },
         fee_context=(),
         verification_tasks=(),
+        groups=(),
     )
     return replace(base, **overrides)  # type: ignore[arg-type]
 

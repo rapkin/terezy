@@ -154,6 +154,7 @@ name         = "H1 FIXTURE note -- terms invented"
 class        = "fixed_income"
 currency     = "UAH"
 is_synthetic = true
+groups       = []
 
 [instrument.terms]
 face_value        = {FACE}

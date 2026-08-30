@@ -46,6 +46,9 @@ name                 = "ІНЖУР REIT — closed-end non-diversified venture f
 class                = "collective_investment_fund"
 unit_currency        = "UAH"
 is_assumption_driven = true
+
+# groups: a DECLARED label, never inferred (015 FR-007a). Here: one of the two real Inzhur declarations in the registry.
+groups       = ["inzhur"]
 day_count            = "act/365"
 terminates_on        = "2045-05-20"
 

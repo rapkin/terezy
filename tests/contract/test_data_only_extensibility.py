@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import ast
 import re
+import shutil
 from dataclasses import replace
 from datetime import date
 from pathlib import Path
@@ -215,6 +216,7 @@ class TestBothIssuesLoadFromTheDataRoot:
         """A mistyped root must not look like a repository that declares nothing."""
         (tmp_path / "instruments").mkdir()
         (tmp_path / "tax").mkdir()
+        shutil.copy2(DATA_ROOT / "groups.toml", tmp_path / "groups.toml")
         with pytest.raises(DeclarationError) as raised:
             resolver.from_data_root(tmp_path)
         assert raised.value.file == tmp_path / "instruments"
@@ -431,6 +433,7 @@ X: int = 1
         """
         (tmp_path / "instruments").mkdir()
         (tmp_path / "tax").mkdir()
+        shutil.copy2(DATA_ROOT / "groups.toml", tmp_path / "groups.toml")
         text = (
             (DATA_ROOT / "instruments" / f"{ISSUE_B}.toml")
             .read_text(encoding="utf-8")

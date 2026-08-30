@@ -145,6 +145,7 @@ DECLARATION = InstrumentDeclaration(
         TaxableEventKind.COUPON: EXEMPT_CLASS.id,
         TaxableEventKind.DISPOSAL_GAIN: EXEMPT_CLASS.id,
     },
+    groups=(),
 )
 
 HOLDING = Holding(

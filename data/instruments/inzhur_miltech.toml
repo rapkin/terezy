@@ -54,6 +54,9 @@ name                 = "Inzhur MilTech — closed-end non-diversified venture fu
 class                = "collective_investment_fund"
 unit_currency        = "UAH"
 is_assumption_driven = true
+
+# groups: a DECLARED label, never inferred (015 FR-007a). Here: one of the two real Inzhur declarations in the registry.
+groups       = ["inzhur"]
 day_count            = "act/365"
 terminates_on        = "2029-11-06"
 subscription_cutoff  = "2026-12-31"

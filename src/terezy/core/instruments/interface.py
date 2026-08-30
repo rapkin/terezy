@@ -329,6 +329,14 @@ class InstrumentDeclaration:
     never treated as untaxed.
     """
 
+    groups: tuple[str, ...]
+    """The declared groups this instrument is in, by group id (015 FR-007a).
+
+    **Required, and empty is a statement.** A forgotten line must never read as *in no group*:
+    that is the shrink FR-008a says no downstream test can catch, because nothing knows how
+    many members the owner expected. Every id resolves against ``data/groups.toml``.
+    """
+
 
 @dataclass(frozen=True, slots=True)
 class Holding:

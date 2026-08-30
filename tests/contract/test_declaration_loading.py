@@ -57,6 +57,7 @@ from tests import declared_terms
 pytestmark = pytest.mark.contract
 
 DATA_ROOT = Path(__file__).resolve().parents[2] / "data"
+GROUPS = DATA_ROOT / "groups.toml"
 INSTRUMENT_A = DATA_ROOT / "instruments" / "ovdp_synthetic_a.toml"
 INSTRUMENT_B = DATA_ROOT / "instruments" / "ovdp_synthetic_b.toml"
 TAX_UA = DATA_ROOT / "tax" / "ua.toml"
@@ -496,7 +497,9 @@ class TestDuplicateIdentifiersAcrossFiles:
         first = _write(tmp_path, "first.toml", original)
         second = _write(tmp_path, "second.toml", original)
         with pytest.raises(DeclarationError) as raised:
-            resolver.resolve(instrument_files=(first, second), tax_files=(TAX_UA,))
+            resolver.resolve(
+                instrument_files=(first, second), tax_files=(TAX_UA,), groups_file=GROUPS
+            )
         assert raised.value.file == second
         assert str(first) in raised.value.problem, "the error must name both files"
         assert "ovdp_synthetic_a" in raised.value.problem
@@ -508,7 +511,9 @@ class TestDuplicateIdentifiersAcrossFiles:
             tmp_path, "ua_twice.toml", text + text[text.index("[[jurisdiction.tax_class]]") :]
         )
         with pytest.raises(DeclarationError) as raised:
-            resolver.resolve(instrument_files=(INSTRUMENT_A,), tax_files=(duplicated,))
+            resolver.resolve(
+                instrument_files=(INSTRUMENT_A,), tax_files=(duplicated,), groups_file=GROUPS
+            )
         assert raised.value.file == duplicated
         assert "ua_government_bond" in raised.value.problem
 
@@ -532,7 +537,7 @@ class TestUnresolvedTaxClassReference:
             ),
         )
         with pytest.raises(DeclarationError) as raised:
-            resolver.resolve(instrument_files=(broken,), tax_files=(TAX_UA,))
+            resolver.resolve(instrument_files=(broken,), tax_files=(TAX_UA,), groups_file=GROUPS)
         _assert_names_file_and_field(
             raised.value, file=broken, field_path="instrument.tax_classes.coupon"
         )
@@ -558,7 +563,9 @@ class TestUnresolvedTaxClassReference:
             ),
         )
         with pytest.raises(DeclarationError) as raised:
-            resolver.resolve(instrument_files=(INSTRUMENT_A,), tax_files=(narrowed,))
+            resolver.resolve(
+                instrument_files=(INSTRUMENT_A,), tax_files=(narrowed,), groups_file=GROUPS
+            )
         _assert_names_file_and_field(
             raised.value, file=INSTRUMENT_A, field_path="instrument.tax_classes.disposal_gain"
         )

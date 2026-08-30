@@ -354,6 +354,13 @@ class FundDeclaration:
     fee_context: tuple[FeeFact, ...]
     verification_tasks: tuple[VerificationTask, ...]
 
+    groups: tuple[str, ...]
+    """The declared groups this fund is in, by group id.
+
+    ``InstrumentDeclaration.groups``' field, on a fund, and required for its reason: a
+    question asks about *Inzhur*, and what answers is a label the file carries.
+    """
+
 
 @dataclass(frozen=True, slots=True)
 class ExitPlan:

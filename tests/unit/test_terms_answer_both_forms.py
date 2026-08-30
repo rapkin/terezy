@@ -74,6 +74,7 @@ DECLARATION = InstrumentDeclaration(
         min_ticket=Money(1000.0, Currency.UAH, SOURCES), min_unit=1.0, provenance=SOURCES
     ),
     tax_classes={},
+    groups=(),
 )
 
 

@@ -29,6 +29,10 @@ class        = "enumerated_schedule"
 currency     = "UAH"
 is_synthetic = true
 
+# groups: a DECLARED label, never inferred (015 FR-007a). Here: fixed income and deliberately NOT an ОВДП: it exists because ОВДП exempt both
+#          income kinds and this declares two taxable ones instead.
+groups       = []
+
 [instrument.schedule]
 face_value   = 1000.0
 covers_from  = "2026-01-05"

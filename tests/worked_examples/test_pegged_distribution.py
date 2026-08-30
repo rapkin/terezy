@@ -255,6 +255,7 @@ def _declaration() -> FundDeclaration:
                 searched_on=date(2026, 8, 23),
             ),
         ),
+        groups=(),
     )
 
 

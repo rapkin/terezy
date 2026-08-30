@@ -82,6 +82,7 @@ from terezy.core.instruments.fund import (
     SpreadTerms,
     VerificationTask,
 )
+from terezy.core.instruments.groups import InstrumentGroup
 from terezy.core.instruments.interface import (
     PAYMENT_KINDS,
     BondTerms,
@@ -646,6 +647,7 @@ def instrument_from_file(path: Path) -> InstrumentDeclaration:
         tax_classes=_tax_class_references(
             path, table.tax_classes, field_prefix=f"{INSTRUMENT_TABLE}.tax_classes"
         ),
+        groups=_group_labels(path, f"{INSTRUMENT_TABLE}.groups", table.groups),
     )
 
 
@@ -1024,6 +1026,7 @@ def enumerated_instrument_from_file(path: Path) -> InstrumentDeclaration:
             path, table.constraints, currency, field_prefix=f"{INSTRUMENT_TABLE}.constraints"
         ),
         tax_classes=tax_classes,
+        groups=_group_labels(path, f"{INSTRUMENT_TABLE}.groups", table.groups),
     )
 
 
@@ -1509,6 +1512,86 @@ def venues_from_file(path: Path) -> tuple[Venue, ...]:
         )
         for entry in declared
     )
+
+
+GROUP_TABLE: Final = "group"
+"""Root array of ``data/groups.toml``."""
+
+
+def groups_from_file(path: Path) -> tuple[InstrumentGroup, ...]:
+    """Every declared group, in file order (015 FR-007a).
+
+    A group table carries no observed value -- an id and a name -- so no citation is read and
+    :class:`~terezy.core.instruments.groups.InstrumentGroup` has no field to carry one. This is
+    ``venues_from_file``'s shape, for that function's reason.
+
+    A duplicate id is refused here rather than by the resolver, because both entries are in one
+    file and naming the other one needs nothing the caller has to supply.
+    """
+    document = read_document(path)
+    declared = _validate(schema.GroupsFile, document, path).group
+    if not declared:
+        raise DeclarationError(
+            path,
+            GROUP_TABLE,
+            "declares no groups. An empty vocabulary is reported rather than read as 'a "
+            "question may name no group': every label an instrument carries would then be "
+            "unresolvable, each refusal naming an instrument file instead of this one.",
+            "declare at least one [[group]]",
+        )
+    seen: dict[str, int] = {}
+    for position, entry in enumerate(declared):
+        field = f"{GROUP_TABLE}[{position}].id"
+        identifier = _require_text(
+            path,
+            field,
+            entry.id,
+            "a group is what a question names, and an unnamed one can be named by nothing",
+        )
+        if identifier in seen:
+            raise DeclarationError(
+                path,
+                field,
+                f"declares the group id {identifier!r}, which entry {seen[identifier]} already "
+                "declares. Two entries with one id are not merged and neither is preferred: "
+                "which name a reader sees would depend on file order.",
+                "rename one of the two groups, or delete the duplicate entry",
+            )
+        seen[identifier] = position
+        _require_text(
+            path,
+            f"{GROUP_TABLE}[{position}].name",
+            entry.name,
+            "a group a reader cannot recognise by name is one they cannot check",
+        )
+    return tuple(InstrumentGroup(id=entry.id, name=entry.name) for entry in declared)
+
+
+def _group_labels(path: Path, field_path: str, declared: list[str]) -> tuple[str, ...]:
+    """The groups one instrument declares itself into, refusing a blank or a repeat.
+
+    Whether each id **exists** is a relation across files and is the resolver's; what can be
+    seen from one file is that a label is a label and that it is claimed once.
+    """
+    labels: list[str] = []
+    for position, label in enumerate(declared):
+        identifier = _require_text(
+            path,
+            f"{field_path}[{position}]",
+            label,
+            "a group label is the id of a declared group, and an empty one names nothing",
+        )
+        if identifier in labels:
+            raise DeclarationError(
+                path,
+                f"{field_path}[{position}]",
+                f"declares the group {identifier!r} twice. Membership is a fact rather than a "
+                "quantity, so a repeated label is a typo and not a stronger claim -- and it "
+                "would be counted twice by anything that counts a group's members.",
+                f"name {identifier!r} once",
+            )
+        labels.append(identifier)
+    return tuple(labels)
 
 
 def _non_empty_list[T](path: Path, field_path: str, values: list[T], why: str) -> list[T]:
@@ -3007,6 +3090,7 @@ def fund_from_file(path: Path) -> FundDeclaration:
             )
             for index, entry in enumerate(table.verification_task)
         ),
+        groups=_group_labels(path, f"{prefix}.groups", table.groups),
     )
 
 

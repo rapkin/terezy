@@ -54,6 +54,7 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.inflation.series import CpiSeries, InflationAssumption
     from terezy.core.instruments.access import InstrumentAccess
     from terezy.core.instruments.fund import FundDeclaration
+    from terezy.core.instruments.groups import InstrumentGroup
     from terezy.core.instruments.interface import InstrumentDeclaration
     from terezy.core.ledger.seeds import SeedLot
     from terezy.core.primitives.currency import Currency
@@ -79,6 +80,14 @@ INSTRUMENTS_DIR = "instruments"
 
 TAX_DIR = "tax"
 """Where jurisdiction rule packs live under a data root."""
+
+GROUPS_FILE = "groups.toml"
+"""The group vocabulary, at the data root beside ``venues.toml`` (015 FR-007a).
+
+Curated and root-level rather than per-owner, because the *label* is on the curated instrument
+declaration: a per-owner vocabulary would make an instrument file fail to load because somebody
+else's directory was absent.
+"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,6 +129,13 @@ class Declarations:
     fund_files: Mapping[str, Path]
     """Which file declared each fund."""
 
+    groups: Mapping[str, InstrumentGroup]
+    """The declared group vocabulary by id (015 FR-007a).
+
+    Every ``groups`` label on every instrument and fund above resolves against this; that is
+    checked before this record exists.
+    """
+
 
 def _refuse_duplicate(
     kind: str,
@@ -148,6 +164,7 @@ def resolve(
     *,
     instrument_files: Sequence[Path],
     tax_files: Sequence[Path],
+    groups_file: Path,
 ) -> Declarations:
     """Parse every file, then check what only the whole set can show.
 
@@ -214,18 +231,21 @@ def resolve(
         instrument_files_by_id[declaration.id] = path
         files_by_id[declaration.id] = path
 
+    groups = {group.id: group for group in loader.groups_from_file(groups_file)}
     for identifier, declaration in instruments.items():
         _check_references(
             declaration,
             tax_classes,
             path=instrument_files_by_id[identifier],
         )
+        _check_groups(declaration.groups, groups, path=instrument_files_by_id[identifier])
     for identifier, declared_fund in funds.items():
         _check_fund_references(
             declared_fund,
             tax_classes,
             path=fund_files_by_id[identifier],
         )
+        _check_groups(declared_fund.groups, groups, path=fund_files_by_id[identifier])
 
     return Declarations(
         instruments=instruments,
@@ -234,7 +254,33 @@ def resolve(
         tax_class_files=tax_class_files,
         funds=funds,
         fund_files=fund_files_by_id,
+        groups=groups,
     )
+
+
+def _check_groups(
+    labels: Sequence[str],
+    groups: Mapping[str, InstrumentGroup],
+    *,
+    path: Path,
+) -> None:
+    """Every group an instrument declares itself into must be declared (015 FR-007a).
+
+    Refused rather than reported, and the asymmetry with a *question* naming an unknown word is
+    deliberate: an instrument is curated data and its typos are defects, while a question is the
+    owner's own vocabulary and its gaps are the answer's content (FR-009).
+    """
+    for position, label in enumerate(labels):
+        if label not in groups:
+            raise DeclarationError(
+                path,
+                f"{loader.INSTRUMENT_TABLE}.groups[{position}]",
+                f"names the group {label!r}, which {GROUPS_FILE} does not declare. Membership "
+                "is a declared label and never a rule, so there is nothing to infer it from: a "
+                "label nobody declared would silently put this instrument in no group, and a "
+                "question asking about that group would answer without it.",
+                f"declare {label!r} in {GROUPS_FILE}, or name one of {sorted(groups)}",
+            )
 
 
 def _check_references(
@@ -311,7 +357,17 @@ def from_data_root(root: Path) -> Declarations:
                 "mistyped path.",
                 "check the data root, or add a declaration file",
             )
-    return resolve(instrument_files=instruments, tax_files=tax)
+    groups_file = root / GROUPS_FILE
+    if not groups_file.is_file():
+        raise DeclarationError(
+            groups_file,
+            "",
+            "does not exist, so no group an instrument declares itself into can be resolved. "
+            "It is reported rather than read as an empty vocabulary: every label would then be "
+            "unresolvable and every question naming a group would answer about nothing.",
+            "check the data root, or declare the groups the instruments name",
+        )
+    return resolve(instrument_files=instruments, tax_files=tax, groups_file=groups_file)
 
 
 # ---------------------------------------------------------------------------

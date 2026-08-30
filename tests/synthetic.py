@@ -214,6 +214,7 @@ def declaration(**overrides: Any) -> InstrumentDeclaration:
             TaxableEventKind.COUPON: EXEMPT_CLASS.id,
             TaxableEventKind.DISPOSAL_GAIN: EXEMPT_CLASS.id,
         },
+        groups=(),
     )
     return replace(base, **overrides)
 
