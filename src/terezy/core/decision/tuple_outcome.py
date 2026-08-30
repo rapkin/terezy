@@ -81,6 +81,7 @@ from typing import TYPE_CHECKING, Final, Literal, assert_never
 
 from terezy.core.errors import InconsistentTerms, LedgerInvariantError
 from terezy.core.instruments import fund as fund_terms
+from terezy.core.instruments import terms as instrument_terms
 from terezy.core.instruments.fund import FundDeclaration
 from terezy.core.instruments.interface import (
     Assumptions,
@@ -1396,7 +1397,7 @@ def _assemble(
             prepared, projected, span=span, horizon=horizon, continuation=continuation
         ),
         accounts_for=ACCOUNTS_FOR,
-        excludes=EXCLUDES,
+        excludes=_excludes_of(prepared),
         provenance=provenance,
         # The costing's own verdicts, plus every source behind the outcome aged under the
         # kind its own citation declares. The third is not a tidier restatement of the first
@@ -1602,12 +1603,35 @@ def _projection_provenance(projected: Projection | FundProjection) -> Provenance
 
 
 def _day_count_of(prepared: _Prepared) -> str:
-    """The convention the instrument's own flows were sized with."""
+    """The convention this holding's own figures are annualised on.
+
+    ⚙ The docstring used to say *the convention the instrument's own flows were **sized**
+    with*, and that was only ever true of a schedule computed from a rate and a periodicity.
+    A day count is a convention of computation: it turns a span of days into a fraction of a
+    year. Whether it also sized anything is a fact about the declaration, not about the
+    convention -- which is why the declaration is asked rather than a field read.
+    """
     match prepared.declared:
         case InstrumentDeclaration():
-            return prepared.declared.terms.day_count
+            return instrument_terms.day_count_of(prepared.declared.terms)
         case FundDeclaration():
             return prepared.declared.day_count
+        case _:  # pragma: no cover -- mypy proves this unreachable
+            assert_never(prepared.declared)
+
+
+def _excludes_of(prepared: _Prepared) -> frozenset[str]:
+    """What this outcome fails to account for, beyond what every outcome fails to account
+    for.
+
+    :data:`~terezy.core.results.tuple.EXCLUDES` is the floor. What a particular declaration
+    adds to it is the declaration's answer, not this module's decision (013 FR-023).
+    """
+    match prepared.declared:
+        case InstrumentDeclaration():
+            return EXCLUDES | instrument_terms.excludes_of(prepared.declared.terms)
+        case FundDeclaration():
+            return EXCLUDES
         case _:  # pragma: no cover -- mypy proves this unreachable
             assert_never(prepared.declared)
 

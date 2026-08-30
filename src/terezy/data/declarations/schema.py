@@ -27,11 +27,21 @@ file can lie about itself:
     A validated document is a fact about a file on disk. Nothing may edit it afterwards
     and hand on a value that no file contains.
 
-**Zero field defaults, anywhere.** Not one model below has a default, and that is a
-standing rule rather than a coincidence: FR-016 says *"a default value MUST NOT be
-substituted for anything absent"*, and in pydantic a default is the only mechanism by
-which that substitution can happen. So the absence of defaults is the enforcement. Two
-consequences a reader should expect and not try to fix:
+**No field default ever stands in for a value** (FR-016: *"a default value MUST NOT be
+substituted for anything absent"*). In pydantic a default is the only mechanism by which
+that substitution can happen, so a default here is written **only** where the absence of
+the key is itself a declaration -- an omitted `[access.price]` says *this instrument prices
+itself*, an omitted `published_in_order` says *the source published in date order*, an
+omitted goal variable says *solve for this one*. Every such field defaults to ``None`` and
+never to a value, because ``None`` is "the key was not written" and a value would be a
+number no file contains.
+
+⚙ This paragraph used to read *"Zero field defaults, anywhere. Not one model below has a
+default"*, and by 2026-08-30 eleven models had one. Corrected rather than reworded, and the
+exact set is pinned by ``tests/contract/test_declaration_loading.py`` so the next one is a
+decision somebody takes rather than a sentence that quietly stops being true.
+
+Two consequences a reader should expect and not try to fix:
 
 * ``verified_on`` must be **present** in every sourced table, and empty (``""``) is how
   a value says it is unverified (FR-014). The key being absent is an error; a default of
@@ -230,6 +240,171 @@ class InstrumentFile(BaseModel):
     """One instrument per file, named after the file. A file declaring several would make
     a duplicate id harder to see and would put two unrelated review histories in one
     place."""
+
+
+# ---------------------------------------------------------------------------
+# 013-enumerated-schedule: a bond declared as the payments it will make
+# ---------------------------------------------------------------------------
+#
+# The same root table and the same ``[instrument] class`` key, on the precedent a fund set:
+# one directory, several kinds of declaration, told apart by the one key they all carry.
+#
+# ⚙ **A payment's label is spelled ``pays``, not ``kind``.** ``kind`` is already the key
+# every sourced table uses for the *observation* kind it ages under, and
+# `scripts/check_provenance.py` reads it that way. A payment declaring ``kind = "coupon"``
+# would be reported as naming an undeclared observation kind -- a true statement about the
+# wrong field, sending the reader to fix a line that is correct. The same trap
+# ``kind_of_observation`` exists for on a route leg, and the same fix: name the field for
+# what it is.
+
+
+class ScheduledPaymentTable(BaseModel):
+    """One ``[[instrument.schedule.payment]]`` -- a dated per-unit amount and its label."""
+
+    model_config = STRICT
+
+    on: str
+    """ISO date the payment is made. Not adjusted by anything: no business-day rule is
+    declared, because none was applied to a payment somebody has already published."""
+
+    amount: float
+    """The payment **per unit**, in the instrument's currency, in its major units.
+
+    A figure published in minor units is converted when it is **transcribed**, and the
+    conversion is recorded here as an inference. The engine performs no unit scaling of a
+    declared amount (FR-004): a division by 100 in a loader looks like plumbing.
+    """
+
+    pays: str
+    """``coupon`` or ``principal_repayment`` -- a member of ``core.instruments.interface``'s
+    ``PaymentKind``. Declared, never read off the amount, the date or the position."""
+
+    kind: str
+    """An ``ObservationKind`` id -- which staleness threshold this payment ages under."""
+
+    source: str
+    """This payment's own citation. For a transcribed schedule it is an **inference**: the
+    published list carries no labels, and `scripts/check_provenance.py` requires the
+    statement to say so."""
+
+    retrieved_on: str
+
+    verified_on: str
+
+
+class EnumeratedScheduleTable(BaseModel):
+    """``[instrument.schedule]`` -- the coverage claim, the face value, and the payments.
+
+    **What is absent is absent by construction.** There is no ``issue_date``, no
+    ``coupon_rate_pct``, no ``periodicity``, no ``business_day_rule`` and no
+    ``maturity_date``, so a file supplying one gets the unrecognised-field error rather
+    than being quietly accepted and ignored (FR-003). There is likewise no second coverage
+    bound, which is what makes a two-ended window unrepresentable rather than checked for
+    (FR-005).
+    """
+
+    model_config = STRICT
+
+    face_value: float
+    """Redemption amount per unit, in the instrument's currency. Positive."""
+
+    covers_from: str
+    """ISO date from which this list is complete, to the end of the instrument's life."""
+
+    day_count: str
+    """A declared key of ``core.primitives.conventions.DAY_COUNT_FNS``.
+
+    Required, and not an exception to the absences above: it is a convention of
+    **computation** rather than a term of the issue, and the contractual yield cannot be
+    annualised without one (FR-003a).
+    """
+
+    published_in_order: list[str] | None = None
+    """The payment dates in the order the **source** gave them, where that was not
+    ascending. Omitted in the ordinary case; see ``loader`` for why declaring the
+    ascending order is refused rather than accepted as a no-op."""
+
+    payment: list[ScheduledPaymentTable]
+    """The payments, in ascending date order. The loader neither sorts them nor accepts an
+    unordered list."""
+
+    kind: str
+    """An ``ObservationKind`` id -- which staleness threshold these values age under."""
+
+    source: str
+    """The schedule's own citation, separate from each payment's."""
+
+    retrieved_on: str
+
+    verified_on: str
+
+
+class EnumeratedVerificationTaskTable(BaseModel):
+    """One ``[[instrument.verification_task]]`` on a declared schedule.
+
+    The fund's shape plus one field: ``settles`` names **which inference** the task would
+    settle, which is what lets `scripts/check_provenance.py` check the relation FR-022 asks
+    for rather than merely counting tasks.
+    """
+
+    model_config = STRICT
+
+    settles: str
+    """Which inference this would settle: one of the four in ``loader.INFERENCES``."""
+
+    question: str
+    """What the documents did not answer, in the words a reader would ask it in."""
+
+    searched: str
+    """What was looked at before recording the question."""
+
+    searched_on: str
+
+
+class EnumeratedInstrumentTable(BaseModel):
+    """``[instrument]`` for a bond declared as the payments it will make."""
+
+    model_config = STRICT
+
+    id: str
+
+    name: str
+
+    instrument_class: str = Field(alias="class")
+    """``enumerated_schedule``. Aliased for the same reason a bond's is."""
+
+    currency: str
+
+    is_synthetic: bool
+
+    schedule: EnumeratedScheduleTable
+    """The one field that decides the form (FR-002). A file carrying this **and**
+    ``[instrument.terms]``, or neither, fails on the unrecognised or missing field."""
+
+    constraints: ConstraintsTable
+    """Unchanged: what the instrument requires of a purchase is not a term of the paper."""
+
+    tax_classes: dict[str, str]
+    """Unchanged, and it must cover every income kind the schedule produces (FR-009)."""
+
+    verification_task: list[EnumeratedVerificationTaskTable]
+    """What is inferred, and what would settle it.
+
+    The **key** is required here; that the list covers every inference is
+    ``scripts/check_provenance.py``'s check, and it errors and exits 1 on a file that misses
+    one. This model has no ``min_length``, so an empty list validates and the loader's
+    per-entry checks then loop zero times -- which is correct division of labour and was not
+    what this docstring said: it claimed "required and non-empty" and attributed to the
+    schema an enforcement that lives in the gate.
+    """
+
+
+class EnumeratedInstrumentFile(BaseModel):
+    """A whole ``data/instruments/<id>.toml`` declaring one bond by its payments."""
+
+    model_config = STRICT
+
+    instrument: EnumeratedInstrumentTable
 
 
 class RateEntryTable(BaseModel):

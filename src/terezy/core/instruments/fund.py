@@ -396,7 +396,7 @@ class ExecutionPlan:
 def lot_id_for(holding: Holding) -> str:
     """The identity of the lot a purchase opens: instrument and settlement date.
 
-    Derived rather than generated, exactly as ``fixed_income.lot_id_for`` is and for the
+    Derived rather than generated, exactly as ``acquire.lot_id_for`` is and for the
     same reason: a counter or a clock would break determinism (C4).
     """
     return f"{holding.instrument_id}@{holding.purchased_on.isoformat()}"

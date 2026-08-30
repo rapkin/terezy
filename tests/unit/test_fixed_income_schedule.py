@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from terezy.core.instruments import fixed_income
+from terezy.core.instruments import acquire, fixed_income
 from terezy.core.ledger.events import Event, EventKind
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
@@ -79,8 +79,8 @@ def test_the_lot_identity_is_derived_from_the_purchase_and_is_stable() -> None:
     # Not generated: a counter or a clock would make two runs of the same scenario
     # produce different-looking results and break the determinism digest (C4).
     holding = synthetic.holding()
-    assert fixed_income.lot_id_for(holding) == "ovdp_synthetic_test@2026-01-15"
-    assert fixed_income.lot_id_for(holding) == fixed_income.lot_id_for(
+    assert acquire.lot_id_for(holding) == "ovdp_synthetic_test@2026-01-15"
+    assert acquire.lot_id_for(holding) == acquire.lot_id_for(
         synthetic.holding(purchased_on=date(2026, 1, 15))
     )
 

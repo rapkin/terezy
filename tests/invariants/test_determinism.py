@@ -67,7 +67,7 @@ from terezy.core.results import canonical, project
 from terezy.core.results.project import Projection
 from terezy.data import manifest
 from terezy.data.declarations import resolver
-from tests import synthetic
+from tests import declared_terms, synthetic
 
 pytestmark = pytest.mark.invariant
 
@@ -225,10 +225,13 @@ class TestTwoRunsOnIdenticalInputsAgree:
                     owner_id="owner-1",
                     instrument_id=ISSUE_A,
                     quantity=10.0,
-                    purchased_on=declaration.terms.issue_date,
+                    purchased_on=declared_terms.contractual(declaration).issue_date,
                     cost=Money(10_000.0, UAH, prov.EMPTY),
                 ),
-                DateRange(start=declaration.terms.issue_date, end=date(2028, 1, 31)),
+                DateRange(
+                    start=declared_terms.contractual(declaration).issue_date,
+                    end=date(2028, 1, 31),
+                ),
                 synthetic.assumptions(),
                 tax_classes=declarations.tax_classes,
             )
@@ -263,7 +266,7 @@ from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.results import canonical, project
 from terezy.data import manifest
-from tests import synthetic
+from tests import declared_terms, synthetic
 
 outcome = project.project(
     synthetic.declaration(),
@@ -402,10 +405,12 @@ class TestVerifyingASourceDoesNotMoveTheDigest:
             owner_id="owner-1",
             instrument_id=ISSUE_A,
             quantity=10.0,
-            purchased_on=declaration.terms.issue_date,
+            purchased_on=declared_terms.contractual(declaration).issue_date,
             cost=Money(10_000.0, UAH, prov.EMPTY),
         )
-        horizon = DateRange(start=declaration.terms.issue_date, end=date(2028, 1, 31))
+        horizon = DateRange(
+            start=declared_terms.contractual(declaration).issue_date, end=date(2028, 1, 31)
+        )
         assumptions = synthetic.assumptions()
         outcome = project.project(
             declaration, holding, horizon, assumptions, tax_classes=declarations.tax_classes

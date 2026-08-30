@@ -87,6 +87,7 @@ from terezy.core.results.hurdle import HurdleRate
 from terezy.core.results.project import Projection
 from terezy.core.tax.interface import TaxableEventKind, TaxClass
 from terezy.core.tax.schedule import RateEntry
+from tests import declared_terms
 
 pytestmark = pytest.mark.worked_example
 
@@ -311,9 +312,10 @@ class TestTheScheduleToMaturity:
         # FR-021: the produced schedule must say which conventions placed its dates,
         # rather than leaving a reader to assume the engine's favourite.
         for row in _projection().schedule.rows:
-            assert row.conventions.periodicity == "semiannual"
-            assert row.conventions.day_count == "act/365"
-            assert row.conventions.business_day_rule == "following"
+            applied = declared_terms.generated(row.conventions)
+            assert applied.periodicity == "semiannual"
+            assert applied.day_count == "act/365"
+            assert applied.business_day_rule == "following"
 
 
 class TestTheTaxIsExactlyZero:

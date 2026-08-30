@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import calendar
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Final
 
@@ -305,3 +306,75 @@ def periodicity(name: str) -> PeriodicityFn:
 def business_day_rule(name: str) -> BusinessDayFn:
     """The non-business-day adjustment a declared name selects."""
     return _resolve(BUSINESS_DAY_FNS, "business-day", name)
+
+
+# ---------------------------------------------------------------------------
+# What a schedule applied, as the statement a row makes about itself
+# ---------------------------------------------------------------------------
+#
+# 001 FR-021 asks a cash-flow row to **state which convention it applied**, and 013 FR-016
+# adds that a schedule of declared payments has to be able to state that two of the three
+# never ran. Two records rather than one with nullable fields: a nullable periodicity is a
+# question about which kind of declaration produced the row, asked without naming it, and a
+# statement carrying a field it cannot fill is a statement a reader has to interpret.
+#
+# They live here, below both the instrument layer that answers the question and the result
+# layer that renders the answer, so neither has to import the other to say what happened.
+
+
+@dataclass(frozen=True, slots=True)
+class ConventionsApplied:
+    """The three declared conventions that generated a schedule's dates and amounts.
+
+    Carried on every row rather than once on the schedule, because 001 FR-021 is a statement
+    about what the schedule *says*: a row lifted out of the table -- into a report, into a
+    comparison -- has to keep saying which convention placed it. They are identical across
+    the rows of one issue today; they will not be when a schedule spans two instruments.
+    """
+
+    periodicity: str
+    """The declared coupon frequency that generated the dates."""
+
+    day_count: str
+    """The declared day-count convention that turned each accrual period into a fraction
+    of a year, and therefore fixed each coupon's size **on this schedule**.
+
+    ⚙ That last clause is the correction 013 forced (FR-016). The sentence used to be
+    unqualified, and it was never a claim about day counts in general -- it is a claim about
+    what happened to *these* rows, which is exactly what :class:`AmountsAsDeclared` exists to
+    deny for a schedule whose amounts were declared rather than computed.
+    """
+
+    business_day_rule: str
+    """The declared rule that moved a payment off a non-business day. Applied to the
+    payment date only; the accrual was measured on the unadjusted dates."""
+
+
+_DECLARED_REASON: Final = (
+    "no periodicity generated this date, no business-day rule moved it, and no day count "
+    "sized this amount -- the amount is declared, per unit, and is carried through "
+    "unchanged. The day count named here annualises a span and does nothing else."
+)
+
+
+@dataclass(frozen=True, slots=True)
+class AmountsAsDeclared:
+    """What a schedule of declared dated payments applied: one convention, to annualise.
+
+    The sibling of :class:`ConventionsApplied`, and FR-016's two halves are what shape it.
+    It **names** a day count, because one is declared and a yield is annualised on it, and a
+    row claiming none had been applied would be false the moment that yield is emitted from
+    the same projection. It names **no** periodicity and **no** business-day rule, because
+    neither ran, and there is nowhere here to put one.
+    """
+
+    day_count: str
+    """The declared convention that annualises a span. It sizes nothing (FR-003b)."""
+
+    reason: str = _DECLARED_REASON
+    """What the row states, in the words it states it in.
+
+    Defaulted because it is the same sentence on every such row and a caller retyping it is
+    a caller who can get it subtly wrong; overridable because a later schedule shape may have
+    a different true thing to say.
+    """

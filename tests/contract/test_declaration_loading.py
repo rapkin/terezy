@@ -30,12 +30,14 @@ from __future__ import annotations
 
 import re
 import shutil
+from collections.abc import Mapping
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Final
 
 import pydantic
 import pytest
+from pydantic import BaseModel
 
 from terezy.core.errors import InconsistentTerms
 from terezy.core.instruments.interface import Assumptions, DateRange, Holding
@@ -48,8 +50,9 @@ from terezy.core.results import project
 from terezy.core.results.project import Projection
 from terezy.core.tax.interface import TaxableEventKind
 from terezy.core.tax.schedule import RateUndeclaredBefore
-from terezy.data.declarations import loader, resolver
+from terezy.data.declarations import loader, resolver, schema
 from terezy.data.declarations.errors import DeclarationError
+from tests import declared_terms
 
 pytestmark = pytest.mark.contract
 
@@ -168,12 +171,13 @@ class TestTheShippedFilesLoad:
         # which is the literal `0.155` bit for bit. An approximate assertion here would
         # pass just as happily on a rate that was off by a rounding step, and the whole
         # point of this line is that the conversion happens once and lands exactly.
-        assert declaration.terms.coupon_rate == 0.155
-        assert declaration.terms.issue_date == date(2026, 1, 15)
-        assert declaration.terms.maturity_date == date(2028, 1, 15)
-        assert declaration.terms.periodicity == "semiannual"
-        assert declaration.terms.day_count == "act/365"
-        assert declaration.terms.business_day_rule == "following"
+        terms = declared_terms.contractual(declaration)
+        assert terms.coupon_rate == 0.155
+        assert terms.issue_date == date(2026, 1, 15)
+        assert terms.maturity_date == date(2028, 1, 15)
+        assert terms.periodicity == "semiannual"
+        assert terms.day_count == "act/365"
+        assert terms.business_day_rule == "following"
         assert declaration.constraints.min_unit == 1.0
         assert declaration.tax_classes == {
             TaxableEventKind.COUPON: "ua_government_bond",
@@ -697,7 +701,7 @@ class TestNonPositiveAmounts:
                 "coupon_rate_pct   = 0.0",
             ),
         )
-        assert loader.instrument_from_file(zero).terms.coupon_rate == 0.0
+        assert declared_terms.contractual(loader.instrument_from_file(zero)).coupon_rate == 0.0
 
     @pytest.mark.parametrize(
         ("old", "new", "field_path"),
@@ -819,7 +823,8 @@ class TestAnImpossibleInstrumentIsNotALoadError:
             ),
         )
         declaration = loader.instrument_from_file(broken)
-        assert declaration.terms.maturity_date < declaration.terms.issue_date
+        impossible = declared_terms.contractual(declaration)
+        assert impossible.maturity_date < impossible.issue_date
 
         outcome = project.project(
             declaration,
@@ -1262,8 +1267,127 @@ class TestTheBatteryCoversTheContract:
             "TestNoPydanticTypeEscapes",
             "TestAnImpossibleInstrumentIsNotALoadError",
             "TestTheBatteryCoversTheContract",
+            "TestNoFieldDefaultStandsInForAValue",
+            "TestEveryShippedInstrumentSaysItIsAFixture",
         }
 
     def test_the_second_issue_is_a_file_and_not_a_special_case(self) -> None:
         """Both shipped issues load through the same function, with no branch on id."""
         assert loader.instrument_from_file(INSTRUMENT_B).id == "ovdp_synthetic_b"
+
+
+class TestNoFieldDefaultStandsInForAValue:
+    """The schema module's own rule, pinned rather than restated (FR-016).
+
+    A default in pydantic is the only mechanism by which a value no file contains can enter
+    the model, so the set of fields that have one is worth knowing exactly. Every entry
+    below is a field whose **absence is itself a declaration** — an omitted `[access.price]`
+    says *this instrument prices itself*, an omitted `published_in_order` says *the source
+    published in date order* — and every one of them defaults to ``None`` rather than to a
+    value.
+
+    ⚙ Written after the module docstring was found claiming *"Zero field defaults,
+    anywhere"* over eleven of them (2026-08-30). A sentence asserting a mechanical property
+    is a test or it is not written.
+    """
+
+    OPTIONAL: Final[Mapping[str, frozenset[str]]] = {
+        "AccessTable": frozenset({"price"}),
+        "ChannelSideTable": frozenset({"markup_bps", "premium_per_unit"}),
+        "DistributionTable": frozenset({"peg"}),
+        "EnumeratedScheduleTable": frozenset({"published_in_order"}),
+        "FundTable": frozenset({"subscription_cutoff", "distribution"}),
+        "GoalTable": frozenset({"monthly_contribution", "target_sum", "target_date"}),
+        "IndexationTable": frozenset({"rate_pct"}),
+        "LegTable": frozenset(
+            {
+                "channel",
+                "capacity_pool",
+                "minimum",
+                "maximum",
+                "monthly_cap",
+                "available_from",
+                "available_until",
+            }
+        ),
+        # Both arrived with feature 011, and both are the permitted shape rather than the
+        # forbidden one: the absence of the key IS the declaration.
+        #
+        # `non_publication_rule` is the sharper of the two, and 011 turns on it. The rule
+        # for a date the National Bank publishes no rate for is written in working days and
+        # public holidays, which FR-011 forbids the engine to know about, so the Ukrainian
+        # series ships WITHOUT one and every such date refuses. A default here would be a
+        # rule nobody declared, applied silently, to the one input that makes a foreign
+        # amount a legal one.
+        "OfficialRateFile": frozenset({"non_publication_rule"}),
+        # A timing table for a jurisdiction whose taxable events are all in the base
+        # currency needs no rate series, and saying so by omission is the same shape
+        # `StreamTable.income_tax_rate_pct` already has: omitted means not stated, which is
+        # a different claim from stated-as-nothing.
+        "TimingTable": frozenset({"official_rate_series"}),
+        "RouteTable": frozenset({"partner_route"}),
+        "SeedTable": frozenset({"reason"}),
+        "StreamTable": frozenset({"income_tax_rate_pct"}),
+    }
+
+    @staticmethod
+    def _defaults() -> dict[str, frozenset[str]]:
+        return {
+            name: frozenset(
+                field for field, info in model.model_fields.items() if not info.is_required()
+            )
+            for name, model in vars(schema).items()
+            if isinstance(model, type)
+            and issubclass(model, BaseModel)
+            and model is not BaseModel
+            and any(not info.is_required() for info in model.model_fields.values())
+        }
+
+    def test_exactly_these_fields_may_be_omitted(self) -> None:
+        assert self._defaults() == dict(self.OPTIONAL), (
+            "a field gained or lost an optional marker. Adding one is permitted where the "
+            "absence of the key is itself a declaration; it is not permitted as a way of "
+            "not writing a value (FR-016), so the decision is taken here"
+        )
+
+    def test_and_every_one_of_them_defaults_to_nothing_rather_than_to_a_value(self) -> None:
+        """The half that matters. ``None`` is "the key was not written"; anything else is a
+        number, a date or a name that no file on disk contains."""
+        for name, fields in self._defaults().items():
+            model = getattr(schema, name)
+            for field in sorted(fields):
+                assert model.model_fields[field].default is None, f"{name}.{field}"
+
+
+class TestEveryShippedInstrumentSaysItIsAFixture:
+    """`docs/METHODOLOGY.md` §0's claim about `data/instruments/`, as a check.
+
+    Every declaration this repository ships is invented, and every one of them says so on
+    its face — a bond through `is_synthetic`, a fund through `is_assumption_driven` — with
+    every `verified_on` empty. §0 tells a reader that no figure computed from any of them
+    describes something anyone can buy, and it used to tell them by naming two files by
+    hand, which had been wrong since feature 006 added three more.
+
+    ⚙ The correction replaced the count with the property and cited a file that checks no
+    such thing (found 2026-08-30). This is that file.
+    """
+
+    def test_every_declared_bond_declares_itself_synthetic(self) -> None:
+        declared = resolver.from_data_root(DATA_ROOT)
+        assert declared.instruments
+        for identifier, instrument in sorted(declared.instruments.items()):
+            assert instrument.is_synthetic, identifier
+
+    def test_every_declared_fund_declares_itself_assumption_driven(self) -> None:
+        declared = resolver.from_data_root(DATA_ROOT)
+        assert declared.funds
+        for identifier, fund in sorted(declared.funds.items()):
+            assert fund.is_assumption_driven, identifier
+
+    def test_and_nothing_they_rest_on_claims_to_have_been_verified(self) -> None:
+        """The other half of the sentence. A verified term in a file of invented ones would
+        be a claim that somebody checked an invention against a source."""
+        declared = resolver.from_data_root(DATA_ROOT)
+        for identifier, instrument in sorted(declared.instruments.items()):
+            assert prov.is_unverified(instrument.terms.provenance), identifier
+            assert prov.is_unverified(instrument.constraints.provenance), identifier

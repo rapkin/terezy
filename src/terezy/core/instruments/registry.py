@@ -37,11 +37,22 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Final
 
-from terezy.core.instruments import fixed_income
+from terezy.core.instruments import enumerated, fixed_income
 from terezy.core.instruments.interface import InstrumentOps
 
 FIXED_INCOME: Final = "fixed_income"
-"""The one instrument class implemented today: contractual schedules from bond terms."""
+"""A bond declared by its terms: the schedule is computed from a rate, a periodicity, an
+issue date and a maturity date."""
+
+ENUMERATED_SCHEDULE: Final = "enumerated_schedule"
+"""A bond declared by the payments it will make: the schedule *is* the declaration.
+
+⚙ **A second entry, and not a second interface** (013). It takes the same arguments, returns
+the same event stream, and fails with the same union, so it belongs in this mapping where a
+fund does not -- the three mismatches recorded below hold for none of it. Why the two forms
+are kept apart rather than merged is argued where the records are, in
+`core.instruments.interface`.
+"""
 
 OPS: Final[InstrumentOps] = InstrumentOps(
     events=fixed_income.events,
@@ -55,8 +66,16 @@ It is the implementation's declaration that it satisfies the interface, so it li
 close to the implementation as the import graph allows.
 """
 
+ENUMERATED_OPS: Final[InstrumentOps] = InstrumentOps(
+    events=enumerated.events,
+    tax_classes=enumerated.tax_classes,
+    constraints=enumerated.constraints,
+)
+"""``enumerated``'s three functions, gathered into the same record, unchanged."""
+
 REGISTRY: Final[Mapping[str, InstrumentOps]] = {
     FIXED_INCOME: OPS,
+    ENUMERATED_SCHEDULE: ENUMERATED_OPS,
 }
 """Every declaration kind whose projection is an event stream.
 
@@ -131,7 +150,9 @@ COLLECTIVE_INVESTMENT_FUND: Final = "collective_investment_fund"
 """A collective-investment fund: `core.instruments.fund`, projected by
 `core.results.fund.project_fund`."""
 
-DECLARATION_KINDS: Final[frozenset[str]] = frozenset({FIXED_INCOME, COLLECTIVE_INVESTMENT_FUND})
+DECLARATION_KINDS: Final[frozenset[str]] = frozenset(
+    {FIXED_INCOME, ENUMERATED_SCHEDULE, COLLECTIVE_INVESTMENT_FUND}
+)
 """Every ``[instrument] class`` a declaration file may name, instrument or otherwise.
 
 The vocabulary lives in `core` because it is domain knowledge; which *loader* parses each

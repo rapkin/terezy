@@ -443,6 +443,127 @@ def check_table(
                     check_table(item, path, f"{child}[{index}]", findings, kinds)
 
 
+# ---------------------------------------------------------------------------
+# 013-enumerated-schedule: what is inferred is declared, and the declaration is checked
+# ---------------------------------------------------------------------------
+#
+# Everything above this line is **shape**: a table with a numeric leaf needs a citation, a
+# date needs to look like a date. What follows is the gate's first **relation** -- that an
+# inferred value has a task saying what would settle it -- and it is worth naming rather
+# than sliding in, because the two are different kinds of check and the second is the one a
+# future reader will wonder how to extend.
+#
+# Why here rather than in the loader: FR-022 asks for the gate, and the gate is what a
+# person maintaining a declaration by hand runs. The loader checks that a task is
+# well-formed; whether the file's tasks *cover* its inferences is a fact about the whole
+# document, and a check nobody runs while editing is a check that fires too late.
+
+ENUMERATED_CLASS = "enumerated_schedule"
+
+INFERRED = ("face_value", "payment_kind", "minor_unit_conversion", "coverage")
+"""What a transcribed schedule infers, and therefore what it must record a task for.
+
+⚙ **A second copy of `terezy.data.declarations.loader.INFERENCES`**, kept because this
+script imports nothing from the engine — the whole point of it being a script is that it
+reads data files and needs no installed package to do it. The copy is held to the original
+by `tests/contract/test_provenance_gate.py`, which asserts the two agree: a duplicate
+nothing checks is the one that goes stale, and this one is checked.
+"""
+
+INFERENCE_MARKER = "INFERENCE:"
+"""How a citation says the value below it is nobody's statement (FR-020)."""
+
+
+def enumerated_findings(document: dict[str, Any], path: Path) -> list[Finding]:
+    """The inference checks, for a declaration that lists the payments it will make.
+
+    Runs on nothing else: a bond declared by its terms infers none of this, and a fund's
+    verification tasks answer a different question.
+    """
+    instrument = document.get("instrument")
+    if not isinstance(instrument, dict) or instrument.get("class") != ENUMERATED_CLASS:
+        return []
+
+    findings: list[Finding] = []
+    # ⚙ **The task check runs whatever shape the rest of the file is in.** An earlier
+    # version returned early on a missing or malformed schedule, on the reading that the
+    # loader reports that and names the field -- which is true, and skipped the one check
+    # this function exists for. A file with a broken schedule and no verification tasks then
+    # passed the gate silently, which is the fail-open shape the header argues against in
+    # the same script.
+    findings.extend(_missing_tasks(instrument, path))
+    findings.extend(_uncited_inferences(instrument.get("schedule"), path))
+    return findings
+
+
+def _uncited_inferences(schedule: Any, path: Path) -> list[Finding]:
+    """Each table carrying inferred values says so, and carries no verification date.
+
+    Reports nothing about a schedule that is not a table or whose payments are not a list:
+    those are shape faults, and the loader names the field. What it must not do is let a
+    shape fault stand in for the checks it *can* make on the tables that are there.
+    """
+    if not isinstance(schedule, dict):
+        return []
+    payments = schedule.get("payment")
+    inferring = [("instrument.schedule", schedule)]
+    if isinstance(payments, list):
+        inferring += [
+            (f"instrument.schedule.payment[{index}]", entry)
+            for index, entry in enumerate(payments)
+            if isinstance(entry, dict)
+        ]
+    findings: list[Finding] = []
+    for name, table in inferring:
+        source = table.get("source")
+        if not isinstance(source, str) or not source.startswith(INFERENCE_MARKER):
+            findings.append(
+                Finding(
+                    path,
+                    name,
+                    "carries values nobody stated -- a face value read off a list, a "
+                    "payment labelled by a human, a conversion out of minor units -- and "
+                    f"its source does not say so. Begin the citation {INFERENCE_MARKER!r} "
+                    "and state what the inference rests on",
+                    error=True,
+                )
+            )
+        if table.get("verified_on"):
+            findings.append(
+                Finding(
+                    path,
+                    name,
+                    "declares a verification date on an inferred value. An inference is "
+                    "unverified by construction: what a later reading verifies is the "
+                    "source it rests on, and that is a different table",
+                    error=True,
+                )
+            )
+    return findings
+
+
+def _missing_tasks(instrument: dict[str, Any], path: Path) -> list[Finding]:
+    """Every inference a declared schedule rests on has a task saying what would settle it."""
+    tasks = instrument.get("verification_task")
+    settled = {
+        entry.get("settles")
+        for entry in (tasks if isinstance(tasks, list) else [])
+        if isinstance(entry, dict)
+    }
+    return [
+        Finding(
+            path,
+            "instrument.verification_task",
+            f"records no task settling {inference!r}, which every declared schedule infers. "
+            "A value nobody stated and nobody has a plan to settle is a value that stays "
+            "unverified without anyone deciding that it should",
+            error=True,
+        )
+        for inference in INFERRED
+        if inference not in settled
+    ]
+
+
 def check_file(path: Path, kinds: frozenset[str]) -> list[Finding]:
     findings: list[Finding] = []
     try:
@@ -452,6 +573,7 @@ def check_file(path: Path, kinds: frozenset[str]) -> list[Finding]:
         # Principle II: a malformed data file fails loudly, naming the file.
         return [Finding(path, "", f"is not valid TOML: {exc}", error=True)]
     check_table(document, path, "", findings, kinds)
+    findings.extend(enumerated_findings(document, path))
     return findings
 
 

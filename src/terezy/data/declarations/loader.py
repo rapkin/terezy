@@ -24,12 +24,19 @@ Four things this module is responsible for, in the order they happen:
    because it is where declared values *enter* the system and where their citation is
    attached; see ``tests/contract/test_money_construction_guard.py``.
 
-**Percent becomes a fraction exactly once, here.** Every ``_pct`` field passes through
-:func:`_as_fraction` and nothing else divides by 100 anywhere in the project. Doing it
-twice and not doing it at all are the two likeliest bugs in this layer, and both are
-invisible in the output -- a 15.5% coupon reading as 0.155% still produces a plausible
-schedule -- so the conversion is one named function with one caller per field and a
-worked assertion in the contract tests.
+**Percent becomes a fraction exactly once in this module**: every ``_pct`` field passes
+through :func:`_as_fraction`, which is the only division by 100 here. Doing it twice and
+not doing it at all are the two likeliest bugs in this layer, and both are invisible in
+the output -- a 15.5% coupon reading as 0.155% still produces a plausible schedule -- so
+the conversion is one named function with one caller per field and a worked assertion in
+the contract tests.
+
+⚙ The sentence used to claim that nothing else divided by 100 **anywhere in the project**,
+and feature 007 made it false: `core.inflation.series` turns a CPI observation published
+against the previous month = 100 into a growth factor. Corrected in 013 rather than
+restated, because a claim about another module is a test or it is not written --
+``tests/contract/test_nothing_is_inferred.py`` now holds the project-wide version, with
+each permitted site named beside its reason.
 
 **Provenance is per table.** Each sourced table becomes one ``SourceRef`` whose id names
 the file and the table, so a figure traces back to *where it was declared* rather than
@@ -45,6 +52,7 @@ is the engine's typed ``InconsistentTerms``, not a load error.
 
 from __future__ import annotations
 
+import itertools
 import tomllib
 from dataclasses import dataclass
 from datetime import date
@@ -75,9 +83,13 @@ from terezy.core.instruments.fund import (
     VerificationTask,
 )
 from terezy.core.instruments.interface import (
+    PAYMENT_KINDS,
     BondTerms,
+    EnumeratedTerms,
     InstrumentConstraints,
     InstrumentDeclaration,
+    PaymentKind,
+    ScheduledPayment,
 )
 from terezy.core.ledger import lots, seeds
 from terezy.core.ledger.seeds import SeedLot
@@ -130,9 +142,15 @@ JURISDICTION_TABLE: Final = "jurisdiction"
 def _as_fraction(percent: float) -> float:
     """A declared percentage as the fraction the core works in: ``15.5`` -> ``0.155``.
 
-    The **only** division by 100 in the project. Every ``_pct`` field goes through here
-    and no other code performs the conversion, which is what makes "exactly once, at the
-    boundary" a checkable claim rather than a convention.
+    The only place a declared **percentage** becomes a fraction, and the only division by
+    100 in this module: every ``_pct`` field goes through here, which is what makes "exactly
+    once, at the boundary" a checkable claim rather than a convention.
+
+    ⚙ It is **not** the only division by 100 in the project -- `core.inflation.series` turns
+    a CPI observation published against the previous month = 100 into a growth factor -- and
+    this docstring said it was, twice, after feature 007 landed that one.
+    ``tests/contract/test_nothing_is_inferred.py`` holds the project-wide version, with each
+    permitted site named beside its reason and pinned to exactly one division each.
     """
     return percent / _PERCENT
 
@@ -626,6 +644,384 @@ def instrument_from_file(path: Path) -> InstrumentDeclaration:
         tax_classes=_tax_class_references(
             path, table.tax_classes, field_prefix=f"{INSTRUMENT_TABLE}.tax_classes"
         ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# 013-enumerated-schedule: a bond declared as the payments it will make
+# ---------------------------------------------------------------------------
+
+SCHEDULE_TABLE: Final = f"{INSTRUMENT_TABLE}.schedule"
+
+INFERENCES: Final[Mapping[str, str]] = {
+    "face_value": "what face value this issue actually has",
+    "payment_kind": "which payments are coupons and which repay principal",
+    "minor_unit_conversion": "whether the published figures denote major or minor units",
+    "coverage": "whether this list is complete from the coverage date onwards",
+}
+"""The four things a transcribed schedule infers, and what each would have to settle.
+
+Read here to validate a ``settles`` key. ``scripts/check_provenance.py`` checks the relation
+FR-022 asks for -- that each inferred value's source says it is an inference and that a task
+exists for it -- and holds its own copy of these ids, because a script that imported the
+engine would stop being runnable by someone who has not installed it. The two are held equal
+by ``tests/contract/test_provenance_gate.py``, which is what makes the copy safe.
+"""
+
+INFERENCE_MARKER: Final = "INFERENCE:"
+"""How a citation says it is an inference rather than a reading of a source.
+
+A prefix, because a sentence in prose cannot be checked and a check cannot go stale
+silently. It marks a value nobody stated: what it rests on follows in the citation's own
+words, and its ``verified_on`` is empty by construction (FR-020).
+"""
+
+
+def _payment_kind(path: Path, field_path: str, value: str) -> PaymentKind:
+    """A declared payment label as the core's closed enum member (FR-007, FR-008).
+
+    Never inferred from the amount, the date or the position in the list: ``8305, 8305,
+    8305, 100000`` is obviously three coupons and a repayment of principal to a human and
+    obviously nothing at all to a machine, and the published data carries no labels.
+    """
+    for kind in PaymentKind:
+        if kind.value == value:
+            return kind
+    raise DeclarationError(
+        path,
+        field_path,
+        f"declares the payment kind {value!r}, which this engine does not model. What a "
+        "payment is decides both what the ledger records and which income kind the tax "
+        "layer assesses, so it is never guessed from the amount or the position.",
+        f"one of: {', '.join(sorted(kind.value for kind in PaymentKind))}",
+    )
+
+
+def _scheduled_payment(
+    path: Path,
+    table: schema.ScheduledPaymentTable,
+    currency: Currency,
+    *,
+    field_prefix: str,
+) -> ScheduledPayment:
+    """One ``[[instrument.schedule.payment]]``, carrying its own citation."""
+    sources: Provenance = prov.of(
+        [
+            _source_ref(
+                path,
+                field_prefix,
+                source=table.source,
+                retrieved_on=table.retrieved_on,
+                verified_on=table.verified_on,
+                kind=table.kind,
+            )
+        ]
+    )
+    return ScheduledPayment(
+        on=_parse_date(path, f"{field_prefix}.on", table.on),
+        amount=Money(
+            _positive(
+                path,
+                f"{field_prefix}.amount",
+                table.amount,
+                "a payment of nothing is not a payment, and a negative one would have the "
+                "holder paying the issuer, which this engine does not model",
+            ),
+            currency,
+            sources,
+        ),
+        pays=_payment_kind(path, f"{field_prefix}.pays", table.pays),
+    )
+
+
+def _enumerated_schedule(
+    path: Path,
+    table: schema.EnumeratedScheduleTable,
+    currency: Currency,
+    *,
+    field_prefix: str,
+) -> EnumeratedTerms:
+    """``[instrument.schedule]`` as ``EnumeratedTerms``, with nothing repaired on the way in.
+
+    **The loader neither sorts nor merges.** An unordered list is refused rather than put in
+    order, because ordering is settled at transcription -- the same declared human step that
+    turns minor units into major ones -- and sorting here would delete the fact FR-020a
+    exists to keep: that the source published it differently.
+    """
+    sources: Provenance = prov.of(
+        [
+            _source_ref(
+                path,
+                field_prefix,
+                source=table.source,
+                retrieved_on=table.retrieved_on,
+                verified_on=table.verified_on,
+                kind=table.kind,
+            )
+        ]
+    )
+    if not table.payment:
+        raise DeclarationError(
+            path,
+            f"{field_prefix}.payment",
+            "declares no payments. A schedule that lists nothing is not a schedule that "
+            "pays nothing -- it is a declaration whose one content is missing, and every "
+            "figure derived from it would describe a holding that was never modelled.",
+            "declare one [[instrument.schedule.payment]] per dated amount",
+        )
+    covers_from = _parse_date(path, f"{field_prefix}.covers_from", table.covers_from)
+    payments = tuple(
+        _scheduled_payment(path, entry, currency, field_prefix=f"{field_prefix}.payment[{index}]")
+        for index, entry in enumerate(table.payment)
+    )
+    _check_ordered(path, payments, field_prefix=field_prefix)
+    _check_covered(path, payments, covers_from, field_prefix=field_prefix)
+    _check_repays_principal(path, payments, field_prefix=field_prefix)
+    return EnumeratedTerms(
+        face_value=Money(
+            _positive(
+                path,
+                f"{field_prefix}.face_value",
+                table.face_value,
+                "a redemption amount of nothing redeems nothing, and every unit fraction a "
+                "principal repayment retires would be computed against it",
+            ),
+            currency,
+            sources,
+        ),
+        covers_from=covers_from,
+        payments=payments,
+        day_count=_known(
+            path,
+            f"{field_prefix}.day_count",
+            table.day_count,
+            conventions.DAY_COUNT_FNS,
+            "day-count convention",
+        ),
+        published_in_order=_published_in_order(
+            path, table.published_in_order, payments, field_prefix=field_prefix
+        ),
+        provenance=sources,
+    )
+
+
+def _check_ordered(
+    path: Path, payments: tuple[ScheduledPayment, ...], *, field_prefix: str
+) -> None:
+    """Every payment on or after the one before it."""
+    for index, (earlier, later) in enumerate(itertools.pairwise(payments)):
+        if later.on < earlier.on:
+            raise DeclarationError(
+                path,
+                f"{field_prefix}.payment[{index + 1}].on",
+                f"is {later.on.isoformat()}, before the payment above it on "
+                f"{earlier.on.isoformat()}, so the list is not in ascending date order. It "
+                "is refused rather than sorted: that the source published its payments in "
+                "another order is a fact about the source, and sorting here would delete it.",
+                "put the payments in date order when transcribing them, and record the "
+                "order the source gave in 'published_in_order'",
+            )
+
+
+def _check_covered(
+    path: Path,
+    payments: tuple[ScheduledPayment, ...],
+    covers_from: date,
+    *,
+    field_prefix: str,
+) -> None:
+    """No payment before the date the schedule claims to be complete from."""
+    for index, payment in enumerate(payments):
+        if payment.on < covers_from:
+            raise DeclarationError(
+                path,
+                f"{field_prefix}.payment[{index}].on",
+                f"is {payment.on.isoformat()}, before this schedule claims to be complete "
+                f"from {covers_from.isoformat()}. Two declared facts that cannot both hold: "
+                "either the coverage claim starts earlier than it says, or this payment "
+                "belongs to a holder the claim does not describe.",
+                "correct 'covers_from', or remove the payment that precedes it",
+            )
+
+
+def _check_repays_principal(
+    path: Path, payments: tuple[ScheduledPayment, ...], *, field_prefix: str
+) -> None:
+    """At least one payment that returns principal."""
+    if any(payment.pays is PaymentKind.PRINCIPAL_REPAYMENT for payment in payments):
+        return
+    raise DeclarationError(
+        path,
+        f"{field_prefix}.payment",
+        "declares no payment repaying principal. A stream of coupons that never returns "
+        "anything is not something the observed data contains and not something a reader "
+        "would mean; read as declared it would report a holding whose basis is never "
+        "recovered.",
+        'label the payment that returns principal pays = "principal_repayment"',
+    )
+
+
+def _published_in_order(
+    path: Path,
+    declared: list[str] | None,
+    payments: tuple[ScheduledPayment, ...],
+    *,
+    field_prefix: str,
+) -> tuple[date, ...] | None:
+    """The order the source published, checked to be a real difference (FR-020a, SC-018).
+
+    Two refusals, and both are about the field staying **evidence**. An order that is not a
+    rearrangement of these very payments describes some other list; an order identical to
+    the ascending one records no difference at all, and a field that can be filled in
+    without saying anything is a field that stops tracking the source.
+
+    ⚙ The second refusal is also the field's stated limit: two payments of different kinds
+    on one date are one date here, so a source that published *that pair* the other way
+    round has nothing to record and is told so. See ``EnumeratedTerms.published_in_order``.
+    """
+    if declared is None:
+        return None
+    field_path = f"{field_prefix}.published_in_order"
+    order = tuple(
+        _parse_date(path, f"{field_path}[{index}]", text) for index, text in enumerate(declared)
+    )
+    dates = tuple(payment.on for payment in payments)
+    if sorted(order) != sorted(dates):
+        raise DeclarationError(
+            path,
+            field_path,
+            "is not a rearrangement of this schedule's own payment dates, so it describes "
+            "some other list. It records what the source published; a list that does not "
+            "match the payments cannot be that.",
+            "write every declared payment date exactly once, in the order the source gave",
+        )
+    if order == dates:
+        raise DeclarationError(
+            path,
+            field_path,
+            "repeats the order the payments are already in, so it records no difference. "
+            "The field exists to keep a fact that sorting would delete -- that the source "
+            "published these payments in another order -- and stating the ascending order "
+            "makes it boilerplate rather than evidence.",
+            "omit the field where the source published in date order",
+        )
+    return order
+
+
+def _check_kinds_are_taxed(
+    path: Path,
+    payments: tuple[ScheduledPayment, ...],
+    declared: Mapping[TaxableEventKind, str],
+    *,
+    field_prefix: str,
+) -> None:
+    """Every income kind this schedule produces has a declared tax class (FR-009).
+
+    Checked here rather than at the first charge, because the schedule is on the page: a
+    declaration that lists a repayment of principal and declares no treatment for a disposal
+    is incomplete as written. Reported rather than treated as untaxed -- an exemption is a
+    cited claim and a missing rule is not.
+    """
+    for index, payment in enumerate(payments):
+        _, assessed = PAYMENT_KINDS[payment.pays]
+        if assessed in declared:
+            continue
+        raise DeclarationError(
+            path,
+            f"{field_prefix}.tax_classes",
+            f"declares no tax class for {assessed.value!r} income, which this schedule "
+            f"produces: the payment at {field_prefix}.schedule.payment[{index}] on "
+            f"{payment.on.isoformat()} is a {payment.pays.value!r}. A missing rule and a "
+            "cited exemption are opposite claims, and only one of them has a source.",
+            f'declare {assessed.value} = "<tax class id>"',
+        )
+
+
+def _check_verification_tasks(
+    path: Path,
+    tasks: list[schema.EnumeratedVerificationTaskTable],
+    *,
+    field_prefix: str,
+) -> None:
+    """Each task names an inference this engine knows about, and asks something.
+
+    Whether every inference **has** a task is `scripts/check_provenance.py`'s question
+    (FR-022), because it is a relation over the whole file and the gate is what a person
+    maintaining a declaration by hand runs. What is checked here is that a task is
+    well-formed, so a typo in ``settles`` fails naming the file rather than silently
+    satisfying nothing.
+    """
+    for index, task in enumerate(tasks):
+        entry = f"{field_prefix}.verification_task[{index}]"
+        if task.settles not in INFERENCES:
+            raise DeclarationError(
+                path,
+                f"{entry}.settles",
+                f"names {task.settles!r}, which is not one of the things a declared "
+                "schedule infers. A task settling nothing this engine tracks would leave "
+                "the inference it was written for uncovered.",
+                f"one of: {', '.join(sorted(INFERENCES))}",
+            )
+        _require_text(
+            path,
+            f"{entry}.question",
+            task.question,
+            "a task with no question records that somebody looked, and not what for",
+        )
+        _require_text(
+            path,
+            f"{entry}.searched",
+            task.searched,
+            "a question with no record of what was searched invites the same search again",
+        )
+        _parse_date(path, f"{entry}.searched_on", task.searched_on)
+
+
+def enumerated_instrument_from_file(path: Path) -> InstrumentDeclaration:
+    """One ``data/instruments/<id>.toml`` declaring a bond by its payments.
+
+    The same record :func:`instrument_from_file` returns, differing in one field: its terms
+    are the schedule rather than the closed form. Everything else about a declaration --
+    what a purchase must satisfy, which class taxes which income -- is the same fact in
+    both forms and is read by the same code.
+    """
+    document = read_document(path)
+    table = _validate(schema.EnumeratedInstrumentFile, document, path).instrument
+    currency = _currency(path, f"{INSTRUMENT_TABLE}.currency", table.currency)
+    terms = _enumerated_schedule(path, table.schedule, currency, field_prefix=SCHEDULE_TABLE)
+    tax_classes = _tax_class_references(
+        path, table.tax_classes, field_prefix=f"{INSTRUMENT_TABLE}.tax_classes"
+    )
+    _check_kinds_are_taxed(path, terms.payments, tax_classes, field_prefix=INSTRUMENT_TABLE)
+    _check_verification_tasks(path, table.verification_task, field_prefix=INSTRUMENT_TABLE)
+    return InstrumentDeclaration(
+        id=_require_text(
+            path,
+            f"{INSTRUMENT_TABLE}.id",
+            table.id,
+            "every declaration needs an identifier, because that is what a holding and a "
+            "result refer to it by",
+        ),
+        name=_require_text(
+            path,
+            f"{INSTRUMENT_TABLE}.name",
+            table.name,
+            "a declaration a reader cannot recognise by name is one they cannot check",
+        ),
+        instrument_class=_known(
+            path,
+            f"{INSTRUMENT_TABLE}.class",
+            table.instrument_class,
+            instrument_registry.REGISTRY,
+            "instrument class",
+        ),
+        currency=currency,
+        is_synthetic=table.is_synthetic,
+        terms=terms,
+        constraints=_constraints(
+            path, table.constraints, currency, field_prefix=f"{INSTRUMENT_TABLE}.constraints"
+        ),
+        tax_classes=tax_classes,
     )
 
 

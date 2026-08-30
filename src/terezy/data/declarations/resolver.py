@@ -173,10 +173,11 @@ def resolve(
     fund_files_by_id: dict[str, Path] = {}
     files_by_id: dict[str, Path] = {}
     for path in instrument_files:
-        # ⚙ feature 006: one directory, two kinds of declaration, told apart by the one
+        # ⚙ feature 006: one directory, several kinds of declaration, told apart by the one
         # key they share and dispatched through a declared mapping rather than a branch
         # naming a class. See ``loader.declared_class_of`` and ``LOADERS_BY_KIND``.
-        if LOADERS_BY_KIND[_kind_of(path)] is loader.fund_from_file:
+        read = LOADERS_BY_KIND[_kind_of(path)]
+        if read is loader.fund_from_file:
             declared_fund = loader.fund_from_file(path)
             if declared_fund.id in files_by_id:
                 raise _refuse_duplicate(
@@ -190,7 +191,14 @@ def resolve(
             fund_files_by_id[declared_fund.id] = path
             files_by_id[declared_fund.id] = path
             continue
-        declaration = loader.instrument_from_file(path)
+        # ⚙ feature 013: both bond forms produce an ``InstrumentDeclaration``, so the id
+        # space, the duplicate check and the tax-class resolution below are shared. A
+        # duplicate id therefore collides across the forms as well as within one.
+        declaration = (
+            loader.enumerated_instrument_from_file(path)
+            if read is loader.enumerated_instrument_from_file
+            else loader.instrument_from_file(path)
+        )
         if declaration.id in files_by_id:
             raise _refuse_duplicate(
                 "instrument",
@@ -1702,6 +1710,7 @@ def composition_from_data_root(
 
 LOADERS_BY_KIND: Mapping[str, Callable[[Path], object]] = {
     instrument_registry.FIXED_INCOME: loader.instrument_from_file,
+    instrument_registry.ENUMERATED_SCHEDULE: loader.enumerated_instrument_from_file,
     instrument_registry.COLLECTIVE_INVESTMENT_FUND: loader.fund_from_file,
 }
 """Which loader parses each declared ``[instrument] class``.
@@ -1712,10 +1721,16 @@ and lives here, beside the loaders. Keeping them apart is what stops ``core`` ne
 know that a file exists.
 
 A mapping rather than a branch, on ``core``'s own precedent -- *"registries are mappings of
-functions, not subclass dispatch"* (owner decision D-E). The two return different record
-types, so this is typed at ``object`` and the caller narrows immediately; that is honest
-about what the two loaders have in common, which is a path in and a declaration out and
-nothing else. :func:`_kind_of` refuses a kind the vocabulary does not contain, naming the
+functions, not subclass dispatch"* (owner decision D-E). Not every entry returns the same record
+type, so this is typed at ``object`` and the caller narrows immediately; that is honest
+about what the loaders have in common, which is a path in and a declaration out and
+nothing else.
+
+⚙ **Feature 013 added a second entry returning an ``InstrumentDeclaration``.** The two
+forms of bond declaration are one record and one downstream, and they differ only in which
+loader reads the file -- which is exactly what this mapping is for.
+
+:func:`_kind_of` refuses a kind the vocabulary does not contain, naming the
 file, so an unrecognised class never reaches a ``KeyError`` here.
 """
 

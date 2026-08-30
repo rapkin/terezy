@@ -88,6 +88,9 @@ from terezy.core.errors import (
     InfeasiblePurchase,
     InstrumentFailure,
 )
+from terezy.core.instruments import acquire
+from terezy.core.instruments import terms as terms_of
+from terezy.core.instruments.interface import BondTerms
 from terezy.core.ledger.events import CausationKind, CausationRef, Event, EventKind, LotRef
 from terezy.core.primitives import conventions, money
 from terezy.core.primitives.money import Money
@@ -96,7 +99,6 @@ from terezy.core.primitives.tolerance import is_close
 if TYPE_CHECKING:  # pragma: no cover -- import-time cycle avoidance
     from terezy.core.instruments.interface import (
         Assumptions,
-        BondTerms,
         DateRange,
         Holding,
         InstrumentConstraints,
@@ -104,23 +106,11 @@ if TYPE_CHECKING:  # pragma: no cover -- import-time cycle avoidance
     )
     from terezy.core.tax.interface import TaxableEventKind
 
-# The registry in ``terezy.core.instruments.registry`` imports this module to build its
-# mapping, and the records above live beside that interface. Importing them only under
-# ``TYPE_CHECKING`` keeps the reference where it is useful -- the type checker -- and out
-# of the runtime import graph, where it would be a cycle. Nothing here constructs one of
-# those records; this module reads declarations and produces events, which is why the
-# type-only import is sufficient rather than a trick.
-
-
-def lot_id_for(holding: Holding) -> str:
-    """The identity of the lot a purchase opens: instrument and settlement date.
-
-    Derived from the purchase rather than generated, because a generated id would need a
-    counter or a clock and the core has neither -- and because two runs of the same
-    scenario must produce the same lot ids or the determinism digest compares two
-    different-looking results (C4).
-    """
-    return f"{holding.instrument_id}@{holding.purchased_on.isoformat()}"
+# Most of the records this module reads are needed only by the type checker -- nothing here
+# constructs an ``Assumptions`` or a ``Holding`` -- so a type-only import keeps the reference
+# where it is useful and out of the runtime graph. ``BondTerms`` is the exception: it is
+# passed to ``terms.narrowed`` as a value. Neither import is a cycle; the registry is what
+# imports this module.
 
 
 def events(
@@ -148,9 +138,9 @@ def events(
     if problem is not None:
         return problem
 
-    terms = declaration.terms
+    terms = terms_of.narrowed(declaration, BondTerms)
     adjust = conventions.business_day_rule(terms.business_day_rule)
-    stream = [_purchase(declaration, holding, sequence=1)]
+    stream = [acquire.purchase(declaration, holding, sequence=1)]
     units = holding.quantity
     for period in coupon_plan(declaration, holding, assumptions):
         stream.append(_coupon(declaration, holding, period, sequence=len(stream) + 1))
@@ -229,7 +219,7 @@ def _check_feasible(
 
 def _terms_problem(declaration: InstrumentDeclaration) -> InstrumentFailure | None:
     """Whether the instrument's own declared terms can hold at all."""
-    terms = declaration.terms
+    terms = terms_of.narrowed(declaration, BondTerms)
     if terms.maturity_date <= terms.issue_date:
         return InconsistentTerms(
             first_term="instrument.maturity_date",
@@ -256,7 +246,7 @@ def _purchase_problem(
     instrument's life -- and reporting a shortfall against a ticket would be answering a
     question the caller has not yet managed to ask.
     """
-    terms = declaration.terms
+    terms = terms_of.narrowed(declaration, BondTerms)
     if holding.quantity <= 0.0:
         return InconsistentTerms(
             first_term="holding.quantity",
@@ -346,39 +336,6 @@ def _horizon_problem(holding: Holding, horizon: DateRange) -> InstrumentFailure 
             ),
         )
     return None
-
-
-def _purchase(
-    declaration: InstrumentDeclaration,
-    holding: Holding,
-    *,
-    sequence: int,
-) -> Event:
-    """Cash out, one lot in, at the cost the owner stated.
-
-    The cause is recorded as an instrument term rather than an owner action because
-    ``CausationKind`` admits no owner-action member by design (see ``ledger.events``): the
-    term named is the declared instrument the purchase acquired, which is the fact a reader
-    following the audit trail actually wants.
-    """
-    return Event(
-        sequence=sequence,
-        occurred_on=holding.purchased_on,
-        kind=EventKind.PURCHASE,
-        amount=money.scale(holding.cost, -1.0),
-        owner_id=holding.owner_id,
-        caused_by=CausationRef(
-            kind=CausationKind.INSTRUMENT_TERM,
-            id=f"{declaration.id}:purchase",
-            detail=(
-                f"purchase of {holding.quantity!r} units of {declaration.name!r} at the stated cost"
-            ),
-        ),
-        lot_ref=LotRef(instrument_id=declaration.id, lot_id=lot_id_for(holding)),
-        quantity=holding.quantity,
-        allocated_to=None,
-        capacity_pool=None,
-    )
 
 
 HOLD_CASH: Final = "hold_cash"
@@ -556,7 +513,7 @@ def coupon_plan(
     conventions, which is the right answer for a programmer error and the wrong one for a
     caller who should have been given a typed failure.
     """
-    terms = declaration.terms
+    terms = terms_of.narrowed(declaration, BondTerms)
     if terms.coupon_rate == 0.0:
         # A zero-coupon bond, which is a valid declaration and not a missing rate. It pays
         # its principal and nothing else, and emitting a stream of zero-amount coupon
@@ -618,7 +575,7 @@ def _decide(
     the calendar for a decision the policy made -- a plausible explanation that would send a
     reader looking for a bug in the wrong place.
     """
-    terms = declaration.terms
+    terms = terms_of.narrowed(declaration, BondTerms)
     constraints = declaration.constraints
     price = terms.face_value
 
@@ -674,7 +631,7 @@ def _bought_nothing(declaration: InstrumentDeclaration, coupon: Money) -> str:
     yet. Branching on the name here would put the set of policies in two places -- the
     registry and a message -- and the second copy is the one that would go stale.
     """
-    terms = declaration.terms
+    terms = terms_of.narrowed(declaration, BondTerms)
     constraints = declaration.constraints
     price = terms.face_value
     increment = money.scale_sourced(price, constraints.min_unit, terms.provenance)
@@ -719,7 +676,7 @@ def _coupon(
     sequence: int,
 ) -> Event:
     """One coupon: face x rate x year fraction x units, resting on the declared terms."""
-    terms = declaration.terms
+    terms = terms_of.narrowed(declaration, BondTerms)
     return Event(
         sequence=sequence,
         occurred_on=period.paid_on,
@@ -746,7 +703,7 @@ def _coupon(
 def reinvestment_lot_id_for(instrument_id: str, paid_on: date) -> str:
     """The identity of a lot a reinvested coupon opens: instrument and payment date.
 
-    Derived rather than generated, for the reason :func:`lot_id_for` gives -- the core has
+    Derived rather than generated, for the reason `acquire.lot_id_for` gives -- the core has
     no counter and no clock, and two runs of the same scenario must produce the same lot
     ids or the determinism digest compares two different-looking results (C4). The suffix
     keeps it distinct from the lot a purchase on the same date would open, so the two can
@@ -837,7 +794,7 @@ def _redemption(
     the configured consumption method, and an event that named one would be asking for
     specific-lot selection, which the ledger refuses loudly rather than ignoring.
     """
-    terms = declaration.terms
+    terms = terms_of.narrowed(declaration, BondTerms)
     paid_on = conventions.business_day_rule(terms.business_day_rule)(terms.maturity_date)
     return Event(
         sequence=sequence,

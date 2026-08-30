@@ -58,3 +58,47 @@ note       = "FIXTURE — an invented disposal class, so the third fund declares
   source         = "SYNTHETIC FIXTURE — not an observation of anything."
   retrieved_on   = "2026-08-23"
   verified_on    = ""
+
+# ---------------------------------------------------------------------------
+# 013: the two classes that make a payment's declared label load-bearing
+# ---------------------------------------------------------------------------
+#
+# FR-010. For ОВДП both income kinds are exempt, so mislabelling a payment as a coupon
+# rather than a repayment of principal changes NO FIGURE on the instruments that motivate
+# the enumerated form. That is luck rather than design, and it is exactly the condition
+# under which a defect ships: the first taxable enumerated instrument makes every earlier
+# mislabelling visible at once.
+#
+# So these two classes carry DIFFERENT invented rates — 8% in total on a coupon, 15% on a
+# disposal — and relabelling one payment on an instrument that declares them moves the tax
+# total by a hand-computable amount. Nothing here describes any real tax system.
+
+[[jurisdiction.tax_class]]
+id         = "synthetic_enumerated_coupon"
+applies_to = ["coupon"]
+note       = "FIXTURE — an invented coupon class, rated differently from the disposal class beside it so that a payment's declared label is provably load-bearing (013 FR-010)."
+
+  [[jurisdiction.tax_class.rate]]
+  effective_from = "2026-01-01"
+  pit_rate_pct   = 6.0
+  levy_rate_pct  = 2.0
+  note           = "FIXTURE — invented rates on an invented date. Read off nothing."
+  kind           = "tax_rule"
+  source         = "SYNTHETIC FIXTURE — not an observation of anything."
+  retrieved_on   = "2026-08-29"
+  verified_on    = ""
+
+[[jurisdiction.tax_class]]
+id         = "synthetic_enumerated_disposal"
+applies_to = ["disposal_gain"]
+note       = "FIXTURE — an invented disposal class in a NETTING category (see ../timing/synthetic_fixture.toml), so that 013 FR-026's netting case is exercised rather than warned about: a purchase at a premium realises a loss at redemption, and whether that loss reduces the year's base is the question a netting category answers and an exempt one does not."
+
+  [[jurisdiction.tax_class.rate]]
+  effective_from = "2026-01-01"
+  pit_rate_pct   = 12.0
+  levy_rate_pct  = 3.0
+  note           = "FIXTURE — invented rates on an invented date."
+  kind           = "tax_rule"
+  source         = "SYNTHETIC FIXTURE — not an observation of anything."
+  retrieved_on   = "2026-08-29"
+  verified_on    = ""

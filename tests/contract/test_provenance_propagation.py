@@ -83,7 +83,7 @@ from terezy.core.tax import flat_rate
 from terezy.core.tax import year as tax_year
 from terezy.core.tax.interface import TaxableEventKind, TaxCharge, TaxClass, TaxContext
 from terezy.data.declarations import loader, resolver
-from tests import cpi_fixtures, synthetic, tax_years
+from tests import cpi_fixtures, declared_terms, synthetic, tax_years
 
 pytestmark = pytest.mark.contract
 
@@ -173,7 +173,7 @@ def _from_data() -> Projection:
         owner_id="owner-1",
         instrument_id=ISSUE_A,
         quantity=10.0,
-        purchased_on=declaration.terms.issue_date,
+        purchased_on=declared_terms.contractual(declaration).issue_date,
         cost=Money(10_000.0, UAH, prov.of([_OWNER_STATED_COST])),
     )
     return _project(declaration, holding, tax_classes=declarations.tax_classes)

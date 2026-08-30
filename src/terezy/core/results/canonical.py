@@ -32,21 +32,51 @@ from typing import assert_never
 
 from terezy.core.ledger import canonical as ledger_canonical
 from terezy.core.ledger.canonical import Canonical
+from terezy.core.primitives.conventions import AmountsAsDeclared, ConventionsApplied
 from terezy.core.primitives.rates import RealRate, RealTermsUnavailable
 from terezy.core.results.hurdle import HurdleRate, RealTerms
-from terezy.core.results.project import Projection
-from terezy.core.results.schedule import CashFlowRow, CashFlowSchedule, ConventionsApplied
+from terezy.core.results.project import (
+    GovernedBy,
+    Projection,
+    PurchasePremium,
+    TreatmentUnstated,
+)
+from terezy.core.results.schedule import CashFlowRow, CashFlowSchedule
 from terezy.core.tax.interface import TaxCharge
 
 
-def of_conventions(value: ConventionsApplied) -> tuple[str, str, str]:
-    """The three declared conventions a schedule applied.
+def of_conventions(value: ConventionsApplied | AmountsAsDeclared) -> tuple[str, ...]:
+    """Whichever statement a row makes about what shaped it, rendered so the two differ.
 
     Part of the identity of a result, not decoration: the same terms under ``act/365`` and
     under ``30/360`` are different schedules, and a digest that ignored the convention
-    would call two genuinely different answers the same.
+    would call two genuinely different answers the same. The same argument reaches one step
+    further -- a schedule whose amounts were **declared** and one whose amounts were
+    computed from three conventions are two different claims about where the money came
+    from, and a digest agreeing between them would report them as one (013 FR-016).
+
+    The **reason** is rendered too, and for the same argument the ledger's canonical form
+    makes about a causation's ``detail``: it is overridable, so two rows can make different
+    statements about what shaped them, and a digest ignoring it would call two
+    differently-explained results identical.
+
+    The two are told apart by the **tag in slot 0**: a generative rendering opens with a
+    periodicity, and no key of ``conventions.PERIODICITY_FNS`` may be spelled ``"declared"``.
+    That is the whole of the separation -- both renderings are three entries long, so arity
+    separates nothing -- and it is asserted rather than argued, in
+    ``tests/unit/test_conventions_statement.py``.
+
+    The three-name arm is deliberately **untagged**: it is
+    byte-for-byte what it has always been, so no generative row's digest moves for a reason
+    that is not about that row (013 SC-017).
     """
-    return (value.periodicity, value.day_count, value.business_day_rule)
+    match value:
+        case ConventionsApplied():
+            return (value.periodicity, value.day_count, value.business_day_rule)
+        case AmountsAsDeclared():
+            return ("declared", value.day_count, value.reason)
+        case _:  # pragma: no cover -- mypy proves this unreachable
+            assert_never(value)
 
 
 def of_row(value: CashFlowRow) -> tuple[Canonical, ...]:
@@ -159,16 +189,51 @@ def of_hurdle_rate(value: HurdleRate) -> tuple[Canonical, ...]:
     )
 
 
+def of_at_purchase(value: PurchasePremium) -> tuple[Canonical, ...]:
+    """What was paid, what comes back as principal, the difference, and what governs it.
+
+    The class the difference is realised under and the governing treatment are both
+    **tagged**, so that a declared answer and its absence can never render as the same
+    bytes: they are opposite claims -- one is a cited rule and the other
+    is its absence -- and a digest agreeing between them would report an unanswered question
+    as an answer.
+    """
+    match value.governed_by:
+        case GovernedBy():
+            governs: Canonical = (
+                "governed",
+                value.governed_by.category_id,
+                value.governed_by.treatment,
+            )
+        case TreatmentUnstated():
+            governs = ("unstated",)
+        case _:  # pragma: no cover -- mypy proves this unreachable
+            assert_never(value.governed_by)
+    return (
+        ledger_canonical.of_money(value.paid),
+        ledger_canonical.of_money(value.principal_returned),
+        ledger_canonical.of_money(value.difference),
+        ("class", value.tax_class_id) if value.tax_class_id else ("undeclared",),
+        governs,
+    )
+
+
 def of_projection(value: Projection) -> tuple[Canonical, ...]:
     """A whole projection: the ledger it came from, then everything derived from it.
 
     The ledger is included in full rather than summarised. The figures are a *claim* about
     those events, and a digest covering only the conclusions would agree between a correct
     projection and an incorrect one that happened to land on the same number.
+
+    ⚙ **The purchase figure was added by 013 and moved every recorded digest**, which is what
+    a golden is for: its input digests are witnesses rather than terms, and a projection that
+    says one more true thing about every holding is *supposed* to change them (constitution
+    1.2.0, Principle V). No amount, date, tax or rate moved with it.
     """
     return (
         ledger_canonical.of_result(value.ledger),
         of_schedule(value.schedule),
         tuple(of_charge(charge) for charge in value.charges),
         of_hurdle_rate(value.hurdle),
+        of_at_purchase(value.at_purchase),
     )

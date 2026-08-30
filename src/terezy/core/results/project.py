@@ -57,6 +57,7 @@ from terezy.core.errors import (
 from terezy.core.inflation.series import CpiSeries, InflationAssumption
 from terezy.core.instruments import fixed_income
 from terezy.core.instruments import registry as instrument_registry
+from terezy.core.instruments import terms as instrument_terms
 from terezy.core.instruments.interface import (
     Assumptions,
     DateRange,
@@ -74,11 +75,97 @@ from terezy.core.primitives.staleness import Ageing
 from terezy.core.results import hurdle as hurdle_figures
 from terezy.core.results import schedule as schedule_rows
 from terezy.core.results.hurdle import CashFlow, HurdleRate
-from terezy.core.results.schedule import CashFlowSchedule, ChargedOn, ConventionsApplied
+from terezy.core.results.schedule import CashFlowSchedule, ChargedOn
 from terezy.core.tax import registry as tax_registry
 from terezy.core.tax import year as tax_year
 from terezy.core.tax.interface import TaxableEventKind, TaxCharge, TaxClass, TaxContext
 from terezy.core.tax.schedule import RateUndeclaredBefore
+from terezy.core.tax.year import AssessmentRules
+
+
+@dataclass(frozen=True, slots=True)
+class GovernedBy:
+    """Which declared category treatment decides what becomes of a purchase difference."""
+
+    category_id: str
+    treatment: str
+    reason: str
+    """What that treatment means for this difference, in the output's own words."""
+
+
+@dataclass(frozen=True, slots=True)
+class TreatmentUnstated:
+    """No assessment rules were given, so nothing here can say what governs the difference.
+
+    A typed absence rather than a blank field or a guess: *outside*, *nets* and *per event*
+    are three different claims about the same money, and defaulting to any of them would be
+    the tool answering a question nobody asked it.
+    """
+
+    reason: str
+
+
+@dataclass(frozen=True, slots=True)
+class PurchasePremium:
+    """What was paid, what comes back as principal, and the difference between them.
+
+    FR-025. Reported as its own figure so that a premium or a discount is **visible** rather
+    than surfacing only as a realised gain or loss at redemption -- which is where it would
+    otherwise appear, a year or five later, indistinguishable from a market movement.
+
+    **Always present, carrying a possibly-zero difference**, on the same reading that makes a
+    zero tax charge cite its exemption: an absent figure meaning *bought at par* is a silent
+    default, and the whole point of recording zeroes is that they name what produced them.
+
+    ⚙ **This feature adds no premium rule.** What happens to the difference is the declared
+    tax category's business and nothing else's -- there is no amortisation here, no
+    imputation, and no branch of its own. The figure states which treatment governed it and
+    stops (FR-026).
+    """
+
+    paid: Money
+    """What was actually paid, in full and exactly as stated. Nothing is amortised, nothing
+    is imputed, and no part of it is reclassified as accrued interest (FR-024).
+
+    ⚙ Named ``paid`` rather than ``cost`` deliberately. ``cost`` on a result record is one of
+    the names `tests/contract/test_cost_labels.py` forbids, because a route cost under an
+    unlabelled name is a figure whose one-way-or-round-trip label has stopped travelling with
+    it. This is not a route cost -- it is the purchase price -- and the clearer word says so
+    without having to argue the point.
+    """
+
+    principal_returned: Money
+    """What this holding gets back as principal: the repayments it will receive, times
+    quantity.
+
+    ⚙ **Not ``face value x quantity``**, and FR-025 was amended to say so (2026-08-30). The
+    two coincide for a bond that repays its face once, which is every fixture this
+    repository ships -- and they part the moment a schedule has already repaid part of its
+    principal before the purchase. A unit of such an issue is a unit of what *remains*: a
+    buyer paying the remaining principal exactly has broken even, and measuring them against
+    the nominal face reported a discount of everything repaid before they arrived, a figure
+    describing somebody else's trade years earlier. It is the same rule the retirement of
+    units already follows -- **the share of what this holding receives** -- and it would be
+    strange for paid-versus-received to measure "received" differently from the ledger.
+    """
+
+    difference: Money
+    """``paid - principal_returned``. Positive is a premium, negative a discount, zero is par
+    -- and a zero here says *par* rather than saying nothing."""
+
+    tax_class_id: str | None
+    """The declared class governing a disposal of this instrument, which is the event the
+    difference is realised by -- or ``None`` where the declaration names none.
+
+    ⚙ **``None`` rather than an empty string**, because the two say different things and the
+    empty string said the wrong one: a declaration is not required to name a class for every
+    kind of income it might produce, and a figure carrying ``""`` here reported the *rules*
+    as mapping no category to a class, sending a reader to the jurisdiction file when the
+    thing to fix was the instrument's own declaration.
+    """
+
+    governed_by: GovernedBy | TreatmentUnstated
+    """The category treatment that decides what the difference does, or why nobody said."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,6 +190,9 @@ class Projection:
     hurdle: HurdleRate
     """The benchmark figure this whole feature exists to produce."""
 
+    at_purchase: PurchasePremium
+    """What was paid against what this holding gets back, and what governs the difference."""
+
 
 ProjectionOutcome = Projection | InstrumentFailure | TaxFailure
 """What a projection returns: a result, or a typed reason there is none.
@@ -123,6 +213,7 @@ def project(
     cpi_series: CpiSeries | None = None,
     inflation_assumption: InflationAssumption | None = None,
     ageing: Ageing | None = None,
+    assessment_rules: AssessmentRules | None = None,
 ) -> ProjectionOutcome:
     """Project one holding to maturity and report what it pays and what it returns.
 
@@ -140,6 +231,19 @@ def project(
     projection identical to one that ran under feature 001* to run here unchanged and produce
     a shape-identical result; a required argument would have made every one of those call
     sites a lie about what changed.
+
+    ⚙ **``assessment_rules`` is what lets the purchase figure say which treatment governs
+    the difference** (FR-026). ``None`` is not a silence either: the figure then carries
+    :class:`TreatmentUnstated`, saying that nobody supplied the rules -- because *outside*,
+    *nets* and *per event* are three different claims about the same money and defaulting to
+    one would answer a question nobody asked.
+
+    ⚙ **Nothing on the tuple path supplies it today** (recorded 2026-08-30):
+    ``core.decision.tuple_outcome`` calls this function without rules, so every projection
+    reached through the join carries :class:`TreatmentUnstated`. That is honest rather than
+    wrong -- the join is given no jurisdiction to resolve them from -- and it means FR-026's
+    named treatment is reachable only on a direct call. Closing it needs the join to be told
+    which jurisdiction assesses the holding, which is a term the tuple does not carry.
 
     ``ageing`` carries the declared staleness thresholds and the ``as_of`` date the question is
     asked at (FR-005). It is one record rather than two arguments so it cannot be half-supplied
@@ -177,7 +281,7 @@ def project(
         consumption_method=assumptions.consumption_method,
     )
 
-    year_fraction = conventions.day_count(declaration.terms.day_count)
+    year_fraction = conventions.day_count(instrument_terms.day_count_of(declaration.terms))
 
     # The contractual series is generated WITHOUT the coupon policy, because a
     # contractual yield to maturity is a property of the paper and reinvestment is a
@@ -194,14 +298,11 @@ def project(
         ledger=state,
         schedule=schedule_rows.of_ledger(
             state,
-            conventions=ConventionsApplied(
-                periodicity=declaration.terms.periodicity,
-                day_count=declaration.terms.day_count,
-                business_day_rule=declaration.terms.business_day_rule,
-            ),
+            conventions=instrument_terms.conventions_of(declaration.terms),
             taxed_by=taxed_by,
         ),
         charges=charges,
+        at_purchase=_at_purchase(declaration, holding, assessment_rules),
         hurdle=hurdle_figures.of_flows(
             contractual=_flows(contractual_events, holding, year_fraction),
             received=_flows(
@@ -211,6 +312,7 @@ def project(
                 assessed={charged.tax_event: charged.amount for charged in taxed_by.values()},
             ),
             total_tax=money.total([charge.total for charge in charges], base_currency),
+            excludes=hurdle_figures.EXCLUDES | instrument_terms.excludes_of(declaration.terms),
             provenance=prov.merge(
                 prov.merge_all(event.amount.provenance for event in state.applied),
                 prov.merge_all(charge.provenance for charge in charges),
@@ -222,6 +324,106 @@ def project(
                 ageing=ageing,
             ),
         ),
+    )
+
+
+def _what_the_treatment_means(treatment: tax_year.Treatment) -> str:
+    """What one declared treatment means for a purchase difference, in the output's own words.
+
+    An exhaustive ``match`` rather than a mapping, so a fourth treatment is a **type error**
+    here rather than a figure that quietly explains itself wrongly at runtime -- the same
+    reason ``_taxable_kind`` below is written the same way.
+    """
+    match treatment:
+        case tax_year.Treatment.OUTSIDE:
+            return (
+                "this category stands outside the annual calculation on both sides, income "
+                "and costs alike, so the difference reduces no other base -- a loss here "
+                "buys no shield"
+            )
+        case tax_year.Treatment.NETS:
+            return (
+                "this category nets its year's results before any rate applies, so the "
+                "difference reaches the annual base and a negative year carries forward"
+            )
+        case tax_year.Treatment.PER_EVENT:
+            return (
+                "nothing nets in this category: the difference is realised on the disposal "
+                "it belongs to and reaches no other event's charge"
+            )
+        case _:  # pragma: no cover -- mypy proves this unreachable
+            assert_never(treatment)
+
+
+def _at_purchase(
+    declaration: InstrumentDeclaration,
+    holding: Holding,
+    rules: AssessmentRules | None,
+) -> PurchasePremium:
+    """What was paid against what this holding gets back as principal (FR-025, amended).
+
+    The declaration is **asked** what a unit returns to a buyer arriving on this date rather
+    than having its face value read: the two answers differ for a schedule that has already
+    repaid part of its principal, and the question both forms answer is the one that is true
+    of both.
+    """
+    returned = money.scale_sourced(
+        instrument_terms.principal_returned(declaration.terms, bought_on=holding.purchased_on),
+        holding.quantity,
+        declaration.terms.provenance,
+    )
+    disposal_class = declaration.tax_classes.get(TaxableEventKind.DISPOSAL_GAIN)
+    return PurchasePremium(
+        paid=holding.cost,
+        principal_returned=returned,
+        difference=money.sub(holding.cost, returned),
+        tax_class_id=disposal_class,
+        governed_by=_governed_by(disposal_class, rules),
+    )
+
+
+def _governed_by(
+    disposal_class: str | None, rules: AssessmentRules | None
+) -> GovernedBy | TreatmentUnstated:
+    """The declared category treatment that decides what the difference does, or why not.
+
+    Three ways there can be no answer, and they send a reader to three different files, so
+    each says which one: the run was given no rules, the **instrument** names no class for a
+    disposal, or the **rules** map no category to the class it does name.
+    """
+    if disposal_class is None:
+        return TreatmentUnstated(
+            reason=(
+                "this instrument declares no tax class for a disposal, so nothing here can "
+                "say what governs the difference between what was paid and what comes "
+                "back. It is the "
+                "declaration that is incomplete rather than the rules: a class named and "
+                "unmapped is a different fault, and reported as one."
+            )
+        )
+    if rules is None:
+        return TreatmentUnstated(
+            reason=(
+                "this run was given no assessment rules, so nothing here can say whether "
+                "the difference nets with the year's other results, is charged on its own "
+                "event, or falls outside the calculation entirely. Those are three "
+                "different claims about the same money and none of them is assumed."
+            )
+        )
+    category_id = rules.category_of_class.get(disposal_class)
+    category = None if category_id is None else rules.categories.get(category_id)
+    if category is None:
+        return TreatmentUnstated(
+            reason=(
+                f"the rules of {rules.jurisdiction_id!r} map no income category to the tax "
+                f"class {disposal_class!r}, so what governs the difference is undeclared "
+                "rather than decided here."
+            )
+        )
+    return GovernedBy(
+        category_id=category.id,
+        treatment=category.treatment.value,
+        reason=_what_the_treatment_means(category.treatment),
     )
 
 
@@ -420,8 +622,11 @@ def _taxable_kind(kind: EventKind) -> TaxableEventKind | None:
             return TaxableEventKind.COUPON
         case EventKind.DISTRIBUTION:  # pragma: no cover -- unreachable on this path
             # ⚙ feature 006. Present for exhaustiveness and **not** reachable here: this
-            # function maps the events of an ``InstrumentOps`` implementation, and the only
-            # one in ``registry.REGISTRY`` is ``fixed_income``, which emits no distribution.
+            # function maps the events of an ``InstrumentOps`` implementation, and no
+            # implementation in ``registry.REGISTRY`` emits a distribution. That is a
+            # property of what those implementations emit rather than of how many of them
+            # there are: this comment used to say "the only one is ``fixed_income``", which
+            # was true when it was written and is a count over a registry that has grown.
             # A fund has its own mapping in ``core.results.fund``. The arm cannot simply be
             # dropped -- the ``assert_never`` below is what makes a forgotten event kind a
             # type error, and omitting this one would make that assertion fail to compile

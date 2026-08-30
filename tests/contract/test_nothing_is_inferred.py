@@ -1,0 +1,311 @@
+"""SC-014: no source-code site derives what a declaration is supposed to declare.
+
+FR-008 and FR-021. A kind that is never inferred leaves **no behaviour to observe** -- there
+is no wrong answer to catch, because the code that would produce one does not run -- so the
+absence of the code is the only available evidence, and a scan is the only way to produce
+it.
+
+Five derivations, each a one-line temptation in a loader:
+
+1. reading the **last** payment as a repayment of principal;
+2. reading the **largest** payment as one;
+3. dividing a declared amount by 100 to turn kopecks into hryvnia;
+4. computing a **coupon rate** from an amount and an interval;
+5. inferring a **coverage window** from where a published list happens to begin.
+
+**What these scans do not catch, measured rather than assumed** (2026-08-30; re-measured
+after a review found the list naming four of at least nine). The derivation walk reads
+assignments, annotated assignments, augmented assignments and **keyword arguments** -- the
+last being how a value actually reaches a frozen record here. Every one of these is missed,
+probed rather than reasoned about:
+
+* a walrus, a tuple target, a ``for`` target, a ``with ... as`` binding, a comprehension
+  target, and a parameter default ``def f(coupon_rate=a / b)``;
+* a dict splat, ``Record(**{"coupon_rate": a / b})`` -- the only one of them with a
+  plausible loader shape;
+* a value computed in one function and returned into the field by another;
+* and, because the walk keys on the field's **name**, a quotient assigned to ``rate`` and
+  passed on as ``coupon_rate``.
+
+``LAST_OR_LARGEST`` likewise misses ``max(payments, key=attrgetter("amount"))``.
+
+None is closed, and the reason is worth stating rather than leaving as an omission: each
+costs a whole-program dataflow to catch, and what actually keeps the door shut is that
+nothing needs to walk through it -- ``coupon_rate`` is a *declared* field of one form and
+absent from the other, and ``covers_from`` is required wherever it exists, so no consumer
+has a reason to derive either. These scans are the second lock, not the first. A lock whose
+limits are written down is a lock; one that reads as complete is a promise, and this
+paragraph opened with *measured rather than assumed* while listing under half of them.
+
+⚙ **The fourth is here for a second reason** (FR-003c). A coupon rate derived from a day
+count, one coupon amount and the spacing between two coupons yields an extrapolated issue
+date in one more step -- the invented legal fact this declaration form exists to refuse.
+FR-003b forbids it at the field; this forbids it at the site. Two locks, because a guard
+that believes itself sufficient is the one nobody adds a second lock to, and FR-003b's first
+draft claimed to close the door while drawing its line one category short of it.
+"""
+
+from __future__ import annotations
+
+import ast
+import re
+from collections.abc import Iterable, Mapping
+from pathlib import Path
+from typing import Final
+
+import pytest
+
+from tests import source_scan
+
+pytestmark = pytest.mark.contract
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+DIVIDES_BY_A_HUNDRED = re.compile(r"/\s*(?:100(?:\.0*)?|_PERCENT)\b")
+"""Turning one unit into another by the factor a minor unit uses.
+
+``_PERCENT`` as well as the literal, because `loader._as_fraction` spells it that way.
+"""
+
+DIVIDING_BY_A_HUNDRED_FOR_A_REASON: Final[Mapping[str, str]] = {
+    "src/terezy/data/declarations/loader.py": (
+        "`_as_fraction`, the one place a declared **percentage** becomes a fraction. A "
+        "percentage is a rate written in per-cent; a payment amount is money, and a "
+        "division of one by 100 is the unit conversion FR-004 forbids the engine to perform"
+    ),
+    "src/terezy/core/inflation/series.py": (
+        "a CPI observation published against the previous month = 100, turned into a growth "
+        "factor. Index points are not minor units of anything, and the series says so in its "
+        "own module docstring (007)"
+    ),
+}
+"""Every site permitted to write that division, **by name and with its reason**.
+
+An allowlist alone is fail-open: the place a future unit conversion is most likely to land
+is a file nobody thought to list. Naming the reason is what makes adding a third entry a
+decision rather than a shrug -- and what caught, while this scan was being written, a claim
+in `loader.py` that it was the only such site in the project, which feature 007 had made
+false.
+"""
+
+LAST_OR_LARGEST = re.compile(
+    r"payments?\s*\[\s*-\s*1\s*\]|"
+    r"max\s*\([^\n]*\.amount|"
+    r"key\s*=\s*[^\n]*\.amount"
+)
+"""Reading a payment's meaning off its position or its size.
+
+``8305, 8305, 8305, 100000`` is obviously three coupons and a repayment of principal to a
+human and obviously nothing at all to a machine, and each of these spellings is a machine
+pretending to be the human. Taking the largest *date* is not one of them: when the last
+payment falls is a fact, what it **is** is a declaration.
+"""
+
+
+def _bound(path: Path, named: str) -> list[ast.expr]:
+    """Every expression bound to ``named`` in a module, however it is bound.
+
+    Four shapes, and the last is the one a regex could never separate from the others:
+    ``x = ...``, an annotated ``x: T = ...``, an augmented ``x += ...``, and
+    ``Record(x=...)`` -- a keyword argument, which is how a value actually reaches a frozen
+    record in this codebase and was outside this walk until 2026-08-30.
+    """
+    tree = ast.parse(source_scan.executable_source(path))
+    bound: list[ast.expr] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign) and any(_is(target, named) for target in node.targets):
+            bound.append(node.value)
+        elif isinstance(node, ast.AnnAssign | ast.AugAssign):
+            if _is(node.target, named) and node.value is not None:
+                bound.append(node.value)
+        elif isinstance(node, ast.Call):
+            bound += [word.value for word in node.keywords if word.arg == named]
+    return bound
+
+
+def _is(target: ast.expr, named: str) -> bool:
+    """Whether this target is the name we are watching, plain or attribute."""
+    return (isinstance(target, ast.Name) and target.id == named) or (
+        isinstance(target, ast.Attribute) and target.attr == named
+    )
+
+
+def _computed(value: ast.expr) -> bool:
+    """Whether what is bound is arithmetic rather than a read of a declared field."""
+    return any(isinstance(inner, ast.BinOp) for inner in ast.walk(value))
+
+
+def _derivations(named: str) -> dict[str, str]:
+    return {
+        _named(path): ast.unparse(value)
+        for path in _python_files()
+        for value in _bound(path, named)
+        if _computed(value)
+    }
+
+
+SCANNED = (REPO_ROOT / "src" / "terezy", REPO_ROOT / "scripts")
+"""Every tree a derivation could be written in.
+
+⚙ **``scripts/`` was outside this scan until 2026-08-30**, and it is where the temptation
+actually lives: `scripts/fetch_inzhur.py` is the transcription site, the one program that
+reads the published figures, and turning kopecks into hryvnia there is precisely the
+one-line convenience FR-021 forbids. A scan that covered only the engine covered everything
+except the place the data comes in.
+"""
+
+
+def _named(path: Path) -> str:
+    return path.relative_to(REPO_ROOT).as_posix()
+
+
+def _python_files() -> list[Path]:
+    return sorted(path for root in SCANNED for path in root.rglob("*.py"))
+
+
+def _offenders(pattern: re.Pattern[str], *, allowed: Iterable[str] = ()) -> dict[str, str]:
+    permitted = set(allowed)
+    found: dict[str, str] = {}
+    for path in _python_files():
+        name = _named(path)
+        if name in permitted:
+            continue
+        match = pattern.search(source_scan.executable_source(path))
+        if match:
+            found[name] = match.group(0)
+    return found
+
+
+def test_no_module_reads_the_last_or_the_largest_payment_as_principal() -> None:
+    found = _offenders(LAST_OR_LARGEST)
+    assert not found, (
+        "a module decides what a payment *is* from where it sits in the list or from how "
+        "big it is (FR-008). The kind is declared, and a schedule that declares none fails "
+        f"at load: {found}"
+    )
+
+
+def test_only_the_two_named_sites_divide_by_a_hundred() -> None:
+    found = _offenders(DIVIDES_BY_A_HUNDRED, allowed=DIVIDING_BY_A_HUNDRED_FOR_A_REASON)
+    assert not found, (
+        "a module converts a declared figure out of minor units (FR-004). The conversion "
+        "happens at transcription and is recorded there as an inference; if this site has "
+        "a reason, add it to DIVIDING_BY_A_HUNDRED_FOR_A_REASON with the reason rather "
+        f"than widening the pattern: {found}"
+    )
+
+
+def test_each_permitted_file_divides_exactly_once() -> None:
+    """The other direction, and it is the half the allowlist would otherwise lose.
+
+    An entry excuses a **file**, so a second division added inside an excused file would go
+    unseen -- which is the fail-open shape the allowlist exists to prevent, reintroduced by
+    the allowlist itself. The count is what closes it: each named file has exactly one, and
+    a second is a decision somebody takes here. It also catches the opposite drift, an entry
+    for a site that no longer divides at all.
+    """
+    for name in DIVIDING_BY_A_HUNDRED_FOR_A_REASON:
+        source = source_scan.executable_source(REPO_ROOT / name)
+        assert len(DIVIDES_BY_A_HUNDRED.findall(source)) == 1, name
+
+
+def test_no_module_derives_a_coupon_rate() -> None:
+    found = _derivations("coupon_rate")
+    assert not found, (
+        "a module computes a coupon rate rather than reading a declared one (FR-021, "
+        f"FR-003c). A rate plus the spacing yields an extrapolated issue date: {found}"
+    )
+
+
+def test_no_module_infers_a_coverage_window() -> None:
+    found = _derivations("covers_from")
+    assert not found, (
+        "a module decides where a schedule's coverage begins rather than reading the "
+        f"declared claim (FR-021). The claim is the transcriber's and it is cited: {found}"
+    )
+
+
+def test_the_scan_reaches_every_module_that_could_hold_such_a_line() -> None:
+    """A scan of nothing passes forever. The loader and the schedule generator are where
+    each of these would actually be written."""
+    walked = {_named(path) for path in _python_files()}
+    assert {
+        "src/terezy/data/declarations/loader.py",
+        "src/terezy/core/instruments/enumerated.py",
+        "src/terezy/core/instruments/fixed_income.py",
+        "src/terezy/core/instruments/terms.py",
+        "scripts/fetch_inzhur.py",
+    } <= walked
+
+
+@pytest.mark.parametrize(
+    ("pattern", "planted"),
+    [
+        (LAST_OR_LARGEST, "principal = terms.payments[-1]\n"),
+        (LAST_OR_LARGEST, "principal = max(payments, key=lambda p: p.amount.amount)\n"),
+        (LAST_OR_LARGEST, "biggest = max(p.amount.amount for p in terms.payments)\n"),
+        (DIVIDES_BY_A_HUNDRED, "amount = table.amount / 100.0\n"),
+        (DIVIDES_BY_A_HUNDRED, "amount = table.amount / 100\n"),
+    ],
+)
+def test_the_scan_would_catch_the_line_it_forbids(pattern: re.Pattern[str], planted: str) -> None:
+    assert pattern.search(planted), planted
+
+
+@pytest.mark.parametrize(
+    ("pattern", "innocent"),
+    [
+        (LAST_OR_LARGEST, "last = max(payment.on for payment in terms.payments)\n"),
+        (DIVIDES_BY_A_HUNDRED, "share = spent.amount / price.amount\n"),
+    ],
+)
+def test_the_scan_permits_the_lines_that_only_look_alike(
+    pattern: re.Pattern[str], innocent: str
+) -> None:
+    """A scan that flags the honest line beside the forbidden one is a scan somebody turns
+    off. Reading the last *date* is not reading the last *payment's meaning*, and dividing
+    two amounts is not converting a unit."""
+    assert not pattern.search(innocent), innocent
+
+
+@pytest.mark.parametrize(
+    ("named", "planted", "innocent"),
+    [
+        (
+            "coupon_rate",
+            "coupon_rate = coupon.amount / (face.amount * year_fraction)",
+            "coupon_rate=_as_fraction(table.coupon_rate_pct)",
+        ),
+        (
+            "covers_from",
+            "covers_from = min(payment.on for payment in payments) - one_period",
+            "covers_from=covers_from",
+        ),
+    ],
+)
+def test_the_derivation_walk_tells_a_computation_from_a_declared_read(
+    tmp_path: Path, named: str, planted: str, innocent: str
+) -> None:
+    """The distinction a regex cannot make, and the reason these two are an AST walk:
+    ``x = a / b`` derives a value and ``x=a`` passes a declared one to a constructor, and
+    both contain the same characters."""
+    guilty = tmp_path / "guilty.py"
+    guilty.write_text(planted + "\n", encoding="utf-8")
+    assert [value for value in _bound(guilty, named) if _computed(value)]
+
+    honest = tmp_path / "honest.py"
+    honest.write_text(f"Record({innocent})\n", encoding="utf-8")
+    assert not [value for value in _bound(honest, named) if _computed(value)], (
+        "a declared value passed to a constructor is now *seen* -- keyword arguments are in "
+        "the walk -- and must still not be reported: what is forbidden is computing one"
+    )
+
+
+def test_the_prose_is_stripped_before_the_scan_reads_it() -> None:
+    """Half this repository's docstrings name the very thing a scan forbids -- this file's
+    own module docstring lists all five. `tests/source_scan` parses and drops them, so the
+    scan reads what runs."""
+    module = ast.parse(
+        source_scan.executable_source(REPO_ROOT / "src/terezy/core/instruments/enumerated.py")
+    )
+    assert ast.get_docstring(module) is None

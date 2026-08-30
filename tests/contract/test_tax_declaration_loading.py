@@ -459,10 +459,16 @@ class TestTheShippedFilesLoad:
         declarations = resolver.from_data_root(DATA_ROOT)
         rules = resolver.tax_rules_from_data_root(DATA_ROOT, declarations)
 
-        assert sorted(rules) == ["ua"]
+        assert sorted(rules) == ["synthetic_fixture", "ua"], (
+            "⚙ 013 declared assessment rules for the synthetic fixture jurisdiction, so that "
+            "a netting category could be exercised rather than warned about. Every "
+            "jurisdiction with rules is named here rather than the list being loosened, "
+            "because a set read off the directory would agree by construction"
+        )
         assert set(rules["ua"].methods) == set(LotMethod)
-        for class_id in rules["ua"].category_of_class:
-            assert class_id in declarations.tax_classes
+        for jurisdiction in rules.values():
+            for class_id in jurisdiction.category_of_class:
+                assert class_id in declarations.tax_classes
 
     def test_every_shipped_category_has_a_timing_rule(self) -> None:
         rules = resolver.tax_rules_from_data_root(DATA_ROOT, resolver.from_data_root(DATA_ROOT))

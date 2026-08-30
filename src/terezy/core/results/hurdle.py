@@ -95,12 +95,17 @@ EXCLUDES: Final[frozenset[str]] = frozenset(
         "public holidays (weekends are observed; no holiday calendar is modelled)",
     }
 )
-"""What a feature-001 hurdle rate does not account for, in the output's own words.
+"""What a hurdle rate does not account for **whatever it was computed from**, in the
+output's own words.
 
-Three items, each of which is a whole later feature. They are phrased for a reader rather
-than as identifiers because they are meant to be shown: a figure that silently omitted a
-five-to-ten-percent access cost is the predecessor project's headline defect
+Each item is a whole later feature or a stated deferral. They are phrased for a reader
+rather than as identifiers because they are meant to be shown: a figure that silently
+omitted a five-to-ten-percent access cost is the predecessor project's headline defect
 (``REWRITE_BRIEF.md`` §4.2), and this set is the standing reminder of it.
+
+⚙ **A floor, not the whole statement** (013 FR-023). What a figure excludes can depend on
+what it was derived from, so :func:`of_flows` takes the set and this is its default. The
+declaration supplies anything it adds; nothing here knows what that might be.
 """
 
 ACCOUNTS_FOR: Final[frozenset[str]] = frozenset(
@@ -587,6 +592,7 @@ def of_flows(
     received: Sequence[CashFlow],
     total_tax: Money,
     provenance: Provenance,
+    excludes: frozenset[str] = EXCLUDES,
     nominal_staleness: StalenessVerdict = staleness.UNASSESSED,
     deflate_with: Deflation | None = None,
 ) -> HurdleRate:
@@ -614,6 +620,12 @@ def of_flows(
     here to age them against yet. The merge point exists so that the day those records carry
     their kind, one caller changes and every real figure inherits the verdict.
 
+    ⚙ **``excludes`` defaults to :data:`EXCLUDES` and may be widened by the caller** (013
+    FR-023). What a figure fails to account for is partly a property of what it was derived
+    from, and the one case that exists is a purchase price that has not been separated into
+    a clean price and accrued interest. The default is the floor rather than a permission:
+    a caller may add to it and there is nothing here that takes anything away.
+
     ``deflate_with`` defaults to ``None``, and the default is **not** a permissive one: the
     slot then holds :data:`NOT_DEFLATED`, two of FR-012's named refusals saying that no series
     and no assumption were supplied -- which is exactly what happened. FR-006 and US1's fifth
@@ -636,6 +648,6 @@ def of_flows(
         ),
         total_tax=total_tax,
         accounts_for=ACCOUNTS_FOR,
-        excludes=EXCLUDES,
+        excludes=excludes,
         provenance=provenance,
     )

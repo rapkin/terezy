@@ -1,0 +1,119 @@
+# SYNTHETIC FIXTURE. This file is `ovdp_synthetic_a.toml` said the other way round.
+#
+# Its purpose is one assertion (013 SC-002): a tuple built on a bond declared by its terms
+# and a tuple built on a bond declared by the payments those terms produce must agree on
+# every figure and take the same position in the ranking. If they do not, the two forms are
+# not two encodings of one thing — they are two concepts sharing an interface, and the right
+# response is to stop rather than to add a branch.
+#
+# EVERY AMOUNT BELOW IS TRANSCRIBED AT FULL FLOAT64 PRECISION from
+# `face x coupon_rate x year_fraction` under issue A's declared terms — 1000.0 face, 15.5%,
+# act/365, semiannual from 2026-01-15 to 2028-01-15. Rounding them to kopecks would make the
+# totals miss the project tolerance by accumulated rounding rather than by anything the
+# comparison is about, and the test would then be measuring the transcription.
+#
+# THE LAST TWO PAYMENTS FALL ON 2028-01-17, not on the 2028-01-15 the terms name: issue A
+# declares the `following` business-day rule and 2028-01-15 is a Saturday. That is the whole
+# of what a business-day rule does — it moves the date money changes hands — and here it has
+# already been applied, by whoever published the schedule. Nothing in this file names a rule,
+# because none was applied by this engine.
+#
+# The final coupon and the repayment of principal share that date, as two entries, which is
+# how a bond ordinarily ends.
+
+[instrument]
+id           = "ovdp_enumerated_mirror"
+name         = "Synthetic OVDP issue A as its payments — TEST FIXTURE, transcribed"
+class        = "enumerated_schedule"
+currency     = "UAH"
+is_synthetic = true
+
+[instrument.schedule]
+face_value   = 1000.0
+covers_from  = "2026-01-15"
+day_count    = "act/365"
+kind         = "bond_terms"
+source       = "INFERENCE: SYNTHETIC FIXTURE — transcribed from ovdp_synthetic_a.toml's own computed schedule, whose terms are themselves invented. The face value is that file's declared face value and the coverage claim is its issue date; neither is observed from any issue. The day count matches issue A's, because SC-011 requires the two yields to be annualised on the same clock — a pair differing in that convention produces two different yields, correctly."
+retrieved_on = "2026-08-29"
+verified_on  = ""
+
+  [[instrument.schedule.payment]]
+  on           = "2026-07-15"
+  amount       = 76.86301369863014
+  pays         = "coupon"
+  kind         = "bond_terms"
+  source       = "INFERENCE: SYNTHETIC FIXTURE — 1000.0 x 0.155 x 181/365, transcribed at full precision. The label is a reading: a published list carries no labels."
+  retrieved_on = "2026-08-29"
+  verified_on  = ""
+
+  [[instrument.schedule.payment]]
+  on           = "2027-01-15"
+  amount       = 78.13698630136987
+  pays         = "coupon"
+  kind         = "bond_terms"
+  source       = "INFERENCE: SYNTHETIC FIXTURE — 1000.0 x 0.155 x 184/365, transcribed at full precision."
+  retrieved_on = "2026-08-29"
+  verified_on  = ""
+
+  [[instrument.schedule.payment]]
+  on           = "2027-07-15"
+  amount       = 76.86301369863014
+  pays         = "coupon"
+  kind         = "bond_terms"
+  source       = "INFERENCE: SYNTHETIC FIXTURE — 1000.0 x 0.155 x 181/365, transcribed at full precision."
+  retrieved_on = "2026-08-29"
+  verified_on  = ""
+
+  [[instrument.schedule.payment]]
+  on           = "2028-01-17"
+  amount       = 78.13698630136987
+  pays         = "coupon"
+  kind         = "bond_terms"
+  source       = "INFERENCE: SYNTHETIC FIXTURE — 1000.0 x 0.155 x 184/365, accrued to 2028-01-15 and paid on the Monday after it. The accrual period is not recoverable from this file, and nothing here claims it is."
+  retrieved_on = "2026-08-29"
+  verified_on  = ""
+
+  [[instrument.schedule.payment]]
+  on           = "2028-01-17"
+  amount       = 1000.0
+  pays         = "principal_repayment"
+  kind         = "bond_terms"
+  source       = "INFERENCE: SYNTHETIC FIXTURE — the redemption at face, labelled a repayment of principal by a human reading a list of numbers."
+  retrieved_on = "2026-08-29"
+  verified_on  = ""
+
+[instrument.constraints]
+min_ticket   = 1000.0
+min_unit     = 1.0
+kind         = "venue_terms"
+source       = "SYNTHETIC FIXTURE — issue A's minimum ticket, copied so that the pair differs in its declaration form and in nothing else. Not observed from any venue."
+retrieved_on = "2026-08-29"
+verified_on  = ""
+
+[instrument.tax_classes]
+coupon        = "ua_government_bond"
+disposal_gain = "ua_government_bond"
+
+[[instrument.verification_task]]
+settles     = "face_value"
+question    = "What face value does this issue actually have?"
+searched    = "SYNTHETIC FIXTURE — nothing was searched: the schedule is transcribed from another fixture, whose terms are invented."
+searched_on = "2026-08-29"
+
+[[instrument.verification_task]]
+settles     = "payment_kind"
+question    = "Which of these payments is a coupon and which repays principal?"
+searched    = "SYNTHETIC FIXTURE — nothing was searched. Here the split is known because the schedule was computed from declared terms; for a real transcription it would be a human reading of a list of numbers, which is why the task is recorded rather than omitted."
+searched_on = "2026-08-29"
+
+[[instrument.verification_task]]
+settles     = "minor_unit_conversion"
+question    = "Do the published figures denote hryvnia or kopecks?"
+searched    = "SYNTHETIC FIXTURE — no conversion was performed: the amounts were transcribed in hryvnia."
+searched_on = "2026-08-29"
+
+[[instrument.verification_task]]
+settles     = "coverage"
+question    = "Is this list complete from 2026-01-15 to the end of the issue's life?"
+searched    = "SYNTHETIC FIXTURE — the claim rests on ovdp_synthetic_a.toml's terms, which state the whole life of an invented issue. No publication was read."
+searched_on = "2026-08-29"
