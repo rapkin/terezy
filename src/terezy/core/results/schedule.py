@@ -15,11 +15,9 @@ and therefore knows. Matching them by date adjacency would be a guess dressed as
 trail -- the same reason a fee's allocation is a stored field rather than a heuristic --
 and it would start lying the moment two taxable events shared a date.
 
-⚙ **Feature 009: the row's tax comes from the charge, not from the charge event's cash.**
-It used to be read off the tax event's amount, which worked only while a charge deducted
-cash at event time -- the predecessor's defect B5, cured in 009 by making a charge an
-assessment memo that moves nothing. Reading a magnitude off that memo now would report zero
-tax on every row, which is exactly the wrong answer in the case this schedule exists for. So
+**The row's tax comes from the charge, not from the charge event's cash.** A ``TAX_CHARGE``
+is an assessment memo that moves nothing, so reading a magnitude off it would report zero tax
+on every row -- exactly the wrong answer in the case this schedule exists for. So
 :class:`ChargedOn` carries both halves of the pairing: which event recorded the assessment,
 and what it assessed. One mapping rather than two, because two could disagree about a row.
 
@@ -104,9 +102,9 @@ class CashFlowSchedule:
 class ChargedOn:
     """What one taxed event was charged, and which assessment memo recorded it.
 
-    ⚙ **Feature 009.** Both halves travel together so a row cannot report one event's
-    traceability beside another's figure. See the module docstring for why the amount is no
-    longer readable off the memo event itself.
+    Both halves travel together so a row cannot report one event's traceability beside
+    another's figure. See the module docstring for why the amount is not readable off the memo
+    event itself.
     """
 
     tax_event: int

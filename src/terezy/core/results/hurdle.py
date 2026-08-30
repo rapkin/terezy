@@ -22,26 +22,17 @@ taxed instrument arrives they diverge, and code that had only ever seen them equ
 have picked whichever it happened to store.
 
 **Both are nominal, and the real slot beside them holds two figures** (FR-022; 007 FR-006,
-FR-009). Feature 001 reserved :attr:`HurdleRate.real` and left it holding a typed
-"unavailable" carrying its reason, so that the feature which introduced CPI could fill it
-without changing the shape of the result or anything that consumes it. Feature 007 is that
-feature, and the promise held: ``real`` is still exactly **one** field, and what it holds is
-now a :class:`RealTerms` carrying two independently typed outcomes.
+FR-009): :attr:`HurdleRate.real` is exactly **one** field, holding a :class:`RealTerms` that
+carries two independently typed outcomes.
 
-**Two, because the horizon has two halves and only one of them has been observed.** 001's
-FR-022 forbade a real figure computed from an assumed inflation rate, and a hurdle projects
-into the future where only assumptions exist. The owner resolved the collision on 2026-08-22:
-*both figures, separately labelled, never mixed into one number.*
-:attr:`RealTerms.realized` is deflated by declared CPI observations,
-:attr:`RealTerms.assumed` by a declared future-inflation assumption, and neither ever stands
-in for the other. The prohibition was refined rather than repealed -- a real figure from an
-*implicit or invented* rate is still forbidden; a *declared, dated, labelled* assumption
-entered as scenario data is a different thing and is visible as an assumption on every figure
-it touches.
-
-**A nominal figure still cannot be assigned into the slot without a mypy error**, which is
-the mechanism decision D4 chose over a naming convention, and it survived the slot changing
-occupant: ``NominalRate`` and ``RealRate`` share no base class and no protocol.
+**Two, because the horizon has two halves and only one of them has been observed.** A hurdle
+projects into the future where only assumptions exist, and a real figure from an assumed rate
+was forbidden outright. The owner resolved the collision on 2026-08-22: *both figures,
+separately labelled, never mixed into one number.* :attr:`RealTerms.realized` is deflated by
+declared CPI observations, :attr:`RealTerms.assumed` by a declared future-inflation
+assumption, and neither ever stands in for the other. What stays forbidden is a real figure
+from an *implicit or invented* rate; a *declared, dated, labelled* assumption entered as
+scenario data is a different thing and is visible as an assumption on every figure it touches.
 
 **The figure states its own boundaries** (:attr:`HurdleRate.excludes`). Principle VI
 forbids quoting an access cost per instrument, so rather than pretending this number is
@@ -103,7 +94,7 @@ rather than as identifiers because they are meant to be shown: a figure that sil
 omitted a five-to-ten-percent access cost is the predecessor project's headline defect
 (``REWRITE_BRIEF.md`` §4.2), and this set is the standing reminder of it.
 
-⚙ **A floor, not the whole statement** (013 FR-023). What a figure excludes can depend on
+**A floor, not the whole statement** (013 FR-023). What a figure excludes can depend on
 what it was derived from, so :func:`of_flows` takes the set and this is its default. The
 declaration supplies anything it adds; nothing here knows what that might be.
 """
@@ -127,14 +118,12 @@ adding one there, in the same change, where a reviewer sees both.
 """
 
 # ---------------------------------------------------------------------------
-# 007-cpi-real-terms: the real slot, filled
+# The real slot
 # ---------------------------------------------------------------------------
 #
-# Feature 001 left one generic sentence here -- that the feature did not model inflation at
-# all -- and it was true then. It stops being true the moment this feature lands, so it
-# survives nowhere in `src/`, and a test greps for it. FR-012 replaces it with reasons that
-# name the specific absence, built by the functions below so that every result says it the
-# same way and no call site improvises.
+# FR-012 wants a refusal that names the specific absence, so the reasons are built by the
+# functions below and no call site improvises. `tests/unit/test_real_terms_reasons.py` greps
+# for the generic sentence they replaced.
 #
 # `real_terms` is the only place a `RealTerms` is built, and it checks coverage BEFORE any
 # arithmetic runs. That ordering is the design (plan.md, Complexity Tracking): a check inside
@@ -153,8 +142,7 @@ class RealTerms:
     **And it is what the one reserved field holds**, rather than being two fields on
     :class:`HurdleRate`. FR-009 wants two figures and FR-006 wants the result's shape
     unchanged; those are only compatible if the *slot* stays one field and the *occupant*
-    carries both. A second field on ``HurdleRate`` would have broken the invariance that
-    001's FR-022 existed to create, which would be an odd way to honour it.
+    carries both.
 
     There is deliberately **no third field** combining the two. No reported number blends
     observed and assumed inflation (FR-010), and the way to keep that true is to have nowhere
@@ -491,10 +479,8 @@ class HurdleRate:
     real: RealTerms
     """The real-terms figures: one deflated by observation, one by assumption, never mixed.
 
-    ⚙ **Still exactly one field, and that is FR-006's whole content.** Feature 001 reserved
-    this slot and left it holding a typed "unavailable"; feature 007 changed what occupies it
-    and did not change the result's shape. Adding a second field beside this one would have
-    broken the invariance the reservation existed to create.
+    **Exactly one field, and that is FR-006's whole content.** Adding a second field beside
+    this one would break the invariance the reserved slot exists to create.
 
     Never ``None`` and never a bare unavailable: :class:`RealTerms` always exists, and when
     neither figure can be computed it holds two reasons rather than one, because *which* half
@@ -604,14 +590,14 @@ def of_flows(
     honest statement that the flows really are the same, not this function's assumption
     that they always are.
 
-    ⚙ **The figure that gets deflated is this function's own ``nominal_ytm``** (007 FR-007),
+    **The figure that gets deflated is this function's own ``nominal_ytm``** (007 FR-007),
     which is why the deflation happens here rather than in the caller. The contractual yield
     is the benchmark the spec designates, and the real figure is *its* counterpart; computing
     the yield in one place and deflating a separately-derived copy of it in another would be
     two roots of the same equation with two chances to disagree. The caller supplies the
     window and the deflators; the rate comes from here.
 
-    ⚙ **``nominal_staleness`` is what the caller knows about the ageing of the figure being
+    **``nominal_staleness`` is what the caller knows about the ageing of the figure being
     deflated** (FR-013: a staleness report on *any input of the nominal figure* must reach the
     real figure). It defaults to :data:`~terezy.core.primitives.staleness.UNASSESSED` --
     *nobody aged anything* -- which is the honest verdict for a feature-001 hurdle rate and not
@@ -620,7 +606,7 @@ def of_flows(
     here to age them against yet. The merge point exists so that the day those records carry
     their kind, one caller changes and every real figure inherits the verdict.
 
-    ⚙ **``excludes`` defaults to :data:`EXCLUDES` and may be widened by the caller** (013
+    **``excludes`` defaults to :data:`EXCLUDES` and may be widened by the caller** (013
     FR-023). What a figure fails to account for is partly a property of what it was derived
     from, and the one case that exists is a purchase price that has not been separated into
     a clean price and accrued interest. The default is the floor rather than a permission:
@@ -628,9 +614,7 @@ def of_flows(
 
     ``deflate_with`` defaults to ``None``, and the default is **not** a permissive one: the
     slot then holds :data:`NOT_DEFLATED`, two of FR-012's named refusals saying that no series
-    and no assumption were supplied -- which is exactly what happened. FR-006 and US1's fifth
-    scenario require a call that ran under feature 001 to run here unchanged and produce a
-    shape-identical result, and this is what makes that literally true.
+    and no assumption were supplied -- which is exactly what happened.
     """
     nominal_ytm = NominalRate(internal_rate_of_return(contractual))
     return HurdleRate(

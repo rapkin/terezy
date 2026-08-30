@@ -117,7 +117,7 @@ class PurchasePremium:
     zero tax charge cite its exemption: an absent figure meaning *bought at par* is a silent
     default, and the whole point of recording zeroes is that they name what produced them.
 
-    ⚙ **This feature adds no premium rule.** What happens to the difference is the declared
+    **There is no premium rule here.** What happens to the difference is the declared
     tax category's business and nothing else's -- there is no amortisation here, no
     imputation, and no branch of its own. The figure states which treatment governed it and
     stops (FR-026).
@@ -127,7 +127,7 @@ class PurchasePremium:
     """What was actually paid, in full and exactly as stated. Nothing is amortised, nothing
     is imputed, and no part of it is reclassified as accrued interest (FR-024).
 
-    ⚙ Named ``paid`` rather than ``cost`` deliberately. ``cost`` on a result record is one of
+    Named ``paid`` rather than ``cost`` deliberately. ``cost`` on a result record is one of
     the names `tests/contract/test_cost_labels.py` forbids, because a route cost under an
     unlabelled name is a figure whose one-way-or-round-trip label has stopped travelling with
     it. This is not a route cost -- it is the purchase price -- and the clearer word says so
@@ -138,7 +138,7 @@ class PurchasePremium:
     """What this holding gets back as principal: the repayments it will receive, times
     quantity.
 
-    ⚙ **Not ``face value x quantity``**, and FR-025 was amended to say so (2026-08-30). The
+    **Not ``face value x quantity``** (FR-025). The
     two coincide for a bond that repays its face once, which is every fixture this
     repository ships -- and they part the moment a schedule has already repaid part of its
     principal before the purchase. A unit of such an issue is a unit of what *remains*: a
@@ -157,11 +157,10 @@ class PurchasePremium:
     """The declared class governing a disposal of this instrument, which is the event the
     difference is realised by -- or ``None`` where the declaration names none.
 
-    ⚙ **``None`` rather than an empty string**, because the two say different things and the
-    empty string said the wrong one: a declaration is not required to name a class for every
-    kind of income it might produce, and a figure carrying ``""`` here reported the *rules*
-    as mapping no category to a class, sending a reader to the jurisdiction file when the
-    thing to fix was the instrument's own declaration.
+    **``None`` rather than an empty string**: a declaration is not required to name a class
+    for every kind of income it might produce, and a figure carrying ``""`` here would report
+    the *rules* as mapping no category to a class, sending a reader to the jurisdiction file
+    when the thing to fix is the instrument's own declaration.
     """
 
     governed_by: GovernedBy | TreatmentUnstated
@@ -223,7 +222,7 @@ def project(
     instrument references and this mapping does not contain is reported, never treated as
     untaxed: those are opposite claims and only one of them is cited.
 
-    ⚙ **``cpi_series`` and ``inflation_assumption`` fill the real-terms slot** (007). Both
+    **``cpi_series`` and ``inflation_assumption`` fill the real-terms slot.** Both
     default to ``None``, and the default is not a silence: the resulting figures are
     :data:`~terezy.core.results.hurdle.NOT_DEFLATED`, whose two reasons say *no CPI series was
     declared* and *no future-inflation assumption was declared* -- which is exactly what
@@ -232,13 +231,13 @@ def project(
     a shape-identical result; a required argument would have made every one of those call
     sites a lie about what changed.
 
-    ⚙ **``assessment_rules`` is what lets the purchase figure say which treatment governs
+    **``assessment_rules`` is what lets the purchase figure say which treatment governs
     the difference** (FR-026). ``None`` is not a silence either: the figure then carries
     :class:`TreatmentUnstated`, saying that nobody supplied the rules -- because *outside*,
     *nets* and *per event* are three different claims about the same money and defaulting to
     one would answer a question nobody asked.
 
-    ⚙ **Nothing on the tuple path supplies it today** (recorded 2026-08-30):
+    **Nothing on the tuple path supplies it today** (recorded 2026-08-30):
     ``core.decision.tuple_outcome`` calls this function without rules, so every projection
     reached through the join carries :class:`TreatmentUnstated`. That is honest rather than
     wrong -- the join is given no jurisdiction to resolve them from -- and it means FR-026's
@@ -246,12 +245,8 @@ def project(
     which jurisdiction assesses the holding, which is a term the tuple does not carry.
 
     ``ageing`` carries the declared staleness thresholds and the ``as_of`` date the question is
-    asked at (FR-005). It is one record rather than two arguments so it cannot be half-supplied
-    -- thresholds without a date age nothing and would say nothing about not having done so --
-    and ``None`` means this run did not ask, which the figures report as
-    :data:`~terezy.core.primitives.staleness.UNASSESSED` rather than as freshness. There is no
-    clock: ``as_of`` is an input, recorded in the manifest, so the same run gives the same
-    verdict for ever.
+    asked at (FR-005). ``None`` means this run did not ask, which the figures report as
+    :data:`~terezy.core.primitives.staleness.UNASSESSED` rather than as freshness.
     """
     ops = instrument_registry.ops_for(declaration.instrument_class)
     produced = ops.events(declaration, holding, horizon, assumptions)
@@ -501,9 +496,9 @@ def _flows(
     would let the yield disagree with the schedule it was computed from, in a way that
     would look like a rounding difference and would not be one.
 
-    ⚙ **``assessed`` is what keeps the cash-flow return an after-tax figure** (009). A tax
-    charge no longer debits the account, so a series taken from the ledger's own amounts would
-    silently become a **pre-tax** series while the field still called itself net of tax. The
+    **``assessed`` is what keeps the cash-flow return an after-tax figure.** A tax charge does
+    not debit the account, so a series taken from the ledger's own amounts would silently be a
+    **pre-tax** series while the field still called itself net of tax. The
     mapping supplies, per **charge-event** sequence -- the memo's own, not the taxed event's --
     what that event assessed, and it is the same ``taxed_by`` pairing the schedule uses, so
     the two cannot disagree about which line a charge belongs to.
@@ -511,8 +506,7 @@ def _flows(
     **Accrual rather than payment, deliberately.** This figure annualises the return of the
     *paper*: what the holding earns and what the tax on it costs. When that tax is settled is
     a fact about the owner's tax year rather than about the instrument. Accrual is also the
-    conservative of the two readings -- paying earlier is worse -- and it keeps the series
-    term-for-term identical to the one 001 recorded.
+    conservative of the two readings -- paying earlier is worse.
     """
     charged = assessed or {}
     return tuple(
@@ -595,7 +589,7 @@ def _charge_every_taxable_event(
         )
         match outcome:
             case UnresolvedTaxClass() | RateUndeclaredBefore():
-                # ⚙ feature 006: a class can exist, cover the kind, and still have no
+                # A class can exist, cover the kind, and still have no
                 # rate in force on the event's date. Returned rather than skipped -- an
                 # uncharged event is indistinguishable from an exempt one in the ledger,
                 # and the whole point of FR-012 is that the two are opposite claims.
@@ -613,26 +607,17 @@ def _taxable_kind(kind: EventKind) -> TaxableEventKind | None:
     An exhaustive ``match`` rather than a mapping with a default, so that adding an event
     kind is a type error here instead of quietly becoming untaxable. ``None`` is the
     considered answer for the kinds listed, not the fallback for the ones nobody thought
-    about: a purchase and a reinvestment are money going *out*, a deposit is money
-    arriving from outside the modelled system, a fee is a cost, and a tax charge is the
-    output of this very process.
+    about.
     """
     match kind:
         case EventKind.COUPON:
             return TaxableEventKind.COUPON
         case EventKind.DISTRIBUTION:  # pragma: no cover -- unreachable on this path
-            # ⚙ feature 006. Present for exhaustiveness and **not** reachable here: this
-            # function maps the events of an ``InstrumentOps`` implementation, and no
-            # implementation in ``registry.REGISTRY`` emits a distribution. That is a
-            # property of what those implementations emit rather than of how many of them
-            # there are: this comment used to say "the only one is ``fixed_income``", which
-            # was true when it was written and is a count over a registry that has grown.
-            # A fund has its own mapping in ``core.results.fund``. The arm cannot simply be
-            # dropped -- the ``assert_never`` below is what makes a forgotten event kind a
+            # Present for exhaustiveness and **not** reachable here: no ``InstrumentOps``
+            # implementation this function maps emits a distribution. The arm cannot simply
+            # be dropped -- the ``assert_never`` below is what makes a forgotten event kind a
             # type error, and omitting this one would make that assertion fail to compile
-            # rather than making the case impossible. Marked like the ``case _`` beside it,
-            # for the same reason: unreachable arms should say so rather than sit as an
-            # uncovered line a reader mistakes for an untested one.
+            # rather than making the case impossible.
             return TaxableEventKind.DISTRIBUTION
         case EventKind.PRINCIPAL_REPAYMENT | EventKind.REDEMPTION:
             # A redemption is a disposal: what is taxable is the realised gain, not the
@@ -659,8 +644,8 @@ def _taxable_kind(kind: EventKind) -> TaxableEventKind | None:
         ):
             # Mechanics, not tax policy: a purchase and a reinvestment are money going
             # out, a deposit arrives from outside the modelled system, a fee is a cost,
-            # and a tax charge is the output of this very process. ⚙ A tax *payment* is
-            # the settlement of that output (009): taxing it would tax the tax. Listed
+            # and a tax charge is the output of this very process. A tax *payment* is
+            # the settlement of that output: taxing it would tax the tax. Listed
             # explicitly rather than falling through, because the ``assert_never`` below
             # is what makes "nobody thought about this kind" a type error.
             return None
@@ -713,9 +698,9 @@ def _interleave(
     from dates -- an inferred pairing would be a guess, and it would break the first time
     two taxable events shared a date.
 
-    ⚙ **Feature 009 put the charged amount in the mapping** rather than leaving the schedule
-    to read it off the tax event: a charge no longer moves cash, so the memo event's amount
-    is zero and a schedule reading it would report no tax at all.
+    **The charged amount is in the mapping** rather than left for the schedule to read off
+    the tax event: a charge moves no cash, so the memo event's amount is zero and a schedule
+    reading it would report no tax at all.
     """
     by_gross_sequence = {charge.event_sequence: charge for charge in charges}
     combined: list[Event] = []
@@ -740,8 +725,8 @@ def _tax_event(taxed: Event, charge: TaxCharge, *, sequence: int) -> Event:
     Dated with the income it taxes rather than with a payment date, because that is the date
     the liability *accrued*; ``charged_for_year`` records the year it accrues to.
 
-    ⚙ **Feature 009 took the cash out of this line** (research.md D1). It used to debit the
-    account by the charge on the day the income arrived, which is defect B5. The amount is now
+    **No cash moves on this line** (research.md D1), because debiting the account on the day
+    the income arrived is defect B5. The amount is
     :func:`terezy.core.tax.year.memo_amount` -- the charge's own money at no magnitude, so the
     citation still travels -- and the liability leaves cash as a ``TAX_PAYMENT`` later.
 

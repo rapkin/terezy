@@ -39,7 +39,7 @@ forward note kept out of the type system rather than out of a code review: a two
 a hole in *this* feature, and feature 004 adds its annotation **beside** the verdict rather
 than by changing what :class:`Ready` means.
 
-⚙ **Where these records live, against what data-model.md says.** ``data-model.md`` heads
+**Where these records live, against what data-model.md says.** ``data-model.md`` heads
 :class:`SpendableEndpoint` and :class:`Destination` with ``core/routes/coverage.py``. They are
 defined here instead, with every other record, because ``core/routes/coverage.py`` *builds*
 :class:`Ready`, :class:`NotReady` and :class:`CoverageReport` -- so defining the two inputs
@@ -168,12 +168,11 @@ means nothing carries this stream's money to this destination, which is deficit 
 class SatisfiedByIdentity(Enum):
     """The exit slot, filled by the destination **being** a declared spendable endpoint.
 
-    ⚙ **Owner decision, 2026-08-23.** FR-002 originally required a declared exit route from
-    every destination without exception, and the first implementation obeyed it literally: the
-    hryvnia balance on the owner's own salary rail came out as a hole, because no route *out*
-    of it is declared. The money is already where it needed to come back out to. Requiring a
-    way out of the place money is spent from would have made the salary rail the first finding
-    in the first real report, and it would have been wrong.
+    **Owner decision, 2026-08-23.** FR-002 read literally requires a declared exit route from
+    every destination without exception, which makes the hryvnia balance on the owner's own
+    salary rail a hole, because no route *out* of it is declared. The money is already where it
+    needed to come back out to, and requiring a way out of the place money is spent from would
+    have made the salary rail the first finding in the first real report.
 
     So the exit half of the owner's rule is satisfied **by identity** when the destination is
     itself in the declared spendable set. The mirror of :class:`SatisfiedByArrival` on the
@@ -181,7 +180,7 @@ class SatisfiedByIdentity(Enum):
     "already spendable" is explicitly not the same claim as "a declared route gets the money
     out", and so the two halves of the rule read the same way in the record and in a ``match``.
 
-    ⚙ **It supersedes declared exits, exactly as arrival supersedes declared inbound routes,
+    **It supersedes declared exits, exactly as arrival supersedes declared inbound routes,
     and that is a real consequence.** A spendable destination that also declares exits shows
     this sentinel and not those routes: the verdict rests on the money already being there, and
     nothing is *relied on*. Where those exits leave a destination no stream can reach they are
@@ -587,7 +586,7 @@ class RegistryDimensionEmpty:
     sorted -- not the first one found. Reporting one at a time would make an owner with an
     empty data root fix four things in four runs.
 
-    ⚙ ``spendable`` is a dimension of *this* feature rather than of feature 002's registry, and
+    ``spendable`` is a dimension of *this* feature rather than of feature 002's registry, and
     FR-020 does not name it. Including it is a deliberate widening, recorded in plan.md's
     Complexity Tracking: an empty spendable list makes every exit deficit 3, which is a report
     full of confident wrong verdicts -- exactly the outcome FR-020 exists to forbid.

@@ -1,12 +1,7 @@
 """What a route costs: the result records, and the types that keep the labels honest.
 
-FR-002: *the system MUST report cost both **one way** and **round trip**, each explicitly
-labelled, and MUST NOT present a one-way figure where a round-trip figure belongs. Round-trip
-cost is what belongs in a comparison.* FR-003 adds the attribution, FR-030 the missing-exit
-case, FR-014 the unusable route.
-
-Three design decisions are carried by the *shapes* here rather than by rules a reader has to
-remember.
+FR-002, FR-003, FR-030, FR-014. The decisions below are carried by the *shapes* here rather
+than by rules a reader has to remember.
 
 **One-way and round-trip are unrelated types** (research.md D4), on the precedent
 ``RealRate | RealTermsUnavailable`` set in feature 001. :class:`OneWayCost` and
@@ -179,9 +174,9 @@ class OneWayCost:
     route, several for a composition. Sums to the same total as :attr:`components`, within the
     project tolerance, and both sums are asserted: a leg cannot hide in either axis.
 
-    ⚙ **Within the tolerance rather than bit-for-bit**, and the reason is the trap this feature
-    was warned about. The whole-candidate accumulators keep the exact addition order feature 002
-    established, and these are accumulated **beside** them rather than summed into them --
+    **Within the tolerance rather than bit-for-bit.** The whole-candidate accumulators keep one
+    exact addition order, and these are accumulated **beside** them rather than summed into them
+    --
     because the rounding of a sum of sums is not the rounding of one fold, and reconstructing the
     total from the segments would move numbers 002 recorded.
     """
@@ -215,20 +210,8 @@ class RoundTripCost:
     refers to."""
 
     spreads_over_reference: tuple[float, ...]
-    """One rate-space spread per converting leg, parallel to :attr:`channels_applied`.
-
-    ``p / r`` for a declared premium -- the figure ``SIMULATOR_SPEC.md`` §4.3.1 quotes. Present
-    so SC-002's "both figures present, each labelled" is true of this record rather than only
-    of a function the caller could have called.
-
-    **This is not the cost.** The cost is :attr:`fraction`, built from
-    ``channels.loss_fraction``, and the two differ on the buy side: 6.67% against 7.14% at
-    §4.3.1's numbers. Naming them differently, in parallel fields, is deliberate -- reporting
-    only the rate-space figure is the mistake this project made once already, and it reported
-    an arriving amount short of what the venue pays.
-
-    Empty for a route that converts nothing.
-    """
+    """One rate-space spread per converting leg, parallel to :attr:`channels_applied`. Not the
+    cost -- see :attr:`OneWayCost.spreads_over_reference`."""
 
     channels_applied: tuple[str, ...]
     """Every channel used, inbound legs first and then exit legs. A round trip crossing the
@@ -285,9 +268,9 @@ class RampCost:
     path: Candidate
     """Which destination, from which stream, by which way in. Never a bare destination.
 
-    Widened from ``FundingPath`` by feature 004 (FR-013): a declared route and a composed chain
-    are two **types**, matched with ``match``, so which comparisons rest on composition is
-    visible in every report rather than inferable from an id.
+    A declared route and a composed chain are two **types**, matched with ``match`` (FR-013), so
+    which comparisons rest on composition is visible in every report rather than inferable from
+    an id.
     """
 
     exit_path: ExitChain | None
@@ -301,16 +284,11 @@ class RampCost:
     ``None`` **exactly when** :attr:`round_trip` is :class:`ExitCostUnknown`, and never
     otherwise: a candidate with no round-trip figure has no exit chain to be keyed by.
 
-    ⚙ **The biconditional holds by construction, and it did not always.** ``cost_one`` derives
-    this field *from the round-trip outcome* in one expression, so the two cannot drift. The
-    first implementation filled both slots from the chain it had chosen, which was right for the
-    "nobody declared a way out" case and wrong for the two that come later -- a way out declared
-    **closed** on the date, and one that **will not carry what arrived**. Both refuse with
-    ``ExitCostUnknown`` while a chain had already been chosen, so the record claimed a key for a
-    figure it did not have. A consumer reading ``exit_path is not None`` as "there is a
-    round-trip figure" is the natural reading, and it is now correct.
+    The biconditional holds by construction: ``cost_one`` derives this field *from the
+    round-trip outcome* in one expression, so the two cannot drift and ``exit_path is not None``
+    can be read as "there is a round-trip figure".
 
-    ⚙ **A departure from data-model.md**, which types this field ``ExitChain`` outright. Three
+    **A departure from data-model.md**, which types this field ``ExitChain`` outright. Three
     members cannot express "there is no way out" without a fourth that would then have to be
     kept in step with the round-trip slot's own statement of it -- two places for one fact. The
     ``None`` reads as *no chain in the key*, and the reason is in :attr:`round_trip`.
@@ -347,17 +325,15 @@ class RampCost:
     reaches this record at all -- it is excluded with its status recorded, and on a chain with
     the binding segment named too (FR-014, FR-015).
 
-    ⚙ **On a chain this is the tightest segment's status, not the first's or the last's** (004).
+    **On a chain this is the tightest segment's status, not the first's or the last's.**
     A chain is no more usable than its tightest link, and taking either end would let a
     constrained corridor hide behind an open one -- in the field a reader scans to decide
     whether to trust the figure beside it. It is the same shape :attr:`ceiling` (the tightest
     declared cap) and :attr:`disruption_probability` (the largest single leg) already take.
 
-    ⚙ **It describes the way in only, and that is now a decision rather than a gap.** A
-    constrained *exit* segment leaves this ``open`` on a record whose headline number is the
-    round trip. Widening this field would change what it means for every declared route that
-    already carries one, so feature 010 took the fix this note used to name as the honest one:
-    :attr:`WayOutCost.status`, a second field for the way out, below in this module. A tuple's
+    **It describes the way in only**, and a constrained *exit* segment leaves it ``open``.
+    Widening this field would change what it means for every declared route that already carries
+    one, so the way out has a second field of its own, :attr:`WayOutCost.status`, and a tuple's
     outcome reports the pair. A closed exit segment is *not* affected either way -- it yields
     ``ExitCostUnknown`` naming the route, so the round-trip slot says so in words."""
 
@@ -437,9 +413,7 @@ class RouteUnusable:
 class Ranking:
     """Every candidate route, costed and ordered, with one of them recommended.
 
-    FR-016: *rank the available routes **lexicographically** on ``(round-trip cost, ceiling
-    descending, latency)``, recommend one, and report what each alternative would have cost.*
-    FR-018 adds that a tie is a tie. FR-029 is what the *shape* of this record enforces.
+    FR-016, FR-018, FR-029.
 
     **The recommendation is an index, and that is the whole design** (research.md D3). The
     winner is not compared against the alternatives -- it **is** one of them, so SC-016 can
@@ -521,7 +495,7 @@ class NothingComparable:
     means every ranking in existence has a valid recommendation, which is what lets
     :func:`recommended_cost` be a total function with no failure mode of its own.
 
-    ⚙ **The design documents did not settle this case.** data-model.md gives
+    **The design documents do not settle this case.** data-model.md gives
     ``recommended: int`` and contracts/route-costing.md gives ``rank(...) -> Ranking``, and
     neither says what either means when every candidate is unusable or has no declared exit.
     """
@@ -556,7 +530,7 @@ def recommended_cost(ranking: Ranking) -> RampCost:
 
 
 # ---------------------------------------------------------------------------
-# 010-full-tuple: the way out, costed from what the instrument actually released
+# The way out, costed from what the instrument actually released
 # ---------------------------------------------------------------------------
 #
 # :class:`RoundTripCost` costs the way out **from what the inbound chain delivered**, because
@@ -585,11 +559,7 @@ class WayOutCost:
     """The way out as a journey: which spendable endpoint, funded from which stream, by which
     declared exit routes.
 
-    **Keyed by the whole triple, exactly as every other cost in this module is** (FR-008). It
-    is the same rule from the other end of the round trip: the way out of an instrument bought
-    from the dollar contract income and the way out of one bought from the hryvnia salary are
-    two figures, because the stream is part of what a cost *is*. A way-out cost keyed by the
-    destination alone would blend them, and the blend would look entirely reasonable.
+    Keyed by the whole triple (FR-008), the same rule from the other end of the round trip.
 
     Never a way *in*, despite the type: a :class:`~terezy.core.routes.path.Candidate` is how
     this project spells "a destination, a stream and one or more declared routes", and the
@@ -651,10 +621,8 @@ class WayOutCost:
     status: RouteStatus
     """The declared status of the way out: **the most constrained any segment declares**.
 
-    :attr:`RampCost.status`'s counterpart, and the field whose absence that one's own docstring
-    records as a stated gap -- *a constrained exit segment leaves this ``open`` on a record
-    whose headline number is the round trip*. It is a second field rather than a widening of
-    the inbound one, exactly as that docstring says the honest fix would be.
+    :attr:`RampCost.status`'s counterpart, and a second field rather than a widening of the
+    inbound one so that what that field means for a declared route does not change.
 
     ``closed`` never reaches here: ``cost_exit`` refuses such a chain with the binding segment
     recorded. ``open`` for an exit by identity, which walks no route to be constrained.
