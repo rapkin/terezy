@@ -279,3 +279,45 @@ Phases 1–3 and Phase 5: the scheme, its declaration, and the stream that names
 US1, US2 and US3 — the whole of what makes the owner's contract income a number rather than an
 "unknown". Phase 4 is what makes it honest about where the money lands, and is not optional in
 this feature, but it is separable work.
+
+---
+
+## What the plan did not predict
+
+Recorded because the next feature to touch this area will meet the same things.
+
+- **The stream module could not hold the deployable figure.** `core.routes.ranking` imports
+  `core.streams.streams` for `IncomeStream`, a deployable figure is net of a charge struck at
+  an official rate, and 011's `official-rate-never-prices-a-leg` contract has
+  `allow_indirect_imports = False` — so the obvious placement broke a compliance contract
+  through three hops. `core/streams/capacity.py` is the split, and it is the contract being
+  right rather than a workaround: what a route needs from a stream is where money lands, and
+  only the funding decision has any business knowing what an official rate is.
+
+- **Two collisions with `test_per_destination_cost_unrepresentable`.** Its access-cost scan
+  reads `venue_id` as a destination and `components` as a cost figure, and a tax charge is
+  neither — it prices no corridor. Fixed by **naming** (`credited_to`, `lines`) rather than by
+  widening the scan's spellings, with the boundary recorded from that module's own side. A
+  crediting destination is not a route's destination, which is FR-024a's whole point.
+
+- **FR-027's three states are two engine outputs.** *No source reaches this destination* and
+  *a source reaches it and the table has not caught one* are the same observation to a
+  program. The refusal names both closures rather than asserting which obtains
+  ([research D16](./research.md)).
+
+- **The declared date names could not go in the source scan.** `credited` and `repatriated`
+  are ordinary English words that appear in refusal messages all over the tree, so a word scan
+  over them reports prose-shaped code rather than branches. What proves the engine knows
+  neither is a **rename** that changes no figure, which is the stronger claim anyway.
+
+- **Two things the tests did not catch and composing the feature did.** The refusal for a
+  missing official-rate series told a caller to name one from the jurisdiction's timing
+  declaration, and nothing on the scheme path read one — so the remedy was false and a caller
+  picked a series by hand. And `deployable` never checked that the charge it was handed was
+  struck on its own stream's arrival: a charge on another amount produced a figure naming this
+  stream, internally consistent in every term. Both are fixed and both are asserted.
+
+- **`= []` is not a permitted schema default.** `test_declaration_loading`'s rule is that an
+  optional field defaults to `None` and nothing else, because `None` is *the key was not
+  written* while `[]` is a value. The first draft used `= []` to get better error messages;
+  the lists are required or `| None` now, and the messages come from the loader instead.
