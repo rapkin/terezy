@@ -96,6 +96,13 @@ EXEMPT_DIRS: dict[str, str] = {
         "carry, and for the same reason. Every *number* that describes a corridor lives on a "
         "leg, in data/routes/, cited (004 research.md D8)"
     ),
+    "candidates": (
+        "the owner's own policy on how many options a search may enumerate before it refuses "
+        "-- a single integer, and nothing here describes the world. It is the same exemption "
+        "`composition` carries and for the same reason: how far and how wide this person will "
+        "let a search run is a fact about him. Every *number* that describes a corridor lives "
+        "on a leg, in data/routes/, cited (014 research.md D9)"
+    ),
     "spendable": (
         "the owner's own statement of where he spends -- a venue id and a currency code, "
         "and nothing a source could vouch for. It is the same exemption `streams` has and "

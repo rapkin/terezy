@@ -1434,6 +1434,40 @@ class CompositionTable(BaseModel):
     """
 
 
+class CandidatesTable(BaseModel):
+    """``[candidates]`` -- the owner's policy on how many candidates a search may produce.
+
+    014 FR-019, on :class:`CompositionTable`'s shape exactly. The two are different knobs on the
+    same search and are declared in different files because they are answered differently: the
+    bound says how far one candidate may reach, and this says how many the whole enumeration may
+    hold before the primitive itself is the wrong one.
+    """
+
+    model_config = STRICT
+
+    max_candidates: int
+    """At least one, checked by the loader, which can name the file and the field.
+
+    Typed ``int`` under ``strict=True``, so ``2.5`` and ``"1000"`` are both refused at the shape
+    stage: half a candidate is not a candidate, and a quoted number is a file whose type and the
+    engine's type disagree while the answer still looks right.
+    """
+
+
+class CandidatesFile(BaseModel):
+    """A whole ``data/candidates/<owner_id>.toml``: one owner's enumeration ceiling.
+
+    Per-owner, beside ``data/composition/``, for that file's reason unchanged: how many options
+    this person is willing to have enumerated is a fact about him rather than about the world.
+    """
+
+    model_config = STRICT
+
+    owner: OwnerTable
+
+    candidates: CandidatesTable
+
+
 class CompositionFile(BaseModel):
     """A whole ``data/composition/<owner_id>.toml``: one owner's reach policy.
 
