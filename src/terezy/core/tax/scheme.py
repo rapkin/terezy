@@ -498,7 +498,13 @@ def charge_income(
         on_date=on_date,
         conversion=conversion,
         lines=charges,
-        total=money.total([line.charged for line in charges], base.currency),
+        # `also_resting_on` because a scheme declaring only periodic components charges no
+        # rate line at all, and a sum of nothing rests on nothing -- an uncited, UNMARKED zero
+        # sitting beside a base that is marked. A zero carries its citation exactly as a
+        # non-zero value does, and here the citation is the base's.
+        total=money.also_resting_on(
+            money.total([line.charged for line in charges], base.currency), base.provenance
+        ),
         provenance=prov.merge_all([base.provenance, *(line.provenance for line in charges)]),
     )
 
@@ -719,7 +725,16 @@ class ChargedUnderTheScheme:
     """
 
     venue_id: str
-    scheme_id: str
+
+    declared_treatment: str
+    """The scheme the income was **asked about** -- the one the stream names.
+
+    **Not necessarily the scheme that charged**, which is ``charge.scheme_id``. An interpreted
+    row may answer that income under one scheme, credited here, is charged under another; the
+    two are carried under different names so a reader is never shown a charge labelled with a
+    scheme that did not produce it. There is no third field: what charged is on the charge.
+    """
+
     reading_id: str
     charge: SchemeCharge
     grounds: str
@@ -762,7 +777,11 @@ class UnsettledDestination:
     """
 
     venue_id: str
-    scheme_id: str
+
+    declared_treatment: str
+    """The scheme the income was asked about. A switch has no single scheme that charged --
+    that is what makes it a switch -- so each figure names its own on :attr:`ReadingFigure`."""
+
     grounds: str
     resolution_path: str
     figures: tuple[ReadingFigure, ...]
@@ -790,7 +809,7 @@ class CreditingDestinationRefused:
     """No reading could be produced for this destination under this scheme."""
 
     venue_id: str
-    scheme_id: str
+    declared_treatment: str
     state: RefusedState
     uncomputable: tuple[UncomputableCandidate, ...]
     reason: str
@@ -945,7 +964,7 @@ def apply(
     if destination is None:
         return CreditingDestinationRefused(
             venue_id=credited_to,
-            scheme_id=scheme_id,
+            declared_treatment=scheme_id,
             state=RefusedState.NO_DECLARED_JUDGEMENT,
             uncomputable=(),
             reason=(
@@ -984,7 +1003,7 @@ def apply(
     if not figures:
         return CreditingDestinationRefused(
             venue_id=credited_to,
-            scheme_id=scheme_id,
+            declared_treatment=scheme_id,
             state=RefusedState.NO_CANDIDATE_IS_COMPUTABLE,
             uncomputable=tuple(uncomputable),
             reason=(
@@ -1007,7 +1026,7 @@ def apply(
         only = figures[0]
         return ChargedUnderTheScheme(
             venue_id=credited_to,
-            scheme_id=scheme_id,
+            declared_treatment=scheme_id,
             reading_id=only.reading_id,
             charge=only.charge,
             grounds=destination.grounds,
@@ -1016,7 +1035,7 @@ def apply(
 
     return UnsettledDestination(
         venue_id=credited_to,
-        scheme_id=scheme_id,
+        declared_treatment=scheme_id,
         grounds=destination.grounds,
         resolution_path=destination.resolution_path,
         figures=tuple(figures),

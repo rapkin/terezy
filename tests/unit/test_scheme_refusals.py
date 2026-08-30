@@ -100,7 +100,17 @@ class TestTheBaseCannotBeStruck:
         assert unavailable.series_id is None
         assert unavailable.wanted == (Currency.UAH, Currency.USD)
 
-    def test_a_series_quoting_another_pair_is_not_inverted(self) -> None:
+    def test_a_series_quoting_another_pair_names_it_rather_than_saying_none_was_given(
+        self,
+    ) -> None:
+        """The two ``OfficialRateSeriesUnavailable`` cases are different situations.
+
+        *No series was supplied* and *the supplied series quotes the other direction* close
+        differently, and the second is the one that gets misreported: a refusal saying nothing
+        was supplied, over a series that was, sends the reader to declare what they already
+        have. Asserting only the union member cannot tell them apart, because both branches
+        return it.
+        """
         refusal = schemes.charge_income(
             _scheme(),
             DOLLARS,
@@ -110,7 +120,12 @@ class TestTheBaseCannotBeStruck:
             ),
         )
         assert isinstance(refusal, schemes.TaxBaseUnavailable), refusal
-        assert isinstance(refusal.unavailable, OfficialRateSeriesUnavailable)
+        unavailable = refusal.unavailable
+        assert isinstance(unavailable, OfficialRateSeriesUnavailable), unavailable
+        assert unavailable.series_id == "synthetic_inverse"
+        assert unavailable.quotes == (Currency.USD, Currency.UAH)
+        assert unavailable.wanted == (Currency.UAH, Currency.USD)
+        assert "none is inverted" in unavailable.reason
 
     def test_the_component_schedule_is_checked_before_the_rate_is_looked_up(self) -> None:
         """A date neither the schedule nor the series reaches names the schedule.
@@ -122,7 +137,28 @@ class TestTheBaseCannotBeStruck:
         assert isinstance(refusal, schemes.ComponentRateUndeclaredBefore), refusal
 
 
-class TestNothingIsChargedInACurrencyItWasNotStruckIn:
+class TestAnArrivalInTheTaxCurrencyIsNeverRefusedForWantOfARate:
+    """011 FR-009. The currency is checked before a series is, and it has to be.
+
+    ``strike_base`` **raises** on an amount that needs no rate, so the check is not an
+    optimisation: without it a hryvnia arrival under a jurisdiction that declares no series
+    would come back refused for want of a rate it never needed -- and a false refusal trains
+    a reader to ignore the true ones.
+    """
+
+    def test_a_hryvnia_arrival_is_charged_with_no_series_at_all(self) -> None:
+        charge = schemes.charge_income(_scheme(), HRYVNIA, on_date=AFTER, series=None)
+        assert isinstance(charge, schemes.SchemeCharge), charge
+        assert charge.conversion is None
+        assert charge.base.amount == HRYVNIA.amount
+
+    def test_it_is_charged_even_where_a_series_is_supplied_and_covers_nothing(self) -> None:
+        charge = schemes.charge_income(
+            _scheme(), HRYVNIA, on_date=AFTER, series=official_rates.series([])
+        )
+        assert isinstance(charge, schemes.SchemeCharge), charge
+        assert charge.conversion is None
+
     def test_a_hryvnia_arrival_before_the_commencement_still_refuses_by_component(self) -> None:
         refusal = schemes.charge_income(_scheme(), HRYVNIA, on_date=BEFORE, series=None)
         assert isinstance(refusal, schemes.ComponentRateUndeclaredBefore), refusal

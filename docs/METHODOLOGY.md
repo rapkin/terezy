@@ -1104,8 +1104,8 @@ running the identical projection with every source verified produces a byte-iden
 ### 13.1 The formula
 
 ```
-gross   = the credited amount, in the tax currency  (§33.2)
-charged = what the named taxation scheme charges on it, line by line  (§33.1)
+gross   = the credited amount, in the tax currency  (§32.2)
+charged = what the named taxation scheme charges on it, line by line  (§32.1)
 net     = gross − charged
 ```
 
@@ -1162,7 +1162,7 @@ it into the stream's own currency are forbidden, in opposite directions:
 
 - converting the hryvnia charge back at the **official** rate is an official rate pricing a
   realised amount (011 FR-012, §30.1);
-- putting it through the **sale channel** is a channel rate deciding a tax figure (§33.7).
+- putting it through the **sale channel** is a channel rate deciding a tax figure (§32.7).
 
 So `gross`, `charged` and `net` are all in the tax currency, the foreign arrival that
 produced them is on the conversion record beside them (`charge.conversion.amount`), and the
@@ -3550,9 +3550,9 @@ and a tuple on a transcription of that bond's own computed schedule produce equa
 tie in the ranking, differing only in identity, provenance, the stated exclusions, the
 conventions statement and the causation detail prose.
 
-## 33. The taxation scheme: what a stream is charged, and where it is credited
+## 32. The taxation scheme: what a stream is charged, and where it is credited
 
-### 33.1 A scheme is a declared set of components, and one of them can be nothing
+### 32.1 A scheme is a declared set of components, and one of them can be nothing
 
 A **taxation scheme** is what an income stream is under: an identity, a variant, a reporting
 cadence, and the set of separately named charges it levies. ФОП group 3, ФОП group 2 and a
@@ -3580,7 +3580,7 @@ same number as 5% + 1% and a different claim, and two components with independen
 cannot be unpicked from a blended figure afterwards. These two have independent legal lives —
 a different statute created one of them, on its own date.
 
-### 33.2 The base is the credited amount at the official rate on the credit date
+### 32.2 The base is the credited amount at the official rate on the credit date
 
 Feature 011's machinery, called unchanged and on a date this feature supplies (§30.2). The
 credit date is the caller's fact: there is no clock in the core, no ledger event to read a
@@ -3590,7 +3590,7 @@ An arrival **already in the tax currency consults no rate at all**, and the curr
 checked before a series is touched — a false rate-unavailable reason on a figure that never
 needed a rate trains a reader to ignore the true ones.
 
-### 33.3 Three different ways a nil is nil
+### 32.3 Three different ways a nil is nil
 
 | claim | what produces it |
 | --- | --- |
@@ -3603,7 +3603,7 @@ gets believed without checking, which is why the second carries its provenance e
 non-zero value does — and the shipped ЄСВ nil is that case, sourced to **the owner's own
 statement of his position** rather than to a public text, and saying so on its face.
 
-### 33.4 A commencement is cited, and an end that is not a date is recorded
+### 32.4 A commencement is cited, and an end that is not a date is recorded
 
 An event dated before a component's earliest entry is a typed error naming the component and
 the date. It is **not** charged a rate of zero: *the schedule does not reach this date*, *the
@@ -3616,7 +3616,7 @@ end is real but is conditioned on an event rather than on a date, it is declared
 applied required on the record. A comment could not do this — it cannot be rendered beside the
 figure it does not move.
 
-### 33.5 Worked example
+### 32.5 Worked example
 
 An invented monthly credit under an invented scheme, at an invented official rate; the shipped
 rates carry their citations in `data/tax/schemes/` and the values there are the owner's to
@@ -3648,7 +3648,7 @@ nothing at all:
 The income column is there to be ignored: no income reaches `charge_periods` at all, because
 the trigger is the month. Checked in `tests/unit/test_periodic_component.py`.
 
-### 33.6 Where the income is credited decides which reading applies
+### 32.6 Where the income is credited decides which reading applies
 
 The **crediting destination** is where income is credited for tax purposes. It is a declared
 fact on the stream and it is **not** the routing origin: `arrives_at` is the venue every
@@ -3685,7 +3685,7 @@ statute. Moving one is a row in `data/tax/destinations/`, and nothing else: the 
 declared word, every reading computes from a declared scheme, and no destination or component
 name reaches the engine.
 
-### 33.7 The base against the hryvnia actually received
+### 32.7 The base against the hryvnia actually received
 
 The dollars on a ФОП account cannot be spent domestically; they are sold for hryvnia through a
 declared channel, on a different date, at a different rate. Two numbers:
@@ -3713,7 +3713,7 @@ mechanism here.
 
 Checked in `tests/worked_examples/test_base_versus_received.py`.
 
-### 33.8 What is not modelled here
+### 32.8 What is not modelled here
 
 No deduction of any kind is applied to the base. The bank commission is answered at the
 INTERPRETED level — the income is the whole invoice amount including it — and its citation
@@ -3727,7 +3727,7 @@ declared fact rather than guessing one.
 
 ---
 
-## 32. Where to look next
+## 33. Where to look next
 
 | question | file |
 | --- | --- |

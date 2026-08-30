@@ -39,7 +39,22 @@ OTHER_SCHEME = fixtures.scheme(
     declared_for="reading",
     rate_components=[fixtures.rate_component([(FROM, 0.23)], component_id="other_rate")],
 )
-REGISTRY = {SCHEME.id: SCHEME, OTHER_SCHEME.id: OTHER_SCHEME}
+ROW_SCHEME = fixtures.scheme(
+    scheme_id="synthetic_row_scheme",
+    rate_components=[fixtures.rate_component([(FROM, 0.11)], component_id="row_rate")],
+)
+"""A third scheme, so the **row's** scheme is a different string from the reading's.
+
+Three identities meet at `apply`: the treatment asked about, the row's, and the reading's.
+While the fixtures defaulted all three to one id, an engine charging every reading under its
+row's scheme -- 5%+1% where the law says 18%+5% -- passed the whole suite.
+"""
+
+REGISTRY = {
+    SCHEME.id: SCHEME,
+    OTHER_SCHEME.id: OTHER_SCHEME,
+    ROW_SCHEME.id: ROW_SCHEME,
+}
 SERIES = official_rates.series(
     [(CREDIT_DATE, RATE_ON_CREDIT), (REPATRIATION_DATE, RATE_ON_REPATRIATION)]
 )
@@ -65,6 +80,52 @@ def _applied(
     )
 
 
+class TestAReadingIsChargedUnderTheSchemeItNames:
+    """The three identities that meet at ``apply``, told apart by using three ids."""
+
+    def test_the_charging_scheme_is_the_readings_and_not_the_rows(self) -> None:
+        outcome = schemes.apply(
+            scheme_id=SCHEME.id,
+            credited_to="synthetic_venue",
+            amount=DOLLARS,
+            on_dates=DATES,
+            schemes=REGISTRY,
+            destinations={
+                (SCHEME.id, "synthetic_venue"): fixtures.destination(
+                    [fixtures.reading(scheme_id=OTHER_SCHEME.id)], scheme_id=SCHEME.id
+                )
+            },
+            series=SERIES,
+        )
+        assert isinstance(outcome, schemes.UnsettledDestination), outcome
+        figure = outcome.figures[0]
+        assert figure.scheme_id == OTHER_SCHEME.id
+        assert figure.charge.scheme_id == OTHER_SCHEME.id
+        assert [line.component_id for line in figure.charge.lines] == ["other_rate"]
+        assert figure.charge.lines[0].rate == 0.23
+
+    def test_the_row_it_sits_in_may_name_a_third_scheme_and_still_charge_the_readings(
+        self,
+    ) -> None:
+        outcome = schemes.apply(
+            scheme_id=ROW_SCHEME.id,
+            credited_to="synthetic_venue",
+            amount=DOLLARS,
+            on_dates=DATES,
+            schemes=REGISTRY,
+            destinations={
+                (ROW_SCHEME.id, "synthetic_venue"): fixtures.destination(
+                    [fixtures.reading(scheme_id=SCHEME.id)], scheme_id=ROW_SCHEME.id
+                )
+            },
+            series=SERIES,
+        )
+        assert isinstance(outcome, schemes.UnsettledDestination), outcome
+        assert outcome.declared_treatment == ROW_SCHEME.id
+        assert outcome.figures[0].charge.scheme_id == SCHEME.id
+        assert outcome.figures[0].charge.lines[0].rate == 0.06
+
+
 class TestAnInterpretedDestinationProducesACharge:
     """FR-025. A charge, with the row's recorded judgement and its citations on it."""
 
@@ -79,6 +140,36 @@ class TestAnInterpretedDestinationProducesACharge:
         assert outcome.charge.on_date == CREDIT_DATE
         assert outcome.grounds
 
+    def test_it_names_the_treatment_asked_about_and_the_scheme_that_charged_separately(
+        self,
+    ) -> None:
+        """The two are different facts, and a shipped row having them equal hides that.
+
+        An interpreted row may answer that income under one scheme, credited here, is charged
+        under another. A record carrying only one of the two would label a charge with a
+        scheme that did not produce it -- which is the shape no reader can detect, because
+        every term of the figure is internally consistent.
+        """
+        outcome = schemes.apply(
+            scheme_id=ROW_SCHEME.id,
+            credited_to="synthetic_venue",
+            amount=DOLLARS,
+            on_dates=DATES,
+            schemes=REGISTRY,
+            destinations={
+                (ROW_SCHEME.id, "synthetic_venue"): fixtures.destination(
+                    [fixtures.reading(scheme_id=SCHEME.id)],
+                    scheme_id=ROW_SCHEME.id,
+                    verdict=schemes.Verdict.INTERPRETED,
+                )
+            },
+            series=SERIES,
+        )
+        assert isinstance(outcome, schemes.ChargedUnderTheScheme), outcome
+        assert outcome.declared_treatment == ROW_SCHEME.id
+        assert outcome.charge.scheme_id == SCHEME.id
+        assert outcome.charge.lines[0].rate == 0.06
+
     def test_the_rows_citations_travel_on_the_figure(self) -> None:
         outcome = _applied(
             fixtures.destination(
@@ -86,6 +177,12 @@ class TestAnInterpretedDestinationProducesACharge:
             )
         )
         assert isinstance(outcome, schemes.ChargedUnderTheScheme), outcome
+        row = fixtures.destination(
+            [fixtures.reading(scheme_id=SCHEME.id)], verdict=schemes.Verdict.INTERPRETED
+        )
+        # By id, not by `is_unverified`: every fixture citation is unverified already, so the
+        # weaker check is true from the rate entry alone and says nothing about the row's.
+        assert row.provenance.sources <= outcome.charge.total.provenance.sources
         assert prov.is_unverified(outcome.provenance)
 
 
@@ -139,6 +236,23 @@ class TestAnUnsettledDestinationProducesOneFigurePerComputableReading:
         for figure in outcome.figures:
             assert figure.label
             assert figure.provenance.sources <= figure.charge.provenance.sources
+
+    def test_the_reading_and_the_row_mark_the_money_and_not_only_the_record(self) -> None:
+        """A record-level subset check does not see the mark leaving the amounts.
+
+        The row and the reading decide *which* rates strike a figure without multiplying it,
+        so their citations reach the money only if they are put there -- and a transform that
+        drops a mark is the constitution's top severity whatever it leaves on a sibling field.
+        """
+        row = fixtures.destination([fixtures.reading(scheme_id=SCHEME.id)])
+        outcome = _applied(row)
+        assert isinstance(outcome, schemes.UnsettledDestination), outcome
+        figure = outcome.figures[0]
+        selecting = row.provenance.sources | row.readings[0].provenance.sources
+        assert selecting <= figure.charge.base.provenance.sources
+        assert selecting <= figure.charge.total.provenance.sources
+        for line in figure.charge.lines:
+            assert selecting <= line.charged.provenance.sources, line.component_id
 
     def test_no_figure_is_labelled_the_tax_owed(self) -> None:
         outcome = _applied(fixtures.destination([fixtures.reading(scheme_id=SCHEME.id)]))
@@ -216,7 +330,7 @@ class TestWhenNothingCanBeSaid:
         assert isinstance(outcome, schemes.CreditingDestinationRefused), outcome
         assert outcome.state is schemes.RefusedState.NO_DECLARED_JUDGEMENT
         assert outcome.venue_id == "a_venue_nobody_recorded"
-        assert outcome.scheme_id == SCHEME.id
+        assert outcome.declared_treatment == SCHEME.id
         assert "find a source" in outcome.reason
         assert "add the row" in outcome.reason
 
@@ -283,7 +397,7 @@ class TestAReadingThatCannotBeComputedForADataReasonRefuses:
 
     def test_a_reading_naming_a_scheme_the_registry_does_not_hold_raises(self) -> None:
         """The loader refuses a dangling reference, so reaching here is a bypassed check."""
-        with pytest.raises(KeyError):
+        with pytest.raises(KeyError, match="nobody_declared_this"):
             _applied(fixtures.destination([fixtures.reading(scheme_id="nobody_declared_this")]))
 
 

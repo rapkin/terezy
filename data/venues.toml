@@ -70,10 +70,14 @@ currencies = ["USD", "UAH"]
 #
 # Both exist because the tax question reaches them: `data/tax/destinations/ua.toml` records
 # what the owner's income would be worth credited at each, and that table is normative — a
-# destination it has no row for refuses rather than being reasoned about. Neither carries a
-# declared route, in or out, and that is a true fact about this registry rather than an
-# omission: nothing in the shipped data moves money to either place. A coverage audit
-# reporting them as unreachable is reporting exactly that.
+# destination it has no row for refuses rather than being reasoned about.
+#
+# **Neither carries a declared route, in or out, and nothing reports that.** The coverage
+# audit is scoped to declared spendable endpoints and the corridors that reach them, so it
+# says nothing about a venue nothing routes to; what does show them is the route diagram,
+# where they render as isolated nodes carrying no mark. That is a true picture of this
+# registry — no money moves to either place in the shipped data — and it is stated here
+# because a reader meeting two unmarked nodes deserves to know they are unmarked on purpose.
 
 [[venue]]
 id         = "payoneer"

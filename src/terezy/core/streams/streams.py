@@ -151,12 +151,14 @@ class IncomeStream:
     offer -- "the loader builds both from one declared value" -- puts the guarantee in a layer
     that does not exist yet and cannot help anything constructing a stream in code. One fact,
     one place.
-    """
-    """What arrives per :attr:`cadence`, gross.
 
-    In the declaration files this is ``0.0`` -- the honest placeholder, because §11 item 3
-    records that the owner's real monthly figures have not been stated. A zero produces a
-    zero result rather than a made-up one.
+    In the declaration files this is ``0.0`` -- the honest placeholder, because
+    ``SIMULATOR_SPEC.md`` §11 item 3 records that the owner's real monthly figures have not
+    been stated. A zero produces a zero result rather than a made-up one.
+
+    ⚙ A second string literal sat under this field until 2026-08-30, saying the same thing in
+    different words. Only the first was an attribute docstring; the second was a dead
+    expression nothing rendered, and the two had already drifted apart.
     """
 
     cadence: Cadence

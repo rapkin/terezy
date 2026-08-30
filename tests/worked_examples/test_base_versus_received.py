@@ -18,6 +18,8 @@ may originate from an implementer's memory.
 
 from __future__ import annotations
 
+import dataclasses
+import shutil
 from datetime import date
 from pathlib import Path
 
@@ -77,9 +79,9 @@ fund this leg; that is exactly the routing-origin fact FR-024a keeps apart from 
 destination, and it is why the fixture exists rather than the shipped stream being reused."""
 
 
-def _received() -> Money:
+def _received(*, root: Path = DATA_ROOT) -> Money:
     """What the declared sale actually produces, through the existing costing path."""
-    ramp = resolver.ramp_from_data_root(DATA_ROOT, base_currency=Currency.UAH)
+    ramp = resolver.ramp_from_data_root(root, base_currency=Currency.UAH)
     outcome = cost.cost_one(
         FundingPath(destination_id="monobank_uah", stream_id=FOP_STREAM.id, route_id=SALE_ROUTE),
         Money(SOLD, Currency.USD, prov.EMPTY),
@@ -145,22 +147,44 @@ class TestTwoFiguresAndNeitherIsTheOther:
 
 
 class TestTheSaleMovesNoTaxFigure:
-    def test_a_sale_at_any_market_rate_leaves_the_base_bit_identical(self) -> None:
-        """The base was fixed at the credit date and nothing about the sale moves it.
+    def test_a_sale_at_a_different_market_rate_leaves_the_base_bit_identical(
+        self, tmp_path: Path
+    ) -> None:
+        """SC-009's middle clause, and the market rate is actually moved.
 
-        Asserted bit-for-bit rather than within the tolerance: this is not an arithmetic
-        agreement, it is the claim that the sale is not an input to the base at all.
+        The sale channel's declared reference is rewritten in a scratch copy of the data root
+        -- which changes what the sale produces -- and the base is compared bit-for-bit
+        against the run that used the shipped one. Bit-for-bit rather than within the
+        tolerance: this is not an arithmetic agreement, it is the claim that the sale is not
+        an input to the base at all.
         """
-        first = _base()
-        second = _base()
-        assert first.amount.hex() == second.amount.hex()
-        assert first.amount.hex() == Money(BASE, Currency.UAH, prov.EMPTY).amount.hex()
+        root = tmp_path / "data"
+        shutil.copytree(DATA_ROOT, root)
+        channels = root / "channels" / "uah_usd.toml"
+        text = channels.read_text(encoding="utf-8")
+        assert "reference_rate = 42.0" in text
+        channels.write_text(text.replace("reference_rate = 42.0", "reference_rate = 37.0"), "utf-8")
 
-    def test_nothing_in_the_gap_record_is_netted_against_anything(self) -> None:
-        """Netting them would assert a deduction nobody cited (FR-014)."""
+        moved = _received(root=root)
+        assert moved.amount != _received().amount
+
+        assert _base().amount.hex() == Money(BASE, Currency.UAH, prov.EMPTY).amount.hex()
+
+    def test_the_gap_is_reported_beside_the_two_figures_and_never_applied_to_either(
+        self,
+    ) -> None:
+        """Netting them would assert a deduction nobody cited (FR-014).
+
+        Structural, because the arithmetic version of this claim is an algebraic restatement
+        of the subtraction and cannot fail. What can fail is a record that grew somewhere to
+        put a netted figure, or a base that arrived already reduced.
+        """
         gap = schemes.base_versus_received(_base(), _received())
-        assert gap.base.amount + gap.difference.amount != gap.received.amount
-        assert gap.base.amount - gap.difference.amount == gap.received.amount
+        names = {field.name for field in dataclasses.fields(schemes.BaseVersusReceived)}
+        assert names == {"base", "received", "difference", "outside_the_base"}
+        assert not names & {"net", "netted", "deduction", "allowance", "adjusted"}
+        # The base reported beside the gap is the base struck on its own, untouched by it.
+        assert gap.base.amount.hex() == _base().amount.hex()
 
 
 class TestTheSaleUsesOnlyMachineryThatAlreadyExisted:

@@ -85,11 +85,21 @@ def _scheme(*, rate: float = RATE) -> schemes.TaxationScheme:
     )
 
 
+DESTINATION = "synthetic_venue"
+"""The venue the fixtures below both charge at and credit to.
+
+They have to agree: a capacity is refused where the charge answers a destination the stream
+does not name, because the same scheme at another destination is a different reading of the
+law with a different figure.
+"""
+
+
 def _stream(*, treatment: str | None, gross: float = GROSS) -> IncomeStream:
     """The hryvnia salary with a stated gross and a stated -- or unstated -- treatment."""
     return dataclasses.replace(
         route_graphs.SALARY_UAH,
         amount=Money(gross, Currency.UAH, STREAM_SOURCES),
+        credited_to=DESTINATION,
         tax_scheme=treatment,
     )
 
@@ -115,7 +125,7 @@ def _charged(*, rate: float = RATE, gross: float = GROSS) -> schemes.ChargedUnde
 def _capacity(*, rate: float = RATE, gross: float = GROSS) -> DeployableCapacity:
     charged = _charged(rate=rate, gross=gross)
     outcome = capacity_module.deployable(
-        _stream(treatment=charged.scheme_id, gross=gross), charged=charged
+        _stream(treatment=charged.declared_treatment, gross=gross), charged=charged
     )
     assert isinstance(outcome, DeployableCapacity), outcome
     return outcome
@@ -176,13 +186,28 @@ class TestTheTwoStatesCannotBeMixedUpByACaller:
         charged = _charged(gross=GROSS)
         with pytest.raises(ValueError, match="was struck on"):
             capacity_module.deployable(
-                _stream(treatment=charged.scheme_id, gross=GROSS + 1.0), charged=charged
+                _stream(treatment=charged.declared_treatment, gross=GROSS + 1.0),
+                charged=charged,
             )
+
+    def test_a_charge_answering_another_treatment_raises(self) -> None:
+        charged = _charged()
+        with pytest.raises(ValueError, match="answers the treatment"):
+            capacity_module.deployable(_stream(treatment="another_scheme"), charged=charged)
+
+    def test_a_charge_for_income_credited_somewhere_else_raises(self) -> None:
+        """The same scheme at another destination is another reading with another figure."""
+        charged = _charged()
+        stream = dataclasses.replace(
+            _stream(treatment=charged.declared_treatment), credited_to="somewhere_else"
+        )
+        with pytest.raises(ValueError, match="credited at"):
+            capacity_module.deployable(stream, charged=charged)
 
     def test_a_charge_struck_in_another_currency_raises(self) -> None:
         charged = _charged(gross=GROSS)
         stream = dataclasses.replace(
-            _stream(treatment=charged.scheme_id),
+            _stream(treatment=charged.declared_treatment),
             amount=Money(GROSS, Currency.USD, STREAM_SOURCES),
         )
         with pytest.raises(ValueError, match="was struck on"):
@@ -314,6 +339,7 @@ class TestAForeignArrivalIsMeasuredInTheTaxCurrency:
         stream = dataclasses.replace(
             route_graphs.SALARY_UAH,
             amount=Money(1_000.0, Currency.USD, STREAM_SOURCES),
+            credited_to=destination.venue_id,
             tax_scheme=scheme.id,
         )
         capacity = capacity_module.deployable(stream, charged=charged)

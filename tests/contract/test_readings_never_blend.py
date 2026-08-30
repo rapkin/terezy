@@ -91,7 +91,7 @@ class TestABlendHasNowhereToLive:
         assert not [field.name for field in fields if "Money" in str(field.type)]
         assert {field.name for field in fields} == {
             "venue_id",
-            "scheme_id",
+            "declared_treatment",
             "grounds",
             "resolution_path",
             "figures",

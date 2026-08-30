@@ -92,13 +92,31 @@ class TestTheThreeNils:
         assert standing.component_id == "contribution"
         assert "charges no such component" in standing.reason
 
-    def test_a_declared_zero_is_in_force_and_carries_its_own_citation(self) -> None:
-        """FR-020: an uncited zero is the figure that gets believed without checking."""
-        standing = schemes.component_standing(_nil(), "contribution", period="2026-02")
-        assert isinstance(standing, schemes.ComponentAmount), standing
-        assert standing.amount.amount == 0.0
-        assert standing.provenance.sources
-        assert prov.is_unverified(standing.amount.provenance)
+    def test_a_declared_zero_is_in_force_and_is_the_entry_the_period_selects(self) -> None:
+        """FR-020: an uncited zero is the figure that gets believed without checking.
+
+        The entry is compared against the one the schedule actually holds for that period,
+        because asserting only that a `ComponentAmount` came back with a zero on it re-reads
+        what the fixture put there.
+        """
+        scheme = fixtures.scheme(
+            scheme_id="synthetic_scheme_two_entries",
+            periodic_components=[
+                fixtures.periodic_component(
+                    [(FROM, CHARGED_AMOUNT), (date(2026, 6, 1), 0.0)],
+                    component_id="contribution",
+                )
+            ],
+        )
+        earlier = schemes.component_standing(scheme, "contribution", period="2026-02")
+        later = schemes.component_standing(scheme, "contribution", period="2026-07")
+        assert isinstance(earlier, schemes.ComponentAmount), earlier
+        assert isinstance(later, schemes.ComponentAmount), later
+        assert earlier.effective_from == FROM
+        assert later.effective_from == date(2026, 6, 1)
+        assert later.amount.amount == 0.0
+        assert later.amount.provenance.sources
+        assert prov.is_unverified(later.amount.provenance)
 
     def test_a_declared_component_with_nothing_in_force_refuses_naming_the_period(self) -> None:
         standing = schemes.component_standing(_charging(), "contribution", period="2025-12")
@@ -130,6 +148,67 @@ class TestTheThreeNils:
         charged = schemes.charge_periods(_charging(), Window(first="2025-12", last="2026-01"))
         assert isinstance(charged[0], schemes.PeriodicAmountNotInForce), charged[0]
         assert isinstance(charged[1], schemes.PeriodicCharge), charged[1]
+
+
+class TestAnAmountTakesEffectForTheWHOLEMonthItLandsIn:
+    """``amount_in_force``'s documented rule, which had no case until it was written.
+
+    A statutory sum takes effect on a **date** and is owed for a **period**, so the two must
+    be compared in one vocabulary, and the period's is the coarser. The month is the trigger
+    and there is no half-month to charge, so an amount effective on the 15th governs the
+    month it lands in — including the days before it.
+    """
+
+    def test_the_month_an_effective_date_falls_in_is_charged_in_full(self) -> None:
+        scheme = fixtures.scheme(
+            scheme_id="synthetic_scheme_mid_month",
+            periodic_components=[
+                fixtures.periodic_component(
+                    [(date(2026, 3, 15), CHARGED_AMOUNT)], component_id="contribution"
+                )
+            ],
+        )
+        charged = schemes.charge_periods(scheme, Window(first="2026-02", last="2026-04"))
+        assert isinstance(charged[0], schemes.PeriodicAmountNotInForce), charged[0]
+        for item in charged[1:]:
+            assert isinstance(item, schemes.PeriodicCharge), item
+            assert_money_close(item.charged, Money(CHARGED_AMOUNT, Currency.UAH, prov.EMPTY))
+        assert [item.period for item in charged] == ["2026-02", "2026-03", "2026-04"]
+
+    def test_the_month_before_it_is_refused_rather_than_charged_a_part(self) -> None:
+        scheme = fixtures.scheme(
+            scheme_id="synthetic_scheme_mid_month",
+            periodic_components=[
+                fixtures.periodic_component(
+                    [(date(2026, 3, 15), CHARGED_AMOUNT)], component_id="contribution"
+                )
+            ],
+        )
+        standing = schemes.component_standing(scheme, "contribution", period="2026-02")
+        assert isinstance(standing, schemes.PeriodicAmountNotInForce), standing
+
+
+class TestEveryComponentIsChargedForEveryPeriod:
+    """Two components over two months, so the fold cannot be right by having only one of each."""
+
+    def test_the_charges_run_period_by_period_and_component_by_component(self) -> None:
+        scheme = fixtures.scheme(
+            scheme_id="synthetic_scheme_two_components",
+            periodic_components=[
+                fixtures.periodic_component([(FROM, 100.0)], component_id="first"),
+                fixtures.periodic_component([(FROM, 25.0)], component_id="second"),
+            ],
+        )
+        charged = schemes.charge_periods(scheme, Window(first="2026-01", last="2026-02"))
+        assert [(item.period, item.component_id) for item in charged] == [
+            ("2026-01", "first"),
+            ("2026-01", "second"),
+            ("2026-02", "first"),
+            ("2026-02", "second"),
+        ]
+        for item, expected in zip(charged, [100.0, 25.0, 100.0, 25.0], strict=True):
+            assert isinstance(item, schemes.PeriodicCharge), item
+            assert_money_close(item.charged, Money(expected, Currency.UAH, prov.EMPTY))
 
 
 class TestARateComponentIsAskedAboutADateAndNotAPeriod:

@@ -109,9 +109,11 @@ class TestOneFileReadInIsolation:
     ) -> None:
         error = _load_error(_file(tmp_path, _body(verdict="probably_fine")))
 
-        assert "probably_fine" in str(error)
-        assert "interpreted" in str(error)
-        assert "unsettled" in str(error)
+        assert error.field_path.endswith(".verdict")
+        assert "probably_fine" in error.problem
+        assert error.remedy is not None
+        assert "interpreted" in error.remedy
+        assert "unsettled" in error.remedy
 
     def test_a_row_with_empty_grounds_is_refused(self, tmp_path: Path) -> None:
         """A verdict with no recorded reasoning is the row that goes stale unnoticed."""
@@ -120,13 +122,14 @@ class TestOneFileReadInIsolation:
         )
         error = _load_error(_file(tmp_path, body))
 
-        assert "grounds" in str(error)
+        assert error.field_path.endswith(".grounds")
 
     def test_a_row_with_no_reading_at_all_is_refused(self, tmp_path: Path) -> None:
         """It says nothing about the destination it names, which a missing row already says."""
         error = _load_error(_file(tmp_path, _row() + "\n  reading = []\n"))
 
-        assert "reading" in str(error)
+        assert error.field_path.endswith(".reading")
+        assert "no reading at all" in error.problem
 
     def test_a_reading_declaring_both_a_scheme_and_a_reason_is_refused(
         self, tmp_path: Path
@@ -136,7 +139,8 @@ class TestOneFileReadInIsolation:
         )
         error = _load_error(_file(tmp_path, _row() + both))
 
-        assert "reading[one]" in str(error)
+        assert error.field_path.endswith("reading[one]")
+        assert "declares both a scheme and a reason" in error.problem
 
     def test_a_reading_declaring_neither_is_refused(self, tmp_path: Path) -> None:
         neither = UNCOMPUTABLE.format(id="one", because="x").replace(
@@ -144,7 +148,8 @@ class TestOneFileReadInIsolation:
         )
         error = _load_error(_file(tmp_path, _row() + neither))
 
-        assert "reading[one]" in str(error)
+        assert error.field_path.endswith("reading[one]")
+        assert "declares both a scheme and a reason" in error.problem
 
     def test_a_reading_naming_a_scheme_with_no_date_name_is_refused(self, tmp_path: Path) -> None:
         """Borrowing another reading's date would compute the reading this one contests."""
@@ -153,7 +158,8 @@ class TestOneFileReadInIsolation:
         )
         error = _load_error(_file(tmp_path, _row() + without))
 
-        assert "recognised_on" in str(error)
+        assert error.field_path.endswith(".recognised_on")
+        assert "names a scheme and no date name" in error.problem
 
     def test_an_uncomputable_candidate_naming_a_date_is_refused(self, tmp_path: Path) -> None:
         """A field nothing reads is a field a reader believes is doing something."""
@@ -163,13 +169,15 @@ class TestOneFileReadInIsolation:
         )
         error = _load_error(_file(tmp_path, _row() + dated))
 
-        assert "recognised_on" in str(error)
+        assert error.field_path.endswith(".recognised_on")
+        assert "declared uncomputable" in error.problem
 
     def test_two_readings_sharing_an_id_are_refused(self, tmp_path: Path) -> None:
         body = _body() + READING.format(id="one", scheme="xx_scheme", recognised_on="credited")
         error = _load_error(_file(tmp_path, body))
 
-        assert "one" in str(error)
+        assert error.field_path.endswith(".reading.id")
+        assert "'one' more than once" in error.problem
 
     def test_an_interpreted_row_with_two_readings_is_refused(self, tmp_path: Path) -> None:
         """An interpreted destination produces a charge, and a charge cannot be two figures."""
@@ -180,7 +188,9 @@ class TestOneFileReadInIsolation:
         )
         error = _load_error(_file(tmp_path, body))
 
-        assert "interpreted" in str(error)
+        assert error.field_path.endswith(".verdict")
+        assert "does not carry exactly one computable reading" in error.problem
+        assert "a charge cannot be two figures or none" in error.problem
 
     def test_an_interpreted_row_whose_only_candidate_is_uncomputable_is_refused(
         self, tmp_path: Path
@@ -191,7 +201,8 @@ class TestOneFileReadInIsolation:
         )
         error = _load_error(_file(tmp_path, body))
 
-        assert "interpreted" in str(error)
+        assert error.field_path.endswith(".verdict")
+        assert "has nothing to charge" in error.problem
 
     def test_an_uncomputable_candidate_loads_and_is_named_rather_than_dropped(
         self, tmp_path: Path
@@ -390,17 +401,28 @@ class TestTheShippedTable:
         assert recorded.not_applied_because.strip()
         assert recorded.provenance.sources
 
-    def test_the_levy_cites_4113_for_its_date_and_never_4015(self) -> None:
-        """FR-008. A rate whose own cited source contradicts its date is undetectable."""
+    def test_the_levy_entry_cites_each_law_for_the_half_it_supplies(self) -> None:
+        """FR-008. A rate whose own cited source contradicts its date is undetectable.
+
+        The strongest mechanical form available over a free-text citation: the string is
+        split at its own labels, and the law named for the **commencement** is checked to be
+        № 4113-IX and not № 4015-IX. A test asserting only that both numbers appear could not
+        tell this citation from one reading ``COMMENCEMENT: … 4015-IX``, which is the exact
+        error the requirement forbids.
+        """
         scheme = self._resolved().schemes["ua_fop_group_3_non_vat"]
         levy = next(item for item in scheme.rate_components if item.id == "viyskovyi_zbir")
         entry = levy.schedule[0]
         citation = next(iter(entry.provenance.sources)).citation
         assert entry.rate == 0.01
         assert entry.effective_from.isoformat() == "2025-01-01"
-        assert "4113-IX" in citation
-        assert "4015-IX" in citation
-        assert "з 1 жовтня 2024 року" in citation
+
+        rate_half, _, date_half = citation.partition("COMMENCEMENT:")
+        assert date_half, citation
+        assert "4015-IX" in rate_half
+        assert "4113-IX" in date_half
+        assert "4015-IX" not in date_half
+        assert "4113-IX" not in rate_half.partition("RATE:")[2]
 
 
 class TestTheSeriesIsResolvedRatherThanChosenByACaller:
@@ -422,7 +444,7 @@ class TestTheSeriesIsResolvedRatherThanChosenByACaller:
     ) -> None:
         root = tmp_path / "data"
         shutil.copytree(DATA_ROOT, root)
-        scheme = root / "tax" / "schemes" / "ua_fop_group_3.toml"
+        scheme = root / "tax" / "schemes" / "ua_personal_income.toml"
         scheme.write_text(
             scheme.read_text(encoding="utf-8").replace(
                 'tax_currency      = "UAH"', 'tax_currency      = "USD"', 1
@@ -432,6 +454,31 @@ class TestTheSeriesIsResolvedRatherThanChosenByACaller:
         with pytest.raises(DeclarationError) as caught:
             resolver.schemes_from_data_root(root, base_currency=Currency.UAH)
 
-        assert "tax_currency" in str(caught.value)
-        assert "UAH" in str(caught.value)
-        assert "ua.toml" in str(caught.value)
+        assert caught.value.field_path == "scheme.tax_currency"
+        assert "assesses tax in UAH" in caught.value.problem
+        assert "ua.toml" in caught.value.problem
+
+    def test_a_periodic_amount_outside_the_schemes_tax_currency_is_refused_at_the_file(
+        self, tmp_path: Path
+    ) -> None:
+        """The per-file check, which fires before the jurisdiction is consulted at all.
+
+        A statutory sum owed in another currency cannot be added to what the scheme charges
+        on income, and the mismatch would otherwise surface from a caller's arithmetic rather
+        than from the file that declared it.
+        """
+        root = tmp_path / "data"
+        shutil.copytree(DATA_ROOT, root)
+        scheme = root / "tax" / "schemes" / "ua_fop_group_3.toml"
+        scheme.write_text(
+            scheme.read_text(encoding="utf-8").replace(
+                '    currency       = "UAH"', '    currency       = "USD"', 1
+            ),
+            encoding="utf-8",
+        )
+        with pytest.raises(DeclarationError) as caught:
+            loader.scheme_from_file(scheme)
+
+        assert caught.value.field_path.endswith(".currency")
+        assert "esv" in caught.value.field_path
+        assert "assesses in UAH" in caught.value.problem

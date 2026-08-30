@@ -132,7 +132,9 @@ reporting cadence is declared and unused**, exactly as the requirement says.
 
 ## D7 — Three states for a nil, and the record that makes them three
 
-**Decision**: `component_standing(scheme, component_id, on)` returns a tagged union:
+**Decision**: `component_standing(scheme, component_id, *, on_date, period)` returns a tagged
+union — the entry in force where there is one, and a refusal naming its own state where there
+is not:
 
 | Return | Means | SC-011's third |
 |---|---|---|
@@ -175,9 +177,10 @@ declaration is a load error. FR-026 wants **N figures in one run**. So:
 ```
 UnsettledDestination        figures: tuple[ReadingFigure, ...]        <- no aggregate field
                             uncomputable: tuple[UncomputableCandidate, ...]
-ReadingFigure               reading_id, label, charge, recognised_on, departs_from_source,
-                            resolution_path, provenance
-ChargedUnderTheScheme       charge, verdict-carrying, the INTERPRETED result
+                            grounds, resolution_path
+ReadingFigure               reading_id, label, scheme_id, recognised_on, charge,
+                            departs_from_source, not_the_tax_owed, provenance
+ChargedUnderTheScheme       charge, grounds, the INTERPRETED result
 ```
 
 Four mechanical guarantees, each asserted rather than written down:
@@ -265,9 +268,11 @@ thing for the audit to report.
 
 ## D14 — `deployable` reports in the tax currency, and the conversion travels with it
 
-**Decision**: after the migration, `DeployableCapacity` carries `gross`, `charged` and `net`
-**all in the tax currency**, plus the `TaxCurrencyConversion` that struck the base — `None`
-for a stream already in the tax currency.
+**Decision**: after the migration, the gross, what was charged and the net are **all in the
+tax currency**. `DeployableCapacity` carries the `SchemeCharge` and the `net`, and nothing
+else: the gross is `charge.base`, what was charged is `charge.total`, and the arrival that
+produced them is `charge.conversion.amount` — `None` for a stream already in the tax
+currency. Three numbers, no field holding a copy of any of them.
 
 **Why**: `gross − charged = net` (US2 scenario 1) cannot hold across two currencies —
 `money.sub` raises `CurrencyMismatchError`, which is the same wall 011 hit in

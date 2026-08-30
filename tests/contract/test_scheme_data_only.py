@@ -1,9 +1,15 @@
 """Principle II on the tax regime: a second scheme, and a moved verdict, are files.
 
 SC-012, SC-004 and SC-013a. Every case here writes into a **scratch copy of the shipped data
-root** and asserts a complete result comes back with **zero source lines changed**. That is
-the whole of what makes the abstraction real rather than claimed: the day the owner moves to
-another ФОП group or to a legal entity, applying the new scheme must be a declaration.
+root** and asserts a complete result comes back. The day the owner moves to another ФОП group
+or to a legal entity, applying the new scheme must be a declaration.
+
+⚙ **"Zero source lines changed" is not asserted here, and it used to be — badly.** A digest
+of ``src/`` taken at import and compared within the same process holds for every possible
+implementation, so it read as coverage while checking nothing. The property is really
+enforced by ``tests/contract/test_no_scheme_is_named_in_code.py``, which fails if any
+declared id reaches executable source; what these cases establish is the other half, that
+the declaration alone produces a complete result.
 
 ⚙ The verdict case is the one this feature was told to build for. The crediting-destination
 verdicts are the least settled thing in it and are **expected to move**; what makes moving
@@ -13,7 +19,6 @@ that moving one changes the outcome and nothing else.
 
 from __future__ import annotations
 
-import hashlib
 import re
 import shutil
 from datetime import date
@@ -21,12 +26,15 @@ from pathlib import Path
 
 import pytest
 
+from terezy.core.primitives import money
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.periods import Window
+from terezy.core.primitives.tolerance import assert_money_close
 from terezy.core.tax import scheme as schemes
 from terezy.data.declarations import resolver
+from terezy.data.declarations.errors import DeclarationError
 from tests import official_rates
 
 pytestmark = pytest.mark.contract
@@ -127,34 +135,6 @@ def _applied(
     )
 
 
-SOURCE_ROOT = REPO_ROOT / "src" / "terezy"
-
-
-def _source_digest() -> str:
-    """A digest of every module under ``src/terezy``, so *zero source lines changed* is a fact.
-
-    Compared before and against after within one case, rather than against the git index: the
-    claim is about what **this test** needed, and asking git would instead ask whether the
-    working tree happened to be clean, which is a different question with a different answer
-    on every machine.
-    """
-    digest = hashlib.sha256()
-    for path in sorted(SOURCE_ROOT.rglob("*.py")):
-        digest.update(path.relative_to(SOURCE_ROOT).as_posix().encode("utf-8"))
-        digest.update(path.read_bytes())
-    return digest.hexdigest()
-
-
-BEFORE = _source_digest()
-
-
-def _no_source_changed() -> None:
-    assert _source_digest() == BEFORE, (
-        "a module under src/terezy changed while this case ran. The whole claim is that a "
-        "second scheme, a legislated change and a moved verdict are files"
-    )
-
-
 class TestASecondSchemeIsAFile:
     """SC-012: a different component set, different schedules, and a periodic component."""
 
@@ -170,10 +150,9 @@ class TestASecondSchemeIsAFile:
         assert isinstance(outcome, schemes.ChargedUnderTheScheme), outcome
         #   base = 1 000.00 USD x 42.00 = 42 000.00 UAH
         #   xx_turnover = 42 000 x 0.02 = 840.00 UAH
-        assert outcome.charge.base.amount == 42_000.00
+        assert_money_close(outcome.charge.base, Money(42_000.00, Currency.UAH, prov.EMPTY))
         assert [line.component_id for line in outcome.charge.lines] == ["xx_turnover"]
-        assert outcome.charge.total.amount == 840.00
-        _no_source_changed()
+        assert_money_close(outcome.charge.total, Money(840.00, Currency.UAH, prov.EMPTY))
 
     def test_its_periodic_component_charges_where_the_shipped_one_charges_nothing(
         self, tmp_path: Path
@@ -192,8 +171,9 @@ class TestASecondSchemeIsAFile:
         for one, other in zip(second, shipped, strict=True):
             assert isinstance(one, schemes.PeriodicCharge), one
             assert isinstance(other, schemes.PeriodicCharge), other
-            assert one.charged.amount - other.charged.amount == 1_760.0
-        _no_source_changed()
+            assert_money_close(
+                money.sub(one.charged, other.charged), Money(1_760.0, Currency.UAH, prov.EMPTY)
+            )
 
     def test_no_component_of_it_has_a_name_the_engine_has_ever_seen(self, tmp_path: Path) -> None:
         """A component is charged and reported under its declared name, whatever it is."""
@@ -242,13 +222,21 @@ class TestALegislatedChangeIsOneDatedEntry:
         levy = "viyskovyi_zbir"
         assert next(x for x in before.lines if x.component_id == levy).rate == 0.01
         assert next(x for x in on_the_day.lines if x.component_id == levy).rate == 0.02
-        _no_source_changed()
 
 
 class TestAMovedVerdictIsARow:
-    """The change this feature was built for, since the verdicts are expected to move."""
+    """The change this feature was built for, since the verdicts are expected to move.
 
-    def test_moving_a_row_to_interpreted_turns_a_switch_into_a_charge(self, tmp_path: Path) -> None:
+    **A row, not a word.** A verdict and the readings under it move together: an interpreted
+    row produces the tax owed, so it needs exactly one candidate and that candidate may not be
+    a scheme declared only for a labelled what-if. Editing the row is still data-only, which
+    is the whole claim; editing only the verdict is refused, and the second case is what says
+    so.
+    """
+
+    def test_rewriting_a_row_as_interpreted_turns_a_switch_into_a_charge(
+        self, tmp_path: Path
+    ) -> None:
         root = _root(tmp_path)
         table = root / "tax" / "destinations" / "ua.toml"
         text = table.read_text(encoding="utf-8")
@@ -259,20 +247,70 @@ class TestAMovedVerdictIsARow:
         assert isinstance(before, schemes.UnsettledDestination), before
         assert len(before.figures) == 1
 
-        # One word, in one file: the crypto-exchange row's verdict.
-        marker = 'venue           = "coinbase"\nverdict         = "unsettled"'
-        assert marker in text
-        table.write_text(
-            text.replace(marker, 'venue           = "coinbase"\nverdict         = "interpreted"'),
-            encoding="utf-8",
+        # The crypto-exchange row, rewritten: its verdict, and the scheme its one reading
+        # charges under. Both in one file, and nothing else anywhere.
+        verdict = 'venue           = "coinbase"\nverdict         = "unsettled"'
+        reads = '  id            = "personal_income_at_a_crypto_exchange"'
+        assert verdict in text
+        assert reads in text
+        rewritten = text.replace(
+            verdict, 'venue           = "coinbase"\nverdict         = "interpreted"'
+        ).replace(
+            reads
+            + text.split(reads)[1].split("scheme        =")[0]
+            + 'scheme        = "ua_personal_income"',
+            reads + '\n  label         = "The ФОП scheme, if this were ever answered"\n'
+            '  scheme        = "ua_fop_group_3_non_vat"',
         )
+        table.write_text(rewritten, encoding="utf-8")
         after = _applied(
             _resolved(root), scheme_id="ua_fop_group_3_non_vat", credited_to="coinbase"
         )
 
         assert isinstance(after, schemes.ChargedUnderTheScheme), after
+        assert after.charge.scheme_id == "ua_fop_group_3_non_vat"
+        assert after.declared_treatment == "ua_fop_group_3_non_vat"
+        # The base is the same because a verdict touches neither the amount, the date nor the
+        # tax currency -- which is why comparing only it would be comparing a value with
+        # itself. What the row moved is everything else.
         assert after.charge.base.amount == before.figures[0].charge.base.amount
-        _no_source_changed()
+        assert after.charge.total.amount != before.figures[0].charge.total.amount
+        assert [line.component_id for line in after.charge.lines] == [
+            "ediniy_podatok",
+            "viyskovyi_zbir",
+        ]
+        assert [line.component_id for line in before.figures[0].charge.lines] == [
+            "pdfo",
+            "viyskovyi_zbir",
+        ]
+        assert after.grounds == before.grounds
+
+    def test_moving_only_the_verdict_is_refused_rather_than_charging_a_what_if(
+        self, tmp_path: Path
+    ) -> None:
+        """The way this feature is most likely to be broken, and it fails at load.
+
+        The crypto-exchange row's one reading charges at personal-income rates, which exist
+        only inside a labelled figure that says on its face it is not the tax owed. An
+        interpreted row produces the tax owed. Refusing an income stream from naming that
+        scheme while letting a verdict reach the same figure would be the prohibition
+        enforced at one door and open at the other.
+        """
+        root = _root(tmp_path)
+        table = root / "tax" / "destinations" / "ua.toml"
+        table.write_text(
+            table.read_text(encoding="utf-8").replace(
+                'venue           = "coinbase"\nverdict         = "unsettled"',
+                'venue           = "coinbase"\nverdict         = "interpreted"',
+            ),
+            encoding="utf-8",
+        )
+        with pytest.raises(DeclarationError) as caught:
+            _resolved(root)
+
+        assert caught.value.field_path.endswith(".verdict")
+        assert "ua_personal_income" in caught.value.problem
+        assert "declared for a reading rather than for a stream" in caught.value.problem
 
 
 class TestTheEngineKnowsNoDateName:
@@ -322,7 +360,6 @@ class TestTheEngineKnowsNoDateName:
             "xx_beta",
             "xx_alpha",
         ]
-        _no_source_changed()
 
     def test_a_date_name_the_caller_does_not_supply_refuses_rather_than_borrowing_one(
         self, tmp_path: Path

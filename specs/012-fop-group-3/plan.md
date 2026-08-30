@@ -129,7 +129,8 @@ applied — and the modelling question stays where it lives, `features.toml`'s
 
 ```text
 src/terezy/core/tax/scheme.py                 new — the scheme, its charges, the destinations
-src/terezy/core/streams/streams.py            the scalar retired; credited_to; deployable
+src/terezy/core/streams/capacity.py           new — deployable capacity, moved out of streams
+src/terezy/core/streams/streams.py            the scalar retired; credited_to; tax_scheme
 src/terezy/data/declarations/schema.py        Scheme*/Destination* tables; StreamTable
 src/terezy/data/declarations/loader.py        scheme_from_file, destinations_from_file, _stream
 src/terezy/data/declarations/resolver.py      SCHEMES_DIR, DESTINATIONS_DIR, the cross-checks
@@ -173,3 +174,4 @@ tests/schemes.py                              new — synthetic fixtures, labell
 | `Verdict` has no `SETTLED` member | Nothing here is settled, and a settled destination would want INTERPRETED's wrapper anyway | An unconstructed enum member states a behaviour the code has never had |
 | A periodic component's `period` is closed at `"month"` | `core/primitives/periods.py` enumerates months and nothing else; ЄСВ is monthly | Declaring `"quarter"` would need period arithmetic that does not exist — a change to `periods`, not a data entry, and pretending otherwise would make Principle II's data-only claim false for a scheme nobody could actually run |
 | Two venues with no declared route | SC-017 pins per-destination figure counts against the **shipped** table; two of its five rows have no venue otherwise | Shipping the table with two rows testable only in a scratch root would make the normative table a fixture |
+| Deployable capacity in its own module, away from the declaration it is about | Not a preference: `core.routes` imports `core.streams.streams`, a deployable figure is net of a charge struck at an official rate, and 011's `official-rate-never-prices-a-leg` has `allow_indirect_imports = False`. The obvious placement breaks a compliance contract through three hops | Keeping them together would need that contract relaxed, and it is the contract that is right — what a route needs from a stream is where money lands, and only the funding decision has any business knowing what an official rate is |

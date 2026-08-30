@@ -43,6 +43,7 @@ from terezy.core.decision.tuple_outcome import Registries
 from terezy.core.instruments import registry as instrument_registry
 from terezy.core.primitives import money
 from terezy.core.routes.venues import can_hold
+from terezy.core.tax.scheme import Verdict
 from terezy.core.tax.year import AssessmentRules
 from terezy.data.declarations import loader
 from terezy.data.declarations.errors import DeclarationError
@@ -2766,18 +2767,23 @@ def schemes_from_data_root(root: Path, *, base_currency: Currency) -> SchemeDecl
     destinations: dict[tuple[str, str], CreditingDestination] = {}
     destination_files: dict[tuple[str, str], Path] = {}
     for path in sorted((root / DESTINATIONS_DIR).glob("*.toml")):
-        for row in loader.destinations_from_file(path):
+        for position, row in enumerate(loader.destinations_from_file(path)):
             key = (row.scheme_id, row.venue_id)
             if key in destinations:
+                already = destination_files[key]
+                where = (
+                    "this file already records it above"
+                    if already == path
+                    else f"{already.name} already records it"
+                )
                 raise DeclarationError(
                     path,
-                    loader.DESTINATION_TABLE,
+                    f"{loader.DESTINATION_TABLE}[{position}]",
                     f"records how {row.scheme_id!r} income credited at {row.venue_id!r} is "
-                    f"treated, which {destination_files[key].name} already records. One "
-                    "destination under one scheme has one verdict: two rows for it are not "
-                    "merged and neither wins, because whichever the lookup reached first "
-                    "would decide a legal position by file order.",
-                    f"delete the row from {destination_files[key].name} or from {path.name}",
+                    f"treated, and {where}. One destination under one scheme has one verdict: "
+                    "two rows for it are not merged and neither wins, because whichever the "
+                    "lookup reached first would decide a legal position by file order.",
+                    "delete one of the two rows",
                 )
             _check_destination(row, schemes, ramp.venues, path=path, key=key)
             destinations[key] = row
@@ -2815,10 +2821,11 @@ def _check_tax_currency(
         path,
         f"{loader.SCHEME_TABLE}.tax_currency",
         f"is {scheme.tax_currency.value} and jurisdiction {scheme.jurisdiction_id!r} assesses "
-        f"tax in {declared[0].tax_currency.value} ({declared[1].name}). A scheme striking its "
-        "base in a currency the jurisdiction does not assess in would consult the wrong "
-        "official-rate series -- or the right one in the wrong direction -- and every figure "
-        "would stay plausible.",
+        f"tax in {declared[0].tax_currency.value} ({declared[1].name}). The series that "
+        "jurisdiction names quotes its own tax currency, so this scheme would refuse every "
+        "foreign arrival for want of a pair -- and, worse, would charge an arrival already in "
+        f"{scheme.tax_currency.value} with no rate consulted at all, producing a base in a "
+        "currency the jurisdiction does not assess in and no sign that anything was wrong.",
         f'declare tax_currency = "{declared[0].tax_currency.value}", or move the scheme to a '
         "jurisdiction that assesses in the one it names",
     )
@@ -2840,17 +2847,20 @@ def _check_destination(
     ):
         if named is None:
             continue
-        if named not in schemes:
-            raise DeclarationError(
-                path,
-                f"{field_prefix}.{field}",
-                f"names the taxation scheme {named!r}, which no file in data/{SCHEMES_DIR} "
-                "declares. A reading that cannot resolve its scheme computes nothing, and "
-                "there is no default scheme to fall back to: a charge under a scheme nobody "
-                f"declared is a legal figure nobody wrote down. Declared schemes: "
-                f"{sorted(schemes)}.",
-                f"declare {named!r} in data/{SCHEMES_DIR}, or name a scheme that exists",
-            )
+        if named in schemes:
+            if field != "scheme" and row.verdict is Verdict.INTERPRETED:
+                _check_interpreted_reading(schemes[named], path=path, field_prefix=field_prefix)
+            continue
+        raise DeclarationError(
+            path,
+            f"{field_prefix}.{field}",
+            f"names the taxation scheme {named!r}, which no file in data/{SCHEMES_DIR} "
+            "declares. A reading that cannot resolve its scheme computes nothing, and "
+            "there is no default scheme to fall back to: a charge under a scheme nobody "
+            f"declared is a legal figure nobody wrote down. Declared schemes: "
+            f"{sorted(schemes)}.",
+            f"declare {named!r} in data/{SCHEMES_DIR}, or name a scheme that exists",
+        )
     if row.venue_id not in venues:
         raise DeclarationError(
             path,
@@ -2860,6 +2870,28 @@ def _check_destination(
             "is a row nothing can ever reach.",
             f"declare the venue, or name one of: {sorted(venues)}",
         )
+
+
+def _check_interpreted_reading(named: TaxationScheme, *, path: Path, field_prefix: str) -> None:
+    """An interpreted row may not charge under a scheme declared only for a reading.
+
+    An interpreted destination produces **the tax owed**, and a ``declared_for = "reading"``
+    scheme exists only inside a labelled what-if that says on its face it is not. Refusing an
+    income stream from naming such a scheme and then letting one reach the same figure through
+    a verdict would be the prohibition enforced at one door and open at the other -- and
+    moving a verdict is one word in one file, which is exactly how it would happen.
+    """
+    if named.declared_for == "stream":
+        return
+    raise DeclarationError(
+        path,
+        f"{field_prefix}.verdict",
+        f"is interpreted and its reading charges under {named.id!r}, which is declared for a "
+        "reading rather than for a stream. An interpreted row produces the tax owed, and "
+        "those rates exist only inside a labelled what-if that says on its face they are not "
+        "it -- which is why an income stream may not name that scheme either.",
+        "declare the verdict unsettled, or point the reading at a scheme declared for a stream",
+    )
 
 
 def _check_treatment(

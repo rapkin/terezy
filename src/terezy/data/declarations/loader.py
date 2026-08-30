@@ -4846,6 +4846,37 @@ def _periodic_component(
     )
 
 
+def _amounts_in_the_tax_currency(
+    path: Path, scheme: scheme_module.TaxationScheme
+) -> scheme_module.TaxationScheme:
+    """Every periodic amount is money in the currency this scheme assesses in.
+
+    A statutory sum carries its own currency because money does, and inheriting one would let
+    a scheme silently charge a sum stated in another. Checked after the components are built
+    rather than inside them, because it is the only rule here that needs the scheme's own
+    ``tax_currency`` -- which is read at the end.
+
+    Without this, a periodic charge could leave in a currency nothing downstream can add to
+    the rate lines, and the mismatch would surface as a ``CurrencyMismatchError`` from a
+    caller's own arithmetic rather than as a file with a field named in it.
+    """
+    for component in scheme.periodic_components:
+        for position, entry in enumerate(component.schedule):
+            if entry.amount.currency is scheme.tax_currency:
+                continue
+            raise DeclarationError(
+                path,
+                f"{SCHEME_TABLE}.periodic_component[{component.id}].amount[{position}].currency",
+                f"is {entry.amount.currency.value} and scheme {scheme.id!r} assesses in "
+                f"{scheme.tax_currency.value}. A statutory sum owed in another currency "
+                "cannot be added to what this scheme charges on income, and the mismatch "
+                "would surface from a caller's arithmetic rather than from the file that "
+                "declared it.",
+                f'write currency = "{scheme.tax_currency.value}"',
+            )
+    return scheme
+
+
 def scheme_from_file(path: Path) -> scheme_module.TaxationScheme:
     """One ``data/tax/schemes/<id>.toml`` as a :class:`TaxationScheme`.
 
@@ -4880,47 +4911,62 @@ def scheme_from_file(path: Path) -> scheme_module.TaxationScheme:
     # components sharing one would make which of them answered depend on scan order.
     declared_ids = [component.id for component in rate_components]
     declared_ids.extend(component.id for component in periodic_components)
-    _no_duplicates(path, f"{SCHEME_TABLE}.rate_component.id", declared_ids)
-    return scheme_module.TaxationScheme(
-        id=_require_text(
-            path,
-            f"{SCHEME_TABLE}.id",
-            declared.id,
-            "a scheme is named by an income stream and by every reading that consumes it, "
-            "and two schemes declaring one id are refused across the whole data root",
+    _no_duplicates(path, f"{SCHEME_TABLE}.component.id", declared_ids)
+    return _amounts_in_the_tax_currency(
+        path,
+        scheme_module.TaxationScheme(
+            id=_require_text(
+                path,
+                f"{SCHEME_TABLE}.id",
+                declared.id,
+                "a scheme is named by an income stream and by every reading that consumes it, "
+                "and two schemes declaring one id are refused across the whole data root",
+            ),
+            name=_require_text(path, f"{SCHEME_TABLE}.name", declared.name, "a scheme is named"),
+            jurisdiction_id=_require_text(
+                path,
+                f"{SCHEME_TABLE}.jurisdiction",
+                declared.jurisdiction,
+                "a scheme belongs to the jurisdiction whose tax currency its base is struck in",
+            ),
+            tax_currency=_currency(path, f"{SCHEME_TABLE}.tax_currency", declared.tax_currency),
+            variant=_require_text(
+                path,
+                f"{SCHEME_TABLE}.variant",
+                declared.variant,
+                "a scheme names which of the law's alternative rate sets it declares, so the "
+                "second is a file rather than a schema change the day its rate is cited",
+            ),
+            reporting_cadence=_require_text(
+                path,
+                f"{SCHEME_TABLE}.reporting_cadence",
+                declared.reporting_cadence,
+                "a scheme declares the cadence it reports and pays on, so the feature that "
+                "models payment inherits a declared fact rather than guessing one",
+            ),
+            declared_for=_closed_value(
+                path,
+                f"{SCHEME_TABLE}.declared_for",
+                declared.declared_for,
+                _DECLARED_FOR,
+                "declaration audience",
+            ),
+            rate_components=rate_components,
+            periodic_components=periodic_components,
         ),
-        name=_require_text(path, f"{SCHEME_TABLE}.name", declared.name, "a scheme is named"),
-        jurisdiction_id=_require_text(
-            path,
-            f"{SCHEME_TABLE}.jurisdiction",
-            declared.jurisdiction,
-            "a scheme belongs to the jurisdiction whose tax currency its base is struck in",
-        ),
-        tax_currency=_currency(path, f"{SCHEME_TABLE}.tax_currency", declared.tax_currency),
-        variant=_require_text(
-            path,
-            f"{SCHEME_TABLE}.variant",
-            declared.variant,
-            "a scheme names which of the law's alternative rate sets it declares, so the "
-            "second is a file rather than a schema change the day its rate is cited",
-        ),
-        reporting_cadence=_require_text(
-            path,
-            f"{SCHEME_TABLE}.reporting_cadence",
-            declared.reporting_cadence,
-            "a scheme declares the cadence it reports and pays on, so the feature that "
-            "models payment inherits a declared fact rather than guessing one",
-        ),
-        declared_for=_closed_value(
-            path,
-            f"{SCHEME_TABLE}.declared_for",
-            declared.declared_for,
-            _DECLARED_FOR,
-            "declaration audience",
-        ),
-        rate_components=rate_components,
-        periodic_components=periodic_components,
     )
+
+
+def _optional_text(path: Path, field_path: str, value: str | None, what: str) -> str | None:
+    """A field that may be omitted, but that may not be written blank.
+
+    ``None`` is *the key was not written*; ``""`` is a key that was written and says nothing.
+    The two are different claims everywhere else in this schema, and they have to stay
+    different here, because each of these fields is **read as a claim downstream**.
+    """
+    if value is None:
+        return None
+    return _require_text(path, field_path, value, what)
 
 
 def _reading(path: Path, entry: schema.ReadingTable, *, field_prefix: str) -> scheme_module.Reading:
@@ -4963,9 +5009,33 @@ def _reading(path: Path, entry: schema.ReadingTable, *, field_prefix: str) -> sc
             "a figure states which reading produced it, in words a reader will see",
         ),
         scheme_id=entry.scheme,
-        uncomputable_because=entry.uncomputable_because,
-        recognised_on=entry.recognised_on,
-        departs_from_source=entry.departs_from_source,
+        # Each of the three is optional and each, once written, must say something. An empty
+        # string is not the absence of a declaration -- the absent key is -- and every one of
+        # these is read as a claim downstream: an uncomputable candidate is named on a switch
+        # WITH ITS REASON, a reading computes on the date its name selects, and a declared
+        # departure from a source is rendered on the figure. Blank, each would render as a
+        # claim that was made and says nothing.
+        uncomputable_because=_optional_text(
+            path,
+            f"{entry_prefix}.uncomputable_because",
+            entry.uncomputable_because,
+            "a candidate that cannot be computed is named on the switch with the reason it "
+            "cannot be, so a switch is never read as complete when it is not",
+        ),
+        recognised_on=_optional_text(
+            path,
+            f"{entry_prefix}.recognised_on",
+            entry.recognised_on,
+            "a reading computes on the date its declared name selects, and the caller "
+            "supplies dates by that name",
+        ),
+        departs_from_source=_optional_text(
+            path,
+            f"{entry_prefix}.departs_from_source",
+            entry.departs_from_source,
+            "a declared departure from a source is rendered on the figure, and a departure "
+            "nothing reports is one that becomes a silent absorption",
+        ),
         provenance=prov.of(
             [
                 _source_ref(

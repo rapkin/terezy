@@ -102,28 +102,46 @@ class TaxTreatmentUndeclared:
     """
 
 
-def _charged_on_this_stream(stream: IncomeStream, charge: SchemeCharge) -> None:
-    """The charge must have been struck on **this stream's** arrival, or the record lies.
+def _charged_for_this_stream(stream: IncomeStream, charged: ChargedUnderTheScheme) -> None:
+    """The charge must be **this stream's**: its arrival, its treatment, its destination.
 
-    A ``DeployableCapacity`` names its stream, so a charge computed on some other amount
-    would produce a figure attributed to a stream it was never about -- and it would look
+    A ``DeployableCapacity`` names its stream, so a charge computed from any other stream's
+    facts produces a figure attributed to a stream it was never about -- and it looks
     entirely plausible, because every term of it is internally consistent. Nothing in the
     types prevents it: both arguments typecheck against any stream and any charge.
 
-    Compared against ``conversion.amount`` where a conversion happened and against the base
-    where none did, because those are the two places the arrival survives. Bit-for-bit: this
-    is not an arithmetic agreement, it is the question of whether the two arguments are about
-    one thing.
+    All three are compared because each alone leaves a hole. Two streams can declare the same
+    amount; one stream's amount can be charged under another's scheme; and the same scheme at
+    a different crediting destination is a different reading of the law with a different
+    figure. Bit-for-bit and by identity: this is not an arithmetic agreement, it is the
+    question of whether the arguments are about one thing.
     """
+    charge = charged.charge
     arrived = charge.base if charge.conversion is None else charge.conversion.amount
-    if arrived.currency is stream.amount.currency and arrived.amount == stream.amount.amount:
+    mismatches = []
+    if arrived.currency is not stream.amount.currency or arrived.amount != stream.amount.amount:
+        mismatches.append(
+            f"it was struck on {arrived.amount} {arrived.currency.value} and the stream "
+            f"declares {stream.amount.amount} {stream.amount.currency.value} per "
+            f"{stream.cadence}"
+        )
+    if charged.declared_treatment != stream.tax_scheme:
+        mismatches.append(
+            f"it answers the treatment {charged.declared_treatment!r} and the stream names "
+            f"{stream.tax_scheme!r}"
+        )
+    if charged.venue_id != stream.credited_to:
+        mismatches.append(
+            f"it is for income credited at {charged.venue_id!r} and the stream is credited "
+            f"at {stream.credited_to!r}"
+        )
+    if not mismatches:
         return
     raise ValueError(
-        f"the charge supplied for stream {stream.id!r} was struck on "
-        f"{arrived.amount} {arrived.currency.value} and the stream declares "
-        f"{stream.amount.amount} {stream.amount.currency.value} per {stream.cadence}. A "
-        "capacity built from the two would name this stream while being net of a charge on "
-        "another amount, and every term of it would be internally consistent."
+        f"the charge supplied for stream {stream.id!r} is not this stream's: "
+        + "; ".join(mismatches)
+        + ". A capacity built from the two would name this stream while being net of another "
+        "one's charge, and every term of it would be internally consistent."
     )
 
 
@@ -179,7 +197,7 @@ def deployable(
             "charge was supplied for it. A capacity reported without one would be net of "
             "nothing while claiming a treatment was applied."
         )
-    _charged_on_this_stream(stream, charged.charge)
+    _charged_for_this_stream(stream, charged)
     return DeployableCapacity(
         stream_id=stream.id,
         cadence=stream.cadence,

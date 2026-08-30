@@ -181,7 +181,10 @@ amount          = 0.0
 cadence         = "monthly"
 arrives_at      = "monobank_uah"
 credited_to     = "monobank_uah"
-tax_scheme      = "ua_fop_group_3_non_vat"   # optional
+# tax_scheme is optional and this stream declares none: the owner's employment-income
+# position has not been stated. Pairing THIS venue with the ФОП scheme would be an example of
+# a declaration that produces a labelled switch rather than a charge, because a personal card
+# is an UNSETTLED crediting destination in the shipped table (012 FR-026b).
 
   [stream.indexation]
   policy   = "cpi"

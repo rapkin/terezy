@@ -5,8 +5,11 @@
 
 Every record is `@dataclass(frozen=True, slots=True, kw_only=True)` unless it is an `Enum`.
 Free functions beside them, no methods, tagged unions matched with `match` (owner decision
-D-E). New core code lives in one module, `src/terezy/core/tax/scheme.py`, except the two
-stream records, which stay in `src/terezy/core/streams/streams.py`.
+D-E). New core code lives in two modules: `src/terezy/core/tax/scheme.py` for the scheme and
+its destinations, and `src/terezy/core/streams/capacity.py` for the deployable figure and its
+two records. `src/terezy/core/streams/streams.py` keeps the declaration itself, and the split
+is mandatory rather than tidy — [research D14](./research.md) and `capacity.py`'s own
+docstring say which contract makes it so.
 
 ---
 
@@ -139,10 +142,15 @@ UNSETTLED row here is an індивідуальна податкова конс�
 
 | Record | Fields |
 |---|---|
-| `ChargedUnderTheScheme` | `venue_id`, `scheme_id`, `reading_id`, `charge: SchemeCharge`, `grounds`, `provenance` |
+| `ChargedUnderTheScheme` | `venue_id`, `declared_treatment`, `reading_id`, `charge: SchemeCharge`, `grounds`, `provenance` |
 | `ReadingFigure` | `reading_id`, `label`, `scheme_id`, `recognised_on: str`, `charge: SchemeCharge`, `departs_from_source: str \| None`, `not_the_tax_owed: str`, `provenance` |
 | `UncomputableCandidate` | `reading_id`, `label`, `because: str` |
-| `UnsettledDestination` | `venue_id`, `scheme_id`, `grounds`, `resolution_path`, `figures: tuple[ReadingFigure, ...]`, `uncomputable: tuple[UncomputableCandidate, ...]` |
+| `UnsettledDestination` | `venue_id`, `declared_treatment`, `grounds`, `resolution_path`, `figures: tuple[ReadingFigure, ...]`, `uncomputable: tuple[UncomputableCandidate, ...]` |
+
+`declared_treatment` is the scheme the income was **asked about**; what actually charged is
+`charge.scheme_id` on the figure. They are two names because an interpreted row may answer
+that income under one scheme, credited somewhere, is charged under another — and a charge
+labelled with a scheme that did not produce it is the shape a reader cannot detect.
 
 **`UnsettledDestination` has no `Money` field, no `total`, no `mean` and no `range`.** There
 is nowhere for a blended number to live, and the test that says so enumerates
@@ -158,7 +166,7 @@ every one of them carries `not_the_tax_owed` in its own words.
 | Record | Fields |
 |---|---|
 | `RefusedState(Enum)` | `NO_DECLARED_JUDGEMENT = "no_declared_judgement"`, `NO_CANDIDATE_IS_COMPUTABLE = "no_candidate_is_computable"` |
-| `CreditingDestinationRefused` | `venue_id`, `scheme_id`, `state: RefusedState`, `uncomputable: tuple[UncomputableCandidate, ...]`, `reason` |
+| `CreditingDestinationRefused` | `venue_id`, `declared_treatment`, `state: RefusedState`, `uncomputable: tuple[UncomputableCandidate, ...]`, `reason` |
 | `ReadingDateUndeclared` | `scheme_id`, `reading_id`, `recognised_on`, `declared: tuple[str, ...]`, `reason` |
 | `ReadingRefused` | `venue_id`, `scheme_id`, `reading_id`, `label`, `because: SchemeChargeRefused \| ReadingDateUndeclared`, `reason` |
 
@@ -204,7 +212,7 @@ component_standing(scheme, component_id: str, *, on_date: date | None, period: s
        -> ComponentRate | ComponentAmount | ComponentNotDeclared
         | ComponentRateUndeclaredBefore | PeriodicAmountNotInForce
 
-apply(*, scheme_id: str, venue_id: str, amount: Money,
+apply(*, scheme_id: str, credited_to: str, amount: Money,
       on_dates: Mapping[str, date],
       schemes: Mapping[str, TaxationScheme],
       destinations: Mapping[tuple[str, str], CreditingDestination],

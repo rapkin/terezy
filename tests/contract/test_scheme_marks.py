@@ -181,6 +181,30 @@ class TestTheMarkReachesEveryFigureInBothDirections:
         for line in charge.lines:
             assert prov.is_unverified(line.charged.provenance), line.component_id
 
+    def test_a_scheme_that_charges_no_rate_still_marks_its_zero_total(self) -> None:
+        """A sum of nothing rests on nothing, and that zero sat beside a base that was marked.
+
+        A scheme declaring only periodic components is legal -- the loader requires one
+        component of *either* kind -- so its income charge has no rate line at all. The total
+        is then a zero, and an uncited zero is the figure that gets believed without checking.
+        """
+        scheme = fixtures.scheme(
+            scheme_id="synthetic_periodic_only",
+            periodic_components=[fixtures.periodic_component([(SCHEDULE_START, 100.0)])],
+        )
+        charge = schemes.charge_income(
+            scheme,
+            DOLLARS,
+            on_date=CREDIT_DATE,
+            series=official_rates.series([(CREDIT_DATE, 42.00)]),
+        )
+        assert isinstance(charge, schemes.SchemeCharge), charge
+        assert charge.lines == ()
+        assert charge.total.amount == 0.0
+        assert charge.total.provenance.sources
+        assert charge.total.provenance.sources == charge.base.provenance.sources
+        assert prov.is_unverified(charge.total.provenance)
+
     def test_the_rows_own_citation_reaches_the_figure_it_selected(self) -> None:
         """A row and a reading decide WHICH rates strike a figure without multiplying it, so
         their marks reach the money only if they are put there."""

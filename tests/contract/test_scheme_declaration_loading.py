@@ -13,8 +13,14 @@ confusion is an unrecognised field rather than a case the loader has to remember
 schedule and silently not applied is indistinguishable from an oversight; the field that
 says why is required, which is what FR-008a is actually asking for.
 
-The last class loads the **shipped** files, because a battery of broken ones proves nothing
-about the files the project uses.
+**Every case asserts on the error's own ``field_path`` and ``problem``, never on ``str(error)``.**
+The rendered string begins with the file path, and pytest names ``tmp_path`` after the test
+that asked for it -- so ``assert "amount" in str(error)`` inside
+``test_an_amount_on_a_rate_component_...`` passes on the directory name alone. Two cases here
+did exactly that.
+
+The shipped files are loaded in ``test_crediting_destination_loading.py``, which resolves the
+whole data root; a battery of broken ones proves nothing about them.
 """
 
 from __future__ import annotations
@@ -32,9 +38,6 @@ from terezy.data.declarations import loader
 from terezy.data.declarations.errors import DeclarationError
 
 pytestmark = pytest.mark.contract
-
-REPO_ROOT = Path(__file__).resolve().parents[2]
-DATA_ROOT = REPO_ROOT / "data"
 
 HEADER = """
 [scheme]
@@ -147,12 +150,14 @@ class TestOneFileReadInIsolation:
         """Empty is a state; absent is an oversight, and the two must not look alike."""
         error = _load_error(_file(tmp_path, _body().replace('verified_on    = ""', "", 1)))
 
-        assert "verified_on" in str(error)
+        assert error.field_path.endswith(".verified_on")
+        assert "missing" in error.problem.lower()
 
     def test_a_scheme_charging_no_component_at_all_is_refused(self, tmp_path: Path) -> None:
         error = _load_error(_file(tmp_path, HEADER))
 
-        assert "component" in str(error)
+        assert error.field_path == "scheme"
+        assert "declares no component at all" in error.problem
 
     def test_a_rate_component_with_an_empty_schedule_is_refused(self, tmp_path: Path) -> None:
         """``rate = []`` is a component that charges nothing on every date and says so
@@ -160,18 +165,27 @@ class TestOneFileReadInIsolation:
         body = HEADER + RATE_COMPONENT.format(id="levy") + "  rate = []\n"
         error = _load_error(_file(tmp_path, body))
 
-        assert "levy" in str(error)
+        assert error.field_path == "scheme.rate_component[levy].rate"
+        assert "declares no rate at all" in error.problem
 
     def test_a_rate_component_with_no_schedule_key_at_all_is_refused(self, tmp_path: Path) -> None:
+        """A different refusal from the empty one, and from a different layer.
+
+        The shape validation reports the missing key; the loader reports an empty list. Both
+        must fire, because giving the field a ``= []`` default -- the defaulting the schema
+        header forbids -- would collapse the first into the second with nothing to say so.
+        """
         error = _load_error(_file(tmp_path, HEADER + RATE_COMPONENT.format(id="levy")))
 
-        assert "rate" in str(error)
+        assert error.field_path == "scheme.rate_component[0].rate"
+        assert "missing" in error.problem.lower()
 
     def test_two_entries_on_one_effective_date_are_refused(self, tmp_path: Path) -> None:
         body = _body() + RATE_ENTRY.format(effective_from="2025-01-01", rate_pct=2.0)
         error = _load_error(_file(tmp_path, body))
 
-        assert "2025-01-01" in str(error)
+        assert error.field_path.endswith(".effective_from")
+        assert "for the second time" in error.problem
 
     def test_a_schedule_running_backwards_is_refused_rather_than_sorted(
         self, tmp_path: Path
@@ -185,7 +199,8 @@ class TestOneFileReadInIsolation:
         )
         error = _load_error(_file(tmp_path, body))
 
-        assert "2024-01-01" in str(error)
+        assert error.field_path.endswith(".effective_from")
+        assert "before the previous entry's 2025-01-01" in error.problem
 
     def test_a_negative_rate_is_refused(self, tmp_path: Path) -> None:
         body = (
@@ -195,7 +210,8 @@ class TestOneFileReadInIsolation:
         )
         error = _load_error(_file(tmp_path, body))
 
-        assert "-1.0" in str(error)
+        assert error.field_path.endswith(".rate_pct")
+        assert "is -1.0" in error.problem
 
     def test_a_negative_amount_is_refused(self, tmp_path: Path) -> None:
         body = (
@@ -205,7 +221,8 @@ class TestOneFileReadInIsolation:
         )
         error = _load_error(_file(tmp_path, body))
 
-        assert "-5.0" in str(error)
+        assert error.field_path.endswith(".amount")
+        assert "is -5.0" in error.problem
 
     def test_two_components_sharing_one_id_are_refused(self, tmp_path: Path) -> None:
         body = (
@@ -215,7 +232,8 @@ class TestOneFileReadInIsolation:
         )
         error = _load_error(_file(tmp_path, body))
 
-        assert "levy" in str(error)
+        assert error.field_path == "scheme.component.id"
+        assert "'levy' more than once" in error.problem
 
     def test_a_rate_component_and_a_periodic_one_may_not_share_an_id(self, tmp_path: Path) -> None:
         body = (
@@ -227,7 +245,11 @@ class TestOneFileReadInIsolation:
         )
         error = _load_error(_file(tmp_path, body))
 
-        assert "same" in str(error)
+        # Across BOTH kinds, and the field path says so: `component_standing` looks a
+        # component up by id alone, so a rate component and a periodic one sharing one would
+        # make which of them answered depend on scan order.
+        assert error.field_path == "scheme.component.id"
+        assert "'same' more than once" in error.problem
 
     def test_an_unknown_period_is_refused_and_the_refusal_lists_what_would_work(
         self, tmp_path: Path
@@ -239,8 +261,9 @@ class TestOneFileReadInIsolation:
         )
         error = _load_error(_file(tmp_path, body))
 
-        assert "quarter" in str(error)
-        assert "month" in str(error)
+        assert error.field_path.endswith(".period")
+        assert "is 'quarter'" in error.problem
+        assert error.remedy == "use one of: month"
 
     def test_an_unknown_declared_for_is_refused(self, tmp_path: Path) -> None:
         error = _load_error(
@@ -250,7 +273,8 @@ class TestOneFileReadInIsolation:
             )
         )
 
-        assert "anyone" in str(error)
+        assert error.field_path == "scheme.declared_for"
+        assert "is 'anyone'" in error.problem
 
     def test_an_unknown_currency_is_refused(self, tmp_path: Path) -> None:
         error = _load_error(
@@ -259,7 +283,8 @@ class TestOneFileReadInIsolation:
             )
         )
 
-        assert "XXX" in str(error)
+        assert error.field_path == "scheme.tax_currency"
+        assert "declares 'XXX'" in error.problem
 
     def test_a_recorded_context_with_no_reason_it_is_not_applied_is_refused(
         self, tmp_path: Path
@@ -268,7 +293,8 @@ class TestOneFileReadInIsolation:
         body = _body() + CONTEXT.format(not_applied_because="")
         error = _load_error(_file(tmp_path, body))
 
-        assert "not_applied_because" in str(error)
+        assert error.field_path.endswith(".not_applied_because")
+        assert "indistinguishable from an oversight" in error.problem
 
     def test_a_recorded_context_loads_and_is_not_applied(self, tmp_path: Path) -> None:
         body = (
@@ -292,14 +318,25 @@ class TestOneFileReadInIsolation:
         assert charge.lines[0].rate == 0.01
 
     def test_an_amount_on_a_rate_component_is_an_unrecognised_field(self, tmp_path: Path) -> None:
-        """FR-019's confusion is unspellable rather than rejected by a remembered check."""
-        body = _body().replace("rate_pct       = 1.0", "amount         = 1.0")
+        """FR-019's confusion is unspellable rather than rejected by a remembered check.
+
+        The rate entry keeps its own ``rate_pct`` so the *only* thing wrong with the file is
+        the extra key -- writing ``amount`` in place of it plants a missing field as well, and
+        the shape validation reports that one first.
+        """
+        body = _body().replace(
+            "    rate_pct       = 1.0", "    rate_pct       = 1.0\n    amount         = 1.0"
+        )
         error = _load_error(_file(tmp_path, body))
 
-        assert "amount" in str(error)
+        assert "amount" in error.field_path
+        assert "is not a field this loader recognises" in error.problem
 
     def test_a_rate_on_a_periodic_component_is_an_unrecognised_field(self, tmp_path: Path) -> None:
-        body = _body().replace("amount         = 0.0", "rate_pct       = 0.0")
+        body = _body().replace(
+            "    amount         = 0.0", "    amount         = 0.0\n    rate_pct       = 0.0"
+        )
         error = _load_error(_file(tmp_path, body))
 
-        assert "rate_pct" in str(error)
+        assert "rate_pct" in error.field_path
+        assert "is not a field this loader recognises" in error.problem
