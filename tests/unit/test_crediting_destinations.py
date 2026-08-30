@@ -349,6 +349,8 @@ class TestWhenNothingCanBeSaid:
         )
         assert isinstance(outcome, schemes.CreditingDestinationRefused), outcome
         assert outcome.state is schemes.RefusedState.NO_CANDIDATE_IS_COMPUTABLE
+        assert outcome.declared_treatment == SCHEME.id
+        assert outcome.venue_id == "synthetic_venue"
         assert [item.reading_id for item in outcome.uncomputable] == ["needs_an_undeclared_scheme"]
 
     def test_a_switch_of_zero_figures_is_never_produced(self) -> None:

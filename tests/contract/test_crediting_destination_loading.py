@@ -204,6 +204,31 @@ class TestOneFileReadInIsolation:
         assert error.field_path.endswith(".verdict")
         assert "has nothing to charge" in error.problem
 
+    def test_a_key_written_blank_is_refused_rather_than_read_as_absent(
+        self, tmp_path: Path
+    ) -> None:
+        """``None`` is *the key was not written*; ``""`` is a key that says nothing.
+
+        Each of these four is **read as a claim** downstream -- a candidate named on a switch
+        with its reason, a reading computing on the date its name selects, a declared
+        departure rendered on a figure, and the scheme a reading charges under. Blank, each
+        would render as a claim that was made and carries nothing; a blank ``scheme`` is worse
+        still, because the resolver then reports a scheme nobody declared and sends the reader
+        to declare one they did write.
+        """
+        blanks = {
+            "uncomputable_because": UNCOMPUTABLE.format(id="one", because=" "),
+            "recognised_on": READING.format(id="one", scheme="xx_scheme", recognised_on=" "),
+            "scheme": READING.format(id="one", scheme=" ", recognised_on="credited"),
+            "departs_from_source": READING.format(
+                id="one", scheme="xx_scheme", recognised_on="credited"
+            ).replace('verified_on   = ""', 'verified_on   = ""\n  departs_from_source = " "'),
+        }
+        for field, reading in blanks.items():
+            error = _load_error(_file(tmp_path, _row() + reading, name=f"{field}.toml"))
+            assert error.field_path.endswith(f".{field}"), field
+            assert "is empty" in error.problem, field
+
     def test_an_uncomputable_candidate_loads_and_is_named_rather_than_dropped(
         self, tmp_path: Path
     ) -> None:
@@ -243,8 +268,9 @@ class TestReferencesResolvedAcrossFiles:
         )
         error = self._resolve(root)
 
-        assert "xx_nobody" in str(error)
-        assert "ua_fop_group_3_non_vat" in str(error)
+        assert error.field_path.endswith(".scheme")
+        assert "xx_nobody" in error.problem
+        assert "ua_fop_group_3_non_vat" in error.problem
 
     def test_a_reading_naming_a_scheme_nobody_declares_is_refused(self, tmp_path: Path) -> None:
         root = self._root(tmp_path)
@@ -257,7 +283,8 @@ class TestReferencesResolvedAcrossFiles:
         )
         error = self._resolve(root)
 
-        assert "xx_nobody" in str(error)
+        assert error.field_path.endswith("].scheme")
+        assert "xx_nobody" in error.problem
 
     def test_a_row_naming_a_venue_nobody_declares_is_refused(self, tmp_path: Path) -> None:
         root = self._root(tmp_path)
@@ -270,7 +297,8 @@ class TestReferencesResolvedAcrossFiles:
         )
         error = self._resolve(root)
 
-        assert "xx_nowhere" in str(error)
+        assert error.field_path.endswith(".venue")
+        assert "xx_nowhere" in error.problem
 
     def test_two_rows_for_one_scheme_and_venue_name_both_files(self, tmp_path: Path) -> None:
         root = self._root(tmp_path)
@@ -314,8 +342,8 @@ class TestReferencesResolvedAcrossFiles:
         )
         error = self._resolve(root)
 
-        assert "xx_nobody" in str(error)
-        assert "contract_usd" in str(error)
+        assert error.field_path == "stream[contract_usd].tax_scheme"
+        assert "xx_nobody" in error.problem
 
     def test_a_stream_naming_a_reading_only_scheme_is_refused(self, tmp_path: Path) -> None:
         """Those rates exist only inside a what-if that says it is not the tax owed."""
@@ -329,8 +357,9 @@ class TestReferencesResolvedAcrossFiles:
         )
         error = self._resolve(root)
 
-        assert "ua_personal_income" in str(error)
-        assert "not the tax owed" in str(error)
+        assert error.field_path == "stream[contract_usd].tax_scheme"
+        assert "ua_personal_income" in error.problem
+        assert "not the tax owed" in error.problem
 
 
 class TestTheShippedTable:

@@ -144,7 +144,8 @@ class TestOneFileReadInIsolation:
     def test_an_unrecognised_field_is_refused(self, tmp_path: Path) -> None:
         error = _load_error(_file(tmp_path, _body() + '\nnote_to_self = "hello"\n'))
 
-        assert "note_to_self" in str(error)
+        assert error.field_path.endswith(".note_to_self")
+        assert "is not a field this loader recognises" in error.problem
 
     def test_a_missing_verified_on_is_refused_rather_than_defaulted(self, tmp_path: Path) -> None:
         """Empty is a state; absent is an oversight, and the two must not look alike."""
@@ -232,10 +233,11 @@ class TestOneFileReadInIsolation:
         )
         error = _load_error(_file(tmp_path, body))
 
-        # The field path names a table the file actually has, and the message names both
-        # positions the duplicate is written in.
+        # The field path names a table the file actually has, and repeats of ONE table are
+        # counted rather than listed -- joining a list of one repeated string with "and" is
+        # how a message comes to say "A and A both declare".
         assert error.field_path == "scheme.rate_component[levy].id"
-        assert "scheme.rate_component[levy] and scheme.rate_component[levy]" in error.problem
+        assert "'levy' 2 times in scheme.rate_component." in error.problem
 
     def test_a_rate_component_and_a_periodic_one_may_not_share_an_id(self, tmp_path: Path) -> None:
         body = (
@@ -251,7 +253,7 @@ class TestOneFileReadInIsolation:
         # component up by id alone, so a rate component and a periodic one sharing one would
         # make which of them answered depend on scan order.
         assert error.field_path == "scheme.rate_component[same].id"
-        assert "scheme.rate_component[same] and scheme.periodic_component[same]" in error.problem
+        assert "'same' in scheme.rate_component and scheme.periodic_component" in error.problem
 
     def test_an_unknown_period_is_refused_and_the_refusal_lists_what_would_work(
         self, tmp_path: Path

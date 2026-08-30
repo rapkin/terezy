@@ -2841,9 +2841,11 @@ def _check_destination(
 ) -> None:
     """A row's scheme, its venue and every reading's scheme, checked against what exists."""
     field_prefix = f"{loader.DESTINATION_TABLE}[{key[0]}/{key[1]}]"
-    # `is_reading` is carried rather than inferred from the field label: a label is a string
-    # built for a message, and a reading whose id ended in `.scheme` would have escaped a
-    # comparison against one.
+    # `is_reading` is carried rather than inferred from the field label. The comparison it
+    # replaced -- `field != "scheme"` -- was in fact unreachable-safe, since a reading's label
+    # always begins `reading[`; what is wrong with it is that its correctness depended on how
+    # a message string happens to be spelled, and the next edit to that spelling would not
+    # look like a behaviour change to anyone making it.
     for named, field, is_reading in (
         (row.scheme_id, "scheme", False),
         *((reading.scheme_id, f"reading[{reading.id}].scheme", True) for reading in row.readings),

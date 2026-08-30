@@ -4867,14 +4867,23 @@ def _no_shared_component_id(
     for identifier, tables in kinds.items():
         if len(tables) == 1:
             continue
-        where = " and ".join(f"{SCHEME_TABLE}.{table}[{identifier}]" for table in tables)
+        # First-appearance order rather than sorted: it is the order the file declares them
+        # in, which is the order a reader will scroll through looking for the second one.
+        distinct = list(dict.fromkeys(tables))
+        if len(distinct) == 1:
+            # Repeats of ONE table are counted, not listed: naming `rate_component[levy]` twice
+            # tells a reader nothing they did not already have, and joining a list of one
+            # repeated string with "and" is how a message comes to say "A and A both declare".
+            where = f"{len(tables)} times in {SCHEME_TABLE}.{distinct[0]}"
+        else:
+            where = "in " + " and ".join(f"{SCHEME_TABLE}.{table}" for table in distinct)
         raise DeclarationError(
             path,
             f"{SCHEME_TABLE}.{tables[0]}[{identifier}].id",
-            f"declares the component id {identifier!r}, which {where} both declare. A "
-            "component is looked up by id alone, so two sharing one would make which of them "
-            "answered depend on the order they were scanned in.",
-            "give one of them a distinct id",
+            f"declares the component id {identifier!r} {where}. A component is looked up by "
+            "id alone, so two sharing one would make which of them answered depend on the "
+            "order they were scanned in.",
+            "give each of them a distinct id",
         )
 
 

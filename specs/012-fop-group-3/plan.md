@@ -141,7 +141,7 @@ data/venues.toml                              + payoneer, + foreign_bank_usd
 data/streams/owner-001.toml                   - income_tax_rate_pct, + credited_to, + tax_scheme
 data/README.md                                the streams row and the exemption argument
 scripts/check_provenance.py                   the streams exemption reason, which names the retired field
-docs/METHODOLOGY.md                           §13 rewritten, + §33 the taxation scheme
+docs/METHODOLOGY.md                           §13 rewritten, + §32 the taxation scheme
 docs/REQUIRED_TESTS.md                        E10's second exercise, E8's prerequisite
 specs/features.toml                           012 status
 specs/002-ramp-cost/spec.md                   ⚙ on FR-007: superseded (FR-018)
@@ -161,7 +161,7 @@ tests/schemes.py                              new — synthetic fixtures, labell
 5. **Base against received** — the two figures and the signed, labelled gap.
 6. **The standing properties** — the no-branch scan, data-only extensibility, never-blended,
    never-the-tax-owed, one-declaration-consumed, the SC-017a departure.
-7. **Documentation and the graph** — METHODOLOGY §13 and §33, `check_methodology_refs.py` by
+7. **Documentation and the graph** — METHODOLOGY §13 and §32, `check_methodology_refs.py` by
    exit code, REQUIRED_TESTS, `features.toml`, the ⚙ on 002's FR-007.
 8. **`/condense`, then `/code-review` until clean.**
 

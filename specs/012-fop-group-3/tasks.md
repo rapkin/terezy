@@ -214,7 +214,7 @@ US6 a second regime is data.
 ## Phase 8 — Documentation and the graph
 
 - [x] **T032** `docs/METHODOLOGY.md` — §13 rewritten for the new deployable formula (FR-018),
-  and a new §33: the scheme and its components, the credit-date base, the periodic component,
+  and a new §32: the scheme and its components, the credit-date base, the periodic component,
   the three nils, a worked example of each, the crediting destination and its labelled switch,
   base against received, and what refuses. In this change, not a follow-up (SC-015). Then
   `uv run python scripts/check_methodology_refs.py`, **read by exit code**.

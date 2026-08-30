@@ -37,6 +37,15 @@ impossible, and a partial scope is what lets one survive. So the scope's own lim
   planning a section not yet written (`specs/009-tax-depth/tasks.md` has exactly that shape
   and passes only because §28 now exists), and a reference quoted as history. Not worth a
   suppression mechanism until one fires.
+- **The cross-file pattern needs `METHODOLOGY` immediately before each `§`, separated by one
+  literal space** -- so three shapes slip past it entirely, all three found on feature 012's
+  branch (2026-08-30) and all three pointing at a section that had been renumbered: a
+  column-aligned table cell (`METHODOLOGY.md` then a run of spaces then `§32`), a second
+  reference in one sentence (`METHODOLOGY §13 and §32`), and a `§` in a file that never says
+  METHODOLOGY at all. Every one resolved to the wrong section while this script exited 0,
+  which is the failure the paragraph above says it exists to prevent. Widening the pattern is
+  a change to a shared tool and is deliberately not made from a feature branch; recorded here
+  with its date so whoever next renumbers a section knows to grep as well as run this.
 
 `SIMULATOR_SPEC.md`'s own section numbers appear in this prose too and collide numerically
 with METHODOLOGY's, so they are listed rather than guessed at.
