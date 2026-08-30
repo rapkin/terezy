@@ -44,6 +44,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
+from datetime import date
 from typing import assert_never
 
 from terezy.core.errors import (
@@ -61,6 +62,7 @@ from terezy.core.instruments import terms as instrument_terms
 from terezy.core.instruments.interface import (
     Assumptions,
     DateRange,
+    EarlyExit,
     Holding,
     InstrumentDeclaration,
 )
@@ -76,6 +78,7 @@ from terezy.core.results import hurdle as hurdle_figures
 from terezy.core.results import schedule as schedule_rows
 from terezy.core.results.hurdle import CashFlow, HurdleRate
 from terezy.core.results.schedule import CashFlowSchedule, ChargedOn
+from terezy.core.scenarios.early_exit import SpreadHolds
 from terezy.core.tax import registry as tax_registry
 from terezy.core.tax import year as tax_year
 from terezy.core.tax.interface import TaxableEventKind, TaxCharge, TaxClass, TaxContext
@@ -167,6 +170,32 @@ class PurchasePremium:
     """The category treatment that decides what the difference does, or why nobody said."""
 
 
+@dataclass(frozen=True, slots=True, kw_only=True)
+class SoldEarly:
+    """The position closed by a sale at the horizon's end rather than by its own terms.
+
+    015 FR-029, and ``FundProjection.exit_line``'s shape for a bond: a reported line saying
+    what the early exit did, so a reader is never left to infer it from a date. Its absence is
+    the ordinary case -- the window reached maturity, no spread was paid, and no figure carries
+    the assumption's mark.
+    """
+
+    on: date
+    """The horizon's last day, which is when the money comes out."""
+
+    units: float
+    """What was still held: the purchase plus every reinvestment, less what payments retired."""
+
+    price_per_unit: Money
+    """The declared resale quote, carrying its own citation."""
+
+    proceeds: Money
+    """``units x price_per_unit``. Gross: the disposal's tax is charged like any other."""
+
+    assumption: SpreadHolds
+    """The belief the figure rests on, named so a reader can find the file (FR-032)."""
+
+
 @dataclass(frozen=True, slots=True)
 class Projection:
     """Everything one projection produced, with the ledger it was all derived from."""
@@ -192,6 +221,9 @@ class Projection:
     at_purchase: PurchasePremium
     """What was paid against what this holding gets back, and what governs the difference."""
 
+    sold_early: SoldEarly | None
+    """The sale that closed the position, or ``None`` where its own terms did (015 FR-029)."""
+
 
 ProjectionOutcome = Projection | InstrumentFailure | TaxFailure
 """What a projection returns: a result, or a typed reason there is none.
@@ -213,6 +245,7 @@ def project(
     inflation_assumption: InflationAssumption | None = None,
     ageing: Ageing | None = None,
     assessment_rules: AssessmentRules | None = None,
+    early_exit: EarlyExit | None = None,
 ) -> ProjectionOutcome:
     """Project one holding to maturity and report what it pays and what it returns.
 
@@ -247,9 +280,14 @@ def project(
     ``ageing`` carries the declared staleness thresholds and the ``as_of`` date the question is
     asked at (FR-005). ``None`` means this run did not ask, which the figures report as
     :data:`~terezy.core.primitives.staleness.UNASSESSED` rather than as freshness.
+
+    **``early_exit`` is what a window shorter than the instrument's own terms is closed with**
+    (015 FR-029). ``None`` is not a silence and is the shipped state: no access declaration
+    quotes a resale price, so such a window refuses naming ``access.resale_price`` rather than
+    striking a sale at a figure nobody declared.
     """
     ops = instrument_registry.ops_for(declaration.instrument_class)
-    produced = ops.events(declaration, holding, horizon, assumptions)
+    produced = ops.events(declaration, holding, horizon, assumptions, early_exit)
     match produced:
         case InfeasiblePurchase() | InconsistentTerms():
             return produced
@@ -285,7 +323,7 @@ def project(
     # would then move when the owner changed their mind about coupons -- a figure
     # labelled "contractual" that is not (FR-005). Policy-invariance is asserted by
     # tests/unit/test_contractual_yield_is_policy_invariant.py.
-    contractual_events = _contractual_events(declaration, holding, horizon, assumptions)
+    contractual_events = _contractual_events(declaration, holding, horizon, assumptions, early_exit)
     if isinstance(contractual_events, InfeasiblePurchase | InconsistentTerms):
         return contractual_events  # pragma: no cover -- the policy run already succeeded
 
@@ -298,6 +336,7 @@ def project(
         ),
         charges=charges,
         at_purchase=_at_purchase(declaration, holding, assessment_rules),
+        sold_early=_sold_early(gross_events, early_exit),
         hurdle=hurdle_figures.of_flows(
             contractual=_flows(contractual_events, holding, year_fraction),
             received=_flows(
@@ -319,6 +358,31 @@ def project(
                 ageing=ageing,
             ),
         ),
+    )
+
+
+def _sold_early(events: Sequence[Event], early_exit: EarlyExit | None) -> SoldEarly | None:
+    """The sale that closed the position, read off the stream that closed it.
+
+    A bond emits ``EventKind.REDEMPTION`` for one reason only -- an early sale; it repays
+    principal under ``PRINCIPAL_REPAYMENT`` -- so the event is found rather than the date
+    recomputed. Recomputing *which* day the window ended on would be a second opinion about a
+    fact the instrument already settled, and the two would disagree the first time a
+    business-day rule moved one of them.
+    """
+    if early_exit is None:
+        return None
+    sale = next((event for event in events if event.kind is EventKind.REDEMPTION), None)
+    if sale is None:
+        return None
+    if sale.quantity is None:  # pragma: no cover -- `early_sale` always carries one
+        return None
+    return SoldEarly(
+        on=sale.occurred_on,
+        units=sale.quantity,
+        price_per_unit=early_exit.price_per_unit,
+        proceeds=sale.amount,
+        assumption=early_exit.assumption,
     )
 
 
@@ -454,6 +518,7 @@ def _contractual_events(
     holding: Holding,
     horizon: DateRange,
     assumptions: Assumptions,
+    early_exit: EarlyExit | None,
 ) -> tuple[Event, ...] | InfeasiblePurchase | InconsistentTerms:
     """The events the paper itself produces, with no coupon policy and no tax applied.
 
@@ -472,6 +537,7 @@ def _contractual_events(
         holding,
         horizon,
         replace(assumptions, coupon_policy=fixed_income.HOLD_CASH),
+        early_exit,
     )
     match produced:
         case InfeasiblePurchase() | InconsistentTerms():

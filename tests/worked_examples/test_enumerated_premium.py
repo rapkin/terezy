@@ -127,7 +127,7 @@ def _events(*lots: Holding) -> tuple[Event, ...]:
     """Both purchases and both schedules, in date order and renumbered as one stream."""
     produced: list[Event] = []
     for lot in lots:
-        stream = ops_for(DECLARED.instrument_class).events(DECLARED, lot, HORIZON, HOLD_CASH)
+        stream = ops_for(DECLARED.instrument_class).events(DECLARED, lot, HORIZON, HOLD_CASH, None)
         assert isinstance(stream, tuple), stream
         produced.extend(stream)
     ordered = sorted(produced, key=lambda event: (event.occurred_on, event.sequence))

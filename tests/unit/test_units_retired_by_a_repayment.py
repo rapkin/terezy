@@ -64,7 +64,11 @@ def _repayments(*amounts: float, on: tuple[date, ...] | None = None) -> tuple[Ev
     )
     payments = tuple(sorted(coupons + principal, key=lambda p: (p.on, p.pays.value)))
     produced = registry.ops_for(DECLARATION.instrument_class).events(
-        replace(DECLARATION, terms=replace(TERMS, payments=payments)), HOLDING, HORIZON, HOLD_CASH
+        replace(DECLARATION, terms=replace(TERMS, payments=payments)),
+        HOLDING,
+        HORIZON,
+        HOLD_CASH,
+        None,
     )
     assert isinstance(produced, tuple), produced
     return produced
@@ -139,7 +143,7 @@ def test_a_purchase_after_every_repayment_refuses_rather_than_never_closing() ->
         ),
     )
     outcome = registry.ops_for(DECLARATION.instrument_class).events(
-        replace(DECLARATION, terms=coupons_only), HOLDING, HORIZON, HOLD_CASH
+        replace(DECLARATION, terms=coupons_only), HOLDING, HORIZON, HOLD_CASH, None
     )
     assert isinstance(outcome, InconsistentTerms), outcome
     assert "repayment of principal" in outcome.reason
@@ -154,6 +158,7 @@ def test_a_purchase_after_every_payment_refuses_rather_than_projecting_nothing()
         replace(HOLDING, purchased_on=last),
         replace(HORIZON, start=last),
         HOLD_CASH,
+        None,
     )
     assert isinstance(outcome, InconsistentTerms), outcome
     assert "receives nothing" in outcome.reason

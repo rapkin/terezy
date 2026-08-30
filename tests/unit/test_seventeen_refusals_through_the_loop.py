@@ -182,9 +182,24 @@ PLANTED: dict[str, tuple[Registries, dict[str, object]]] = {
         fixtures.shipped(),
         {"amounts": {fixtures.SALARY: Money(500.0, fixtures.UAH, prov.EMPTY)}},
     ),
+    # 015 FR-029 narrowed this arm to the fund. A bond outliving its horizon is now **sold**
+    # at the end of it, so a short horizon plants a missing resale price rather than this; what
+    # still cannot span a horizon is a fund held with no exit requested, which owes no buyback
+    # before it terminates and so has nothing to be liquidated into.
     "CannotSpanHorizon": (
         fixtures.shipped(),
-        {"horizon": DateRange(start=fixtures.OUTLAY_ON, end=date(2026, 5, 1))},
+        {
+            "horizon": DateRange(start=fixtures.OUTLAY_ON, end=date(2026, 5, 1)),
+            "plans": _plans(
+                inzhur_miltech=(
+                    fixtures.fund_plan(fixtures.shipped().funds[MILTECH], exit_on=None),
+                ),
+                inzhur_reit=(fixtures.fund_plan(fixtures.shipped().funds[REIT], exit_on=None),),
+                synthetic_fund_c=(
+                    fixtures.fund_plan(fixtures.shipped().funds["synthetic_fund_c"], exit_on=None),
+                ),
+            ),
+        },
     ),
     "NoExitTermsDeclared": (
         fixtures.shipped(),

@@ -96,6 +96,7 @@ if TYPE_CHECKING:  # pragma: no cover -- import-time cycle avoidance
     from terezy.core.instruments.interface import (
         Assumptions,
         DateRange,
+        EarlyExit,
         Holding,
         InstrumentConstraints,
         InstrumentDeclaration,
@@ -114,8 +115,14 @@ def events(
     holding: Holding,
     horizon: DateRange,
     assumptions: Assumptions,
+    early_exit: EarlyExit | None,
 ) -> tuple[Event, ...] | InstrumentFailure:
-    """The purchase, every coupon, any reinvestment and the redemption, as a stream.
+    """The purchase, every coupon, any reinvestment, and the way the position closes.
+
+    It closes at maturity where the horizon reaches it, and at ``horizon.end`` -- sold at the
+    declared resale price -- where it does not (015 FR-029). Handed no price for a window that
+    ends first, the refusal names ``access.resale_price`` rather than the maturity date: the
+    money **can** be withdrawn at a spread, so what is missing is the spread and not the window.
 
     ``assumptions`` is read for exactly one thing: the declared coupon policy (FR-019).
     Everything else in the schedule is contractual -- the bond's terms and the owner's
@@ -136,36 +143,50 @@ def events(
 
     terms = terms_of.narrowed(declaration, BondTerms)
     adjust = conventions.business_day_rule(terms.business_day_rule)
+    redeems_on = adjust(terms.maturity_date)
+    sells_early = horizon.end < redeems_on
+    if sells_early and early_exit is None:
+        return InconsistentTerms(
+            first_term="horizon.end",
+            second_term="access.resale_price",
+            reason=(
+                f"the horizon ends {horizon.end.isoformat()} but {declaration.id!r} redeems "
+                f"{redeems_on.isoformat()}"
+                + (
+                    f" (the declared maturity {terms.maturity_date.isoformat()} moved by "
+                    f"the {terms.business_day_rule!r} rule)"
+                    if redeems_on != terms.maturity_date
+                    else ""
+                )
+                + ", so the position is sold at the end of the window -- and no declaration "
+                "says what it sells for. The price is not inferred: face value is what the "
+                "issue repays and the purchase quote is what a unit costs, and striking a "
+                "sale at either would report a spread of zero that nobody observed."
+            ),
+        )
     stream = [acquire.purchase(declaration, holding, sequence=1)]
     units = holding.quantity
     for period in coupon_plan(declaration, holding, assumptions):
+        if sells_early and period.paid_on > horizon.end:
+            # Ascending by payment date, so the first one past the window ends the schedule:
+            # a later period's reinvestment must not add units the sale then surrenders.
+            break
         stream.append(_coupon(declaration, holding, period, sequence=len(stream) + 1))
         if period.reinvestment.units_bought > 0.0:
             stream.append(_reinvestment(declaration, holding, period, sequence=len(stream) + 1))
         units += period.reinvestment.units_bought
-    stream.append(_redemption(declaration, holding, units, sequence=len(stream) + 1))
-
-    final_payment = max(event.occurred_on for event in stream)
-    if horizon.end < final_payment:
-        return InconsistentTerms(
-            first_term="horizon.end",
-            second_term="instrument.maturity_date",
-            reason=(
-                f"the horizon ends {horizon.end.isoformat()} but the last payment of "
-                f"{declaration.id!r} falls on {final_payment.isoformat()}"
-                + (
-                    f" (the declared maturity {terms.maturity_date.isoformat()} moved by "
-                    f"the {terms.business_day_rule!r} rule)"
-                    if adjust(terms.maturity_date) != terms.maturity_date
-                    else ""
-                )
-                + ". This feature projects hold-to-maturity only, so it will not report "
-                "a truncated schedule: the yield of a bond whose principal was cut off "
-                "would be wrong rather than partial. Extend the horizon, or wait for the "
-                "feature that values an open position at the horizon -- an implicit "
-                "liquidation is not available, because nobody asked for one."
-            ),
+    stream.append(
+        acquire.early_sale(
+            declaration,
+            holding,
+            units,
+            on=horizon.end,
+            exit_=early_exit,
+            sequence=len(stream) + 1,
         )
+        if sells_early and early_exit is not None
+        else _redemption(declaration, holding, units, sequence=len(stream) + 1)
+    )
     return tuple(stream)
 
 

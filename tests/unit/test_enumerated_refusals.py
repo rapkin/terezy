@@ -50,7 +50,7 @@ def _events(
     assumptions: Assumptions = HOLD_CASH,
 ) -> object:
     ops = registry.ops_for(DECLARATION.instrument_class)
-    return ops.events(DECLARATION, holding, horizon, assumptions)
+    return ops.events(DECLARATION, holding, horizon, assumptions, None)
 
 
 class TestAPurchaseBeforeTheCoverageStart:
@@ -107,17 +107,27 @@ class TestAReinvestingCouponPolicy:
 
 
 class TestAHorizonThatDoesNotReachTheLastPayment:
+    """015 FR-029 changed the remedy and not the count: the window is not extended, the
+    position is **sold** at the end of it, and what is missing is the price."""
+
     def test_it_refuses_rather_than_truncating(self) -> None:
         last = max(payment.on for payment in TERMS.payments)
         outcome = _events(horizon=replace(HORIZON, end=last - timedelta(days=1)))
         assert isinstance(outcome, InconsistentTerms), outcome
         assert last.isoformat() in outcome.reason
 
-    def test_no_implicit_liquidation_is_offered(self) -> None:
+    def test_the_missing_term_is_the_resale_price_and_not_the_horizon(self) -> None:
         last = max(payment.on for payment in TERMS.payments)
         outcome = _events(horizon=replace(HORIZON, end=last - timedelta(days=1)))
         assert isinstance(outcome, InconsistentTerms), outcome
-        assert "nobody declared" in outcome.reason
+        assert outcome.second_term == "access.resale_price"
+
+    def test_no_price_is_inferred_from_the_schedule_or_the_purchase(self) -> None:
+        """The two flattering guesses, refused by name: either would report a spread of zero."""
+        last = max(payment.on for payment in TERMS.payments)
+        outcome = _events(horizon=replace(HORIZON, end=last - timedelta(days=1)))
+        assert isinstance(outcome, InconsistentTerms), outcome
+        assert "spread of zero" in outcome.reason
 
 
 class TestAHorizonThatCannotContainThePurchase:
