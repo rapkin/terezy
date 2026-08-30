@@ -119,12 +119,13 @@ SALARY_UAH = IncomeStream(
 )
 """The hryvnia salary. The stream that has to cross the ramp to reach a dollar asset.
 
-``amount`` is ``0.0`` and ``income_tax_rate`` is ``None`` because both are honestly unknown:
+``amount`` is ``0.0`` and ``tax_scheme`` is ``None`` because both are honestly unknown:
 ``SIMULATOR_SPEC.md`` §11 item 3 records that the owner's monthly figures have not been
-stated, and ``None`` says *no rate has been declared* rather than asserting a zero one. No
-costing reads either field -- the amount to move is passed to ``cost_one`` explicitly -- so a
-fixture that invented them would be inventing numbers nothing needs. The tests that do need
-a stated amount or rate declare their own, and say there that they invented it.
+stated, and ``None`` says *no treatment has been named* rather than asserting a scheme that
+charges nothing. No costing reads either field -- the amount to move is passed to ``cost_one``
+explicitly -- so a fixture that invented them would be inventing numbers nothing needs. The
+tests that do need a stated amount or a charge declare their own, and say there that they
+invented it.
 """
 
 CONTRACT_USD = IncomeStream(

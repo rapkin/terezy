@@ -47,6 +47,10 @@ DATA_ROOT = REPO_ROOT / "data"
 # `official_rates` joined in feature 011. Every `[[observation]]` is one date's published
 # legal reference — the single input that turns a foreign amount into a hryvnia tax base —
 # so an uncited one is the confidently-wrong number this project exists to refuse.
+#
+# ⚙ Feature 012 added `tax/schemes/` and `tax/destinations/` and needed no entry here,
+# because the walk below is `rglob` and both sit under `tax`. What it did move is the
+# `streams` exemption's reason: the rates a stream used to carry are in `tax/schemes/` now.
 SOURCED_DIRS = (
     "tax",
     "instruments",
@@ -78,11 +82,12 @@ EXEMPT_DIRS: dict[str, str] = {
         "directory rather than widen this exemption"
     ),
     "streams": (
-        "an owner's own salary is a statement of fact by the only person who can make it, "
-        "income_tax_rate_pct included: the tool takes net-of-income-tax amounts as input "
-        "and the field exists only so the deployable figure is not overstated. A rate the "
-        "engine applies to a taxable event needs a source; a rate the owner states about "
-        "his own payslip does not (contracts/declaration-schema.md, data/README.md)"
+        "an owner's own salary is a statement of fact by the only person who can make it: "
+        "an amount, a cadence, the venues it lands at and is credited to, and which "
+        "taxation scheme he is in. Feature 012 removed the one thing here the exemption "
+        "never covered -- a tax RATE, which is a public legal fact about the Republic "
+        "rather than a statement about him. The rates of every scheme now live in "
+        "data/tax/schemes/, where a citation is required (data/README.md)"
     ),
     "composition": (
         "the owner's own policy on how far a search may run -- how many declared routes may "
