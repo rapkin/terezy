@@ -144,9 +144,16 @@ beside `[access.price]` and with its own citation. `TupleRefused` stays at seven
 `DeclarationMissing.part` stays a five-member literal. 015 FR-031's open question closes on the
 first of its two branches.
 
-This overrides 016 FR-014, whose own premise 015 removed; the reasoning is in
-[plan.md](./plan.md) under *Two collisions*. Two success criteria are narrowed with it and the
-narrowing is stated rather than assumed:
+**This overrides 016 FR-014**, which forbids declaring the sell quotation and states its own
+condition for doing so: *"Nothing in this engine prices a disposal before the end of a
+schedule, so a declared sell price would be read by nothing."* 015 landed `EarlyExit`,
+`InstrumentAccess.resale_price` and `[access.resale_price]`, so the condition is gone — and the
+repository's own landed data says which feature was expected to fill it, in
+`data/scenarios/early_exit/owner-001.toml`: *"The day feature 016 declares a seller's quote,
+this is what says the quote may be used for a date nobody has quoted."* FR-014's other half
+survives intact and is FR-015: the spread is not the round trip and is never presented as one.
+
+Two success criteria are narrowed with it, and the narrowing is stated rather than assumed:
 
 - **SC-009**'s second clause — *"no declared value anywhere in `data/` equals a published sell
   quotation"* — is the direct statement of FR-014 and falls with it.

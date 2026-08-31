@@ -138,10 +138,9 @@ risk_class    = "sovereign_debt"
 # terms live in data/instruments/UA*.toml and come from the issuer's depository; these
 # two figures come from Inzhur and no citation here names the depository.
 #
-# Both sides of the quotation are declared. The gap between them — 0.000% to 0.637% of
-# the buy price across these 24 — is the seller's round trip on an IMMEDIATE resale and
-# is never the round-trip cost of a tuple (016 FR-015): that one runs the way in, the
-# purchase, the schedule to its end and the way out, and is computed per
+# Both sides of the quotation are declared. The gap between them is the seller's round trip on
+# an IMMEDIATE resale and is never the round-trip cost of a tuple (016 FR-015): that one runs
+# the way in, the purchase, the schedule to its end and the way out, and is computed per
 # (instrument × income stream × route).
 
 [[access]]

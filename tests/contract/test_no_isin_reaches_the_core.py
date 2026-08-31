@@ -5,8 +5,8 @@
 fixture. Declaring 24 real securities is what makes it worth a check: a branch on an ISIN is
 the exact shape Principle II forbids, and it is now a shape somebody could reach for.
 
-**Two scans, and each carries a control.** A scan that can never fail protects nothing, so
-every one below is paired with a probe proving it catches the thing it forbids.
+**Every scan below carries a control.** A scan that can never fail protects nothing, so each is
+paired with a probe proving it catches the thing it forbids.
 
 Prose is stripped first (`tests/source_scan.py`): half the docstrings in this repository name
 the very thing being looked for, and a sentence explaining a rule is not a violation of it.
@@ -197,12 +197,9 @@ def test_the_path_scan_sees_both_ways_a_path_is_built_here() -> None:
 
 def test_no_declaration_carries_a_sellers_field() -> None:
     """The other half of FR-017a, over the files rather than over the modules: a status and an
-    available quantity are not declared anywhere, so nothing can read one.
-
-    The available quantity is the pointed case. It decays in hours and contradicts itself in
-    the shipped observation -- 11 of the 24 active issues publish `0` while being offered, and
-    a *completed* issue publishes 14 473 -- so taking it as an inventory cap would be a guess
-    dressed as a constraint. That no cap is enforced is a recorded gap, not an oversight.
+    available quantity are not declared anywhere, so nothing can read one. Why the quantity in
+    particular is not declared is measured by the test below; that no inventory cap is enforced
+    in consequence is a recorded gap rather than an oversight.
     """
     data = REPO_ROOT / "data"
     files = [*sorted((data / "instruments").glob("*.toml")), data / "access/instruments.toml"]
@@ -219,7 +216,8 @@ def test_no_declaration_carries_a_sellers_field() -> None:
 
 
 def test_the_shipped_observation_is_why_the_available_quantity_governs_nothing() -> None:
-    """Measured rather than asserted, because the argument above rests on the measurement."""
+    """The field decays in hours and is not self-consistent, so taking it as an inventory cap
+    would be a guess dressed as a constraint -- measured here rather than argued in prose."""
     bonds = obs.seller_bonds()
     active = [bonds[isin] for isin in obs.active_isins()]
     assert sum(1 for bond in active if bond["available_quantity"] == 0) > len(active) // 3

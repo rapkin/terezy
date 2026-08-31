@@ -62,16 +62,9 @@ the `primary-sourced-schedule-may-be-verified` future entry and is deliberately 
 
 ## Two collisions this plan resolves
 
-**FR-014 is superseded by feature 015, which landed on 2026-08-30 — after this specification
-was written.** FR-014 forbids declaring the sell quotation, and states its own condition:
-*"Nothing in this engine prices a disposal before the end of a schedule, so a declared sell
-price would be read by nothing."* 015 landed `EarlyExit`, `InstrumentAccess.resale_price` and
-`[access.resale_price]`; the condition is gone. The repository's own landed data says so in
-`data/scenarios/early_exit/owner-001.toml`: *"The day feature 016 declares a seller's quote,
-this is what says the quote may be used for a date nobody has quoted."* So the sell quotation
-**is** declared, on the access record, and 015 FR-031 closes with `part = "access"` — the
-existing home, no eighteenth member of `TupleRefused`. FR-014's *other* half survives intact
-and is FR-015: the spread is not the round trip and is never presented as one.
+**FR-014 is superseded by feature 015**, which landed after this specification was written and
+removed the condition FR-014 states for itself. The argument and what it narrows are
+[research.md](./research.md) D7.
 
 **FR-027a is this feature's to apply**, because 015 landed first.
 `data/instruments/enumerated_out_of_order.toml` loses its `ovdp` group label and keeps
@@ -111,9 +104,11 @@ than the 24; why `covers_from` is the placement date; why `published_in_order` i
 all 24; where the minimum ticket came from and what its word «приблизно» costs; and why the
 reconciliation is computed against the depository's schedule rather than the seller's.
 
-## No new formula
+## No new formula, and one corrected claim
 
-`docs/METHODOLOGY.md` is unchanged, and FR-028 requires the landing change to say so. The
-internal rate of return in the reconciliation is a **check on a transcription**, not a figure
-the engine emits: it is computed in the test module, reaches no result record, and no
-declaration rests on it.
+FR-028 expected `docs/METHODOLOGY.md` to be unchanged and it is not, in one place that is not a
+formula: §0 told a reader that **every** shipped instrument is synthetic, which 24 real
+declarations make false. Correcting it is FR-028's own requirement rather than an exception to
+the prediction. No formula is added, and the internal rate of return in the reconciliation is
+not one: it is a **check on a transcription**, computed in the test module, reaching no result
+record and carrying no declaration.

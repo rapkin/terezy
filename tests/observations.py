@@ -1,10 +1,9 @@
 """The two observation files, read once.
 
 Feature 016 declares an issue from **two** sources and the whole of it turns on keeping them
-apart: the National Bank's depository has the terms, Inzhur has the price. Three test modules
-need both, and a reader in each would be one fact in three places -- so the readers live here
-and nothing else does. No module here interprets: the reconciliation, the disagreement check
-and the transcription check each state their own reading of what these return.
+apart: the National Bank's depository has the terms, Inzhur has the price. Several modules need
+both, and a reader in each would be one fact in several places -- so the readers live here and
+nothing else does. Nothing here interprets: each caller states its own reading.
 """
 
 from __future__ import annotations

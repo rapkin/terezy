@@ -1,14 +1,13 @@
 """Every declared payment, against the issuer's own record. Row by row, all 24.
 
-016 SC-002 to SC-006 and SC-009. The transcription is where a real declaration can go wrong
-silently: 158 payment rows, and one wrong digit produces a schedule that loads, projects and
-reports a plausible yield. So this compares the whole of every declaration against the
-observation it was transcribed from, rather than sampling.
+016 SC-002 to SC-006 and SC-009. The transcription is where a real declaration goes wrong
+silently: one wrong digit in a payment row produces a schedule that loads, projects and reports
+a plausible yield. So this compares the whole of every declaration against the observation it
+was transcribed from, rather than sampling.
 
 **Against the register, never against the seller.** The seller publishes the same schedules
-with every date one day early on fifteen of the 24, one date wrong on a sixteenth, and one
-principal repayment out of order. Which of the two a declaration matches is the whole
-question, and `test_two_sources_disagree.py` is where the disagreement itself lives.
+with dates of its own, and which of the two a declaration matches is the whole question.
+`test_two_sources_disagree.py` is where the disagreement itself lives.
 """
 
 from __future__ import annotations
