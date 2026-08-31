@@ -168,17 +168,23 @@ class TestANonPositiveQuantity:
 
 
 class TestTheHorizon:
-    """A window that cannot contain the whole schedule is refused, never truncated."""
+    """A window that ends before maturity **sells** the position at its end (015 FR-029).
 
-    def test_a_horizon_ending_before_maturity_is_refused_not_truncated(self) -> None:
-        # A truncated schedule would omit the principal, so the yield computed from it
-        # would be a large loss rather than a partial answer -- wrong rather than
-        # incomplete. An implicit liquidation at the horizon is the other option and the
-        # spec forbids it: nobody asked to sell.
+    A truncated schedule is still refused -- it would omit the principal, so the yield computed
+    from it would be a large loss rather than a partial answer. What changed is the remedy: the
+    money can be withdrawn at a spread, so what is missing is the price and not the window.
+    """
+
+    def test_a_horizon_ending_before_maturity_wants_a_resale_price(self) -> None:
         outcome = _project(horizon=synthetic.horizon(end=date(2027, 6, 1)))
         assert isinstance(outcome, InconsistentTerms)
         assert outcome.first_term == "horizon.end"
-        assert "hold-to-maturity" in outcome.reason
+        assert outcome.second_term == "access.resale_price"
+
+    def test_no_price_is_inferred_from_the_face_value_or_the_purchase(self) -> None:
+        outcome = _project(horizon=synthetic.horizon(end=date(2027, 6, 1)))
+        assert isinstance(outcome, InconsistentTerms)
+        assert "spread of zero" in outcome.reason
 
     def test_a_horizon_ending_on_the_unadjusted_maturity_is_still_short(self) -> None:
         # 2028-01-15 is a Saturday and the declared rule pays on the Monday, so a

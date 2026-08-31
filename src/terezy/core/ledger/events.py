@@ -108,14 +108,14 @@ class EventKind(Enum):
     """
 
     REDEMPTION = "redemption"
-    """Cash in against fund units surrendered -- a disposal, like a bond's repayment.
+    """Cash in against units surrendered at somebody's quoted price -- a disposal.
 
-    Deliberately not spelled ``PRINCIPAL_REPAYMENT``. A
-    fund buying its certificates back is not repaying principal: there is no principal,
-    the price is NAV less whatever discount the terms allow, and the amount can be less
-    than what was put in. The kind reaches the canonical form and every rendered
-    schedule, so a name that described the wrong contract would be a wrong label on a
-    real figure.
+    Deliberately not spelled ``PRINCIPAL_REPAYMENT``. Neither a fund buying its certificates
+    back nor a bond sold before maturity is repaying principal: there is no principal, the
+    price is NAV less whatever discount the terms allow or the resale price the access
+    declaration quotes, and the amount can be less than what was put in. The kind reaches the
+    canonical form and every rendered schedule, so a name that described the wrong contract
+    would be a wrong label on a real figure.
     """
 
     TAX_PAYMENT = "tax_payment"
@@ -182,6 +182,19 @@ class CausationKind(Enum):
     neither an instrument term nor a tax rule -- so without this member such a fee would have to
     claim a cause it does not have, which is worse than a widened set: a traceable figure pointing
     at the wrong declaration.
+    """
+
+    ACCESS_TERM = "access_term"
+    """A declared term of how an instrument is *reached*: the price one unit sells for.
+
+    It passes the test the class docstring sets rather than widening it: an access declaration
+    is a kind of declaration resolvable back to the file it was read from, and ``id`` names the
+    instrument whose entry declares the price. It cannot become the catch-all the docstring
+    forbids, because exactly one function produces it (``core.instruments.acquire.early_sale``)
+    and that function is reached only from a declared resale price.
+
+    The alternative was worse than a fifth member: an early sale claiming an *instrument* term
+    as its cause would send a reader to the bond's own file, which declares no such price.
     """
 
     SEED_DECLARATION = "seed_declaration"

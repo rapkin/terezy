@@ -23,7 +23,9 @@ from terezy.core.ledger.events import CausationKind, CausationRef, Event, EventK
 from terezy.core.primitives import money
 
 if TYPE_CHECKING:  # pragma: no cover -- the records live beside the interface
-    from terezy.core.instruments.interface import Holding, InstrumentDeclaration
+    from datetime import date
+
+    from terezy.core.instruments.interface import EarlyExit, Holding, InstrumentDeclaration
 
 
 def lot_id_for(holding: Holding) -> str:
@@ -60,6 +62,54 @@ def purchase(declaration: InstrumentDeclaration, holding: Holding, *, sequence: 
         ),
         lot_ref=LotRef(instrument_id=declaration.id, lot_id=lot_id_for(holding)),
         quantity=holding.quantity,
+        allocated_to=None,
+        capacity_pool=None,
+    )
+
+
+def early_sale(
+    declaration: InstrumentDeclaration,
+    holding: Holding,
+    quantity: float,
+    *,
+    on: date,
+    exit_: EarlyExit,
+    sequence: int,
+) -> Event:
+    """Cash in, units out, at the declared resale price, on the horizon's last day.
+
+    015 FR-029. A **disposal**, like a redemption at maturity and unlike a cash receipt: it
+    consumes basis and realises a gain or a loss, and the loss is what a spread *is*. Reporting
+    it as cash would make the cost of the early exit invisible in the ledger.
+
+    ``EventKind.REDEMPTION`` rather than ``PRINCIPAL_REPAYMENT``, on the reasoning that kind's
+    own docstring already gives for a fund buyback: nothing is repaying principal here, the
+    price is somebody's quote, and the amount can be less than what was put in.
+
+    The cause is the **access** declaration, because that is where the price is declared. An
+    instrument term would be a traceable figure pointing at the wrong file, which
+    ``CausationKind`` names as worse than a widened set.
+
+    ``quantity`` is passed rather than read off the holding, for the reason a redemption's is:
+    under a reinvesting policy the units sold are the purchase plus every reinvestment.
+    """
+    return Event(
+        sequence=sequence,
+        occurred_on=on,
+        kind=EventKind.REDEMPTION,
+        amount=money.scale_sourced(exit_.price_per_unit, quantity, exit_.price_per_unit.provenance),
+        owner_id=holding.owner_id,
+        caused_by=CausationRef(
+            kind=CausationKind.ACCESS_TERM,
+            id=f"{declaration.id}:resale_price",
+            detail=(
+                f"sale of {quantity!r} units at the declared resale price on "
+                f"{on.isoformat()}, the last day of the horizon, under the assumption "
+                f"{exit_.assumption.id!r}"
+            ),
+        ),
+        lot_ref=LotRef(instrument_id=declaration.id, lot_id=None),
+        quantity=quantity,
         allocated_to=None,
         capacity_pool=None,
     )

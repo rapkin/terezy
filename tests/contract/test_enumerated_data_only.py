@@ -50,6 +50,7 @@ name         = "Synthetic enumerated issue C — TEST FIXTURE, payments invented
 class        = "enumerated_schedule"
 currency     = "UAH"
 is_synthetic = true
+groups       = []
 
 [instrument.schedule]
 face_value   = 500.0

@@ -270,6 +270,7 @@ def _declaration() -> FundDeclaration:
         },
         fee_context=(),
         verification_tasks=(),
+        groups=(),
     )
 
 

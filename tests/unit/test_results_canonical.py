@@ -23,6 +23,9 @@ from __future__ import annotations
 import dataclasses
 from dataclasses import replace
 from datetime import date
+from typing import Any, Final, cast
+
+import pytest
 
 from terezy.core.ledger import canonical as ledger_canonical
 from terezy.core.ledger import engine
@@ -31,6 +34,7 @@ from terezy.core.ledger.events import CausationKind, CausationRef, Event, EventK
 from terezy.core.ledger.lots import Disposal, Lot, Position
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives import staleness
+from terezy.core.primitives.conventions import AmountsAsDeclared
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.periods import Window
@@ -38,7 +42,15 @@ from terezy.core.primitives.provenance import SourceRef
 from terezy.core.primitives.rates import NominalRate, RealBasis, RealRate, RealTermsUnavailable
 from terezy.core.results import canonical, hurdle, project
 from terezy.core.results.project import Projection
+from terezy.core.results.tuple import InstrumentPlan, Tuple
 from terezy.core.routes import capacity
+from terezy.core.routes.path import (
+    EXIT_BY_IDENTITY,
+    FROM_THE_DECLARATION,
+    ComposedExit,
+    ExitChoice,
+    FundingPath,
+)
 from terezy.data import manifest
 from tests import synthetic
 
@@ -249,6 +261,12 @@ CANONICAL_SHAPE_BY_ENCODING = {
         "|(i,(s,s),(s,s),(s,s),(s,s),s,i)"
         "|(s,s,((s,s,s,s,s,s),(s,s,s,s,s,s)),(s,s),(s),(s))"
         "|(s,s,((s,s),(s,s)),(s,s),(s),(s))"
+        "|((s,s),(s,s),(s,s),(s,s),(s,s,s))"
+        "|((s,s),(s,s),(s,s),(s),(s))"
+        "|(s,s,s)"
+        "|(s,s,s,(s,s),(s,s,s))"
+        "|(s,s,s,(),(s,s,s,s,(i,i,i),s,s))"
+        "|(s,s,s,(s),(s,s,s,s,(i,i,i),s,s))"
     ),
 }
 """One recorded shape fingerprint per encoding tag, and exactly one entry: the current tag.
@@ -260,13 +278,23 @@ canonical tuple gained ``capacity_pool`` and the capacity accumulator while the 
 ``terezy-canonical-v1``, so pre-002 digests silently disagreed under an unchanged name.
 This pinned pair is what makes the next such change a red test naming the remedy.
 
-⚙ **One fingerprint per component of ``of_projection``, joined by pipes, since feature 007.**
-The pin used to cover ``ledger.canonical.of_result`` alone, which left the schedule, the
-charges and the figures outside it -- three quarters of what a digest is taken over, including
-the part 007 changed. A shape change in a schedule row would have moved every recorded digest
-under an unchanged tag, which is the feature-002 failure this test exists to prevent. The
-figures appear twice: with both real figures populated, and with both unavailable, because the
-two branches have different shapes and pinning one leaves the other free to move.
+**One fingerprint per form covered and per branch of it**, joined by pipes, on the rules
+:func:`_projection_fingerprint` states -- and its own body is the list of them.
+
+Covering ``ledger.canonical.of_result`` alone would leave the rest of what a digest is taken
+over free to change shape under an unchanged tag, which is the feature-002 failure this test
+exists to prevent.
+
+**Every form ``of_answer`` reaches above the candidate key is uncovered, as of 2026-08-31**,
+starting with its own arity. A shape change in any of them moves the recorded answer digest
+while this test stays green; what closes it is a hand-built representative per form, because a
+real answer's shape carries how many candidates that run enumerated and a fixture's count would
+then leak into the tag. They are not listed here: a list of what a module contains is a sentence
+that stops being true without anything failing.
+
+Widening the pin is not itself a scheme change, and the candidate key is the case to check
+before assuming otherwise: no digest recorded under ``v3`` covered it, because neither
+``of_tuple_key`` nor ``of_answer`` existed when the tag was set.
 
 **v3** (2026-08): feature 007 filled the reserved real-terms slot. Where a v2 projection
 rendered one ``(tag, value)`` pair, a v3 one renders two figures, each carrying its basis,
@@ -365,23 +393,33 @@ def _representative_state() -> engine.LedgerState:
 
 
 def _projection_fingerprint() -> str:
-    """The shape of **every** component of ``of_projection``, joined, plus the absent branch.
-
-    ⚙ **Widened after review.** The first version fingerprinted the ledger alone, which left
-    the schedule, the charges and the figures outside the pin -- three quarters of what a
-    digest is taken over, including the part feature 007 changed. A shape change in a schedule
-    row would then have moved every recorded digest under an unchanged encoding tag, which is
-    precisely the feature-002 failure this test was written to prevent.
+    """One shape per form covered, joined -- and per branch, where a form has branches.
 
     ``of_projection`` is not called directly because building a representative ``Projection``
     means running a projection, and a fixture's coupon count would then leak into the
-    fingerprint. Each component is fingerprinted from a hand-built representative instead --
-    one of everything, no ``None`` where a value could sit -- and the join is the same
-    structure ``of_projection`` assembles.
+    fingerprint. Each form is fingerprinted from a representative that carries one of
+    everything and no more, hand-built where the fixture cannot supply one. **What is covered
+    is the list below, not a sentence about it**: the join is read straight off the code, and
+    this docstring says only the rules the list obeys.
 
-    The real slot appears **twice**: once with both figures populated and once with both
-    unavailable. The two branches have different shapes -- six elements against two -- and
-    pinning only the populated one would leave a change to the refusal's rendering invisible.
+    **A form whose branches render to different arities is pinned once per branch.** Pinning one
+    would leave the others free to move: the hurdle's real slot and the purchase premium each
+    have an absent form shorter than the answered one, and the way out is rendered by two
+    different expressions -- the segments of a chain, or the instruction's own name.
+
+    Not *every* absence, because not every absence changes an arity. A field rendered as a bare
+    ``None`` becomes ``0`` in the slot it already occupied, so the record is as long without it
+    as with it -- and the representative fills every such slot, for
+    :func:`_representative_state`'s reason. An absence rendered as its own **tag** is the other
+    case and is pinned: an unstated tax class is ``("undeclared",)`` against ``("class", id)``.
+
+    Inside the chain branch the arity follows the **segment count**, and a ``DeclaredExit`` is
+    not pinned because its one segment renders to the arity the instruction's entry already
+    covers. What the chain branch contributes is a chain of two, and the empty one -- the arity
+    only :data:`EXIT_BY_IDENTITY` produces, since a composed chain declares at least two.
+
+    The candidate key is here because no projection carries it and an answer digest carries it
+    wherever it names a candidate.
     """
     result = _projection(verified=False)
     # Two schedule rows and one charge, never the whole run: the fixture pays four coupons and
@@ -396,7 +434,60 @@ def _projection_fingerprint() -> str:
             _shape(canonical.of_charge(result.charges[0])),
             _shape(canonical.of_hurdle_rate(_representative_hurdle())),
             _shape(canonical.of_hurdle_rate(_unavailable_hurdle())),
+            _shape(canonical.of_at_purchase(_governed(result.at_purchase))),
+            _shape(canonical.of_at_purchase(_ungoverned(result.at_purchase))),
+            _shape(canonical.of_conventions(AmountsAsDeclared(day_count="act/365"))),
+            _shape(canonical.of_tuple_key(_a_key(A_CHAIN, synthetic.A_BOND_PLAN))),
+            _shape(canonical.of_tuple_key(_a_key(EXIT_BY_IDENTITY, synthetic.A_FUND_PLAN))),
+            _shape(canonical.of_tuple_key(_a_key(FROM_THE_DECLARATION, synthetic.A_FUND_PLAN))),
         )
+    )
+
+
+def _governed(value: project.PurchasePremium) -> project.PurchasePremium:
+    """The same premium with both of its tagged slots **answered**.
+
+    The projection is run without assessment rules, so the figure it produces already carries
+    ``TreatmentUnstated`` -- and pinning that alone would leave the longer, answered rendering
+    outside the fingerprint, which is the shape a change is most likely to land in. Populated
+    and absent are pinned as a pair, which is this module's own rule and what
+    :func:`_unavailable_hurdle` is the other instance of.
+    """
+    return dataclasses.replace(
+        value,
+        tax_class_id="a_class",
+        governed_by=project.GovernedBy(
+            category_id="a_category",
+            treatment="nets",
+            reason="TEST FIXTURE -- one answered treatment, for the shape alone.",
+        ),
+    )
+
+
+def _ungoverned(value: project.PurchasePremium) -> project.PurchasePremium:
+    """The same premium with neither a declared class nor a treatment."""
+    return dataclasses.replace(
+        value,
+        tax_class_id=None,
+        governed_by=project.TreatmentUnstated(reason="TEST FIXTURE -- no rules were given"),
+    )
+
+
+A_CHAIN: Final = ComposedExit(segments=("out_a", "out_b"))
+
+
+def _a_key(way_out: ExitChoice, plan: InstrumentPlan) -> Tuple:
+    """One candidate key, for the fingerprint's sake alone.
+
+    Both kinds of run plan, because they render to different shapes; the ways out for the
+    reason :func:`_projection_fingerprint` gives.
+    """
+    return Tuple(
+        instrument_id="an_instrument",
+        stream_id="a_stream",
+        route_in=FundingPath(destination_id="a_venue", stream_id="a_stream", route_id="a_route"),
+        exit_terms=plan,
+        route_out=way_out,
     )
 
 
@@ -426,6 +517,10 @@ def _representative_hurdle() -> hurdle.HurdleRate:
     )
 
 
+PROJECTION_COMPONENTS: Final = 5
+"""How many things ``of_projection`` renders, so that a sixth cannot arrive unremarked."""
+
+
 def test_the_encoding_tag_moves_whenever_the_canonical_shape_does() -> None:
     """The reproducibility contract, made mechanical (manifest.py's own promise).
 
@@ -435,10 +530,17 @@ def test_the_encoding_tag_moves_whenever_the_canonical_shape_does() -> None:
     which is exactly what a golden digest flipping under an unchanged tag looks like. This
     test fails on either half changing alone, and its message says which line to move.
 
-    ⚙ **Both halves of the projection's form are fingerprinted** (007). Pinning the ledger
-    alone left every figure outside the pin, which is where 007's own change landed.
+    Every component is fingerprinted, not the ledger alone: pinning the ledger would leave every
+    figure a digest also covers free to change shape under an unchanged tag. The **number** of
+    components is asserted separately, because a fingerprint per component says nothing about a
+    sixth being added -- which is the shape of the feature-002 failure itself.
     """
     fingerprint = _projection_fingerprint()
+    assert len(canonical.of_projection(_projection(verified=False))) == PROJECTION_COMPONENTS, (
+        "of_projection gained or lost a component. Every recorded digest now covers a different "
+        "tuple under an unchanged scheme name: bump manifest.ENCODING, fingerprint the new "
+        "component in _projection_fingerprint, and record the count here."
+    )
     assert manifest.ENCODING in CANONICAL_SHAPE_BY_ENCODING, (
         f"manifest.ENCODING is {manifest.ENCODING!r}, which this test does not know. "
         "Record the tag with its shape fingerprint in CANONICAL_SHAPE_BY_ENCODING -- and "
@@ -452,3 +554,38 @@ def test_the_encoding_tag_moves_whenever_the_canonical_shape_does() -> None:
         f"new shape here.\nrecorded: {CANONICAL_SHAPE_BY_ENCODING[manifest.ENCODING]}\n"
         f"actual:   {fingerprint}"
     )
+
+
+class TestAPlansCanonicalForm:
+    """Every field a plan declares reaches its form, or two declarable plans share one digest.
+
+    ``DuplicateRunPlan`` refuses only plans that are **equal**, so a question may state two for
+    one instrument and 010 fixes the plan as one of the five terms of a candidate's key. A field
+    left out of the rendering is that key collapsing one level down: two candidates, one digest,
+    one printed line -- which is exactly what rendering the record's type name used to do.
+
+    Written as a perturbation per field rather than as a list of names, because a list is prose
+    about a record and goes stale the moment somebody adds a seventh field.
+    """
+
+    @pytest.mark.parametrize("plan", [synthetic.A_BOND_PLAN, synthetic.A_FUND_PLAN])
+    def test_changing_any_declared_field_changes_the_form(self, plan: InstrumentPlan) -> None:
+        for field in dataclasses.fields(plan):
+            other: Any = replace(
+                cast(Any, plan), **{field.name: synthetic.PLAN_FIELD_ALTERNATIVES[field.name]}
+            )
+            assert canonical.of_plan(other) != canonical.of_plan(plan), field.name
+
+    def test_the_two_kinds_of_plan_never_share_a_form(self) -> None:
+        assert canonical.of_plan(synthetic.A_BOND_PLAN) != canonical.of_plan(synthetic.A_FUND_PLAN)
+
+    def test_the_rationale_is_excluded_like_every_other_reason_string(self) -> None:
+        """Deliberate, and the same rule the module docstring states: a digest that moved when
+        somebody improved a sentence would fail C4 on a wording edit."""
+        point = synthetic.A_FUND_PLAN.yield_point
+        assert point is not None
+        reworded = replace(
+            synthetic.A_FUND_PLAN,
+            yield_point=replace(point, rationale="the same choice, said better"),
+        )
+        assert canonical.of_plan(reworded) == canonical.of_plan(synthetic.A_FUND_PLAN)

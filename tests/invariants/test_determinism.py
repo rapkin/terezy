@@ -64,12 +64,16 @@ from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import SourceRef
 from terezy.core.primitives.tolerance import TOLERANCE, is_close
 from terezy.core.results import canonical, project
+from terezy.core.results.coverage import IMPLICIT_REGIME_ID
 from terezy.core.results.project import Projection
 from terezy.data import manifest
 from terezy.data.declarations import resolver
 from tests import declared_terms, synthetic
 
 pytestmark = pytest.mark.invariant
+
+AS_OF = date(2026, 8, 30)
+"""When the question is asked. Decides staleness and nothing else."""
 
 UAH = Currency.UAH
 
@@ -203,8 +207,8 @@ class TestTwoRunsOnIdenticalInputsAgree:
         )
         horizon = DateRange(start=purchased_on, end=date(2028, 1, 31))
         assumptions = synthetic.assumptions()
-        first = ops.events(declaration, holding, horizon, assumptions)
-        second = ops.events(declaration, holding, horizon, assumptions)
+        first = ops.events(declaration, holding, horizon, assumptions, None)
+        second = ops.events(declaration, holding, horizon, assumptions, None)
         assert isinstance(first, tuple)
         assert isinstance(second, tuple)
         assert _digest_of_stream(first) == _digest_of_stream(second)
@@ -423,6 +427,8 @@ class TestVerifyingASourceDoesNotMoveTheDigest:
             horizon=horizon,
             assumptions=assumptions,
             seed=None,
+            as_of=AS_OF,
+            regime_id=IMPLICIT_REGIME_ID,
         )
         assert record.result_digest == _digest(outcome)
         assert record.unverified_sources

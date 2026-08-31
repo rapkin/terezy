@@ -16,6 +16,9 @@ class        = "fixed_income"
 currency     = "UAH"
 is_synthetic = true
 
+# groups: a DECLARED label, never inferred (015 FR-007a). Here: a government bond.
+groups       = ["ovdp"]
+
 [instrument.terms]
 face_value        = 1000.0
 coupon_rate_pct   = 15.5

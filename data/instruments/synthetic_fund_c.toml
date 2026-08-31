@@ -19,6 +19,10 @@ name                 = "Synthetic fund C — TEST FIXTURE, terms invented, diffe
 class                = "collective_investment_fund"
 unit_currency        = "UAH"
 is_assumption_driven = true
+
+# groups: a DECLARED label, never inferred (015 FR-007a). Here: a fund whose own header says its whole purpose is that it is DIFFERENT from
+#          the Inzhur funds.
+groups       = []
 day_count            = "act/365"
 terminates_on        = "2031-12-31"
 subscription_cutoff  = "2028-06-30"

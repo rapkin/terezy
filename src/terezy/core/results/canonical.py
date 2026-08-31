@@ -23,10 +23,30 @@ from __future__ import annotations
 
 from typing import assert_never
 
+from terezy.core.instruments.interface import Assumptions
 from terezy.core.ledger import canonical as ledger_canonical
 from terezy.core.ledger.canonical import Canonical
 from terezy.core.primitives.conventions import AmountsAsDeclared, ConventionsApplied
-from terezy.core.primitives.rates import RealRate, RealTermsUnavailable
+from terezy.core.primitives.rates import NominalRate, RealRate, RealTermsUnavailable
+from terezy.core.results.answer import (
+    Answer,
+    CoveredByThePlan,
+    DeclaredSubject,
+    HorizonSection,
+    PartialExitWouldBeNeeded,
+    ReserveVerdict,
+    ResolvedSubject,
+    SectionOutcome,
+    StatedExclusion,
+    SubjectNotAssessed,
+    SubjectReached,
+    SubjectStanding,
+    SubjectUndeclared,
+    SubjectUnreached,
+    UndeclaredSubject,
+)
+from terezy.core.results.candidates import CandidateSurvey
+from terezy.core.results.fund import FundAssumptions
 from terezy.core.results.hurdle import HurdleRate, RealTerms
 from terezy.core.results.project import (
     GovernedBy,
@@ -35,6 +55,14 @@ from terezy.core.results.project import (
     TreatmentUnstated,
 )
 from terezy.core.results.schedule import CashFlowRow, CashFlowSchedule
+from terezy.core.results.tuple import (
+    BenchmarkUnavailable,
+    Comparison,
+    InstrumentPlan,
+    Tuple,
+    TupleOutcome,
+)
+from terezy.core.routes.path import ExitChain, candidate_id, exit_segments_of
 from terezy.core.tax.interface import TaxCharge
 
 
@@ -223,3 +251,192 @@ def of_projection(value: Projection) -> tuple[Canonical, ...]:
         of_hurdle_rate(value.hurdle),
         of_at_purchase(value.at_purchase),
     )
+
+
+# ---------------------------------------------------------------------------
+# 015-the-question: the canonical form of a whole answer
+# ---------------------------------------------------------------------------
+#
+# The same rule, restated where it is easiest to break: **provenance is excluded, and so are
+# the reason strings**. A reason is 010's and 014's prose about a refusal, and a digest that
+# moved when somebody improved a sentence would fail C4 on a wording edit -- while the *kind*
+# of refusal, which is what the answer says, is rendered and cannot change silently.
+
+
+def of_plan(value: InstrumentPlan) -> tuple[Canonical, ...]:
+    """How a holding is run, by the choices that were stated rather than by the record's name.
+
+    The kind alone would make two plans one term: a question may state several plans for one
+    instrument -- ``DuplicateRunPlan`` refuses only plans that are *equal* -- and two candidates
+    differing in the exit date alone are two options whose figures differ. Rendering the type
+    name would give them one canonical form and one printed line, which is the collision the
+    five-term key exists to prevent.
+
+    The rationale strings are excluded for the reason every reason string here is: a digest that
+    moved when somebody improved a sentence fails C4 on a wording edit.
+    """
+    match value:
+        case Assumptions():
+            return (type(value).__name__, value.consumption_method, value.coupon_policy)
+        case FundAssumptions():
+            point, rate = value.yield_point, value.exchange_rate
+            return (
+                type(value).__name__,
+                value.consumption_method,
+                value.liquidity_mode,
+                value.buyback,
+                None if value.exit_on is None else ledger_canonical.of_date(value.exit_on),
+                None if point is None else ledger_canonical.of_number(point.rate),
+                None if rate is None else ledger_canonical.of_number(rate.uah_per_unit),
+            )
+        case _:
+            assert_never(value)
+
+
+def of_tuple_key(value: Tuple) -> tuple[Canonical, ...]:
+    """One candidate's five declared terms, and nothing else (014 FR-023).
+
+    ``FROM_THE_DECLARATION`` renders under its **own** name. It is an instruction to read the
+    inbound route's partner, not a way out, and rendering it as ``EXIT_BY_IDENTITY`` -- *the
+    destination is already spendable* -- would put one member of the union under another's name
+    in the record a digest is taken over.
+    """
+    way_out = value.route_out
+    return (
+        value.instrument_id,
+        value.stream_id,
+        candidate_id(value.route_in),
+        exit_segments_of(way_out) if isinstance(way_out, ExitChain) else (way_out.value,),
+        of_plan(value.exit_terms),
+    )
+
+
+def of_outcome(value: TupleOutcome) -> tuple[Canonical, ...]:
+    """One evaluated candidate: its key, what reaches, and the rate it is ranked by."""
+    rate = value.implied_rate
+    return (
+        of_tuple_key(value.key),
+        ledger_canonical.of_money(value.reaches),
+        ledger_canonical.of_number(rate.value) if isinstance(rate, NominalRate) else None,
+        ledger_canonical.of_date(value.span.start),
+        ledger_canonical.of_date(value.span.end),
+        None if value.sold_early is None else ledger_canonical.of_date(value.sold_early.on),
+    )
+
+
+def of_section(value: HorizonSection) -> tuple[Canonical, ...]:
+    """One horizon and everything it reported, in the order the record holds it."""
+    return (
+        ledger_canonical.of_date(value.horizon.start),
+        ledger_canonical.of_date(value.horizon.end),
+        _of_section_outcome(value.outcome),
+        tuple(_of_standing(item) for item in value.standings),
+        tuple(
+            (of_tuple_key(item.key), ledger_canonical.of_date(item.arrives_on))
+            for item in value.arrives_after_horizon
+        ),
+        tuple(_of_verdict(item) for item in value.reserves),
+        tuple(_of_exclusion(item) for item in value.excludes),
+    )
+
+
+def of_answer(value: Answer) -> tuple[Canonical, ...]:
+    """A whole answer: what was asked, what each section made of it, and what it excludes."""
+    return (
+        value.question.id,
+        ledger_canonical.of_date(value.as_of),
+        value.question.regime_id,
+        value.question.continuation.value,
+        tuple(_of_subject(item) for item in value.subjects),
+        tuple(of_section(item) for item in value.sections),
+        tuple(_of_exclusion(item) for item in value.excludes),
+    )
+
+
+def _of_subject(value: ResolvedSubject) -> tuple[Canonical, ...]:
+    match value:
+        case DeclaredSubject():
+            return (value.named, "group" if value.is_group else "id", value.ids)
+        case UndeclaredSubject():
+            return (value.named, "undeclared")
+        case _:  # pragma: no cover -- mypy proves this unreachable
+            assert_never(value)
+
+
+def _of_standing(value: SubjectStanding) -> tuple[Canonical, ...]:
+    match value:
+        case SubjectReached():
+            return ("reached", value.named, value.ids, value.with_candidates)
+        case SubjectUnreached():
+            return ("unreached", value.named, value.ids)
+        case SubjectUndeclared():
+            return ("undeclared", value.named)
+        case SubjectNotAssessed():
+            return ("not_assessed", value.named, value.ids)
+        case _:  # pragma: no cover -- mypy proves this unreachable
+            assert_never(value)
+
+
+def _of_verdict(value: ReserveVerdict) -> tuple[Canonical, ...]:
+    match value:
+        case CoveredByThePlan():
+            return (
+                "covered",
+                of_tuple_key(value.key),
+                ledger_canonical.of_money(value.reserve.amount),
+                ledger_canonical.of_date(value.reserve.by),
+                ledger_canonical.of_date(value.covered_on),
+            )
+        case PartialExitWouldBeNeeded():
+            return (
+                "partial_exit",
+                of_tuple_key(value.key),
+                ledger_canonical.of_money(value.reserve.amount),
+                ledger_canonical.of_date(value.reserve.by),
+                ledger_canonical.of_money(value.short_by),
+            )
+        case _:  # pragma: no cover -- mypy proves this unreachable
+            assert_never(value)
+
+
+def _of_exclusion(value: StatedExclusion) -> tuple[Canonical, ...]:
+    return (
+        value.what.value,
+        None if value.applies_to is None else of_tuple_key(value.applies_to),
+        value.supplied_by,
+        None if value.direction is None else value.direction.value,
+    )
+
+
+def _of_section_outcome(value: SectionOutcome) -> tuple[Canonical, ...]:
+    """The survey's whole shape, or the **kind** of refusal that replaced it.
+
+    A refusal renders as its type name and nothing else. Which of them fired is what the answer
+    says; the words it says it in are 010's and 014's, and a digest that moved when one was
+    improved would fail on a wording edit with no honest way to fix it.
+    """
+    if not isinstance(value, CandidateSurvey):
+        return (type(value).__name__,)
+    comparison = value.comparison
+    return (
+        type(value).__name__,
+        tuple((of_tuple_key(item.key), item.plan_position) for item in value.enumerated.candidates),
+        tuple(
+            (item.instrument_id, item.stream_id, type(item.why).__name__)
+            for item in value.enumerated.no_candidate
+        ),
+        type(comparison).__name__,
+        tuple(of_outcome(item) for item in _evaluated_of(comparison)),
+        tuple((of_tuple_key(item.key), type(item.refusal).__name__) for item in comparison.refused),
+    )
+
+
+def _evaluated_of(value: Comparison | BenchmarkUnavailable) -> tuple[TupleOutcome, ...]:
+    """Both cases carry the outcomes, and a benchmark that refused does not cost the rest."""
+    match value:
+        case Comparison():
+            return (*value.ranked, *value.not_comparable)
+        case BenchmarkUnavailable():
+            return (*value.scored, *value.not_comparable)
+        case _:  # pragma: no cover -- mypy proves this unreachable
+            assert_never(value)

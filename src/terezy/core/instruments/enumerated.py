@@ -45,11 +45,13 @@ from terezy.core.instruments.interface import (
 )
 from terezy.core.ledger.events import CausationKind, CausationRef, Event, LotRef
 from terezy.core.primitives import money
+from terezy.core.primitives.tolerance import is_close
 
 if TYPE_CHECKING:  # pragma: no cover -- import-time cycle avoidance
     from terezy.core.instruments.interface import (
         Assumptions,
         DateRange,
+        EarlyExit,
         Holding,
         InstrumentConstraints,
         InstrumentDeclaration,
@@ -62,6 +64,7 @@ def events(
     holding: Holding,
     horizon: DateRange,
     assumptions: Assumptions,
+    early_exit: EarlyExit | None,
 ) -> tuple[Event, ...] | InstrumentFailure:
     """The purchase and every declared payment falling after it, scaled by units held.
 
@@ -70,24 +73,60 @@ def events(
     of the payment straddling the purchase, and there could not be: the two facts it needs
     -- the start of the accrual period and the basis interest accrues on within it -- are
     not declared and may not be inferred (FR-017).
+
+    A window ending before the last declared payment closes the position **by selling it** on
+    its last day at the declared resale price (015 FR-029), and the units sold are whatever the
+    payments inside the window have not already retired.
     """
     terms = terms_of.narrowed(declaration, EnumeratedTerms)
     receivable = terms_of.payments_after(terms.payments, holding.purchased_on)
     problem = _check_feasible(
-        declaration, terms, receivable, holding=holding, horizon=horizon, assumptions=assumptions
+        declaration,
+        terms,
+        receivable,
+        holding=holding,
+        horizon=horizon,
+        assumptions=assumptions,
+        early_exit=early_exit,
     )
     if problem is not None:
         return problem
 
     principal = terms_of.principal_returned(terms, bought_on=holding.purchased_on)
+    inside = tuple(payment for payment in receivable if payment.on <= horizon.end)
     stream = [acquire.purchase(declaration, holding, sequence=1)]
-    for payment in receivable:
+    retired = 0.0
+    for payment in inside:
         stream.append(
             _payment(
                 declaration,
                 holding,
                 payment,
                 principal=principal.amount,
+                sequence=len(stream) + 1,
+            )
+        )
+        retired += _units_retired(payment, principal=principal.amount, quantity=holding.quantity)
+    # **The residual decides whether there is a sale, not the payment count.** A schedule can
+    # repay its principal inside the window and pay a final coupon after it -- the shipped
+    # `enumerated_out_of_order` does exactly that -- and there is then nothing left to sell.
+    # Striking a sale for zero units would emit a disposal of nothing, which the ledger refuses
+    # by *raising*: an uncaught exception where a coupon the holding simply never receives is
+    # the honest answer.
+    #
+    # **Compared to the project tolerance, not to zero.** A repayment retires
+    # `quantity * amount / principal` units, and several of them do not sum to the holding
+    # exactly: a residual of 1.8e-15 is a schedule that ran to term, and selling it would ask
+    # the ledger for units no lot holds.
+    residual = holding.quantity - retired
+    if early_exit is not None and not is_close(residual, 0.0) and residual > 0.0:
+        stream.append(
+            acquire.early_sale(
+                declaration,
+                holding,
+                residual,
+                on=horizon.end,
+                exit_=early_exit,
                 sequence=len(stream) + 1,
             )
         )
@@ -112,6 +151,7 @@ def _check_feasible(
     holding: Holding,
     horizon: DateRange,
     assumptions: Assumptions,
+    early_exit: EarlyExit | None,
 ) -> InstrumentFailure | None:
     """Every reason this holding cannot be projected, in the order a reader would ask.
 
@@ -135,7 +175,7 @@ def _check_feasible(
     problem = _receivable_problem(declaration, terms, receivable, holding)
     if problem is not None:
         return problem
-    return _horizon_problem(declaration, receivable, holding, horizon)
+    return _horizon_problem(declaration, receivable, holding, horizon, early_exit)
 
 
 def _purchase_problem(
@@ -226,8 +266,14 @@ def _horizon_problem(
     receivable: tuple[ScheduledPayment, ...],
     holding: Holding,
     horizon: DateRange,
+    early_exit: EarlyExit | None,
 ) -> InstrumentFailure | None:
-    """Whether the window asked about contains the purchase and reaches the last payment."""
+    """Whether the window contains the purchase, and can close the position at its end.
+
+    **Both sides of the purchase.** A window that starts after it measures a return from a day
+    nothing was bought on; one that *ends* before it would sell something never bought, and the
+    hold-to-maturity refusal used to cover that case implicitly (015 FR-029).
+    """
     if horizon.end < horizon.start:
         return InconsistentTerms(
             first_term="horizon.start",
@@ -248,17 +294,30 @@ def _horizon_problem(
                 "measure returns from a date on which nothing was bought."
             ),
         )
-    last = max(payment.on for payment in receivable)
-    if horizon.end < last:
+    if horizon.end < holding.purchased_on:
         return InconsistentTerms(
             first_term="horizon.end",
-            second_term="instrument.schedule.payment",
+            second_term="holding.purchased_on",
+            reason=(
+                f"the horizon ends {horizon.end.isoformat()}, before the purchase of "
+                f"{declaration.id!r} settles on {holding.purchased_on.isoformat()} -- the way "
+                "in's declared latency runs past the window. Selling at the end of a window "
+                "that closes before the money arrives is a sale of something never bought, "
+                "which is not a figure."
+            ),
+        )
+    last = max(payment.on for payment in receivable)
+    if horizon.end < last and early_exit is None:
+        return InconsistentTerms(
+            first_term="horizon.end",
+            second_term="access.resale_price",
             reason=(
                 f"the horizon ends {horizon.end.isoformat()} but the last payment this "
-                f"holding of {declaration.id!r} receives falls on {last.isoformat()}. A truncated "
-                "schedule is not reported: the yield of a holding whose principal was cut "
-                "off would be wrong rather than partial, and an implicit liquidation at "
-                "the horizon would be a cash flow nobody declared."
+                f"holding of {declaration.id!r} receives falls on {last.isoformat()}, so the "
+                "position is sold at the end of the window -- and no declaration says what it "
+                "sells for. The price is not inferred: the face value is what the schedule "
+                "repays and the purchase quote is what a unit cost, and striking a sale at "
+                "either would report a spread of zero that nobody observed."
             ),
         )
     return None

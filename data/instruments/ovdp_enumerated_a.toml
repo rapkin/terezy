@@ -25,6 +25,9 @@ class        = "enumerated_schedule"
 currency     = "UAH"
 is_synthetic = true
 
+# groups: a DECLARED label, never inferred (015 FR-007a). Here: a government bond, declared as its payments.
+groups       = ["ovdp"]
+
 [instrument.schedule]
 face_value   = 1000.0
 covers_from  = "2026-02-01"

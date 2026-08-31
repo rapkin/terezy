@@ -108,6 +108,7 @@ def test_every_count_travels_with_the_whole_question() -> None:
         "plans",
         "bound",
         "regime_id",
+        "subjects",
     }
     for name in stated:
         assert getattr(enumerated.question, name) is not None, name

@@ -40,6 +40,7 @@ from terezy.core.results.tuple import (
     BenchmarkUnavailable,
     CannotSpanHorizon,
     Comparison,
+    DeclarationMissing,
     InstrumentDemandsCash,
     InstrumentRefused,
     NoExitRouteDeclared,
@@ -228,15 +229,22 @@ class TestASeriesWithNoRateToFind:
 
 
 class TestAnInstrumentThatCannotSpanTheHorizon:
-    """FR-025: infeasible for this comparison, with the binding term named."""
+    """FR-025: infeasible for this comparison, with the binding term named.
 
-    def test_a_bond_maturing_after_the_horizon_ends(self) -> None:
+    015 FR-029 narrowed which instruments reach it. A **bond** outliving its horizon is now
+    sold at the end of it, so what it reports is the missing resale price; a **fund** held with
+    no exit requested owes no buyback before it terminates, so there is nothing to sell into and
+    the arm is still right for it.
+    """
+
+    def test_a_bond_maturing_after_the_horizon_ends_wants_a_resale_price(self) -> None:
         refusal = _evaluated(
             fixtures.shipped(),
             horizon=fixtures.DateRange(start=fixtures.ISSUE_DATE, end=date(2027, 6, 30)),
         )
-        assert isinstance(refusal, CannotSpanHorizon), refusal
-        assert refusal.binding_term == "instrument.maturity_date"
+        assert isinstance(refusal, DeclarationMissing), refusal
+        assert refusal.part == "access"
+        assert "access.resale_price" in refusal.what
 
     def test_a_fund_still_open_at_the_horizon(self) -> None:
         # A holding is never sold because a projection ran out of dates. There is no round

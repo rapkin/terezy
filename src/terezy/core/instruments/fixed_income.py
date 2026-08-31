@@ -96,6 +96,7 @@ if TYPE_CHECKING:  # pragma: no cover -- import-time cycle avoidance
     from terezy.core.instruments.interface import (
         Assumptions,
         DateRange,
+        EarlyExit,
         Holding,
         InstrumentConstraints,
         InstrumentDeclaration,
@@ -114,8 +115,14 @@ def events(
     holding: Holding,
     horizon: DateRange,
     assumptions: Assumptions,
+    early_exit: EarlyExit | None,
 ) -> tuple[Event, ...] | InstrumentFailure:
-    """The purchase, every coupon, any reinvestment and the redemption, as a stream.
+    """The purchase, every coupon, any reinvestment, and the way the position closes.
+
+    It closes at maturity where the horizon reaches it, and at ``horizon.end`` -- sold at the
+    declared resale price -- where it does not (015 FR-029). Handed no price for a window that
+    ends first, the refusal names ``access.resale_price`` rather than the maturity date: the
+    money **can** be withdrawn at a spread, so what is missing is the spread and not the window.
 
     ``assumptions`` is read for exactly one thing: the declared coupon policy (FR-019).
     Everything else in the schedule is contractual -- the bond's terms and the owner's
@@ -136,36 +143,56 @@ def events(
 
     terms = terms_of.narrowed(declaration, BondTerms)
     adjust = conventions.business_day_rule(terms.business_day_rule)
-    stream = [acquire.purchase(declaration, holding, sequence=1)]
-    units = holding.quantity
-    for period in coupon_plan(declaration, holding, assumptions):
-        stream.append(_coupon(declaration, holding, period, sequence=len(stream) + 1))
-        if period.reinvestment.units_bought > 0.0:
-            stream.append(_reinvestment(declaration, holding, period, sequence=len(stream) + 1))
-        units += period.reinvestment.units_bought
-    stream.append(_redemption(declaration, holding, units, sequence=len(stream) + 1))
-
-    final_payment = max(event.occurred_on for event in stream)
-    if horizon.end < final_payment:
+    redeems_on = adjust(terms.maturity_date)
+    sells_early = horizon.end < redeems_on
+    if sells_early and early_exit is None:
         return InconsistentTerms(
             first_term="horizon.end",
-            second_term="instrument.maturity_date",
+            second_term="access.resale_price",
             reason=(
-                f"the horizon ends {horizon.end.isoformat()} but the last payment of "
-                f"{declaration.id!r} falls on {final_payment.isoformat()}"
+                f"the horizon ends {horizon.end.isoformat()} but {declaration.id!r} redeems "
+                f"{redeems_on.isoformat()}"
                 + (
                     f" (the declared maturity {terms.maturity_date.isoformat()} moved by "
                     f"the {terms.business_day_rule!r} rule)"
-                    if adjust(terms.maturity_date) != terms.maturity_date
+                    if redeems_on != terms.maturity_date
                     else ""
                 )
-                + ". This feature projects hold-to-maturity only, so it will not report "
-                "a truncated schedule: the yield of a bond whose principal was cut off "
-                "would be wrong rather than partial. Extend the horizon, or wait for the "
-                "feature that values an open position at the horizon -- an implicit "
-                "liquidation is not available, because nobody asked for one."
+                + ", so the position is sold at the end of the window -- and no declaration "
+                "says what it sells for. The price is not inferred: face value is what the "
+                "issue repays and the purchase quote is what a unit costs, and striking a "
+                "sale at either would report a spread of zero that nobody observed."
             ),
         )
+    stream = [acquire.purchase(declaration, holding, sequence=1)]
+    units = holding.quantity
+    for period in coupon_plan(declaration, holding, assumptions):
+        if sells_early and period.paid_on > horizon.end:
+            # Ascending by payment date, so the first one past the window ends the schedule:
+            # a later period's reinvestment must not add units the sale then surrenders.
+            break
+        stream.append(_coupon(declaration, holding, period, sequence=len(stream) + 1))
+        # **A coupon paid on the day of the sale is not reinvested**, for the reason `_decide`
+        # already refuses to reinvest the last one: the units it bought would be surrendered
+        # the same day, at the resale price rather than at what they cost, and the round trip
+        # nobody made would post a gain and a disposal-gain charge on it.
+        if period.reinvestment.units_bought > 0.0 and not (
+            sells_early and period.paid_on >= horizon.end
+        ):
+            stream.append(_reinvestment(declaration, holding, period, sequence=len(stream) + 1))
+            units += period.reinvestment.units_bought
+    stream.append(
+        acquire.early_sale(
+            declaration,
+            holding,
+            units,
+            on=horizon.end,
+            exit_=early_exit,
+            sequence=len(stream) + 1,
+        )
+        if sells_early and early_exit is not None
+        else _redemption(declaration, holding, units, sequence=len(stream) + 1)
+    )
     return tuple(stream)
 
 
@@ -305,11 +332,13 @@ def _purchase_problem(
 
 
 def _horizon_problem(holding: Holding, horizon: DateRange) -> InstrumentFailure | None:
-    """Whether the window asked about can contain the purchase at all.
+    """Whether the window asked about can contain the purchase at all -- on **both** sides.
 
-    Whether it also reaches the final payment is checked in :func:`events`, once the
-    adjusted payment dates are known -- a business-day rule can move the last flow past a
-    horizon that looked long enough against the unadjusted maturity.
+    Whether it also reaches the final payment is checked in :func:`events`, once the adjusted
+    payment dates are known: a business-day rule can move the last flow past a horizon that
+    looked long enough against the unadjusted maturity, and under 015 FR-029 that is a sale
+    rather than a refusal. What is *not* a sale is a window that closes before the money
+    arrives, which the hold-to-maturity refusal used to cover implicitly.
     """
     if horizon.end < horizon.start:
         return InconsistentTerms(
@@ -329,6 +358,17 @@ def _horizon_problem(holding: Holding, horizon: DateRange) -> InstrumentFailure 
                 f"{holding.purchased_on.isoformat()}. The purchase is the origin of every "
                 "time measurement in the result, so a horizon that excludes it would "
                 "measure returns from a date on which nothing was bought."
+            ),
+        )
+    if horizon.end < holding.purchased_on:
+        return InconsistentTerms(
+            first_term="horizon.end",
+            second_term="holding.purchased_on",
+            reason=(
+                f"the horizon ends {horizon.end.isoformat()}, before the purchase settles on "
+                f"{holding.purchased_on.isoformat()} -- the way in's declared latency runs "
+                "past the window. Under 015 FR-029 the position is sold at the window's end, "
+                "and a sale of something never bought is not a figure."
             ),
         )
     return None

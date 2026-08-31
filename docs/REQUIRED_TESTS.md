@@ -134,7 +134,7 @@ Compliance tests for Principle II. May not be skipped without an amendment.
 |---|---|---|
 | H1 | Adding a new instrument, route, tax class and jurisdiction **in data only** — no engine edit — runs the full pipeline and appears in the comparison. **Closed by feature 010**, and it did not pass for free: nothing declared *where* an instrument is bought, so the join could anchor neither of its two positional seams (there is a third, the funding stream, and it has no venue in it). That gap was closed as a declaration kind (`data/access/`, `docs/METHODOLOGY.md` §29.6) rather than as a special case inside the join — FR-023's rule, and the reason this row is worth having. **A second FR-023 gap is recorded and not closed** (2026-08-24): the `[jurisdiction]` table's `id`, `name` and `base_currency` are validated at load and then discarded — no registry is keyed by jurisdiction and `TaxClass` carries no jurisdiction field — so that kind is exercised as a *container* for its classes rather than as a term. The row is claimed on the other three; the test module states the gap and what closing it would take. H1 also funds from the shipped `salary_uah`, so it says nothing about the income-stream term. | `[x]` `tests/contract/test_h1_data_only.py` |
 | H2 | A malformed or unknown field in any data file fails loudly at load time, naming file and field; it never silently defaults. | `[x]` `tests/contract/test_declaration_loading.py` |
-| H3 | Every data file's values round-trip through the run manifest, so a result traces to the exact configuration that produced it. | `[ ]` |
+| H3 | Every data file's values round-trip through the run manifest, so a result traces to the exact configuration that produced it. **Closed by feature 015**, on two tests together: one digest moves per edited file, and a walk over the resolved declarations' own `Path` fields proves the manifest names *every* file the run read rather than a sample of them. That walk is an independent computation from the one that builds the references, and it is how four families the first pass recorded nothing for — channels, venues, observation kinds and scenarios — were found. The question's own file is an input reference like any other, which is what makes an answer traceable to the sentence that asked for it. | `[x]` `tests/unit/test_answer_manifest.py`, `tests/unit/test_manifest_records_inputs.py` |
 | H4 | Architecture boundaries hold: the core imports no I/O, no network, no framework, and nothing from a layer above it. | `[x]` `tests/contract/test_architecture_boundaries.py` |
 
 ## I. The decision layer
@@ -322,6 +322,20 @@ rows it presses on without closing:
 | **E5** | Pressed on at the level of a *set* rather than a figure: a candidate set carries the union of the marks on every declaration enumeration itself read — the legs of every route it put in a candidate, and the venue quote of every access entry it considered — so a set never looks cleaner than the registry behind it (`tests/unit/test_candidate_marks.py`, walked over both families rather than sampled). **The per-drop half is open and recorded**: 010's refusal records carry no provenance, so which unverified value caused a particular drop is not traceable from the drop. That is the `provenance-on-a-refusal` future entry. |
 
 ---
+
+**015-the-question** closes **H3** — see its row. It closes **no row in Section I**: I1 is 014's
+and is closed at the tuple level, and I2 to I7 are objectives, constraints, the naive-baseline
+allocation, stability, indifference bands and *sometimes best* versus *never bad* — every one of
+them a thing this feature is forbidden to invent. Section I therefore stands at **1 of 7**.
+
+Four rows it presses on without closing:
+
+| Row | How, and why the box does not move |
+|---|---|
+| **I4** | *Naive baselines always scored and always shown.* The row's own subject — a cash instrument — is the one candidate the engine cannot represent: bought at the venue the money already sits at, it reaches `compose`'s *money that is already where it was wanted* and stands in the no-candidate column until the recorded `zero-hop-way-in` gap is closed. This feature makes that visible by name in the answer and does not close it, and the cash instrument's own terms are an owner verification task rather than an implementer's to invent. |
+| **J4** | Touched on 014's terms, unchanged. What moved is the *other* horizon interaction: a bond outliving its window is now sold at the window's end rather than refused, so `CannotSpanHorizon` narrows to the fund arm. A declared `lock_up_months` term compared against a horizon still does not exist. |
+| **E5** | Pressed on one layer up: an answer carries the union of the marks on every declaration behind every figure it reports, walked over the whole result rather than sampled (`tests/contract/test_the_answer_says_only_what_it_computed.py`). Every figure computed through the early-exit belief names it by id. The per-drop half is still open — 010's refusal records carry no provenance — and is still the `provenance-on-a-refusal` future entry. |
+| **B12** | The shape again, one layer above 014's: an answer adds no feasibility rule, no objective and no scoring weight. Its two own rules withhold and report rather than prune, and a scan asserts its modules derive no rate and read none from a series. |
 
 **018-nbu-rate-series** closes **no** row and moves two notes. It lands data, not behaviour:
 the National Bank's published UAH/USD rate for every calendar day from 2019-12-28, plus the

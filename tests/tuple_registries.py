@@ -363,14 +363,24 @@ def fx_route(route_id: str, *, origin: str, destination: str, channel: str = "p2
 
 
 def access(
-    instrument_id: str, *, bought_at: str, proceeds_to: str, price: float | None
+    instrument_id: str,
+    *,
+    bought_at: str,
+    proceeds_to: str,
+    price: float | None,
+    resale_price: float | None = None,
 ) -> InstrumentAccess:
-    """One access declaration, built in code. A test fixture."""
+    """One access declaration, built in code. A test fixture.
+
+    ``resale_price`` defaults to absent because that is what every shipped declaration says, and
+    it is the state 015 FR-031 refuses by name. A battery about an early exit states its own.
+    """
     return InstrumentAccess(
         instrument_id=instrument_id,
         bought_at=bought_at,
         proceeds_to=proceeds_to,
         quote=None if price is None else quote(price),
+        resale_price=None if resale_price is None else quote(resale_price),
         risk_class="test_fixture",
     )
 

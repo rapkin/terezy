@@ -117,7 +117,7 @@ def enumerate_candidates(
     later pass -- dominance, an objective, a stability check -- would then be computed over a
     silently partial universe, which is a false optimum with an impeccable audit trail.
     """
-    considered = _considered(registries)
+    considered = _considered(registries, question.subjects)
     walked = _walk(considered, registries=registries, routes=routes, question=question)
     if not isinstance(walked, tuple):
         return walked
@@ -285,16 +285,19 @@ def drop_tally(refused: Sequence[RefusedTuple]) -> tuple[DropGroup, ...]:
 # ---------------------------------------------------------------------------
 
 
-def _considered(registries: Registries) -> tuple[tuple[str, InstrumentAccess, Currency], ...]:
-    """Every instrument that is both declared and reachable-in-principle, with its currency.
+def _considered(
+    registries: Registries, subjects: frozenset[str]
+) -> tuple[tuple[str, InstrumentAccess, Currency], ...]:
+    """Every named instrument that is both declared and reachable-in-principle, with its currency.
 
     An access entry naming an instrument nobody declared is skipped rather than refused here:
     FR-015 says such a tuple is never constructed and appears in **no** population, and the data
     layer already refuses the declaration at load, so this is the same rule stated where a
-    hand-built registry can also reach it.
+    hand-built registry can also reach it. A **named** id the registry does not declare is
+    skipped for the same reason and reported by name one layer up (015 FR-008, FR-009).
     """
     entries = []
-    for instrument_id in sorted(registries.access):
+    for instrument_id in sorted(registries.access.keys() & subjects):
         fund = registries.funds.get(instrument_id)
         bond = registries.instruments.get(instrument_id)
         declared = fund if fund is not None else bond

@@ -109,6 +109,19 @@ class InstrumentAccess:
     sized from an arriving amount without inventing a price.
     """
 
+    resale_price: VenueQuote | None
+    """What one unit sells for at :attr:`bought_at`, or ``None`` where nobody has quoted one.
+
+    015 FR-031. A horizon means the money comes out at its end, so an instrument whose terms
+    run past it is sold there -- and the price is a **declaration**, never a face value, a NAV
+    or the purchase price standing in for one. ``None`` is the shipped state and refuses by
+    name through ``DeclarationMissing(part="access")``: it is what makes the refusal the real
+    behaviour rather than a guard that reads as protection.
+
+    Distinct from :attr:`quote`, which is what a unit **costs**. The gap between the two is the
+    loss an early exit takes, and one field holding both would make it zero by construction.
+    """
+
     risk_class: str
     """The declared risk class of this option. **Carried, never scored** (research.md D9).
 

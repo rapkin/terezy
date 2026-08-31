@@ -154,8 +154,13 @@ def question(
     horizon: DateRange = HORIZON,
     as_of: date = AS_OF,
     regime_id: str = IMPLICIT_REGIME_ID,
+    subjects: frozenset[str] | None = None,
 ) -> Question:
-    """The shipped question: an amount per stream, one horizon, one plan per instrument."""
+    """The shipped question: an amount per stream, one horizon, one plan per instrument.
+
+    ``subjects`` defaults to every instrument with an access entry, which is what 014's suites
+    meant before 015 narrowed the walk (FR-008). A battery about the narrowing states its own.
+    """
     return Question(
         amounts=dict(amounts)
         if amounts is not None
@@ -166,6 +171,7 @@ def question(
         plans=dict(plans) if plans is not None else one_plan_each(registries),
         bound=bound if bound is not None else declarations().composition.bound,
         regime_id=regime_id,
+        subjects=frozenset(registries.access) if subjects is None else subjects,
     )
 
 

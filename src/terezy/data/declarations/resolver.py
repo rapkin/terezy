@@ -54,6 +54,7 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.inflation.series import CpiSeries, InflationAssumption
     from terezy.core.instruments.access import InstrumentAccess
     from terezy.core.instruments.fund import FundDeclaration
+    from terezy.core.instruments.groups import InstrumentGroup
     from terezy.core.instruments.interface import InstrumentDeclaration
     from terezy.core.ledger.seeds import SeedLot
     from terezy.core.primitives.currency import Currency
@@ -63,9 +64,11 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.results.composed import SegmentBound
     from terezy.core.results.coverage import SpendableEndpoint
     from terezy.core.results.goal import Goal
+    from terezy.core.results.question import Question
     from terezy.core.routes.channels import FxChannel
     from terezy.core.routes.legs import Leg, Route
     from terezy.core.routes.venues import Venue
+    from terezy.core.scenarios.early_exit import SpreadHolds
     from terezy.core.scenarios.regimes import Regime
     from terezy.core.streams.streams import IncomeStream
     from terezy.core.tax import year as tax_year
@@ -79,6 +82,14 @@ INSTRUMENTS_DIR = "instruments"
 
 TAX_DIR = "tax"
 """Where jurisdiction rule packs live under a data root."""
+
+GROUPS_FILE = "groups.toml"
+"""The group vocabulary, at the data root beside ``venues.toml`` (015 FR-007a).
+
+Curated and root-level rather than per-owner, because the *label* is on the curated instrument
+declaration: a per-owner vocabulary would make an instrument file fail to load because somebody
+else's directory was absent.
+"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,6 +131,16 @@ class Declarations:
     fund_files: Mapping[str, Path]
     """Which file declared each fund."""
 
+    groups: Mapping[str, InstrumentGroup]
+    """The declared group vocabulary by id (015 FR-007a).
+
+    Every ``groups`` label on every instrument and fund above resolves against this; that is
+    checked before this record exists.
+    """
+
+    groups_file: Path
+    """Which file declared the vocabulary, so the manifest can name it after the TOML is gone."""
+
 
 def _refuse_duplicate(
     kind: str,
@@ -148,6 +169,7 @@ def resolve(
     *,
     instrument_files: Sequence[Path],
     tax_files: Sequence[Path],
+    groups_file: Path,
 ) -> Declarations:
     """Parse every file, then check what only the whole set can show.
 
@@ -214,18 +236,21 @@ def resolve(
         instrument_files_by_id[declaration.id] = path
         files_by_id[declaration.id] = path
 
+    groups = {group.id: group for group in loader.groups_from_file(groups_file)}
     for identifier, declaration in instruments.items():
         _check_references(
             declaration,
             tax_classes,
             path=instrument_files_by_id[identifier],
         )
+        _check_groups(declaration.groups, groups, path=instrument_files_by_id[identifier])
     for identifier, declared_fund in funds.items():
         _check_fund_references(
             declared_fund,
             tax_classes,
             path=fund_files_by_id[identifier],
         )
+        _check_groups(declared_fund.groups, groups, path=fund_files_by_id[identifier])
 
     return Declarations(
         instruments=instruments,
@@ -234,7 +259,34 @@ def resolve(
         tax_class_files=tax_class_files,
         funds=funds,
         fund_files=fund_files_by_id,
+        groups=groups,
+        groups_file=groups_file,
     )
+
+
+def _check_groups(
+    labels: Sequence[str],
+    groups: Mapping[str, InstrumentGroup],
+    *,
+    path: Path,
+) -> None:
+    """Every group an instrument declares itself into must be declared (015 FR-007a).
+
+    Refused rather than reported, and the asymmetry with a *question* naming an unknown word is
+    deliberate: an instrument is curated data and its typos are defects, while a question is the
+    owner's own vocabulary and its gaps are the answer's content (FR-009).
+    """
+    for position, label in enumerate(labels):
+        if label not in groups:
+            raise DeclarationError(
+                path,
+                f"{loader.INSTRUMENT_TABLE}.groups[{position}]",
+                f"names the group {label!r}, which {GROUPS_FILE} does not declare. Membership "
+                "is a declared label and never a rule, so there is nothing to infer it from: a "
+                "label nobody declared would silently put this instrument in no group, and a "
+                "question asking about that group would answer without it.",
+                f"declare {label!r} in {GROUPS_FILE}, or name one of {sorted(groups)}",
+            )
 
 
 def _check_references(
@@ -311,7 +363,17 @@ def from_data_root(root: Path) -> Declarations:
                 "mistyped path.",
                 "check the data root, or add a declaration file",
             )
-    return resolve(instrument_files=instruments, tax_files=tax)
+    groups_file = root / GROUPS_FILE
+    if not groups_file.is_file():
+        raise DeclarationError(
+            groups_file,
+            "",
+            "does not exist, so no group an instrument declares itself into can be resolved. "
+            "It is reported rather than read as an empty vocabulary: every label would then be "
+            "unresolvable and every question naming a group would answer about nothing.",
+            "check the data root, or declare the groups the instruments name",
+        )
+    return resolve(instrument_files=instruments, tax_files=tax, groups_file=groups_file)
 
 
 # ---------------------------------------------------------------------------
@@ -2476,6 +2538,9 @@ class TupleDeclarations:
     access_files: Mapping[str, Path]
     """Which file declared each entry, so a later failure can still name it."""
 
+    early_exit_file: Path
+    """Which file declared the spread-holds belief every early-exit figure rests on."""
+
     registries: Registries
     """The same set again, flattened into the record the pure core takes.
 
@@ -2536,9 +2601,57 @@ def _check_access(
         _check_venue(venue_id, currency, venues, path=path, field_path=f"{prefix}.{field}")
     if entry.quote is not None:
         _check_kind(entry.quote.kind, kinds, path=path, field_path=f"{prefix}.price.kind")
+    if entry.resale_price is not None:
+        _check_kind(
+            entry.resale_price.kind, kinds, path=path, field_path=f"{prefix}.resale_price.kind"
+        )
     _check_access_price(
         entry, currency=currency, self_priced=self_priced, path=path, field_prefix=prefix
     )
+    _check_resale_price(
+        entry, currency=currency, self_priced=self_priced, path=path, field_prefix=prefix
+    )
+
+
+def _check_resale_price(
+    entry: InstrumentAccess,
+    *,
+    currency: Currency,
+    self_priced: bool,
+    path: Path,
+    field_prefix: str,
+) -> None:
+    """A resale price is optional, is in the instrument's currency, and is not a fund's.
+
+    Optional because its absence is the shipped state and the thing 015 FR-031 refuses by name:
+    an early exit that cannot be struck reports a missing declaration rather than a figure. A
+    **fund** may not declare one, on the purchase quote's reasoning: it prices its own exit from
+    its declared NAV and its declared exit discount, and a second price in a second file is one
+    fact in two places.
+    """
+    quote = entry.resale_price
+    if quote is None:
+        return
+    if self_priced:
+        raise DeclarationError(
+            path,
+            f"{field_prefix}.resale_price",
+            f"quotes a resale price for {entry.instrument_id!r}, which declares its own net "
+            "asset value and its own exit discount. The quote is refused rather than preferred "
+            "or ignored: an exit priced in two files is one fact in two places, and the day "
+            "either moved the figure would rest on whichever the code happened to read.",
+            "delete the [access.resale_price] table; the fund's own terms price its exit",
+        )
+    if quote.price.currency is not currency:
+        raise DeclarationError(
+            path,
+            f"{field_prefix}.resale_price.currency",
+            f"quotes a resale price for {entry.instrument_id!r} in {quote.price.currency.value}, "
+            f"and that instrument is declared in {currency.value}. The two are refused rather "
+            "than converted: there is no rate here, and inventing one would strike every early "
+            "exit of this instrument at a sum nobody declared.",
+            f"quote the resale price in {currency.value}, or correct the instrument's currency",
+        )
 
 
 def _check_access_price(
@@ -2621,6 +2734,59 @@ def _resolved_access(
     return access, declaring
 
 
+EARLY_EXIT_DIR = "scenarios/early_exit"
+"""Where the owner's early-exit belief lives, as a subdirectory of the scenarios directory.
+
+Nested for ``INFLATION_ASSUMPTION_DIR``'s reason: ``scenarios/*.toml`` is globbed and validated
+as scenario documents, and ``glob`` does not recurse.
+"""
+
+
+def _resolved_early_exit(
+    root: Path, streams: Mapping[str, IncomeStream]
+) -> tuple[SpreadHolds, Path]:
+    """The one declared belief under a data root, checked against the streams' owner.
+
+    An absent directory is an **error**, not an absent belief (015 FR-032): reading it as
+    *the spread holds* would put a figure in the model that no file declares, which is the one
+    thing the declaration exists to prevent.
+    """
+    declared = sorted((root / EARLY_EXIT_DIR).glob("*.toml"))
+    if not declared:
+        raise DeclarationError(
+            root / EARLY_EXIT_DIR,
+            "",
+            f"contains no *.toml declarations. An empty {EARLY_EXIT_DIR} directory is reported "
+            "rather than read as 'the observed spread holds': a horizon means the money comes "
+            "out at its end, so every comparison can reach an early exit, and a run that "
+            "assumed the belief would report a figure no file declares.",
+            "check the data root, or declare what an early exit is struck under",
+        )
+    if len(declared) > 1:
+        raise DeclarationError(
+            root / EARLY_EXIT_DIR,
+            "",
+            f"holds {len(declared)} early-exit beliefs "
+            f"({', '.join(path.name for path in declared)}), and this engine resolves one. Two "
+            "beliefs cannot both be in force, and taking either would be choosing one by file "
+            "order.",
+            "keep one file per data root until multi-owner support lands",
+        )
+    owner_id, assumption = loader.early_exit_from_file(declared[0])
+    owners = sorted({stream.owner_id for stream in streams.values()})
+    if owner_id not in owners:
+        raise DeclarationError(
+            declared[0],
+            f"{loader.EARLY_EXIT_TABLE}.owner_id",
+            f"declares owner {owner_id!r}, but the income streams this belief is resolved with "
+            f"belong to {owners}. What a person is willing to assume about a future price is "
+            "his own statement, and one owner's belief marking another's figures would put two "
+            "people's assumptions in one comparison.",
+            f"name one of {owners}, or resolve this belief against that owner's streams",
+        )
+    return assumption, declared[0]
+
+
 def tuple_from_data_root(
     root: Path, *, base_currency: Currency, scenario_id: str | None
 ) -> TupleDeclarations:
@@ -2649,6 +2815,7 @@ def tuple_from_data_root(
             "a mistyped path is indistinguishable from one emptied by a real gap.",
             "check the data root, or declare how each instrument is reached",
         )
+    early_exit, early_exit_file = _resolved_early_exit(root, covered.ramp.streams)
     access, declaring = _resolved_access(
         files,
         instruments=instruments.instruments,
@@ -2661,6 +2828,7 @@ def tuple_from_data_root(
         coverage=covered,
         access=access,
         access_files=declaring,
+        early_exit_file=early_exit_file,
         registries=Registries(
             instruments=instruments.instruments,
             funds=instruments.funds,
@@ -2671,6 +2839,7 @@ def tuple_from_data_root(
             streams=covered.ramp.streams,
             kinds=covered.ramp.kinds,
             spendable=covered.spendable,
+            spread_holds=early_exit,
             base_currency=covered.ramp.base_currency,
         ),
     )
@@ -3054,3 +3223,147 @@ def _check_treatment(
             "treatment, which no source in this repository supports.",
             'name a scheme whose declared_for is "stream"',
         )
+
+
+# ---------------------------------------------------------------------------
+# 015-the-question: the questions, and the bundle one verb takes
+# ---------------------------------------------------------------------------
+#
+# Three relations a per-file validator structurally cannot check, and every one of them is a
+# **typo in an artefact under review** rather than a fact about the money (015 FR-004):
+#
+# 1. an amount for a stream the registry does not declare;
+# 2. a declared stream the question states no amount for -- the case that fails *silently*
+#    today, because such a stream's pairs yield no candidate and never reach `survey`;
+# 3. an amount whose currency the named stream does not deliver.
+#
+# What is deliberately NOT checked here: whether a subject word names anything. A question is
+# the owner's own vocabulary and its gaps are the answer's content (FR-009), which is the
+# asymmetry with an instrument naming an undeclared group.
+
+QUESTIONS_DIR = "questions"
+"""Where the owner's questions live under a data root. Per-owner, beside `candidates/`."""
+
+
+@dataclass(frozen=True, slots=True)
+class AnswerDeclarations:
+    """Everything the answer verb reads: the registries, the two policies, and the questions.
+
+    ``Registries`` alone cannot carry it. The **candidate ceiling** comes from `data/candidates/`
+    and the **segment bound** from `data/composition/`, and 014's `survey` takes both as its own
+    arguments -- so a verb that could not receive them could not call it.
+    """
+
+    tuples: TupleDeclarations
+    """The registries every candidate is evaluated against, and which file declared each."""
+
+    candidates: CandidateDeclarations
+    """The segment bound and the candidate ceiling, with the coverage set behind them."""
+
+    questions: Mapping[str, Question]
+    """Every declared question by its own id."""
+
+    question_files: Mapping[str, Path]
+    """Which file declared each question, so the manifest can name it after the TOML is gone."""
+
+
+def check_question(
+    question: Question,
+    streams: Mapping[str, IncomeStream],
+    *,
+    path: Path,
+) -> None:
+    """One question against the streams it names and the streams it does not.
+
+    **Public, because a question built from flags has to go through it too** (015 FR-005). Two
+    of its four refusals are re-stated by the verb and two are not -- the owner and the amount's
+    currency -- so a caller-built record that skipped this would answer one person's question
+    from another person's money, and the refusal names the path it was declared in either way.
+
+    A question that reached here through a file is checked twice, once at load and once at the
+    verb, and that is the cost of the guarantee: the second call cannot know which it got.
+    """
+    owners = sorted({stream.owner_id for stream in streams.values()})
+    if question.owner_id not in owners:
+        raise DeclarationError(
+            path,
+            f"{loader.OWNER_TABLE}.id",
+            f"declares owner {question.owner_id!r}, but the income streams this question is "
+            f"resolved with belong to {owners}. A question is one person's, and answering it "
+            "from another person's money would put two people's facts in one comparison.",
+            f"name one of {owners}, or resolve this question against that owner's streams",
+        )
+    for stream_id, amount in question.amounts.items():
+        field = f"{loader.QUESTION_TABLE}.amount"
+        if stream_id not in streams:
+            raise DeclarationError(
+                path,
+                f"{field}.stream",
+                f"states an amount for {stream_id!r}, which no declaration under "
+                f"{STREAMS_DIR}/ declares. The money has to leave somewhere: an amount for a "
+                "stream nobody declared would be deployed by nothing and would silently "
+                "disappear from the comparison.",
+                f"name one of {sorted(streams)}, or declare that stream",
+            )
+        declared = streams[stream_id].amount.currency
+        if amount.currency is not declared:
+            raise DeclarationError(
+                path,
+                f"{field}.currency",
+                f"states {stream_id!r}'s amount in {amount.currency.value}, and that stream "
+                f"delivers {declared.value}. The two are refused rather than converted: there "
+                "is no rate here, and in an artefact under review a mismatched currency is a "
+                "typo rather than a fact about the money.",
+                f"write the amount in {declared.value}",
+            )
+    for stream_id in sorted(streams):
+        if stream_id not in question.amounts:
+            raise DeclarationError(
+                path,
+                f"{loader.QUESTION_TABLE}.amount",
+                f"states no amount for the declared stream {stream_id!r}. This is the case that "
+                "fails silently: a stream with no stated amount whose pairs yield no candidate "
+                "never reaches the comparison, so nothing raises and the answer is simply "
+                "missing a stream nobody mentioned. In a file under review an omitted amount is "
+                "a typo, not a decision to leave that money out.",
+                f"state an amount for {stream_id!r}",
+            )
+
+
+def answer_from_data_root(
+    root: Path, *, base_currency: Currency, scenario_id: str | None
+) -> AnswerDeclarations:
+    """Every declaration the answer verb reads, under one data root.
+
+    **An empty ``questions/`` directory is not an error here**, and that is a deliberate
+    narrowing: the flags path answers a question that has **no** file, and demanding some other
+    question's file to exist would make *flags are sugar over the file* false in the one place
+    the file does not exist. A question asked **by id** that nothing declares is refused where
+    it is asked -- ``api.answer._declared_question`` -- which is the place that can name the id.
+    """
+    files = sorted((root / QUESTIONS_DIR).glob("*.toml"))
+    tuples = tuple_from_data_root(root, base_currency=base_currency, scenario_id=scenario_id)
+    candidates = candidates_from_data_root(
+        root, base_currency=base_currency, scenario_id=scenario_id
+    )
+    questions: dict[str, Question] = {}
+    declaring: dict[str, Path] = {}
+    for path in files:
+        declared = loader.question_from_file(path)
+        if declared.id in questions:
+            raise _refuse_duplicate(
+                "question",
+                declared.id,
+                f"{loader.QUESTION_TABLE}.id",
+                declaring[declared.id],
+                path,
+            )
+        check_question(declared, tuples.registries.streams, path=path)
+        questions[declared.id] = declared
+        declaring[declared.id] = path
+    return AnswerDeclarations(
+        tuples=tuples,
+        candidates=candidates,
+        questions=questions,
+        question_files=declaring,
+    )

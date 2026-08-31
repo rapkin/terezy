@@ -31,6 +31,7 @@ def _events(**term_overrides: object) -> tuple[Event, ...]:
         synthetic.holding(),
         synthetic.horizon(),
         synthetic.assumptions(),
+        None,
     )
     assert isinstance(produced, tuple)
     return produced

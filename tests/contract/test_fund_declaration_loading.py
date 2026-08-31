@@ -25,6 +25,7 @@ carry the feature's design:
 
 from __future__ import annotations
 
+import shutil
 from datetime import date
 from pathlib import Path
 
@@ -190,6 +191,7 @@ class TestTheClassKeyChoosesTheLoader:
         """
         (tmp_path / "instruments").mkdir()
         (tmp_path / "tax").mkdir()
+        shutil.copy2(DATA_ROOT / "groups.toml", tmp_path / "groups.toml")
         (tmp_path / "tax" / "ua.toml").write_text(
             (DATA_ROOT / "tax" / "ua.toml").read_text(encoding="utf-8"), encoding="utf-8"
         )
@@ -464,6 +466,7 @@ class TestReferencesResolveAcrossFiles:
     def _resolved(self, tmp_path: Path, fund_text: str, *, name: str = "fund.toml") -> None:
         (tmp_path / "instruments").mkdir(exist_ok=True)
         (tmp_path / "tax").mkdir(exist_ok=True)
+        shutil.copy2(DATA_ROOT / "groups.toml", tmp_path / "groups.toml")
         (tmp_path / "instruments" / name).write_text(fund_text, encoding="utf-8")
         (tmp_path / "tax" / "ua.toml").write_text(
             (DATA_ROOT / "tax" / "ua.toml").read_text(encoding="utf-8"), encoding="utf-8"
@@ -513,6 +516,7 @@ class TestReferencesResolveAcrossFiles:
         """
         (tmp_path / "instruments").mkdir()
         (tmp_path / "tax").mkdir()
+        shutil.copy2(DATA_ROOT / "groups.toml", tmp_path / "groups.toml")
         (tmp_path / "tax" / "ua.toml").write_text(
             (DATA_ROOT / "tax" / "ua.toml").read_text(encoding="utf-8"), encoding="utf-8"
         )

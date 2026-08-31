@@ -44,6 +44,7 @@ from terezy.core.results.fund import FundAssumptions
 from terezy.core.results.ramp import ExitCostUnknown, RouteUnusable
 from terezy.core.routes.legs import RouteStatus
 from terezy.core.routes.path import Candidate, ExitChoice
+from terezy.core.scenarios.early_exit import SoldEarly
 
 InstrumentPlan = Assumptions | FundAssumptions
 """How the holding is run, and therefore **which declared way out this tuple takes**.
@@ -369,6 +370,16 @@ class TupleOutcome:
     **Never scored** (research.md D9). It is here so the fifth term of Principle VI's tuple is
     visible in every output rather than silently dropped, and scoring it would need a model
     nobody has declared.
+    """
+
+    sold_early: SoldEarly | None
+    """The sale that closed the position at the horizon's end, or ``None`` where its own terms
+    did (015 FR-029).
+
+    Typed rather than left to be read out of :attr:`rests_on`: an early-exit figure carries
+    three stated exclusions of its own (FR-033), and deciding whether to attach them by
+    searching a sentence is the string-matching 014 FR-014a already refuses for a refusal's
+    case.
     """
 
     rests_on: tuple[str, ...]
@@ -785,8 +796,13 @@ class CannotSpanHorizon:
 
     instrument_id: str
     binding_term: str
-    """The declared term that binds -- ``instrument.maturity_date``,
-    ``instrument.terminates_on``."""
+    """The declared term that binds.
+
+    ``instrument.terminates_on`` today, and only that: 015 FR-029 sells a **bond** that
+    outlives its window rather than refusing it, so what is left here is a fund still open at
+    the horizon's end with no exit requested -- there is nothing to sell into, and no date to
+    name but the fund's own.
+    """
 
     reason: str
 

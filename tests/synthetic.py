@@ -37,9 +37,10 @@ from __future__ import annotations
 
 from dataclasses import replace
 from datetime import date
-from typing import Any
+from typing import Any, Final
 
 from terezy.core.instruments import fixed_income
+from terezy.core.instruments.fund import ChosenPoint, ExchangeRateAssumption
 from terezy.core.instruments.interface import (
     Assumptions,
     BondTerms,
@@ -52,6 +53,7 @@ from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance, SourceRef
+from terezy.core.results.fund import FundAssumptions
 from terezy.core.tax.interface import TaxableEventKind, TaxClass
 from terezy.core.tax.schedule import RateEntry
 
@@ -214,6 +216,7 @@ def declaration(**overrides: Any) -> InstrumentDeclaration:
             TaxableEventKind.COUPON: EXEMPT_CLASS.id,
             TaxableEventKind.DISPOSAL_GAIN: EXEMPT_CLASS.id,
         },
+        groups=(),
     )
     return replace(base, **overrides)
 
@@ -250,3 +253,45 @@ def assumptions(**overrides: Any) -> Assumptions:
         coupon_policy=fixed_income.HOLD_CASH,
     )
     return replace(base, **overrides)
+
+
+A_BOND_PLAN: Final = Assumptions(consumption_method="fifo", coupon_policy=fixed_income.HOLD_CASH)
+"""One run plan for a bond, stating both of the choices the record admits.
+
+Here rather than in either suite because two of them walk these records field by field -- the
+digest's rendering and the CLI's -- and two copies of one base record is how the two walks come
+to be walking different things.
+"""
+
+A_FUND_PLAN: Final = FundAssumptions(
+    liquidity_mode="practice",
+    buyback="available",
+    exit_on=date(2028, 1, 17),
+    yield_point=ChosenPoint(rate=0.25, is_assumption=True, rationale="TEST FIXTURE"),
+    exchange_rate=ExchangeRateAssumption(
+        uah_per_unit=41.0, is_assumption=True, rationale="TEST FIXTURE"
+    ),
+    consumption_method="fifo",
+)
+"""One run plan for a fund, with every optional field populated exactly once.
+
+Populated rather than absent: the fuller record is the one a walk over its fields can say
+anything about, and an omitted value hides the field it sits in.
+"""
+
+PLAN_FIELD_ALTERNATIVES: Final = {
+    "consumption_method": "lifo",
+    "coupon_policy": fixed_income.REINVEST,
+    "liquidity_mode": "legal",
+    "buyback": "unavailable",
+    "exit_on": date(2029, 3, 2),
+    "yield_point": ChosenPoint(rate=0.29, is_assumption=True, rationale="TEST FIXTURE"),
+    "exchange_rate": ExchangeRateAssumption(
+        uah_per_unit=42.0, is_assumption=True, rationale="TEST FIXTURE"
+    ),
+}
+"""A different value for every field either plan record declares.
+
+A record that grows a field fails those walks on the lookup rather than passing over it, which
+is what makes each of them a check rather than a list somebody has to remember to extend.
+"""

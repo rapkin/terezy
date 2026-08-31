@@ -86,6 +86,7 @@ from terezy.core.instruments.fund import FundDeclaration
 from terezy.core.instruments.interface import (
     Assumptions,
     DateRange,
+    EarlyExit,
     Holding,
     InstrumentDeclaration,
 )
@@ -155,6 +156,8 @@ from terezy.core.routes.path import (
     exit_segments_of,
     segments_of,
 )
+from terezy.core.scenarios import early_exit
+from terezy.core.scenarios.early_exit import SpreadHolds
 from terezy.core.tax.interface import TaxClass
 
 if TYPE_CHECKING:  # pragma: no cover -- typing only
@@ -198,6 +201,15 @@ class Registries:
     streams: Mapping[str, IncomeStream]
     kinds: Mapping[str, ObservationKind]
     spendable: frozenset[SpendableEndpoint]
+
+    spread_holds: SpreadHolds
+    """The owner's declared belief that a quoted resale spread holds at a future exit date.
+
+    On the registries rather than on the question, because it is not a property of one question:
+    two questions asked on one day must not be able to disagree about how a platform's quote
+    behaves (015 FR-032). Required with no default -- an absent belief refuses at load, and a
+    default here would be the invented number the declaration exists to prevent.
+    """
 
     base_currency: Currency
     """The currency tax is assessed in (Principle VI's tax role).
@@ -398,6 +410,7 @@ def _hold(
         purchased_on=horizon.start + timedelta(days=routed.latency_days),
         horizon=horizon,
         tax_classes=registries.tax_classes,
+        registries=registries,
     )
     if not isinstance(projected, Projection | FundProjection):
         return projected
@@ -1011,6 +1024,7 @@ def _project(
     purchased_on: date,
     horizon: DateRange,
     tax_classes: Mapping[str, TaxClass],
+    registries: Registries,
 ) -> Projection | FundProjection | TupleRefused:
     """Run the holding through the call that owns its lifecycle, and read the refusals.
 
@@ -1037,6 +1051,7 @@ def _project(
                     window,
                     prepared.plan,
                     tax_classes=tax_classes,
+                    early_exit=_early_exit(prepared, registries),
                 ),
             )
         case FundDeclaration(), FundAssumptions():
@@ -1058,6 +1073,20 @@ def _project(
             )
 
 
+def _early_exit(prepared: _Prepared, registries: Registries) -> EarlyExit | None:
+    """What this holding is sold for if the horizon ends before its own terms do (015 FR-029).
+
+    ``None`` where the access declaration quotes no resale price, which is every shipped
+    declaration: the instrument then refuses naming ``access.resale_price`` and
+    :func:`_bond_outcome` turns that into a missing declaration. Nothing is inferred from the
+    purchase quote or the face value -- either would report a spread of zero.
+    """
+    quote = prepared.access.resale_price
+    if quote is None:
+        return None
+    return EarlyExit(price_per_unit=quote.price, assumption=registries.spread_holds)
+
+
 def _bond_outcome(
     prepared: _Prepared, outcome: bond_results.ProjectionOutcome
 ) -> Projection | TupleRefused:
@@ -1065,15 +1094,14 @@ def _bond_outcome(
     match outcome:
         case Projection():
             return outcome
-        case InconsistentTerms() if outcome.first_term == "horizon.end":
-            return CannotSpanHorizon(
-                instrument_id=prepared.declared.id,
-                binding_term="instrument.maturity_date",
+        case InconsistentTerms() if outcome.second_term == "access.resale_price":
+            return DeclarationMissing(
+                part="access",
+                what=f"{prepared.access.instrument_id}: access.resale_price",
                 reason=(
-                    f"{outcome.reason} This tuple is infeasible for this comparison's horizon "
-                    "rather than truncated to the span the instrument can manage: a return "
-                    "measured over a period the money could not have been withdrawn in is a "
-                    "rate for a holding nobody could have had."
+                    f"{outcome.reason} The remedy is a declaration rather than a longer "
+                    "horizon: this instrument can be sold before its terms end, and what is "
+                    "missing is the price it sells at."
                 ),
             )
         case _:
@@ -1398,6 +1426,7 @@ def _assemble(
         undeployed=undeployed,
         routes=_standing(routed, way_out_costs),
         risk_class=prepared.access.risk_class,
+        sold_early=projected.sold_early if isinstance(projected, Projection) else None,
         rests_on=_rests_on(
             prepared, projected, span=span, horizon=horizon, continuation=continuation
         ),
@@ -1783,6 +1812,8 @@ def _rests_on(
                 f"disposals consume lots {prepared.plan.consumption_method!r}; both are the "
                 "owner's stated choices and both change the answer"
             )
+            if projected.sold_early is not None:
+                stated.append(early_exit.rests_on(projected.sold_early.assumption))
         case _:  # pragma: no cover -- `_plan_for` has already refused a mismatch
             raise ValueError(
                 f"{prepared.declared.id!r} reached the assumptions summary with a projection "

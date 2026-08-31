@@ -24,6 +24,7 @@ from __future__ import annotations
 import ast
 import importlib
 import pkgutil
+import shutil
 from dataclasses import replace
 from datetime import date
 from pathlib import Path
@@ -228,6 +229,7 @@ class TestAFourthFundNeedsNoSourceChangeEither:
     def _scratch(self, tmp_path: Path) -> Path:
         (tmp_path / "instruments").mkdir()
         (tmp_path / "tax").mkdir()
+        shutil.copy2(DATA_ROOT / "groups.toml", tmp_path / "groups.toml")
         for name in ("ua.toml", "synthetic_fixture.toml"):
             (tmp_path / "tax" / name).write_text(
                 (DATA_ROOT / "tax" / name).read_text(encoding="utf-8"), encoding="utf-8"

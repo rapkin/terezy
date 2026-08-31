@@ -244,6 +244,7 @@ def _declaration() -> FundDeclaration:
         tax_classes={TaxableEventKind.DISPOSAL_GAIN: DISPOSAL_CLASS},
         fee_context=(),
         verification_tasks=(),
+        groups=(),
     )
 
 

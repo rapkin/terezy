@@ -49,6 +49,7 @@ from terezy.core.ledger.events import Event, EventKind
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance
+from terezy.core.scenarios.early_exit import SpreadHolds
 from terezy.core.tax.interface import TaxableEventKind
 
 
@@ -329,6 +330,14 @@ class InstrumentDeclaration:
     never treated as untaxed.
     """
 
+    groups: tuple[str, ...]
+    """The declared groups this instrument is in, by group id (015 FR-007a).
+
+    **Required, and empty is a statement.** A forgotten line must never read as *in no group*:
+    that is the shrink FR-008a says no downstream test can catch, because nothing knows how
+    many members the owner expected. Every id resolves against ``data/groups.toml``.
+    """
+
 
 @dataclass(frozen=True, slots=True)
 class Holding:
@@ -417,8 +426,28 @@ class Assumptions:
     """
 
 
+@dataclass(frozen=True, slots=True, kw_only=True)
+class EarlyExit:
+    """What a holding that outlives its horizon is sold for at the end of it (015 FR-029).
+
+    A horizon means the money comes out at its end, so an instrument whose own terms run past
+    it is sold rather than refused. The price is a **declaration** -- the resale quote on the
+    access record -- and the belief that it still holds on the exit date is the owner's, stated
+    beside it so every figure computed through it can name it.
+
+    ``None`` where an implementation is handed one is the shipped state and refuses by name: no
+    declaration carries a resale price today (015 FR-031).
+    """
+
+    price_per_unit: Money
+    """The declared seller's quote, carrying its own citation, in the instrument's currency."""
+
+    assumption: SpreadHolds
+    """The owner's belief that the quote holds at the exit date. Named on every figure."""
+
+
 EventsFn = Callable[
-    [InstrumentDeclaration, Holding, DateRange, Assumptions],
+    [InstrumentDeclaration, Holding, DateRange, Assumptions, EarlyExit | None],
     tuple[Event, ...] | InstrumentFailure,
 ]
 """Produce the ledger events a holding generates over a horizon, or say why not.
@@ -436,6 +465,10 @@ Obligations, all of them checkable by reading one implementation:
 * **Explicit failure.** An instrument that cannot produce events returns an
   ``InstrumentFailure`` -- a typed value, not an exception and not an empty tuple. An
   empty tuple means "legitimately no events in this horizon" and nothing else.
+* **The horizon is when the money comes out** (015 FR-029). An instrument whose own terms
+  run past ``horizon.end`` emits its flows up to that day and a sale on it, at the
+  :class:`EarlyExit` price; handed ``None`` it returns an ``InconsistentTerms`` naming
+  ``access.resale_price``, which the join turns into a missing declaration.
 """
 
 TaxClassesFn = Callable[[InstrumentDeclaration], Mapping[TaxableEventKind, str]]

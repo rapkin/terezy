@@ -57,6 +57,7 @@ from tests import declared_terms
 pytestmark = pytest.mark.contract
 
 DATA_ROOT = Path(__file__).resolve().parents[2] / "data"
+GROUPS = DATA_ROOT / "groups.toml"
 INSTRUMENT_A = DATA_ROOT / "instruments" / "ovdp_synthetic_a.toml"
 INSTRUMENT_B = DATA_ROOT / "instruments" / "ovdp_synthetic_b.toml"
 TAX_UA = DATA_ROOT / "tax" / "ua.toml"
@@ -496,7 +497,9 @@ class TestDuplicateIdentifiersAcrossFiles:
         first = _write(tmp_path, "first.toml", original)
         second = _write(tmp_path, "second.toml", original)
         with pytest.raises(DeclarationError) as raised:
-            resolver.resolve(instrument_files=(first, second), tax_files=(TAX_UA,))
+            resolver.resolve(
+                instrument_files=(first, second), tax_files=(TAX_UA,), groups_file=GROUPS
+            )
         assert raised.value.file == second
         assert str(first) in raised.value.problem, "the error must name both files"
         assert "ovdp_synthetic_a" in raised.value.problem
@@ -508,7 +511,9 @@ class TestDuplicateIdentifiersAcrossFiles:
             tmp_path, "ua_twice.toml", text + text[text.index("[[jurisdiction.tax_class]]") :]
         )
         with pytest.raises(DeclarationError) as raised:
-            resolver.resolve(instrument_files=(INSTRUMENT_A,), tax_files=(duplicated,))
+            resolver.resolve(
+                instrument_files=(INSTRUMENT_A,), tax_files=(duplicated,), groups_file=GROUPS
+            )
         assert raised.value.file == duplicated
         assert "ua_government_bond" in raised.value.problem
 
@@ -532,7 +537,7 @@ class TestUnresolvedTaxClassReference:
             ),
         )
         with pytest.raises(DeclarationError) as raised:
-            resolver.resolve(instrument_files=(broken,), tax_files=(TAX_UA,))
+            resolver.resolve(instrument_files=(broken,), tax_files=(TAX_UA,), groups_file=GROUPS)
         _assert_names_file_and_field(
             raised.value, file=broken, field_path="instrument.tax_classes.coupon"
         )
@@ -558,7 +563,9 @@ class TestUnresolvedTaxClassReference:
             ),
         )
         with pytest.raises(DeclarationError) as raised:
-            resolver.resolve(instrument_files=(INSTRUMENT_A,), tax_files=(narrowed,))
+            resolver.resolve(
+                instrument_files=(INSTRUMENT_A,), tax_files=(narrowed,), groups_file=GROUPS
+            )
         _assert_names_file_and_field(
             raised.value, file=INSTRUMENT_A, field_path="instrument.tax_classes.disposal_gain"
         )
@@ -1292,13 +1299,33 @@ class TestNoFieldDefaultStandsInForAValue:
     """
 
     OPTIONAL: Final[Mapping[str, frozenset[str]]] = {
-        "AccessTable": frozenset({"price"}),
+        # An omitted `[access.resale_price]` says *nobody has quoted what this sells for*, and
+        # 015 FR-031 refuses an early exit by name for it. Every shipped entry omits it.
+        "AccessTable": frozenset({"price", "resale_price"}),
         "ChannelSideTable": frozenset({"markup_bps", "premium_per_unit"}),
         "DistributionTable": frozenset({"peg"}),
         "EnumeratedScheduleTable": frozenset({"published_in_order"}),
         "FundTable": frozenset({"subscription_cutoff", "distribution"}),
         "GoalTable": frozenset({"monthly_contribution", "target_sum", "target_date"}),
         "IndexationTable": frozenset({"rate_pct"}),
+        # A question states exactly one of a subject list and the every-instrument token, and
+        # the loader refuses both and neither: omission must never read as *everything*. On a
+        # run plan every absence is a positive declaration a named refusal reports -- no chosen
+        # point inside a stated range is `TwoFiguresNotOne`, no exchange-rate assumption is
+        # `PegUnsizable` -- and the fields of the kind a plan is not are refused rather than
+        # ignored. `exit_on` is deliberately NOT here: *hold to the fund's own end* is a choice
+        # (014 FR-003), so it is required with a closed vocabulary.
+        "QuestionTable": frozenset({"subjects", "every_declared_instrument"}),
+        "QuestionPlanTable": frozenset(
+            {
+                "coupon_policy",
+                "liquidity_mode",
+                "buyback",
+                "exit_on",
+                "yield_point",
+                "exchange_rate",
+            }
+        ),
         "LegTable": frozenset(
             {
                 "channel",

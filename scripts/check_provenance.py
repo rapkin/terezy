@@ -92,6 +92,14 @@ EXEMPT_DIRS: dict[str, str] = {
         "carry, and for the same reason. Every *number* that describes a corridor lives on a "
         "leg, in data/routes/, cited (004 research.md D8)"
     ),
+    "questions": (
+        "the owner's own questions -- an amount, some subjects, some horizons and a run plan "
+        "per subject. A question is one person's stated preference, not an observation about "
+        "the world, so there is nothing for a source to vouch for: the same exemption "
+        "`objectives`, `strategies`, `composition` and `candidates` carry. If a number "
+        "describing the world ever has to live in a question it moves to a sourced directory "
+        "rather than this exemption widening (015 FR-003)"
+    ),
     "candidates": (
         "the owner's own policy on how many options a search may enumerate before it refuses "
         "-- a single integer, and nothing here describes the world. It is the same exemption "
