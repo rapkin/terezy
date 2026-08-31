@@ -347,21 +347,29 @@ def classify(
     reached = _reached(calendars, calendar_id, scope)
     if not isinstance(reached, WorkingDayCalendar):
         return reached
-    return _outside(reached, on_date) or _classified(reached, on_date)
+    refused = _outside(reached, on_date)
+    return refused if refused is not None else _classified(reached, on_date)
 
 
 def _search(
-    calendar: WorkingDayCalendar, from_date: date, step: timedelta
-) -> WorkingDay | CalendarOutOfCoverage:
-    """The first working day from ``from_date`` in ``step``'s direction, or the refusal."""
-    first, last = calendar.covers
+    calendar: WorkingDayCalendar, from_date: date, step: timedelta, within: tuple[date, date]
+) -> WorkingDay | None:
+    """The first working day from ``from_date`` in ``step``'s direction, inside ``within``.
+
+    ``within`` is an argument rather than :attr:`WorkingDayCalendar.covers` because the two
+    searches bound differently and one of them silently gives a wrong answer if it borrows the
+    other's bound: *the last working day of this week* searched to the window's edge would walk
+    out of the week and return a date from the one before it -- a plausible answer to a
+    question nobody asked.
+    """
+    first, last = within
     day = from_date
     while first <= day <= last:
         found = _classified(calendar, day)
         if isinstance(found, WorkingDay):
             return found
         day += step
-    return _out_of_coverage(calendar, from_date, Missed.RAN_OFF_AN_END)
+    return None
 
 
 def first_working_day_on_or_after(
@@ -379,7 +387,11 @@ def first_working_day_on_or_after(
     reached = _reached(calendars, calendar_id, scope)
     if not isinstance(reached, WorkingDayCalendar):
         return reached
-    return _outside(reached, on_date) or _search(reached, on_date, ONE_DAY)
+    refused = _outside(reached, on_date)
+    if refused is not None:
+        return refused
+    found = _search(reached, on_date, ONE_DAY, reached.covers)
+    return found if found is not None else _out_of_coverage(reached, on_date, Missed.RAN_OFF_AN_END)
 
 
 def last_working_day_on_or_before(
@@ -394,7 +406,11 @@ def last_working_day_on_or_before(
     reached = _reached(calendars, calendar_id, scope)
     if not isinstance(reached, WorkingDayCalendar):
         return reached
-    return _outside(reached, on_date) or _search(reached, on_date, -ONE_DAY)
+    refused = _outside(reached, on_date)
+    if refused is not None:
+        return refused
+    found = _search(reached, on_date, -ONE_DAY, reached.covers)
+    return found if found is not None else _out_of_coverage(reached, on_date, Missed.RAN_OFF_AN_END)
 
 
 def last_working_day_of_week(
@@ -422,16 +438,41 @@ def last_working_day_of_week(
     first, last = reached.covers
     if starts < first or ends > last:
         return _out_of_coverage(reached, on_date, Missed.RAN_OFF_AN_END)
-    found = _search(reached, ends, -ONE_DAY)
-    if isinstance(found, WorkingDay):
-        return found
-    raise ValueError(
-        f"calendar {reached.id!r} declares no working day in the week beginning "
-        f"{starts.isoformat()}, which lies wholly inside its coverage window. The loader "
-        "refuses such a calendar, so this one was built without it."
-    )
+    found = _search(reached, ends, -ONE_DAY, (starts, ends))
+    if found is None:
+        raise ValueError(
+            f"calendar {reached.id!r} declares no working day in the week beginning "
+            f"{starts.isoformat()}, which lies wholly inside its coverage window. "
+            f"{week_without_a_working_day.__name__} refuses such a calendar at the data "
+            "boundary, so this one was built without passing it."
+        )
+    return found
 
 
 def week_start(week: DeclaredWeek, on_date: date) -> date:
     """The first date of the week containing ``on_date``, by the calendar's own week start."""
     return on_date - ONE_DAY * ((on_date.weekday() - week.starts_on) % DAYS_IN_WEEK)
+
+
+def week_without_a_working_day(calendar: WorkingDayCalendar) -> date | None:
+    """The start of the first week inside the window that holds no working day, or ``None``.
+
+    The data boundary calls this and refuses, for the reason an all-seven rest pattern is
+    refused there: every working-day question would then produce a refusal naming the *date*,
+    sending a reader to fix a date when the declaration is what is wrong. Seven consecutive
+    enumerated non-working rows reach that state by another road, and FR-011 fixes the refusal
+    union at three reasons -- none of which is *this week has no working day*.
+
+    Weeks straddling either end are skipped: :func:`last_working_day_of_week` refuses those
+    with the ran-off-an-end discriminator, so they need no working day at all.
+    """
+    first, last = calendar.covers
+    starts = week_start(calendar.week, first)
+    if starts < first:
+        starts += ONE_DAY * DAYS_IN_WEEK
+    while starts + ONE_DAY * (DAYS_IN_WEEK - 1) <= last:
+        ends = starts + ONE_DAY * (DAYS_IN_WEEK - 1)
+        if _search(calendar, starts, ONE_DAY, (starts, ends)) is None:
+            return starts
+        starts += ONE_DAY * DAYS_IN_WEEK
+    return None

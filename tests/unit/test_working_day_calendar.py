@@ -379,26 +379,44 @@ def test_an_unverified_row_marks_the_answer_it_decided() -> None:
 
 
 def test_a_week_with_no_working_day_is_a_violated_invariant_rather_than_a_refusal() -> None:
-    """The loader refuses such a calendar (research D7), so reaching here means one was built
-    by hand. FR-011 fixes the refusal union at three reasons and none of them is this."""
+    """The loader refuses such a calendar, so reaching here means one was built by hand.
+
+    The window holds **two** weeks and only the second is shut, which is what makes this a
+    regression rather than a tautology: a search bounded by the coverage window instead of by
+    the week walks back into week one and returns Friday 2026-03-06 — a working day, in the
+    wrong week, indistinguishable from a correct answer. FR-011 fixes the refusal union at
+    three reasons and none of them is *this week has no working day*, so the answer is a
+    violated invariant.
+    """
     shut = wd.WorkingDayCalendar(
         id="synthetic_shut",
         jurisdiction="XX",
         authority="a synthetic authority",
         scope=wd.CalendarScope.CIVIL,
-        covers=(date(2026, 3, 2), date(2026, 3, 8)),
+        covers=(date(2026, 3, 2), date(2026, 3, 15)),
         covered_by=_sources("coverage"),
         week=WEEK,
         rows=tuple(
             wd.NonWorkingDay(
-                on_date=date(2026, 3, 2) + wd.ONE_DAY * offset,
+                on_date=date(2026, 3, 9) + wd.ONE_DAY * offset,
                 decided_by=wd.DecidedBy.ENUMERATED_NON_WORKING_DAY,
                 provenance=_sources("shut"),
             )
             for offset in range(5)
         ),
     )
+    assert wd.week_without_a_working_day(shut) == date(2026, 3, 9)
     with pytest.raises(ValueError, match="synthetic_shut"):
         wd.last_working_day_of_week(
-            {shut.id: shut}, shut.id, scope=wd.CalendarScope.CIVIL, on_date=date(2026, 3, 4)
+            {shut.id: shut}, shut.id, scope=wd.CalendarScope.CIVIL, on_date=date(2026, 3, 10)
         )
+
+
+def test_the_first_week_still_answers_from_inside_itself() -> None:
+    """The complement: the same shape asked about the week that is intact."""
+    assert wd.week_without_a_working_day(FORTNIGHT) is None
+    answer = wd.last_working_day_of_week(
+        CALENDARS, FORTNIGHT.id, scope=wd.CalendarScope.CIVIL, on_date=date(2026, 3, 10)
+    )
+    assert isinstance(answer, wd.WorkingDay)
+    assert answer.on_date == date(2026, 3, 13)

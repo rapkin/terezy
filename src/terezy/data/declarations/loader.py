@@ -5957,43 +5957,21 @@ def _classification_row(
 def _shut_week(path: Path, calendar: wd.WorkingDayCalendar) -> None:
     """Refuse a calendar with a week inside its window that holds no working day.
 
-    The all-seven rest pattern above is refused for a stated reason -- every working-day
-    question would refuse naming the date rather than the declaration -- and seven consecutive
-    enumerated non-working rows reach the same state by another road. FR-011 fixes the refusal
-    union at three reasons and none of them is *this week has no working day*, so the choice is
-    between refusing here and answering a question with nothing.
-
-    Weeks straddling either end are excluded: ``last_working_day_of_week`` already refuses
-    those with the ran-off-an-end discriminator, so they need no working day at all.
+    The reasoning is ``working_day.week_without_a_working_day``'s; what belongs here is the
+    file name, which the core structurally cannot supply.
     """
-    first, last = calendar.covers
-    starts = wd.week_start(calendar.week, first)
-    if starts < first:
-        starts += wd.ONE_DAY * wd.DAYS_IN_WEEK
-    while starts + wd.ONE_DAY * (wd.DAYS_IN_WEEK - 1) <= last:
-        week = [starts + wd.ONE_DAY * offset for offset in range(wd.DAYS_IN_WEEK)]
-        if not any(
-            isinstance(
-                wd.classify(
-                    {calendar.id: calendar},
-                    calendar.id,
-                    scope=calendar.scope,
-                    on_date=day,
-                ),
-                wd.WorkingDay,
-            )
-            for day in week
-        ):
-            raise DeclarationError(
-                path,
-                CALENDAR_DAY_TABLE,
-                f"declares no working day in the week beginning {starts.isoformat()}, which "
-                "lies wholly inside the coverage window. The last working day of that week is "
-                "a question with no answer, and refusing it at the DATE would send a reader "
-                "to fix the wrong thing.",
-                "correct the rows for that week, or narrow the coverage window past it",
-            )
-        starts += wd.ONE_DAY * wd.DAYS_IN_WEEK
+    starts = wd.week_without_a_working_day(calendar)
+    if starts is None:
+        return
+    raise DeclarationError(
+        path,
+        CALENDAR_DAY_TABLE,
+        f"declares no working day in the week beginning {starts.isoformat()}, which lies "
+        "wholly inside the coverage window. The last working day of that week is a question "
+        "with no answer, and refusing it at the DATE would send a reader to fix the wrong "
+        "thing.",
+        "correct the rows for that week, or narrow the coverage window past it",
+    )
 
 
 def working_day_calendar_from_file(path: Path) -> wd.WorkingDayCalendar:
