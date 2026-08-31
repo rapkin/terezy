@@ -3813,7 +3813,77 @@ route, and a `compose` refusal that is about the question rather than about one 
 
 ---
 
-## 34. Where to look next
+## 34. The question, the answer, and the sale at the window's end
+
+§33 finds candidates for one horizon. This section answers a **question** — an amount, some
+subjects, several horizons and a run plan for each — and it is the first output a person reads
+rather than a test module.
+
+### 34.1 What a horizon means, and the one figure this adds
+
+A horizon means **the money comes out at its end**. An instrument whose own terms run past the
+window is therefore **sold** on the window's last day rather than reported as impossible to
+hold. The figure is:
+
+```
+proceeds = units still held x the declared resale price per unit
+```
+
+where `units still held` is the purchase plus every reinvestment, less whatever payments inside
+the window already retired, and the resale price is a **declaration** on the access record
+beside the purchase quote. The sale is a **disposal**: it consumes basis and realises a gain or
+a loss under the instrument's declared disposal-gain class, exactly as a redemption at maturity
+does. A sale below basis is what a spread *is*, and reporting it as a cash receipt would make
+the cost of the early exit invisible in the ledger.
+
+Payments falling after the window are **absent** from the stream rather than moved. Nothing is
+paid early and nothing is folded into the sale.
+
+**No shipped declaration carries a resale price**, so on today's registry every early exit
+refuses by name — `DeclarationMissing(part="access")`, naming `access.resale_price` — and the
+remedy is a file rather than a longer window. The price is not inferred from the face value or
+from the purchase quote: either would report a spread of **zero** that nobody observed.
+
+### 34.2 What the figure rests on, and how it errs
+
+That a quote taken today still holds on a future date is nobody's observation. If a platform
+committed to its buyback price that would be a *term*, and there would be no assumption; the
+assumption exists because none does. It is declared under `data/scenarios/early_exit/`, with no
+default — an absent belief refuses at load — and every figure computed through it names it in
+`TupleOutcome.rests_on`.
+
+Three claims travel with such a figure, and **exactly two of them carry a direction**:
+
+| claim | direction | why |
+| --- | --- | --- |
+| it is a point where the world is a distribution | **more certain than it is** | the optionality is the reason the option was chosen |
+| the spread is a seller's quote under today's conditions | **understated** | a seller's quote widens exactly when a forced sale is most likely |
+| it carries no rate risk | **none** | rate risk is symmetric: a bond sold after rates rise fetches less than its spread implies, and one sold after rates fall fetches more |
+
+An approximation whose sign is unstated is incomplete; one whose sign is asserted without a
+warrant is a number more confident than its inputs, which is worse.
+
+### 34.3 What the answer says, and what it refuses to say
+
+One section per declared horizon, each carrying §33's whole survey or the typed refusal that
+replaced it. Two rules are this layer's own:
+
+* a candidate whose money the **holding released** after the window's end is **withheld** from
+  that section, not labelled. Measured on the shipped registry, a one-month section would
+  otherwise be one number — 18.11% over a span running to 2028 — wearing a caveat, and a reader
+  takes the number. *Nothing could be ranked at one month, and here is why for each* is only
+  available if the figure is withheld. Settlement latency on the way out is **not** what this
+  rule is about: it sits inside the span, because waiting is a cost (§29);
+* a stated **reserve** produces a verdict per candidate and removes nothing. There are two
+  values and the second is a refusal — *a partial exit would be needed, and a partly-liquidated
+  holding is not projected*. There is deliberately no third value asserting that a reserve
+  *cannot* be met, and a reserve in a currency the arrivals do not deliver is short by the whole
+  of it rather than converted at a rate nobody declared.
+
+Nothing here optimises. There is no objective, no scoring weight and no shortlist; ranking is
+§29's and the tie rule is §29's.
+
+## 35. Where to look next
 
 | question | file |
 | --- | --- |
@@ -3828,6 +3898,9 @@ route, and a `compose` refusal that is about the question rather than about one 
 | What happens if the cash is not there? | `tests/unit/test_insufficient_cash.py` |
 | Can a figure hide which method produced it? | `tests/contract/test_method_is_never_implicit.py` |
 | Is an unsettled reading of the law visible on the figure? | `tests/contract/test_unsettled_is_labelled.py` |
+| What does the owner's own question actually answer? | `tests/golden/the_answer.golden.txt` |
+| Is the arithmetic of a sale at the window's end right? | `tests/worked_examples/test_early_exit_sale.py` |
+| Can a group be inferred rather than declared? | `tests/contract/test_group_membership_is_declared.py` |
 | Is the run reproducible? | `tests/invariants/test_determinism.py` |
 | Does the mark survive? | `tests/contract/test_provenance_propagation.py` |
 | Is a new instrument really data-only? | `tests/contract/test_data_only_extensibility.py` |

@@ -1,0 +1,42 @@
+# terezy golden result -- the owner's question, answered.
+#
+# Produced by tests/golden/test_the_answer.py; see that module on regenerating it.
+# Provenance is deliberately excluded from the digest below.
+
+[question] fifty-thousand-hryvnia  asked 2026-08-30  as_of 2026-08-30  regime (no regime declared)
+[benchmark] ovdp_synthetic_a
+[considered] enumerated_out_of_order inzhur_miltech inzhur_reit ovdp_enumerated_a ovdp_enumerated_mirror ovdp_synthetic_a ovdp_synthetic_b
+
+[subject] cash                     undeclared  
+[subject] ovdp                     group       enumerated_out_of_order ovdp_enumerated_a ovdp_enumerated_mirror ovdp_synthetic_a ovdp_synthetic_b
+[subject] inzhur                   group       inzhur_miltech inzhur_reit
+[subject] btc                      undeclared  
+
+[section] 2026-09-01..2026-10-01  CandidateSurvey  reached=2 unreached=0 undeclared=2 ids=7
+  enumerated 7  no_candidate 7  pairs 14  comparison BenchmarkUnavailable
+  ranked 0
+  dropped DeclarationMissing           5  enumerated_out_of_order,ovdp_enumerated_a,ovdp_enumerated_mirror,ovdp_synthetic_a,ovdp_synthetic_b
+  dropped InstrumentRefused            1  inzhur_reit
+  withheld inzhur_miltech           arrives 2028-01-20
+
+[section] 2026-09-01..2026-12-01  CandidateSurvey  reached=2 unreached=0 undeclared=2 ids=7
+  enumerated 7  no_candidate 7  pairs 14  comparison BenchmarkUnavailable
+  ranked 0
+  dropped DeclarationMissing           5  enumerated_out_of_order,ovdp_enumerated_a,ovdp_enumerated_mirror,ovdp_synthetic_a,ovdp_synthetic_b
+  dropped InstrumentRefused            1  inzhur_reit
+  withheld inzhur_miltech           arrives 2028-01-20
+
+[section] 2026-09-01..2027-09-01  CandidateSurvey  reached=2 unreached=0 undeclared=2 ids=7
+  enumerated 7  no_candidate 7  pairs 14  comparison BenchmarkUnavailable
+  evaluated enumerated_out_of_order  reaches 0x1.a9c8000000000p+15
+  evaluated ovdp_enumerated_a        reaches 0x1.9d70000000000p+15
+  ranked 0
+  dropped DeclarationMissing           3  ovdp_enumerated_mirror,ovdp_synthetic_a,ovdp_synthetic_b
+  dropped InstrumentRefused            1  inzhur_reit
+  withheld inzhur_miltech           arrives 2028-01-20
+
+[excludes] no_real_terms_figure                                            
+[excludes] no_income_tax_on_the_stated_amount                              
+
+[keys] SectionsAgreeByKey
+[digest] sha256:a413012f7ab2e3e9b91a739ced6cbb8cd6fa6f6fa8008d19febd49fb230ad98e
