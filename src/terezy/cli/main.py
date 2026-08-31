@@ -29,11 +29,12 @@ from terezy.api.answer import AnsweredQuestion, answer_declared, answer_question
 from terezy.core.decision.answer import (
     benchmark_unavailable,
     key_agreement,
-    section_evaluated,
     section_ranking,
+    section_scored,
     subject_counts,
 )
 from terezy.core.primitives.currency import Currency
+from terezy.core.primitives.rates import NominalRate
 from terezy.core.results.answer import (
     Answer,
     CoveredByThePlan,
@@ -52,6 +53,8 @@ from terezy.core.results.candidates import (
     NothingConnects,
     NothingNeedsToConnect,
 )
+from terezy.core.results.tuple import TupleOutcome
+from terezy.core.routes.path import candidate_id
 from terezy.data.declarations import loader
 from terezy.data.declarations.errors import DeclarationError
 
@@ -144,7 +147,7 @@ def render(run: AnsweredQuestion) -> list[str]:
     if not isinstance(result, Answer):
         return [
             f"the question does not stand up: {type(result).__name__}",
-            *(f"  {name} = {value!r}" for name, value in _fields_of(result)),
+            *_named_scalars(result),
             f"manifest: {run.manifest.result_digest}",
         ]
     lines = [
@@ -162,9 +165,18 @@ def render(run: AnsweredQuestion) -> list[str]:
     return lines
 
 
-def _fields_of(record: object) -> list[tuple[str, object]]:
-    slots = getattr(type(record), "__slots__", ())
-    return [(name, getattr(record, name)) for name in slots]
+def _named_scalars(record: object) -> list[str]:
+    """A refusal's own fields, named, and **only the ones a reader can read**.
+
+    A record field is skipped rather than printed: ``BenchmarkYieldsNoCandidate`` carries the
+    whole enumerated set, and a bare ``repr`` of it is thousands of characters where a sentence
+    was intended. What the reader needs from a refusal is its ids, its counts and its reason.
+    """
+    return [
+        f"    {name} = {value}"
+        for name in getattr(type(record), "__slots__", ())
+        if isinstance(value := getattr(record, name), str | int | float | date)
+    ]
 
 
 def _subject_lines(result: Answer) -> list[str]:
@@ -195,23 +207,32 @@ def _section_lines(result: Answer, section: HorizonSection) -> list[str]:
     ]
     if not isinstance(section.outcome, CandidateSurvey):
         lines.append(f"  NO COMPARISON: {type(section.outcome).__name__}")
-        lines.extend(f"    {value}" for _, value in _fields_of(section.outcome))
+        lines.extend(_named_scalars(section.outcome))
         return lines
     lines.append(f"  {len(section.outcome.enumerated.candidates)} candidate(s) enumerated")
     ranked = section_ranking(section)
-    lines.append(
-        f"  ranked: {len(ranked)}"
-        if ranked
-        else "  ranked: NOTHING. Every candidate below refuses, is withheld, or has no rate."
-    )
-    for outcome in ranked:
-        lines.append(f"    {outcome.key.instrument_id}  reaches {outcome.reaches.amount}")
-    for outcome in section_evaluated(section):
+    scored = section_scored(section)
+    if ranked:
+        lines.append(f"  ranked: {len(ranked)}")
+    else:
+        lines.append(
+            "  ranked: NOTHING. There is no benchmark to rank against, so the figures below "
+            "are reported unranked rather than ordered."
+        )
+    for outcome in ranked or scored:
+        lines.extend(_figure_lines(outcome))
+    for outcome in scored:
         for claim in outcome.rests_on:
             lines.append(f"    rests on ({outcome.key.instrument_id}): {claim}")
     unavailable = benchmark_unavailable(section)
     if unavailable is not None:
         lines.append(f"  NO BENCHMARK: {unavailable.reason}")
+    elif not ranked and scored:
+        lines.append(
+            "  NO BENCHMARK: the named benchmark's own money arrives after this window, so it "
+            "is withheld like any other candidate -- and a ranking with no hurdle in it "
+            "invites its own head to be read as a winner."
+        )
     for item in section.arrives_after_horizon:
         lines.append(
             f"  WITHHELD {item.key.instrument_id}: its money arrives "
@@ -225,6 +246,25 @@ def _section_lines(result: Answer, section: HorizonSection) -> list[str]:
     lines.extend(_reserve_lines(section))
     lines.extend(f"  {line}" for line in _exclusion_lines(section.excludes))
     return lines
+
+
+def _figure_lines(outcome: TupleOutcome) -> list[str]:
+    """One candidate's figures, with the currency, the rate and the terms that identify it.
+
+    The **five** declared terms, because two candidates for one instrument over two routes are
+    two options and printing an id alone renders them identically. The currency, because the
+    owner has two streams and a bare number in an ordered list is the Principle VI conflation
+    ``Money`` exists to prevent.
+    """
+    rate = outcome.implied_rate
+    return [
+        f"    {outcome.key.instrument_id} from {outcome.key.stream_id} via "
+        f"{candidate_id(outcome.key.route_in)}",
+        f"      reaches {outcome.reaches.amount} {outcome.reaches.currency.value}"
+        + (
+            f"; rate {rate.value}" if isinstance(rate, NominalRate) else f"; NO RATE: {rate.reason}"
+        ),
+    ]
 
 
 def _standing_lines(section: HorizonSection) -> list[str]:

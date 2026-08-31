@@ -172,9 +172,15 @@ def events(
             # a later period's reinvestment must not add units the sale then surrenders.
             break
         stream.append(_coupon(declaration, holding, period, sequence=len(stream) + 1))
-        if period.reinvestment.units_bought > 0.0:
+        # **A coupon paid on the day of the sale is not reinvested**, for the reason `_decide`
+        # already refuses to reinvest the last one: the units it bought would be surrendered
+        # the same day, at the resale price rather than at what they cost, and the round trip
+        # nobody made would post a gain and a disposal-gain charge on it.
+        if period.reinvestment.units_bought > 0.0 and not (
+            sells_early and period.paid_on >= horizon.end
+        ):
             stream.append(_reinvestment(declaration, holding, period, sequence=len(stream) + 1))
-        units += period.reinvestment.units_bought
+            units += period.reinvestment.units_bought
     stream.append(
         acquire.early_sale(
             declaration,

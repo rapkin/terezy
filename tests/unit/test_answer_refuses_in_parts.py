@@ -23,6 +23,7 @@ from terezy.core.decision.answer import (
     key_agreement,
     section_evaluated,
     section_ranking,
+    section_scored,
     subject_counts,
 )
 from terezy.core.decision.candidates import evaluated
@@ -270,3 +271,41 @@ def test_the_answers_marks_describe_the_figures_it_reports() -> None:
     } - reported.sources
     assert withheld_only, "the fixture must actually withhold a candidate with sources of its own"
     assert not withheld_only & result.provenance.sources
+
+
+def test_a_section_with_no_benchmark_still_carries_the_figures_it_computed() -> None:
+    """``BenchmarkUnavailable.scored`` exists so the work is not thrown away.
+
+    Nothing is *ranked* -- there is nothing to rank against -- but two candidates produced
+    complete outcomes at twelve months, and a reader told only "nothing was ranked" would never
+    learn they exist.
+    """
+    twelve = fixtures.answered().sections[2]
+    assert section_ranking(twelve) == ()
+    assert len(section_scored(twelve)) == 2
+    assert all(item.reaches.amount > 0.0 for item in section_scored(twelve))
+
+
+def test_a_withheld_benchmark_leaves_nothing_ranked() -> None:
+    """The case a reader would miss: the figures are all there and the hurdle is not.
+
+    010 FR-011 says the hurdle is always scored and always shown, so a ranking without it is
+    not offered -- the head of the remaining list is exactly the winner it must not read as.
+    """
+    question = fixtures.owners_question()
+    with_price = fixtures.with_resale_price(fixtures.inputs(), "ovdp_synthetic_a")
+    result = fixtures.answered(
+        replace(question, benchmark_instrument_id=fixtures.MILTECH), with_price
+    )
+    for section in result.sections:
+        withheld = {item.key.instrument_id for item in section.arrives_after_horizon}
+        assert fixtures.MILTECH in withheld
+        assert section_ranking(section) == ()
+        assert section_scored(section)
+
+
+def test_a_disagreement_names_the_section_a_reader_can_count_to() -> None:
+    """``only_in`` is keyed by the section's own index, not by a position in a filtered list."""
+    result = _plant_ceiling()
+    agreement = key_agreement(result)
+    assert isinstance(agreement, SectionsAgreeByKey)

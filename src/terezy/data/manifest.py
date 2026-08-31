@@ -61,8 +61,9 @@ two checkouts of the same commit would then describe the same declaration differ
 Reproducing a run needs the whole input set, because the set is what resolution depended
 on: another file declaring the same id would have been a load-time failure, and one
 declaring the tax class that was used is as load-bearing as the instrument itself. The
-instrument actually projected is named separately
-(:attr:`RunManifest.projected_instrument_id`) so nothing has to be inferred from the list.
+instrument actually projected is named separately (:attr:`ProjectedRun.instrument_id`) so
+nothing has to be inferred from the list. An **answer** projects many and names none there:
+its :attr:`RunManifest.projection` is ``None``.
 
 **The manifest records the unverified sources; the digest does not.** Provenance is
 excluded from the canonical form on purpose -- filling in a ``verified_on`` changes what a

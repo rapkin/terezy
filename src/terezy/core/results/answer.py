@@ -428,6 +428,14 @@ class BenchmarkYieldsSeveralCandidates:
 
     Picking the first would settle by declaration file order which figure everything else is
     ranked against.
+
+    **Whole-answer rather than section-level, and the argument against is worth recording**:
+    how many candidates an instrument yields is a fact about one enumeration, which is exactly
+    why :class:`BenchmarkYieldsNoCandidate` *is* section-level. FR-026 nevertheless names this
+    one among the ways the *question* does not stand up, and the reading it rests on is that an
+    ambiguous benchmark is a question nobody can answer at any horizon: whichever candidate a
+    section picked, another section could pick differently, and the cross-horizon reading would
+    then compare two rankings measured against two different hurdles.
     """
 
     instrument_id: str

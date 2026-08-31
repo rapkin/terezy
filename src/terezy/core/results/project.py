@@ -296,6 +296,7 @@ def project(
     # would then move when the owner changed their mind about coupons -- a figure
     # labelled "contractual" that is not (FR-005). Policy-invariance is asserted by
     # tests/unit/test_contractual_yield_is_policy_invariant.py.
+    sold_early = _sold_early(gross_events, early_exit)
     contractual_events = _contractual_events(declaration, holding, horizon, assumptions, early_exit)
     if isinstance(contractual_events, InfeasiblePurchase | InconsistentTerms):
         return contractual_events  # pragma: no cover -- the policy run already succeeded
@@ -309,7 +310,7 @@ def project(
         ),
         charges=charges,
         at_purchase=_at_purchase(declaration, holding, assessment_rules),
-        sold_early=_sold_early(gross_events, early_exit),
+        sold_early=sold_early,
         hurdle=hurdle_figures.of_flows(
             contractual=_flows(contractual_events, holding, year_fraction),
             received=_flows(
@@ -319,7 +320,9 @@ def project(
                 assessed={charged.tax_event: charged.amount for charged in taxed_by.values()},
             ),
             total_tax=money.total([charge.total for charge in charges], base_currency),
-            excludes=hurdle_figures.EXCLUDES | instrument_terms.excludes_of(declaration.terms),
+            excludes=hurdle_figures.EXCLUDES
+            | instrument_terms.excludes_of(declaration.terms)
+            | _sale_excludes(sold_early),
             provenance=prov.merge(
                 prov.merge_all(event.amount.provenance for event in state.applied),
                 prov.merge_all(charge.provenance for charge in charges),
@@ -331,6 +334,26 @@ def project(
                 ageing=ageing,
             ),
         ),
+    )
+
+
+def _sale_excludes(sold: SoldEarly | None) -> frozenset[str]:
+    """What a *contractual* figure stops being when the position is sold before its terms end.
+
+    ``nominal_ytm`` is documented as a yield **to maturity** -- a property of the terms and the
+    price, and policy-invariant. Under 015 FR-029 a window that ends first closes the series at
+    a **declared resale quote** under a **stated belief**, and neither is a term of the paper.
+    The figure is still what the holding pays over the window it was asked about; what it stops
+    being is unconditional, and the exclusion is where a reader is told so.
+    """
+    if sold is None:
+        return frozenset()
+    return frozenset(
+        {
+            "the contractual figure closes at a declared resale price rather than at maturity "
+            f"({sold.on.isoformat()}), under the stated belief {sold.assumption.id!r} that the "
+            "observed spread holds at that date -- neither is a term of the paper"
+        }
     )
 
 

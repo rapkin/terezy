@@ -372,7 +372,7 @@ def _section(
         excludes=tuple(
             stated
             for item in _outcomes(outcome)
-            if item.sold_early is not None
+            if item.sold_early is not None and item.key not in withheld
             for stated in _early_exit_exclusions(item.key, item.sold_early.assumption.id)
         ),
     )
@@ -620,10 +620,17 @@ def section_evaluated(section: HorizonSection) -> tuple[TupleOutcome, ...]:
 
 
 def section_ranking(section: HorizonSection) -> tuple[TupleOutcome, ...]:
-    """This section's ranking, in order, less any candidate FR-030 withheld.
+    """This section's ranking, in order, or empty where there is nothing to rank against.
 
-    Empty is the answer over the shipped registry at every horizon the owner asked about, and
-    saying so plainly is what this feature exists for.
+    Empty in three cases, and all three are the same claim: **there is no benchmark here**.
+    The comparison itself may be a ``BenchmarkUnavailable``; or it may be a ``Comparison``
+    whose benchmark FR-030 withheld, which is the case a reader would miss -- the figures are
+    all there, the head of the list looks like a winner, and the thing it would be a winner
+    against is not being shown. 010 FR-011 says the hurdle is always scored and always shown,
+    so a ranking without it is not offered.
+
+    :func:`section_scored` is what carries the figures in those cases: they were computed and
+    throwing them away would hide work the owner paid for.
     """
     if not isinstance(section.outcome, CandidateSurvey):
         return ()
@@ -631,7 +638,20 @@ def section_ranking(section: HorizonSection) -> tuple[TupleOutcome, ...]:
     if not isinstance(comparison, Comparison):
         return ()
     withheld = frozenset(item.key for item in section.arrives_after_horizon)
+    if comparison.ranked[comparison.benchmark].key in withheld:
+        return ()
     return tuple(item for item in comparison.ranked if item.key not in withheld)
+
+
+def section_scored(section: HorizonSection) -> tuple[TupleOutcome, ...]:
+    """Every candidate this section produced a figure for, ranked or not, less the withheld.
+
+    The population a reader is shown when :func:`section_ranking` is empty. Both cases carry
+    the outcomes -- ``BenchmarkUnavailable.scored`` exists for exactly this -- and a renderer
+    that read only the ranking would print *nothing was ranked* over a section that computed
+    two complete figures.
+    """
+    return section_evaluated(section)
 
 
 def benchmark_unavailable(section: HorizonSection) -> BenchmarkUnavailable | None:
@@ -671,12 +691,14 @@ def key_agreement(answer_: Answer) -> KeyAgreement:
     enumeration rather than a contract -- so an inequality is reported as a finding instead of
     being smoothed over.
     """
-    enumerated = [_enumerated_of(section.outcome) for section in answer_.sections]
-    per_section = [
-        tuple(item.key for item in item_set.candidates)
-        for item_set in enumerated
+    by_index = {
+        index: tuple(item.key for item in item_set.candidates)
+        for index, item_set in enumerate(
+            _enumerated_of(section.outcome) for section in answer_.sections
+        )
         if item_set is not None
-    ]
+    }
+    per_section = list(by_index.values())
     shared = (
         frozenset.intersection(*[frozenset(keys) for keys in per_section])
         if per_section
@@ -684,7 +706,7 @@ def key_agreement(answer_: Answer) -> KeyAgreement:
     )
     only_in = {
         index: tuple(key for key in keys if key not in shared)
-        for index, keys in enumerate(per_section)
+        for index, keys in by_index.items()
         if any(key not in shared for key in keys)
     }
     if only_in:
@@ -715,6 +737,7 @@ __all__ = [
     "key_agreement",
     "section_evaluated",
     "section_ranking",
+    "section_scored",
     "subject_counts",
     "undeclared",
 ]

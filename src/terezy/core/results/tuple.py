@@ -796,8 +796,13 @@ class CannotSpanHorizon:
 
     instrument_id: str
     binding_term: str
-    """The declared term that binds -- ``instrument.maturity_date``,
-    ``instrument.terminates_on``."""
+    """The declared term that binds.
+
+    ``instrument.terminates_on`` today, and only that: 015 FR-029 sells a **bond** that
+    outlives its window rather than refusing it, so what is left here is a fund still open at
+    the horizon's end with no exit requested -- there is nothing to sell into, and no date to
+    name but the fund's own.
+    """
 
     reason: str
 

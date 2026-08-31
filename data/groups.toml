@@ -26,8 +26,9 @@
 # **Root-level and curated, beside `venues.toml`.** The label lives on the curated instrument
 # declaration, so a per-owner vocabulary would make an instrument file fail to load because
 # somebody else's directory was absent. No citation keys: an id and a name are references, not
-# observations, exactly as a venue's are — which is also why `scripts/check_provenance.py` never
-# sees this file, since that gate walks directories and this is not one.
+# observations, exactly as a venue's are. `scripts/check_provenance.py` **does** scan this file —
+# it globs the data root's own `*.toml` as well as the sourced directories — and it passes
+# because there is no observed value here, not because nothing looked.
 #
 # **An instrument may be in several groups, and two groups may overlap** (015 FR-007b). Feature
 # 016 declares ОВДП issues sold *through* Inzhur, so `ovdp` and `inzhur` are not disjoint and

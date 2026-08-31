@@ -186,3 +186,46 @@ def test_the_window_may_not_end_before_the_purchase_settles() -> None:
     )
     assert isinstance(outcome, InconsistentTerms), outcome
     assert outcome.second_term == "holding.purchased_on"
+
+
+def test_a_coupon_paid_on_the_day_of_the_sale_is_not_reinvested() -> None:
+    """The round trip nobody made: bought at face and surrendered at the resale price, same day.
+
+    ``_decide`` already refuses to reinvest the **last** coupon for this exact reason, and the
+    guard was written against the maturity date rather than against the window's end. Under a
+    reinvesting policy it would post a gain equal to units x (resale price - face value), and a
+    disposal-gain charge on a trade that never happened.
+    """
+    coupon_day = date(2026, 7, 15)
+    outcome = project.project(
+        synthetic.declaration(),
+        synthetic.holding(),
+        synthetic.horizon(end=coupon_day),
+        synthetic.assumptions(coupon_policy="reinvest"),
+        tax_classes=synthetic.TAX_PACK,
+        early_exit=EarlyExit(
+            price_per_unit=Money(RESALE_PER_UNIT, synthetic.UAH, synthetic.TERMS_PROVENANCE),
+            assumption=SPREAD_HOLDS,
+        ),
+    )
+    assert isinstance(outcome, Projection), outcome
+    assert not [event for event in outcome.ledger.applied if event.kind is EventKind.REINVESTMENT]
+    assert outcome.sold_early is not None
+    assert outcome.sold_early.units == UNITS
+
+
+def test_a_sale_says_the_contractual_figure_is_no_longer_to_maturity() -> None:
+    """FR-023a's rule at the level below: an exclusion that is not stated is a silent default."""
+    sold = _sold_at_the_horizon()
+    assert any("declared resale price" in claim for claim in sold.hurdle.excludes), (
+        sold.hurdle.excludes
+    )
+    to_maturity = project.project(
+        synthetic.declaration(),
+        synthetic.holding(),
+        synthetic.horizon(),
+        synthetic.assumptions(),
+        tax_classes=synthetic.TAX_PACK,
+    )
+    assert isinstance(to_maturity, Projection), to_maturity
+    assert not [claim for claim in to_maturity.hurdle.excludes if "resale" in claim]

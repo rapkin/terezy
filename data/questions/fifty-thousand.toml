@@ -75,10 +75,12 @@ reserve      = []
   amount   = 50000.0
   currency = "UAH"
 
-  # The dollar stream releases nothing for this question. An amount is required for every
-  # declared stream, because a stream with no stated amount is the case that fails silently:
-  # its pairs yield no candidate, nothing raises, and the answer is missing a stream nobody
-  # mentioned.
+  # A token dollar amount, and it is required rather than decorative: an amount is stated for
+  # EVERY declared stream, because a stream with no stated amount is the case that fails
+  # silently — its pairs yield no candidate, nothing raises, and the answer is simply missing a
+  # stream nobody mentioned. The stream really is enumerated: the answer carries one
+  # `contract_usd` pair per instrument per section, each saying no declared corridor reaches the
+  # buying venue. That absence is the finding, and stating an amount is what makes it visible.
   [[question.amount]]
   stream   = "contract_usd"
   amount   = 1.0
