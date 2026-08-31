@@ -23,7 +23,7 @@ import sys
 import tomllib
 from datetime import date
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, assert_never
 
 from terezy.api.answer import AnsweredQuestion, answer_question, inputs_of
 from terezy.core.decision.answer import answer as answer_of
@@ -44,7 +44,12 @@ from terezy.core.results.answer import (
     SubjectUndeclared,
     SubjectUnreached,
 )
-from terezy.core.results.candidates import CandidateSurvey
+from terezy.core.results.candidates import (
+    CandidateSurvey,
+    NoCandidateReason,
+    NothingConnects,
+    NothingNeedsToConnect,
+)
 from terezy.data import manifest as run_manifest
 from terezy.data.declarations import loader, resolver
 
@@ -237,10 +242,15 @@ def _reserve_lines(section: HorizonSection) -> list[str]:
     return lines
 
 
-def _why(reason: object) -> str:
+def _why(reason: NoCandidateReason) -> str:
     """A no-candidate pair's reason, in compose's own words, carried verbatim (FR-011)."""
-    refusal = getattr(reason, "refusal", None)
-    return str(getattr(refusal, "reason", None) or getattr(reason, "reason", ""))
+    match reason:
+        case NothingNeedsToConnect():
+            return reason.refusal.reason
+        case NothingConnects():
+            return reason.reason
+        case _:  # pragma: no cover -- mypy proves this unreachable
+            assert_never(reason)
 
 
 def _closing_lines(run: AnsweredQuestion, result: Answer) -> list[str]:

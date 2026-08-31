@@ -41,8 +41,9 @@ would use for one subcommand is one more thing that has to be installed to read 
 instrument declaration.
 
 **Testing**: pytest. Worked examples over the shipped registry; a golden artefact of the
-owner's whole answer; source-tree scans for the four properties a type cannot carry; a
-Hypothesis invariant for the cross-horizon reading.
+owner's whole answer; walks over the whole result for the four properties a type cannot carry;
+a battery over 014's refusal union, partitioned into what a question can plant and what it
+structurally cannot.
 
 **Target Platform**: library, plus a loopback-free CLI that reads files and writes stdout.
 
@@ -53,9 +54,9 @@ Hypothesis invariant for the cross-horizon reading.
 feature composed in any record it returns (FR-020, scanned by SC-003); no objective, no scoring
 weight, no shortlist.
 
-**Scale/Scope**: 3 new core modules, 1 new api module, 1 new cli module, 1 new declaration kind
-across schema/loader/resolver, 2 records widened in 010 and 014, 3 data changes, ~20 test
-modules.
+**Scale/Scope**: four new core modules, one api module, one cli module, three new declaration
+kinds across schema/loader/resolver, and the reshaped run manifest. The source list below is the
+inventory; a count here would be a second copy of it.
 
 ## Constitution Check
 
@@ -99,6 +100,12 @@ src/terezy/core/instruments/fund.py        EDIT `FundDeclaration.groups`
 src/terezy/core/instruments/access.py      EDIT `InstrumentAccess.resale_price`
 src/terezy/core/decision/tuple_outcome.py  EDIT the bond arm of `CannotSpanHorizon` (FR-029)
 src/terezy/core/results/project.py         EDIT the sale at `horizon.end` (FR-029)
+src/terezy/core/instruments/fixed_income.py EDIT the sale, and the refusal naming the price
+src/terezy/core/instruments/enumerated.py  EDIT the same, over declared payments
+src/terezy/core/instruments/acquire.py     EDIT `early_sale`, beside the purchase
+src/terezy/core/ledger/events.py           EDIT `CausationKind.ACCESS_TERM`
+src/terezy/core/results/tuple.py           EDIT `TupleOutcome.sold_early`
+src/terezy/core/results/canonical.py       EDIT the canonical form of a whole answer
 src/terezy/core/scenarios/early_exit.py    NEW  the spread-holds belief, as a record
 src/terezy/data/declarations/schema.py     EDIT QuestionFile, GroupsFile, EarlyExitFile, groups, resale price
 src/terezy/data/declarations/loader.py     EDIT question_from_file, groups_from_file, early_exit_from_file

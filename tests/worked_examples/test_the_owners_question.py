@@ -50,19 +50,12 @@ def _answer() -> Answer:
     return fixtures.answered()
 
 
-def _labels() -> dict[str, tuple[str, ...]]:
-    """Which groups each shipped instrument declares itself into, read off the registry."""
-    registries = fixtures.declarations().tuples.registries
-    return {
-        **{name: declared.groups for name, declared in registries.instruments.items()},
-        **{name: declared.groups for name, declared in registries.funds.items()},
-    }
-
-
 def _expected_ids() -> frozenset[str]:
     """What ``ovdp`` and ``inzhur`` reach, derived from the labels rather than written out."""
     wanted = {fixtures.OVDP, fixtures.INZHUR}
-    return frozenset(name for name, groups in _labels().items() if wanted & set(groups))
+    return frozenset(
+        name for name, groups in fixtures.declared_labels().items() if wanted & set(groups)
+    )
 
 
 def test_the_question_names_four_subjects_and_two_of_them_are_declared_by_nothing() -> None:

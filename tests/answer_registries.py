@@ -120,3 +120,18 @@ def with_resale_price(
         resale_price=VenueQuote(price=Money(per_unit, UAH, prov.EMPTY), kind="venue_terms"),
     )
     return replace(supplied, registries=replace(supplied.registries, access=access))
+
+
+def declared_labels(
+    declared: resolver.AnswerDeclarations | None = None,
+) -> dict[str, tuple[str, ...]]:
+    """Which groups each declared instrument declares itself into, by id.
+
+    Here rather than in each suite because three of them ask the registry the same question, and
+    three copies of one traversal is where they come to disagree about what a group *is*.
+    """
+    registries = (declarations() if declared is None else declared).tuples.registries
+    return {
+        **{name: item.groups for name, item in registries.instruments.items()},
+        **{name: item.groups for name, item in registries.funds.items()},
+    }

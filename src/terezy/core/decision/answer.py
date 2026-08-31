@@ -6,10 +6,10 @@ it are not verbs: the cross-horizon reading is :func:`cross_horizon` over the an
 *"just rank it"* is this function with a question declaring one horizon.
 
 **It calls 014's ``survey`` and 010's ``compare``; it forks neither.** No feasibility rule, no
-objective, no scoring weight, no shortlist. It adds exactly two rules of its own -- a candidate
-whose money arrives after the window is withheld rather than labelled (FR-030), and a reserve
-gets a verdict that removes nothing (FR-018) -- and both are section-level, so neither needs a
-change to 010's union.
+objective, no scoring weight, no shortlist. The two rules it adds about *candidates* are both
+section-level, so neither needs a change to 010's union: a candidate whose money the holding
+released after the window is withheld rather than labelled (FR-030), and a reserve gets a
+verdict that removes nothing (FR-018).
 
 **No exchange rate is derived and none is read from a series** (FR-021). A cross-currency
 candidate is evaluated and reported and not ranked, by 010's ``RateNotComparable``; a reserve in

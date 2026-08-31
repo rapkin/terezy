@@ -20,6 +20,7 @@ import pytest
 
 from terezy.data.declarations import loader, resolver
 from terezy.data.declarations.errors import DeclarationError
+from tests import answer_registries as fixtures
 
 pytestmark = pytest.mark.contract
 
@@ -75,18 +76,6 @@ def _edit(path: Path, old: str, new: str) -> None:
     pytest.fail(f"{path.name} no longer declares {old!r}; this test is stale")
 
 
-def _declared_labels(declarations: resolver.Declarations) -> dict[str, tuple[str, ...]]:
-    """Every declared instrument's groups, by id, read off the two declaration maps.
-
-    Two maps rather than one because a fund and a bond are different records; folding them
-    into a ``dict[str, object]`` is what made mypy unable to see the field at all.
-    """
-    return {
-        **{name: declared.groups for name, declared in declarations.instruments.items()},
-        **{name: declared.groups for name, declared in declarations.funds.items()},
-    }
-
-
 def _assert_names_file_and_field(exc: DeclarationError, file: Path, contains: str) -> None:
     assert exc.file == file
     assert contains in exc.field_path, f"{exc.field_path!r} does not locate {contains!r}"
@@ -104,9 +93,8 @@ def test_the_shipped_groups_file_loads() -> None:
 
 
 def test_the_shipped_labels_are_what_the_owners_words_resolve_to() -> None:
-    declarations = resolver.from_data_root(DATA_ROOT)
     labelled: dict[str, set[str]] = {group: set() for group in SHIPPED_MEMBERSHIP}
-    for identifier, labels in _declared_labels(declarations).items():
+    for identifier, labels in fixtures.declared_labels().items():
         for group in labels:
             labelled[group].add(identifier)
     assert {name: frozenset(ids) for name, ids in labelled.items()} == SHIPPED_MEMBERSHIP
@@ -114,7 +102,7 @@ def test_the_shipped_labels_are_what_the_owners_words_resolve_to() -> None:
 
 def test_two_declared_instruments_are_in_no_group() -> None:
     """Their own files say what they are for, and neither is what the owner asked about."""
-    labels = _declared_labels(resolver.from_data_root(DATA_ROOT))
+    labels = fixtures.declared_labels()
     assert {name for name, groups in labels.items() if not groups} == IN_NO_GROUP
 
 

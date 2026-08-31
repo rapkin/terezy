@@ -40,7 +40,11 @@ The same `VenueQuote` an `[access.price]` builds — a `Money` per unit with its
 | `id` | `str` | named in `rests_on`, so a reader can find the file |
 | `is_assumption` | `Literal[True]` | FR-032 — it is a belief, not an observation |
 | `rationale` | `str` | required and non-empty; the owner's own words |
-| `provenance` | `Provenance \| None` | `None` for the owner's own belief; a published forecast fills it |
+
+No citation keys, and their absence is the design: a platform that committed to its quoted
+buyback price would have declared a **term**, so a source here would replace the belief rather
+than vouch for it.
+
 
 Exactly one file; an absent directory refuses at load naming it (FR-032, D9).
 
@@ -53,17 +57,19 @@ Exactly one file; an absent directory refuses at load naming it (FR-032, D9).
 | `regime_id` | `str` | FR-002 — one regime per question |
 | `continuation` | `ContinuationAssumption` | FR-002, 010's enum |
 | `amounts` | `Mapping[str, Money]` | FR-002, FR-004 — per stream, in that stream's own currency |
-| `subjects` | `tuple[NamedSubject, ...]` | FR-007, in declared order |
+| `subjects` | `tuple[str, ...]` | FR-007, the words the owner wrote, in declared order |
 | `every_declared_instrument` | `bool` | FR-007's explicit token; `True` forbids `subjects` and vice versa |
 | `horizons` | `tuple[DateRange, ...]` | FR-012, in declared order |
 | `benchmark_instrument_id` | `str` | FR-026 |
-| `plans` | `Mapping[str, tuple[InstrumentPlan, ...]]` | FR-002, keyed by **subject** id (D4) |
+| `plans` | `Mapping[str, tuple[InstrumentPlan, ...]]` | FR-002, keyed by a **subject** word or by an instrument id the subjects reach; the per-instrument one wins (D4) |
 | `reserves` | `tuple[Reserve, ...]` | FR-016 |
 | `owner_id` | `str` | Principle VII |
 
-`NamedSubject` is `SubjectId | SubjectGroup`, both carrying one `id`. The distinction is what
-the question *said*, before anything resolves it; an id naming no instrument and a group naming
-no group are both FR-009's population, and the file cannot be refused for either (FR-009).
+**The subjects are untagged**, and that is forced by FR-009: whether a word is an instrument id,
+a group id or neither is a fact about the *registry*, and a word that is neither must reach the
+answer as its own population rather than refuse the file. Tagging them at load would need the
+registry there and would turn the owner's vocabulary into curated data. The tagging happens in
+the answer, as `DeclaredSubject.is_group`.
 
 `Reserve`: `amount: Money`, `by: date`.
 
@@ -103,7 +109,7 @@ Derived, never stored: `considered_ids(answer)` (FR-007b's deduplicated union),
 | Field | Type | Requirement |
 |---|---|---|
 | `horizon` | `DateRange` | FR-012 |
-| `outcome` | `CandidateSurvey \| SurveyRefused \| BenchmarkUnavailable` | FR-014 — 014's and 010's records, whole |
+| `outcome` | `CandidateSurvey \| SurveyRefused \| BenchmarkYieldsNoCandidate` | FR-014 — 014's records, whole, widened by one |
 | `standings` | `tuple[SubjectStanding, ...]` | FR-010; one per named subject, declared order |
 | `arrives_after_horizon` | `tuple[MoneyArrivesAfterHorizon, ...]` | FR-030 |
 | `reserves` | `tuple[ReserveVerdict, ...]` | FR-016 — one per `(candidate × reserve)` |
@@ -114,7 +120,7 @@ candidate. Three records rather than one with a discriminator, because FR-010 re
 distinguishable without reading prose and their remedies differ.
 
 `MoneyArrivesAfterHorizon(key: Tuple, arrives_on: date)` — FR-030's typed part-refusal, naming
-the candidate and the date its money actually arrives.
+the candidate and the date its money actually reaches a spendable endpoint.
 
 `ReserveVerdict = CoveredByThePlan | PartialExitWouldBeNeeded`:
 
@@ -125,7 +131,10 @@ the candidate and the date its money actually arrives.
   Never *the reserve cannot be met*, and never *no price is declared*.
 
 `section_evaluated(section)` and `section_ranking(section)` are derived and exclude every key in
-`arrives_after_horizon` (D8, FR-030).
+`arrives_after_horizon` (D8, FR-030). **The withholding tests the date the holding released the
+money**, not the date it arrived: a sale at `horizon.end` settles a few days later on every
+declared corridor, and 010's `accounts_for` already says settlement latency sits inside the span
+because waiting is a cost. Testing the arrival would withhold every early exit there is.
 
 ### `core.results.answer.StatedExclusion`
 
@@ -134,7 +143,7 @@ the candidate and the date its money actually arrives.
 | `what` | `Exclusion` (enum) | FR-023a — a closed set |
 | `applies_to` | `Tuple \| None` | FR-023a — the candidate, where it is specific to one |
 | `supplied_by` | `str` | FR-023a — a feature id or a declaration path, never a search |
-| `direction` | `Understated \| Overstated \| None` | FR-033 — `None` where the claim has no warranted sign |
+| `direction` | `Direction \| None` | FR-033 — `None` where the claim has no warranted sign |
 
 `Exclusion` members: `NO_REAL_TERMS_FIGURE`, `NO_INCOME_TAX_ON_THE_STATED_AMOUNT`,
 `EARLY_EXIT_CARRIES_NO_RATE_RISK`, `EARLY_EXIT_IS_A_POINT_NOT_A_DISTRIBUTION`,
@@ -147,7 +156,15 @@ absence rather than tolerating it.
 Returned **instead of** an `Answer` (FR-026). A tagged union over what is wrong with the
 *question*: `NoHorizonDeclared`, `NoSubjectDeclared`, `AmountForAnUndeclaredStream(stream_id)`,
 `StreamWithNoAmount(stream_id)`, `BenchmarkOutsideTheSubjects(instrument_id)`,
-`BenchmarkYieldsSeveralCandidates(instrument_id, count)`, `TwoIdenticalHorizons(horizon)`.
+`BenchmarkYieldsSeveralCandidates(instrument_id, occurrences)`, `TwoIdenticalHorizons(horizon)`,
+`PlanForNothing(named)`.
+
+`BenchmarkOutsideTheSubjects` is a benchmark the question does not **name**; a benchmark that is
+a named subject and reaches nothing is that section's `BenchmarkYieldsNoCandidate` instead. The
+split is what lets SC-020's question — four words the registry declares none of — be answered at
+all. `PlanForNothing` is a plan keyed by a word no subject reaches, refused for the reason every
+declaration here refuses an ignored field: a setting silently dropped is a stated choice that
+does nothing.
 
 Every member is reachable from a **file** as well as from a caller, which is why the first four
 are also load-time refusals: in an artefact under review an omitted amount is a typo, and FR-004
