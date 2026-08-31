@@ -34,6 +34,7 @@ from terezy.core.ledger.events import CausationKind, CausationRef, Event, EventK
 from terezy.core.ledger.lots import Disposal, Lot, Position
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives import staleness
+from terezy.core.primitives.conventions import AmountsAsDeclared
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.periods import Window
@@ -45,6 +46,7 @@ from terezy.core.results.tuple import InstrumentPlan, Tuple
 from terezy.core.routes import capacity
 from terezy.core.routes.path import (
     EXIT_BY_IDENTITY,
+    FROM_THE_DECLARATION,
     ComposedExit,
     ExitChoice,
     FundingPath,
@@ -261,8 +263,10 @@ CANONICAL_SHAPE_BY_ENCODING = {
         "|(s,s,((s,s),(s,s)),(s,s),(s),(s))"
         "|((s,s),(s,s),(s,s),(s,s),(s,s,s))"
         "|((s,s),(s,s),(s,s),(s),(s))"
+        "|(s,s,s)"
         "|(s,s,s,(s,s),(s,s,s))"
         "|(s,s,s,(),(s,s,s,s,(i,i,i),s,s))"
+        "|(s,s,s,(s),(s,s,s,s,(i,i,i),s,s))"
     ),
 }
 """One recorded shape fingerprint per encoding tag, and exactly one entry: the current tag.
@@ -284,11 +288,12 @@ test exists to prevent.
 to different shapes, and pinning one leaves the other free to move. That is why the hurdle and
 the purchase premium each appear here in both of their forms.
 
-**The answer's own forms above the candidate key are not covered, as of 2026-08-31** --
-``of_section``, ``of_outcome``, the subject standings, the reserve verdicts and the exclusions.
-A shape change in one of them moves the recorded answer digest while this test stays green;
-what closes it is a hand-built representative per form, because a real answer's shape carries
-how many candidates that run enumerated and a fixture's count would then leak into the tag.
+**Every form ``of_answer`` reaches above the candidate key is uncovered, as of 2026-08-31**,
+starting with its own arity. A shape change in any of them moves the recorded answer digest
+while this test stays green; what closes it is a hand-built representative per form, because a
+real answer's shape carries how many candidates that run enumerated and a fixture's count would
+then leak into the tag. They are not listed here: a list of what a module contains is a sentence
+that stops being true without anything failing.
 
 Widening the pin is not itself a scheme change, and the candidate key is the case to check
 before assuming otherwise: no digest recorded under ``v3`` covered it, because neither
@@ -399,7 +404,8 @@ def _projection_fingerprint() -> str:
     fingerprint. Each form is fingerprinted from a hand-built representative instead -- one of
     everything, no ``None`` where a value could sit. The join runs ``of_projection``'s five
     components in its own order, then the candidate key, which no projection carries and an
-    answer digest carries once per candidate it reported a figure for.
+    answer digest carries wherever it names a candidate -- for a figure, for a refusal, for a
+    withheld arrival, for a reserve verdict.
 
     The hurdle's real slot and the purchase premium each appear **twice**: once populated and
     once absent. The two branches of each have different shapes, and pinning only the populated
@@ -425,8 +431,10 @@ def _projection_fingerprint() -> str:
             _shape(canonical.of_hurdle_rate(_unavailable_hurdle())),
             _shape(canonical.of_at_purchase(_governed(result.at_purchase))),
             _shape(canonical.of_at_purchase(_ungoverned(result.at_purchase))),
+            _shape(canonical.of_conventions(AmountsAsDeclared(day_count="act/365"))),
             _shape(canonical.of_tuple_key(_a_key(A_CHAIN, synthetic.A_BOND_PLAN))),
             _shape(canonical.of_tuple_key(_a_key(EXIT_BY_IDENTITY, synthetic.A_FUND_PLAN))),
+            _shape(canonical.of_tuple_key(_a_key(FROM_THE_DECLARATION, synthetic.A_FUND_PLAN))),
         )
     )
 
@@ -437,7 +445,8 @@ def _governed(value: project.PurchasePremium) -> project.PurchasePremium:
     The projection is run without assessment rules, so the figure it produces already carries
     ``TreatmentUnstated`` -- and pinning that alone would leave the longer, answered rendering
     outside the fingerprint, which is the shape a change is most likely to land in. Populated
-    and absent are pinned as a pair, on ``_representative_hurdle``'s rule.
+    and absent are pinned as a pair, which is this module's own rule and what
+    :func:`_unavailable_hurdle` is the other instance of.
     """
     return dataclasses.replace(
         value,
@@ -503,6 +512,10 @@ def _representative_hurdle() -> hurdle.HurdleRate:
     )
 
 
+PROJECTION_COMPONENTS: Final = 5
+"""How many things ``of_projection`` renders, so that a sixth cannot arrive unremarked."""
+
+
 def test_the_encoding_tag_moves_whenever_the_canonical_shape_does() -> None:
     """The reproducibility contract, made mechanical (manifest.py's own promise).
 
@@ -513,9 +526,16 @@ def test_the_encoding_tag_moves_whenever_the_canonical_shape_does() -> None:
     test fails on either half changing alone, and its message says which line to move.
 
     Every component is fingerprinted, not the ledger alone: pinning the ledger would leave every
-    figure a digest also covers free to change shape under an unchanged tag.
+    figure a digest also covers free to change shape under an unchanged tag. The **number** of
+    components is asserted separately, because a fingerprint per component says nothing about a
+    sixth being added -- which is the shape of the feature-002 failure itself.
     """
     fingerprint = _projection_fingerprint()
+    assert len(canonical.of_projection(_projection(verified=False))) == PROJECTION_COMPONENTS, (
+        "of_projection gained or lost a component. Every recorded digest now covers a different "
+        "tuple under an unchanged scheme name: bump manifest.ENCODING, fingerprint the new "
+        "component in _projection_fingerprint, and record the count here."
+    )
     assert manifest.ENCODING in CANONICAL_SHAPE_BY_ENCODING, (
         f"manifest.ENCODING is {manifest.ENCODING!r}, which this test does not know. "
         "Record the tag with its shape fingerprint in CANONICAL_SHAPE_BY_ENCODING -- and "

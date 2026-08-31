@@ -275,8 +275,8 @@ A_FUND_PLAN: Final = FundAssumptions(
 )
 """One run plan for a fund, with every optional field populated exactly once.
 
-Populated rather than absent for :func:`assumptions`'s reason: the fuller record is the one a
-walk over its fields can say something about, and an omitted value hides the field it sits in.
+Populated rather than absent: the fuller record is the one a walk over its fields can say
+anything about, and an omitted value hides the field it sits in.
 """
 
 PLAN_FIELD_ALTERNATIVES: Final = {

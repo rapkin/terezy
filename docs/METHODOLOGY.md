@@ -1013,10 +1013,10 @@ different schemes.
 | v3 | the real-terms slot became **two** tagged figures, each carrying its basis, the series it is real against and its window (§27.5) |
 
 A pinned shape fingerprint in `tests/unit/test_results_canonical.py` fails the build if the
-shape moves while the name does not. That pin covers **every** component `of_projection` is
-built from — the ledger, a schedule row, a charge, and the figures with the real slot both
-populated and absent — because a pin over one component leaves the rest free to move under an
-unchanged name, which is the v1→v2 failure it exists to prevent.
+shape moves while the name does not, because a pin over one component leaves the rest free to
+move under an unchanged name — which is the v1→v2 failure it exists to prevent. What it covers,
+and what it does not yet cover, is recorded there rather than restated here: the pin and the
+sentence describing it would otherwise be two facts, and the copy is what drifts.
 
 Bumping the name moves **every** digest taken under it, including
 `tests/golden/ramp_comparison.golden.txt`, whose ranking did not change. That is the cost of
