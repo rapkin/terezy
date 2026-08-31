@@ -168,6 +168,14 @@ registry. The labels, each read from the fixture's **own header** rather than fr
 | `inzhur` | `inzhur_reit`, `inzhur_miltech` — **2** | the two real declarations in the registry |
 | in neither | `enumerated_taxable_x`, `synthetic_fund_c` | the first exists *because* ОВДП exempt both income kinds and it declares two taxable ones instead; the second's *"whole purpose is that it is different"* from the Inzhur funds |
 
+> **Superseded 2026-08-31 by feature 016.** The table is left as it was measured, because it is
+> the labelling judgement this feature made. Two things moved: `ovdp` gained the **24** real
+> issues, so the four words now resolve to **30**; and `enumerated_out_of_order` **lost** the
+> label (016 FR-027a), because the real issue it is modelled on is declared and a group holding
+> both would hold one piece of paper twice. That is also the answer to the last column's own
+> note. The live membership is derived rather than written, in
+> `tests/contract/test_group_declaration_loading.py`.
+
 **Seven, and seven is the honest figure.** Nine was *every instrument in the registry*, which is
 not what he asked. The cheapest route back to nine is to put `ovdp` on `enumerated_taxable_x` and
 `inzhur` on `synthetic_fund_c` — which is precisely the class-stands-in-for-the-group inference

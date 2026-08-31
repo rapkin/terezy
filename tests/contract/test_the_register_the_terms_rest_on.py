@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from collections import Counter
 from datetime import date
+from pathlib import Path
 
 import pytest
 
@@ -119,3 +120,30 @@ def test_every_declared_schedule_is_published_in_ascending_date_order() -> None:
     for isin in obs.declared_isins():
         dates = obs.register_dates(obs.register_issues()[isin])
         assert dates == sorted(dates), isin
+
+
+def test_an_active_issue_the_register_drops_is_refused_rather_than_declared(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """SC-011, FR-008. Unreached in the shipped data -- all 24 are listed -- so it is reached
+    with a scratch register one issue short, which is the register's ORDINARY behaviour: seven
+    of the eight completed issues have already left it.
+
+    A refusal naming the ISIN, never a fall back to the seller's terms. The seller has the
+    whole schedule for every one of these and taking it would be the exact laundering this
+    feature exists to prevent: an issue the issuer no longer records, declared on a seller's
+    authority.
+    """
+    dropped = "UA4000239081"
+    text = obs.REGISTER.read_text(encoding="utf-8")
+    start = text.index(f'isin   = "{dropped}"')
+    opening = text.rindex("[[issue]]", 0, start)
+    end = text.index("\n[[issue]]", start)
+    copy = tmp_path / obs.REGISTER.name
+    copy.write_text(text[:opening] + text[end + 1 :], encoding="utf-8")
+    monkeypatch.setattr(obs, "REGISTER", copy)
+
+    assert dropped not in obs.register_issues()
+    assert obs.undeclarable_isins() == (dropped,)
+    assert dropped not in obs.declared_isins()
+    assert dropped in obs.active_isins()

@@ -28,6 +28,10 @@ from tests import answer_registries as fixtures
 
 pytestmark = pytest.mark.contract
 
+FIXTURE = "enumerated_out_of_order"
+MODELLED_ON = "UA4000235865"
+"""The fixture and the real issue whose published list it is shaped like."""
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DATA_ROOT = REPO_ROOT / "data"
 
@@ -133,3 +137,25 @@ def test_the_shipped_count_is_unchanged_by_an_unlabelled_addition(tmp_path: Path
     shipped = fixtures.answered()
     without = _answered(_root_with_lookalike(tmp_path, labelled=False))
     assert _members(without, fixtures.OVDP) == _members(shipped, fixtures.OVDP)
+
+
+def test_no_group_holds_one_piece_of_paper_twice() -> None:
+    """016 FR-027a, SC-020. `enumerated_out_of_order` is modelled on `UA4000235865` and names
+    that ISIN in its own header; 016 declares the real issue, so a group carrying both would
+    hold one security as two candidates with two sets of cash flows in one comparison,
+    differing only in that one is invented.
+
+    015 FR-007b's deduplication cannot catch it -- it deduplicates by **id**, and these are two
+    ids for one security -- so the remedy is the label rather than the counter.
+
+    **Asserted against a registry that actually declares the group.** A green result over zero
+    declared labels would be evidence of nothing, so the fixture's own membership is read back
+    and required to be empty rather than merely absent from a resolution.
+    """
+    labels = fixtures.declared_labels()
+    assert labels[FIXTURE] == (), labels[FIXTURE]
+    together = {name for name, groups in labels.items() if groups}
+    assert MODELLED_ON in together, "the real issue must be labelled for this check to mean any"
+    for group in {group for groups in labels.values() for group in groups}:
+        members = {name for name, groups in labels.items() if group in groups}
+        assert not ({FIXTURE, MODELLED_ON} <= members), group
