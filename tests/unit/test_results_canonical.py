@@ -281,9 +281,9 @@ This pinned pair is what makes the next such change a red test naming the remedy
 **One fingerprint per form covered and per branch of it**, joined by pipes, on the rules
 :func:`_projection_fingerprint` states -- and its own body is the list of them.
 
-Covering ``ledger.canonical.of_result`` alone would leave the rest
-of what a digest is taken over free to change shape under an unchanged tag, which is the
-feature-002 failure this test exists to prevent.
+Covering ``ledger.canonical.of_result`` alone would leave the rest of what a digest is taken
+over free to change shape under an unchanged tag, which is the feature-002 failure this test
+exists to prevent.
 
 **Every form ``of_answer`` reaches above the candidate key is uncovered, as of 2026-08-31**,
 starting with its own arity. A shape change in any of them moves the recorded answer digest
@@ -407,10 +407,11 @@ def _projection_fingerprint() -> str:
     have an absent form shorter than the answered one, and the way out is rendered by two
     different expressions -- the segments of a chain, or the instruction's own name.
 
-    Not *every* absence: an optional field renders as ``0`` rather than shortening the tuple it
-    sits in, so a record's absent form has the arity of its populated one and the representative
-    fills every slot for :func:`_representative_state`'s reason. The rule is about branches that
-    change the **shape**, which is what a digest scheme's identity is made of.
+    Not *every* absence, because not every absence changes an arity. A field rendered as a bare
+    ``None`` becomes ``0`` in the slot it already occupied, so the record is as long without it
+    as with it -- and the representative fills every such slot, for
+    :func:`_representative_state`'s reason. An absence rendered as its own **tag** is the other
+    case and is pinned: an unstated tax class is ``("undeclared",)`` against ``("class", id)``.
 
     Inside the chain branch the arity follows the **segment count**, and a ``DeclaredExit`` is
     not pinned because its one segment renders to the arity the instruction's entry already
