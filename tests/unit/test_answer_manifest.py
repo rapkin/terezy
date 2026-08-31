@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import dataclasses
 import shutil
+from collections.abc import Mapping
 from dataclasses import replace
 from pathlib import Path
 from typing import Any, Final, get_args
@@ -26,6 +27,8 @@ from terezy.api.answer import answer_question
 from terezy.core.primitives.currency import Currency
 from terezy.core.results.answer import Answer, NoHorizonDeclared, PlanForNothing
 from terezy.core.results.coverage import IMPLICIT_REGIME_ID
+from terezy.core.tax.official_rate import OfficialRateSeries
+from terezy.core.tax.year import AssessmentRules
 from terezy.data import manifest as run_manifest
 from terezy.data.manifest import InputKind
 from tests import answer_registries as fixtures
@@ -237,9 +240,15 @@ def test_every_input_kind_the_set_admits_is_one_the_walk_produces() -> None:
 def test_an_answer_reads_no_rate_series_at_all() -> None:
     """015 FR-021 from the input side: the series cannot reach a figure it never loaded.
 
-    Asserted over the resolved registries rather than by scanning imports, because the way a
-    rate would arrive is a *value* -- an ``AssessmentRules`` carrying an ``official_rate`` --
-    and a scan for the word would pass a run that was handed one.
+    Asserted over the **values** the resolved registries hold, not over their field names: the
+    way a rate would arrive is an ``AssessmentRules`` carrying an ``OfficialRateSeries``, and it
+    could arrive under any name at all -- or inside a mapping, which is why the walk descends
+    into one. A scan over names would pass a run that had been handed the series.
     """
     registries = fixtures.declarations().tuples.registries
-    assert not [name for name in dir(registries) if "rule" in name or "rate" in name.lower()]
+    held = [getattr(registries, field.name) for field in dataclasses.fields(registries)]
+    inside = [item for value in held if isinstance(value, Mapping) for item in value.values()]
+    carried = [
+        item for item in [*held, *inside] if isinstance(item, AssessmentRules | OfficialRateSeries)
+    ]
+    assert not carried, carried
