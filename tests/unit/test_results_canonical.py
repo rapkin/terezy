@@ -395,17 +395,20 @@ def _projection_fingerprint() -> str:
 
     ``of_projection`` is not called directly because building a representative ``Projection``
     means running a projection, and a fixture's coupon count would then leak into the
-    fingerprint. Each form is fingerprinted from a hand-built representative instead -- one of
-    everything, no ``None`` where a value could sit. **What is covered is the list below, not a
-    sentence about it**: the join is read straight off the code, and this docstring says only
-    the rules the list obeys.
+    fingerprint. Each form is fingerprinted from a representative that carries one of
+    everything and no more, hand-built where the fixture cannot supply one. **What is covered
+    is the list below, not a sentence about it**: the join is read straight off the code, and
+    this docstring says only the rules the list obeys.
 
     **A form whose branches render to different shapes is pinned once per branch.** Pinning one
     would leave the others free to move: the hurdle's real slot and the purchase premium each
-    have an absent form shorter than the answered one, and a way out renders by the number of
-    exit segments -- which makes the empty chain and the instruction that is not a chain two
-    arities nothing else produces, while one declared segment and one composed segment render
-    alike and pinning both would say nothing.
+    have an absent form shorter than the answered one, and the way out is rendered by two
+    different expressions -- the segments of a chain, or the instruction's own name.
+
+    Inside the chain branch the arity follows the **segment count**, and a ``DeclaredExit`` is
+    not pinned because its one segment renders to the arity the instruction's entry already
+    covers. What the chain branch contributes is a chain of two, and the empty one -- the arity
+    only :data:`EXIT_BY_IDENTITY` produces, since a composed chain declares at least two.
 
     The candidate key is here because no projection carries it and an answer digest carries it
     wherever it names a candidate.
@@ -468,8 +471,8 @@ A_CHAIN: Final = ComposedExit(segments=("out_a", "out_b"))
 def _a_key(way_out: ExitChoice, plan: InstrumentPlan) -> Tuple:
     """One candidate key, for the fingerprint's sake alone.
 
-    Both kinds of run plan, because they render to different shapes; the way out as a chain and
-    as the identity exit, for the reason :func:`_projection_fingerprint` gives.
+    Both kinds of run plan, because they render to different shapes; the ways out for the
+    reason :func:`_projection_fingerprint` gives.
     """
     return Tuple(
         instrument_id="an_instrument",
