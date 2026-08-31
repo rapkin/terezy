@@ -21,6 +21,7 @@ import pytest
 from terezy.data.declarations import loader, resolver
 from terezy.data.declarations.errors import DeclarationError
 from tests import answer_registries as fixtures
+from tests import observations as obs
 
 pytestmark = pytest.mark.contract
 
@@ -31,31 +32,38 @@ GROUPS = DATA_ROOT / "groups.toml"
 OVDP = "ovdp"
 INZHUR = "inzhur"
 
-SHIPPED_MEMBERSHIP: dict[str, frozenset[str]] = {
-    OVDP: frozenset(
-        {
-            "ovdp_synthetic_a",
-            "ovdp_synthetic_b",
-            "ovdp_enumerated_a",
-            "ovdp_enumerated_mirror",
-            "enumerated_out_of_order",
-        }
-    ),
-    INZHUR: frozenset({"inzhur_reit", "inzhur_miltech"}),
-}
-"""What the owner's two words resolve to over the shipped registry (spec *The measurement* 4).
+FIXTURES_IN_OVDP = frozenset(
+    {"ovdp_synthetic_a", "ovdp_synthetic_b", "ovdp_enumerated_a", "ovdp_enumerated_mirror"}
+)
+"""The invented bonds the owner's word ``ovdp`` reaches.
 
-Pinned rather than derived, because the labels **are** the judgement this feature made and a
-test that read them back off the files would assert that the files equal themselves. 016 adds
-24 ids to ``ovdp`` and updates this map in the same change.
+Pinned rather than derived, because a fixture's label **is** a judgement and a test that read
+it back off the file would assert that the file equals itself. ``enumerated_out_of_order`` is
+deliberately absent: 016 declares ``UA4000235865``, the real issue that fixture is modelled on
+and names in its own header, so keeping the label would put one piece of paper in the group
+twice -- two candidates with two sets of cash flows, differing only in that one is invented.
+015 FR-007b's deduplication cannot catch it, because it deduplicates by id and these are two
+ids for one security (016 FR-027a).
 """
 
-IN_NO_GROUP = frozenset({"enumerated_taxable_x", "synthetic_fund_c"})
-"""The two the registry declares and the owner's question does not reach.
+SHIPPED_MEMBERSHIP: dict[str, frozenset[str]] = {
+    OVDP: FIXTURES_IN_OVDP | frozenset(obs.declared_isins()),
+    INZHUR: frozenset({"inzhur_reit", "inzhur_miltech"}),
+}
+"""What the owner's two words resolve to over the shipped registry.
+
+The real half is **derived** from the two observation files rather than listed, which is the
+whole argument for a group: an issue joins by carrying the label and nothing here changes.
+"""
+
+IN_NO_GROUP = frozenset({"enumerated_taxable_x", "synthetic_fund_c", "enumerated_out_of_order"})
+"""The three the registry declares and the owner's question does not reach.
 
 The first is fixed income and is not an OVDP; the second's own header says its whole purpose is
 that it is different from the Inzhur funds. Both are the reason FR-007a forbids inferring a
-group from a class.
+group from a class -- and the third is the fixture 016 FR-027a unlabelled, which is why a group
+is a label and not a rule: no rule over a class, a venue, a tax class or an id prefix could
+have excluded it.
 """
 
 
@@ -100,8 +108,8 @@ def test_the_shipped_labels_are_what_the_owners_words_resolve_to() -> None:
     assert {name: frozenset(ids) for name, ids in labelled.items()} == SHIPPED_MEMBERSHIP
 
 
-def test_two_declared_instruments_are_in_no_group() -> None:
-    """Their own files say what they are for, and neither is what the owner asked about."""
+def test_three_declared_instruments_are_in_no_group() -> None:
+    """Their own files say what they are for, and none is what the owner asked about."""
     labels = fixtures.declared_labels()
     assert {name for name, groups in labels.items() if not groups} == IN_NO_GROUP
 

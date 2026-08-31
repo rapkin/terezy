@@ -53,10 +53,15 @@ from terezy.core.tax.schedule import RateUndeclaredBefore
 from terezy.data.declarations import loader, resolver, schema
 from terezy.data.declarations.errors import DeclarationError
 from tests import declared_terms
+from tests import observations as obs
 
 pytestmark = pytest.mark.contract
 
 DATA_ROOT = Path(__file__).resolve().parents[2] / "data"
+
+REAL_OVDP_ISINS: Final = frozenset(obs.declared_isins())
+"""Derived from the two observation files rather than listed, so an issue leaving the
+register moves this set instead of leaving a stale literal behind."""
 GROUPS = DATA_ROOT / "groups.toml"
 INSTRUMENT_A = DATA_ROOT / "instruments" / "ovdp_synthetic_a.toml"
 INSTRUMENT_B = DATA_ROOT / "instruments" / "ovdp_synthetic_b.toml"
@@ -1405,21 +1410,32 @@ class TestNoFieldDefaultStandsInForAValue:
 class TestEveryShippedInstrumentSaysItIsAFixture:
     """`docs/METHODOLOGY.md` §0's claim about `data/instruments/`, as a check.
 
-    Every declaration this repository ships is invented, and every one of them says so on
-    its face — a bond through `is_synthetic`, a fund through `is_assumption_driven` — with
-    every `verified_on` empty. §0 tells a reader that no figure computed from any of them
-    describes something anyone can buy, and it used to tell them by naming two files by
-    hand, which had been wrong since feature 006 added three more.
+    Which declarations are invented is a fact about files, and §0 states it in prose. So the
+    prose is held here: a fixture says so on its face — a bond through `is_synthetic`, a fund
+    through `is_assumption_driven` — and the real issues say the opposite, so a reader is
+    never told a figure describes something buyable when it does not, nor the reverse.
 
-    ⚙ The correction replaced the count with the property and cited a file that checks no
-    such thing (found 2026-08-30). This is that file.
+    The property is stated rather than a file list, because a count of files goes stale on the
+    next data change and this one already had, twice.
     """
 
-    def test_every_declared_bond_declares_itself_synthetic(self) -> None:
+    def test_a_bond_declares_itself_a_fixture_exactly_when_its_identity_is_not_an_isin(
+        self,
+    ) -> None:
+        """The real ones are named for their ISIN and nothing else (016 FR-002), so the two
+        populations are told apart by the identity rather than by a list kept beside them."""
         declared = resolver.from_data_root(DATA_ROOT)
         assert declared.instruments
         for identifier, instrument in sorted(declared.instruments.items()):
-            assert instrument.is_synthetic, identifier
+            assert instrument.is_synthetic == (identifier not in REAL_OVDP_ISINS), identifier
+
+    def test_the_real_issues_are_exactly_the_ones_the_two_observations_agree_on(self) -> None:
+        """FR-001 and FR-008's boundary, from the registry's side: an issue is declared when
+        the seller carries it as active and the issuer's register still lists it."""
+        declared = resolver.from_data_root(DATA_ROOT)
+        real = {name for name, item in declared.instruments.items() if not item.is_synthetic}
+        assert real == set(obs.declared_isins())
+        assert obs.undeclarable_isins() == ()
 
     def test_every_declared_fund_declares_itself_assumption_driven(self) -> None:
         declared = resolver.from_data_root(DATA_ROOT)
@@ -1428,8 +1444,9 @@ class TestEveryShippedInstrumentSaysItIsAFixture:
             assert fund.is_assumption_driven, identifier
 
     def test_and_nothing_they_rest_on_claims_to_have_been_verified(self) -> None:
-        """The other half of the sentence. A verified term in a file of invented ones would
-        be a claim that somebody checked an invention against a source."""
+        """The other half of the sentence, and it survives the real issues arriving: their
+        terms COULD be checked against the issuer's register and their price never can, so
+        every one of them is still marked — through the price alone."""
         declared = resolver.from_data_root(DATA_ROOT)
         for identifier, instrument in sorted(declared.instruments.items()):
             assert prov.is_unverified(instrument.terms.provenance), identifier

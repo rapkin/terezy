@@ -6,17 +6,22 @@ and a sentence can:
     pairs considered      = pairs enumerated + pairs yielding no candidate
     candidates enumerated = evaluated        + dropped
 
-The arithmetic on the shipped registry, worked on 2026-08-30 under this module's own question
-(an outlay on 2026-04-01, a horizon ending 2030-06-30, one plan per instrument):
+The arithmetic on the shipped registry, re-measured on 2026-08-31 under this module's own
+question (an outlay on 2026-04-01, a horizon ending 2030-06-30, one plan per instrument):
 
-    18 pairs considered  =   9 pairs enumerated  +  9 pairs yielding no candidate
-     9 candidates        =   7 evaluated         +  2 dropped
+    66 pairs considered  =  33 pairs enumerated  + 33 pairs yielding no candidate
+    33 candidates        =  27 evaluated         +  6 dropped
 
 The **second** line is the one that moves with the question. Refusals across 010's union turn on
-the amount, on the horizon and on `as_of`, so 7 and 2 are facts about *this* question rather
+the amount, on the horizon and on `as_of`, so 27 and 6 are facts about *this* question rather
 than about the registry -- which is why FR-012 puts the whole question on the record beside
 every count, and why the identities are asserted against the set rather than against the
 numbers above. Both are derived here; the literals are the reader's check on the derivation.
+
+Four of the six drops are what a real registry looks like: `UA4000239016`, `UA4000239040`,
+`UA4000239081` and `UA4000239107` were placed after this question's outlay date, so buying them
+on it is buying paper that did not exist. The other two are the funds that size their payouts
+in USD with no declared rate, and they are the two that dropped before 016 declared anything.
 """
 
 from __future__ import annotations
@@ -56,19 +61,19 @@ class TestTheThreePopulationsPartitionEverythingConsidered:
         pairs_enumerated = {
             (item.key.instrument_id, item.key.stream_id) for item in enumerated.candidates
         }
-        assert len(pairs_enumerated) == 9
-        assert len(enumerated.no_candidate) == 9
+        assert len(pairs_enumerated) == 33
+        assert len(enumerated.no_candidate) == 33
         assert len(pairs_enumerated) + len(enumerated.no_candidate) == enumerated.pairs_considered
-        assert enumerated.pairs_considered == 18
+        assert enumerated.pairs_considered == 66
 
     def test_candidates_enumerated_equals_evaluated_plus_dropped(self) -> None:
         result = _survey()
-        assert len(evaluated(result.comparison)) == 7
-        assert len(dropped(result.comparison)) == 2
+        assert len(evaluated(result.comparison)) == 27
+        assert len(dropped(result.comparison)) == 6
         assert len(evaluated(result.comparison)) + len(dropped(result.comparison)) == len(
             result.enumerated.candidates
         )
-        assert len(result.enumerated.candidates) == 9
+        assert len(result.enumerated.candidates) == 33
 
     def test_every_enumerated_key_lands_in_exactly_one_of_the_two_columns(self) -> None:
         """The identity above holds by count; this holds it by **membership**, which is what a

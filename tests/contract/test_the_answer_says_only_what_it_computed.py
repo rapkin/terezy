@@ -214,13 +214,23 @@ def test_every_early_exit_figure_names_the_assumption_it_rests_on() -> None:
         assert expected in outcome.rests_on, outcome.rests_on
 
 
-def test_a_holding_the_window_reaches_carries_no_early_exit_claim() -> None:
-    """The machinery is reachable only where an early exit actually happens."""
+def test_an_early_exit_claim_appears_exactly_where_a_holding_was_sold_early() -> None:
+    """The machinery is reachable only where an early exit actually happens, and it IS reached:
+    016 declared 24 real issues with an observed resale price and most run past every horizon
+    the owner asked about. An `if` here rather than a `not` -- the claim is the equivalence, and
+    a section that carried the exclusion without selling anything would be marking a figure it
+    did not earn."""
     result = fixtures.answered()
-    for section in result.sections:
-        assert not [item for item in section.excludes if item.what in EARLY_EXIT_CLAIMS]
-        for outcome in section_evaluated(section):
-            assert outcome.sold_early is None
+    claimed = [
+        any(item.what in EARLY_EXIT_CLAIMS for item in section.excludes)
+        for section in result.sections
+    ]
+    sold = [
+        any(outcome.sold_early is not None for outcome in section_evaluated(section))
+        for section in result.sections
+    ]
+    assert claimed == sold
+    assert any(sold), "the shipped registry must actually reach an early exit"
 
 
 def test_a_section_that_holds_to_maturity_inherits_no_early_exit_claim() -> None:
@@ -233,11 +243,16 @@ def test_a_section_that_holds_to_maturity_inherits_no_early_exit_claim() -> None
     question = fixtures.owners_question()
     both = replace(
         question,
+        subjects=("ovdp_synthetic_a",),
+        plans={"ovdp_synthetic_a": question.plans["ovdp"]},
         horizons=(
             DateRange(start=date(2026, 9, 1), end=date(2027, 6, 1)),
             DateRange(start=date(2026, 9, 1), end=date(2028, 6, 1)),
         ),
     )
+    # ONE instrument, because the claim is about one key across two windows. Left over the whole
+    # registry the second section would carry the exclusion honestly -- a real issue maturing in
+    # 2029 is sold at 2028-06-01 -- and the demonstration would prove nothing about this key.
     result = fixtures.answered(
         both, fixtures.with_resale_price(fixtures.inputs(), "ovdp_synthetic_a")
     )

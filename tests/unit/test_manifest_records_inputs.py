@@ -60,6 +60,19 @@ manifest rather than in the declaration it answers."""
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DATA_ROOT = REPO_ROOT / "data"
 
+
+def _declared_files() -> dict[str, str]:
+    """Every instrument and fund the registry declares, and the file each is declared in.
+
+    Derived rather than listed. It was a list of nine until 016 declared 24 real ОВДП issues,
+    and a list of thirty-three would be a hand edit per issue thereafter -- silently wrong
+    until somebody made it. The claim being checked is that the manifest names what the
+    RESOLVER loaded, and the two are independent things.
+    """
+    declared = resolver.from_data_root(DATA_ROOT)
+    return {name: f"instruments/{name}.toml" for name in [*declared.instruments, *declared.funds]}
+
+
 ISSUE_A = "ovdp_synthetic_a"
 ISSUE_B = "ovdp_synthetic_b"
 EXEMPT_CLASS = "ua_government_bond"
@@ -232,22 +245,14 @@ class TestEveryDeclarationAndVersionThatFedTheRun:
 
     def test_every_declaration_in_the_set_is_named(self) -> None:
         record = _manifest()
+        declared = resolver.from_data_root(DATA_ROOT)
+        # FR-015 requires the record to say which price series and which declared belief were
+        # in force: two runs differing only in the belief are two results, and nothing else in
+        # the manifest tells them apart.
         assert {(ref.kind, ref.id) for ref in record.inputs} == {
-            # ⚙ The last two joined in 007. FR-015 requires the record to say which price
-            # series and which declared belief were in force, because two runs differing only
-            # in the belief are two results and nothing else in the manifest tells them apart.
             ("cpi_series", CPI_SERIES),
             ("inflation_assumption", INFLATION_BELIEF),
             ("official_rate", OFFICIAL_RATE_SERIES),
-            ("instrument", ISSUE_A),
-            ("instrument", ISSUE_B),
-            ("instrument", ENUMERATED_A),
-            ("instrument", ENUMERATED_MIRROR),
-            ("instrument", ENUMERATED_OUT_OF_ORDER),
-            ("instrument", ENUMERATED_TAXABLE),
-            ("fund", REIT),
-            ("fund", MILTECH),
-            ("fund", FUND_C),
             ("tax_class", EXEMPT_CLASS),
             ("tax_class", DISTRIBUTION_CLASS),
             ("tax_class", DISPOSAL_CLASS),
@@ -255,6 +260,8 @@ class TestEveryDeclarationAndVersionThatFedTheRun:
             ("tax_class", FIXTURE_DISPOSAL_CLASS),
             ("tax_class", FIXTURE_COUPON_CLASS),
             ("tax_class", FIXTURE_ENUMERATED_DISPOSAL_CLASS),
+            *(("instrument", name) for name in declared.instruments),
+            *(("fund", name) for name in declared.funds),
         }
 
     def test_the_second_issue_is_named_although_this_run_did_not_project_it(self) -> None:
@@ -284,15 +291,6 @@ class TestEveryDeclarationAndVersionThatFedTheRun:
             CPI_SERIES: "cpi/ua.toml",
             INFLATION_BELIEF: "inflation/owner-001.toml",
             OFFICIAL_RATE_SERIES: f"official_rates/{OFFICIAL_RATE_SERIES}.toml",
-            ISSUE_A: f"instruments/{ISSUE_A}.toml",
-            ISSUE_B: f"instruments/{ISSUE_B}.toml",
-            ENUMERATED_A: f"instruments/{ENUMERATED_A}.toml",
-            ENUMERATED_MIRROR: f"instruments/{ENUMERATED_MIRROR}.toml",
-            ENUMERATED_OUT_OF_ORDER: f"instruments/{ENUMERATED_OUT_OF_ORDER}.toml",
-            ENUMERATED_TAXABLE: f"instruments/{ENUMERATED_TAXABLE}.toml",
-            REIT: f"instruments/{REIT}.toml",
-            MILTECH: f"instruments/{MILTECH}.toml",
-            FUND_C: f"instruments/{FUND_C}.toml",
             EXEMPT_CLASS: "tax/ua.toml",
             DISTRIBUTION_CLASS: "tax/ua.toml",
             DISPOSAL_CLASS: "tax/ua.toml",
@@ -300,6 +298,7 @@ class TestEveryDeclarationAndVersionThatFedTheRun:
             FIXTURE_DISPOSAL_CLASS: "tax/synthetic_fixture.toml",
             FIXTURE_COUPON_CLASS: "tax/synthetic_fixture.toml",
             FIXTURE_ENUMERATED_DISPOSAL_CLASS: "tax/synthetic_fixture.toml",
+            **_declared_files(),
         }
         for name in files.values():
             assert not Path(name).is_absolute()
@@ -315,17 +314,6 @@ class TestEveryDeclarationAndVersionThatFedTheRun:
             CPI_SERIES: DATA_ROOT / "cpi" / "ua.toml",
             INFLATION_BELIEF: DATA_ROOT / "scenarios" / "inflation" / "owner-001.toml",
             OFFICIAL_RATE_SERIES: (DATA_ROOT / "official_rates" / f"{OFFICIAL_RATE_SERIES}.toml"),
-            ISSUE_A: DATA_ROOT / "instruments" / f"{ISSUE_A}.toml",
-            ISSUE_B: DATA_ROOT / "instruments" / f"{ISSUE_B}.toml",
-            ENUMERATED_A: DATA_ROOT / "instruments" / f"{ENUMERATED_A}.toml",
-            ENUMERATED_MIRROR: DATA_ROOT / "instruments" / f"{ENUMERATED_MIRROR}.toml",
-            ENUMERATED_OUT_OF_ORDER: (
-                DATA_ROOT / "instruments" / f"{ENUMERATED_OUT_OF_ORDER}.toml"
-            ),
-            ENUMERATED_TAXABLE: DATA_ROOT / "instruments" / f"{ENUMERATED_TAXABLE}.toml",
-            REIT: DATA_ROOT / "instruments" / f"{REIT}.toml",
-            MILTECH: DATA_ROOT / "instruments" / f"{MILTECH}.toml",
-            FUND_C: DATA_ROOT / "instruments" / f"{FUND_C}.toml",
             EXEMPT_CLASS: DATA_ROOT / "tax" / "ua.toml",
             DISTRIBUTION_CLASS: DATA_ROOT / "tax" / "ua.toml",
             DISPOSAL_CLASS: DATA_ROOT / "tax" / "ua.toml",
@@ -333,6 +321,7 @@ class TestEveryDeclarationAndVersionThatFedTheRun:
             FIXTURE_DISPOSAL_CLASS: DATA_ROOT / "tax" / "synthetic_fixture.toml",
             FIXTURE_COUPON_CLASS: DATA_ROOT / "tax" / "synthetic_fixture.toml",
             FIXTURE_ENUMERATED_DISPOSAL_CLASS: (DATA_ROOT / "tax" / "synthetic_fixture.toml"),
+            **{name: DATA_ROOT / file for name, file in _declared_files().items()},
         }
         recorded = _manifest().inputs
         assert {ref.id for ref in recorded} == set(expected), (

@@ -9,6 +9,30 @@ segment_bound  3
 regime         (no regime declared)
 amount         contract_usd USD 250.0
 amount         salary_uah UAH 10000.0
+plans          UA4000207518 x1
+plans          UA4000230270 x1
+plans          UA4000231195 x1
+plans          UA4000233712 x1
+plans          UA4000234223 x1
+plans          UA4000234413 x1
+plans          UA4000235196 x1
+plans          UA4000235782 x1
+plans          UA4000235865 x1
+plans          UA4000236228 x1
+plans          UA4000236475 x1
+plans          UA4000236624 x1
+plans          UA4000237416 x1
+plans          UA4000237556 x1
+plans          UA4000237804 x1
+plans          UA4000238281 x1
+plans          UA4000238968 x1
+plans          UA4000238976 x1
+plans          UA4000238992 x1
+plans          UA4000239008 x1
+plans          UA4000239016 x1
+plans          UA4000239040 x1
+plans          UA4000239081 x1
+plans          UA4000239107 x1
 plans          enumerated_out_of_order x1
 plans          enumerated_taxable_x x1
 plans          inzhur_miltech x1
@@ -20,13 +44,37 @@ plans          ovdp_synthetic_b x1
 plans          synthetic_fund_c x1
 
 [accounting]
-pairs_considered  18
-enumerated        9
-no_candidate      9
-evaluated         7
-dropped           2
+pairs_considered  66
+enumerated        33
+no_candidate      33
+evaluated         27
+dropped           6
 
 [candidates]  instrument | stream | way in | way out | plan
+UA4000207518 | salary_uah | inzhur_direct | inzhur_to_monobank | 0
+UA4000230270 | salary_uah | inzhur_direct | inzhur_to_monobank | 0
+UA4000231195 | salary_uah | inzhur_direct | inzhur_to_monobank | 0
+UA4000233712 | salary_uah | inzhur_direct | inzhur_to_monobank | 0
+UA4000234223 | salary_uah | inzhur_direct | inzhur_to_monobank | 0
+UA4000234413 | salary_uah | inzhur_direct | inzhur_to_monobank | 0
+UA4000235196 | salary_uah | inzhur_direct | inzhur_to_monobank | 0
+UA4000235782 | salary_uah | inzhur_direct | inzhur_to_monobank | 0
+UA4000235865 | salary_uah | inzhur_direct | inzhur_to_monobank | 0
+UA4000236228 | salary_uah | inzhur_direct | inzhur_to_monobank | 0
+UA4000236475 | salary_uah | inzhur_direct | inzhur_to_monobank | 0
+UA4000236624 | salary_uah | inzhur_direct | inzhur_to_monobank | 0
+UA4000237416 | salary_uah | inzhur_direct | inzhur_to_monobank | 0
+UA4000237556 | salary_uah | inzhur_direct | inzhur_to_monobank | 0
+UA4000237804 | salary_uah | inzhur_direct | inzhur_to_monobank | 0
+UA4000238281 | salary_uah | inzhur_direct | inzhur_to_monobank | 0
+UA4000238968 | salary_uah | inzhur_direct | inzhur_to_monobank | 0
+UA4000238976 | salary_uah | inzhur_direct | inzhur_to_monobank | 0
+UA4000238992 | salary_uah | inzhur_direct | inzhur_to_monobank | 0
+UA4000239008 | salary_uah | inzhur_direct | inzhur_to_monobank | 0
+UA4000239016 | salary_uah | inzhur_direct | inzhur_to_monobank | 0
+UA4000239040 | salary_uah | inzhur_direct | inzhur_to_monobank | 0
+UA4000239081 | salary_uah | inzhur_direct | inzhur_to_monobank | 0
+UA4000239107 | salary_uah | inzhur_direct | inzhur_to_monobank | 0
 enumerated_out_of_order | salary_uah | inzhur_direct | inzhur_to_monobank | 0
 enumerated_taxable_x | salary_uah | inzhur_direct | inzhur_to_monobank | 0
 inzhur_miltech | salary_uah | inzhur_direct | inzhur_to_monobank | 0
@@ -38,6 +86,26 @@ ovdp_synthetic_b | salary_uah | inzhur_direct | inzhur_to_monobank | 0
 synthetic_fund_c | salary_uah | inzhur_direct | inzhur_to_monobank | 0
 
 [scored]  instrument | reaches | rate
+UA4000207518 | UAH 11468.5 | 0.1447835839904406
+UA4000230270 | UAH 11497.5 | 0.1816635891150744
+UA4000231195 | UAH 11362.5 | 0.10385012299919516
+UA4000233712 | UAH 11962.800000000001 | 0.17226024809063378
+UA4000234223 | UAH 11187.0 | 0.17419414922376408
+UA4000234413 | UAH 10494.900000000001 | 0.18469196478606825
+UA4000235196 | UAH 13005.0 | 0.17570356507651563
+UA4000235782 | UAH 13806.0 | 0.1756352187317406
+UA4000235865 | UAH 9735.75 | 0.019189099585153163
+UA4000236228 | UAH 10539.0 | 0.08261584356770206
+UA4000236475 | UAH 12998.25 | 0.1302111214348779
+UA4000236624 | UAH 10471.5 | 0.19975774963863024
+UA4000237416 | UAH 10471.5 | 0.19161233038595468
+UA4000237556 | UAH 13806.0 | 0.1751240760853504
+UA4000237804 | UAH 12150.0 | 0.12145222829860869
+UA4000238281 | UAH 10471.5 | 0.19073141465731613
+UA4000238968 | UAH 12195.2 | 0.13559122557004988
+UA4000238976 | UAH 10411.2 | 0.08641975772107043
+UA4000238992 | UAH 14090.400000000001 | 0.17254449042914677
+UA4000239008 | UAH 12550.5 | 0.17034162124390317
 enumerated_out_of_order | UAH 10900.0 | 0.0914616391788764
 enumerated_taxable_x | UAH 9868.5 | 0.09791659778494802
 inzhur_miltech | UAH 13398.679794520547 | 0.17591456857516952
@@ -47,9 +115,33 @@ ovdp_synthetic_a | UAH 13100.0 | 0.1824376043941759
 ovdp_synthetic_b | UAH 13675.0 | 0.13219775965212432
 
 [dropped]  reason | count | instruments
-InstrumentRefused | 2 | inzhur_reit, synthetic_fund_c
+InstrumentRefused | 6 | UA4000239016, UA4000239040, UA4000239081, UA4000239107, inzhur_reit, synthetic_fund_c
 
 [no candidate]  instrument | stream | reason
+UA4000207518 | contract_usd | nothing connects (route_in)
+UA4000230270 | contract_usd | nothing connects (route_in)
+UA4000231195 | contract_usd | nothing connects (route_in)
+UA4000233712 | contract_usd | nothing connects (route_in)
+UA4000234223 | contract_usd | nothing connects (route_in)
+UA4000234413 | contract_usd | nothing connects (route_in)
+UA4000235196 | contract_usd | nothing connects (route_in)
+UA4000235782 | contract_usd | nothing connects (route_in)
+UA4000235865 | contract_usd | nothing connects (route_in)
+UA4000236228 | contract_usd | nothing connects (route_in)
+UA4000236475 | contract_usd | nothing connects (route_in)
+UA4000236624 | contract_usd | nothing connects (route_in)
+UA4000237416 | contract_usd | nothing connects (route_in)
+UA4000237556 | contract_usd | nothing connects (route_in)
+UA4000237804 | contract_usd | nothing connects (route_in)
+UA4000238281 | contract_usd | nothing connects (route_in)
+UA4000238968 | contract_usd | nothing connects (route_in)
+UA4000238976 | contract_usd | nothing connects (route_in)
+UA4000238992 | contract_usd | nothing connects (route_in)
+UA4000239008 | contract_usd | nothing connects (route_in)
+UA4000239016 | contract_usd | nothing connects (route_in)
+UA4000239040 | contract_usd | nothing connects (route_in)
+UA4000239081 | contract_usd | nothing connects (route_in)
+UA4000239107 | contract_usd | nothing connects (route_in)
 enumerated_out_of_order | contract_usd | nothing connects (route_in)
 enumerated_taxable_x | contract_usd | nothing connects (route_in)
 inzhur_miltech | contract_usd | nothing connects (route_in)
@@ -60,4 +152,4 @@ ovdp_synthetic_a | contract_usd | nothing connects (route_in)
 ovdp_synthetic_b | contract_usd | nothing connects (route_in)
 synthetic_fund_c | contract_usd | nothing connects (route_in)
 
-[digest]  957871d9d7bf6095c766129f103e87fd
+[digest]  9aadad0ce85876fb8f57b9efacd08d1f
