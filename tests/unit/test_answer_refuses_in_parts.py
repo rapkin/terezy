@@ -41,9 +41,10 @@ UNREACHABLE: Final[dict[str, str]] = {
         "more than one is a whole-answer Refused, both of which are asserted here"
     ),
     "MoreThanOneStreamInTheSet": (
-        "the shipped registry's dollar stream connects to nothing inbound, so no enumerated set "
-        "spans two streams. Reached in tests/unit/test_cross_currency_candidate.py, which "
-        "declares the corridor the shipped registry lacks"
+        "the benchmark check is about the *question* and fires first. Every instrument in this "
+        "registry is bought at one venue, so a corridor that makes a set span two streams gives "
+        "the benchmark a second candidate too -- which is a whole-answer Refused. Measured in "
+        "tests/unit/test_cross_currency_candidate.py, which declares that corridor"
     ),
 }
 

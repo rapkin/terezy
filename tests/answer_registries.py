@@ -18,8 +18,8 @@ from typing import TYPE_CHECKING, Final
 from terezy.core.decision.answer import AnswerInputs, answer
 from terezy.core.instruments.access import VenueQuote
 from terezy.core.primitives import provenance as prov
-from terezy.core.primitives.money import Money
 from terezy.core.primitives.currency import Currency
+from terezy.core.primitives.money import Money
 from terezy.core.results.answer import Answer
 from terezy.data.declarations import loader, resolver
 
