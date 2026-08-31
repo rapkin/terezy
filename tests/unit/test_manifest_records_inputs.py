@@ -34,6 +34,7 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import shutil
+import tomllib
 from datetime import date
 from pathlib import Path
 
@@ -62,15 +63,18 @@ DATA_ROOT = REPO_ROOT / "data"
 
 
 def _declared_files() -> dict[str, str]:
-    """Every instrument and fund the registry declares, and the file each is declared in.
+    """Every declaration under `data/instruments/`, read off the **directory**.
 
-    Derived rather than listed. It was a list of nine until 016 declared 24 real ОВДП issues,
-    and a list of thirty-three would be a hand edit per issue thereafter -- silently wrong
-    until somebody made it. The claim being checked is that the manifest names what the
-    RESOLVER loaded, and the two are independent things.
+    Read by parsing each file's own `[instrument] id` rather than by asking the resolver, so
+    the manifest -- which the resolver builds -- is checked against something that did not
+    produce it. It was a list of nine until feature 016 declared 24 real ОВДП issues, and a
+    list of thirty-three would be a hand edit per issue, silently wrong until somebody made it.
     """
-    declared = resolver.from_data_root(DATA_ROOT)
-    return {name: f"instruments/{name}.toml" for name in [*declared.instruments, *declared.funds]}
+    found: dict[str, str] = {}
+    for path in sorted((DATA_ROOT / "instruments").glob("*.toml")):
+        with path.open("rb") as handle:
+            found[tomllib.load(handle)["instrument"]["id"]] = f"instruments/{path.name}"
+    return found
 
 
 ISSUE_A = "ovdp_synthetic_a"
@@ -78,24 +82,15 @@ ISSUE_B = "ovdp_synthetic_b"
 EXEMPT_CLASS = "ua_government_bond"
 DISTRIBUTION_CLASS = "ua_ci_fund_distribution"
 DISPOSAL_CLASS = "ua_investment_profit"
-REIT = "inzhur_reit"
-MILTECH = "inzhur_miltech"
-FUND_C = "synthetic_fund_c"
-ENUMERATED_A = "ovdp_enumerated_a"
-ENUMERATED_MIRROR = "ovdp_enumerated_mirror"
-ENUMERATED_OUT_OF_ORDER = "enumerated_out_of_order"
-ENUMERATED_TAXABLE = "enumerated_taxable_x"
 FIXTURE_COUPON_CLASS = "synthetic_enumerated_coupon"
 FIXTURE_ENUMERATED_DISPOSAL_CLASS = "synthetic_enumerated_disposal"
 FIXTURE_PAYOUT_CLASS = "synthetic_fund_payout"
 FIXTURE_DISPOSAL_CLASS = "synthetic_fund_disposal"
-"""⚙ Features 006 and 013 added declarations to the shipped data root: two fund files
-and two tax classes, then a bond declared as the payments it will make.
-
-They are named here rather than the set being loosened to "whatever is on disk", because
-the claim under test is that the manifest records **every** declaration a run was given:
-a set computed from the directory would agree with the manifest by construction and
-assert nothing.
+"""The tax classes are named rather than the set being loosened to "whatever is on disk",
+because the claim under test is that the manifest records **every** declaration a run was
+given, and a set computed from the resolver the manifest was built from would agree by
+construction and assert nothing. The instruments are read off the directory instead, which is
+not that loosening: the directory did not build the manifest.
 """
 
 CPI_SERIES = "ua_cpi_monthly"
@@ -246,6 +241,7 @@ class TestEveryDeclarationAndVersionThatFedTheRun:
     def test_every_declaration_in_the_set_is_named(self) -> None:
         record = _manifest()
         declared = resolver.from_data_root(DATA_ROOT)
+        assert set(_declared_files()) == set(declared.instruments) | set(declared.funds)
         # FR-015 requires the record to say which price series and which declared belief were
         # in force: two runs differing only in the belief are two results, and nothing else in
         # the manifest tells them apart.

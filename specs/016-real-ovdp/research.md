@@ -31,12 +31,13 @@ from the spec's, the difference and its cause are stated.
 return **byte-identical** payloads (SHA-256 `c6af0ac1…`, 576 037 bytes, 195 issues). The
 parameter is accepted and ignored.
 
-**Decision.** The fetcher sends its own retrieval date, and the observation file records the
-retrieval date and the URL — never "the register as of" any other date. The finding is
+**Decision.** The endpoint is cited **without** the parameter, and the observation records only
+the date it was retrieved on — never "the register as of" some other date. The finding is
 recorded in the script's header so nobody builds a historical query on it.
 
-*Alternative rejected*: omitting the parameter. The spec names the URL with it, and dropping it
-would make the recorded citation differ from the one the specification cites.
+*Alternative rejected*: keeping `&date=YYYYMMDD` because the specification cites the URL that
+way. A citation carrying an inert parameter invites the next reader to believe it selected
+something, which is the belief this measurement exists to remove.
 
 ## D2 — The whole register is snapshotted, not the 24
 
@@ -45,8 +46,8 @@ rows. Writing only those would be a **filter**, and the filter's criterion — "
 seller lists as active" — is a judgement, which is precisely what `fetch_inzhur.py`'s own
 docstring refuses to let a fetcher make.
 
-**Decision.** The observation is the whole register. It costs about 29 000 lines and 1.3 MB,
-roughly doubling `data/`.
+**Decision.** The observation is the whole register: 32 982 lines and 1.3 MB, roughly doubling
+`data/`.
 
 Two things need it beyond tidiness. FR-008's refusal is *"an active issue the depository does
 not list"*, and an observation restricted to the issues we declared cannot witness an absence —
@@ -99,15 +100,20 @@ and, in the page's summary line, «Початкова інвестиція ві�
 
 **Decision.** `min_unit = 1.0` and `min_ticket = 1000.0 UAH`, cited to that page with its own
 retrieval date, on all 24. It restates no access price: the buy quotations run from 989.47 to
-1 081.23 and no two are alike.
+1 113.04 and no two are alike.
 
-**What the word «приблизно» costs, stated rather than smoothed.** The venue's floor is really
-in *units*; the money figure is its own approximation of one unit. One issue — `UA4000207518`,
-quoted at 989.47 — is quoted below it, so a purchase of exactly one unit of that issue would be
-reported infeasible by 10.53 UAH. That is the venue's published figure rather than this
-project's reading, and an overstatement refuses a feasible purchase where FR-018's severity
-argument is about the understatement that permits an infeasible one. It is asserted as a test
-rather than left in prose, so it cannot go quietly wrong when a quotation moves.
+**What the word «приблизно» costs, and what actually enforces the floor.** The venue's floor is
+in *units* — «від 1 цінного паперу» — and its money figure is the venue's own approximation of
+one. So the declared `min_ticket` is not the cost of a unit on any issue: it is **below** it on
+23 of the 24 and above it on `UA4000207518`, quoted at 989.47.
+
+That does not leave the understatement FR-018 puts in the highest severity class, and the
+reason is worth stating rather than assuming: what enforces the venue's real floor is
+`min_unit`, through `BuysNoWholeUnit` — an amount that will not buy one whole increment is
+reported with the shortfall rather than rounded up. `min_ticket` is the money term the form
+requires, and the venue's own published figure for it is the only one this project may write.
+Both consequences are asserted rather than left in prose, so neither goes quietly wrong when a
+quotation moves.
 
 ## D6 — The reconciliation is computed against the depository's schedule
 

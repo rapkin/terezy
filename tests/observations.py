@@ -8,6 +8,7 @@ nothing else does. Nothing here interprets: each caller states its own reading.
 
 from __future__ import annotations
 
+import functools
 import tomllib
 from collections.abc import Mapping, Sequence
 from datetime import date
@@ -27,7 +28,11 @@ COUPON: Final = "1"
 PRINCIPAL: Final = "2"
 
 
+@functools.cache
 def _load(path: Path) -> Mapping[str, Any]:
+    """Cached on the path, because the register is 33 000 lines and the callers below read it
+    per ISIN inside loops. Keying on the path is what keeps a monkeypatched scratch copy a
+    different file rather than a stale hit."""
     with path.open("rb") as handle:
         return tomllib.load(handle)
 

@@ -1280,7 +1280,7 @@ class TestTheBatteryCoversTheContract:
             "TestAnImpossibleInstrumentIsNotALoadError",
             "TestTheBatteryCoversTheContract",
             "TestNoFieldDefaultStandsInForAValue",
-            "TestEveryShippedInstrumentSaysItIsAFixture",
+            "TestEveryShippedInstrumentSaysWhetherItIsAFixture",
         }
 
     def test_the_second_issue_is_a_file_and_not_a_special_case(self) -> None:
@@ -1407,7 +1407,7 @@ class TestNoFieldDefaultStandsInForAValue:
                 assert model.model_fields[field].default is None, f"{name}.{field}"
 
 
-class TestEveryShippedInstrumentSaysItIsAFixture:
+class TestEveryShippedInstrumentSaysWhetherItIsAFixture:
     """`docs/METHODOLOGY.md` §0's claim about `data/instruments/`, as a check.
 
     Which declarations are invented is a fact about files, and §0 states it in prose. So the

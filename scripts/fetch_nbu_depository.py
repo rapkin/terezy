@@ -34,8 +34,9 @@ happens to want would encode a judgement in a fetcher, and it would break the on
 needs this file -- an issue a seller lists and the register does **not** can only be seen
 against the register's whole membership.
 
-Left: nothing. Every scalar the endpoint publishes per issue is written, so a later reading can
-ask a question nobody has thought of yet without a re-fetch changing the answer.
+Left: nothing, and that is **enforced** rather than promised. ``register`` refuses an issue
+carrying a field this script does not write, so a field the endpoint adds stops the run instead
+of being dropped into a file that reads as complete.
 
 Usage
 -----
@@ -95,6 +96,9 @@ is published, not read off the issuer's nationality."""
 
 DATES: Final = ("razm_date", "pgs_date")
 
+WRITTEN: Final = frozenset({"cpcode", "payments", *SCALARS, *OPTIONAL_SCALARS, *LABELS, *DATES})
+"""Every key this script writes. An issue carrying anything else stops the run."""
+
 
 class FetchError(RuntimeError):
     """The endpoint did not answer, or answered with something this script cannot read."""
@@ -109,11 +113,35 @@ def _get(url: str) -> bytes:
         raise FetchError(f"{url}: {error}") from error
 
 
+def _check_issue(issue: dict[str, Any], code: str) -> None:
+    """One register entry, or a loud refusal naming the field."""
+    unknown = sorted(set(issue) - WRITTEN)
+    if unknown:
+        raise FetchError(
+            f"{ENDPOINT}: {code} publishes {unknown}, which this script does not write. "
+            "A field dropped silently would leave a file that reads as the whole record "
+            "and is not; widen the field lists above and re-run."
+        )
+    for field in (*SCALARS, *LABELS, *DATES):
+        if issue.get(field) is None:
+            raise FetchError(f"{ENDPOINT}: {code} publishes no {field!r}")
+    payments = issue.get("payments")
+    if not isinstance(payments, list) or not payments:
+        raise FetchError(f"{ENDPOINT}: {code} publishes no payments")
+    for row in payments:
+        if not isinstance(row, dict):
+            raise FetchError(f"{ENDPOINT}: {code} has a payment row that is not an object")
+        for field in ("pay_date", "pay_type", "pay_val"):
+            if row.get(field) is None:
+                raise FetchError(f"{ENDPOINT}: {code} has a payment row with no {field!r}")
+
+
 def register(raw: bytes) -> list[dict[str, Any]]:
     """The register as a list of issues, or a loud refusal.
 
     Every shape fault stops the run rather than writing a thinner file: an observation missing
-    issues reads exactly like a register that lost them.
+    issues, or missing a field the endpoint has started publishing, reads exactly like a
+    register that lost them.
     """
     try:
         payload = json.loads(raw)
@@ -134,15 +162,7 @@ def register(raw: bytes) -> list[dict[str, Any]]:
                 "declaration is keyed by, so a duplicate makes every lookup ambiguous."
             )
         seen.add(code)
-        payments = issue.get("payments")
-        if not isinstance(payments, list) or not payments:
-            raise FetchError(f"{ENDPOINT}: {code} publishes no payments")
-        for row in payments:
-            if not isinstance(row, dict):
-                raise FetchError(f"{ENDPOINT}: {code} has a payment row that is not an object")
-            for field in ("pay_date", "pay_type", "pay_val"):
-                if row.get(field) is None:
-                    raise FetchError(f"{ENDPOINT}: {code} has a payment row with no {field!r}")
+        _check_issue(issue, code)
     return payload
 
 
@@ -259,11 +279,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         issues = register(_get(ENDPOINT))
+        report(issues)
+        text = render(issues, today=datetime.date.today())  # noqa: DTZ011
     except FetchError as error:
         print(f"fetch failed: {error}", file=sys.stderr)  # noqa: T201
         return 1
-    report(issues)
-    text = render(issues, today=datetime.date.today())  # noqa: DTZ011
     if args.dry_run:
         print(f"--dry-run: {len(text.splitlines())} line(s) not written", file=sys.stderr)  # noqa: T201
         return 0

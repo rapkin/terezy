@@ -38,7 +38,7 @@ suite.
 new field on the instrument declaration record (FR-029). Nothing under `core/` may name an
 ISIN. No script may write under `data/instruments/` or `data/access/`.
 
-**Scale/Scope**: one new script, one generated observation file of about 29 000 lines, 24
+**Scale/Scope**: one new script, one generated observation file of 32 982 lines, 24
 declaration files, one edited access file, one edited fixture header, and the test modules
 below.
 

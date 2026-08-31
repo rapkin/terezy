@@ -23,7 +23,7 @@ from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.tolerance import TOLERANCE
-from terezy.core.results.tuple import TupleOutcome, TupleRefused
+from terezy.core.results.tuple import BuysNoWholeUnit, TupleOutcome, TupleRefused
 from terezy.data.declarations import resolver
 from tests import answer_registries as answers
 from tests import observations as obs
@@ -128,30 +128,35 @@ def test_every_declared_minimum_cites_the_venues_dealing_terms_and_is_not_a_pric
         assert abs(constraints.min_ticket.amount - quote.price.amount) > TOLERANCE, isin
 
 
-def test_the_venues_approximate_floor_refuses_one_unit_of_the_issue_quoted_below_it() -> None:
-    """The consequence of «приблизно», asserted rather than smoothed away.
+def test_the_venues_approximate_floor_is_not_the_cost_of_a_unit_on_any_issue() -> None:
+    """The consequence of «приблизно», measured rather than smoothed away.
 
-    The venue's floor is really in UNITS -- «від 1 цінного паперу» -- and its money figure is
-    the venue's own approximation of one. `UA4000207518` is quoted at 989.47, below that
-    figure, so buying exactly one of it is reported infeasible by 10.53 UAH. Overstating a
-    minimum refuses a feasible purchase; FR-018's severity argument is about the understatement
-    that permits an infeasible one, which is why the venue's published number stands.
+    The venue's floor is in UNITS -- «від 1 цінного паперу» -- and its money figure is the
+    venue's own approximation of one, so the declared `min_ticket` is **below** the cost of a
+    unit on 23 of the 24 and above it on `UA4000207518`, quoted at 989.47.
+
+    Neither direction leaves the understatement FR-018 puts in the highest severity class, and
+    the reason is `min_unit` rather than luck: `BuysNoWholeUnit` reports an amount that will not
+    buy one whole increment, with the shortfall, rather than rounding it up. `min_ticket` is the
+    money term the form requires and the venue's own published figure is the only one this
+    project may write for it.
     """
     declared = resolver.tuple_from_data_root(
         DATA_ROOT, base_currency=Currency.UAH, scenario_id=None
     )
-    below = [
-        isin
+    floor = {
+        isin: declared.instruments.instruments[isin].constraints.min_ticket.amount
         for isin in obs.declared_isins()
-        if obs.seller_bonds()[isin]["buy"]
-        < declared.instruments.instruments[isin].constraints.min_ticket.amount
-    ]
-    assert below == ["UA4000207518"]
-    shortfall = (
-        declared.instruments.instruments[below[0]].constraints.min_ticket.amount
-        - obs.seller_bonds()[below[0]]["buy"]
+    }
+    above = [isin for isin in floor if obs.seller_bonds()[isin]["buy"] < floor[isin]]
+    assert above == ["UA4000207518"]
+    assert floor[above[0]] - obs.seller_bonds()[above[0]]["buy"] == pytest.approx(10.53, abs=5e-3)
+    below = [isin for isin in floor if obs.seller_bonds()[isin]["buy"] > floor[isin]]
+    assert set(below) == set(floor) - {above[0]}
+    assert BuysNoWholeUnit in get_args(TupleRefused), (
+        "the unit floor is what enforces the venue's real minimum; if this refusal goes, the "
+        "money term above is the only one left and it is below the price of a unit"
     )
-    assert shortfall == pytest.approx(10.53, abs=0.005)
 
 
 def _outcomes() -> list[TupleOutcome]:

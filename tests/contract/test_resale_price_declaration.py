@@ -79,9 +79,7 @@ def test_the_real_issues_carry_a_resale_price_and_no_fixture_does() -> None:
     declared = _resolve(DATA_ROOT)
     quoted = {name for name, entry in declared.access.items() if entry.resale_price is not None}
     assert quoted == set(obs.declared_isins())
-    for name in declared.access:
-        if name not in quoted:
-            assert declared.access[name].resale_price is None, name
+    assert set(declared.access) - quoted, "there must still be a declaration that refuses"
 
 
 def test_every_real_resale_price_is_the_sellers_observed_sell_quotation() -> None:

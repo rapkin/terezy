@@ -75,7 +75,7 @@ number tomorrow, so it stays unverified permanently — and because taint is asy
 figure a real issue produces carries the mark through the price alone.
 
 Which files are which is a check rather than a sentence:
-`tests/contract/test_declaration_loading.py::TestEveryShippedInstrumentSaysItIsAFixture`.
+`tests/contract/test_declaration_loading.py::TestEveryShippedInstrumentSaysWhetherItIsAFixture`.
 
 **The tax exemption is cited but unverified.** `data/tax/ua.toml` declares the
 `ua_government_bond` class with a PIT rate of 0% and a military levy of 0%. The zeroes cite
