@@ -18,16 +18,27 @@ from typing import Final, get_args
 
 import pytest
 
-from terezy.core.decision.answer import cross_horizon, key_agreement, section_ranking
+from terezy.core.decision.answer import (
+    cross_horizon,
+    key_agreement,
+    section_evaluated,
+    section_ranking,
+    subject_counts,
+)
+from terezy.core.decision.candidates import evaluated
 from terezy.core.instruments.interface import DateRange
+from terezy.core.primitives import provenance as prov
 from terezy.core.results.answer import (
     Answer,
     BenchmarkOutsideTheSubjects,
     BenchmarkYieldsNoCandidate,
+    HorizonSection,
     SectionsAgreeByKey,
+    SubjectUnreached,
 )
 from terezy.core.results.candidates import CandidateCeiling, CandidateSurvey, SurveyRefused
 from terezy.core.results.composed import SegmentBound
+from terezy.core.results.tuple import TupleOutcome
 from tests import answer_registries as fixtures
 
 UNREACHABLE: Final[dict[str, str]] = {
@@ -201,3 +212,61 @@ def test_a_horizon_that_starts_before_as_of_is_unremarkable() -> None:
         question, horizons=(DateRange(start=date(2026, 4, 1), end=date(2026, 10, 1)),)
     )
     assert isinstance(fixtures.answered(earlier), Answer)
+
+
+def test_a_section_that_refused_before_enumerating_says_so_rather_than_naming_a_corridor() -> None:
+    """The remedy for a ceiling is ``data/candidates/``, not a corridor.
+
+    *Declared but unreached* names a remedy, and naming it where the section never looked is a
+    guard whose message is false, one layer up.
+    """
+    result = _plant_ceiling()
+    for section in result.sections:
+        counts = subject_counts(result, section)
+        assert counts.not_assessed == 2
+        assert counts.declared_but_unreached == 0
+        assert counts.undeclared == 2
+        assert not [item for item in section.standings if isinstance(item, SubjectUnreached)]
+
+
+def test_a_benchmark_that_yields_nothing_still_knows_which_subjects_connect() -> None:
+    """Enumeration succeeded there -- the benchmark is what failed -- so the set is in hand."""
+    question = fixtures.owners_question()
+    narrowed = fixtures.with_plans(
+        fixtures.with_subjects(question, fixtures.OVDP, "cash"),
+        {fixtures.OVDP: question.plans[fixtures.OVDP]},
+    )
+    result = fixtures.answered(replace(narrowed, benchmark_instrument_id="cash"))
+    for section in result.sections:
+        assert isinstance(section.outcome, BenchmarkYieldsNoCandidate)
+        counts = subject_counts(result, section)
+        assert counts.reached == 1
+        assert counts.not_assessed == 0
+
+
+def test_a_section_that_never_enumerated_is_not_a_disagreement_about_candidates() -> None:
+    """Counting its empty set would report every other section's keys as unique to it."""
+    assert isinstance(key_agreement(_plant_ceiling()), SectionsAgreeByKey)
+
+
+def evaluated_of(section: HorizonSection) -> tuple[TupleOutcome, ...]:
+    """Every candidate the comparison evaluated, before FR-030 withheld any."""
+    outcome = section.outcome
+    return evaluated(outcome.comparison) if isinstance(outcome, CandidateSurvey) else ()
+
+
+def test_the_answers_marks_describe_the_figures_it_reports() -> None:
+    """A withheld candidate's figure is not reported, so its sources are not behind one."""
+    result = fixtures.answered()
+    reported = prov.merge_all(
+        item.provenance for section in result.sections for item in section_evaluated(section)
+    )
+    withheld_only = {
+        source
+        for section in result.sections
+        for item in evaluated_of(section)
+        if item.key in {late.key for late in section.arrives_after_horizon}
+        for source in item.provenance.sources
+    } - reported.sources
+    assert withheld_only, "the fixture must actually withhold a candidate with sources of its own"
+    assert not withheld_only & result.provenance.sources

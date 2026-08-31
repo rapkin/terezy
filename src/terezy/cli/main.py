@@ -40,6 +40,7 @@ from terezy.core.results.answer import (
     HorizonSection,
     SectionsDisagreeByKey,
     StatedExclusion,
+    SubjectNotAssessed,
     SubjectReached,
     SubjectUndeclared,
     SubjectUnreached,
@@ -77,8 +78,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Answer one question and print it. Returns 0 for an answer, 1 for a refusal."""
     args = _parser().parse_args(argv)
     try:
-        root = Path(args.data_root)
         as_of = date.fromisoformat(args.as_of)
+    except ValueError as malformed:
+        # Outside the block below, because nothing has been loaded and no declaration is at
+        # fault: reporting it as a load failure would send the reader to `data/`.
+        print(f"--as-of is not an ISO date: {malformed}")
+        return LOAD_FAILED
+    try:
+        root = Path(args.data_root)
         run = (
             answer_question(root, args.question, as_of=as_of, base_currency=Currency.UAH)
             if args.question is not None
@@ -180,9 +187,9 @@ def _section_lines(result: Answer, section: HorizonSection) -> list[str]:
     counts = subject_counts(result, section)
     lines = [
         f"{section.horizon.start.isoformat()} to {section.horizon.end.isoformat()}",
-        f"  of {counts.reached + counts.declared_but_unreached + counts.undeclared} named "
-        f"subject(s): {counts.reached} reached, {counts.declared_but_unreached} declared but "
-        f"unreached, {counts.undeclared} undeclared "
+        f"  of {len(section.standings)} named subject(s): {counts.reached} reached, "
+        f"{counts.declared_but_unreached} declared but unreached, {counts.undeclared} "
+        f"undeclared, {counts.not_assessed} not assessed "
         f"({counts.ids_considered} instrument id(s) considered)",
         *_standing_lines(section),
     ]
@@ -235,6 +242,11 @@ def _standing_lines(section: HorizonSection) -> list[str]:
                 )
             case SubjectUndeclared():
                 lines.append(f"    {standing.named}: undeclared. The remedy is a declaration.")
+            case SubjectNotAssessed():
+                lines.append(
+                    f"    {standing.named}: not assessed -- this section refused before it "
+                    "enumerated anything."
+                )
     return lines
 
 

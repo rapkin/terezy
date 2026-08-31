@@ -20,7 +20,7 @@ from typing import Any, get_args
 
 import pytest
 
-from terezy.api.answer import answer_question
+from terezy.api.answer import answer_declared, answer_question, inputs_of
 from terezy.core.instruments.interface import DateRange
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
@@ -34,6 +34,7 @@ from terezy.core.results.answer import (
     StreamWithNoAmount,
     TwoIdenticalHorizons,
 )
+from terezy.data.declarations import resolver
 from terezy.data.declarations.errors import DeclarationError
 from tests import answer_registries as fixtures
 
@@ -177,3 +178,37 @@ def test_a_horizon_that_ends_before_it_starts_is_the_loaders_refusal() -> None:
     backwards = DateRange(start=date(2027, 1, 1), end=date(2026, 1, 1))
     result = fixtures.answered(replace(question, horizons=(backwards,)))
     assert isinstance(result, Answer)
+
+
+def test_the_route_set_is_the_one_the_named_regime_declares(tmp_path: Path) -> None:
+    """The regime named is the regime searched, and the manifest records the one searched.
+
+    ``routes_in_force`` selects by **date**, so a question naming ``normalized`` with horizons
+    starting before the declared transition was answered over ``wartime``'s smaller route set
+    while both the manifest and the CLI printed ``normalized`` -- the manifest asserting a world
+    the run did not search.
+    """
+    root = _scratch_with_regime(tmp_path, "normalized")
+    declarations = resolver.answer_from_data_root(
+        root, base_currency=Currency.UAH, scenario_id="war_end"
+    )
+    for regime_id in ("wartime", "normalized"):
+        supplied = inputs_of(declarations, regime_id=regime_id)
+        assert set(supplied.routes) == set(
+            declarations.candidates.composition.coverage.regimes[regime_id].route_ids
+        )
+    assert set(inputs_of(declarations, regime_id="wartime").routes) < set(
+        inputs_of(declarations, regime_id="normalized").routes
+    ), "the fixture must use two regimes that actually differ"
+
+
+def test_a_question_with_no_horizon_refuses_through_the_api_too(tmp_path: Path) -> None:
+    """``_about_the_question`` says every refusal is reachable from a caller-built record."""
+    root = _scratch_with_regime(tmp_path, "(no regime declared)")
+    run = answer_declared(
+        replace(fixtures.owners_question(), horizons=()),
+        root,
+        as_of=fixtures.AS_OF,
+        base_currency=Currency.UAH,
+    )
+    assert isinstance(run.answer, NoHorizonDeclared), run.answer

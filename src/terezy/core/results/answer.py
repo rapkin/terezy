@@ -30,7 +30,7 @@ from terezy.core.instruments.interface import DateRange
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance
 from terezy.core.primitives.staleness import StalenessVerdict
-from terezy.core.results.candidates import CandidateSurvey, SurveyRefused
+from terezy.core.results.candidates import CandidateSet, CandidateSurvey, SurveyRefused
 from terezy.core.results.question import Question, Reserve
 from terezy.core.results.tuple import Arrival, Tuple
 
@@ -118,9 +118,23 @@ class SubjectUndeclared:
     named: str
 
 
-SubjectStanding = SubjectReached | SubjectUnreached | SubjectUndeclared
-"""One named subject's state in one section. Three records rather than one with a flag,
-because FR-010 requires them distinguishable without reading prose and the remedies differ."""
+@dataclass(frozen=True, slots=True, kw_only=True)
+class SubjectNotAssessed:
+    """This section refused **before** enumerating, so nothing is known about this subject.
+
+    A fourth state rather than folding into :class:`SubjectUnreached`, because *unreached* names
+    a remedy -- a corridor -- and a section that hit its candidate ceiling or was handed a
+    segment bound admitting nothing has not looked. Telling a reader to declare a corridor there
+    would send him to the wrong file, which is the same defect as a guard whose message is false.
+    """
+
+    named: str
+    ids: tuple[str, ...]
+
+
+SubjectStanding = SubjectReached | SubjectUnreached | SubjectUndeclared | SubjectNotAssessed
+"""One named subject's state in one section. Four records rather than one with a flag, because
+FR-010 requires them distinguishable without reading prose and the remedies differ."""
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -135,6 +149,10 @@ class SubjectCounts:
     reached: int
     declared_but_unreached: int
     undeclared: int
+    not_assessed: int
+    """Declared, and this section refused before it could look. Counted apart from
+    *unreached*, whose remedy is a corridor and whose remedy this one is not."""
+
     ids_considered: int
     """The union of every declared subject's ids, deduplicated (FR-007b): an id named twice --
     by a group and by itself, or by two overlapping groups -- is counted once."""
@@ -278,6 +296,11 @@ class BenchmarkYieldsNoCandidate:
     """
 
     instrument_id: str
+
+    enumerated: CandidateSet
+    """The set that *was* enumerated, carried whole. Enumeration succeeded here -- what failed
+    is the benchmark -- so throwing the set away would report every subject as unassessed when
+    the section knows exactly which of them connect."""
 
 
 SectionOutcome = CandidateSurvey | SurveyRefused | BenchmarkYieldsNoCandidate
@@ -523,6 +546,7 @@ __all__ = [
     "StatedExclusion",
     "StreamWithNoAmount",
     "SubjectCounts",
+    "SubjectNotAssessed",
     "SubjectReached",
     "SubjectStanding",
     "SubjectUndeclared",

@@ -37,6 +37,7 @@ from terezy.core.results.answer import (
     ResolvedSubject,
     SectionOutcome,
     StatedExclusion,
+    SubjectNotAssessed,
     SubjectReached,
     SubjectStanding,
     SubjectUndeclared,
@@ -326,6 +327,8 @@ def _of_standing(value: SubjectStanding) -> tuple[Canonical, ...]:
             return ("unreached", value.named, value.ids)
         case SubjectUndeclared():
             return ("undeclared", value.named)
+        case SubjectNotAssessed():
+            return ("not_assessed", value.named, value.ids)
         case _:  # pragma: no cover -- mypy proves this unreachable
             assert_never(value)
 

@@ -326,11 +326,13 @@ def _purchase_problem(
 
 
 def _horizon_problem(holding: Holding, horizon: DateRange) -> InstrumentFailure | None:
-    """Whether the window asked about can contain the purchase at all.
+    """Whether the window asked about can contain the purchase at all -- on **both** sides.
 
-    Whether it also reaches the final payment is checked in :func:`events`, once the
-    adjusted payment dates are known -- a business-day rule can move the last flow past a
-    horizon that looked long enough against the unadjusted maturity.
+    Whether it also reaches the final payment is checked in :func:`events`, once the adjusted
+    payment dates are known: a business-day rule can move the last flow past a horizon that
+    looked long enough against the unadjusted maturity, and under 015 FR-029 that is a sale
+    rather than a refusal. What is *not* a sale is a window that closes before the money
+    arrives, which the hold-to-maturity refusal used to cover implicitly.
     """
     if horizon.end < horizon.start:
         return InconsistentTerms(
@@ -350,6 +352,17 @@ def _horizon_problem(holding: Holding, horizon: DateRange) -> InstrumentFailure 
                 f"{holding.purchased_on.isoformat()}. The purchase is the origin of every "
                 "time measurement in the result, so a horizon that excludes it would "
                 "measure returns from a date on which nothing was bought."
+            ),
+        )
+    if horizon.end < holding.purchased_on:
+        return InconsistentTerms(
+            first_term="horizon.end",
+            second_term="holding.purchased_on",
+            reason=(
+                f"the horizon ends {horizon.end.isoformat()}, before the purchase settles on "
+                f"{holding.purchased_on.isoformat()} -- the way in's declared latency runs "
+                "past the window. Under 015 FR-029 the position is sold at the window's end, "
+                "and a sale of something never bought is not a figure."
             ),
         )
     return None

@@ -16,10 +16,12 @@ Every broken variant is a mutation of the **shipped** question, on
 from __future__ import annotations
 
 import shutil
+from datetime import date
 from pathlib import Path
 
 import pytest
 
+from terezy.api.answer import answer_question
 from terezy.core.primitives.currency import Currency
 from terezy.data.declarations import loader, resolver
 from terezy.data.declarations.errors import DeclarationError
@@ -30,6 +32,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DATA_ROOT = REPO_ROOT / "data"
 QUESTION = DATA_ROOT / "questions" / "fifty-thousand.toml"
 
+AS_OF = date(2026, 8, 30)
 SALARY = "salary_uah"
 CONTRACT = "contract_usd"
 
@@ -291,12 +294,23 @@ def test_two_files_declaring_one_question_id_are_refused(tmp_path: Path) -> None
     assert "fifty-thousand-hryvnia" in caught.value.problem
 
 
-def test_an_empty_questions_directory_is_refused(tmp_path: Path) -> None:
+def test_a_data_root_declaring_no_question_resolves_and_refuses_only_when_asked(
+    tmp_path: Path,
+) -> None:
+    """The refusal is where the **id** is asked for, and not a load-time rule.
+
+    A root with no question file is a legitimate root: the CLI's flags path answers a question
+    that has no file, and demanding some other question's file to exist would make *flags are
+    sugar over the file* false in the one place the file does not exist.
+    """
     root = _scratch_root(tmp_path)
     (root / "questions" / "fifty-thousand.toml").unlink()
+    assert _resolve(root).questions == {}
+
     with pytest.raises(DeclarationError) as caught:
-        _resolve(root)
+        answer_question(root, "fifty-thousand-hryvnia", as_of=AS_OF, base_currency=Currency.UAH)
     assert caught.value.file == root / "questions"
+    assert "fifty-thousand-hryvnia" in caught.value.problem
 
 
 def test_a_subject_that_names_nothing_does_not_refuse(tmp_path: Path) -> None:

@@ -3326,19 +3326,13 @@ def answer_from_data_root(
 ) -> AnswerDeclarations:
     """Every declaration the answer verb reads, under one data root.
 
-    An empty ``questions/`` directory is an **error**, on ``composition``'s precedent: a run
-    that answered nothing would be indistinguishable from a mistyped path.
+    **An empty ``questions/`` directory is not an error here**, and that is a deliberate
+    narrowing: the flags path answers a question that has **no** file, and demanding some other
+    question's file to exist would make *flags are sugar over the file* false in the one place
+    the file does not exist. A question asked **by id** that nothing declares is refused where
+    it is asked -- ``api.answer._declared_question`` -- which is the place that can name the id.
     """
     files = sorted((root / QUESTIONS_DIR).glob("*.toml"))
-    if not files:
-        raise DeclarationError(
-            root / QUESTIONS_DIR,
-            "",
-            f"contains no *.toml declarations. An empty {QUESTIONS_DIR} directory is reported "
-            "rather than read as 'nothing was asked': the two are indistinguishable to "
-            "everything downstream, and one of them is a mistyped path.",
-            "check the data root, or declare a question",
-        )
     tuples = tuple_from_data_root(root, base_currency=base_currency, scenario_id=scenario_id)
     candidates = candidates_from_data_root(
         root, base_currency=base_currency, scenario_id=scenario_id

@@ -29,7 +29,8 @@ from datetime import date
 
 import pytest
 
-from terezy.core.instruments.interface import EarlyExit
+from terezy.core.errors import InconsistentTerms
+from terezy.core.instruments.interface import DateRange, EarlyExit
 from terezy.core.ledger.events import EventKind
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.tolerance import is_close
@@ -151,3 +152,37 @@ def test_holding_to_maturity_is_unchanged_by_the_declared_price() -> None:
     assert to_maturity.ledger.applied == without.ledger.applied
     assert to_maturity.sold_early is None
     assert without.sold_early is None
+
+
+def test_a_schedule_that_ran_to_term_is_not_sold_for_a_rounding_residual() -> None:
+    """Several repayments do not sum to the holding **exactly**, and a residual is not a unit.
+
+    ``quantity x amount / principal`` per repayment leaves ~1.8e-15 for many amount splits.
+    Selling that asks the ledger for units no lot holds, which it refuses by raising -- so the
+    residual is compared to the project tolerance rather than to zero.
+    """
+    principal = 1.13 + 12.28
+    left_over = 10.0 - (10.0 * 1.13 / principal + 10.0 * 12.28 / principal)
+    assert left_over != 0.0, "the fixture must actually leave a residual"
+    assert is_close(left_over, 0.0)
+
+
+def test_the_window_may_not_end_before_the_purchase_settles() -> None:
+    """A sale at the end of a window that closes before the money arrives is not a figure.
+
+    Reachable today: a one-day horizon plus a declared inbound latency puts the purchase past
+    the window's end, and the hold-to-maturity refusal used to cover that case implicitly.
+    """
+    outcome = project.project(
+        synthetic.declaration(),
+        synthetic.holding(purchased_on=date(2026, 2, 4)),
+        DateRange(start=date(2026, 1, 15), end=date(2026, 2, 1)),
+        synthetic.assumptions(),
+        tax_classes=synthetic.TAX_PACK,
+        early_exit=EarlyExit(
+            price_per_unit=Money(RESALE_PER_UNIT, synthetic.UAH, synthetic.TERMS_PROVENANCE),
+            assumption=SPREAD_HOLDS,
+        ),
+    )
+    assert isinstance(outcome, InconsistentTerms), outcome
+    assert outcome.second_term == "holding.purchased_on"

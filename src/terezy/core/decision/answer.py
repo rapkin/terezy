@@ -55,6 +55,7 @@ from terezy.core.results.answer import (
     StatedExclusion,
     StreamWithNoAmount,
     SubjectCounts,
+    SubjectNotAssessed,
     SubjectReached,
     SubjectStanding,
     SubjectUndeclared,
@@ -327,7 +328,9 @@ def _section_outcome(
             instrument_id=question.benchmark_instrument_id, occurrences=len(keys)
         )
     if not keys:
-        return BenchmarkYieldsNoCandidate(instrument_id=question.benchmark_instrument_id)
+        return BenchmarkYieldsNoCandidate(
+            instrument_id=question.benchmark_instrument_id, enumerated=enumerated
+        )
     return enumeration.survey(
         registries=inputs.registries,
         routes=inputs.routes,
@@ -406,12 +409,21 @@ def _arrives_after_horizon(
 def _standings(
     subjects: Sequence[ResolvedSubject], outcome: SectionOutcome
 ) -> tuple[SubjectStanding, ...]:
-    """Where each named subject stands here: reached, declared but unreached, or undeclared."""
-    reached = (
-        frozenset(item.key.instrument_id for item in outcome.enumerated.candidates)
-        if isinstance(outcome, CandidateSurvey)
-        else frozenset()
-    )
+    """Where each named subject stands here, in one of the four states FR-010 distinguishes.
+
+    **A section that refused before enumerating knows nothing about any subject**, and saying
+    *declared but unreached* there would name a remedy -- declare a corridor -- for a cause that
+    is a ceiling or a bound. That is a guard whose message is false, one layer up.
+    """
+    enumerated = _enumerated_of(outcome)
+    if enumerated is None:
+        return tuple(
+            SubjectUndeclared(named=subject.named)
+            if isinstance(subject, UndeclaredSubject)
+            else SubjectNotAssessed(named=subject.named, ids=subject.ids)
+            for subject in subjects
+        )
+    reached = frozenset(item.key.instrument_id for item in enumerated.candidates)
     return tuple(
         SubjectUndeclared(named=subject.named)
         if isinstance(subject, UndeclaredSubject)
@@ -426,6 +438,21 @@ def _standings(
         )
         for subject in subjects
     )
+
+
+def _enumerated_of(outcome: SectionOutcome) -> CandidateSet | None:
+    """The set this section enumerated, or ``None`` where it refused before enumerating.
+
+    A benchmark that yields no candidate is **not** that case: enumeration succeeded and the
+    set is in hand, so a section carrying it knows exactly which subjects connect.
+    """
+    match outcome:
+        case CandidateSurvey():
+            return outcome.enumerated
+        case BenchmarkYieldsNoCandidate():
+            return outcome.enumerated
+        case _:
+            return None
 
 
 def _verdicts(
@@ -539,9 +566,10 @@ def _reported_provenance(sections: Sequence[HorizonSection]) -> list[prov.Proven
     """Every mark behind every figure the answer reports, and behind the sets it enumerated."""
     marks: list[prov.Provenance] = []
     for section in sections:
-        if isinstance(section.outcome, CandidateSurvey):
-            marks.append(section.outcome.enumerated.provenance)
-        marks.extend(item.provenance for item in _outcomes(section.outcome))
+        enumerated = _enumerated_of(section.outcome)
+        if enumerated is not None:
+            marks.append(enumerated.provenance)
+        marks.extend(item.provenance for item in section_evaluated(section))
     return marks
 
 
@@ -549,9 +577,10 @@ def _reported_staleness(sections: Sequence[HorizonSection]) -> list[staleness.St
     """The merged verdict over the same sources."""
     verdicts: list[staleness.StalenessVerdict] = []
     for section in sections:
-        if isinstance(section.outcome, CandidateSurvey):
-            verdicts.append(section.outcome.enumerated.staleness)
-        verdicts.extend(item.staleness for item in _outcomes(section.outcome))
+        enumerated = _enumerated_of(section.outcome)
+        if enumerated is not None:
+            verdicts.append(enumerated.staleness)
+        verdicts.extend(item.staleness for item in section_evaluated(section))
     return verdicts
 
 
@@ -574,6 +603,7 @@ def subject_counts(answer_: Answer, section: HorizonSection) -> SubjectCounts:
             1 for item in section.standings if isinstance(item, SubjectUnreached)
         ),
         undeclared=sum(1 for item in section.standings if isinstance(item, SubjectUndeclared)),
+        not_assessed=sum(1 for item in section.standings if isinstance(item, SubjectNotAssessed)),
         ids_considered=len(_considered_ids(answer_.subjects)),
     )
 
@@ -641,16 +671,11 @@ def key_agreement(answer_: Answer) -> KeyAgreement:
     enumeration rather than a contract -- so an inequality is reported as a finding instead of
     being smoothed over.
     """
+    enumerated = [_enumerated_of(section.outcome) for section in answer_.sections]
     per_section = [
-        tuple(
-            item.key
-            for item in (
-                section.outcome.enumerated.candidates
-                if isinstance(section.outcome, CandidateSurvey)
-                else ()
-            )
-        )
-        for section in answer_.sections
+        tuple(item.key for item in item_set.candidates)
+        for item_set in enumerated
+        if item_set is not None
     ]
     shared = (
         frozenset.intersection(*[frozenset(keys) for keys in per_section])

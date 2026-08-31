@@ -20,7 +20,6 @@ from typing import TYPE_CHECKING
 from terezy.core.decision.answer import AnswerInputs, answer
 from terezy.core.results.answer import Answer, Refused
 from terezy.core.results.coverage import IMPLICIT_REGIME_ID
-from terezy.core.scenarios.regimes import routes_in_force
 from terezy.data import manifest as run_manifest
 from terezy.data.declarations import loader, resolver
 from terezy.data.declarations.errors import DeclarationError
@@ -33,7 +32,6 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.primitives.currency import Currency
     from terezy.core.results.question import Question
     from terezy.core.routes.legs import Route
-    from terezy.core.scenarios.regimes import RegimeTransition
     from terezy.data.manifest import RunManifest
 
 
@@ -49,41 +47,44 @@ class AnsweredQuestion:
     manifest: RunManifest
 
 
-def inputs_of(declarations: resolver.AnswerDeclarations, *, on_date: date) -> AnswerInputs:
+def inputs_of(declarations: resolver.AnswerDeclarations, *, regime_id: str) -> AnswerInputs:
     """The verb's second parameter, built from a resolved data root.
 
-    ``on_date`` is when the money moves -- the first horizon's start -- and is **never**
-    ``as_of``, which decides staleness. Both are ``date`` and nothing catches the substitution,
-    which is why ``routes_in_force`` says so in its own words and why this passes it explicitly.
+    **The route set is the one the question's regime declares**, never the one a transition
+    happens to put in force on some date. 014 FR-023 makes the regime *the* record of which
+    world was searched, and ``RunManifest.regime_id`` records the same string -- so selecting a
+    different regime's routes and printing the named one would make the manifest assert a world
+    the run did not search. Measured 2026-08-31: over the shipped ``war_end`` scenario a
+    question naming ``normalized`` with horizons starting 2026-09-01 was answered over
+    ``wartime``'s eight routes, two corridors short, under the label ``normalized``.
     """
     coverage = declarations.candidates.composition.coverage
     routes = coverage.ramp.routes
-    narrowed: Mapping[str, Route] = (
-        routes
-        if not coverage.regimes
-        else routes_in_force(
-            coverage.regimes,
-            routes,
-            transitions=_transitions(declarations),
-            on_date=on_date,
-        ).routes
-    )
+    if not coverage.regimes:
+        return _inputs(declarations, routes)
+    named = coverage.regimes.get(regime_id)
+    if named is None:
+        raise DeclarationError(
+            coverage.spendable_file.parent.parent / resolver.SCENARIOS_DIR,
+            "",
+            f"the question asks under the regime {regime_id!r}, and the scenario resolved for "
+            f"this run declares {sorted(coverage.regimes)}. A regime nobody declared would "
+            "leave the route set unnarrowed, and the answer would compare corridors the "
+            "question's own world says do not exist.",
+            f"name one of {sorted(coverage.regimes)}",
+        )
+    return _inputs(declarations, {name: routes[name] for name in sorted(named.route_ids)})
+
+
+def _inputs(declarations: resolver.AnswerDeclarations, routes: Mapping[str, Route]) -> AnswerInputs:
+    """The bundle, over whichever route set the regime settled on."""
     return AnswerInputs(
         registries=declarations.tuples.registries,
-        routes=narrowed,
+        routes=routes,
         groups=declarations.tuples.instruments.groups,
         bound=declarations.candidates.composition.bound,
         ceiling=declarations.candidates.ceiling,
     )
-
-
-def _transitions(declarations: resolver.AnswerDeclarations) -> tuple[RegimeTransition, ...]:
-    """The declared transitions of the scenario the coverage set was resolved for."""
-    coverage = declarations.candidates.composition.coverage
-    scenario_id = coverage.scenario_id
-    if scenario_id is None:
-        return ()
-    return tuple(coverage.ramp.scenarios[scenario_id].transitions)
 
 
 def answer_declared(
@@ -109,7 +110,7 @@ def answer_declared(
         base_currency=base_currency,
         scenario_id=_scenario_of(root, question.regime_id, base_currency=base_currency),
     )
-    result = answer(question, inputs_of(declarations, on_date=question.horizons[0].start), as_of)
+    result = answer(question, inputs_of(declarations, regime_id=question.regime_id), as_of)
     return AnsweredQuestion(
         answer=result,
         manifest=run_manifest.of_answer(
@@ -146,10 +147,14 @@ def _declared_question(root: Path, question_id: str) -> Question:
         declared = loader.question_from_file(path)
         if declared.id == question_id:
             return declared
+    ids = sorted(
+        loader.question_from_file(path).id
+        for path in sorted((root / resolver.QUESTIONS_DIR).glob("*.toml"))
+    )
     raise DeclarationError(
         root / resolver.QUESTIONS_DIR,
         "",
-        f"declares no question with the id {question_id!r}.",
+        f"declares no question with the id {question_id!r}. The declared ids are {ids}.",
         "name a declared question, or declare the one you meant to ask",
     )
 

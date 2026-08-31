@@ -45,6 +45,7 @@ from terezy.core.instruments.interface import (
 )
 from terezy.core.ledger.events import CausationKind, CausationRef, Event, LotRef
 from terezy.core.primitives import money
+from terezy.core.primitives.tolerance import is_close
 
 if TYPE_CHECKING:  # pragma: no cover -- import-time cycle avoidance
     from terezy.core.instruments.interface import (
@@ -112,8 +113,13 @@ def events(
     # Striking a sale for zero units would emit a disposal of nothing, which the ledger refuses
     # by *raising*: an uncaught exception where a coupon the holding simply never receives is
     # the honest answer.
+    #
+    # **Compared to the project tolerance, not to zero.** A repayment retires
+    # `quantity * amount / principal` units, and several of them do not sum to the holding
+    # exactly: a residual of 1.8e-15 is a schedule that ran to term, and selling it would ask
+    # the ledger for units no lot holds.
     residual = holding.quantity - retired
-    if early_exit is not None and residual > 0.0:
+    if early_exit is not None and not is_close(residual, 0.0) and residual > 0.0:
         stream.append(
             acquire.early_sale(
                 declaration,
@@ -262,7 +268,12 @@ def _horizon_problem(
     horizon: DateRange,
     early_exit: EarlyExit | None,
 ) -> InstrumentFailure | None:
-    """Whether the window contains the purchase, and can close the position at its end."""
+    """Whether the window contains the purchase, and can close the position at its end.
+
+    **Both sides of the purchase.** A window that starts after it measures a return from a day
+    nothing was bought on; one that *ends* before it would sell something never bought, and the
+    hold-to-maturity refusal used to cover that case implicitly (015 FR-029).
+    """
     if horizon.end < horizon.start:
         return InconsistentTerms(
             first_term="horizon.start",
@@ -281,6 +292,18 @@ def _horizon_problem(
                 f"{holding.purchased_on.isoformat()}. The purchase is the origin of every "
                 "time measurement in the result, so a horizon that excludes it would "
                 "measure returns from a date on which nothing was bought."
+            ),
+        )
+    if horizon.end < holding.purchased_on:
+        return InconsistentTerms(
+            first_term="horizon.end",
+            second_term="holding.purchased_on",
+            reason=(
+                f"the horizon ends {horizon.end.isoformat()}, before the purchase of "
+                f"{declaration.id!r} settles on {holding.purchased_on.isoformat()} -- the way "
+                "in's declared latency runs past the window. Selling at the end of a window "
+                "that closes before the money arrives is a sale of something never bought, "
+                "which is not a figure."
             ),
         )
     last = max(payment.on for payment in receivable)

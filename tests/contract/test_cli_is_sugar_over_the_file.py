@@ -256,3 +256,37 @@ def test_a_declared_group_nobody_labelled_is_not_printed_as_undeclared() -> None
     printed = "\n".join(cli._subject_lines(result))
     assert "  unlabelled: 0 instrument(s) --" in printed
     assert "  btc: NOTHING IS DECLARED BY THAT NAME" in printed
+
+
+def test_flags_answer_a_question_against_a_root_that_declares_none(tmp_path: Path) -> None:
+    """The one place the file does not exist is the one place the flags path exists for."""
+    root = tmp_path / "data"
+    shutil.copytree(fixtures.DATA_ROOT, root)
+    (root / "questions" / "fifty-thousand.toml").unlink()
+    run = cli._from_flags(
+        root, [fixtures.QUESTION_FILE.read_text(encoding="utf-8")], as_of=fixtures.AS_OF
+    )
+    assert isinstance(run.answer, Answer), run.answer
+    assert not [ref for ref in run.manifest.inputs if ref.kind == "question"]
+
+
+def test_a_malformed_as_of_is_not_blamed_on_a_declaration(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Nothing was loaded, so sending the reader to ``data/`` would be a false statement."""
+    assert (
+        cli.main(
+            [
+                "--data-root",
+                str(fixtures.DATA_ROOT),
+                "--as-of",
+                "yesterday",
+                "--question",
+                fixtures.OWNERS_QUESTION,
+            ]
+        )
+        == cli.LOAD_FAILED
+    )
+    printed = capsys.readouterr().out
+    assert "--as-of is not an ISO date" in printed
+    assert "declarations could not be loaded" not in printed
