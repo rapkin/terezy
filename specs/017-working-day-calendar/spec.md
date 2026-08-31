@@ -596,9 +596,10 @@ without a calendar.
   the *ran off an end* discriminator of FR-011's third reason, rather than return the window's
   edge or loop. The discriminator is required rather than optional: *the date you asked about
   was never covered* and *the date you asked about was covered but the answer is not* have
-  different remedies, and which **end** to extend follows from which reason fired — earlier
-  for a date before the window and for a backwards search that ran off, later for the other
-  two.
+  different remedies, and which **end** to extend follows from the question rather than from
+  the reason alone — earlier for a date before the window and for a backwards search that ran
+  off, later for a date after it and a forwards search, and for a week straddling the boundary
+  whichever end the week crosses.
 - **FR-014**: Given a calendar and a date, the system MUST answer the **last working day of the
   week containing that date**, computed from the calendar's own declared week start. Included
   because пункт 10 is written in it — *«останній робочий день тижня»* — and omitting it would

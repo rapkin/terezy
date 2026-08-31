@@ -5917,9 +5917,12 @@ def _classification_row(
       working day the law shortens, so the two facts cannot both hold. Writable in TOML on
       purpose and refused here; the core has no field for it.
     * **a row the declared pattern already gives.** A row is an exception *over* the pattern
-      (FR-008), and one that repeats it would be reported as a declared move that never
-      happened. A ``working_day`` row on a date the pattern already works is the one case that
-      still says something -- the pre-holiday shortening -- and it is kept for exactly that.
+      (FR-008). The two branches are refused for **different** reasons and say so separately: a
+      ``rest_day`` row on a date the pattern already rests would be reported as a declared move
+      that never happened, while a ``working_day`` row on a date the pattern already works
+      classifies correctly and simply declares nothing. A ``working_day`` row carrying
+      ``pre_holiday = true`` is kept, because the shortening is something the pattern cannot
+      say.
     """
     field_prefix = f"{CALENDAR_DAY_TABLE}[{position}]"
     on_date = _parse_date(path, f"{field_prefix}.on_date", entry.on_date)
@@ -5941,7 +5944,16 @@ def _classification_row(
     rests = wd.rests_on(week, on_date)
     if classification == "working_day":
         if not rests and not entry.pre_holiday:
-            raise _says_nothing(path, field_prefix, on_date, "a working day")
+            raise DeclarationError(
+                path,
+                f"{field_prefix}.classification",
+                f"declares {on_date.isoformat()} a working day, which the declared rest "
+                "pattern already makes it, and declares no pre-holiday shortening. The row "
+                "says nothing the pattern does not, so it is refused rather than kept as a "
+                "line a later reader would take for a declared exception.",
+                "write pre_holiday = true if the law shortens this day, correct the date, or "
+                "delete the row",
+            )
         return wd.DeclaredWorkingDay(
             on_date=on_date, pre_holiday=entry.pre_holiday, provenance=provenance
         )
@@ -5959,20 +5971,15 @@ def _classification_row(
         # holiday is a fact about the date, and it is a different fact from a Sunday.
         return wd.DeclaredHoliday(on_date=on_date, provenance=provenance)
     if rests:
-        raise _says_nothing(path, field_prefix, on_date, "a rest day")
+        raise DeclarationError(
+            path,
+            f"{field_prefix}.classification",
+            f"declares {on_date.isoformat()} a rest day, which the declared rest pattern "
+            "already makes it. A rest_day row is a MOVE, and this one would make the "
+            "classification report a declared move on a date no act touched.",
+            "delete the row, or correct the date it names",
+        )
     return wd.DeclaredRestDay(on_date=on_date, provenance=provenance)
-
-
-def _says_nothing(path: Path, field_prefix: str, on_date: date, already: str) -> DeclarationError:
-    """A row the declared rest pattern already gives, refused rather than reported as a move."""
-    return DeclarationError(
-        path,
-        f"{field_prefix}.classification",
-        f"declares {on_date.isoformat()} a day the declared rest pattern already makes "
-        f"{already}. A row is an exception OVER the pattern, and keeping this one would make "
-        "the classification report a declared move on a date no act touched.",
-        "delete the row, or correct the date it names",
-    )
 
 
 def _shut_week(path: Path, calendar: wd.WorkingDayCalendar) -> None:

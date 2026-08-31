@@ -41,8 +41,8 @@ empty `verified_on` on any of them marks the answer (SC-005).
 Skips every consecutive non-working day. A search that would leave `covers` returns
 `CalendarOutOfCoverage` with `RAN_OFF_AN_END` — never the window's edge, never a loop (FR-013).
 The discriminator separates *the date you asked about was never covered* from *the date you
-asked about was covered and the answer is not*: only the second is fixed by extending the
-calendar.
+asked about was covered and the answer is not*. Which end to widen follows from the direction
+searched, and for `last_working_day_of_week` from whichever end its week crosses.
 
 ## `last_working_day_of_week`
 

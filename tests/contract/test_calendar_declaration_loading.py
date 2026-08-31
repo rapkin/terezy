@@ -21,10 +21,13 @@ state is unrepresentable rather than repeatedly checked.
 stated reason, and seven consecutive non-working rows reach the same state by another road.
 Refusing here keeps the query total and keeps the refusal union at FR-011's three reasons.
 
-*A row the declared pattern already gives.* A row is an exception **over** the pattern, and one
-that repeats it would be reported as a declared move on a date no act touched. Two exceptions
-to that, both tested: a ``working_day`` row carrying the pre-holiday shortening says something
-the pattern cannot, and a ``public_holiday`` row on a rest day names a fact a Sunday is not.
+*A row the declared pattern already gives.* A row is an exception **over** the pattern, and the
+two branches are refused for different reasons: a ``rest_day`` row on a pattern-rest date would
+be reported as a declared move on a date no act touched, while a ``working_day`` row on a
+pattern-working date classifies correctly and simply declares nothing. Two rows survive that
+rule and both are tested: a ``working_day`` row carrying the pre-holiday shortening says
+something the pattern cannot, and a ``public_holiday`` row on a rest day names a fact a Sunday
+is not.
 
 The last tests load the **shipped** ``data/calendars/ua_civil.toml``, because a battery of
 broken files proves nothing about the file the project actually uses.

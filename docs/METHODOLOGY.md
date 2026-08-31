@@ -3959,10 +3959,13 @@ end, repeats the last declared year, or infers from an adjacent one.
 *Which way* is one of three: **before** the window, **after** it, or **the search ran off an
 end** — the last being a date that *was* covered whose answer is not. The first two say the
 question was outside what anybody read the law for; the third says it was inside and the answer
-is one day past an edge. Which end to widen follows from which of the three: earlier for
-*before* and for a backwards search that ran off, later for *after* and a forwards one. A
-next-working-day search that walks past an end, and a last-working-day-of-the-week question
-whose week straddles one, both land in the third.
+is one day past an edge. A next-working-day search that walks past an end, and a
+last-working-day-of-the-week question whose week straddles one, both land in the third.
+
+Which end to widen follows from the **question**, not from the reason alone: earlier for
+*before the window*, later for *after* it, later for a forwards search that ran off and earlier
+for a backwards one — and for the week question, whichever end its week crosses, which is the
+one case the reason alone does not settle.
 
 That refusal is the answer to the enumerated form's one weakness. An enumerated calendar goes
 stale at its last declared year; declaring the window is what makes the staleness loud instead

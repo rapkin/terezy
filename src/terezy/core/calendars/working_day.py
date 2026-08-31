@@ -96,9 +96,12 @@ class Missed(Enum):
     within one situation. *The date was never covered* and *the date was covered and the
     answer is not* send a reader to different places: the first says the question was outside
     what anybody read the law for, the second says the question was inside it and the answer
-    is one day past an edge. Which **end** to extend is the discriminator's other half --
-    :attr:`BEFORE_WINDOW` and a backwards search that ran off need the window widened
-    earlier, :attr:`AFTER_WINDOW` and a forwards one need it widened later (FR-011, FR-013).
+    is one day past an edge. Which **end** to extend follows from the question rather than from
+    the member: :attr:`BEFORE_WINDOW` needs the window widened earlier and :attr:`AFTER_WINDOW`
+    later, :func:`first_working_day_on_or_after` running off needs it later and
+    :func:`last_working_day_on_or_before` earlier -- and
+    :func:`last_working_day_of_week` needs whichever end its week crosses, which is why it is
+    the one case the member alone does not settle (FR-011, FR-013).
     """
 
     BEFORE_WINDOW = "before_window"
@@ -338,7 +341,7 @@ def _out_of_coverage(
     )
 
 
-def row_on(calendar: WorkingDayCalendar, on_date: date) -> ClassificationRow | None:
+def _row_on(calendar: WorkingDayCalendar, on_date: date) -> ClassificationRow | None:
     """The enumerated exception for a date, by bisection over the ascending rows."""
     position = bisect_left(calendar.rows, on_date, key=lambda row: row.on_date)
     if position < len(calendar.rows) and calendar.rows[position].on_date == on_date:
@@ -358,8 +361,8 @@ def _classified(calendar: WorkingDayCalendar, on_date: date) -> DayClassificatio
     declaration's: *no row for this date* means *the law declared no exception here* only
     because somebody read the law for this window.
     """
-    row = row_on(calendar, on_date)
     pattern = prov.merge(calendar.covered_by, calendar.week.provenance)
+    row = _row_on(calendar, on_date)
     if row is None:
         if rests_on(calendar.week, on_date):
             return NonWorkingDay(
@@ -372,6 +375,13 @@ def _classified(calendar: WorkingDayCalendar, on_date: date) -> DayClassificatio
             provenance=pattern,
         )
     cited = prov.merge(calendar.covered_by, row.provenance)
+    # A verdict read off the pattern rests on the pattern, whichever way it comes out.
+    # `DECLARED_MOVE` is the claim that an act moved this date, and the only evidence anything
+    # was moved is the rest pattern saying the date would otherwise go the other way -- so an
+    # unverified pattern must mark a moved answer exactly as it marks a pattern-decided one.
+    # `ENUMERATED_NON_WORKING_DAY` is the one verdict that does not consult it: that the law
+    # names a date a holiday is true of a Sunday and a Tuesday alike.
+    against_the_pattern = prov.merge(cited, calendar.week.provenance)
     match row:
         case DeclaredHoliday():
             return NonWorkingDay(
@@ -381,15 +391,20 @@ def _classified(calendar: WorkingDayCalendar, on_date: date) -> DayClassificatio
             )
         case DeclaredRestDay():
             return NonWorkingDay(
-                on_date=on_date, decided_by=DecidedBy.DECLARED_MOVE, provenance=cited
+                on_date=on_date,
+                decided_by=DecidedBy.DECLARED_MOVE,
+                provenance=against_the_pattern,
             )
         case DeclaredWorkingDay():
-            moved = rests_on(calendar.week, on_date)
             return WorkingDay(
                 on_date=on_date,
-                decided_by=DecidedBy.DECLARED_MOVE if moved else DecidedBy.REST_PATTERN,
+                decided_by=(
+                    DecidedBy.DECLARED_MOVE
+                    if rests_on(calendar.week, on_date)
+                    else DecidedBy.REST_PATTERN
+                ),
                 pre_holiday=row.pre_holiday,
-                provenance=cited if moved else prov.merge(pattern, row.provenance),
+                provenance=against_the_pattern,
             )
 
 

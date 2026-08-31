@@ -61,18 +61,23 @@ SATURDAY = 5
 SUNDAY = 6
 
 
+def _verified(name: str) -> Provenance:
+    """A citation somebody checked, used only where a test needs one unverified input."""
+    return prov.of([_ref(name, verified_on=date(2026, 3, 2))])
+
+
 def _cited(name: str) -> Provenance:
     """One synthetic citation per declaration element, unverified, as the real file's are."""
-    return prov.of(
-        [
-            SourceRef(
-                id=f"synthetic_fortnight.{name}",
-                citation=f"synthetic://fortnight/{name}",
-                retrieved_on=date(2026, 3, 1),
-                verified_on=None,
-                kind="tax_rule",
-            )
-        ]
+    return prov.of([_ref(name, verified_on=None)])
+
+
+def _ref(name: str, *, verified_on: date | None) -> SourceRef:
+    return SourceRef(
+        id=f"synthetic_fortnight.{name}",
+        citation=f"synthetic://fortnight/{name}",
+        retrieved_on=date(2026, 3, 1),
+        verified_on=verified_on,
+        kind="tax_rule",
     )
 
 
@@ -146,7 +151,8 @@ def test_the_table_covers_the_whole_window_and_nothing_outside_it() -> None:
 
 
 def test_the_counts_the_docstring_states_are_the_counts_the_table_holds() -> None:
-    """The docstring's *ten working days, one shortened, three decided by a row* as a check."""
+    """The module docstring's counts as a check: ten working days, one of them shortened, two
+    decided by something other than the pattern, and three dates carrying a row."""
     assert sum(1 for _, working, _, _ in BY_HAND if working) == 10
     assert sum(1 for _, _, _, pre_holiday in BY_HAND if pre_holiday) == 1
     assert sum(1 for _, _, decided_by, _ in BY_HAND if decided_by is not PATTERN) == 2
@@ -161,15 +167,17 @@ def test_every_answer_carries_the_mark_of_the_declaration_that_decided_it() -> N
     read the law for this window, and without that claim it would mean *nobody transcribed
     this date*.
 
-    2026-03-04 rests on three, which is the shape of what it declares: an ordinary Wednesday
-    the **pattern** works, that a **row** additionally shortens, inside a **window** somebody
-    read. Dropping the week there would mark the pre-holiday fact and leave the working half
-    of the same answer resting on nothing.
+    **The week is on every answer whose verdict was read off it, in either direction.** A
+    pre-holiday Wednesday is working *because the pattern works it*, and a moved Saturday is
+    moved *because the pattern rests it* -- the second is as much a claim about the pattern as
+    the first, so an unverified pattern has to mark both. The one verdict that does not consult
+    it is the enumerated holiday: that the law names a date a holiday is true of a Sunday and a
+    Tuesday alike, so 2026-03-05 rests on its row and the window and nothing else.
     """
     expected = {
         date(2026, 3, 4): {"synthetic_fortnight.pre_holiday", "synthetic_fortnight.week"},
         date(2026, 3, 5): {"synthetic_fortnight.holiday"},
-        date(2026, 3, 7): {"synthetic_fortnight.moved"},
+        date(2026, 3, 7): {"synthetic_fortnight.moved", "synthetic_fortnight.week"},
         date(2026, 3, 9): {"synthetic_fortnight.week"},
     }
     for on_date, deciding in expected.items():
@@ -179,3 +187,41 @@ def test_every_answer_carries_the_mark_of_the_declaration_that_decided_it() -> N
         assert {ref.id for ref in answer.provenance.sources} == deciding | {
             "synthetic_fortnight.coverage"
         }
+
+
+def test_an_unverified_rest_pattern_marks_a_moved_day_as_well_as_a_pattern_day() -> None:
+    """The half of the rule above that a reader would not expect, asserted on its own.
+
+    Every citation in this file's calendar is unverified, so the test builds a calendar whose
+    window and rows are **verified** and whose week is not. A moved Saturday then has exactly
+    one unverified input -- the pattern that says Saturday rests, which is the whole of the
+    evidence that anything was moved -- and the answer has to carry it.
+    """
+    checked = wd.WorkingDayCalendar(
+        id="synthetic_checked",
+        jurisdiction="XX",
+        authority="a synthetic authority",
+        scope=wd.CalendarScope.CIVIL,
+        covers=FORTNIGHT.covers,
+        covered_by=_verified("coverage"),
+        week=wd.DeclaredWeek(
+            rest_days=frozenset({SATURDAY, SUNDAY}), starts_on=MONDAY, provenance=_cited("week")
+        ),
+        rows=(
+            wd.DeclaredWorkingDay(
+                on_date=date(2026, 3, 7), pre_holiday=False, provenance=_verified("moved")
+            ),
+        ),
+    )
+    answer = wd.classify(
+        {checked.id: checked}, checked.id, scope=wd.CalendarScope.CIVIL, on_date=date(2026, 3, 7)
+    )
+    assert isinstance(answer, wd.WorkingDay)
+    assert answer.decided_by is wd.DecidedBy.DECLARED_MOVE
+    assert prov.is_unverified(answer.provenance), (
+        "a move asserted on an unverified rest pattern must render marked: the pattern is the "
+        "only evidence anything was moved"
+    )
+    assert {ref.id for ref in prov.unverified_sources(answer.provenance)} == {
+        "synthetic_fortnight.week"
+    }
