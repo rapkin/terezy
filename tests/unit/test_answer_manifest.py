@@ -137,14 +137,19 @@ def test_editing_one_file_moves_exactly_one_digest(tmp_path: Path, relative: str
     root = _scratch_root(tmp_path)
     before: Any = _answered(root)
     target = root / relative
+    was = run_manifest.file_version(target)
     target.write_text(target.read_text(encoding="utf-8") + "\n# a comment\n", encoding="utf-8")
     after: Any = _answered(root)
 
     versions_before = {ref.file: ref.version for ref in before.manifest.inputs}
     versions_after = {ref.file: ref.version for ref in after.manifest.inputs}
     moved = {name for name in versions_before if versions_before[name] != versions_after.get(name)}
-    assert len(moved) == 1, sorted(moved)
-    assert next(iter(moved)).endswith(target.name)
+    # The expected name is read off the **pre-edit** manifest by content, not derived from the
+    # path: five recorded files are called `owner-001.toml` and three of the targets are, so a
+    # basename comparison would pass while a sibling's digest moved instead of this one's.
+    edited = {name for name, version in versions_before.items() if version == was}
+    assert len(edited) == 1, sorted(edited)
+    assert moved == edited
 
 
 def test_answering_twice_produces_an_equal_digest() -> None:

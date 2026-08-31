@@ -15,23 +15,27 @@ string in the output -- no blank, no dash, no zero, no omitted row.
 from __future__ import annotations
 
 import ast
+import dataclasses
 import shutil
 from dataclasses import replace
 from datetime import date
 from pathlib import Path
+from typing import Any, Final, cast
 
 import pytest
 
 from terezy.api.answer import answer_question
 from terezy.cli import main as cli
 from terezy.core.decision.answer import benchmark_unavailable, section_ranking
+from terezy.core.instruments.fund import ChosenPoint, ExchangeRateAssumption
 from terezy.core.instruments.groups import InstrumentGroup
+from terezy.core.instruments.interface import Assumptions
 from terezy.core.primitives.currency import Currency
 from terezy.core.results import canonical
 from terezy.core.results.answer import Answer, HorizonSection
 from terezy.core.results.candidates import CandidateSurvey
 from terezy.core.results.fund import FundAssumptions
-from terezy.core.results.tuple import Comparison, Tuple, TupleOutcome
+from terezy.core.results.tuple import Comparison, InstrumentPlan, Tuple, TupleOutcome
 from terezy.data.declarations import loader
 from tests import answer_registries as fixtures
 
@@ -277,7 +281,11 @@ def test_flags_answer_a_question_against_a_root_that_declares_none(tmp_path: Pat
 def test_a_malformed_as_of_is_not_blamed_on_a_declaration(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Nothing was loaded, so sending the reader to ``data/`` would be a false statement."""
+    """Nothing was read, so a message about the declarations would be a false statement.
+
+    The date is parsed outside the block that catches a refusal, and this is what says so: a
+    malformed ``--as-of`` names the flag it came from and nothing else.
+    """
     assert (
         cli.main(
             [
@@ -407,7 +415,50 @@ def test_a_printed_figure_names_all_five_terms_of_its_key() -> None:
     assert "from salary_uah" in line
     assert "via inzhur_direct" in line
     assert "out inzhur_to_monobank" in line
-    assert "run as Assumptions/fifo/hold_cash" in line
+    assert "run as fifo/hold_cash" in line
+
+
+A_BOND_PLAN: Final = Assumptions(consumption_method="fifo", coupon_policy="hold_cash")
+A_FUND_PLAN: Final = FundAssumptions(
+    liquidity_mode="practice",
+    buyback="available",
+    exit_on=date(2028, 1, 17),
+    yield_point=ChosenPoint(rate=0.25, is_assumption=True, rationale="TEST FIXTURE"),
+    exchange_rate=ExchangeRateAssumption(
+        uah_per_unit=41.0, is_assumption=True, rationale="TEST FIXTURE"
+    ),
+    consumption_method="fifo",
+)
+
+PLAN_FIELDS_OTHERWISE: Final = {
+    "consumption_method": "lifo",
+    "coupon_policy": "reinvest",
+    "liquidity_mode": "legal",
+    "buyback": "unavailable",
+    "exit_on": date(2029, 3, 2),
+    "yield_point": ChosenPoint(rate=0.29, is_assumption=True, rationale="TEST FIXTURE"),
+    "exchange_rate": ExchangeRateAssumption(
+        uah_per_unit=42.0, is_assumption=True, rationale="TEST FIXTURE"
+    ),
+}
+"""A different value for every field either plan record declares, for the walk below.
+
+A record that grows an eighth field fails on the lookup rather than passing over it, which is
+what makes the walk a check rather than a list of names somebody has to remember to extend.
+"""
+
+
+@pytest.mark.parametrize("plan", [A_BOND_PLAN, A_FUND_PLAN])
+def test_the_printed_plan_states_every_choice_the_plan_declares(plan: InstrumentPlan) -> None:
+    """The renderer and the digest must drop the same fields, which is none of them.
+
+    ``canonical.of_plan`` exists to be hashed and prints dates as tuples and rates as
+    ``float.hex()``, so the CLI renders a plan itself -- and two renderings of one record is
+    exactly where one quietly stops saying something the other still says.
+    """
+    for field in dataclasses.fields(plan):
+        other: Any = replace(cast(Any, plan), **{field.name: PLAN_FIELDS_OTHERWISE[field.name]})
+        assert cli._plan_terms(other) != cli._plan_terms(plan), field.name
 
 
 def test_two_plans_for_one_instrument_are_two_rows_that_read_differently() -> None:
@@ -449,16 +500,16 @@ def _a_miltech_key() -> Tuple:
     )
 
 
-def test_a_question_naming_an_undeclared_stream_fails_to_load_rather_than_refusing(
+def test_a_question_naming_an_undeclared_stream_is_refused_before_the_verb_sees_it(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """The consequence of running the file's checks on the flags path, pinned rather than left.
 
     ``AmountForAnUndeclaredStream`` is still what the **verb** returns to a caller holding a
-    record it built itself; through the CLI the same question is a load failure, because FR-004
-    says a file naming a stream nobody declared is a typo and the flags are sugar over the file.
-    The two exit codes are what a reader and a script tell them apart by, so the choice is
-    asserted here rather than discovered.
+    record it built itself; through the CLI the same question never reaches the verb, because
+    FR-004 says a stream nobody declared is a typo and the flags are sugar over the file. The
+    two exit codes are what a reader and a script tell that apart by, so the choice is asserted
+    here rather than discovered.
     """
     broken = fixtures.QUESTION_FILE.read_text(encoding="utf-8").replace(
         'stream   = "salary_uah"', 'stream   = "salary_eur"', 1

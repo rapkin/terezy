@@ -62,7 +62,7 @@ from terezy.core.results.tuple import (
     Tuple,
     TupleOutcome,
 )
-from terezy.core.routes.path import EXIT_BY_IDENTITY, ExitChain, candidate_id, exit_segments_of
+from terezy.core.routes.path import ExitChain, candidate_id, exit_segments_of
 from terezy.core.tax.interface import TaxCharge
 
 
@@ -294,13 +294,19 @@ def of_plan(value: InstrumentPlan) -> tuple[Canonical, ...]:
 
 
 def of_tuple_key(value: Tuple) -> tuple[Canonical, ...]:
-    """One candidate's five declared terms, and nothing else (014 FR-023)."""
+    """One candidate's five declared terms, and nothing else (014 FR-023).
+
+    ``FROM_THE_DECLARATION`` renders under its **own** name. It is an instruction to read the
+    inbound route's partner, not a way out, and rendering it as ``EXIT_BY_IDENTITY`` -- *the
+    destination is already spendable* -- would put one member of the union under another's name
+    in the record a digest is taken over.
+    """
     way_out = value.route_out
     return (
         value.instrument_id,
         value.stream_id,
         candidate_id(value.route_in),
-        exit_segments_of(way_out) if isinstance(way_out, ExitChain) else (EXIT_BY_IDENTITY.value,),
+        exit_segments_of(way_out) if isinstance(way_out, ExitChain) else (way_out.value,),
         of_plan(value.exit_terms),
     )
 

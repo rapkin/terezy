@@ -33,9 +33,9 @@ from terezy.core.decision.answer import (
     section_ranking,
     subject_counts,
 )
+from terezy.core.instruments.interface import Assumptions
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.rates import NominalRate
-from terezy.core.results import canonical
 from terezy.core.results.answer import (
     Answer,
     CoveredByThePlan,
@@ -54,7 +54,8 @@ from terezy.core.results.candidates import (
     NothingConnects,
     NothingNeedsToConnect,
 )
-from terezy.core.results.tuple import TupleOutcome
+from terezy.core.results.fund import FundAssumptions
+from terezy.core.results.tuple import InstrumentPlan, TupleOutcome
 from terezy.core.routes.path import (
     ComposedExit,
     DeclaredExit,
@@ -74,7 +75,8 @@ REFUSED = 1
 """The question did not stand up. A **result**, and a different thing from a broken file."""
 
 LOAD_FAILED = 2
-"""A declaration would not load. Distinct, so a caller can tell a refusal from a crash."""
+"""Nothing was answered: a declaration would not load, or the question was refused before the
+verb ever saw it. Distinct from :data:`REFUSED`, so a caller can tell a result from neither."""
 
 FLAGS = Path("<flags>")
 """What a question built from the command line is named by when it refuses.
@@ -292,21 +294,50 @@ def _figure_lines(outcome: TupleOutcome) -> list[str]:
     owner has two streams and a bare number in an ordered list is the Principle VI conflation
     ``Money`` exists to prevent.
 
-    ``exit_terms`` prints as the plan's own canonical form, not as the name of its record: a
-    question may state several plans for one instrument, and two that differ only in the exit
-    date would otherwise be two figures under one identical line.
+    ``exit_terms`` prints every choice the plan states, not the name of its record: a question
+    may state several plans for one instrument, and two that differ only in the exit date would
+    otherwise be two figures under one identical line.
     """
     rate = outcome.implied_rate
     return [
         f"    {outcome.key.instrument_id} from {outcome.key.stream_id} "
         f"via {candidate_id(outcome.key.route_in)} "
         f"out {_exit_choice(outcome.key.route_out)} "
-        f"run as {'/'.join(str(part) for part in canonical.of_plan(outcome.key.exit_terms))}",
+        f"run as {_plan_terms(outcome.key.exit_terms)}",
         f"      reaches {outcome.reaches.amount} {outcome.reaches.currency.value}"
         + (
             f"; rate {rate.value}" if isinstance(rate, NominalRate) else f"; NO RATE: {rate.reason}"
         ),
     ]
+
+
+def _plan_terms(plan: InstrumentPlan) -> str:
+    """How the holding is run, in the words the question stated it in.
+
+    Rendered here rather than through ``canonical.of_plan``, which exists to be **hashed**: its
+    dates are tuples and its rates are ``float.hex()``, so a reader could not tell two yield
+    points apart by reading -- the very collision the five-term key exists to prevent. The two
+    renderings are kept in step by
+    ``tests/contract/test_cli_is_sugar_over_the_file.py``'s per-field walk, which fails if
+    either drops a field the other keeps.
+    """
+    match plan:
+        case Assumptions():
+            return f"{plan.consumption_method}/{plan.coupon_policy}"
+        case FundAssumptions():
+            point, rate = plan.yield_point, plan.exchange_rate
+            return "/".join(
+                [
+                    plan.consumption_method,
+                    plan.liquidity_mode,
+                    f"buyback {plan.buyback}",
+                    "no exit date" if plan.exit_on is None else f"exit {plan.exit_on.isoformat()}",
+                    "no yield point" if point is None else f"yield {point.rate}",
+                    "no stated rate" if rate is None else f"rate {rate.uah_per_unit}",
+                ]
+            )
+        case _:  # pragma: no cover -- mypy proves this unreachable
+            assert_never(plan)
 
 
 def _exit_choice(choice: ExitChoice) -> str:

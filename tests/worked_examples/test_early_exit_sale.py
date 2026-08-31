@@ -33,7 +33,9 @@ from terezy.core.errors import InconsistentTerms
 from terezy.core.instruments import fixed_income
 from terezy.core.instruments.interface import DateRange, EarlyExit
 from terezy.core.ledger.events import EventKind
+from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.money import Money
+from terezy.core.primitives.provenance import SourceRef
 from terezy.core.primitives.tolerance import is_close
 from terezy.core.results import project
 from terezy.core.results.project import Projection
@@ -312,3 +314,35 @@ def test_the_premium_measures_the_units_the_purchase_paid_for() -> None:
         outcome.ledger.disposals[0].realised_gain_base_ccy.amount,
         REINVEST_PROCEEDS - BASIS_AT_THE_SALE,
     )
+
+
+QUOTE_SOURCE = SourceRef(
+    id="synthetic:resale_quote",
+    citation="SYNTHETIC FIXTURE -- an invented resale quote. Not an observation of any venue.",
+    retrieved_on=date(2026, 8, 31),
+    verified_on=None,
+)
+
+
+def test_the_figure_is_marked_by_the_quote_and_not_by_the_terms() -> None:
+    """Principle I at the level a gate cannot see: which file a reader is sent to.
+
+    The whole purchase is sold here, so what comes back is the quote times a quantity the
+    holding declared and the terms had no part in. Carrying the terms' sources would say the
+    figure rests on the issue's declaration, and a reader chasing the unverified mark would
+    open the wrong file. Nothing is dropped either: the quote's own mark is on the figure.
+    """
+    outcome = project.project(
+        synthetic.declaration(),
+        synthetic.holding(),
+        synthetic.horizon(end=HORIZON_END),
+        synthetic.assumptions(),
+        tax_classes=synthetic.TAX_PACK,
+        early_exit=EarlyExit(
+            price_per_unit=Money(RESALE_PER_UNIT, synthetic.UAH, prov.of([QUOTE_SOURCE])),
+            assumption=SPREAD_HOLDS,
+        ),
+    )
+    assert isinstance(outcome, Projection), outcome
+    assert set(outcome.at_purchase.principal_returned.provenance.sources) == {QUOTE_SOURCE}
+    assert synthetic.TERMS_SOURCE not in outcome.at_purchase.principal_returned.provenance.sources

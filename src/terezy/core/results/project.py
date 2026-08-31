@@ -138,11 +138,13 @@ class PurchasePremium:
 
     principal_returned: Money
     """What the units ``paid`` bought get back: the repayments they will receive, times
-    quantity -- or, where the window closed the position first, what they sell for (015 FR-029).
+    quantity.
 
-    The quantity is always the **purchased** one, so that both readings measure the population
-    ``paid`` paid for; a schedule reinvesting its own coupons ends holding more units than that,
-    and those were bought with income rather than with this outlay.
+    Where the window closed the position first (015 FR-029), it is what those units get back
+    **through the sale instead**: the ones still held at their resale price, and any the
+    schedule already retired at the principal that retired them. Always the purchased
+    population, never what was held at the end -- a schedule reinvesting its own coupons ends
+    holding more units than the outlay bought, and those were bought with income.
 
     **Not ``face value x quantity``** (FR-025). The
     two coincide for a bond that repays its face once, which is every fixture this
@@ -443,26 +445,29 @@ def _at_purchase(
     The two cases cannot occur together, so the split is exact rather than an approximation:
     ``enumerated`` refuses ``reinvest`` outright, which is the only way units grow.
 
-    **The sale half is marked by the quote alone.** It is the resale price times a quantity that
-    came from the holding, so the terms file contributed nothing to it -- unioning the terms'
-    sources in would send a reader chasing an unverified mark to the wrong declaration. The
-    repaid half is the terms' own figure and carries their sources, as it always did.
+    **The sale half is marked by the terms only where the terms decided how much was left.**
+    Nothing retired means the whole purchase is sold and the quantity is the holding's own, so
+    the figure is the quote times a number the terms had no part in; something retired means
+    the units sold are what the declared repayments left, and the terms are behind that figure
+    as much as behind the repaid half. A mark that named the terms in both cases would send a
+    reader chasing an unverified quote to the wrong declaration.
     """
     per_unit = instrument_terms.principal_returned(
         declaration.terms, bought_on=holding.purchased_on
     )
-    still_held = holding.quantity if sold is None else min(sold.units, holding.quantity)
-    returned = (
-        money.scale(sold.price_per_unit, still_held)
-        if sold is not None
-        else money.scale_sourced(per_unit, still_held, declaration.terms.provenance)
-    )
-    if sold is not None and still_held < holding.quantity:
-        returned = money.add(
-            returned,
-            money.scale_sourced(
-                per_unit, holding.quantity - still_held, declaration.terms.provenance
-            ),
+    terms = declaration.terms.provenance
+    if sold is None:
+        returned = money.scale_sourced(per_unit, holding.quantity, terms)
+    else:
+        still_held = min(sold.units, holding.quantity)
+        retired = holding.quantity - still_held
+        returned = (
+            money.scale(sold.price_per_unit, still_held)
+            if retired == 0.0
+            else money.add(
+                money.scale_sourced(sold.price_per_unit, still_held, terms),
+                money.scale_sourced(per_unit, retired, terms),
+            )
         )
     disposal_class = declaration.tax_classes.get(TaxableEventKind.DISPOSAL_GAIN)
     return PurchasePremium(

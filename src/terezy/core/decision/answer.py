@@ -148,11 +148,11 @@ def _about_the_question(question: Question, inputs: AnswerInputs) -> Refused | N
     benchmark it names, and a plan for a word nothing reaches -- and are decided where that
     resolution happens.
 
-    Every one is reachable from a **caller-built** record, which is the only way two of them
-    are reached at all: the loader refuses an amount for an undeclared stream and a declared
-    stream with no amount before the verb ever sees them, because in an artefact under review
-    a missing amount is a typo. Stated here as well so the rule holds for a record no file
-    produced.
+    All five are reachable **only** from a caller-built record: the loader refuses every one of
+    them before the verb sees it -- no horizon, a repeated window and no subject in
+    ``question_from_document``, an unknown stream and a missing amount in ``check_question`` --
+    because in an artefact under review each of them is a typo rather than a decision. Stated
+    here as well because a record no file produced has had none of that said about it.
     """
     if not question.horizons:
         return NoHorizonDeclared()

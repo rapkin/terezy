@@ -44,8 +44,14 @@ from terezy.core.primitives.rates import NominalRate, RealBasis, RealRate, RealT
 from terezy.core.results import canonical, hurdle, project
 from terezy.core.results.fund import FundAssumptions
 from terezy.core.results.project import Projection
-from terezy.core.results.tuple import InstrumentPlan
+from terezy.core.results.tuple import InstrumentPlan, Tuple
 from terezy.core.routes import capacity
+from terezy.core.routes.path import (
+    FROM_THE_DECLARATION,
+    ComposedExit,
+    ExitChoice,
+    FundingPath,
+)
 from terezy.data import manifest
 from tests import synthetic
 
@@ -256,6 +262,8 @@ CANONICAL_SHAPE_BY_ENCODING = {
         "|(i,(s,s),(s,s),(s,s),(s,s),s,i)"
         "|(s,s,((s,s,s,s,s,s),(s,s,s,s,s,s)),(s,s),(s),(s))"
         "|(s,s,((s,s),(s,s)),(s,s),(s),(s))"
+        "|(s,s,s,(s,s),(s,s,s))"
+        "|(s,s,s,(s),(s,s,s,s,(i,i,i),s,s))"
     ),
 }
 """One recorded shape fingerprint per encoding tag, and exactly one entry: the current tag.
@@ -274,6 +282,12 @@ the part 007 changed. A shape change in a schedule row would have moved every re
 under an unchanged tag, which is the feature-002 failure this test exists to prevent. The
 figures appear twice: with both real figures populated, and with both unavailable, because the
 two branches have different shapes and pinning one leaves the other free to move.
+
+**Widened again by 015**, on the same reasoning: a candidate's five-term key is inside every
+answer digest, and it was outside this pin. Both branches of the way out and both kinds of run
+plan appear, because each renders to a different shape and pinning one leaves the other free to
+move. Widening the pin under an unchanged tag is not a scheme change -- no digest recorded under
+``v3`` covered these forms, because neither ``of_tuple_key`` nor ``of_answer`` existed then.
 
 **v3** (2026-08): feature 007 filled the reserved real-terms slot. Where a v2 projection
 rendered one ``(tag, value)`` pair, a v3 one renders two figures, each carrying its basis,
@@ -403,7 +417,39 @@ def _projection_fingerprint() -> str:
             _shape(canonical.of_charge(result.charges[0])),
             _shape(canonical.of_hurdle_rate(_representative_hurdle())),
             _shape(canonical.of_hurdle_rate(_unavailable_hurdle())),
+            _shape(canonical.of_tuple_key(_a_key(A_CHAIN, A_BOND_PLAN))),
+            _shape(canonical.of_tuple_key(_a_key(FROM_THE_DECLARATION, A_FUND_PLAN))),
         )
+    )
+
+
+A_BOND_PLAN: Final = Assumptions(consumption_method="fifo", coupon_policy="hold_cash")
+A_FUND_PLAN: Final = FundAssumptions(
+    liquidity_mode="practice",
+    buyback="available",
+    exit_on=date(2028, 1, 17),
+    yield_point=ChosenPoint(rate=0.25, is_assumption=True, rationale="TEST FIXTURE"),
+    exchange_rate=ExchangeRateAssumption(
+        uah_per_unit=41.0, is_assumption=True, rationale="TEST FIXTURE"
+    ),
+    consumption_method="fifo",
+)
+A_CHAIN: Final = ComposedExit(segments=("out_a", "out_b"))
+
+
+def _a_key(way_out: ExitChoice, plan: InstrumentPlan) -> Tuple:
+    """One candidate key, for the fingerprint's sake alone.
+
+    Both branches of the way out and both kinds of plan, because they render to different
+    shapes and pinning one would leave the other free to move: a digest is taken over whichever
+    the run produced, and 015 put both inside it.
+    """
+    return Tuple(
+        instrument_id="an_instrument",
+        stream_id="a_stream",
+        route_in=FundingPath(destination_id="a_venue", stream_id="a_stream", route_id="a_route"),
+        exit_terms=plan,
+        route_out=way_out,
     )
 
 
@@ -473,18 +519,6 @@ class TestAPlansCanonicalForm:
     about a record and goes stale the moment somebody adds a seventh field.
     """
 
-    PLAINLY: Final = Assumptions(consumption_method="fifo", coupon_policy="hold_cash")
-    AS_A_FUND: Final = FundAssumptions(
-        liquidity_mode="practice",
-        buyback="available",
-        exit_on=date(2028, 1, 17),
-        yield_point=ChosenPoint(rate=0.25, is_assumption=True, rationale="TEST FIXTURE"),
-        exchange_rate=ExchangeRateAssumption(
-            uah_per_unit=41.0, is_assumption=True, rationale="TEST FIXTURE"
-        ),
-        consumption_method="fifo",
-    )
-
     OTHERWISE: Final = {
         "consumption_method": "lifo",
         "coupon_policy": "reinvest",
@@ -497,21 +531,21 @@ class TestAPlansCanonicalForm:
         ),
     }
 
-    @pytest.mark.parametrize("plan", [PLAINLY, AS_A_FUND])
+    @pytest.mark.parametrize("plan", [A_BOND_PLAN, A_FUND_PLAN])
     def test_changing_any_declared_field_changes_the_form(self, plan: InstrumentPlan) -> None:
         for field in dataclasses.fields(plan):
             other: Any = replace(cast(Any, plan), **{field.name: self.OTHERWISE[field.name]})
             assert canonical.of_plan(other) != canonical.of_plan(plan), field.name
 
     def test_the_two_kinds_of_plan_never_share_a_form(self) -> None:
-        assert canonical.of_plan(self.PLAINLY) != canonical.of_plan(self.AS_A_FUND)
+        assert canonical.of_plan(A_BOND_PLAN) != canonical.of_plan(A_FUND_PLAN)
 
     def test_the_rationale_is_excluded_like_every_other_reason_string(self) -> None:
         """Deliberate, and the same rule the module docstring states: a digest that moved when
         somebody improved a sentence would fail C4 on a wording edit."""
-        point = self.AS_A_FUND.yield_point
+        point = A_FUND_PLAN.yield_point
         assert point is not None
         reworded = replace(
-            self.AS_A_FUND, yield_point=replace(point, rationale="the same choice, said better")
+            A_FUND_PLAN, yield_point=replace(point, rationale="the same choice, said better")
         )
-        assert canonical.of_plan(reworded) == canonical.of_plan(self.AS_A_FUND)
+        assert canonical.of_plan(reworded) == canonical.of_plan(A_FUND_PLAN)
