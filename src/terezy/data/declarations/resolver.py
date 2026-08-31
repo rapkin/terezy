@@ -51,6 +51,7 @@ from terezy.data.declarations.errors import DeclarationError
 if TYPE_CHECKING:  # pragma: no cover -- typing only
     from collections.abc import Mapping, Sequence
 
+    from terezy.core.calendars.working_day import WorkingDayCalendar
     from terezy.core.inflation.series import CpiSeries, InflationAssumption
     from terezy.core.instruments.access import InstrumentAccess
     from terezy.core.instruments.fund import FundDeclaration
@@ -3367,3 +3368,74 @@ def answer_from_data_root(
         questions=questions,
         question_files=declaring,
     )
+
+
+# ---------------------------------------------------------------------------
+# 017-working-day-calendar: every declared calendar under one data root
+# ---------------------------------------------------------------------------
+#
+# An absent directory is an empty set rather than a load failure, on `official_rates`'
+# reading: nothing in the engine consumes a calendar (017 FR-015), so a data root without one
+# is an ordinary state and a consumer that wanted one comes back typed-unavailable naming the
+# id it asked for.
+
+CALENDARS_DIR = "calendars"
+"""Where declared working-day calendars live under a data root. Cited; in `SOURCED_DIRS`."""
+
+
+@dataclass(frozen=True, slots=True)
+class CalendarDeclarations:
+    """Every declared calendar under one data root, and which file declared each."""
+
+    calendars: Mapping[str, WorkingDayCalendar]
+    files: Mapping[str, Path]
+
+
+def working_day_calendars_from_data_root(
+    root: Path, kinds: Mapping[str, ObservationKind]
+) -> CalendarDeclarations:
+    """Every calendar under a data root, refusing two files claiming one identity.
+
+    Sorted, so a run does not depend on the order a filesystem happens to return.
+
+    ``kinds`` is required for the reason ``official_rates_from_data_root`` gives, and here it
+    is `[calendar.week]` it covers: three tables carry a citation, and that one holds weekday
+    *names* rather than a number or a date, so `scripts/check_provenance.py` does not see it
+    even with a predicate that counts dates. Left unchecked, a misspelt kind on it loads clean
+    and raises from `staleness.kind_for` when a figure it marked is aged -- a crash at report
+    time for a file that could have been refused by name at load.
+    """
+    calendars: dict[str, WorkingDayCalendar] = {}
+    declaring: dict[str, Path] = {}
+    for path in sorted((root / CALENDARS_DIR).glob("*.toml")):
+        declared = loader.working_day_calendar_from_file(path)
+        _check_calendar_kinds(declared, kinds, path=path)
+        if declared.id in calendars:
+            raise DeclarationError(
+                path,
+                f"{loader.CALENDAR_TABLE}.id",
+                f"declares the calendar id {declared.id!r}, which "
+                f"{declaring[declared.id].name} already declares. Two calendars cannot share "
+                "an identity: a consumer names the one it wants, and whichever loaded second "
+                "would win by directory order with nothing in the answer to say which.",
+                f"give one of {declaring[declared.id].name} and {path.name} a distinct id",
+            )
+        calendars[declared.id] = declared
+        declaring[declared.id] = path
+    return CalendarDeclarations(calendars=calendars, files=declaring)
+
+
+def _check_calendar_kinds(
+    declared: WorkingDayCalendar, kinds: Mapping[str, ObservationKind], *, path: Path
+) -> None:
+    """Every citation on a loaded calendar names a kind `observation_kinds.toml` declares."""
+    tables = [
+        (loader.CALENDAR_COVERAGE_TABLE, declared.covered_by),
+        (loader.CALENDAR_WEEK_TABLE, declared.week.provenance),
+    ] + [
+        (f"{loader.CALENDAR_DAY_TABLE}[{position}]", row.provenance)
+        for position, row in enumerate(declared.rows)
+    ]
+    for table, provenance in tables:
+        for source in sorted(provenance.sources, key=lambda ref: ref.id):
+            _check_kind(source.kind, kinds, path=path, field_path=f"{table}.kind")

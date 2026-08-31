@@ -445,10 +445,10 @@ def settlement_business_days_for(declaration: FundDeclaration, mode: LiquidityMo
 def settlement_date(executed_on: date, business_days: int) -> date:
     """``business_days`` business days after execution, weekends only.
 
-    Public holidays are declared domain knowledge with a citation and belong in ``data/``,
-    exactly as ``conventions._is_weekend`` records: until that data exists a settlement
-    landing on a holiday is placed on the holiday, which is wrong in a stated, visible way
-    rather than wrong from a calendar somebody remembered.
+    A settlement landing on a public holiday is placed on the holiday. Declared calendars
+    exist and this consults none, by CL-1 of 2026-08-30, for a reason particular to a fund:
+    dealing days belong to the operator rather than to Ukraine, and nobody has retrieved
+    Inzhur's. A ``civil`` calendar is the wrong input here, not a missing one.
 
     Zero business days means same-day settlement, and it is a real declared value -- the
     observed practice settles the day the request is made.

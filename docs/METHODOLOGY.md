@@ -175,11 +175,11 @@ The implemented rules are:
 | `following` | the first business day on or after the date |
 | `modified_following` | `following`, unless that leaves the month; then the last business day on or before |
 
-**Weekends only.** There is no holiday calendar, because a list of public holidays is
-domain knowledge that must arrive as data with a citation and a verification date, not from
-an implementer's memory. Until that data exists, a coupon falling on a public holiday is
-placed **on the holiday** — wrong in a stated, visible way rather than wrong from an
-uncited hard-coded list.
+**Weekends only, and uncited.** A public holiday is domain knowledge that arrives as data
+with a citation and a verification date, and it now does (METHODOLOGY §35). These three rules consult
+none of it, by owner decision CL-1 of 2026-08-30, so a coupon falling on a public holiday is
+placed **on the holiday** — wrong in a stated way rather than a hidden one.
+`tests/contract/test_no_calendar_free_working_day.py` counts every site that inherits it.
 
 ### 1.4 Worked example: synthetic issue A
 
@@ -3902,7 +3902,86 @@ replaced it. Two rules are this layer's own:
 Nothing here optimises. There is no objective, no scoring weight and no shortlist; ranking is
 §29's and the tie rule is §29's.
 
-## 35. Where to look next
+## 35. The working-day calendar: what a date is, and what it refuses
+
+A **working-day calendar** says which dates a jurisdiction's law calls working. It is a
+declaration — `data/calendars/<id>.toml` — and the engine derives nothing about a holiday from
+anything.
+
+### 35.1 The four words, and what each means here
+
+| word | meaning |
+| --- | --- |
+| **rest day** | a weekday the jurisdiction's law makes a day of rest, declared as a pattern |
+| **public holiday** | a date the law names as a holiday, declared as one enumerated row |
+| **working day** | a date that is neither, including one an executive act moved into that status |
+| **pre-holiday day** | a **working** day the law shortens because a holiday follows it |
+
+A pre-holiday day is a working day, always. The answer carries the flag only on its working
+member, so a pre-holiday non-working day cannot be built; a file declaring one fails at load,
+naming the file and the date.
+
+*Working day* is this section's word and *business day* is §1.3's, and they are not synonyms.
+§1.3's means *not Saturday and not Sunday*, is uncited, and knows nothing about holidays. The
+two notions coexist by owner decision CL-1 of 2026-08-30, and
+`tests/contract/test_no_calendar_free_working_day.py` counts the sites that use the old one so
+a fourth cannot appear quietly.
+
+### 35.2 How a pattern and its exceptions combine
+
+Each date inside the window is decided **once**, and the answer says by what:
+
+1. the date's own enumerated row, if it has one — a public holiday, or a day a declared move
+   turned into a rest day or a working day;
+2. otherwise the declared **weekly rest pattern**.
+
+Nothing else participates. There is no observance rule that shifts a holiday off a rest day and
+no computation of a movable feast: whether the law moved a day is itself a declared row with its
+own citation, because deriving it would be inventing a legal reading nobody has.
+
+The answer carries the deciding declaration's provenance **and the coverage window's**. The
+second is not decoration: *no row for this date* means *the law declared no exception here* only
+because somebody read the law for this window. Without that claim it would mean *nobody
+transcribed this date*, and the two are opposite.
+
+### 35.3 Past the window it refuses, and says which way it missed
+
+The window is declared as an explicit first and last date, and a question it does not reach
+produces a typed refusal rather than a classification. Nothing extends the rest pattern past an
+end, repeats the last declared year, or infers from an adjacent one.
+
+| refusal | what it carries |
+| --- | --- |
+| no calendar with this id | the id wanted, and no window — nothing was found to have one |
+| wrong scope | the id, the scope wanted, the scope found |
+| out of coverage | the id, the date, the window, and which way it missed |
+
+*Which way* is one of three: **before** the window, **after** it, or **the search ran off an
+end** — the last being a date that *was* covered whose answer is not. The first two say the
+question was outside what anybody read the law for; the third says it was inside and the answer
+is one day past an edge. A next-working-day search that walks past an end, and a
+last-working-day-of-the-week question whose week straddles one, both land in the third.
+
+Which end to widen follows from the **question**, not from the reason alone: earlier for
+*before the window*, later for *after* it, later for a forwards search that ran off and earlier
+for a backwards one — and for the week question, whichever end its week crosses, which is the
+one case the reason alone does not settle.
+
+That refusal is the answer to the enumerated form's one weakness. An enumerated calendar goes
+stale at its last declared year; declaring the window is what makes the staleness loud instead
+of silent.
+
+### 35.4 The shipped Ukrainian calendar declares no holidays
+
+`data/calendars/ua_civil.toml` covers 2025-01-01 to 2026-10-30, rests on **Sunday alone**, and
+enumerates **nothing** — because статті 53 і 73 КЗпП, the holiday list and the shortened
+pre-holiday day, are not applied during martial law. The file states which provision says each
+of those and why the window ends where it does; it is not restated here.
+
+**Nothing consumes this calendar** (017 FR-015). It moves no coupon, no settlement and no
+deadline, so no figure in this document changes because it exists.
+
+## 36. Where to look next
 
 | question | file |
 | --- | --- |

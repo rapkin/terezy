@@ -194,13 +194,13 @@ steps cannot drift apart.
 
 
 def _is_weekend(day: date) -> bool:
-    """Saturday or Sunday.
+    """Saturday or Sunday, uncited, and knowing nothing about holidays.
 
-    Weekends only. Public holidays are declared domain knowledge with a citation and a
-    verification date, and belong in ``data/`` -- not in a list written from an
-    implementer's memory (constitution, Principle I). Until that data exists a coupon
-    falling on a public holiday is placed on the holiday, which is wrong in a stated,
-    visible way rather than wrong from an uncited hard-coded calendar.
+    Declared calendars exist -- ``core.calendars.working_day`` over ``data/calendars/`` -- and
+    this function consults none, by owner decision CL-1 of 2026-08-30. So a coupon falling on
+    a public holiday is placed on the holiday, and Saturday is asserted a rest day with no
+    source behind it. ``tests/contract/test_no_calendar_free_working_day.py`` counts every
+    site that inherits both, so a fourth cannot appear quietly.
     """
     return day.weekday() >= _SATURDAY
 
@@ -209,9 +209,9 @@ def is_business_day(day: date) -> bool:
     """Whether a date is a business day -- that is, not a weekend.
 
     Public so that counting *forward* N business days to a settlement date does not
-    reimplement "what counts as a business day" beside its caller: the day public holidays
-    arrive as declared data, one function changes and every settlement date changes with
-    it.
+    reimplement "what counts as a business day" beside its caller. Public holidays are
+    declared data now and this function is unchanged: rewiring a site needs an answer to
+    *which kind* of calendar governs it, which CL-1 left to whichever feature first has one.
     """
     return not _is_weekend(day)
 

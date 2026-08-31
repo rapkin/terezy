@@ -2760,3 +2760,129 @@ class DestinationFile(BaseModel):
     """Required with no default, on ``OfficialRateFile.observation``'s reading: a file that
     forgot its rows and a file declaring it has none must not look alike, and an empty table
     is written ``destination = []``."""
+
+
+# ---------------------------------------------------------------------------
+# 017-working-day-calendar: which dates a jurisdiction's law calls working
+# ---------------------------------------------------------------------------
+#
+# A classification row is a date and a label and holds no number, which is what made
+# `scripts/check_provenance.py` unable to see one until its predicate learned to count dates.
+# Two of the three tables below reach that gate because they carry a date; the third does not,
+# and says so where it is defined.
+
+
+class CalendarCoverageTable(BaseModel):
+    """``[calendar.coverage]`` -- the first and last date somebody read this law for.
+
+    Two-ended, unlike 013's one-ended schedule coverage, because a calendar knows both ends
+    and it is the far end that arrives by waiting.
+
+    Its citation is also the only home an **empty enumeration** has: a year whose holiday
+    regime a statute suspended declares no rows, so per-row provenance would leave the
+    suspending act nowhere to be cited from.
+    """
+
+    model_config = STRICT
+
+    first: str
+    last: str
+    kind: str
+    source: str
+    retrieved_on: str
+    verified_on: str
+
+
+class CalendarWeekTable(BaseModel):
+    """``[calendar.week]`` -- the weekly rest pattern and the week start, cited together.
+
+    **The provenance gate cannot see this table, measured 2026-08-31**: it holds weekday
+    *names* and no date and no number, so `_has_observed_value` is false for it even after the
+    predicate learned to count dates. Its citation is required by the loader and its
+    observation kind by the resolver, which is the same division `non_publication_rule`
+    already lives under -- and the reason `[calendar.coverage]` carries the window as two
+    dates rather than as two years is that the gate does then reach *that* one.
+    """
+
+    model_config = STRICT
+
+    rest_days: list[str]
+    """Weekday names the jurisdiction's law makes rest days. Non-empty and never all seven,
+    both checked by the loader. **Never defaulted** (FR-002): a Saturday-and-Sunday weekend is
+    the fact most likely to be inherited from an implementer rather than from a source, and a
+    default here would make a second jurisdiction's calendar silently Ukrainian."""
+
+    starts_on: str
+    """Which weekday the week begins on. Declared because *«останній робочий день тижня»*
+    cannot be answered without it and no convention in this engine may supply one."""
+
+    kind: str
+    source: str
+    retrieved_on: str
+    verified_on: str
+
+
+class CalendarTable(BaseModel):
+    """``[calendar]`` -- the identity, and what kind of calendar this is."""
+
+    model_config = STRICT
+
+    id: str
+    """How a consumer reaches it. Never selected by jurisdiction or load order (FR-003a)."""
+
+    jurisdiction: str
+    authority: str
+    """Whose acts this transcribes -- a legislature for a civil calendar, an operator for a
+    settlement one. Half of what makes a second jurisdiction's calendar a data-only change."""
+
+    scope: str
+    """``civil`` or ``settlement``. There is no member for observed publication days: those
+    are already declared as ``OfficialRateSeries.observations``, and a calendar built from
+    them would answer *was this a working day?* from what a publisher did (FR-004)."""
+
+    coverage: CalendarCoverageTable
+    week: CalendarWeekTable
+
+
+class CalendarDayTable(BaseModel):
+    """One ``[[day]]`` row: a date whose classification departs from the rest pattern."""
+
+    model_config = STRICT
+
+    on_date: str
+    classification: str
+    """``public_holiday``, ``rest_day`` or ``working_day``. The last two are the two
+    directions an executive act moves a day in."""
+
+    pre_holiday: bool
+    """Whether the law shortens this working day because a holiday follows it.
+
+    Required rather than defaulting to ``false``, on ``OfficialRateFile.observation``'s rule:
+    a forgotten line and a deliberate *no* must not look alike. ``true`` on a non-working
+    classification is a load failure naming the file and the date -- two declared facts that
+    cannot both hold -- which is why it is a field here and not a fourth ``classification``.
+    """
+
+    kind: str
+    source: str
+    retrieved_on: str
+    verified_on: str
+    """Per row, never per calendar (FR-005). A holiday list comes from a labour statute, a
+    moved working day from an individual executive act of that year, and a suspension from a
+    third law; one citation on the file would attach one of the three to all of them."""
+
+
+class CalendarFile(BaseModel):
+    """A whole ``data/calendars/<id>.toml``: one calendar and its enumerated exceptions."""
+
+    model_config = STRICT
+
+    calendar: CalendarTable
+    day: list[CalendarDayTable]
+    """Strictly ascending by date, inside the window, no duplicates -- all checked by the
+    loader.
+
+    **Required with no default, and an empty enumeration is written ``day = []``.** A year in
+    which a jurisdiction's holiday regime was suspended is expressible, and means it; a file
+    that simply forgot its rows must not look identical to one declaring it has none.
+    """

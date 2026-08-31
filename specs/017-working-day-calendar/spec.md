@@ -576,6 +576,15 @@ without a calendar.
      before the window, after it, or *a working-day search that started inside the window ran
      off an end* (FR-013, FR-014).
 
+  **Recorded and not built: the refusal does not carry which end to widen.** A consumer holding
+  only a *ran off an end* refusal cannot render the remedy — the end follows from the question
+  asked, and the record does not carry the question. Threading the crossed bound into the
+  refusal's reason is the cheap honest form (`_search` knows which bound it fell off, and the
+  week query knows which end its week crosses), and it is **not** a fourth reason: which end to
+  widen is a detail of the third, not a fourth remedy. Deferred because nothing consumes a
+  calendar (FR-015), so no output is degraded today and there is no consumer to design against.
+  Recorded 2026-08-31 in review.
+
   **There is deliberately no "no calendar is declared for this jurisdiction" reason**, because
   FR-003a forbids the engine from asking that question: nothing looks a calendar up by
   jurisdiction, so nothing can discover that a jurisdiction has none. Shipping that reason
@@ -596,7 +605,10 @@ without a calendar.
   the *ran off an end* discriminator of FR-011's third reason, rather than return the window's
   edge or loop. The discriminator is required rather than optional: *the date you asked about
   was never covered* and *the date you asked about was covered but the answer is not* have
-  different remedies, and only the second is fixed by extending the calendar forward.
+  different remedies, and which **end** to extend follows from the question rather than from
+  the reason alone — earlier for a date before the window and for a backwards search that ran
+  off, later for a date after it and a forwards search, and for a week straddling the boundary
+  whichever end the week crosses.
 - **FR-014**: Given a calendar and a date, the system MUST answer the **last working day of the
   week containing that date**, computed from the calendar's own declared week start. Included
   because пункт 10 is written in it — *«останній робочий день тижня»* — and omitting it would
@@ -676,9 +688,11 @@ without a calendar.
   `year.py::_due_on` is already counted and reaches it by that same indirect path. A scan that
   cannot see `fixed_income.py` is worse than no scan: it converts an unexamined site into a
   documented absence.
-- **FR-018a**: FR-018's scan is **being landed on `main` ahead of this feature**, against the
-  corrected three-site set. Its entire value is that a fourth site cannot appear quietly, and
-  that value is lost for as long as it waits on an unscheduled feature.
+- **FR-018a**: FR-018's scan is landed **first within this feature** rather than ahead of it on
+  `main`, because the feature was scheduled after all. Its entire value is that a fourth site
+  cannot appear quietly, so it went in before the calendar existed —
+  `tests/contract/test_no_calendar_free_working_day.py`, phase 0 — and the calendar's own
+  declaration surface is excluded by path, exactly as this requirement's wording anticipates.
 
 A second stale claim found in that same neighbourhood — `_due_on`'s docstring naming "the same
 four names" where `conventions.BUSINESS_DAY_FNS` declares three — was confirmed and is **fixed
@@ -902,10 +916,16 @@ FR-018's scan pins the three-site set so a fourth cannot appear quietly.
 
 ## Owner verification tasks
 
-No legal value has been filled in. Both tasks below are retrieval-and-reading, and until they
-close, the shipped calendar covers only the years the owner has verified and refuses outside
-that window (FR-010, FR-020). Neither is urgent — nothing consumes the calendar (FR-015) — and
-both are kept because the reading will be needed whenever something does.
+No legal value has been filled in from memory, and none of the three tasks below is urgent:
+nothing consumes the calendar (FR-015). Task 1's **retrieval** closed on 2026-08-31 and its
+*verification* half stays open; task 2 stays open by design; task 3 is new and is the one place
+this feature could have inherited a value from an implementer.
+
+**On FR-020's window.** The shipped window covers what somebody read the law for rather than
+what the owner has checked, because a calendar with an empty window is a load failure and no
+`verified_on` under `data/` is filled anywhere in this repository. Every citation on the file
+is empty-verified, so every classification it produces renders marked, and a date past
+2026-10-30 refuses by name (FR-010).
 
 1. **The holiday enumeration itself, and the acts that move working days.** The provision that
    sets Ukraine's святкові і неробочі дні is **стаття 73 Кодексу законів про працю України**
@@ -914,16 +934,36 @@ both are kept because the reading will be needed whenever something does.
    Положення that 011 cites records the Cabinet's power to move working days, which is
    exercised by an individual act each year and must be cited per year, per row.
 
-   **Not retrieved here, and the reason is recorded so nobody repeats the attempt blind.**
-   011's owner verification task 1 established the working retrieval form —
-   `https://zakon.rada.gov.ua/laws/show/<id>/print` with `curl --compressed`. On 2026-08-30
-   that form returned **HTTP 403** to `curl` for both documents tried, and a browser-equivalent
-   fetch of `322-08/print` returned the Code **truncated mid-стаття 40**, well before стаття 53.
-   The Labour Code is long enough that a whole-document fetch does not reach these articles.
-   Whoever retrieves them needs a per-article or per-section route, not the whole Code — and the
-   1300-plus dates of a decade of calendars are not a thing to transcribe from a summary page.
-   Per the owner's standing instruction, this is recorded and moved past rather than researched
-   further.
+   **RETRIEVED 2026-08-31, and this half of the task is closed.** The 2026-08-30 failure had
+   one cause and it was the request rather than the document: retrieval needs **both** a
+   browser `User-Agent` **and** `/print`. With both, `curl --compressed` returns the whole
+   consolidated Code — 141 KB, all three articles present. Without a `User-Agent` every path
+   returns HTTP 403; with one, the bare URL and `/card` return **HTTP 200 on an incomplete
+   document**, which is the more convincing false negative and is what the earlier attempt hit.
+   The `WebFetch` tool still truncates the Code mid-стаття 40 and is not a route to it.
+
+   **What the three articles say, and what the implementation therefore declares.** Стаття 73
+   (святкові і неробочі дні) and стаття 53 (the shortened передсвятковий день) each carry the
+   marker *«У період дії воєнного стану не застосовуються норми статті … згідно із Законом
+   № 2136-IX від 15.03.2022 з урахуванням змін, внесених Законом № 2352-IX від 01.07.2022»*, as
+   does частина третя статті 67. Частина друга статті 67 is **not** suspended and reads
+   *«Загальним вихідним днем є неділя»*, leaving the second rest day of a five-day week to the
+   enterprise's own schedule. So inside a martial-law window the Code enumerates **no** holidays
+   and **no** pre-holiday days, and makes exactly one weekday a rest day — which is what
+   `data/calendars/ua_civil.toml` declares, with the enumeration empty and the suspending act
+   cited on the coverage window.
+
+   **The Cabinet's power to move working days is not in статті 67 any more.** Частини п'ята і
+   шоста статті 67 were **excluded** by Закон № 3494-IX від 22.11.2023, and what remains puts
+   перенесення вихідних та робочих днів in a трудовий/колективний договір or an employer's
+   order. Пункт 11 розділу III of the НБУ Положення that 011 cites is a different instrument and
+   is unread here; the enumerated form is what makes either answer declarable without the engine
+   holding a rule.
+
+   **What is still open on this task**: the owner's own verification. Every citation in the
+   shipped file carries an empty `verified_on`, so every classification it produces renders
+   marked. Extending the window past 2026-10-30 is a retrieval of the next martial-law Указ
+   rather than a judgement, and the window refuses until somebody performs it.
 
 2. **Whether the National Bank's holiday vocabulary tracks the Labour Code's suspension.** This
    is the load-bearing one, and it is the martial-law trap in its concrete form.
@@ -961,6 +1001,32 @@ both are kept because the reading will be needed whenever something does.
 
    **Read the consolidated text and the amendment markers under the provision you quote.** The
    lesson 011 records twice, and the reason the marker above is quoted with the provision.
+
+3. **Is Saturday a rest day as a matter of Ukrainian law?** The one place the implementation
+   could have inherited a value from an implementer rather than from a source, and it declined
+   to.
+
+   Стаття 67 ч. 2 КЗпП makes **Sunday** the general rest day and says the second rest day of a
+   five-day week, *«якщо він не визначений законодавством, визначається графіком роботи
+   підприємства»* — an enterprise's own schedule, which is not a fact about the jurisdiction.
+   So `data/calendars/ua_civil.toml` declares `rest_days = ["sunday"]`, and
+   `core/primitives/conventions.py::_is_weekend` asserts Saturday **and** Sunday with no
+   citation at all. **The two disagree about every Saturday in the window.**
+
+   **Nothing consumes the calendar (FR-015), so landing it moved no figure — but the question
+   is not free of consequence, and the first draft of this task said it was.** `_is_weekend`'s
+   uncited Saturday already travels into `fund.settlement_date` and into a bond's coupon dates
+   through `conventions.business_day_rule`, so if the law does not rest Saturday those are
+   already wrong today. They are wrong *visibly*, which is CL-1's stated cost: the bond path is
+   reached only by `is_synthetic = true` fixtures the engine marks, and `year._due_on` moves
+   nothing because `data/tax/timing/ua.toml` declares `non_business_day_rule = "none"` on all
+   three categories. The fund path has no such cover, and it is the one that needs an
+   operator's calendar rather than this one.
+
+   What would settle the question is a provision naming Saturday, or a reading that the
+   five-day week's second rest day is fixed by legislation somewhere else — neither of which is
+   in the three articles retrieved. FR-002 predicted exactly this inheritance, which is why the
+   transcription rather than the familiar answer is what shipped.
 
 ## Recorded, not resolved: martial law is now three places
 

@@ -61,6 +61,7 @@ from typing import TYPE_CHECKING, Any, Final, Literal, assert_never, cast, get_a
 
 from pydantic import BaseModel, ValidationError
 
+from terezy.core.calendars import working_day as wd
 from terezy.core.inflation.series import (
     CpiObservation,
     CpiSeries,
@@ -5823,3 +5824,291 @@ def _literal[T: str](path: Path, field_path: str, value: str, allowed: tuple[T, 
         "question nobody asked.",
         f"write one of {sorted(allowed)}",
     )
+
+
+# ---------------------------------------------------------------------------
+# 017-working-day-calendar: which dates a jurisdiction's law calls working
+# ---------------------------------------------------------------------------
+
+CALENDAR_TABLE: Final = "calendar"
+CALENDAR_COVERAGE_TABLE: Final = "calendar.coverage"
+CALENDAR_WEEK_TABLE: Final = "calendar.week"
+CALENDAR_DAY_TABLE: Final = "day"
+
+_SCOPES: Final[Mapping[str, wd.CalendarScope]] = {
+    member.value: member for member in wd.CalendarScope
+}
+
+_CLASSIFICATIONS: Final = ("public_holiday", "rest_day", "working_day")
+"""What a row may say. The first is an enumerated non-working day; the other two are the two
+directions a declared move goes in."""
+
+
+def _weekday(path: Path, field_path: str, name: str) -> int:
+    """A declared weekday name as ``date.weekday()``'s index."""
+    if name not in wd.WEEKDAY_NAMES:
+        raise DeclarationError(
+            path,
+            field_path,
+            f"declares the weekday {name!r}, which is not a day of the week. Weekdays are "
+            "named rather than numbered so that a rest pattern reads as the law reads and an "
+            "off-by-one is a load failure instead of a calendar shifted by a day.",
+            f"one of: {', '.join(wd.WEEKDAY_NAMES)}",
+        )
+    return wd.WEEKDAY_NAMES[name]
+
+
+def _declared_week(path: Path, table: schema.CalendarWeekTable) -> wd.DeclaredWeek:
+    """The rest pattern and the week start, refusing an empty one and an all-seven one."""
+    names = _non_empty_list(
+        path,
+        f"{CALENDAR_WEEK_TABLE}.rest_days",
+        table.rest_days,
+        "a calendar states which weekdays its jurisdiction's law makes rest days, and there "
+        "is no default: Saturday and Sunday is a fact about one country",
+    )
+    rest_days = frozenset(
+        _weekday(path, f"{CALENDAR_WEEK_TABLE}.rest_days", name) for name in names
+    )
+    if len(rest_days) != len(names):
+        raise DeclarationError(
+            path,
+            f"{CALENDAR_WEEK_TABLE}.rest_days",
+            f"names {len(names)} weekdays and only {len(rest_days)} distinct ones: {names!r}. "
+            "A weekday declared twice is a file edited twice, and merging the repeat silently "
+            "would hide which edit was meant.",
+            "delete the duplicate",
+        )
+    if len(rest_days) == len(wd.WEEKDAY_NAMES):
+        raise DeclarationError(
+            path,
+            f"{CALENDAR_WEEK_TABLE}.rest_days",
+            "names every day of the week, so this calendar has no working days at all. Every "
+            "working-day question would then refuse naming the DATE, sending a reader to fix "
+            "a date when the declaration is what is wrong.",
+            "leave at least one weekday out of the rest pattern",
+        )
+    return wd.DeclaredWeek(
+        rest_days=rest_days,
+        starts_on=_weekday(path, f"{CALENDAR_WEEK_TABLE}.starts_on", table.starts_on),
+        provenance=prov.of(
+            [
+                _source_ref(
+                    path,
+                    CALENDAR_WEEK_TABLE,
+                    source=table.source,
+                    retrieved_on=table.retrieved_on,
+                    verified_on=table.verified_on,
+                    kind=table.kind,
+                )
+            ]
+        ),
+    )
+
+
+def _classification_row(
+    path: Path, position: int, entry: schema.CalendarDayTable, week: wd.DeclaredWeek
+) -> wd.ClassificationRow:
+    """One ``[[day]]`` row.
+
+    Two refusals live here and both are about a row saying something it cannot mean:
+
+    * **a pre-holiday fact on a date the same row calls non-working.** A pre-holiday day is a
+      working day the law shortens, so the two facts cannot both hold. Writable in TOML on
+      purpose and refused here; the core has no field for it.
+    * **a row the declared pattern already gives.** A row is an exception *over* the pattern
+      (FR-008). The two branches are refused for **different** reasons and say so separately: a
+      ``rest_day`` row on a date the pattern already rests would be reported as a declared move
+      that never happened, while a ``working_day`` row on a date the pattern already works
+      classifies correctly and simply declares nothing. A ``working_day`` row carrying
+      ``pre_holiday = true`` is kept, because the shortening is something the pattern cannot
+      say.
+    """
+    field_prefix = f"{CALENDAR_DAY_TABLE}[{position}]"
+    on_date = _parse_date(path, f"{field_prefix}.on_date", entry.on_date)
+    classification = _literal(
+        path, f"{field_prefix}.classification", entry.classification, _CLASSIFICATIONS
+    )
+    provenance = prov.of(
+        [
+            _source_ref(
+                path,
+                field_prefix,
+                source=entry.source,
+                retrieved_on=entry.retrieved_on,
+                verified_on=entry.verified_on,
+                kind=entry.kind,
+            )
+        ]
+    )
+    rests = wd.rests_on(week, on_date)
+    if classification == "working_day":
+        if not rests and not entry.pre_holiday:
+            raise DeclarationError(
+                path,
+                f"{field_prefix}.classification",
+                f"declares {on_date.isoformat()} a working day, which the declared rest "
+                "pattern already makes it, and declares no pre-holiday shortening. The row "
+                "says nothing the pattern does not, so it is refused rather than kept as a "
+                "line a later reader would take for a declared exception.",
+                "write pre_holiday = true if the law shortens this day, correct the date, or "
+                "delete the row",
+            )
+        return wd.DeclaredWorkingDay(
+            on_date=on_date, pre_holiday=entry.pre_holiday, provenance=provenance
+        )
+    if entry.pre_holiday:
+        raise DeclarationError(
+            path,
+            f"{field_prefix}.pre_holiday",
+            f"declares {on_date.isoformat()} both {classification!r} and a pre-holiday day. A "
+            "pre-holiday day is a working day the law SHORTENS, so a non-working one is two "
+            "declared facts that cannot both hold.",
+            "write pre_holiday = false, or declare the date a working day",
+        )
+    if classification == "public_holiday":
+        # Kept even where the pattern already rests the date: that the law NAMES a date a
+        # holiday is a fact about the date, and it is a different fact from a Sunday.
+        return wd.DeclaredHoliday(on_date=on_date, provenance=provenance)
+    if rests:
+        raise DeclarationError(
+            path,
+            f"{field_prefix}.classification",
+            f"declares {on_date.isoformat()} a rest day, which the declared rest pattern "
+            "already makes it. A rest_day row is a MOVE, and this one would make the "
+            "classification report a declared move on a date no act touched.",
+            "delete the row, or correct the date it names",
+        )
+    return wd.DeclaredRestDay(on_date=on_date, provenance=provenance)
+
+
+def _shut_week(path: Path, calendar: wd.WorkingDayCalendar) -> None:
+    """Refuse a calendar with a week inside its window that holds no working day.
+
+    The reasoning is ``working_day.week_without_a_working_day``'s; what belongs here is the
+    file name, which the core structurally cannot supply.
+    """
+    starts = wd.week_without_a_working_day(calendar)
+    if starts is None:
+        return
+    raise DeclarationError(
+        path,
+        CALENDAR_DAY_TABLE,
+        f"declares no working day in the week beginning {starts.isoformat()}, which lies "
+        "wholly inside the coverage window. The last working day of that week is a question "
+        "with no answer, and refusing it at the DATE would send a reader to fix the wrong "
+        "thing.",
+        "correct the rows for that week, or narrow the coverage window past it",
+    )
+
+
+def working_day_calendar_from_file(path: Path) -> wd.WorkingDayCalendar:
+    """One ``data/calendars/<id>.toml`` as a :class:`WorkingDayCalendar`.
+
+    Every refusal below is a property of this one file read in isolation, and every one names
+    the file and the offending field or date (FR-007). The two that are not obvious:
+
+    * **A row dated outside the coverage window.** The window is what a refusal reports, and a
+      row outside it is a date the calendar simultaneously claims not to reach.
+    * **A week inside the window with no working day** -- see :func:`_shut_week`.
+
+    Two files declaring one calendar id is a *relation* and belongs to the resolver, which is
+    the only thing holding both paths.
+    """
+    document = read_document(path)
+    file = _validate(schema.CalendarFile, document, path)
+    declared = file.calendar
+    first = _parse_date(path, f"{CALENDAR_COVERAGE_TABLE}.first", declared.coverage.first)
+    last = _parse_date(path, f"{CALENDAR_COVERAGE_TABLE}.last", declared.coverage.last)
+    if last < first:
+        raise DeclarationError(
+            path,
+            f"{CALENDAR_COVERAGE_TABLE}.last",
+            f"is {last.isoformat()}, before the window's first date {first.isoformat()}. A "
+            "window that runs backwards covers nothing, so every question would refuse and "
+            "the message would name the date rather than the file.",
+            "put the two dates in order",
+        )
+
+    week = _declared_week(path, declared.week)
+    rows: list[wd.ClassificationRow] = []
+    for position, entry in enumerate(file.day):
+        row = _classification_row(path, position, entry, week)
+        if rows and row.on_date <= rows[-1].on_date:
+            raise DeclarationError(
+                path,
+                f"{CALENDAR_DAY_TABLE}[{position}].on_date",
+                f"declares {row.on_date.isoformat()} after {rows[-1].on_date.isoformat()}, so "
+                "the enumeration runs backwards or repeats a date here. One date has one "
+                "classification: whichever the lookup reached first would otherwise decide a "
+                "legal question by file order.",
+                "put the rows in ascending date order, one row per date",
+            )
+        if not first <= row.on_date <= last:
+            raise DeclarationError(
+                path,
+                f"{CALENDAR_DAY_TABLE}[{position}].on_date",
+                f"declares {row.on_date.isoformat()}, outside the coverage window "
+                f"{first.isoformat()} to {last.isoformat()}. The calendar would classify that "
+                "date from a row while refusing to speak for it, which are two answers to one "
+                "question.",
+                "widen the coverage window, or delete the row",
+            )
+        rows.append(row)
+
+    calendar = wd.WorkingDayCalendar(
+        id=_require_text(
+            path,
+            f"{CALENDAR_TABLE}.id",
+            declared.id,
+            "a calendar is reached by naming its id, and two calendars declaring one id are "
+            "refused across the whole data root",
+        ),
+        jurisdiction=_require_text(
+            path,
+            f"{CALENDAR_TABLE}.jurisdiction",
+            declared.jurisdiction,
+            "a calendar states whose law it transcribes",
+        ),
+        authority=_require_text(
+            path,
+            f"{CALENDAR_TABLE}.authority",
+            declared.authority,
+            "a calendar states whose acts it transcribes; that is half of what makes a second "
+            "jurisdiction's calendar a data-only addition",
+        ),
+        scope=_scope(path, declared.scope),
+        covers=(first, last),
+        covered_by=prov.of(
+            [
+                _source_ref(
+                    path,
+                    CALENDAR_COVERAGE_TABLE,
+                    source=declared.coverage.source,
+                    retrieved_on=declared.coverage.retrieved_on,
+                    verified_on=declared.coverage.verified_on,
+                    kind=declared.coverage.kind,
+                )
+            ]
+        ),
+        week=week,
+        rows=tuple(rows),
+    )
+    _shut_week(path, calendar)
+    return calendar
+
+
+def _scope(path: Path, value: str) -> wd.CalendarScope:
+    """A declared scope as the core's closed enum member."""
+    if value not in _SCOPES:
+        raise DeclarationError(
+            path,
+            f"{CALENDAR_TABLE}.scope",
+            f"declares the scope {value!r}. A calendar asserts a jurisdiction's law or a named "
+            "operator's dealing days, and there is deliberately no scope for a publisher's "
+            "observed publication days: those are already declared as rate observations, and a "
+            "calendar built from them would answer 'was this a working day' from what a "
+            "publisher happened to do.",
+            f"one of: {', '.join(sorted(_SCOPES))}",
+        )
+    return _SCOPES[value]
