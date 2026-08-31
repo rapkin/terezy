@@ -356,12 +356,11 @@ confirm the digest moves.
   row's `units` differs from the series' declared `quotation_unit`. It MUST NOT normalise a value
   to fit the declared unit, and MUST NOT use `rate_per_unit` in place of `rate`.
 
-  This closes the gap `scripts/check_provenance.py:221-241` states and assigns by name: the
-  `quotation_unit` exemption drops the citation requirement for the whole `[series]` table, so
-  *"nothing verifies it, and a value read as 1 where the publisher quotes per 100 is wrong by two
-  orders of magnitude while every figure stays plausible"*, and that comment ends by saying the
-  closure *"belongs with whoever builds the fetch script"*. This is that script. The closure is a
-  **refusal**, not a conversion: a normalising script would make the declared `value` something
+  This closes the gap `data/official_rates/ua_nbu_usd.toml` states where a declarer meets it: the
+  `quotation_unit` exemption in `scripts/check_provenance.py` drops the citation requirement for
+  the whole `[series]` table, so *"a value read as 1 where the publisher quotes per 100 is wrong
+  by two orders of magnitude while every figure stays plausible"*. This script is the closure, and
+  it closes by **refusing**, not converting: a normalising script would make the declared `value` something
   other than what the published table says, and re-deriving a base by eye against the publisher's
   page — the only check anyone will ever actually perform — would stop working.
 
