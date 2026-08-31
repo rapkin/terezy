@@ -23,7 +23,12 @@ from __future__ import annotations
 import dataclasses
 from dataclasses import replace
 from datetime import date
+from typing import Any, Final, cast
 
+import pytest
+
+from terezy.core.instruments.fund import ChosenPoint, ExchangeRateAssumption
+from terezy.core.instruments.interface import Assumptions
 from terezy.core.ledger import canonical as ledger_canonical
 from terezy.core.ledger import engine
 from terezy.core.ledger.accounts import CashBalance
@@ -37,7 +42,9 @@ from terezy.core.primitives.periods import Window
 from terezy.core.primitives.provenance import SourceRef
 from terezy.core.primitives.rates import NominalRate, RealBasis, RealRate, RealTermsUnavailable
 from terezy.core.results import canonical, hurdle, project
+from terezy.core.results.fund import FundAssumptions
 from terezy.core.results.project import Projection
+from terezy.core.results.tuple import InstrumentPlan
 from terezy.core.routes import capacity
 from terezy.data import manifest
 from tests import synthetic
@@ -452,3 +459,59 @@ def test_the_encoding_tag_moves_whenever_the_canonical_shape_does() -> None:
         f"new shape here.\nrecorded: {CANONICAL_SHAPE_BY_ENCODING[manifest.ENCODING]}\n"
         f"actual:   {fingerprint}"
     )
+
+
+class TestAPlansCanonicalForm:
+    """Every field a plan declares reaches its form, or two declarable plans share one digest.
+
+    ``DuplicateRunPlan`` refuses only plans that are **equal**, so a question may state two for
+    one instrument and 010 fixes the plan as one of the five terms of a candidate's key. A field
+    left out of the rendering is that key collapsing one level down: two candidates, one digest,
+    one printed line -- which is exactly what rendering the record's type name used to do.
+
+    Written as a perturbation per field rather than as a list of names, because a list is prose
+    about a record and goes stale the moment somebody adds a seventh field.
+    """
+
+    PLAINLY: Final = Assumptions(consumption_method="fifo", coupon_policy="hold_cash")
+    AS_A_FUND: Final = FundAssumptions(
+        liquidity_mode="practice",
+        buyback="available",
+        exit_on=date(2028, 1, 17),
+        yield_point=ChosenPoint(rate=0.25, is_assumption=True, rationale="TEST FIXTURE"),
+        exchange_rate=ExchangeRateAssumption(
+            uah_per_unit=41.0, is_assumption=True, rationale="TEST FIXTURE"
+        ),
+        consumption_method="fifo",
+    )
+
+    OTHERWISE: Final = {
+        "consumption_method": "lifo",
+        "coupon_policy": "reinvest",
+        "liquidity_mode": "legal",
+        "buyback": "unavailable",
+        "exit_on": date(2029, 3, 2),
+        "yield_point": ChosenPoint(rate=0.29, is_assumption=True, rationale="TEST FIXTURE"),
+        "exchange_rate": ExchangeRateAssumption(
+            uah_per_unit=42.0, is_assumption=True, rationale="TEST FIXTURE"
+        ),
+    }
+
+    @pytest.mark.parametrize("plan", [PLAINLY, AS_A_FUND])
+    def test_changing_any_declared_field_changes_the_form(self, plan: InstrumentPlan) -> None:
+        for field in dataclasses.fields(plan):
+            other: Any = replace(cast(Any, plan), **{field.name: self.OTHERWISE[field.name]})
+            assert canonical.of_plan(other) != canonical.of_plan(plan), field.name
+
+    def test_the_two_kinds_of_plan_never_share_a_form(self) -> None:
+        assert canonical.of_plan(self.PLAINLY) != canonical.of_plan(self.AS_A_FUND)
+
+    def test_the_rationale_is_excluded_like_every_other_reason_string(self) -> None:
+        """Deliberate, and the same rule the module docstring states: a digest that moved when
+        somebody improved a sentence would fail C4 on a wording edit."""
+        point = self.AS_A_FUND.yield_point
+        assert point is not None
+        reworded = replace(
+            self.AS_A_FUND, yield_point=replace(point, rationale="the same choice, said better")
+        )
+        assert canonical.of_plan(reworded) == canonical.of_plan(self.AS_A_FUND)
