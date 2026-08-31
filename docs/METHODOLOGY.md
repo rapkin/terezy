@@ -175,11 +175,11 @@ The implemented rules are:
 | `following` | the first business day on or after the date |
 | `modified_following` | `following`, unless that leaves the month; then the last business day on or before |
 
-**Weekends only.** There is no holiday calendar, because a list of public holidays is
-domain knowledge that must arrive as data with a citation and a verification date, not from
-an implementer's memory. Until that data exists, a coupon falling on a public holiday is
-placed **on the holiday** — wrong in a stated, visible way rather than wrong from an
-uncited hard-coded list.
+**Weekends only, and uncited.** A public holiday is domain knowledge that arrives as data
+with a citation and a verification date, and it now does (§35). These three rules consult
+none of it, by owner decision CL-1 of 2026-08-30, so a coupon falling on a public holiday is
+placed **on the holiday** — wrong in a stated way rather than a hidden one.
+`tests/contract/test_no_calendar_free_working_day.py` counts every site that inherits it.
 
 ### 1.4 Worked example: synthetic issue A
 
