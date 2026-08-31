@@ -256,6 +256,13 @@ def assumptions(**overrides: Any) -> Assumptions:
 
 
 A_BOND_PLAN: Final = Assumptions(consumption_method="fifo", coupon_policy=fixed_income.HOLD_CASH)
+"""One run plan for a bond, stating both of the choices the record admits.
+
+Here rather than in either suite because two of them walk these records field by field -- the
+digest's rendering and the CLI's -- and two copies of one base record is how the two walks come
+to be walking different things.
+"""
+
 A_FUND_PLAN: Final = FundAssumptions(
     liquidity_mode="practice",
     buyback="available",
@@ -266,11 +273,10 @@ A_FUND_PLAN: Final = FundAssumptions(
     ),
     consumption_method="fifo",
 )
-"""One of each kind of run plan, with every optional field populated exactly once.
+"""One run plan for a fund, with every optional field populated exactly once.
 
-Here rather than in either suite because two of them walk these records field by field -- the
-digest's rendering and the CLI's -- and two copies of one base record is how the two walks come
-to be walking different things.
+Populated rather than absent for :func:`assumptions`'s reason: the fuller record is the one a
+walk over its fields can say something about, and an omitted value hides the field it sits in.
 """
 
 PLAN_FIELD_ALTERNATIVES: Final = {

@@ -319,8 +319,9 @@ def _plan_terms(plan: InstrumentPlan) -> str:
     """How the holding is run, in the words the question stated it in.
 
     Rendered here rather than through ``canonical.of_plan``, which exists to be **hashed**: it
-    loses nothing, but it renders a date as a tuple and a rate as ``float.hex()``, and nobody
-    reads ``0x1.0000000000000p-2`` as a quarter. Each rendering has a per-field walk of its own
+    states every choice this does, but it renders a date as a tuple and a rate as
+    ``float.hex()``, and nobody reads ``0x1.0000000000000p-2`` as a quarter. Each rendering has
+    a per-field walk of its own
     -- this one's in ``tests/contract/test_cli_is_sugar_over_the_file.py``, the digest's in
     ``tests/unit/test_results_canonical.py`` -- because one walk can only see the function it
     calls, and the failure to catch is either of them quietly dropping a field.

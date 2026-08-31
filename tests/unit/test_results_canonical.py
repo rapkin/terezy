@@ -259,7 +259,7 @@ CANONICAL_SHAPE_BY_ENCODING = {
         "|(i,(s,s),(s,s),(s,s),(s,s),s,i)"
         "|(s,s,((s,s,s,s,s,s),(s,s,s,s,s,s)),(s,s),(s),(s))"
         "|(s,s,((s,s),(s,s)),(s,s),(s),(s))"
-        "|((s,s),(s,s),(s,s),(s,s),(s))"
+        "|((s,s),(s,s),(s,s),(s,s),(s,s,s))"
         "|((s,s),(s,s),(s,s),(s),(s))"
         "|(s,s,s,(s,s),(s,s,s))"
         "|(s,s,s,(),(s,s,s,s,(i,i,i),s,s))"
@@ -274,15 +274,21 @@ canonical tuple gained ``capacity_pool`` and the capacity accumulator while the 
 ``terezy-canonical-v1``, so pre-002 digests silently disagreed under an unchanged name.
 This pinned pair is what makes the next such change a red test naming the remedy.
 
-**One fingerprint per form a recorded digest is taken over, joined by pipes.** Covering
-``ledger.canonical.of_result`` alone would leave the schedule, the charges, the figures, the
-purchase premium and the candidate key outside the pin -- most of what a digest covers -- and a
-shape change in any of them would move every recorded digest under an unchanged tag, which is
-the feature-002 failure this test exists to prevent.
+**One fingerprint per form covered, joined by pipes**: ``of_projection``'s five components and
+the candidate key. Covering ``ledger.canonical.of_result`` alone would leave the schedule, the
+charges, the figures and the purchase premium outside the pin, and a shape change in any of them
+would move every recorded digest under an unchanged tag, which is the feature-002 failure this
+test exists to prevent.
 
 **A form with a tagged absence is pinned twice**, once populated and once absent: the two render
 to different shapes, and pinning one leaves the other free to move. That is why the hurdle and
 the purchase premium each appear here in both of their forms.
+
+**The answer's own forms above the candidate key are not covered, as of 2026-08-31** --
+``of_section``, ``of_outcome``, the subject standings, the reserve verdicts and the exclusions.
+A shape change in one of them moves the recorded answer digest while this test stays green;
+what closes it is a hand-built representative per form, because a real answer's shape carries
+how many candidates that run enumerated and a fixture's count would then leak into the tag.
 
 Widening the pin is not itself a scheme change, and the candidate key is the case to check
 before assuming otherwise: no digest recorded under ``v3`` covered it, because neither
@@ -385,15 +391,15 @@ def _representative_state() -> engine.LedgerState:
 
 
 def _projection_fingerprint() -> str:
-    """Every component of ``of_projection``, and every other form a recorded digest is taken
-    over, joined -- each with its absent branch where it has one.
+    """``of_projection``'s components and the candidate key, joined -- each with its absent
+    branch where it has one.
 
     ``of_projection`` is not called directly because building a representative ``Projection``
     means running a projection, and a fixture's coupon count would then leak into the
     fingerprint. Each form is fingerprinted from a hand-built representative instead -- one of
     everything, no ``None`` where a value could sit. The join runs ``of_projection``'s five
-    components in its own order, then the candidate key, which no projection carries and every
-    answer digest does.
+    components in its own order, then the candidate key, which no projection carries and an
+    answer digest carries once per candidate it reported a figure for.
 
     The hurdle's real slot and the purchase premium each appear **twice**: once populated and
     once absent. The two branches of each have different shapes, and pinning only the populated
@@ -417,21 +423,35 @@ def _projection_fingerprint() -> str:
             _shape(canonical.of_charge(result.charges[0])),
             _shape(canonical.of_hurdle_rate(_representative_hurdle())),
             _shape(canonical.of_hurdle_rate(_unavailable_hurdle())),
-            _shape(canonical.of_at_purchase(result.at_purchase)),
+            _shape(canonical.of_at_purchase(_governed(result.at_purchase))),
             _shape(canonical.of_at_purchase(_ungoverned(result.at_purchase))),
-            _shape(canonical.of_tuple_key(_a_key(A_CHAIN, A_BOND_PLAN))),
-            _shape(canonical.of_tuple_key(_a_key(EXIT_BY_IDENTITY, A_FUND_PLAN))),
+            _shape(canonical.of_tuple_key(_a_key(A_CHAIN, synthetic.A_BOND_PLAN))),
+            _shape(canonical.of_tuple_key(_a_key(EXIT_BY_IDENTITY, synthetic.A_FUND_PLAN))),
         )
     )
 
 
-def _ungoverned(value: project.PurchasePremium) -> project.PurchasePremium:
-    """The same premium with neither a declared class nor a treatment.
+def _governed(value: project.PurchasePremium) -> project.PurchasePremium:
+    """The same premium with both of its tagged slots **answered**.
 
-    Both of its tagged slots render to a shorter form than the answered one, and a digest that
-    agreed between an answer and its absence is what the tagging exists to prevent -- so the
-    absent shape is pinned beside the populated one, as the hurdle's is.
+    The projection is run without assessment rules, so the figure it produces already carries
+    ``TreatmentUnstated`` -- and pinning that alone would leave the longer, answered rendering
+    outside the fingerprint, which is the shape a change is most likely to land in. Populated
+    and absent are pinned as a pair, on ``_representative_hurdle``'s rule.
     """
+    return dataclasses.replace(
+        value,
+        tax_class_id="a_class",
+        governed_by=project.GovernedBy(
+            category_id="a_category",
+            treatment="nets",
+            reason="TEST FIXTURE -- one answered treatment, for the shape alone.",
+        ),
+    )
+
+
+def _ungoverned(value: project.PurchasePremium) -> project.PurchasePremium:
+    """The same premium with neither a declared class nor a treatment."""
     return dataclasses.replace(
         value,
         tax_class_id=None,
@@ -439,8 +459,6 @@ def _ungoverned(value: project.PurchasePremium) -> project.PurchasePremium:
     )
 
 
-A_BOND_PLAN: Final = synthetic.A_BOND_PLAN
-A_FUND_PLAN: Final = synthetic.A_FUND_PLAN
 A_CHAIN: Final = ComposedExit(segments=("out_a", "out_b"))
 
 
@@ -494,7 +512,7 @@ def test_the_encoding_tag_moves_whenever_the_canonical_shape_does() -> None:
     which is exactly what a golden digest flipping under an unchanged tag looks like. This
     test fails on either half changing alone, and its message says which line to move.
 
-    Every form is fingerprinted, not the ledger alone: pinning the ledger would leave every
+    Every component is fingerprinted, not the ledger alone: pinning the ledger would leave every
     figure a digest also covers free to change shape under an unchanged tag.
     """
     fingerprint = _projection_fingerprint()
@@ -525,7 +543,7 @@ class TestAPlansCanonicalForm:
     about a record and goes stale the moment somebody adds a seventh field.
     """
 
-    @pytest.mark.parametrize("plan", [A_BOND_PLAN, A_FUND_PLAN])
+    @pytest.mark.parametrize("plan", [synthetic.A_BOND_PLAN, synthetic.A_FUND_PLAN])
     def test_changing_any_declared_field_changes_the_form(self, plan: InstrumentPlan) -> None:
         for field in dataclasses.fields(plan):
             other: Any = replace(
@@ -534,14 +552,15 @@ class TestAPlansCanonicalForm:
             assert canonical.of_plan(other) != canonical.of_plan(plan), field.name
 
     def test_the_two_kinds_of_plan_never_share_a_form(self) -> None:
-        assert canonical.of_plan(A_BOND_PLAN) != canonical.of_plan(A_FUND_PLAN)
+        assert canonical.of_plan(synthetic.A_BOND_PLAN) != canonical.of_plan(synthetic.A_FUND_PLAN)
 
     def test_the_rationale_is_excluded_like_every_other_reason_string(self) -> None:
         """Deliberate, and the same rule the module docstring states: a digest that moved when
         somebody improved a sentence would fail C4 on a wording edit."""
-        point = A_FUND_PLAN.yield_point
+        point = synthetic.A_FUND_PLAN.yield_point
         assert point is not None
         reworded = replace(
-            A_FUND_PLAN, yield_point=replace(point, rationale="the same choice, said better")
+            synthetic.A_FUND_PLAN,
+            yield_point=replace(point, rationale="the same choice, said better"),
         )
-        assert canonical.of_plan(reworded) == canonical.of_plan(A_FUND_PLAN)
+        assert canonical.of_plan(reworded) == canonical.of_plan(synthetic.A_FUND_PLAN)

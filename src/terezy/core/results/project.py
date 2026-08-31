@@ -445,10 +445,10 @@ def _at_purchase(
     The two cases cannot occur together, so the split is exact rather than an approximation:
     ``enumerated`` refuses ``reinvest`` outright, which is the only way units grow.
 
-    **Where nothing retired, the figure carries the quote's sources and no others.** It is the
-    resale price times the holding's own quantity, and the terms had no part in it: marking it
-    with them as well would send a reader chasing its unverified mark to a file that did not
-    supply it. Where something retired, both sources are on the figure and belong there -- the
+    **Where a sale retired nothing, the figure carries the quote's sources and no others.** It
+    is the resale price times the holding's own quantity, and the terms had no part in it:
+    marking it with them as well would send a reader chasing its unverified mark to a file that
+    did not supply it. Where something retired, both sources are on the figure and belong there -- the
     units sold are what the declared repayments left, so the terms decided that quantity too.
     """
     per_unit = instrument_terms.principal_returned(
