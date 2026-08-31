@@ -278,15 +278,10 @@ canonical tuple gained ``capacity_pool`` and the capacity accumulator while the 
 ``terezy-canonical-v1``, so pre-002 digests silently disagreed under an unchanged name.
 This pinned pair is what makes the next such change a red test naming the remedy.
 
-**One fingerprint per form covered, joined by pipes**: ``of_projection``'s five components and
-the candidate key. Covering ``ledger.canonical.of_result`` alone would leave the schedule, the
-charges, the figures and the purchase premium outside the pin, and a shape change in any of them
-would move every recorded digest under an unchanged tag, which is the feature-002 failure this
-test exists to prevent.
-
-**A form with a tagged absence is pinned twice**, once populated and once absent: the two render
-to different shapes, and pinning one leaves the other free to move. That is why the hurdle and
-the purchase premium each appear here in both of their forms.
+**One fingerprint per form covered, joined by pipes**, and :func:`_projection_fingerprint`'s
+own body is the list of them. Covering ``ledger.canonical.of_result`` alone would leave the rest
+of what a digest is taken over free to change shape under an unchanged tag, which is the
+feature-002 failure this test exists to prevent.
 
 **Every form ``of_answer`` reaches above the candidate key is uncovered, as of 2026-08-31**,
 starting with its own arity. A shape change in any of them moves the recorded answer digest
@@ -396,25 +391,24 @@ def _representative_state() -> engine.LedgerState:
 
 
 def _projection_fingerprint() -> str:
-    """``of_projection``'s components and the candidate key, joined -- each with its absent
-    branch where it has one.
+    """One shape per form covered, joined -- and per branch, where a form has branches.
 
     ``of_projection`` is not called directly because building a representative ``Projection``
     means running a projection, and a fixture's coupon count would then leak into the
     fingerprint. Each form is fingerprinted from a hand-built representative instead -- one of
-    everything, no ``None`` where a value could sit. The join runs ``of_projection``'s five
-    components in its own order, then the candidate key, which no projection carries and an
-    answer digest carries wherever it names a candidate -- for a figure, for a refusal, for a
-    withheld arrival, for a reserve verdict.
+    everything, no ``None`` where a value could sit. **What is covered is the list below, not a
+    sentence about it**: the join is read straight off the code, and this docstring says only
+    the rules the list obeys.
 
-    The hurdle's real slot and the purchase premium each appear **twice**: once populated and
-    once absent. The two branches of each have different shapes, and pinning only the populated
-    one would leave a change to the absence's rendering invisible.
+    **A form whose branches render to different shapes is pinned once per branch.** Pinning one
+    would leave the others free to move: the hurdle's real slot and the purchase premium each
+    have an absent form shorter than the answered one, and a way out renders by the number of
+    exit segments -- which makes the empty chain and the instruction that is not a chain two
+    arities nothing else produces, while one declared segment and one composed segment render
+    alike and pinning both would say nothing.
 
-    The way out is pinned as a chain and as :data:`EXIT_BY_IDENTITY`, whose empty tuple is the
-    one arity a run actually produces that no other value can stand in for. A ``DeclaredExit``
-    is not pinned separately: the slot's arity follows the **segment count**, so one declared
-    segment and one composed segment render alike and pinning both would say nothing.
+    The candidate key is here because no projection carries it and an answer digest carries it
+    wherever it names a candidate.
     """
     result = _projection(verified=False)
     # Two schedule rows and one charge, never the whole run: the fixture pays four coupons and
