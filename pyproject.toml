@@ -14,6 +14,11 @@ dependencies = [
     "pydantic>=2.9",
 ]
 
+[project.scripts]
+# One subcommand over one record. argparse rather than the `cli` extra: a library installed for
+# one subcommand is one more thing between a person and their answer (015 research D11).
+terezy = "terezy.cli.main:main"
+
 [project.optional-dependencies]
 api = [
     "fastapi>=0.115",

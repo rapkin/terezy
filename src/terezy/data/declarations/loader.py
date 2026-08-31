@@ -5406,7 +5406,17 @@ that. An absent key would make the choice the thing that happens when nobody tho
 
 def question_from_file(path: Path) -> Question:
     """One ``data/questions/<id>.toml`` as the question it declares."""
-    document = read_document(path)
+    return question_from_document(read_document(path), path)
+
+
+def question_from_document(document: Mapping[str, Any], path: Path) -> Question:
+    """One question, from a document the caller has already read.
+
+    Split from :func:`question_from_file` so the **CLI** builds its record through this exact
+    function (015 FR-005). Flags are sugar over the file, and the guarantee that they own no
+    field the file cannot express and no default it cannot state is then structural rather than
+    a scan somebody has to keep honest: there is one validator and one set of refusals.
+    """
     file = _validate(schema.QuestionFile, document, path)
     table = file.question
     prefix = QUESTION_TABLE
