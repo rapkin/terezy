@@ -100,11 +100,12 @@ def _received(*, root: Path = DATA_ROOT) -> Money:
 def _base(*, rate: float = OFFICIAL_RATE, root: Path = DATA_ROOT) -> Money:
     """The taxable base: the credited dollars at the official rate on the credit date.
 
-    The series is synthetic and the shipped one is not consulted, because the shipped
-    Ukrainian series declares **no observation at all** (011 FR-017) -- every date asked of it
-    refuses by name until the publisher's values are fetched. What is asserted here is the
-    arithmetic; that the jurisdiction's own series is the one resolved for a run is asserted
-    in ``tests/contract/test_crediting_destination_loading.py``.
+    The series is synthetic and the shipped one is not consulted, because what is asserted
+    here is the **arithmetic**: a worked example states the values it works from, so a reader
+    can check the product on paper without opening a data file. A base struck against the
+    National Bank's own declared rates is ``tests/worked_examples/test_nbu_official_rate_base.py``;
+    that the jurisdiction's own series is the one resolved for a run is asserted in
+    ``tests/contract/test_crediting_destination_loading.py``.
     """
     declared = resolver.schemes_from_data_root(root, base_currency=Currency.UAH)
     assert declared.official_rates["ua"] is not None

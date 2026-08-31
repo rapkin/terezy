@@ -22,6 +22,7 @@ from __future__ import annotations
 import shutil
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -257,7 +258,7 @@ def test_a_numberless_table_is_reached_by_the_gate(tmp_path: Path) -> None:
     the gate never opening the file."""
     outcome = _planted(tmp_path, PLANTED_ROW)
     assert outcome.returncode == 0, outcome.stdout
-    assert "planted_classification.toml: [classification[0]] is unverified" in outcome.stdout
+    assert "planted_classification.toml: 1 unverified" in outcome.stdout
 
 
 def test_a_numberless_table_without_a_citation_is_an_error(tmp_path: Path) -> None:
@@ -292,3 +293,73 @@ def test_a_numberless_table_naming_an_undeclared_kind_is_an_error(tmp_path: Path
     )
     assert outcome.returncode == 1, outcome.stdout
     assert "names the observation kind 'no_such_kind'" in outcome.stdout
+
+
+# ---------------------------------------------------------------------------
+# 018-nbu-rate-series: a gate whose output nobody reads is a gate that is off
+
+
+def _lines(outcome: subprocess.CompletedProcess[str], level: str) -> list[str]:
+    return [line for line in outcome.stdout.splitlines() if line.startswith(f"{level}:")]
+
+
+def test_each_file_reports_its_unverified_values_as_one_line(tmp_path: Path) -> None:
+    """018 FR-023. One warning per value put 3,143 lines in front of a reader after the NBU
+    series landed, burying the 704 that were there to be read. Runtime was never the problem
+    and never becomes one: the gate walks the whole tree in under a second either way.
+    """
+    outcome = _run(_scratch_root(tmp_path))
+    warnings = _lines(outcome, "warning")
+
+    named = [line.split(":")[1].strip() for line in warnings]
+    assert len(named) == len(set(named)), f"a file is reported twice: {sorted(named)}"
+
+
+def test_the_line_for_a_file_states_how_many_of_its_values_are_unverified(
+    tmp_path: Path,
+) -> None:
+    """The count is what the summary must not lose: a per-file mark that collapsed to
+    "this file has some" would read identically for one value and for two thousand.
+    """
+    root = _scratch_root(tmp_path)
+    rates = root / "official_rates" / "ua_nbu_usd.toml"
+    declared = tomllib.loads(rates.read_text(encoding="utf-8"))
+    expected = sum(1 for entry in declared["observation"] if not entry["verified_on"])
+    assert expected > 1_000, "this assertion is about a long series; the shipped one is short"
+
+    (line,) = [
+        text for text in _lines(_run(root), "warning") if "official_rates/ua_nbu_usd.toml" in text
+    ]
+
+    assert f"{expected} unverified" in line
+
+
+def test_the_whole_output_grows_by_one_line_for_a_file_however_long_it_is(
+    tmp_path: Path,
+) -> None:
+    """The claim FR-023 actually makes, and it is about lines rather than about values."""
+    root = _scratch_root(tmp_path)
+    with_series = len(_run(root).stdout.splitlines())
+    (root / "official_rates" / "ua_nbu_usd.toml").unlink()
+    without = len(_run(root).stdout.splitlines())
+
+    assert with_series - without == 1
+
+
+def test_errors_stay_one_line_per_value(tmp_path: Path) -> None:
+    """An error is a thing to be fixed, and there are none; a summary would hide which."""
+    root = _scratch_root(tmp_path)
+    (root / PLANTED).write_text(
+        PLANTED_ROW.replace(
+            'source       = "planted by tests/contract/test_provenance_gate.py"\n', ""
+        )
+        + PLANTED_ROW.replace(
+            'source       = "planted by tests/contract/test_provenance_gate.py"\n', ""
+        ).replace("2026-01-01", "2026-01-02"),
+        encoding="utf-8",
+    )
+    outcome = _run(root)
+
+    assert outcome.returncode == 1
+    planted = [line for line in _lines(outcome, "error") if PLANTED in line]
+    assert len(planted) == 2, outcome.stdout

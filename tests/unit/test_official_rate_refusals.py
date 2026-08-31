@@ -84,7 +84,11 @@ class TestADateTheSeriesDoesNotCover:
         assert outcome.covers == (MARCH_2, MARCH_5)
 
     def test_a_series_with_no_observations_refuses_and_says_the_window_is_empty(self) -> None:
-        """What the shipped Ukrainian series does, until the publisher's values are fetched."""
+        """A window with no ends at all, which reads differently from a date outside one.
+
+        The shape a fetch script writes into before it has run: the refusal has no dates to
+        name, so it says the series declares nothing rather than naming a window.
+        """
         outcome = official_rate.strike_base(
             AMOUNT,
             official_rates.series([]),

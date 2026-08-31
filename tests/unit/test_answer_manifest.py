@@ -18,7 +18,7 @@ import dataclasses
 import shutil
 from dataclasses import replace
 from pathlib import Path
-from typing import Any, get_args
+from typing import Any, Final, get_args
 
 import pytest
 
@@ -215,9 +215,31 @@ def test_two_refusals_of_two_kinds_do_not_share_one_digest() -> None:
     )
 
 
+NOT_READ_BY_AN_ANSWER: Final = frozenset({"cpi_series", "inflation_assumption", "official_rate"})
+"""Series an answer reads none of, named here so their absence is a claim rather than a gap.
+
+The first two are 007's, and an answer computes no real-terms figure. The third is 018's, and
+015 FR-021 is the reason: **no rate is derived and none is read from a series.** A tuple whose
+figure would need one refuses by name -- ``inzhur_reit`` says so on the shipped registry -- and
+that refusal is only honest while nothing behind it quietly consults the National Bank. The
+answer's registries carry no ``AssessmentRules``, which is where an official rate would enter.
+"""
+
+
 def test_every_input_kind_the_set_admits_is_one_the_walk_produces() -> None:
     """A member nothing constructs reads as coverage the manifest does not have."""
     produced = {ref.kind for ref in run_manifest.answer_input_refs(fixtures.declarations())}
     admitted = set(get_args(InputKind))
-    unreachable = admitted - produced - {"cpi_series", "inflation_assumption"}
+    unreachable = admitted - produced - NOT_READ_BY_AN_ANSWER
     assert not unreachable, sorted(unreachable)
+
+
+def test_an_answer_reads_no_rate_series_at_all() -> None:
+    """015 FR-021 from the input side: the series cannot reach a figure it never loaded.
+
+    Asserted over the resolved registries rather than by scanning imports, because the way a
+    rate would arrive is a *value* -- an ``AssessmentRules`` carrying an ``official_rate`` --
+    and a scan for the word would pass a run that was handed one.
+    """
+    registries = fixtures.declarations().tuples.registries
+    assert not [name for name in dir(registries) if "rule" in name or "rate" in name.lower()]

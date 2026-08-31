@@ -336,3 +336,29 @@ Four rows it presses on without closing:
 | **J4** | Touched on 014's terms, unchanged. What moved is the *other* horizon interaction: a bond outliving its window is now sold at the window's end rather than refused, so `CannotSpanHorizon` narrows to the fund arm. A declared `lock_up_months` term compared against a horizon still does not exist. |
 | **E5** | Pressed on one layer up: an answer carries the union of the marks on every declaration behind every figure it reports, walked over the whole result rather than sampled (`tests/contract/test_the_answer_says_only_what_it_computed.py`). Every figure computed through the early-exit belief names it by id. The per-drop half is still open — 010's refusal records carry no provenance — and is still the `provenance-on-a-refusal` future entry. |
 | **B12** | The shape again, one layer above 014's: an answer adds no feasibility rule, no objective and no scoring weight. Its two own rules withhold and report rather than prune, and a scan asserts its modules derive no rate and read none from a series. |
+
+**018-nbu-rate-series** closes **no** row and moves two notes. It lands data, not behaviour:
+the National Bank's published UAH/USD rate for every calendar day from 2019-12-28, plus the
+script that retrieves it and the three shipped-code defects an empty series was hiding.
+
+**F1** loses nothing further and gains nothing further. 011 supplied the machinery and this
+supplies the rates both halves of F1 would read; what is still missing is unchanged — a per-lot
+basis carried in both currencies with each leg struck at its own date's rate, and a projection
+fold that does not sum a hryvnia charge inside a dollar holding. `ForeignGainNotStruckPerDate`
+still refuses, and must.
+
+**F2**'s tax-figure half was established by 011 before the display switch existed, and this is
+the first time it is established **against real data**: populating the series moves no cost,
+route, leg, channel or ranking figure, asserted as the diff of the golden — one added input
+line and no result line — rather than as a claim
+(`tests/golden/ovdp_synthetic_a.golden.txt`). The realised-amount and ranking halves still need
+the switch.
+
+**F3** stays deliberately not attempted, for 011's reason: F3 is about a display switch
+converting a chart, which is a channel-rate question about presentation, and treating it as
+this feature's subject would conflate the two roles the constitution names explicitly.
+
+**K3** is unmoved and its artefact was regenerated deliberately: the run manifest can now name
+the official-rate series a tax base rested on, which it could not before —
+`InputKind` had no member for it — so the golden gains that one input reference. An input
+digest is a witness, not a term (Principle V).

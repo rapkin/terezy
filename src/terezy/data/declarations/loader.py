@@ -3545,8 +3545,8 @@ def _require_two_variables(path: Path, entry: schema.GoalTable, *, field_prefix:
 # Same four responsibilities -- read, shape, meaning, construct -- over two declarations of
 # opposite epistemic kinds, and the difference is the whole point of loading them separately.
 #
-# A CPI file is the most heavily cited declaration in the project: **one `SourceRef` per
-# observation**, 411 of them in the shipped Ukrainian series. Not one per file, which would
+# A CPI file carries **one `SourceRef` per observation**, 411 of them in the shipped
+# Ukrainian price series. Not one per file, which would
 # collapse into a single ref in a frozenset and make a real figure over a long window look as
 # though it rested on one thing. It rests on every month it chained, and research.md D6 says
 # to report that honestly rather than summarise it.
@@ -4539,11 +4539,10 @@ def _access_price(
 # in both directions: an official rate may never price a leg (FR-012) and a channel's
 # reference rate may never strike a tax base (FR-013).
 #
-# **No network, no cache, and no knowledge that a fetcher exists.** The National Bank
-# publishes through an open developer API and `scripts/fetch_cpi.py` established the pattern
-# a script would follow -- retrieve, write an EMPTY `verified_on`, never verify. Building it
-# is `provider-automation`'s, not this module's; what this module owes it is the shape it
-# writes into.
+# **No network and no cache.** `scripts/fetch_nbu_rates.py` retrieves the National Bank's
+# published rates and writes the file this module reads -- retrieve, write an EMPTY
+# `verified_on`, never verify. What this module owes it is the shape it writes into, and
+# nothing here reaches for it: a declaration is read the same way whoever produced it.
 #
 # What is *not* here, because it needs a second file: whether two files declare one series
 # identity, and whether the series a jurisdiction names exists and quotes its tax currency.

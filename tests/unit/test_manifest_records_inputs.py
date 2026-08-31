@@ -47,7 +47,7 @@ from terezy.core.results import project
 from terezy.core.results.coverage import IMPLICIT_REGIME_ID
 from terezy.core.results.project import Projection
 from terezy.data import manifest
-from terezy.data.declarations import resolver
+from terezy.data.declarations import loader, resolver
 from terezy.data.declarations.errors import DeclarationError
 from tests import declared_terms, synthetic
 
@@ -87,6 +87,11 @@ assert nothing.
 
 CPI_SERIES = "ua_cpi_monthly"
 """The declared price series this data root holds (007)."""
+
+OFFICIAL_RATE_SERIES = "ua_nbu_usd"
+"""The declared official-rate series this data root holds (011, populated by 018). Recorded
+because a tax base struck at an official rate is only reproducible if the manifest says which
+series, at which version, struck it."""
 
 INFLATION_BELIEF = "owner_placeholder_inflation"
 """The declared future-inflation belief this data root holds (007). A placeholder, and the
@@ -129,6 +134,14 @@ def _projected(record: manifest.RunManifest) -> manifest.ProjectedRun:
     return record.projection
 
 
+def _official_rates(root: Path) -> resolver.OfficialRateDeclarations:
+    kinds = {
+        kind.id: kind
+        for kind in loader.observation_kinds_from_file(root / "observation_kinds.toml")
+    }
+    return resolver.official_rates_from_data_root(root, kinds)
+
+
 def _manifest(root: Path = DATA_ROOT) -> manifest.RunManifest:
     declarations = resolver.from_data_root(root)
     holding = _holding(declarations)
@@ -142,6 +155,7 @@ def _manifest(root: Path = DATA_ROOT) -> manifest.RunManifest:
         as_of=AS_OF,
         regime_id=IMPLICIT_REGIME_ID,
         inflation=resolver.inflation_from_data_root(root),
+        official_rates=_official_rates(root),
     )
 
 
@@ -224,6 +238,7 @@ class TestEveryDeclarationAndVersionThatFedTheRun:
             # in the belief are two results and nothing else in the manifest tells them apart.
             ("cpi_series", CPI_SERIES),
             ("inflation_assumption", INFLATION_BELIEF),
+            ("official_rate", OFFICIAL_RATE_SERIES),
             ("instrument", ISSUE_A),
             ("instrument", ISSUE_B),
             ("instrument", ENUMERATED_A),
@@ -268,6 +283,7 @@ class TestEveryDeclarationAndVersionThatFedTheRun:
         assert files == {
             CPI_SERIES: "cpi/ua.toml",
             INFLATION_BELIEF: "inflation/owner-001.toml",
+            OFFICIAL_RATE_SERIES: f"official_rates/{OFFICIAL_RATE_SERIES}.toml",
             ISSUE_A: f"instruments/{ISSUE_A}.toml",
             ISSUE_B: f"instruments/{ISSUE_B}.toml",
             ENUMERATED_A: f"instruments/{ENUMERATED_A}.toml",
@@ -298,6 +314,7 @@ class TestEveryDeclarationAndVersionThatFedTheRun:
         expected = {
             CPI_SERIES: DATA_ROOT / "cpi" / "ua.toml",
             INFLATION_BELIEF: DATA_ROOT / "scenarios" / "inflation" / "owner-001.toml",
+            OFFICIAL_RATE_SERIES: (DATA_ROOT / "official_rates" / f"{OFFICIAL_RATE_SERIES}.toml"),
             ISSUE_A: DATA_ROOT / "instruments" / f"{ISSUE_A}.toml",
             ISSUE_B: DATA_ROOT / "instruments" / f"{ISSUE_B}.toml",
             ENUMERATED_A: DATA_ROOT / "instruments" / f"{ENUMERATED_A}.toml",
@@ -348,6 +365,31 @@ class TestEveryDeclarationAndVersionThatFedTheRun:
         assert before[EXEMPT_CLASS] != after[EXEMPT_CLASS]
         assert before[ISSUE_A] == after[ISSUE_A]
         assert before[ISSUE_B] == after[ISSUE_B]
+
+    def test_editing_one_official_rate_observation_moves_the_recorded_version(
+        self, tmp_path: Path
+    ) -> None:
+        """018 SC-012. A base struck at an official rate is reproducible only if the manifest
+        says which series struck it, at which version -- and a version that did not notice one
+        observation changing would answer that question wrongly for every date but one.
+        """
+        root = tmp_path / "data"
+        shutil.copytree(DATA_ROOT, root)
+        before = {ref.id: ref.version for ref in _manifest(root).inputs}
+
+        rates = root / "official_rates" / f"{OFFICIAL_RATE_SERIES}.toml"
+        declared = _official_rates(root).series[OFFICIAL_RATE_SERIES]
+        moved = declared.observations[0]
+        rates.write_text(
+            rates.read_text(encoding="utf-8").replace(
+                f"value        = {moved.value}\n", f"value        = {moved.value + 0.0001}\n", 1
+            ),
+            encoding="utf-8",
+        )
+        after = {ref.id: ref.version for ref in _manifest(root).inputs}
+
+        assert before[OFFICIAL_RATE_SERIES] != after[OFFICIAL_RATE_SERIES]
+        assert before[CPI_SERIES] == after[CPI_SERIES]
 
     def test_a_copied_data_root_produces_the_same_versions_and_the_same_digest(
         self, tmp_path: Path

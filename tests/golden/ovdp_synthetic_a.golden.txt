@@ -50,6 +50,7 @@ instrument           ovdp_enumerated_a            instruments/ovdp_enumerated_a.
 instrument           ovdp_enumerated_mirror       instruments/ovdp_enumerated_mirror.toml  sha256:52bda6035475be9d3d4f17127ebd7131f8c12456682babaf31d3c2f054832521
 instrument           ovdp_synthetic_a             instruments/ovdp_synthetic_a.toml        sha256:398de746fb47c3359a988bdd4114721003b526c0a5b02dd857f6325191249e25
 instrument           ovdp_synthetic_b             instruments/ovdp_synthetic_b.toml        sha256:dc083c9969628d61d8ee9d7cde108e50226dcfce02193009d941ce6a1151c663
+official_rate        ua_nbu_usd                   official_rates/ua_nbu_usd.toml           sha256:3ca68f5c89cce74d21595eaba19fddcdd905c4b773b141bb15248b3cee8a7748
 tax_class            synthetic_enumerated_coupon  tax/synthetic_fixture.toml               sha256:59fa3761fb68d26bf0100a750d27eab68392b41799d8271e4e5adc48edfec964
 tax_class            synthetic_enumerated_disposal tax/synthetic_fixture.toml               sha256:59fa3761fb68d26bf0100a750d27eab68392b41799d8271e4e5adc48edfec964
 tax_class            synthetic_fund_disposal      tax/synthetic_fixture.toml               sha256:59fa3761fb68d26bf0100a750d27eab68392b41799d8271e4e5adc48edfec964

@@ -236,8 +236,14 @@ STRUCTURAL_KEYS = frozenset(
         # observed value, so listing it here leaves the table with none and drops the
         # `source`, `retrieved_on`, `verified_on` and `kind` requirements with it. Measured
         # 2026-08-30: removing this line produces four errors on
-        # `data/official_rates/ua_nbu_usd.toml`, not one. A STATED GAP, argued and recorded
-        # where a declarer meets it, in that file's own header.
+        # `data/official_rates/ua_nbu_usd.toml`, not one.
+        #
+        # What this gate still does not check, `scripts/fetch_nbu_rates.py` now does: it reads
+        # the publisher's stated `units` on every row and refuses the whole run where one
+        # differs from the declared `quotation_unit`, rather than normalising a value to fit.
+        # The unit is thereby checked against the publisher on every retrieval, and each
+        # observation's citation records the unit that row was published at, so the refusal is
+        # auditable after the fact and not only at fetch time.
         "quotation_unit",
         # --- feature 017: dates that are not observations ---
         # The date a search was run, on a `[[verification_task]]` -- the record of a question
@@ -269,14 +275,20 @@ class Finding:
 
     def render(self) -> str:
         level = "error" if self.error else "warning"
-        try:
-            rel: Path | str = self.path.relative_to(REPO_ROOT)
-        except ValueError:
-            # A data root outside the repository -- a test's scratch copy. The absolute
-            # path is the honest rendering there.
-            rel = self.path
-        where = f"{rel}: [{self.table}]" if self.table else f"{rel}"
+        where = f"{named(self.path)}: [{self.table}]" if self.table else f"{named(self.path)}"
         return f"{level}: {where} {self.message}"
+
+
+def named(path: Path) -> Path | str:
+    """A file as a reader will look for it: relative to the repository where it is inside it.
+
+    A data root outside the repository is a test's scratch copy, and the absolute path is the
+    honest rendering there.
+    """
+    try:
+        return path.relative_to(REPO_ROOT)
+    except ValueError:
+        return path
 
 
 def _is_numeric(value: object) -> bool:
@@ -645,6 +657,29 @@ def unknown_directories(data_root: Path) -> list[Finding]:
     ]
 
 
+def rendered(findings: list[Finding]) -> list[str]:
+    """Every error, one line each; then every file with unverified values, one line each.
+
+    **Errors stay per value and unverified values do not.** An error is a thing to be fixed,
+    and which value is wrong is the whole of what a reader needs. An unverified value is a
+    standing state -- every `verified_on` under `data/` is empty and will be until the owner
+    checks one -- so what a reader needs is which file to go and check, and how much of it.
+    Measured 2026-08-31: per value the shipped tree prints 3,143 lines, of which 2,439 are one
+    rate series, and the 704 that were there before are unfindable in it. A gate whose output
+    nobody reads is a gate that is off.
+    """
+    lines = [finding.render() for finding in findings if finding.error]
+    counted: dict[Path, int] = {}
+    for finding in findings:
+        if not finding.error:
+            counted[finding.path] = counted.get(finding.path, 0) + 1
+    lines.extend(
+        f"warning: {named(path)}: {count} unverified value(s); each must render visibly marked"
+        for path, count in sorted(counted.items())
+    )
+    return lines
+
+
 def main(argv: list[str] | None = None) -> int:
     """Check a data root -- the repository's by default, or the one argv names.
 
@@ -672,11 +707,10 @@ def main(argv: list[str] | None = None) -> int:
     for path in paths:
         findings.extend(check_file(path, kinds))
 
-    for finding in findings:
-        print(finding.render())  # noqa: T201
-
     errors = sum(1 for finding in findings if finding.error)
     warnings = len(findings) - errors
+    for line in rendered(findings):
+        print(line)  # noqa: T201
 
     print(  # noqa: T201
         f"\nchecked {len(paths)} data file(s) under {', '.join(SOURCED_DIRS)} "

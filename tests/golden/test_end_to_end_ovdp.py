@@ -129,7 +129,7 @@ from terezy.core.results.schedule import CashFlowRow
 from terezy.core.tax import year as tax_year
 from terezy.core.tax.interface import TaxCharge, TaxClass
 from terezy.data import manifest
-from terezy.data.declarations import resolver
+from terezy.data.declarations import loader, resolver
 from tests import declared_terms
 
 pytestmark = pytest.mark.golden
@@ -216,6 +216,21 @@ def _inflation() -> resolver.InflationDeclarations:
     with a specific reason, and holding a figure.
     """
     return resolver.inflation_from_data_root(DATA_ROOT)
+
+
+def _official_rates() -> resolver.OfficialRateDeclarations:
+    """The declared official-rate series (011, populated by 018).
+
+    Recorded although this run strikes no foreign base: the manifest names every declaration
+    the run was **given**, because resolution depended on the set. It is also the input whose
+    digest moves on every re-fetch, which is a golden regenerated on purpose rather than a
+    golden to be worked around -- an input digest is a witness, not a term (Principle V).
+    """
+    kinds = {
+        kind.id: kind
+        for kind in loader.observation_kinds_from_file(DATA_ROOT / "observation_kinds.toml")
+    }
+    return resolver.official_rates_from_data_root(DATA_ROOT, kinds)
 
 
 def _project(declarations: resolver.Declarations) -> Projection:
@@ -504,7 +519,11 @@ def _inputs(declarations: resolver.Declarations) -> Iterable[str]:
     this test, on the line that names the file.
     """
     refs = sorted(
-        [*manifest.input_refs(declarations), *manifest.inflation_input_refs(_inflation())],
+        [
+            *manifest.input_refs(declarations),
+            *manifest.inflation_input_refs(_inflation()),
+            *manifest.official_rate_input_refs(_official_rates()),
+        ],
         key=lambda ref: (ref.kind, ref.id),
     )
     for ref in refs:
@@ -683,6 +702,7 @@ class TestTheRecordedResultIsStillTheResult:
         for ref in (
             *manifest.input_refs(declarations),
             *manifest.inflation_input_refs(_inflation()),
+            *manifest.official_rate_input_refs(_official_rates()),
         ):
             assert ref.file in recorded, f"the artefact does not name {ref.file}"
             assert ref.version in recorded, (
