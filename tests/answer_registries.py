@@ -16,6 +16,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
 from terezy.core.decision.answer import AnswerInputs, answer
+from terezy.core.instruments.access import VenueQuote
+from terezy.core.primitives import provenance as prov
+from terezy.core.primitives.money import Money
 from terezy.core.primitives.currency import Currency
 from terezy.core.results.answer import Answer
 from terezy.data.declarations import loader, resolver
@@ -101,3 +104,19 @@ def with_plans(question: Question, plans: Mapping[str, object]) -> Question:
 def one_horizon(question: Question, index: int = 0) -> Question:
     """The same question over one of its declared horizons."""
     return replace(question, horizons=(question.horizons[index],))
+
+
+def with_resale_price(
+    supplied: AnswerInputs, instrument_id: str, per_unit: float = 995.0
+) -> AnswerInputs:
+    """The same registry with one instrument declaring what it sells for (015 FR-031).
+
+    No shipped declaration carries one, so this is how an early-exit **figure** is reached at
+    all -- and it is the fixture SC-024 and SC-026 both rest on.
+    """
+    access = dict(supplied.registries.access)
+    access[instrument_id] = replace(
+        access[instrument_id],
+        resale_price=VenueQuote(price=Money(per_unit, UAH, prov.EMPTY), kind="venue_terms"),
+    )
+    return replace(supplied, registries=replace(supplied.registries, access=access))

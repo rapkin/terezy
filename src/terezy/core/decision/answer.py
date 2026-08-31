@@ -379,11 +379,21 @@ def _outcomes(outcome: SectionOutcome) -> tuple[TupleOutcome, ...]:
 def _arrives_after_horizon(
     outcome: SectionOutcome, horizon: DateRange
 ) -> tuple[MoneyArrivesAfterHorizon, ...]:
-    """The candidates FR-030 withholds, naming each and the date its money actually arrives."""
+    """The candidates FR-030 withholds, naming each and the date its money actually arrives.
+
+    The test is on the date the **holding released** the money, and the date reported is the
+    date it reached a spendable endpoint. They differ by the way out's declared latency, and
+    testing on the arrival would withhold every figure there is: a sale at ``horizon.end``
+    settles a few days later on every declared corridor, and 010's ``accounts_for`` already says
+    settlement latency sits *inside* the span because waiting is a cost. What FR-030 exists to
+    withhold is a candidate whose money comes out long after the window **because its plan says
+    so** -- measured, ``inzhur_miltech``, whose plan requests an exit sixteen months past a
+    one-month horizon.
+    """
     return tuple(
         MoneyArrivesAfterHorizon(key=item.key, arrives_on=item.arrivals[-1].arrived_on)
         for item in _outcomes(outcome)
-        if item.arrivals and item.arrivals[-1].arrived_on > horizon.end
+        if item.arrivals and item.arrivals[-1].released_on > horizon.end
     )
 
 
