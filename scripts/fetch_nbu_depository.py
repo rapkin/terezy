@@ -110,10 +110,10 @@ PAYMENT_WRITTEN: Final = frozenset({*PAYMENT_TEXT, *PAYMENT_NUMBERS})
 for the reason the issue-level guard exists: an accrual amount or a gross/net split added here
 would be dropped into a file whose header says it is the whole register.
 
-Composed from the two lists above rather than spelled a second time, because the run's error
-message tells a maintainer to widen this AND ``render``: a key widened here alone would be
-required non-null and then written nowhere, and one widened in ``render`` alone would be
-written with no null check -- rendering a missing label as the string ``"None"``.
+Composed from the two lists above rather than spelled a second time, so that widening a row is
+one edit: ``render`` writes exactly those two lists, and this set is what the null check reads.
+A key added *here* instead would be required non-null and then written nowhere, which is why
+the refusal below sends a maintainer to the lists rather than to this name.
 """
 
 TOLERATED: Final[Mapping[str, str]] = {"array": "true"}

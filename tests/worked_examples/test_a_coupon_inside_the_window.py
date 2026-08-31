@@ -58,7 +58,10 @@ EARLY_EXIT_CLAIMS = frozenset(
 none of them is signed the way this omission is."""
 
 WORKED = "UA4000236228"
-"""Bought 2026-09-01 at 1089.32, pays 85.50 on 2026-09-09, sold 2026-10-01 at 1087.89.
+"""Bought 2026-09-02 at 1089.32, pays 85.50 on 2026-09-09, sold 2026-10-01 at 1087.89.
+
+The purchase is a day after the window opens, not on it: `inzhur_direct` declares one leg of
+`latency_days = 1`, and the engine buys at `horizon.start` plus the way in's own latency.
 
 The whole arithmetic, on the owner's own 50 000 UAH and the declared minimum increment of one
 whole unit::
@@ -80,8 +83,8 @@ DEPLOYED_UNITS = 45.0
 
 @functools.cache
 def _supplied() -> AnswerInputs:
-    """The shipped registry, read once. `answers.inputs()` re-resolves the whole data root, and
-    the helpers below are called per payment."""
+    """The shipped registry, read once. `answers.inputs()` re-resolves the whole data root at
+    69 ms a call, and this module reads it once per candidate across seven tests."""
     return answers.inputs()
 
 
@@ -166,9 +169,11 @@ def test_the_worked_arithmetic_is_what_the_declarations_say() -> None:
     declared = _supplied().registries
     terms = declared.instruments[WORKED].terms
     assert isinstance(terms, EnumeratedTerms)
-    inside = [
-        payment for payment in terms.payments if date(2026, 9, 1) < payment.on <= date(2026, 10, 1)
-    ]
+    section = answers.answered().sections[0]
+    worked = next(item for item in section_evaluated(section) if item.key.instrument_id == WORKED)
+    bought = _bought_on(worked, section.horizon.start)
+    assert bought == date(2026, 9, 2)
+    inside = [payment for payment in terms.payments if bought < payment.on <= section.horizon.end]
     assert [(payment.on, payment.amount.amount) for payment in inside] == [(date(2026, 9, 9), 85.5)]
     access = declared.access[WORKED]
     assert access.quote is not None
@@ -213,21 +218,20 @@ def test_the_latency_this_module_sums_is_the_one_the_engine_adds() -> None:
     comparing against the old one, so the sum is pinned against the accumulator the engine
     actually uses -- `cost.cost_one`, whose `RampCost.latency_days` is what the join adds.
     """
-    supplied = _supplied()
-    declarations = answers.declarations()
+    registries = _supplied().registries
     section = answers.answered().sections[0]
     checked = 0
     for item in section_evaluated(section):
         priced = cost.cost_one(
             item.key.route_in,
             item.outlay,
-            routes=supplied.routes,
-            channels=declarations.tuples.registries.channels,
-            streams=declarations.tuples.registries.streams,
-            kinds=declarations.tuples.registries.kinds,
+            routes=_supplied().routes,
+            channels=registries.channels,
+            streams=registries.streams,
+            kinds=registries.kinds,
             on_date=section.horizon.start,
             as_of=answers.AS_OF,
-            spendable=declarations.tuples.registries.spendable,
+            spendable=registries.spendable,
         )
         assert isinstance(priced, RampCost), item.key.instrument_id
         assert priced.latency_days == _latency(item), item.key.instrument_id
