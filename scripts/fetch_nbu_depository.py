@@ -102,10 +102,19 @@ DATES: Final = ("razm_date", "pgs_date")
 WRITTEN: Final = frozenset({"cpcode", "payments", *SCALARS, *OPTIONAL_SCALARS, *LABELS, *DATES})
 """Every key this script writes on an issue. An issue carrying anything else stops the run."""
 
-PAYMENT_WRITTEN: Final = frozenset({"pay_date", "pay_type", "pay_val"})
+PAYMENT_TEXT: Final = ("pay_date", "pay_type")
+PAYMENT_NUMBERS: Final = ("pay_val",)
+
+PAYMENT_WRITTEN: Final = frozenset({*PAYMENT_TEXT, *PAYMENT_NUMBERS})
 """Every key this script writes on a payment row. A row carrying anything else stops the run,
 for the reason the issue-level guard exists: an accrual amount or a gross/net split added here
-would be dropped into a file whose header says it is the whole register."""
+would be dropped into a file whose header says it is the whole register.
+
+Composed from the two lists above rather than spelled a second time, because the run's error
+message tells a maintainer to widen this AND ``render``: a key widened here alone would be
+required non-null and then written nowhere, and one widened in ``render`` alone would be
+written with no null check -- rendering a missing label as the string ``"None"``.
+"""
 
 TOLERATED: Final[Mapping[str, str]] = {"array": "true"}
 """A key written nowhere because it says nothing -- and the VALUE is what licenses that, so the
@@ -157,7 +166,7 @@ def _check_issue(issue: dict[str, Any], code: str) -> None:
                     f"rather than {constant!r}. That field is dropped because it says nothing; "
                     "a row that varies it is a field carrying information and must be written."
                 )
-        for field in ("pay_date", "pay_type", "pay_val"):
+        for field in sorted(PAYMENT_WRITTEN):
             if row.get(field) is None:
                 raise FetchError(f"{ENDPOINT}: {code} has a payment row with no {field!r}")
 
@@ -261,9 +270,10 @@ def render(issues: list[dict[str, Any]], *, today: datetime.date) -> str:
             # to want a citation on each. `pay_type` is the ISSUER's label for the kind, which
             # is the whole reason a declaration need not read a kind off an amount or a date.
             lines.append("  [[issue.payment]]")
-            lines.append(f'  pay_date     = "{_escape(str(row["pay_date"]))}"')
-            lines.append(f'  pay_type     = "{_escape(str(row["pay_type"]))}"')
-            lines.append(f"  pay_val      = {_scalar(row['pay_val'])}")
+            for field in PAYMENT_TEXT:
+                lines.append(f'  {field:<12} = "{_escape(str(row[field]))}"')
+            for field in PAYMENT_NUMBERS:
+                lines.append(f"  {field:<12} = {_scalar(row[field])}")
             lines.append('  kind         = "bond_terms"')
             lines.append(
                 f'  source       = "{ENDPOINT} — payment row published for {_escape(code)}, '

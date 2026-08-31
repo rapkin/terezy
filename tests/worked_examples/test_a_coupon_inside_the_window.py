@@ -33,6 +33,8 @@ from terezy.core.decision.answer import section_evaluated
 from terezy.core.instruments.interface import EnumeratedTerms
 from terezy.core.primitives.tolerance import TOLERANCE
 from terezy.core.results.answer import Exclusion
+from terezy.core.results.tuple import TupleOutcome
+from terezy.core.routes.path import segments_of
 from tests import answer_registries as answers
 
 pytestmark = pytest.mark.worked_example
@@ -73,10 +75,23 @@ REACHED = 52802.55
 DEPLOYED_UNITS = 45.0
 
 
+def _bought_on(item: TupleOutcome, start: date) -> date:
+    """When the engine's own rule says the purchase happens: the window opens, then the way in
+    takes as long as its legs declare. The SUM along the chain, which is what `cost` accumulates
+    and `tuple_outcome` adds -- a chain of two one-day legs is two days, not one."""
+    routes = answers.inputs().routes
+    days = sum(
+        leg.latency_days
+        for segment in segments_of(item.key.route_in)
+        for leg in routes[segment].legs
+    )
+    return start + timedelta(days=days)
+
+
 def _sold_early_with_a_payment_inside(horizon_index: int) -> list[str]:
     answer = answers.answered()
     section = answer.sections[horizon_index]
-    start, end = section.horizon.start, section.horizon.end
+    end = section.horizon.end
     declared = answers.inputs().registries.instruments
     found = []
     for item in section_evaluated(section):
@@ -84,33 +99,35 @@ def _sold_early_with_a_payment_inside(horizon_index: int) -> list[str]:
             continue
         terms = declared[item.key.instrument_id].terms
         assert isinstance(terms, EnumeratedTerms)
-        if any(start < payment.on <= end for payment in terms.payments):
+        bought = _bought_on(item, section.horizon.start)
+        if any(bought < payment.on <= end for payment in terms.payments):
             found.append(item.key.instrument_id)
     return sorted(found)
 
 
 def test_the_window_and_the_holding_cannot_disagree_about_what_is_inside() -> None:
-    """The count above opens its window at the HORIZON start; the engine buys at the horizon
-    start plus the way in's declared latency, and credits only payments after that. The two
-    readings agree only while no declared payment falls in the gap between them -- which is
-    true today and is a fact about the data rather than about either rule, so it is asserted
-    rather than assumed.
+    """The count above opens its window at the candidate's own purchase date. Reading it from
+    the horizon start instead is the looser rule a reader would reach for first, and the two
+    agree only while no declared payment falls in the gap between them -- a fact about the data
+    rather than about either rule, so it is asserted rather than assumed.
     """
-    latency = max(
-        leg.latency_days for route in answers.inputs().routes.values() for leg in route.legs
-    )
-    assert latency > 0, "a zero latency would make this check vacuous"
-    windows = [section.horizon.start for section in answers.answered().sections]
+    answer = answers.answered()
     declared = answers.inputs().registries.instruments
-    inside_the_gap = [
-        (name, payment.on)
-        for name, item in declared.items()
-        if isinstance(item.terms, EnumeratedTerms)
-        for payment in item.terms.payments
-        for start in windows
-        if start < payment.on <= start + timedelta(days=latency)
+    gaps = [
+        (item.key.instrument_id, payment.on)
+        for section in answer.sections
+        for item in section_evaluated(section)
+        if item.sold_early is not None
+        for payment in getattr(declared[item.key.instrument_id].terms, "payments", ())
+        if section.horizon.start < payment.on <= _bought_on(item, section.horizon.start)
     ]
-    assert not inside_the_gap, inside_the_gap
+    assert not gaps, gaps
+    latencies = {
+        _bought_on(item, section.horizon.start) - section.horizon.start
+        for section in answer.sections
+        for item in section_evaluated(section)
+    }
+    assert latencies != {timedelta(0)}, "a zero latency everywhere would make this vacuous"
 
 
 def test_the_gap_is_reached_at_every_horizon_the_owner_asked_about() -> None:
