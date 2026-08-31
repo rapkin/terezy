@@ -110,10 +110,7 @@ def answer(question: Question, inputs: AnswerInputs, as_of: date) -> Answer | Re
         return wrong
     subjects = _resolve(question, inputs)
     considered = _considered_ids(subjects)
-    if not any(
-        isinstance(subject, DeclaredSubject) and question.benchmark_instrument_id in subject.ids
-        for subject in subjects
-    ):
+    if question.benchmark_instrument_id not in _named_or_reached(subjects):
         return BenchmarkOutsideTheSubjects(instrument_id=question.benchmark_instrument_id)
     unused = _plan_for_nothing(question, subjects)
     if unused is not None:
@@ -232,12 +229,23 @@ def _considered_ids(subjects: Sequence[ResolvedSubject]) -> frozenset[str]:
     )
 
 
+def _named_or_reached(subjects: Sequence[ResolvedSubject]) -> frozenset[str]:
+    """The words the question wrote, plus every id they reach.
+
+    What a benchmark and a run plan are both checked against. A benchmark **outside** the
+    subjects can never be a member of the set, which is a fact about the question (FR-026); a
+    benchmark that *is* a named subject and reaches nothing is that section's own refusal, which
+    is a fact about one enumeration -- and the two must not be the same answer, because SC-020's
+    question names four words the registry declares none of and is still answerable.
+    """
+    return frozenset(subject.named for subject in subjects) | _considered_ids(subjects)
+
+
 def _plan_for_nothing(
     question: Question, subjects: Sequence[ResolvedSubject]
 ) -> PlanForNothing | None:
     """A plan keyed by a word that runs nothing at all."""
-    named = {subject.named for subject in subjects}
-    reachable = named | _considered_ids(subjects)
+    reachable = _named_or_reached(subjects)
     for word in sorted(question.plans):
         if word not in reachable:
             return PlanForNothing(named=word)
