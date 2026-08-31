@@ -53,11 +53,16 @@ observation kind on each of the three — which is the hole `e6def2f` closed.
 | `WorkingDay` | `on_date`, `decided_by`, `pre_holiday: bool`, `provenance` |
 | `NonWorkingDay` | `on_date`, `decided_by`, `provenance` |
 | `DayClassification` | `WorkingDay \| NonWorkingDay` |
-| `WorkingDayCalendar` | `id`, `jurisdiction`, `authority`, `scope`, `covers: tuple[date, date]`, `week: DeclaredWeek`, `rows: tuple[DayClassification, ...]` |
+| `WorkingDayCalendar` | `id`, `jurisdiction`, `authority`, `scope`, `covers: tuple[date, date]`, `covered_by: Provenance`, `week: DeclaredWeek`, `rows: tuple[DayClassification, ...]` |
 
 Weekdays are `date.weekday()` indices — Monday 0 … Sunday 6 — throughout. `rows` is strictly
 ascending by `on_date` and looked up by bisection, exactly as `OfficialRateSeries.observations`
 is.
+
+`covered_by` is the coverage window's own citation and is merged onto **every** answer, not
+only onto the ones no row decided. *No row for this date* means *the law declared no exception
+here* only because somebody read the law for this window; without that claim it would mean
+*nobody transcribed this date*.
 
 **`pre_holiday` exists only on `WorkingDay`.** That is the whole of FR-012's *"the answer MUST
 make a wrong state unrepresentable"*: there is no field for a pre-holiday non-working day, so

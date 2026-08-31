@@ -158,11 +158,14 @@ def test_no_module_in_the_source_tree_names_the_added_calendars(tmp_path: Path) 
     assert not mentions, f"these modules name a calendar that exists only as data: {mentions}"
 
 
-def test_no_module_holds_a_calendar_and_no_query_finds_one_for_itself() -> None:
+def test_no_module_holds_a_calendar_of_its_own() -> None:
     """SC-011, FR-016: every calendar is an argument.
 
-    A module-level ``WorkingDayCalendar`` would make *which calendar answered this* unrecoverable
-    from a result, and every classification here is an input to a legal figure downstream.
+    A module-level ``WorkingDayCalendar`` would make *which calendar answered this*
+    unrecoverable from a result, and every classification here is an input to a legal figure
+    downstream. The other half of SC-011 -- that no query carries a default that would let a
+    caller omit one -- is
+    ``tests/unit/test_working_day_calendar.py::test_no_query_has_a_default_that_would_answer_one_of_these``.
     """
     constructing = []
     for path in sorted(SRC.rglob("*.py")):

@@ -213,3 +213,47 @@ def test_the_literal_scan_would_see_a_holiday_written_into_a_module() -> None:
     assert _holiday_literals(compared) == [(12, 25)]
     ordinary = ast.parse("from datetime import date\nSETTLED = date(2026, 2, 17)\n")
     assert _holiday_literals(ordinary) == []
+
+
+CHARTER = (
+    "**A rule written in working days or public holidays cannot be declared against these\n"
+    "records at all**, because evaluating one needs a working-day and holiday calendar and "
+    "nothing\ndeclares one."
+)
+"""The sentence in ``core/tax/official_rate.py`` that this feature exists to answer, and which
+``core/calendars/working_day.py`` quotes. A quotation of another module is a claim about
+elsewhere, so it is checked."""
+
+
+def test_the_charter_sentence_the_calendar_answers_is_still_written_where_it_is_quoted() -> None:
+    """``core/calendars/working_day.py`` opens by quoting ``core/tax/official_rate.py``.
+
+    If that module ever stops saying it -- because a rule in working days became declarable
+    against its records after all -- the quotation becomes a claim about a sentence nobody
+    wrote, and the calendar's own stated reason for existing goes with it.
+    """
+    charter = (SRC / "core" / "tax" / "official_rate.py").read_text(encoding="utf-8")
+    assert CHARTER in charter
+    quoting = (SRC / "core" / "calendars" / "working_day.py").read_text(encoding="utf-8")
+    assert "cannot be declared against these records at all" in quoting
+
+
+def test_the_three_corrected_sentences_name_a_calendar_that_exists() -> None:
+    """FR-017a: each correction says a declared calendar exists and this site consults none.
+
+    Half of that is checked by the scans above -- the sites consult none. The other half is
+    that the calendar is real, which is what makes the sentence a correction rather than a
+    second false promise.
+    """
+    assert (SRC / "core" / "calendars" / "working_day.py").is_file()
+    assert sorted((REPO_ROOT / "data" / "calendars").glob("*.toml")), (
+        "the corrected docstrings say declared calendars exist; data/calendars/ holds none"
+    )
+    corrected = {
+        "core/primitives/conventions.py": (
+            "Declared calendars exist -- ``core.calendars.working_day`` over ``data/calendars/``"
+        ),
+        "core/instruments/fund.py": "Declared calendars\n    exist and this consults none",
+    }
+    for module, sentence in corrected.items():
+        assert sentence in (SRC / module).read_text(encoding="utf-8"), module

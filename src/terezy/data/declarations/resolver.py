@@ -3398,12 +3398,12 @@ def working_day_calendars_from_data_root(
 
     Sorted, so a run does not depend on the order a filesystem happens to return.
 
-    ``kinds`` is required for the reason ``official_rates_from_data_root`` gives, and it bites
-    harder here: a calendar's coverage window, its week and each of its rows carry a citation,
-    and none of the three tables holds a number. `scripts/check_provenance.py` reaches them
-    because its predicate counts dates -- but a calendar declaring `day = []` has only the two
-    numberless-by-construction tables left, and this is what keeps a misspelt kind on either
-    of them from loading clean and raising at report time instead.
+    ``kinds`` is required for the reason ``official_rates_from_data_root`` gives, and here it
+    is `[calendar.week]` it covers: three tables carry a citation, and that one holds weekday
+    *names* rather than a number or a date, so `scripts/check_provenance.py` does not see it
+    even with a predicate that counts dates. Left unchecked, a misspelt kind on it loads clean
+    and raises from `staleness.kind_for` when a figure it marked is aged -- a crash at report
+    time for a file that could have been refused by name at load.
     """
     calendars: dict[str, WorkingDayCalendar] = {}
     declaring: dict[str, Path] = {}
@@ -3437,7 +3437,5 @@ def _check_calendar_kinds(
         for position, row in enumerate(declared.rows)
     ]
     for table, provenance in tables:
-        # Sorted, because a set has no order and a refusal that depends on one changes
-        # between runs.
         for source in sorted(provenance.sources, key=lambda ref: ref.id):
             _check_kind(source.kind, kinds, path=path, field_path=f"{table}.kind")

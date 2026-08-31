@@ -73,8 +73,10 @@ from the mapping produces.
 
 ## D7 — A week inside the window with no working day is refused at load
 
-**Decision**: the loader refuses a calendar in which some week lying **entirely inside** the
-coverage window contains no working day, naming the file and that week's first date.
+**Decision**: `working_day.week_without_a_working_day` finds the first such week and the
+loader refuses on it, naming the file and that week's first date. The reasoning is in the
+core, beside the queries whose totality depends on it; the file name is all the data boundary
+adds.
 
 The specification refuses a rest pattern naming all seven weekdays at load, with the reason:
 *a calendar with no working days answers every working-day question with a refusal that names
@@ -90,11 +92,16 @@ query with the ran-off-an-end discriminator.
 
 **Decision**: `tests/contract/test_no_calendar_free_working_day.py`, parsing `src/` with `ast`.
 
-A site counts when a module reaches the weekend notion **any** of the three ways: a call to
-`is_business_day`, a call to `business_day_rule`, or a reference to `BUSINESS_DAY_FNS`. The
-specification is explicit that narrowing to direct callers of `is_business_day` would pass
-while asserting something false, because `year.py::_due_on` is counted and reaches it through
-the registry.
+A site counts when a module **calls** `is_business_day` or **calls** `business_day_rule` —
+the second is the registry path, and the specification is explicit that narrowing to the first
+would pass while asserting something false, because `year.py::_due_on` is counted and reaches
+it that way.
+
+**A mention is deliberately not a call.** `loader.py` names `BUSINESS_DAY_FNS` to validate a
+declared name against it and `canonical.py` reads a `business_day_rule` string off a record;
+neither decides anything about a date. Counting references would put both in the set and make
+the assertion false — which is the mirror of the narrowing the specification warns about, and
+was found by running it.
 
 The holiday-literal half searches for `date(y, m, d)` constructions and `(month, day)` pairs
 whose month-and-day matches a public holiday. **The list of holiday month-and-days lives in the

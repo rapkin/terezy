@@ -4,61 +4,30 @@
 # `verified_on`, because a provision somebody transcribed is not one the owner has checked.
 # Every classification struck from this file renders marked until he does.
 #
-# ---------------------------------------------------------------------------
-# THE ENUMERATION IS EMPTY, AND IT MEANS IT
-# ---------------------------------------------------------------------------
+# Each of the two tables below quotes the provisions it transcribes, so the reasoning is
+# beside the citation rather than repeated here. Three things a reader needs that the
+# citations do not say:
 #
-# `day = []` is not a file somebody forgot to fill in. Inside this window the Labour Code's
-# holiday regime IS NOT APPLIED: ч. 6 ст. 6 Закону № 2136-IX suspends статті 53 і 73 КЗпП for
-# the duration of martial law, стаття 73 being the list of святкові і неробочі дні and стаття
-# 53 the shortened передсвятковий день. So the law enumerates no holidays here and no
-# pre-holiday days, and the transcription of that is no rows.
+# `day = []` MEANS IT. It is not a file somebody forgot to fill in: inside this window the
+# Labour Code's holiday regime is not applied, so the transcription of it is no rows. What
+# separates "suspended" from "not transcribed" is the WINDOW, which is why the suspending act
+# is cited on `[calendar.coverage]` and why every answer this file gives rests on it.
 #
-# The distinction between "suspended" and "not transcribed" is carried by the WINDOW rather
-# than by the absence, which is why `[calendar.coverage]` carries the suspending act's
-# citation and why every answer this file gives rests on it.
-#
-# ---------------------------------------------------------------------------
-# THE REST PATTERN IS SUNDAY, AND SATURDAY IS AN OPEN QUESTION
-# ---------------------------------------------------------------------------
-#
-# ст. 67 ч. 2 КЗпП makes SUNDAY the general rest day and puts the second rest day of a
-# five-day week in the enterprise's own schedule -- «якщо він не визначений законодавством,
-# визначається графіком роботи підприємства». A civil calendar transcribes what the
-# JURISDICTION's law says, and the jurisdiction's law does not make Saturday a rest day.
-#
+# THIS FILE AND THE ENGINE DISAGREE ABOUT EVERY SATURDAY.
 # `core/primitives/conventions.py::_is_weekend` asserts Saturday and Sunday with no citation
-# at all, so this file and that function disagree about every Saturday. NEITHER IS CONSUMED
-# BY ANYTHING (017 FR-015, CL-1), so no figure moves either way, and the divergence is
-# recorded as owner verification task 3 in `specs/017-working-day-calendar/spec.md` rather
-# than resolved by picking whichever looks more familiar.
+# at all. NEITHER NOTION IS CONSUMED BY ANYTHING (017 FR-015, CL-1), so no figure moves either
+# way, and the divergence is recorded rather than resolved by picking the familiar answer.
 #
-# ---------------------------------------------------------------------------
-# WHY THE WINDOW BEGINS ON 2025-01-01 AND ENDS ON 2026-10-30
-# ---------------------------------------------------------------------------
+# THE WINDOW BEGINS ON 2025-01-01 because every amendment touching статті 53, 67 і 73 predates
+# it -- № 3258-IX від 14.07.2023 for ст. 73, № 3494-IX від 22.11.2023 for ст. 67 -- so the
+# consolidated text retrieved on 2026-08-31 is the text in force throughout. An earlier date
+# would need the edition in force then, which is a different retrieval and is not carried here.
+# It ENDS ON 2026-10-30 because that is the last whole day the cited martial-law extension
+# chain covers; extending it is a retrieval of the next Указ rather than a guess.
 #
-# BEGINS: every amendment touching статті 53, 67 і 73 predates it -- № 3258-IX від 14.07.2023
-# for ст. 73, № 3494-IX від 22.11.2023 for ст. 67 -- so the consolidated text retrieved on
-# 2026-08-31 is the text in force throughout the window. An earlier date would need the
-# edition in force then, which is a different retrieval and is not carried here.
-#
-# ENDS: martial law is in force continuously from 05:30 on 2022-02-24 to 05:30 on 2026-10-31
-# by the extension chain recorded on Указ № 64/2022, the last being Указ № 596/2026 від
-# 13.07.2026 -- 90 діб from 05:30 on 2026-08-02. 2026-10-30 is the last day that chain covers
-# whole. A date past it REFUSES by name, naming this calendar, the date and the window; the
-# rest pattern is never extended forward and the last year is never repeated. That refusal is
-# the answer to the enumerated form's one weakness, and extending the window is a retrieval
-# of the next Указ rather than a guess.
-#
-# ---------------------------------------------------------------------------
-# WHAT THIS FILE DOES NOT SETTLE
-# ---------------------------------------------------------------------------
-#
-# Whether the National Bank's «святкові дні» and «передсвятковий день» in пункт 10 розділу III
-# of its Положення track КЗпП's suspension is a reading nobody here has done, and it is owner
-# verification task 2. That the NBU publishes an official rate for 1 January 2026 FALSIFIES
-# the reading that it treats holidays as non-publication days; it does not establish what
-# пункт 10's own words mean, and 017 FR-004 forbids turning publication data into a calendar.
+# Two readings this file does NOT make are owner verification tasks 2 and 3 in
+# `specs/017-working-day-calendar/spec.md`: whether the National Bank's holiday vocabulary
+# tracks КЗпП's suspension at all, and whether Saturday is a rest day as a matter of law.
 
 # `day` sits above `[calendar]` because TOML binds a bare key to the table it follows:
 # written below, it would declare `calendar.day`.

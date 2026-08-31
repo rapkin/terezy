@@ -3967,12 +3967,10 @@ of silent.
 
 ### 35.4 The shipped Ukrainian calendar declares no holidays
 
-`data/calendars/ua_civil.toml` covers 2025-01-01 to 2026-10-30 and enumerates **nothing**,
-because ч. 6 ст. 6 Закону № 2136-IX suspends статті 53 і 73 КЗпП for the duration of martial
-law — стаття 73 being the holiday list and стаття 53 the shortened pre-holiday day. Its rest
-pattern is **Sunday alone**: ст. 67 ч. 2 makes Sunday the general rest day and leaves the second
-rest day of a five-day week to an enterprise's own schedule, so Saturday is not a fact about the
-jurisdiction. The window ends where the cited martial-law extension chain does.
+`data/calendars/ua_civil.toml` covers 2025-01-01 to 2026-10-30, rests on **Sunday alone**, and
+enumerates **nothing** — because статті 53 і 73 КЗпП, the holiday list and the shortened
+pre-holiday day, are not applied during martial law. The file states which provision says each
+of those and why the window ends where it does; it is not restated here.
 
 **Nothing consumes this calendar** (017 FR-015). It moves no coupon, no settlement and no
 deadline, so no figure in this document changes because it exists.

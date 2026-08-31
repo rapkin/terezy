@@ -25,8 +25,9 @@ Returns `WorkingDay` or `NonWorkingDay`, each stating `decided_by`:
 | `ENUMERATED_NON_WORKING_DAY` | a row declares `classification = "public_holiday"` |
 | `DECLARED_MOVE` | a row declares `"rest_day"` or `"working_day"` |
 
-Provenance on the answer is the deciding declaration's own — the row's, or the week's where the
-pattern decided it. An empty `verified_on` therefore marks every answer derived from it (SC-005).
+Provenance on the answer is the deciding declaration's — the row's, or the week's where the
+pattern decided it — **merged with the coverage window's**, which every answer rests on. An
+empty `verified_on` on any of them marks the answer (SC-005).
 
 `on_date` outside `covers` returns `CalendarOutOfCoverage` with `BEFORE_WINDOW` or
 `AFTER_WINDOW`. The rest pattern is never extended past either end (FR-010).
