@@ -57,6 +57,7 @@ import pytest
 from terezy.core.instruments.interface import (
     Assumptions,
     DateRange,
+    EarlyExit,
     EnumeratedTerms,
     Holding,
     InstrumentDeclaration,
@@ -71,6 +72,7 @@ from terezy.core.primitives.money import Money
 from terezy.core.primitives.tolerance import is_close
 from terezy.core.results import project
 from terezy.core.results.project import GovernedBy, Projection, PurchasePremium
+from terezy.core.scenarios.early_exit import SpreadHolds
 from terezy.core.tax import flat_rate
 from terezy.core.tax import year as tax_year
 from terezy.core.tax.interface import TaxableEventKind, TaxCharge, TaxContext
@@ -332,6 +334,45 @@ class TestAPurchaseMadeAfterARepaymentOfPrincipal:
     def test_a_premium_over_the_remaining_principal_is_still_a_premium(self) -> None:
         """The rule is not "always par": it measures against a different, correct base."""
         assert is_close(self._bought_at(self.HALVES + 30.0).difference.amount, 300.00)
+
+    RESALE: Final = 995.00
+    SOLD_ON: Final = date(2026, 9, 1)
+
+    def test_a_sale_prices_what_is_left_and_leaves_what_was_repaid_alone(self) -> None:
+        """015 FR-029 meeting an amortising schedule: the two halves are priced differently.
+
+        ```
+        bought 2026-01-05   10 units at 1 000.00                  = 10 000.00
+        2026-06-05          500.00 per unit repaid, retiring      =      5 units
+        sale 2026-09-01     the remaining 5 units at 995.00       =  4 975.00
+                            plus the 5 000.00 already repaid      =  9 975.00
+                            paid 10 000.00 -> premium             =     25.00
+        ```
+
+        Pricing all ten at the resale quote would report 9 950.00 and a premium of 50.00 --
+        charging the spread on units nobody sold, which the issuer had already repaid at par.
+        """
+        outcome = project.project(
+            self._amortising(),
+            _holding(on=HORIZON.start, paid=1_000.00 * 10.0),
+            replace(HORIZON, end=self.SOLD_ON),
+            HOLD_CASH,
+            tax_classes=DECLARATIONS.tax_classes,
+            assessment_rules=RULES["synthetic_fixture"],
+            early_exit=EarlyExit(
+                price_per_unit=Money(self.RESALE, UAH, prov.EMPTY),
+                assumption=SpreadHolds(
+                    id="test_spread_holds",
+                    is_assumption=True,
+                    rationale="TEST FIXTURE -- the quoted resale price still holds at the exit.",
+                ),
+            ),
+        )
+        assert isinstance(outcome, Projection), outcome
+        assert outcome.sold_early is not None
+        assert outcome.sold_early.units == 5.0
+        assert is_close(outcome.at_purchase.principal_returned.amount, 5_000.00 + 4_975.00)
+        assert is_close(outcome.at_purchase.difference.amount, 25.00)
 
     def test_a_bond_that_repays_its_face_once_is_unaffected(self) -> None:
         """Why this was latent. For every declaration this repository ships, the amended

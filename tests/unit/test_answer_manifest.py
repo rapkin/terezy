@@ -87,21 +87,20 @@ def test_the_question_is_an_input_reference_like_any_other_declaration() -> None
     assert questions[0].file == "questions/fifty-thousand.toml"
 
 
-def _recorded_name(path: Path) -> str:
-    """How the manifest names one file: bare at the data root, ``directory/name`` below it.
-
-    A root-level file's parent is the data root's **own** directory name, which is one
-    machine's layout -- so it is dropped, and two checkouts describe one declaration one way.
-    """
-    return path.name if path.parent == fixtures.DATA_ROOT else run_manifest.file_name(path)
-
-
 def test_the_manifest_names_every_file_the_run_read() -> None:
-    """SC-008, and the half of H3 that a sample cannot claim."""
+    """SC-008, and the half of H3 that a sample cannot claim.
+
+    Matched on the **content digest**, not on the name: the manifest's naming rule drops a
+    root-level file's parent directory, and a walk that re-derived that rule here would assert
+    the rule against itself. A version is what a walk can compute without knowing it.
+    """
     declarations = fixtures.declarations()
-    named = {ref.file for ref in run_manifest.answer_input_refs(declarations)}
-    walked = {_recorded_name(path) for path in _declared_files(declarations)}
-    assert walked - named == set(), sorted(walked - named)
+    recorded = {ref.version for ref in run_manifest.answer_input_refs(declarations)}
+    walked = {run_manifest.file_version(path) for path in _declared_files(declarations)}
+    assert walked - recorded == set(), sorted(walked - recorded)
+    assert len(walked) == len(set(_declared_files(declarations))), (
+        "two declaration files with identical bytes would hide a missing reference"
+    )
 
 
 def test_a_root_level_input_is_named_the_same_from_any_checkout(tmp_path: Path) -> None:
@@ -144,7 +143,8 @@ def test_editing_one_file_moves_exactly_one_digest(tmp_path: Path, relative: str
     versions_before = {ref.file: ref.version for ref in before.manifest.inputs}
     versions_after = {ref.file: ref.version for ref in after.manifest.inputs}
     moved = {name for name in versions_before if versions_before[name] != versions_after.get(name)}
-    assert moved == {target.name if target.parent == root else run_manifest.file_name(target)}
+    assert len(moved) == 1, sorted(moved)
+    assert next(iter(moved)).endswith(target.name)
 
 
 def test_answering_twice_produces_an_equal_digest() -> None:

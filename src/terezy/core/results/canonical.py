@@ -23,6 +23,7 @@ from __future__ import annotations
 
 from typing import assert_never
 
+from terezy.core.instruments.interface import Assumptions
 from terezy.core.ledger import canonical as ledger_canonical
 from terezy.core.ledger.canonical import Canonical
 from terezy.core.primitives.conventions import AmountsAsDeclared, ConventionsApplied
@@ -45,6 +46,7 @@ from terezy.core.results.answer import (
     UndeclaredSubject,
 )
 from terezy.core.results.candidates import CandidateSurvey
+from terezy.core.results.fund import FundAssumptions
 from terezy.core.results.hurdle import HurdleRate, RealTerms
 from terezy.core.results.project import (
     GovernedBy,
@@ -53,7 +55,13 @@ from terezy.core.results.project import (
     TreatmentUnstated,
 )
 from terezy.core.results.schedule import CashFlowRow, CashFlowSchedule
-from terezy.core.results.tuple import BenchmarkUnavailable, Comparison, Tuple, TupleOutcome
+from terezy.core.results.tuple import (
+    BenchmarkUnavailable,
+    Comparison,
+    InstrumentPlan,
+    Tuple,
+    TupleOutcome,
+)
 from terezy.core.routes.path import EXIT_BY_IDENTITY, ExitChain, candidate_id, exit_segments_of
 from terezy.core.tax.interface import TaxCharge
 
@@ -255,6 +263,36 @@ def of_projection(value: Projection) -> tuple[Canonical, ...]:
 # of refusal, which is what the answer says, is rendered and cannot change silently.
 
 
+def of_plan(value: InstrumentPlan) -> tuple[Canonical, ...]:
+    """How a holding is run, by the choices that were stated rather than by the record's name.
+
+    The kind alone would make two plans one term: a question may state several plans for one
+    instrument -- ``DuplicateRunPlan`` refuses only plans that are *equal* -- and two candidates
+    differing in the exit date alone are two options whose figures differ. Rendering the type
+    name would give them one canonical form and one printed line, which is the collision the
+    five-term key exists to prevent.
+
+    The rationale strings are excluded for the reason every reason string here is: a digest that
+    moved when somebody improved a sentence fails C4 on a wording edit.
+    """
+    match value:
+        case Assumptions():
+            return (type(value).__name__, value.consumption_method, value.coupon_policy)
+        case FundAssumptions():
+            point, rate = value.yield_point, value.exchange_rate
+            return (
+                type(value).__name__,
+                value.consumption_method,
+                value.liquidity_mode,
+                value.buyback,
+                None if value.exit_on is None else ledger_canonical.of_date(value.exit_on),
+                None if point is None else ledger_canonical.of_number(point.rate),
+                None if rate is None else ledger_canonical.of_number(rate.uah_per_unit),
+            )
+        case _:
+            assert_never(value)
+
+
 def of_tuple_key(value: Tuple) -> tuple[Canonical, ...]:
     """One candidate's five declared terms, and nothing else (014 FR-023)."""
     way_out = value.route_out
@@ -263,7 +301,7 @@ def of_tuple_key(value: Tuple) -> tuple[Canonical, ...]:
         value.stream_id,
         candidate_id(value.route_in),
         exit_segments_of(way_out) if isinstance(way_out, ExitChain) else (EXIT_BY_IDENTITY.value,),
-        type(value.exit_terms).__name__,
+        of_plan(value.exit_terms),
     )
 
 

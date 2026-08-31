@@ -107,14 +107,14 @@ def answer_declared(
     that the reproducible case is the one with an artefact behind it -- and ``declared_in`` is
     what a refusal names instead, so *where* is answered either way.
 
-    **The cross-file checks run here rather than at load**, so a caller-built record goes
+    **The cross-file checks run here as well as at load**, so a record built by a caller goes
     through them too: two of the four -- the owner and the amount's currency -- are stated
     nowhere else, and skipping them would answer one person's question from another person's
-    money (015 FR-005, Principle VII).
+    money (015 FR-005, Principle VII). A question that came from a file is checked twice with
+    the same path, because this call cannot know which kind it got.
 
-    The price is that the other two are then *unreachable through this function*: a question
-    naming a stream nobody declares raises here rather than returning
-    ``AmountForAnUndeclaredStream``, so what a reader meets is a load failure naming the field.
+    The price is that the other two are *unreachable through this function*: a question naming
+    a stream nobody declares refuses here rather than returning ``AmountForAnUndeclaredStream``.
     That is FR-004's own rule -- in an artefact under review an unknown stream is a typo -- and
     it is why *flags are sugar over the file* has to mean the refusal too. The typed members
     stay the form the **verb** returns to a caller holding a record it built itself.

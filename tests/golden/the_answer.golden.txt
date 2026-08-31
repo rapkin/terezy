@@ -39,4 +39,4 @@
 [excludes] no_income_tax_on_the_stated_amount
 
 [keys] SectionsAgreeByKey
-[digest] sha256:e3d169700a636ea930f86a649b5b3a7ce851dacbf6aeeade4cc77b03fcabd4c6
+[digest] sha256:e0829f82070203568bf672542997178a725f66f349cf9287f00e1a92fa6c52bb

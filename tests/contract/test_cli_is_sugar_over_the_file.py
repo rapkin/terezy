@@ -27,10 +27,11 @@ from terezy.cli import main as cli
 from terezy.core.decision.answer import benchmark_unavailable, section_ranking
 from terezy.core.instruments.groups import InstrumentGroup
 from terezy.core.primitives.currency import Currency
+from terezy.core.results import canonical
 from terezy.core.results.answer import Answer, HorizonSection
 from terezy.core.results.candidates import CandidateSurvey
-from terezy.core.results.tuple import Comparison, TupleOutcome
-from terezy.core.routes.path import candidate_id
+from terezy.core.results.fund import FundAssumptions
+from terezy.core.results.tuple import Comparison, Tuple, TupleOutcome
 from terezy.data.declarations import loader
 from tests import answer_registries as fixtures
 
@@ -232,7 +233,7 @@ def test_a_declaration_that_will_not_load_reaches_the_reader_as_words(
         == cli.LOAD_FAILED
     )
     printed = capsys.readouterr().out
-    assert "could not be loaded" in printed
+    assert "nothing was answered" in printed
     assert "Traceback" not in printed
     assert cli.LOAD_FAILED != cli.REFUSED
 
@@ -292,7 +293,7 @@ def test_a_malformed_as_of_is_not_blamed_on_a_declaration(
     )
     printed = capsys.readouterr().out
     assert "--as-of is not an ISO date" in printed
-    assert "declarations could not be loaded" not in printed
+    assert "nothing was answered" not in printed
 
 
 def test_the_flags_path_runs_the_checks_that_only_the_file_path_used_to_run(
@@ -300,7 +301,7 @@ def test_the_flags_path_runs_the_checks_that_only_the_file_path_used_to_run(
 ) -> None:
     """The owner and the currency are checked against the streams, however the record was built.
 
-    Two of ``resolver.check_question``'s three refusals are re-stated by the verb and two are
+    Two of ``resolver.check_question``'s four refusals are re-stated by the verb and two are
     not. A flags path that skipped it would answer one person's question from another person's
     money, or state fifty thousand of a currency the stream does not deliver -- and would do it
     silently, because neither is representable as a ``Refused``.
@@ -395,15 +396,57 @@ def test_a_printed_figure_names_all_five_terms_of_its_key() -> None:
     """Two candidates for one instrument are two options, and an id alone renders them alike.
 
     The identity 010 fixes is the five declared terms, and the four that are not the amount are
-    what tell the reader which of them this row is.
+    what tell the reader which of them this row is. Written against the **literal** words the
+    shipped registry produces rather than against the renderer's own helpers: asserting
+    ``cli._exit_choice(key.route_out) in line`` would pass for a helper that returned the empty
+    string, which is the term this row exists to pin.
     """
     section, _ = _ranked_section_with_an_unrankable_figure()
     outcome = section_ranking(section)[0]
     line = next(item for item in cli._figure_lines(outcome) if outcome.key.instrument_id in item)
-    assert outcome.key.stream_id in line
-    assert candidate_id(outcome.key.route_in) in line
-    assert cli._exit_choice(outcome.key.route_out) in line
-    assert type(outcome.key.exit_terms).__name__ in line
+    assert "from salary_uah" in line
+    assert "via inzhur_direct" in line
+    assert "out inzhur_to_monobank" in line
+    assert "run as Assumptions/fifo/hold_cash" in line
+
+
+def test_two_plans_for_one_instrument_are_two_rows_that_read_differently() -> None:
+    """The case the type name alone could not tell apart (015 FR-020a, 010 FR-023).
+
+    A question may state several plans for one instrument -- ``DuplicateRunPlan`` refuses only
+    plans that are *equal* -- so two fund candidates differing in the exit date alone are two
+    figures. Rendered by the record's name they were one line printed twice, which reads as a
+    duplicate rather than as a choice.
+    """
+    stated = fixtures.owners_question().plans[fixtures.MILTECH][0]
+    assert isinstance(stated, FundAssumptions)
+    later = replace(stated, exit_on=date(2028, 2, 17))
+    key = _a_miltech_key()
+    lines = {
+        cli._figure_lines(replace(_a_miltech_outcome(), key=replace(key, exit_terms=plan)))[0]
+        for plan in (stated, later)
+    }
+    assert len(lines) == 2, lines
+    assert canonical.of_tuple_key(replace(key, exit_terms=stated)) != canonical.of_tuple_key(
+        replace(key, exit_terms=later)
+    )
+
+
+def _a_miltech_outcome() -> TupleOutcome:
+    """One outcome the engine built, so the rendering above is of a real figure."""
+    section, _ = _ranked_section_with_an_unrankable_figure()
+    return section_ranking(section)[0]
+
+
+def _a_miltech_key() -> Tuple:
+    """One real key for the fund, so the comparison above is over a key the engine built."""
+    survey = fixtures.answered().sections[0].outcome
+    assert isinstance(survey, CandidateSurvey)
+    return next(
+        item.key
+        for item in survey.enumerated.candidates
+        if item.key.instrument_id == fixtures.MILTECH
+    )
 
 
 def test_a_question_naming_an_undeclared_stream_fails_to_load_rather_than_refusing(

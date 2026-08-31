@@ -432,19 +432,38 @@ def _at_purchase(
     it: reporting the paper's principal there would assert a premium or a discount realised at a
     maturity the window ends before, while the ledger realises the sale's own gain or loss.
 
-    **Both branches scale by ``holding.quantity``, never by what was held at the end.** Under
-    ``reinvest`` a schedule buys further units out of its own coupons, so ``SoldEarly.units``
-    exceeds the quantity ``paid`` bought; measuring the sale over those would set a purchase
-    price for one population against a sale of a larger one and report a par purchase sold at a
-    loss as a large discount -- and that difference is what the disposal-gain class governs.
+    **A sale is priced over the purchased units, and the rest of them over what repaid them.**
+    ``SoldEarly.units`` is not ``holding.quantity``, in either direction: under ``reinvest`` a
+    schedule buys further units out of its own coupons and sells more than the outlay bought,
+    and an amortising schedule retires units as it repays and sells fewer. Pricing the whole
+    sale against ``paid`` reported a par purchase sold at a spread as a large discount, and
+    pricing the retired units at the resale quote would charge a spread on units that were
+    repaid rather than sold -- and the difference is what the disposal-gain class governs.
+
+    The two cases cannot occur together, so the split is exact rather than an approximation:
+    ``enumerated`` refuses ``reinvest`` outright, which is the only way units grow.
+
+    **The sale half is marked by the quote alone.** It is the resale price times a quantity that
+    came from the holding, so the terms file contributed nothing to it -- unioning the terms'
+    sources in would send a reader chasing an unverified mark to the wrong declaration. The
+    repaid half is the terms' own figure and carries their sources, as it always did.
     """
-    returned = money.scale_sourced(
-        sold.price_per_unit
-        if sold is not None
-        else instrument_terms.principal_returned(declaration.terms, bought_on=holding.purchased_on),
-        holding.quantity,
-        declaration.terms.provenance,
+    per_unit = instrument_terms.principal_returned(
+        declaration.terms, bought_on=holding.purchased_on
     )
+    still_held = holding.quantity if sold is None else min(sold.units, holding.quantity)
+    returned = (
+        money.scale(sold.price_per_unit, still_held)
+        if sold is not None
+        else money.scale_sourced(per_unit, still_held, declaration.terms.provenance)
+    )
+    if sold is not None and still_held < holding.quantity:
+        returned = money.add(
+            returned,
+            money.scale_sourced(
+                per_unit, holding.quantity - still_held, declaration.terms.provenance
+            ),
+        )
     disposal_class = declaration.tax_classes.get(TaxableEventKind.DISPOSAL_GAIN)
     return PurchasePremium(
         paid=holding.cost,

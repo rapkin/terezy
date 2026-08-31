@@ -142,11 +142,17 @@ def answer(question: Question, inputs: AnswerInputs, as_of: date) -> Answer | Re
 
 
 def _about_the_question(question: Question, inputs: AnswerInputs) -> Refused | None:
-    """The seven ways a question does not stand up, in the order a reader would ask.
+    """The five ways a question does not stand up on its own, in the order a reader would ask.
 
-    Every one is reachable from a **caller-built** record as well as from a file: the loader
-    refuses most of them too, because in an artefact under review a missing amount is a typo,
-    and this is the same rule stated where the CLI and a test can also reach it.
+    The other three members of ``Refused`` are about the question meeting a **registry** -- the
+    benchmark it names, and a plan for a word nothing reaches -- and are decided where that
+    resolution happens.
+
+    Every one is reachable from a **caller-built** record, which is the only way two of them
+    are reached at all: the loader refuses an amount for an undeclared stream and a declared
+    stream with no amount before the verb ever sees them, because in an artefact under review
+    a missing amount is a typo. Stated here as well so the rule holds for a record no file
+    produced.
     """
     if not question.horizons:
         return NoHorizonDeclared()

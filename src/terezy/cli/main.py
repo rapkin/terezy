@@ -35,6 +35,7 @@ from terezy.core.decision.answer import (
 )
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.rates import NominalRate
+from terezy.core.results import canonical
 from terezy.core.results.answer import (
     Answer,
     CoveredByThePlan,
@@ -55,11 +56,12 @@ from terezy.core.results.candidates import (
 )
 from terezy.core.results.tuple import TupleOutcome
 from terezy.core.routes.path import (
-    EXIT_BY_IDENTITY,
+    ComposedExit,
+    DeclaredExit,
+    ExitByIdentity,
     ExitChoice,
     FromTheDeclaration,
     candidate_id,
-    exit_segments_of,
 )
 from terezy.data.declarations import loader
 from terezy.data.declarations.errors import DeclarationError
@@ -100,10 +102,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             else _from_flags(root, args.set, as_of=as_of)
         )
     except (DeclarationError, tomllib.TOMLDecodeError, ValueError) as broken:
-        # A declaration that will not load is not a refused question, and the exit code says
-        # so: 1 is *the question does not stand up*, which is a result. Printing a traceback
-        # here would be the one place this feature failed to reach a reader as words.
-        print(f"the declarations could not be loaded: {broken}")
+        # A refusal reached before anything was answered, and the exit code says so: 1 is *the
+        # question does not stand up as a question*, which is a result with a manifest behind
+        # it. The word here is deliberately not "loaded": the same exception carries a file
+        # that would not parse and a question, flags included, refused against the streams it
+        # names, and telling a reader a declaration broke when none did is a false message.
+        # Printing a traceback would be the one place this feature failed to reach them at all.
+        print(f"nothing was answered: {broken}")
         return LOAD_FAILED
     for line in render(run):
         print(line)
@@ -287,15 +292,16 @@ def _figure_lines(outcome: TupleOutcome) -> list[str]:
     owner has two streams and a bare number in an ordered list is the Principle VI conflation
     ``Money`` exists to prevent.
 
-    ``exit_terms`` prints as the name of the plan record rather than its fields: which plan was
-    run is the identifying term, and the fields behind it are the question's own declaration.
+    ``exit_terms`` prints as the plan's own canonical form, not as the name of its record: a
+    question may state several plans for one instrument, and two that differ only in the exit
+    date would otherwise be two figures under one identical line.
     """
     rate = outcome.implied_rate
     return [
         f"    {outcome.key.instrument_id} from {outcome.key.stream_id} "
         f"via {candidate_id(outcome.key.route_in)} "
         f"out {_exit_choice(outcome.key.route_out)} "
-        f"run as {type(outcome.key.exit_terms).__name__}",
+        f"run as {'/'.join(str(part) for part in canonical.of_plan(outcome.key.exit_terms))}",
         f"      reaches {outcome.reaches.amount} {outcome.reaches.currency.value}"
         + (
             f"; rate {rate.value}" if isinstance(rate, NominalRate) else f"; NO RATE: {rate.reason}"
@@ -306,13 +312,22 @@ def _figure_lines(outcome: TupleOutcome) -> list[str]:
 def _exit_choice(choice: ExitChoice) -> str:
     """The way out of the venue: its declared ids, or the instruction standing in for one.
 
-    A chain with no segments is :data:`EXIT_BY_IDENTITY` -- the destination is already
-    spendable -- and it prints under that name rather than as an empty field, which a reader
-    would take for a missing one.
+    Matched on the member rather than on the segments being empty. *The destination is already
+    spendable* and *a chain that charged nothing* are the distinction ``ExitByIdentity`` exists
+    to make, and only the value itself says which; a truthiness fallback would print one under
+    the other's name.
     """
-    if isinstance(choice, FromTheDeclaration):
-        return choice.value
-    return "+".join(exit_segments_of(choice)) or EXIT_BY_IDENTITY.value
+    match choice:
+        case FromTheDeclaration():
+            return choice.value
+        case ExitByIdentity():
+            return choice.value
+        case DeclaredExit():
+            return choice.route_id
+        case ComposedExit():
+            return "+".join(choice.segments)
+        case _:  # pragma: no cover -- mypy proves this unreachable
+            assert_never(choice)
 
 
 def _standing_lines(section: HorizonSection) -> list[str]:
