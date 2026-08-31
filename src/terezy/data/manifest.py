@@ -97,7 +97,11 @@ from terezy.core.results import canonical
 from terezy.core.results.project import Projection
 from terezy.core.tax.interface import TaxClass
 from terezy.data.declarations.errors import DeclarationError
-from terezy.data.declarations.resolver import Declarations, InflationDeclarations
+from terezy.data.declarations.resolver import (
+    Declarations,
+    InflationDeclarations,
+    OfficialRateDeclarations,
+)
 
 ENCODING: Final = "terezy-canonical-v3"
 """The name of the byte encoding a digest was taken under.
@@ -126,7 +130,9 @@ Carried in the value rather than only in this constant so that a stored digest c
 compared against one taken with a different algorithm by accident.
 """
 
-InputKind = Literal["cpi_series", "fund", "inflation_assumption", "instrument", "tax_class"]
+InputKind = Literal[
+    "cpi_series", "fund", "inflation_assumption", "instrument", "official_rate", "tax_class"
+]
 """What kind of declaration an :class:`InputRef` describes. A closed set, not a free string.
 
 ⚙ ``"fund"`` joined with feature 006. Kept distinct from ``"instrument"`` rather than folded
@@ -139,6 +145,10 @@ in their declared belief are two results, and a manifest that did not name the b
 not tell them apart. The CPI series is recorded for the same reason from the other side: a
 real figure is only reproducible if the manifest says which series deflated it, at which
 version.
+
+``"official_rate"`` is kept distinct from ``"cpi_series"`` although both are dated observation
+series: a tax base struck at an official rate is only reproducible if the manifest says which
+*legal* series struck it, and a manifest that called the two one thing could not.
 
 Listed alphabetically because :func:`input_refs` sorts by ``(kind, id)``, so the order here is
 the order a manifest reads in.
@@ -450,6 +460,36 @@ def inflation_input_refs(declarations: InflationDeclarations) -> tuple[InputRef,
     return tuple(sorted([*series, *assumptions], key=lambda ref: (ref.kind, ref.id)))
 
 
+def official_rate_input_refs(rates: OfficialRateDeclarations) -> tuple[InputRef, ...]:
+    """Every declared official-rate series, as manifest input references (018 FR-020).
+
+    A separate function beside :func:`inflation_input_refs` for the same reason that one is
+    separate from :func:`input_refs`: the three declaration sets are resolved independently,
+    and a run given no rates is a legitimate run whose manifest lists none of these.
+
+    ``unverified_sources`` is the union over **every observation**, because each carries its own
+    citation -- one per calendar day since 2019-12-28. That makes the list long, which is the
+    honest answer rather than a reason to trim it: nobody has checked any of them.
+    """
+    return tuple(
+        sorted(
+            (
+                InputRef(
+                    kind="official_rate",
+                    id=identifier,
+                    file=file_name(rates.files[identifier]),
+                    version=file_version(rates.files[identifier]),
+                    unverified_sources=_unverified_ids(
+                        prov.merge_all(item.provenance for item in declared.observations)
+                    ),
+                )
+                for identifier, declared in rates.series.items()
+            ),
+            key=lambda ref: (ref.kind, ref.id),
+        )
+    )
+
+
 def _instrument_provenance(declaration: InstrumentDeclaration) -> Provenance:
     """Every source behind one instrument declaration: its terms and its constraints.
 
@@ -474,13 +514,16 @@ def of_run(
     assumptions: Assumptions,
     seed: int | None,
     inflation: InflationDeclarations | None = None,
+    official_rates: OfficialRateDeclarations | None = None,
 ) -> RunManifest:
     """The manifest of one projection: its inputs, their versions, and its digest.
 
     ⚙ **``inflation`` records which price series and which declared belief were in force**
-    (007 FR-015). It defaults to ``None`` because a run given no CPI is a legitimate run whose
-    real-terms slot reports both absences in words; the default records nothing rather than
-    recording a default, and the result itself already says what it was not given.
+    (007 FR-015), and ``official_rates`` which series a tax base could have been struck at
+    (018 FR-020). Both default to ``None`` because a run given neither is a legitimate run: the
+    real-terms slot reports its absence in words, and a base in a currency the tax is already
+    assessed in consults no rate at all. The default records nothing rather than recording a
+    default.
 
     Every argument is required and keyword-only. There is nothing this function can
     reasonably guess: a manifest built from defaults would be a record of a run that did
@@ -505,14 +548,14 @@ def of_run(
         holding=holding,
         horizon=horizon,
         assumptions=assumptions,
-        inputs=(
-            input_refs(declarations)
-            if inflation is None
-            else tuple(
-                sorted(
-                    [*input_refs(declarations), *inflation_input_refs(inflation)],
-                    key=lambda ref: (ref.kind, ref.id),
-                )
+        inputs=tuple(
+            sorted(
+                [
+                    *input_refs(declarations),
+                    *(() if inflation is None else inflation_input_refs(inflation)),
+                    *(() if official_rates is None else official_rate_input_refs(official_rates)),
+                ],
+                key=lambda ref: (ref.kind, ref.id),
             )
         ),
         seed=seed,

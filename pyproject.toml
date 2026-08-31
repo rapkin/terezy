@@ -85,6 +85,11 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["PLR2004", "S101", "ARG001", "ARG002"]
 "src/terezy/cli/**" = ["T20"]      # the CLI is allowed to write to stdout
+# This script writes a Ukrainian-language declaration header quoting two statutory provisions
+# verbatim. RUF001 flags a Cyrillic word every one of whose letters has an ASCII lookalike --
+# «особа», «ЗУ», «КМУ», «у» -- which is what a legal citation is made of. Paraphrasing to please
+# the linter would be editing a quotation.
+"scripts/fetch_nbu_rates.py" = ["RUF001"]
 
 [tool.ruff.lint.flake8-builtins]
 builtins-allowed-modules = ["types"]

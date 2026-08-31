@@ -32,12 +32,12 @@ module contains no notion of a weekend, a public holiday or a banking calendar (
 
 **A rule written in working days or public holidays cannot be declared against these
 records at all**, because evaluating one needs a working-day and holiday calendar and nothing
-declares one. That is the constraint this module imposes; which series it bites and what it
-costs them is stated where the absence lives, in the declaration file.
+declares one. That is the constraint this module imposes on what a rule may say.
 """
 
 from __future__ import annotations
 
+from bisect import bisect_left
 from dataclasses import dataclass
 from datetime import date
 
@@ -155,9 +155,9 @@ class OfficialRateSeries:
 
     **Gaps are permitted, and so is emptiness.** A date the publisher did not publish for is
     a fact and inventing one is forbidden; and a series with no observations at all is the
-    declared shape a fetch script writes into, which is what ships for Ukraine today. Both
-    are reported by the request that wanted a rate, naming the date it asked about -- which
-    is more use than a load error naming a directory.
+    declared shape a fetch script writes into before it has run. Both are reported by the
+    request that wanted a rate, naming the date it asked about -- which is more use than a
+    load error naming a directory.
     """
 
 
@@ -254,6 +254,26 @@ def covered_window(series: OfficialRateSeries) -> tuple[date, date] | None:
     return series.observations[0].on_date, series.observations[-1].on_date
 
 
+def _declared_on(series: OfficialRateSeries, on_date: date) -> OfficialRateObservation | None:
+    """The series' own observation for a date, found by bisection, or ``None``.
+
+    Searched rather than indexed, because the observations are strictly ascending by the time
+    they leave the loader and a date-keyed copy would be the same fact in a second place --
+    on a record whose whole point is that it holds one. A series covering every calendar day
+    since 2019 is consulted once per taxable event, so the cost of the lookup is the cost of
+    the tax path (``tests/unit/test_official_rate_lookup.py``).
+
+    ``bisect_left`` lands on the first observation not before ``on_date``, which is the
+    *nearest* one -- so the equality below is what refuses to return it. Dropping that check
+    is the carry-forward this module forbids, arriving as an off-by-one.
+    """
+    position = bisect_left(series.observations, on_date, key=lambda item: item.on_date)
+    if position == len(series.observations):
+        return None
+    found = series.observations[position]
+    return found if found.on_date == on_date else None
+
+
 def observation_for(
     series: OfficialRateSeries, on_date: date
 ) -> tuple[OfficialRateObservation, str | None] | None:
@@ -264,14 +284,13 @@ def observation_for(
     publication -- refused at load, where the file can be named, and the ordering here is
     what makes that refusal the only way such a rule can exist.
     """
-    declared = {observation.on_date: observation for observation in series.observations}
-    found = declared.get(on_date)
+    found = _declared_on(series, on_date)
     if found is not None:
         return found, None
     if series.rule is not None:
         for day in series.rule.days:
             if day.applies_to == on_date:
-                governing = declared.get(day.governed_by)
+                governing = _declared_on(series, day.governed_by)
                 if governing is None:
                     raise KeyError(
                         f"rule {series.rule.id!r} of series {series.id!r} sends "

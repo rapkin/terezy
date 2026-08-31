@@ -24,6 +24,7 @@ below proves both halves against the file itself, so a naive grep replacing the 
 
 from __future__ import annotations
 
+import tomllib
 from datetime import date
 from pathlib import Path
 
@@ -191,3 +192,60 @@ class TestNoDisplayChoiceCanReachATaxFigure:
         )
         assert isinstance(struck, official_rate.TaxCurrencyConversion), struck
         assert struck.base.currency is Currency.UAH
+
+
+class TestARealOfficialRateIsNotARepairForAnInventedChannelQuote:
+    """018 SC-010: the substitution this repository now actually contains the makings of.
+
+    ``data/official_rates/ua_nbu_usd.toml`` carries real published figures for every calendar
+    day, and one directory away ``data/channels/uah_usd.toml`` declares three channels whose
+    ``reference_rate`` is invented and says so on every line. Pointing the second at the first
+    is the cheapest-looking repair in the tree and is the conflation the classes above forbid,
+    arriving as a tidy-up. What stops it is this, asserted over the shipped files.
+    """
+
+    CHANNELS = Path(__file__).resolve().parents[2] / "data" / "channels" / "uah_usd.toml"
+    RATES = Path(__file__).resolve().parents[2] / "data" / "official_rates" / "ua_nbu_usd.toml"
+
+    def _channels(self) -> list[dict[str, object]]:
+        declared = tomllib.loads(self.CHANNELS.read_text(encoding="utf-8"))
+        found = declared["channel"]
+        assert isinstance(found, list), self.CHANNELS
+        assert found, self.CHANNELS
+        return found
+
+    def test_every_declared_reference_rate_is_still_the_invented_one(self) -> None:
+        for channel in self._channels():
+            assert channel["reference_rate"] == 42.0, channel["id"]
+
+    def test_every_declared_reference_rate_is_still_marked_synthetic_and_unverified(
+        self,
+    ) -> None:
+        """A real rate that arrived here would have to lose the marking to look right, so the
+        marking is the thing to hold: it is what a reader sees on every figure downstream."""
+        for channel in self._channels():
+            assert "SYNTHETIC" in str(channel["source"]), channel["id"]
+            assert channel["verified_on"] == "", channel["id"]
+
+    def test_no_channel_quote_is_sourced_to_the_tax_series(self) -> None:
+        """The substitution's other shape: the same number, re-sourced.
+
+        Scoped to the **series and the statistics endpoint it is fetched from**, not to the
+        National Bank generally. ``FxChannel.id`` names ``nbu_official`` among the channels a
+        declarer may legitimately declare, and such a channel would carry its own two-sided
+        quote with its own citation. What is forbidden is a channel quote that takes its
+        number from the legal reference nobody transacts at.
+        """
+        for channel in self._channels():
+            source = str(channel["source"])
+            assert "ua_nbu_usd" not in source, channel["id"]
+            assert "NBU_Exchange/exchange_site" not in source, channel["id"]
+
+    def test_the_invented_reference_is_not_a_value_the_publisher_ever_published(self) -> None:
+        """So the fixture cannot be mistaken for a retrieved figure on any date. Checked
+        against the landed series rather than asserted, because that is what would change."""
+        declared = tomllib.loads(self.RATES.read_text(encoding="utf-8"))
+        published = {observation["value"] for observation in declared["observation"]}
+
+        assert published, "this claim is about a populated series"
+        assert 42.0 not in published
