@@ -30,6 +30,7 @@ from datetime import date
 import pytest
 
 from terezy.core.errors import InconsistentTerms
+from terezy.core.instruments import fixed_income
 from terezy.core.instruments.interface import DateRange, EarlyExit
 from terezy.core.ledger.events import EventKind
 from terezy.core.primitives.money import Money
@@ -253,3 +254,61 @@ def test_what_the_position_gets_back_is_the_sale_rather_than_the_principal() -> 
     )
     assert isinstance(to_maturity, Projection), to_maturity
     assert to_maturity.at_purchase.principal_returned != sold.at_purchase.principal_returned
+
+
+REINVEST_UNITS = 100.0
+REINVEST_COST = 100_000.0
+REINVEST_END = date(2027, 12, 31)
+UNITS_AT_THE_SALE = 123.0
+"""100 bought, then 7, 8 and 8 whole units bought out of the three coupons inside the window."""
+
+BASIS_AT_THE_SALE = REINVEST_COST + 7_000.0 + 8_000.0 + 8_000.0
+REINVEST_PROCEEDS = UNITS_AT_THE_SALE * RESALE_PER_UNIT
+PREMIUM_ON_WHAT_WAS_BOUGHT = REINVEST_COST - REINVEST_UNITS * RESALE_PER_UNIT
+
+
+def _reinvested_then_sold() -> Projection:
+    outcome = project.project(
+        synthetic.declaration(),
+        synthetic.holding(
+            quantity=REINVEST_UNITS,
+            cost=Money(REINVEST_COST, synthetic.UAH, synthetic.holding().cost.provenance),
+        ),
+        synthetic.horizon(end=REINVEST_END),
+        synthetic.assumptions(coupon_policy=fixed_income.REINVEST),
+        tax_classes=synthetic.TAX_PACK,
+        early_exit=EarlyExit(
+            price_per_unit=Money(RESALE_PER_UNIT, synthetic.UAH, synthetic.TERMS_PROVENANCE),
+            assumption=SPREAD_HOLDS,
+        ),
+    )
+    assert isinstance(outcome, Projection), outcome
+    return outcome
+
+
+def test_the_premium_measures_the_units_the_purchase_paid_for() -> None:
+    """A schedule that reinvests ends holding more units than the outlay bought.
+
+        bought 2026-01-15    100 units for                     = 100 000.00
+        reinvested                 7 + 8 + 8 whole units       =  23 000.00 of coupons
+        sale   2027-12-31    123 units x 995.00                = 122 385.00
+                             basis 123 000.00 -> realised      =    -615.00
+        at purchase          100 units x 995.00                =  99 500.00
+                             paid 100 000.00 -> premium        =     500.00
+
+    Measuring the **sale** against the **purchase** would set 122 385.00 against 100 000.00 and
+    report a par purchase sold at a spread as a discount of 22 385.00 -- a figure the
+    disposal-gain class then governs. The two sides count one population or the record is a
+    statement about no trade that happened.
+    """
+    outcome = _reinvested_then_sold()
+    assert outcome.sold_early is not None
+    assert outcome.sold_early.units == UNITS_AT_THE_SALE
+    assert is_close(outcome.sold_early.proceeds.amount, REINVEST_PROCEEDS)
+    assert is_close(outcome.at_purchase.paid.amount, REINVEST_COST)
+    assert is_close(outcome.at_purchase.principal_returned.amount, REINVEST_UNITS * RESALE_PER_UNIT)
+    assert is_close(outcome.at_purchase.difference.amount, PREMIUM_ON_WHAT_WAS_BOUGHT)
+    assert is_close(
+        outcome.ledger.disposals[0].realised_gain_base_ccy.amount,
+        REINVEST_PROCEEDS - BASIS_AT_THE_SALE,
+    )

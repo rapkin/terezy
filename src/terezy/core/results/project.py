@@ -137,8 +137,12 @@ class PurchasePremium:
     """
 
     principal_returned: Money
-    """What this holding gets back as principal: the repayments it will receive, times
-    quantity.
+    """What the units ``paid`` bought get back: the repayments they will receive, times
+    quantity -- or, where the window closed the position first, what they sell for (015 FR-029).
+
+    The quantity is always the **purchased** one, so that both readings measure the population
+    ``paid`` paid for; a schedule reinvesting its own coupons ends holding more units than that,
+    and those were bought with income rather than with this outlay.
 
     **Not ``face value x quantity``** (FR-025). The
     two coincide for a bond that repays its face once, which is every fixture this
@@ -427,15 +431,19 @@ def _at_purchase(
     The field says *what this holding gets back*, and a redemption that will not happen is not
     it: reporting the paper's principal there would assert a premium or a discount realised at a
     maturity the window ends before, while the ledger realises the sale's own gain or loss.
+
+    **Both branches scale by ``holding.quantity``, never by what was held at the end.** Under
+    ``reinvest`` a schedule buys further units out of its own coupons, so ``SoldEarly.units``
+    exceeds the quantity ``paid`` bought; measuring the sale over those would set a purchase
+    price for one population against a sale of a larger one and report a par purchase sold at a
+    loss as a large discount -- and that difference is what the disposal-gain class governs.
     """
-    returned = (
-        sold.proceeds
+    returned = money.scale_sourced(
+        sold.price_per_unit
         if sold is not None
-        else money.scale_sourced(
-            instrument_terms.principal_returned(declaration.terms, bought_on=holding.purchased_on),
-            holding.quantity,
-            declaration.terms.provenance,
-        )
+        else instrument_terms.principal_returned(declaration.terms, bought_on=holding.purchased_on),
+        holding.quantity,
+        declaration.terms.provenance,
     )
     disposal_class = declaration.tax_classes.get(TaxableEventKind.DISPOSAL_GAIN)
     return PurchasePremium(

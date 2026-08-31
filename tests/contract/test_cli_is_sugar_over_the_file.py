@@ -404,3 +404,35 @@ def test_a_printed_figure_names_all_five_terms_of_its_key() -> None:
     assert candidate_id(outcome.key.route_in) in line
     assert cli._exit_choice(outcome.key.route_out) in line
     assert type(outcome.key.exit_terms).__name__ in line
+
+
+def test_a_question_naming_an_undeclared_stream_fails_to_load_rather_than_refusing(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The consequence of running the file's checks on the flags path, pinned rather than left.
+
+    ``AmountForAnUndeclaredStream`` is still what the **verb** returns to a caller holding a
+    record it built itself; through the CLI the same question is a load failure, because FR-004
+    says a file naming a stream nobody declared is a typo and the flags are sugar over the file.
+    The two exit codes are what a reader and a script tell them apart by, so the choice is
+    asserted here rather than discovered.
+    """
+    broken = fixtures.QUESTION_FILE.read_text(encoding="utf-8").replace(
+        'stream   = "salary_uah"', 'stream   = "salary_eur"', 1
+    )
+    assert (
+        cli.main(
+            [
+                "--data-root",
+                str(fixtures.DATA_ROOT),
+                "--as-of",
+                fixtures.AS_OF.isoformat(),
+                "--set",
+                broken,
+            ]
+        )
+        == cli.LOAD_FAILED
+    )
+    printed = capsys.readouterr().out
+    assert "salary_eur" in printed, printed
+    assert cli.LOAD_FAILED != cli.REFUSED

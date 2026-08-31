@@ -278,7 +278,10 @@ class InputRef:
     """The declared id, as every figure and every reference names it."""
 
     file: str
-    """``directory/name`` of the declaring file. See :func:`file_name`."""
+    """``directory/name`` of the declaring file, or the bare name for one at the data root.
+
+    See :func:`file_name`, and :func:`_ref`'s ``at_root`` for why the parent is dropped there.
+    """
 
     version: str
     """``"sha256:<hex>"`` of the file's bytes. See the module docstring on versions."""
