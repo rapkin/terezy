@@ -38,6 +38,13 @@ REGISTER_URL: Final = "bank.gov.ua/depo_securities"
 SELLER_URL: Final = "inzhur.reit/_api/assets"
 DEALING_URL: Final = "https://www.inzhur.reit/offer/ovdp"
 
+DECLARED_ISSUES: Final = 24
+"""What the two shipped observations intersect to. Pinned in exactly one place, because the
+prose in this repository says "23 of the 24" and "all 24" in several, and a partition asserted
+without its size would keep passing over a population that grew. It cannot drift quietly: both
+observation files are pinned to their own retrieval dates in `tests/observations.py`, so a
+re-fetch fails there first."""
+
 REFUSAL_MEMBERS: Final = 17
 """SC-021: 016 declared 24 instruments and widened nothing. 015 left the resale price's home
 open precisely so that settling it late could not add an eighteenth member behind a landed
@@ -148,6 +155,7 @@ def test_the_venues_approximate_floor_is_not_the_cost_of_a_unit_on_any_issue() -
         isin: declared.instruments.instruments[isin].constraints.min_ticket.amount
         for isin in obs.declared_isins()
     }
+    assert len(floor) == DECLARED_ISSUES
     above = [isin for isin in floor if obs.seller_bonds()[isin]["buy"] < floor[isin]]
     assert above == ["UA4000207518"]
     assert floor[above[0]] - obs.seller_bonds()[above[0]]["buy"] == pytest.approx(10.53, abs=5e-3)

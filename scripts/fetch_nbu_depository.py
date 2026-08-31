@@ -34,9 +34,11 @@ happens to want would encode a judgement in a fetcher, and it would break the on
 needs this file -- an issue a seller lists and the register does **not** can only be seen
 against the register's whole membership.
 
-Left: nothing, and that is **enforced** rather than promised. ``register`` refuses an issue
-carrying a field this script does not write, so a field the endpoint adds stops the run instead
-of being dropped into a file that reads as complete.
+Left: one field, and the rest is **enforced** rather than promised. ``register`` refuses an
+issue or a payment row carrying a key this script does not write, so a field the endpoint adds
+stops the run instead of being dropped into a file that reads as complete. The exception is a
+payment row's ``array``, a constant ``"true"`` on all 3 634 rows that says nothing about the
+payment.
 
 Usage
 -----
@@ -97,7 +99,14 @@ is published, not read off the issuer's nationality."""
 DATES: Final = ("razm_date", "pgs_date")
 
 WRITTEN: Final = frozenset({"cpcode", "payments", *SCALARS, *OPTIONAL_SCALARS, *LABELS, *DATES})
-"""Every key this script writes. An issue carrying anything else stops the run."""
+"""Every key this script writes on an issue. An issue carrying anything else stops the run."""
+
+PAYMENT_WRITTEN: Final = frozenset({"pay_date", "pay_type", "pay_val", "array"})
+"""Every key this script reads on a payment row, `array` included -- it is a constant `"true"`
+on all 3 634 rows and carries nothing, so it is read and deliberately not written. A row
+carrying anything else stops the run, for the reason the issue-level guard exists: an accrual
+amount or a gross/net split added here would be dropped into a file whose header says it is the
+whole register."""
 
 
 class FetchError(RuntimeError):
@@ -131,6 +140,12 @@ def _check_issue(issue: dict[str, Any], code: str) -> None:
     for row in payments:
         if not isinstance(row, dict):
             raise FetchError(f"{ENDPOINT}: {code} has a payment row that is not an object")
+        extra = sorted(set(row) - PAYMENT_WRITTEN)
+        if extra:
+            raise FetchError(
+                f"{ENDPOINT}: {code} has a payment row publishing {extra}, which this script "
+                "does not write; widen PAYMENT_WRITTEN and render() and re-run."
+            )
         for field in ("pay_date", "pay_type", "pay_val"):
             if row.get(field) is None:
                 raise FetchError(f"{ENDPOINT}: {code} has a payment row with no {field!r}")
