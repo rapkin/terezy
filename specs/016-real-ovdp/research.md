@@ -201,7 +201,7 @@ which is what the loader requires. No rate, category or treatment is declared he
 
 Feature 015's answer dropped five of seven candidates for a missing resale price. Four of those
 five were the invented bonds and one, `enumerated_out_of_order`, left the group entirely under
-FR-027a; the 24 real issues carry a quotation and evaluate at all three horizons.
+FR-027a; the 24 real issues carry a quotation and evaluate at all three horizons, each sold at the window's end unless its own schedule ends inside the window first.
 
 **The comparison is still `BenchmarkUnavailable`, and the reason moved.** The question names
 `ovdp_synthetic_a` as its benchmark, and that is one of the four fixtures that still refuses.
