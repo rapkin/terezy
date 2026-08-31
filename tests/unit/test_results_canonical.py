@@ -278,8 +278,10 @@ canonical tuple gained ``capacity_pool`` and the capacity accumulator while the 
 ``terezy-canonical-v1``, so pre-002 digests silently disagreed under an unchanged name.
 This pinned pair is what makes the next such change a red test naming the remedy.
 
-**One fingerprint per form covered, joined by pipes**, and :func:`_projection_fingerprint`'s
-own body is the list of them. Covering ``ledger.canonical.of_result`` alone would leave the rest
+**One fingerprint per form covered and per branch of it**, joined by pipes, on the rules
+:func:`_projection_fingerprint` states -- and its own body is the list of them.
+
+Covering ``ledger.canonical.of_result`` alone would leave the rest
 of what a digest is taken over free to change shape under an unchanged tag, which is the
 feature-002 failure this test exists to prevent.
 
@@ -400,10 +402,15 @@ def _projection_fingerprint() -> str:
     is the list below, not a sentence about it**: the join is read straight off the code, and
     this docstring says only the rules the list obeys.
 
-    **A form whose branches render to different shapes is pinned once per branch.** Pinning one
+    **A form whose branches render to different arities is pinned once per branch.** Pinning one
     would leave the others free to move: the hurdle's real slot and the purchase premium each
     have an absent form shorter than the answered one, and the way out is rendered by two
     different expressions -- the segments of a chain, or the instruction's own name.
+
+    Not *every* absence: an optional field renders as ``0`` rather than shortening the tuple it
+    sits in, so a record's absent form has the arity of its populated one and the representative
+    fills every slot for :func:`_representative_state`'s reason. The rule is about branches that
+    change the **shape**, which is what a digest scheme's identity is made of.
 
     Inside the chain branch the arity follows the **segment count**, and a ``DeclaredExit`` is
     not pinned because its one segment renders to the arity the instruction's entry already
