@@ -676,9 +676,11 @@ without a calendar.
   `year.py::_due_on` is already counted and reaches it by that same indirect path. A scan that
   cannot see `fixed_income.py` is worse than no scan: it converts an unexamined site into a
   documented absence.
-- **FR-018a**: FR-018's scan is **being landed on `main` ahead of this feature**, against the
-  corrected three-site set. Its entire value is that a fourth site cannot appear quietly, and
-  that value is lost for as long as it waits on an unscheduled feature.
+- **FR-018a**: FR-018's scan is landed **first within this feature** rather than ahead of it on
+  `main`, because the feature was scheduled after all. Its entire value is that a fourth site
+  cannot appear quietly, so it went in before the calendar existed —
+  `tests/contract/test_no_calendar_free_working_day.py`, phase 0 — and the calendar's own
+  declaration surface is excluded by path, exactly as this requirement's wording anticipates.
 
 A second stale claim found in that same neighbourhood — `_due_on`'s docstring naming "the same
 four names" where `conventions.BUSINESS_DAY_FNS` declares three — was confirmed and is **fixed
