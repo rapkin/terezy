@@ -132,6 +132,545 @@ risk_class    = "sovereign_debt"
   retrieved_on = "2026-08-29"
   verified_on  = ""
 
+# --- the twenty-four real ОВДП issues ------------------------------------------------
+#
+# The SELLER's half of a real issue, and the only half of it anybody can quote. The
+# terms live in data/instruments/UA*.toml and come from the issuer's depository; these
+# two figures come from Inzhur and no citation here names the depository.
+#
+# Both sides of the quotation are declared. The gap between them is the seller's round trip on
+# an IMMEDIATE resale and is never the round-trip cost of a tuple (016 FR-015): that one runs
+# the way in, the purchase, the schedule to its end and the way out, and is computed per
+# (instrument × income stream × route).
+
+[[access]]
+instrument_id = "UA4000207518"
+bought_at     = "inzhur"
+proceeds_to   = "inzhur"
+risk_class    = "sovereign_debt"
+
+  [access.price]
+  per_unit     = 989.47
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, retrieved 2026-08-24 and recorded in data/observations/inzhur.toml. A SELLER'S QUOTATION for one unit on one morning, not an independent valuation and not a term of the paper. Nobody has verified it and nobody can: a dated offer has no independent record and the page shows a different number tomorrow, so verified_on stays empty for ever. This is the single remaining reason every figure this issue produces carries the unverified mark."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+  [access.resale_price]
+  per_unit     = 986.66
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — the SELL side of the same quotation, retrieved 2026-08-24. What one unit fetches if the horizon ends before this issue's own terms do (015 FR-031). Declared rather than inferred: the face value is what the issue repays and the buy quotation is what a unit costs, and striking a sale at either would report a spread of zero that nobody observed. That it still holds at a FUTURE exit date is the owner's declared belief in data/scenarios/early_exit/, not this quotation."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[access]]
+instrument_id = "UA4000230270"
+bought_at     = "inzhur"
+proceeds_to   = "inzhur"
+risk_class    = "sovereign_debt"
+
+  [access.price]
+  per_unit     = 1052.81
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, retrieved 2026-08-24 and recorded in data/observations/inzhur.toml. A SELLER'S QUOTATION for one unit on one morning, not an independent valuation and not a term of the paper. Nobody has verified it and nobody can: a dated offer has no independent record and the page shows a different number tomorrow, so verified_on stays empty for ever. This is the single remaining reason every figure this issue produces carries the unverified mark."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+  [access.resale_price]
+  per_unit     = 1049.8
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — the SELL side of the same quotation, retrieved 2026-08-24. What one unit fetches if the horizon ends before this issue's own terms do (015 FR-031). Declared rather than inferred: the face value is what the issue repays and the buy quotation is what a unit costs, and striking a sale at either would report a spread of zero that nobody observed. That it still holds at a FUTURE exit date is the owner's declared belief in data/scenarios/early_exit/, not this quotation."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[access]]
+instrument_id = "UA4000231195"
+bought_at     = "inzhur"
+proceeds_to   = "inzhur"
+risk_class    = "sovereign_debt"
+
+  [access.price]
+  per_unit     = 1110.24
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, retrieved 2026-08-24 and recorded in data/observations/inzhur.toml. A SELLER'S QUOTATION for one unit on one morning, not an independent valuation and not a term of the paper. Nobody has verified it and nobody can: a dated offer has no independent record and the page shows a different number tomorrow, so verified_on stays empty for ever. This is the single remaining reason every figure this issue produces carries the unverified mark."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+  [access.resale_price]
+  per_unit     = 1107.43
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — the SELL side of the same quotation, retrieved 2026-08-24. What one unit fetches if the horizon ends before this issue's own terms do (015 FR-031). Declared rather than inferred: the face value is what the issue repays and the buy quotation is what a unit costs, and striking a sale at either would report a spread of zero that nobody observed. That it still holds at a FUTURE exit date is the owner's declared belief in data/scenarios/early_exit/, not this quotation."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[access]]
+instrument_id = "UA4000233712"
+bought_at     = "inzhur"
+proceeds_to   = "inzhur"
+risk_class    = "sovereign_debt"
+
+  [access.price]
+  per_unit     = 1064.1
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, retrieved 2026-08-24 and recorded in data/observations/inzhur.toml. A SELLER'S QUOTATION for one unit on one morning, not an independent valuation and not a term of the paper. Nobody has verified it and nobody can: a dated offer has no independent record and the page shows a different number tomorrow, so verified_on stays empty for ever. This is the single remaining reason every figure this issue produces carries the unverified mark."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+  [access.resale_price]
+  per_unit     = 1062.6
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — the SELL side of the same quotation, retrieved 2026-08-24. What one unit fetches if the horizon ends before this issue's own terms do (015 FR-031). Declared rather than inferred: the face value is what the issue repays and the buy quotation is what a unit costs, and striking a sale at either would report a spread of zero that nobody observed. That it still holds at a FUTURE exit date is the owner's declared belief in data/scenarios/early_exit/, not this quotation."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[access]]
+instrument_id = "UA4000234223"
+bought_at     = "inzhur"
+proceeds_to   = "inzhur"
+risk_class    = "sovereign_debt"
+
+  [access.price]
+  per_unit     = 1042.77
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, retrieved 2026-08-24 and recorded in data/observations/inzhur.toml. A SELLER'S QUOTATION for one unit on one morning, not an independent valuation and not a term of the paper. Nobody has verified it and nobody can: a dated offer has no independent record and the page shows a different number tomorrow, so verified_on stays empty for ever. This is the single remaining reason every figure this issue produces carries the unverified mark."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+  [access.resale_price]
+  per_unit     = 1040.73
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — the SELL side of the same quotation, retrieved 2026-08-24. What one unit fetches if the horizon ends before this issue's own terms do (015 FR-031). Declared rather than inferred: the face value is what the issue repays and the buy quotation is what a unit costs, and striking a sale at either would report a spread of zero that nobody observed. That it still holds at a FUTURE exit date is the owner's declared belief in data/scenarios/early_exit/, not this quotation."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[access]]
+instrument_id = "UA4000234413"
+bought_at     = "inzhur"
+proceeds_to   = "inzhur"
+risk_class    = "sovereign_debt"
+
+  [access.price]
+  per_unit     = 1025.59
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, retrieved 2026-08-24 and recorded in data/observations/inzhur.toml. A SELLER'S QUOTATION for one unit on one morning, not an independent valuation and not a term of the paper. Nobody has verified it and nobody can: a dated offer has no independent record and the page shows a different number tomorrow, so verified_on stays empty for ever. This is the single remaining reason every figure this issue produces carries the unverified mark."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+  [access.resale_price]
+  per_unit     = 1023.33
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — the SELL side of the same quotation, retrieved 2026-08-24. What one unit fetches if the horizon ends before this issue's own terms do (015 FR-031). Declared rather than inferred: the face value is what the issue repays and the buy quotation is what a unit costs, and striking a sale at either would report a spread of zero that nobody observed. That it still holds at a FUTURE exit date is the owner's declared belief in data/scenarios/early_exit/, not this quotation."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[access]]
+instrument_id = "UA4000235196"
+bought_at     = "inzhur"
+proceeds_to   = "inzhur"
+risk_class    = "sovereign_debt"
+
+  [access.price]
+  per_unit     = 1096.92
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, retrieved 2026-08-24 and recorded in data/observations/inzhur.toml. A SELLER'S QUOTATION for one unit on one morning, not an independent valuation and not a term of the paper. Nobody has verified it and nobody can: a dated offer has no independent record and the page shows a different number tomorrow, so verified_on stays empty for ever. This is the single remaining reason every figure this issue produces carries the unverified mark."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+  [access.resale_price]
+  per_unit     = 1092.94
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — the SELL side of the same quotation, retrieved 2026-08-24. What one unit fetches if the horizon ends before this issue's own terms do (015 FR-031). Declared rather than inferred: the face value is what the issue repays and the buy quotation is what a unit costs, and striking a sale at either would report a spread of zero that nobody observed. That it still holds at a FUTURE exit date is the owner's declared belief in data/scenarios/early_exit/, not this quotation."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[access]]
+instrument_id = "UA4000235782"
+bought_at     = "inzhur"
+proceeds_to   = "inzhur"
+risk_class    = "sovereign_debt"
+
+  [access.price]
+  per_unit     = 1076.68
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, retrieved 2026-08-24 and recorded in data/observations/inzhur.toml. A SELLER'S QUOTATION for one unit on one morning, not an independent valuation and not a term of the paper. Nobody has verified it and nobody can: a dated offer has no independent record and the page shows a different number tomorrow, so verified_on stays empty for ever. This is the single remaining reason every figure this issue produces carries the unverified mark."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+  [access.resale_price]
+  per_unit     = 1073.17
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — the SELL side of the same quotation, retrieved 2026-08-24. What one unit fetches if the horizon ends before this issue's own terms do (015 FR-031). Declared rather than inferred: the face value is what the issue repays and the buy quotation is what a unit costs, and striking a sale at either would report a spread of zero that nobody observed. That it still holds at a FUTURE exit date is the owner's declared belief in data/scenarios/early_exit/, not this quotation."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[access]]
+instrument_id = "UA4000235865"
+bought_at     = "inzhur"
+proceeds_to   = "inzhur"
+risk_class    = "sovereign_debt"
+
+  [access.price]
+  per_unit     = 1072.16
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, retrieved 2026-08-24 and recorded in data/observations/inzhur.toml. A SELLER'S QUOTATION for one unit on one morning, not an independent valuation and not a term of the paper. Nobody has verified it and nobody can: a dated offer has no independent record and the page shows a different number tomorrow, so verified_on stays empty for ever. This is the single remaining reason every figure this issue produces carries the unverified mark."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+  [access.resale_price]
+  per_unit     = 1071.96
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — the SELL side of the same quotation, retrieved 2026-08-24. What one unit fetches if the horizon ends before this issue's own terms do (015 FR-031). Declared rather than inferred: the face value is what the issue repays and the buy quotation is what a unit costs, and striking a sale at either would report a spread of zero that nobody observed. That it still holds at a FUTURE exit date is the owner's declared belief in data/scenarios/early_exit/, not this quotation."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[access]]
+instrument_id = "UA4000236228"
+bought_at     = "inzhur"
+proceeds_to   = "inzhur"
+risk_class    = "sovereign_debt"
+
+  [access.price]
+  per_unit     = 1089.32
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, retrieved 2026-08-24 and recorded in data/observations/inzhur.toml. A SELLER'S QUOTATION for one unit on one morning, not an independent valuation and not a term of the paper. Nobody has verified it and nobody can: a dated offer has no independent record and the page shows a different number tomorrow, so verified_on stays empty for ever. This is the single remaining reason every figure this issue produces carries the unverified mark."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+  [access.resale_price]
+  per_unit     = 1087.89
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — the SELL side of the same quotation, retrieved 2026-08-24. What one unit fetches if the horizon ends before this issue's own terms do (015 FR-031). Declared rather than inferred: the face value is what the issue repays and the buy quotation is what a unit costs, and striking a sale at either would report a spread of zero that nobody observed. That it still holds at a FUTURE exit date is the owner's declared belief in data/scenarios/early_exit/, not this quotation."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[access]]
+instrument_id = "UA4000236475"
+bought_at     = "inzhur"
+proceeds_to   = "inzhur"
+risk_class    = "sovereign_debt"
+
+  [access.price]
+  per_unit     = 1107.18
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, retrieved 2026-08-24 and recorded in data/observations/inzhur.toml. A SELLER'S QUOTATION for one unit on one morning, not an independent valuation and not a term of the paper. Nobody has verified it and nobody can: a dated offer has no independent record and the page shows a different number tomorrow, so verified_on stays empty for ever. This is the single remaining reason every figure this issue produces carries the unverified mark."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+  [access.resale_price]
+  per_unit     = 1107.18
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — the SELL side of the same quotation, retrieved 2026-08-24. What one unit fetches if the horizon ends before this issue's own terms do (015 FR-031). Declared rather than inferred: the face value is what the issue repays and the buy quotation is what a unit costs, and striking a sale at either would report a spread of zero that nobody observed. That it still holds at a FUTURE exit date is the owner's declared belief in data/scenarios/early_exit/, not this quotation."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[access]]
+instrument_id = "UA4000236624"
+bought_at     = "inzhur"
+proceeds_to   = "inzhur"
+risk_class    = "sovereign_debt"
+
+  [access.price]
+  per_unit     = 1060.56
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, retrieved 2026-08-24 and recorded in data/observations/inzhur.toml. A SELLER'S QUOTATION for one unit on one morning, not an independent valuation and not a term of the paper. Nobody has verified it and nobody can: a dated offer has no independent record and the page shows a different number tomorrow, so verified_on stays empty for ever. This is the single remaining reason every figure this issue produces carries the unverified mark."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+  [access.resale_price]
+  per_unit     = 1060.12
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — the SELL side of the same quotation, retrieved 2026-08-24. What one unit fetches if the horizon ends before this issue's own terms do (015 FR-031). Declared rather than inferred: the face value is what the issue repays and the buy quotation is what a unit costs, and striking a sale at either would report a spread of zero that nobody observed. That it still holds at a FUTURE exit date is the owner's declared belief in data/scenarios/early_exit/, not this quotation."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[access]]
+instrument_id = "UA4000237416"
+bought_at     = "inzhur"
+proceeds_to   = "inzhur"
+risk_class    = "sovereign_debt"
+
+  [access.price]
+  per_unit     = 1046.49
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, retrieved 2026-08-24 and recorded in data/observations/inzhur.toml. A SELLER'S QUOTATION for one unit on one morning, not an independent valuation and not a term of the paper. Nobody has verified it and nobody can: a dated offer has no independent record and the page shows a different number tomorrow, so verified_on stays empty for ever. This is the single remaining reason every figure this issue produces carries the unverified mark."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+  [access.resale_price]
+  per_unit     = 1045.66
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — the SELL side of the same quotation, retrieved 2026-08-24. What one unit fetches if the horizon ends before this issue's own terms do (015 FR-031). Declared rather than inferred: the face value is what the issue repays and the buy quotation is what a unit costs, and striking a sale at either would report a spread of zero that nobody observed. That it still holds at a FUTURE exit date is the owner's declared belief in data/scenarios/early_exit/, not this quotation."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[access]]
+instrument_id = "UA4000237556"
+bought_at     = "inzhur"
+proceeds_to   = "inzhur"
+risk_class    = "sovereign_debt"
+
+  [access.price]
+  per_unit     = 1084.37
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, retrieved 2026-08-24 and recorded in data/observations/inzhur.toml. A SELLER'S QUOTATION for one unit on one morning, not an independent valuation and not a term of the paper. Nobody has verified it and nobody can: a dated offer has no independent record and the page shows a different number tomorrow, so verified_on stays empty for ever. This is the single remaining reason every figure this issue produces carries the unverified mark."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+  [access.resale_price]
+  per_unit     = 1079.53
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — the SELL side of the same quotation, retrieved 2026-08-24. What one unit fetches if the horizon ends before this issue's own terms do (015 FR-031). Declared rather than inferred: the face value is what the issue repays and the buy quotation is what a unit costs, and striking a sale at either would report a spread of zero that nobody observed. That it still holds at a FUTURE exit date is the owner's declared belief in data/scenarios/early_exit/, not this quotation."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[access]]
+instrument_id = "UA4000237804"
+bought_at     = "inzhur"
+proceeds_to   = "inzhur"
+risk_class    = "sovereign_debt"
+
+  [access.price]
+  per_unit     = 1101.03
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, retrieved 2026-08-24 and recorded in data/observations/inzhur.toml. A SELLER'S QUOTATION for one unit on one morning, not an independent valuation and not a term of the paper. Nobody has verified it and nobody can: a dated offer has no independent record and the page shows a different number tomorrow, so verified_on stays empty for ever. This is the single remaining reason every figure this issue produces carries the unverified mark."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+  [access.resale_price]
+  per_unit     = 1097.83
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — the SELL side of the same quotation, retrieved 2026-08-24. What one unit fetches if the horizon ends before this issue's own terms do (015 FR-031). Declared rather than inferred: the face value is what the issue repays and the buy quotation is what a unit costs, and striking a sale at either would report a spread of zero that nobody observed. That it still holds at a FUTURE exit date is the owner's declared belief in data/scenarios/early_exit/, not this quotation."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[access]]
+instrument_id = "UA4000238281"
+bought_at     = "inzhur"
+proceeds_to   = "inzhur"
+risk_class    = "sovereign_debt"
+
+  [access.price]
+  per_unit     = 1033.03
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, retrieved 2026-08-24 and recorded in data/observations/inzhur.toml. A SELLER'S QUOTATION for one unit on one morning, not an independent valuation and not a term of the paper. Nobody has verified it and nobody can: a dated offer has no independent record and the page shows a different number tomorrow, so verified_on stays empty for ever. This is the single remaining reason every figure this issue produces carries the unverified mark."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+  [access.resale_price]
+  per_unit     = 1033.03
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — the SELL side of the same quotation, retrieved 2026-08-24. What one unit fetches if the horizon ends before this issue's own terms do (015 FR-031). Declared rather than inferred: the face value is what the issue repays and the buy quotation is what a unit costs, and striking a sale at either would report a spread of zero that nobody observed. That it still holds at a FUTURE exit date is the owner's declared belief in data/scenarios/early_exit/, not this quotation."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[access]]
+instrument_id = "UA4000238968"
+bought_at     = "inzhur"
+proceeds_to   = "inzhur"
+risk_class    = "sovereign_debt"
+
+  [access.price]
+  per_unit     = 1113.04
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, retrieved 2026-08-24 and recorded in data/observations/inzhur.toml. A SELLER'S QUOTATION for one unit on one morning, not an independent valuation and not a term of the paper. Nobody has verified it and nobody can: a dated offer has no independent record and the page shows a different number tomorrow, so verified_on stays empty for ever. This is the single remaining reason every figure this issue produces carries the unverified mark."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+  [access.resale_price]
+  per_unit     = 1113.04
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — the SELL side of the same quotation, retrieved 2026-08-24. What one unit fetches if the horizon ends before this issue's own terms do (015 FR-031). Declared rather than inferred: the face value is what the issue repays and the buy quotation is what a unit costs, and striking a sale at either would report a spread of zero that nobody observed. That it still holds at a FUTURE exit date is the owner's declared belief in data/scenarios/early_exit/, not this quotation."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[access]]
+instrument_id = "UA4000238976"
+bought_at     = "inzhur"
+proceeds_to   = "inzhur"
+risk_class    = "sovereign_debt"
+
+  [access.price]
+  per_unit     = 1069.04
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, retrieved 2026-08-24 and recorded in data/observations/inzhur.toml. A SELLER'S QUOTATION for one unit on one morning, not an independent valuation and not a term of the paper. Nobody has verified it and nobody can: a dated offer has no independent record and the page shows a different number tomorrow, so verified_on stays empty for ever. This is the single remaining reason every figure this issue produces carries the unverified mark."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+  [access.resale_price]
+  per_unit     = 1069.04
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — the SELL side of the same quotation, retrieved 2026-08-24. What one unit fetches if the horizon ends before this issue's own terms do (015 FR-031). Declared rather than inferred: the face value is what the issue repays and the buy quotation is what a unit costs, and striking a sale at either would report a spread of zero that nobody observed. That it still holds at a FUTURE exit date is the owner's declared belief in data/scenarios/early_exit/, not this quotation."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[access]]
+instrument_id = "UA4000238992"
+bought_at     = "inzhur"
+proceeds_to   = "inzhur"
+risk_class    = "sovereign_debt"
+
+  [access.price]
+  per_unit     = 1058.12
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, retrieved 2026-08-24 and recorded in data/observations/inzhur.toml. A SELLER'S QUOTATION for one unit on one morning, not an independent valuation and not a term of the paper. Nobody has verified it and nobody can: a dated offer has no independent record and the page shows a different number tomorrow, so verified_on stays empty for ever. This is the single remaining reason every figure this issue produces carries the unverified mark."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+  [access.resale_price]
+  per_unit     = 1053.42
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — the SELL side of the same quotation, retrieved 2026-08-24. What one unit fetches if the horizon ends before this issue's own terms do (015 FR-031). Declared rather than inferred: the face value is what the issue repays and the buy quotation is what a unit costs, and striking a sale at either would report a spread of zero that nobody observed. That it still holds at a FUTURE exit date is the owner's declared belief in data/scenarios/early_exit/, not this quotation."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[access]]
+instrument_id = "UA4000239008"
+bought_at     = "inzhur"
+proceeds_to   = "inzhur"
+risk_class    = "sovereign_debt"
+
+  [access.price]
+  per_unit     = 1033.76
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, retrieved 2026-08-24 and recorded in data/observations/inzhur.toml. A SELLER'S QUOTATION for one unit on one morning, not an independent valuation and not a term of the paper. Nobody has verified it and nobody can: a dated offer has no independent record and the page shows a different number tomorrow, so verified_on stays empty for ever. This is the single remaining reason every figure this issue produces carries the unverified mark."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+  [access.resale_price]
+  per_unit     = 1028.09
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — the SELL side of the same quotation, retrieved 2026-08-24. What one unit fetches if the horizon ends before this issue's own terms do (015 FR-031). Declared rather than inferred: the face value is what the issue repays and the buy quotation is what a unit costs, and striking a sale at either would report a spread of zero that nobody observed. That it still holds at a FUTURE exit date is the owner's declared belief in data/scenarios/early_exit/, not this quotation."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[access]]
+instrument_id = "UA4000239016"
+bought_at     = "inzhur"
+proceeds_to   = "inzhur"
+risk_class    = "sovereign_debt"
+
+  [access.price]
+  per_unit     = 1015.39
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, retrieved 2026-08-24 and recorded in data/observations/inzhur.toml. A SELLER'S QUOTATION for one unit on one morning, not an independent valuation and not a term of the paper. Nobody has verified it and nobody can: a dated offer has no independent record and the page shows a different number tomorrow, so verified_on stays empty for ever. This is the single remaining reason every figure this issue produces carries the unverified mark."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+  [access.resale_price]
+  per_unit     = 1015.39
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — the SELL side of the same quotation, retrieved 2026-08-24. What one unit fetches if the horizon ends before this issue's own terms do (015 FR-031). Declared rather than inferred: the face value is what the issue repays and the buy quotation is what a unit costs, and striking a sale at either would report a spread of zero that nobody observed. That it still holds at a FUTURE exit date is the owner's declared belief in data/scenarios/early_exit/, not this quotation."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[access]]
+instrument_id = "UA4000239040"
+bought_at     = "inzhur"
+proceeds_to   = "inzhur"
+risk_class    = "sovereign_debt"
+
+  [access.price]
+  per_unit     = 1055.91
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, retrieved 2026-08-24 and recorded in data/observations/inzhur.toml. A SELLER'S QUOTATION for one unit on one morning, not an independent valuation and not a term of the paper. Nobody has verified it and nobody can: a dated offer has no independent record and the page shows a different number tomorrow, so verified_on stays empty for ever. This is the single remaining reason every figure this issue produces carries the unverified mark."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+  [access.resale_price]
+  per_unit     = 1051.27
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — the SELL side of the same quotation, retrieved 2026-08-24. What one unit fetches if the horizon ends before this issue's own terms do (015 FR-031). Declared rather than inferred: the face value is what the issue repays and the buy quotation is what a unit costs, and striking a sale at either would report a spread of zero that nobody observed. That it still holds at a FUTURE exit date is the owner's declared belief in data/scenarios/early_exit/, not this quotation."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[access]]
+instrument_id = "UA4000239081"
+bought_at     = "inzhur"
+proceeds_to   = "inzhur"
+risk_class    = "sovereign_debt"
+
+  [access.price]
+  per_unit     = 1085.0
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, retrieved 2026-08-24 and recorded in data/observations/inzhur.toml. A SELLER'S QUOTATION for one unit on one morning, not an independent valuation and not a term of the paper. Nobody has verified it and nobody can: a dated offer has no independent record and the page shows a different number tomorrow, so verified_on stays empty for ever. This is the single remaining reason every figure this issue produces carries the unverified mark."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+  [access.resale_price]
+  per_unit     = 1078.09
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — the SELL side of the same quotation, retrieved 2026-08-24. What one unit fetches if the horizon ends before this issue's own terms do (015 FR-031). Declared rather than inferred: the face value is what the issue repays and the buy quotation is what a unit costs, and striking a sale at either would report a spread of zero that nobody observed. That it still holds at a FUTURE exit date is the owner's declared belief in data/scenarios/early_exit/, not this quotation."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+[[access]]
+instrument_id = "UA4000239107"
+bought_at     = "inzhur"
+proceeds_to   = "inzhur"
+risk_class    = "sovereign_debt"
+
+  [access.price]
+  per_unit     = 1008.12
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — Inzhur's own asset endpoint, retrieved 2026-08-24 and recorded in data/observations/inzhur.toml. A SELLER'S QUOTATION for one unit on one morning, not an independent valuation and not a term of the paper. Nobody has verified it and nobody can: a dated offer has no independent record and the page shows a different number tomorrow, so verified_on stays empty for ever. This is the single remaining reason every figure this issue produces carries the unverified mark."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
+  [access.resale_price]
+  per_unit     = 1002.66
+  currency     = "UAH"
+  kind         = "venue_terms"
+  source       = "https://www.inzhur.reit/_api/assets — the SELL side of the same quotation, retrieved 2026-08-24. What one unit fetches if the horizon ends before this issue's own terms do (015 FR-031). Declared rather than inferred: the face value is what the issue repays and the buy quotation is what a unit costs, and striking a sale at either would report a spread of zero that nobody observed. That it still holds at a FUTURE exit date is the owner's declared belief in data/scenarios/early_exit/, not this quotation."
+  retrieved_on = "2026-08-24"
+  verified_on  = ""
+
 # --- the funds, which price themselves ---------------------------------------------------
 #
 # No [access.price] on any of the three: each declares its own net asset value per unit and

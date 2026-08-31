@@ -87,6 +87,17 @@ Every count below was read from `data/` on 2026-08-30 by loading the shipped reg
 `terezy.data.declarations.resolver.tuple_from_data_root` and running feature 004's `compose`
 over it. It is reproducible from the repository and from nothing else.
 
+> **Superseded 2026-08-31 by feature 016, which declared 24 real ОВДП issues.** The registry is
+> now **33** instruments and **33** access declarations, so the cross product is **66** pairs,
+> **33** candidates and **33** pairs yielding no candidate — and at the module's own question
+> **27** evaluated against **6** dropped, four of the six being issues placed after that
+> question's outlay date. Every count in this section is left as it was measured, because it is
+> the record of what this feature was designed against; the live figures are derived rather
+> than written, in `tests/worked_examples/test_candidate_accounting.py` and
+> `tests/worked_examples/test_candidate_enumeration.py`. **What did not change is the finding**:
+> the dollar stream still contributes nothing, for the same reason, and the ratio is now one
+> half of a much larger set.
+
 | Declared | Count | Which |
 |---|---|---|
 | instruments | **9** | `enumerated_out_of_order`, `enumerated_taxable_x`, `ovdp_enumerated_a`, `ovdp_enumerated_mirror`, `ovdp_synthetic_a`, `ovdp_synthetic_b` (fixed income); `inzhur_miltech`, `inzhur_reit`, `synthetic_fund_c` (funds) |

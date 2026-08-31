@@ -4,11 +4,12 @@
 that is the point rather than a style: a literal 9 would keep passing after a tenth instrument
 was declared, and the count it agreed with would be the code's rather than the declarations'.
 
-The arithmetic a reader can check, worked on the shipped registry as loaded on 2026-08-30:
+The arithmetic a reader can check, re-measured on the shipped registry on 2026-08-31 after
+feature 016 declared 24 real ОВДП issues:
 
-    9 instruments with an access declaration
+   33 instruments with an access declaration
   x 2 declared income streams
-  = 18 (instrument, stream) pairs considered
+  = 66 (instrument, stream) pairs considered
 
     salary_uah  arrives as UAH at monobank_uah, and inzhur_direct carries UAH
                 monobank_uah -> inzhur:  1 way in
@@ -21,13 +22,14 @@ The arithmetic a reader can check, worked on the shipped registry as loaded on 2
 
     1 run plan supplied per instrument
 
-  candidates = 9 x (1 x 1 x 1)  +  9 x (0 x 1 x 1)  =  9
-  pairs yielding none = 18 - 9 = 9, every one of them contract_usd
+  candidates = 33 x (1 x 1 x 1)  +  33 x (0 x 1 x 1)  =  33
+  pairs yielding none = 66 - 33 = 33, every one of them contract_usd
 
-The nine that yield nothing are a finding about the registry: its two USD-to-UAH corridors are
-declared in the `exit` direction, and an inbound enumeration cannot see them. The remedy is
-feature 003's audit to answer; what must not happen is a comparison quietly holding nine
-options with nothing saying the other nine were never asked.
+The half that yields nothing is a finding about the registry rather than about the
+instruments: its two USD-to-UAH corridors are declared in the `exit` direction, and an inbound
+enumeration cannot see them. The remedy is feature 003's audit to answer; what must not happen
+is a comparison quietly holding one stream's options with nothing saying the other stream was
+never asked.
 """
 
 from __future__ import annotations

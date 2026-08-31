@@ -4,15 +4,21 @@
 # order other than ascending by date is an observation about **the source**, not about the
 # money, and sorting the list is precisely the act that would delete it.
 #
-# MODELLED ON A REAL ISSUE AND DELIBERATELY NOT IT. `UA4000235865` is the single observed
-# counterexample to the pattern every other issue follows: it publishes the repayment of
-# principal one day BEFORE the final coupon, which also makes its list the only one not in
-# ascending date order. So the one real exception is the one issue this form would have
-# refused as published. The counts are measured in
-# tests/contract/test_the_observation_the_form_rests_on.py rather than restated here. The fixture is shaped like it —
-# principal a day before the final coupon, published after it — because the assertion is about
-# the mechanism and
-# not about that ISIN, and declaring a real ОВДП is out of this feature's scope.
+# MODELLED ON A SELLER'S ERROR, WHICH IS WHY THE FIXTURE OUTLIVES ITS EXAMPLE. It is shaped
+# like Inzhur's published list for `UA4000235865`, the one observed list not in ascending date
+# order: the seller publishes the repayment of principal on 2026-09-15, a day BEFORE the final
+# coupon it also publishes. The issuer's own depository puts BOTH on 2026-09-16, the ordinary
+# way a bond ends — so the ordering is the seller's transcription error and not a fact about
+# how the issuer pays (016, checked in tests/worked_examples/test_two_sources_disagree.py).
+# There is therefore NO real instance of the thing 013 FR-020a exists for, and retiring this
+# fixture would delete the only example of a live mechanism. The mechanism survives its
+# example being a mistake; the mistake is exactly the kind of thing recording a source's
+# published order exists to preserve.
+#
+# NO `ovdp` GROUP LABEL (016 FR-027a). The real issue is declared now, so a group holding both
+# would hold ONE PIECE OF PAPER TWICE — two candidates, two sets of cash flows, one comparison,
+# differing only in that one is invented. 015 FR-007b's deduplication cannot catch it: it
+# deduplicates by id, and these are two ids for one security.
 #
 # THE PAYMENTS BELOW ARE IN DATE ORDER, and `published_in_order` records that the source was
 # not. Ordering is settled at transcription, the same declared human step that turns kopecks
@@ -26,8 +32,8 @@ class        = "enumerated_schedule"
 currency     = "UAH"
 is_synthetic = true
 
-# groups: a DECLARED label, never inferred (015 FR-007a). Here: modelled on the real issue UA4000235865, which is a government bond.
-groups       = ["ovdp"]
+# groups: a DECLARED label, never inferred (015 FR-007a). Empty, for the reason in the header.
+groups       = []
 
 [instrument.schedule]
 face_value         = 1000.0

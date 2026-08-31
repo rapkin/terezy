@@ -282,10 +282,16 @@ class TestTheBatteryOfBrokenDeclarations:
             ("coupon_rate_pct = 15.5", "coupon_rate_pct"),
             ('periodicity = "semiannual"', "periodicity"),
             ('business_day_rule = "following"', "business_day_rule"),
+            ('stated_yield = "16,5% річних"', "stated_yield"),
+            ("available_quantity = 14473", "available_quantity"),
+            ('status = "active"', "status"),
         ],
     )
     def test_a_declared_generative_term(self, tmp_path: Path, line: str, field: str) -> None:
-        """SC-019. Forbidden rather than optional: each would be either invented or unread."""
+        """SC-019, and 016 SC-008. Forbidden rather than optional: each of the first four would
+        be either invented or unread, and the last three are the SELLER's figures -- a forecast
+        about itself, an inventory that decays in hours and contradicts itself in the shipped
+        observation, and a word that decides only which files get written."""
         with_term = _replaced('day_count    = "act/365"', f'day_count    = "act/365"\n{line}')
         assert field in self._refused(tmp_path, with_term).field_path
 

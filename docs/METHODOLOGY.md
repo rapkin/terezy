@@ -60,18 +60,22 @@ and it says so on the face of every figure it touches.
 The `excludes` line above is unchanged and still true: the two **nominal** figures exclude
 inflation. The real figures are reported beside them, never instead of them.
 
-**Every instrument currently shipped is synthetic and unverified.** Every file under
-`data/instruments/` declares `is_synthetic = true` — or, for a fund,
-`is_assumption_driven = true` — and every `verified_on` in it is empty. Every term is
-**invented**, chosen so that a hand-checkable example exists. **No figure computed from any
-of them describes something anyone can buy, and none may be quoted as if it did.**
+**Some shipped instruments are real now, and every one of them is still unverified.** Feature
+016 declared 24 ОВДП issues whose terms are the National Bank depository's record of what the
+Ministry of Finance issued; each carries `is_synthetic = false` and is named for its ISIN. Every
+other file under `data/instruments/` still declares `is_synthetic = true` — or, for a fund,
+`is_assumption_driven = true` — and its terms are **invented**, chosen so that a hand-checkable
+example exists. **No figure computed from a fixture describes something anyone can buy, and none
+may be quoted as if it did.**
 
-⚙ This paragraph used to name two files by hand, and had said "two" since feature 006 added
-three more. Corrected in 013 to state the property instead: a count of files goes stale on
-the next data change, and what actually matters is that the property holds of all of them —
-which `tests/contract/test_declaration_loading.py::TestEveryShippedInstrumentSaysItIsAFixture`
-now checks, having been cited to a file that checked nothing of the kind under a ⚙ whose own
-point was replacing an unchecked count with a checked property.
+**Every `verified_on` in the whole directory is still empty**, and for the 24 the reason is now
+one thing rather than everything: the terms could be checked against the issuer's register, and
+the price could not. A dated seller's quotation has no independent record and shows a different
+number tomorrow, so it stays unverified permanently — and because taint is asymmetric, every
+figure a real issue produces carries the mark through the price alone.
+
+Which files are which is a check rather than a sentence:
+`tests/contract/test_declaration_loading.py::TestEveryShippedInstrumentSaysWhetherItIsAFixture`.
 
 **The tax exemption is cited but unverified.** `data/tax/ua.toml` declares the
 `ua_government_bond` class with a PIT rate of 0% and a military levy of 0%. The zeroes cite

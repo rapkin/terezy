@@ -54,8 +54,17 @@ BOND_CLASS = "ua_government_bond"
 OVDP = "ovdp_synthetic_a"
 MILTECH = "inzhur_miltech"
 REIT = "inzhur_reit"
-UNCHANGED_NO_CANDIDATES = 9
-"""What the shipped registry puts in the third column, asserted rather than assumed below."""
+
+
+def unchanged_no_candidates() -> int:
+    """What the shipped registry puts in the third column, derived rather than written.
+
+    One pair per declared instrument -- it was nine and became thirty-three when 016 declared
+    the real ОВДП issues, and a literal here would have to be re-typed on every data change.
+    """
+    enumerated = fixtures.enumerated(fixtures.shipped())
+    assert isinstance(enumerated, CandidateSet), enumerated
+    return len(enumerated.no_candidate)
 
 
 # ---------------------------------------------------------------------------
@@ -285,11 +294,16 @@ def test_the_battery_covers_every_member_of_the_union() -> None:
     assert not set(PLANTED) & set(UNREACHABLE)
 
 
-def test_the_baseline_puts_nine_pairs_in_the_third_column() -> None:
-    """The constant every planted case is measured against, read off the registry."""
-    enumerated = fixtures.enumerated(fixtures.shipped())
+def test_the_baseline_puts_one_pair_per_declared_instrument_in_the_third_column() -> None:
+    """What every planted case is measured against, and why that number is what it is: the
+    dollar stream reaches the buying venue through no declared corridor, so every pair on it is
+    the ABSENCE of an option rather than the rejection of one."""
+    registries = fixtures.shipped()
+    enumerated = fixtures.enumerated(registries)
     assert isinstance(enumerated, CandidateSet), enumerated
-    assert len(enumerated.no_candidate) == UNCHANGED_NO_CANDIDATES
+    declared = len(registries.instruments) + len(registries.funds)
+    assert len(enumerated.no_candidate) == declared
+    assert {pair.stream_id for pair in enumerated.no_candidate} == {"contract_usd"}
 
 
 @pytest.mark.parametrize("refusal", sorted(PLANTED))
@@ -308,7 +322,7 @@ def test_no_planted_refusal_moves_a_pair_into_the_no_candidate_column(refusal: s
     in the third column is the absence of one, and the owner's remedy for the two is opposite."""
     registries, changes = PLANTED[refusal]
     result = _surveyed(registries, changes)
-    assert len(result.enumerated.no_candidate) == UNCHANGED_NO_CANDIDATES
+    assert len(result.enumerated.no_candidate) == unchanged_no_candidates()
 
 
 @pytest.mark.parametrize("refusal", sorted(PLANTED))
@@ -369,8 +383,8 @@ class TestTheThreeNoLoopCanReach:
     def test_the_worlds_cover_more_than_one_currency_and_the_identity_exit(self) -> None:
         """The control, and it guards **coverage** rather than variety.
 
-        Set sizes alone would not: the two-currency world yields the same nine candidates the
-        shipped one does, so a fixture that quietly stopped producing a dollar candidate would
+        Set sizes alone would not: the two-currency world yields exactly as many candidates as
+        the shipped one does, so a fixture that quietly stopped producing a dollar candidate would
         leave the sizes unchanged and silently degrade every junction assertion below back to a
         single-currency check -- which is the exact degradation those assertions exist to
         prevent.

@@ -1,15 +1,16 @@
 """SC-018: what the source published, kept as a fact about the source (FR-020a).
 
 An observation about **the source**, not about the money, and the one that silently
-disappears: that an issuer publishes the repayment of principal after a coupon dated later
-than it is a fact about how the endpoint reports, and sorting the list is precisely the act
-that would delete it.
+disappears: that a publisher lists the repayment of principal after a coupon dated later than
+it is a fact about how that publisher reports, and sorting the list is precisely the act that
+would delete it.
 
-The fixture is modelled on `UA4000235865` and is deliberately **not** it. Of the 32 issues
-observed on 2026-08-24 that one is the single counterexample to the pattern the other 31
-follow -- so the one real exception is the one issue this form would have refused as
-published -- and transcribing it would mean declaring a real ОВДП, which this feature puts
-out of scope.
+The fixture is modelled on Inzhur's published list for `UA4000235865` and is deliberately
+**not** it. 016 declared that issue from the ISSUER's depository, which puts both final
+payments on 2026-09-16, the ordinary way a bond ends -- so the ordering is the seller's
+transcription error and not a fact about how the issuer pays, and there is no real instance of
+what FR-020a exists for. The mechanism survives its example being a mistake, and a seller's
+error is exactly the kind of thing recording a published order preserves.
 
 **The second half is what makes the field evidence rather than boilerplate**: rewrite the
 declared order to the ascending one and the record does not survive, because a field that

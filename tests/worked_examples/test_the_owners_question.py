@@ -105,18 +105,27 @@ def test_nothing_is_ranked_at_any_horizon_he_asked_about() -> None:
 
 
 def test_every_section_has_no_benchmark_to_rank_against() -> None:
-    """The hurdle itself is one of the five wanting a resale price, so there is no ranking."""
+    """The hurdle itself is one of the fixtures wanting a resale price, so nothing is ranked --
+    unchanged by 016, which priced the real issues and left every invented one refusing."""
     for section in _answer().sections:
         assert isinstance(section.outcome, CandidateSurvey)
         assert isinstance(section.outcome.comparison, BenchmarkUnavailable)
 
 
-def test_five_want_a_resale_price_at_one_and_three_months_and_three_at_twelve() -> None:
-    """SC-023, per section: the count is unchanged from the baseline and the remedy is a file.
+def test_only_the_invented_bonds_still_want_a_resale_price() -> None:
+    """SC-023, per section, and what 016 changed about it.
 
-    The population differs by horizon because two of the bonds' own schedules end inside the
-    twelve-month window and are simply held to their end there.
+    Every candidate still dropping for a missing resale price is an **invented** bond. Nobody
+    quotes a resale price for a bond that does not exist, and inventing one would put a made-up
+    spread inside the worked examples a reader checks on paper. The 24 real ОВДП issues carry
+    the seller's observed sell quotation on their access records and are sold at the window's
+    end instead -- which is where 015 FR-031 left the question for 016 to settle, and settling
+    it there is why `DeclarationMissing.part` stayed a five-member literal.
+
+    The population still differs by horizon: `ovdp_enumerated_a`'s own schedule ends inside the
+    twelve-month window and it is simply held to its end there.
     """
+    declared = fixtures.inputs().registries
     wanting = [
         sorted(
             item.key.instrument_id
@@ -128,7 +137,10 @@ def test_five_want_a_resale_price_at_one_and_three_months_and_three_at_twelve() 
         for section in _answer().sections
         if isinstance(section.outcome, CandidateSurvey)
     ]
-    assert [len(names) for names in wanting] == [5, 5, 3]
+    for names in wanting:
+        assert names, "the refusal must stay the shipped behaviour for an invented bond"
+        assert all(declared.instruments[name].is_synthetic for name in names)
+    assert wanting[0] == wanting[1]
     assert set(wanting[2]) < set(wanting[0])
 
 

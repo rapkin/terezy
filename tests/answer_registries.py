@@ -111,8 +111,9 @@ def with_resale_price(
 ) -> AnswerInputs:
     """The same registry with one instrument declaring what it sells for (015 FR-031).
 
-    No shipped declaration carries one, so this is how an early-exit **figure** is reached at
-    all -- and it is the fixture SC-024 and SC-026 both rest on.
+    Every real ОВДП declaration carries one since 016; no FIXTURE does, because nobody quotes
+    a resale price for a bond that does not exist. So this is how an early exit is reached on a
+    *checkable* schedule, which is what SC-024 and SC-026 both rest on.
     """
     access = dict(supplied.registries.access)
     access[instrument_id] = replace(

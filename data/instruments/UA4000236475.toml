@@ -1,0 +1,142 @@
+# A REAL GOVERNMENT BOND: UA4000236475. Nothing in this file is invented.
+#
+# TWO SOURCES, AND THEY ARE NEVER MERGED. The TERMS below — currency, face value,
+# every payment date, amount and kind, and the coverage claim — are the ISSUER's,
+# from the NBU depository register, retrieved 2026-08-31. The PRICE this issue is
+# bought and sold at is the SELLER's quotation of 2026-08-24 and lives in
+# data/access/instruments.toml. Merging the two would let the issuer's authority
+# attach to a figure the issuer never made.
+#
+# The terms are verifiable against the depository and the price never will be, so
+# every figure this issue produces stays marked — and the mark now rests on the price
+# rather than on everything at once. Why these 24 issues, why the enumerated form and
+# what the INFERENCE marker below costs: specs/016-real-ovdp/spec.md.
+
+[instrument]
+id           = "UA4000236475"
+name         = "ОВДП UA4000236475 — a real Ukrainian government bond, not a fixture"
+class        = "enumerated_schedule"
+currency     = "UAH"
+is_synthetic = false
+
+# A declared LABEL, never inferred (015 FR-007a).
+groups       = ["ovdp"]
+
+[instrument.schedule]
+face_value   = 1000.0
+covers_from  = "2025-07-22"
+day_count    = "act/365"
+kind         = "bond_terms"
+source       = "INFERENCE: nothing below is inferred, and the marker is required anyway. Transcribed verbatim from https://bank.gov.ua/depo_securities?json — the National Bank of Ukraine's depository register of government securities, «Міністерство фінансів України» named as issuer, retrieved 2026-08-31 and recorded in data/observations/nbu_depository.toml. The register states this issue's currency (val_code), its face value (nominal), every payment's date and amount in MAJOR units, and each payment's KIND (pay_type), and its list runs from placement to maturity — which is what covers_from below is. So the four things 013 called inferences are the issuer's own statements here. scripts/check_provenance.py requires every enumerated schedule to open its citation 'INFERENCE:' and refuses a verification date beside it; 016 stays data-only by the owner's decision, so the false word sits beside a true citation rather than replacing it (016 FR-011). Reused under ст. 10¹ ч. 2 Закону України «Про доступ до публічної інформації» (№ 2939-VI), whose condition on reuse is a reference to the source — this URL is that reference."
+retrieved_on = "2026-08-31"
+verified_on  = ""
+
+  [[instrument.schedule.payment]]
+  on           = "2025-10-01"
+  amount       = 88.85
+  pays         = "coupon"
+  kind         = "bond_terms"
+  source       = "INFERENCE: not inferred — https://bank.gov.ua/depo_securities?json publishes this row for UA4000236475 as pay_date 2025-10-01, pay_type 1, pay_val 88.85, retrieved 2026-08-31. The marker is the gate's; see this file's [instrument.schedule] citation."
+  retrieved_on = "2026-08-31"
+  verified_on  = ""
+
+  [[instrument.schedule.payment]]
+  on           = "2026-04-01"
+  amount       = 88.85
+  pays         = "coupon"
+  kind         = "bond_terms"
+  source       = "INFERENCE: not inferred — https://bank.gov.ua/depo_securities?json publishes this row for UA4000236475 as pay_date 2026-04-01, pay_type 1, pay_val 88.85, retrieved 2026-08-31. The marker is the gate's; see this file's [instrument.schedule] citation."
+  retrieved_on = "2026-08-31"
+  verified_on  = ""
+
+  [[instrument.schedule.payment]]
+  on           = "2026-09-30"
+  amount       = 88.85
+  pays         = "coupon"
+  kind         = "bond_terms"
+  source       = "INFERENCE: not inferred — https://bank.gov.ua/depo_securities?json publishes this row for UA4000236475 as pay_date 2026-09-30, pay_type 1, pay_val 88.85, retrieved 2026-08-31. The marker is the gate's; see this file's [instrument.schedule] citation."
+  retrieved_on = "2026-08-31"
+  verified_on  = ""
+
+  [[instrument.schedule.payment]]
+  on           = "2027-03-31"
+  amount       = 88.85
+  pays         = "coupon"
+  kind         = "bond_terms"
+  source       = "INFERENCE: not inferred — https://bank.gov.ua/depo_securities?json publishes this row for UA4000236475 as pay_date 2027-03-31, pay_type 1, pay_val 88.85, retrieved 2026-08-31. The marker is the gate's; see this file's [instrument.schedule] citation."
+  retrieved_on = "2026-08-31"
+  verified_on  = ""
+
+  [[instrument.schedule.payment]]
+  on           = "2027-09-29"
+  amount       = 88.85
+  pays         = "coupon"
+  kind         = "bond_terms"
+  source       = "INFERENCE: not inferred — https://bank.gov.ua/depo_securities?json publishes this row for UA4000236475 as pay_date 2027-09-29, pay_type 1, pay_val 88.85, retrieved 2026-08-31. The marker is the gate's; see this file's [instrument.schedule] citation."
+  retrieved_on = "2026-08-31"
+  verified_on  = ""
+
+  [[instrument.schedule.payment]]
+  on           = "2028-03-29"
+  amount       = 88.85
+  pays         = "coupon"
+  kind         = "bond_terms"
+  source       = "INFERENCE: not inferred — https://bank.gov.ua/depo_securities?json publishes this row for UA4000236475 as pay_date 2028-03-29, pay_type 1, pay_val 88.85, retrieved 2026-08-31. The marker is the gate's; see this file's [instrument.schedule] citation."
+  retrieved_on = "2026-08-31"
+  verified_on  = ""
+
+  [[instrument.schedule.payment]]
+  on           = "2028-09-27"
+  amount       = 88.85
+  pays         = "coupon"
+  kind         = "bond_terms"
+  source       = "INFERENCE: not inferred — https://bank.gov.ua/depo_securities?json publishes this row for UA4000236475 as pay_date 2028-09-27, pay_type 1, pay_val 88.85, retrieved 2026-08-31. The marker is the gate's; see this file's [instrument.schedule] citation."
+  retrieved_on = "2026-08-31"
+  verified_on  = ""
+
+  [[instrument.schedule.payment]]
+  on           = "2028-09-27"
+  amount       = 1000.0
+  pays         = "principal_repayment"
+  kind         = "bond_terms"
+  source       = "INFERENCE: not inferred — https://bank.gov.ua/depo_securities?json publishes this row for UA4000236475 as pay_date 2028-09-27, pay_type 2, pay_val 1000, retrieved 2026-08-31. The marker is the gate's; see this file's [instrument.schedule] citation."
+  retrieved_on = "2026-08-31"
+  verified_on  = ""
+
+[instrument.constraints]
+min_ticket   = 1000.0
+min_unit     = 1.0
+kind         = "venue_terms"
+source       = "https://www.inzhur.reit/offer/ovdp — the venue's own offer page for these issues, retrieved 2026-08-31. Its FAQ: «Мінімальний обсяг покупки — від 1 цінного паперу, що дорівнює приблизно 1000 грн», and its summary line «Початкова інвестиція від 1 облігації». The floor the venue states is in UNITS; the 1000.00 is the venue's own «приблизно» for one of them, and it is not this issue's price. This is the venue speaking about its own conditions of dealing, which is the one thing it is primary for."
+retrieved_on = "2026-08-31"
+verified_on  = ""
+
+# Both income kinds this schedule produces fall in the category the shipped Ukrainian
+# rule pack already declares for a government bond. No rate is declared here.
+[instrument.tax_classes]
+coupon        = "ua_government_bond"
+disposal_gain = "ua_government_bond"
+
+[[instrument.verification_task]]
+settles     = "face_value"
+question    = "What face value does this issue have?"
+searched    = "SETTLED by the issuer's depository, which publishes `nominal` for this ISIN at https://bank.gov.ua/depo_securities?json, retrieved 2026-08-31. It is read off nothing. This entry exists because scripts/check_provenance.py requires a task for each of its four inference names on every enumerated schedule, and 016 stays data-only (016 FR-011)."
+searched_on = "2026-08-31"
+
+[[instrument.verification_task]]
+settles     = "payment_kind"
+question    = "Which payments are coupons and which repay principal?"
+searched    = "SETTLED by the issuer's depository, which labels every row with `pay_type` — 1 a coupon, 2 a repayment of principal. No kind is read off an amount, a date or a position in a list. Required by the gate rather than open (016 FR-011)."
+searched_on = "2026-08-31"
+
+[[instrument.verification_task]]
+settles     = "minor_unit_conversion"
+question    = "Do the published figures denote hryvnia or kopecks?"
+searched    = "SETTLED, and no conversion is performed at all: the depository publishes MAJOR units. The seller publishes the same amounts multiplied by 100 and says nowhere that it quotes kopecks, so a transcription from the seller would have had to choose a reading — and the lot reading, a hundred bonds of 1000 nominal, is what the price refuses. Required by the gate rather than open (016 FR-011)."
+searched_on = "2026-08-31"
+
+[[instrument.verification_task]]
+settles     = "coverage"
+question    = "Is the depository's list complete from placement to maturity, and does the owner accept one register as sufficient evidence that it is?"
+searched    = "OPEN, and the only one of these four that is. The register's list starts at or after `razm_date` and ends exactly on `pgs_date` for all 24 declared issues, which is as good as a single source can make the claim; whether the owner wants a second source per ISIN is his call and is owner verification task 3 of specs/016-real-ovdp."
+searched_on = "2026-08-31"

@@ -295,14 +295,17 @@ def test_the_answers_marks_describe_the_figures_it_reports() -> None:
 def test_a_section_with_no_benchmark_still_carries_the_figures_it_computed() -> None:
     """``BenchmarkUnavailable.scored`` exists so the work is not thrown away.
 
-    Nothing is *ranked* -- there is nothing to rank against -- but two candidates produced
+    Nothing is *ranked* -- there is nothing to rank against -- but candidates did produce
     complete outcomes at twelve months, and a reader told only "nothing was ranked" would never
-    learn they exist.
+    learn they exist. The population is named rather than counted: it is the registry's and it
+    grew by 24 when the real ОВДП issues were declared.
     """
     twelve = fixtures.answered().sections[2]
     assert section_ranking(twelve) == ()
-    assert len(section_evaluated(twelve)) == 2
-    assert all(item.reaches.amount > 0.0 for item in section_evaluated(twelve))
+    scored = section_evaluated(twelve)
+    assert scored
+    assert "ovdp_enumerated_a" in {item.key.instrument_id for item in scored}
+    assert all(item.reaches.amount > 0.0 for item in scored)
 
 
 def test_a_withheld_benchmark_leaves_nothing_ranked() -> None:

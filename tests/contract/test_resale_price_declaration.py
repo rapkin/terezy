@@ -4,11 +4,17 @@
 past it is sold there -- at a price that comes from a **declaration**, never from a face value,
 a NAV or a purchase price standing in for one.
 
-**No shipped declaration carries one**, and that is the point of this module's first assertion:
-the refusal FR-031 requires is the shipped behaviour rather than a guard that reads as
-protection. What is tested here is that the term is declarable, that it is checked exactly as
-the purchase quote is, and that a fund may not declare one -- a fund prices its own exit from
-NAV and a declared discount, and a second price would be one fact in two places.
+**Exactly the real ОВДП issues carry one**, and not one fixture does. 016 declared the seller's
+observed sell quotation on their access records, which is where 015 FR-031 left the question
+open -- so `DeclarationMissing(part="access")` stays the home, `TupleRefused` stays at
+seventeen, and the refusal is still the shipped behaviour for every invented bond rather than a
+guard nothing reaches. A fixture gets none because nobody quotes a resale price for a bond that
+does not exist, and inventing one would put a made-up spread inside the worked examples a
+reader checks on paper.
+
+What is also tested here is that the term is checked exactly as the purchase quote is, and that
+a fund may not declare one -- a fund prices its own exit from NAV and a declared discount, and a
+second price would be one fact in two places.
 """
 
 from __future__ import annotations
@@ -21,6 +27,7 @@ import pytest
 from terezy.core.primitives.currency import Currency
 from terezy.data.declarations import resolver
 from terezy.data.declarations.errors import DeclarationError
+from tests import observations as obs
 
 pytestmark = pytest.mark.contract
 
@@ -67,10 +74,24 @@ def _resolve(root: Path) -> resolver.TupleDeclarations:
     return resolver.tuple_from_data_root(root, base_currency=Currency.UAH, scenario_id=None)
 
 
-def test_no_shipped_declaration_carries_a_resale_price() -> None:
-    """FR-031's refusal is the shipped behaviour, not a guard nothing reaches."""
+def test_the_real_issues_carry_a_resale_price_and_no_fixture_does() -> None:
+    """FR-031's refusal is still the shipped behaviour for every invented bond."""
+    declared = _resolve(DATA_ROOT)
+    quoted = {name for name, entry in declared.access.items() if entry.resale_price is not None}
+    assert quoted == set(obs.declared_isins())
+    assert set(declared.access) - quoted, "there must still be a declaration that refuses"
+
+
+def test_every_real_resale_price_is_the_sellers_observed_sell_quotation() -> None:
+    """Declared, never inferred: not the face value, not the purchase quote, not a NAV. On five
+    of the 24 the seller quotes buy equal to sell, so an assertion that the two merely differ
+    would be wrong -- what is asserted is that each equals what the seller published."""
     access = _resolve(DATA_ROOT).access
-    assert all(entry.resale_price is None for entry in access.values())
+    for isin in obs.declared_isins():
+        quote = access[isin].resale_price
+        assert quote is not None, isin
+        assert quote.price.amount == obs.seller_bonds()[isin]["sell"], isin
+        assert quote.price.currency is Currency.UAH, isin
 
 
 def test_a_declared_resale_price_loads(tmp_path: Path) -> None:

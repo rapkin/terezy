@@ -392,3 +392,14 @@ What it *does* land that no row asks for is the mechanical half of the deferral 
 working day from an uncited weekend rule, counting the two that reach it through the
 declared-convention registry rather than by a direct call. A fourth fails the scan instead of
 being caught by review.
+
+**016-real-ovdp** closes **no** row and lands the first instruments that are not fixtures:
+24 real ОВДП issues, their terms transcribed from the National Bank's depository register and
+their price from Inzhur's quotation, with the two sources never sharing a citation.
+
+| Row | How, and why the box does not move |
+|---|---|
+| **H1** | The data-only claim gets its first test on **real** instruments, 24 at once, and it sits **beside** H1 rather than strengthening it — the same reading 013's second declaration shape took. H1 asks for an instrument, a route, a tax class and a jurisdiction through the full pipeline; this is 24 instruments through it in one data change, with no new plugin interface, no new member of the instrument failure union and no new field on the declaration record (`tests/contract/test_ovdp_two_sources.py`). The two gaps H1 already records are untouched. |
+| **D1** | **Unchanged, and the golden says so.** D1 is about a *generative* bond reproducing a hand-computed schedule; no generative declaration's behaviour changed, and `tests/golden/ovdp_synthetic_a.golden.txt` moved in its recorded input digests and in no result line at all. An input digest is a witness, not a term (Principle V). |
+| **E5** | Pressed rather than closed, and this is the first time the mark means one thing. Every figure a real issue produces is marked because the **price** is unverified, and a scratch registry in which every register-sourced citation carries a verification date still produces a marked figure with no register source left among the unverified ones (`tests/contract/test_ovdp_two_sources.py`). Verification removes the reasons for the mark rather than the mark. |
+| **J3** | Untouched. An early exit is now struck at a declared resale price for every real issue, which is a *price*, not a redemption window or a haircut. |
