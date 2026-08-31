@@ -3957,9 +3957,12 @@ end, repeats the last declared year, or infers from an adjacent one.
 | out of coverage | the id, the date, the window, and which way it missed |
 
 *Which way* is one of three: **before** the window, **after** it, or **the search ran off an
-end** — a date that was covered whose answer is not, which is the only one of the three that
-extending the calendar forward repairs. A next-working-day search that walks past an end, and a
-last-working-day-of-the-week question whose week straddles one, both land there.
+end** — the last being a date that *was* covered whose answer is not. The first two say the
+question was outside what anybody read the law for; the third says it was inside and the answer
+is one day past an edge. Which end to widen follows from which of the three: earlier for
+*before* and for a backwards search that ran off, later for *after* and a forwards one. A
+next-working-day search that walks past an end, and a last-working-day-of-the-week question
+whose week straddles one, both land in the third.
 
 That refusal is the answer to the enumerated form's one weakness. An enumerated calendar goes
 stale at its last declared year; declaring the window is what makes the staleness loud instead

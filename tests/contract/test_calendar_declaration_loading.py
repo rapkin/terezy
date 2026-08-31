@@ -21,6 +21,11 @@ state is unrepresentable rather than repeatedly checked.
 stated reason, and seven consecutive non-working rows reach the same state by another road.
 Refusing here keeps the query total and keeps the refusal union at FR-011's three reasons.
 
+*A row the declared pattern already gives.* A row is an exception **over** the pattern, and one
+that repeats it would be reported as a declared move on a date no act touched. Two exceptions
+to that, both tested: a ``working_day`` row carrying the pre-holiday shortening says something
+the pattern cannot, and a ``public_holiday`` row on a rest day names a fact a Sunday is not.
+
 The last tests load the **shipped** ``data/calendars/ua_civil.toml``, because a battery of
 broken files proves nothing about the file the project actually uses.
 """
@@ -157,9 +162,14 @@ def test_the_whole_fixture_loads_so_the_battery_below_isolates_one_fault_each(
             "calendar.week.starts_on",
         ),
         (
-            "a missing verification date",
-            WHOLE.replace('retrieved_on = "2026-03-01"\nverified_on  = ""\n', "", 1),
+            "a missing retrieval date",
+            WHOLE.replace('retrieved_on = "2026-03-01"\n', "", 1),
             "calendar.coverage.retrieved_on",
+        ),
+        (
+            "a missing verification date",
+            WHOLE.replace('verified_on  = ""\n', "", 1),
+            "calendar.coverage.verified_on",
         ),
         (
             "an omitted enumeration",
@@ -171,7 +181,13 @@ def test_the_whole_fixture_loads_so_the_battery_below_isolates_one_fault_each(
 def test_a_missing_or_unrecognised_field_names_itself(
     tmp_path: Path, case: str, mutated: str, field_path: str
 ) -> None:
-    """FR-007: the shape validation names the field, and nothing is substituted for it."""
+    """FR-007: the shape validation names the field, and nothing is substituted for it.
+
+    ``verified_on`` has its own case rather than sharing one with ``retrieved_on``: the empty
+    string is a **permitted declared state** -- nobody has checked this -- and the absent key
+    is not, so a case that deleted both would pass on whichever the validator reported first
+    and never exercise the one that matters.
+    """
     refused = _refused(tmp_path, mutated)
     assert refused.field_path == field_path, case
 
@@ -295,6 +311,18 @@ def test_a_missing_or_unrecognised_field_names_itself(
             "",
         ),
         (
+            "a working-day row the pattern already works, adding nothing",
+            HEADER + _row("2026-03-04", "working_day"),
+            "day[0].classification",
+            "2026-03-04",
+        ),
+        (
+            "a rest-day row the pattern already rests",
+            HEADER + _row("2026-03-08", "rest_day"),
+            "day[0].classification",
+            "2026-03-08",
+        ),
+        (
             "a row with no citation",
             (HEADER + _row("2026-03-05")).replace(
                 'source         = "SYNTHETIC FIXTURE -- an invented classification."',
@@ -320,6 +348,49 @@ def test_a_malformed_value_names_the_file_and_the_field_or_date(
     assert refused.file.name == "xx_civil.toml", case
     if quoted:
         assert quoted in refused.problem, case
+
+
+def test_a_row_that_only_adds_the_shortening_loads_and_is_decided_by_the_pattern(
+    tmp_path: Path,
+) -> None:
+    """The complement of the two "adds nothing" refusals above, and the reason they are two
+    cases rather than one blanket rule.
+
+    Wednesday 2026-03-04 is a working day under the pattern. A ``working_day`` row on it with
+    ``pre_holiday = false`` says nothing and is refused; the same row with ``pre_holiday =
+    true`` says the law shortens it, which the pattern cannot say, so it loads — and what
+    decided that the date is *working* is still the pattern, not a move nobody made.
+    """
+    path = _written(tmp_path, HEADER + _row("2026-03-04", "working_day", pre_holiday=True))
+    calendar = loader.working_day_calendar_from_file(path)
+    answer = wd.classify(
+        {calendar.id: calendar},
+        calendar.id,
+        scope=wd.CalendarScope.CIVIL,
+        on_date=date(2026, 3, 4),
+    )
+    assert isinstance(answer, wd.WorkingDay)
+    assert answer.pre_holiday is True
+    assert answer.decided_by is wd.DecidedBy.REST_PATTERN
+
+
+def test_a_public_holiday_on_a_rest_day_loads_because_it_is_a_different_fact(
+    tmp_path: Path,
+) -> None:
+    """Sunday 2026-03-08 already rests under the pattern, and the law naming it a holiday is
+    still a fact about that date. Refusing it as redundant would make the edge case the spec
+    names — *a holiday that falls on a weekly rest day is declared, not derived* —
+    undeclarable."""
+    path = _written(tmp_path, HEADER + _row("2026-03-08", "public_holiday"))
+    calendar = loader.working_day_calendar_from_file(path)
+    answer = wd.classify(
+        {calendar.id: calendar},
+        calendar.id,
+        scope=wd.CalendarScope.CIVIL,
+        on_date=date(2026, 3, 8),
+    )
+    assert isinstance(answer, wd.NonWorkingDay)
+    assert answer.decided_by is wd.DecidedBy.ENUMERATED_NON_WORKING_DAY
 
 
 def test_a_week_with_no_working_day_inside_the_window_is_refused_at_load(

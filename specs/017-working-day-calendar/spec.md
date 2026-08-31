@@ -596,7 +596,9 @@ without a calendar.
   the *ran off an end* discriminator of FR-011's third reason, rather than return the window's
   edge or loop. The discriminator is required rather than optional: *the date you asked about
   was never covered* and *the date you asked about was covered but the answer is not* have
-  different remedies, and only the second is fixed by extending the calendar forward.
+  different remedies, and which **end** to extend follows from which reason fired — earlier
+  for a date before the window and for a backwards search that ran off, later for the other
+  two.
 - **FR-014**: Given a calendar and a date, the system MUST answer the **last working day of the
   week containing that date**, computed from the calendar's own declared week start. Included
   because пункт 10 is written in it — *«останній робочий день тижня»* — and omitting it would
@@ -1001,11 +1003,20 @@ is empty-verified, so every classification it produces renders marked, and a dat
    `core/primitives/conventions.py::_is_weekend` asserts Saturday **and** Sunday with no
    citation at all. **The two disagree about every Saturday in the window.**
 
-   Nothing consumes either (FR-015, CL-1), so no figure moves whichever way this resolves. What
-   would settle it is a provision naming Saturday, or a reading that the five-day week's second
-   rest day is fixed by legislation somewhere else — neither of which is in the three articles
-   retrieved. FR-002 predicted exactly this inheritance, which is why the transcription rather
-   than the familiar answer is what shipped.
+   **Nothing consumes the calendar (FR-015), so landing it moved no figure — but the question
+   is not free of consequence, and the first draft of this task said it was.** `_is_weekend`'s
+   uncited Saturday already travels into `fund.settlement_date` and into a bond's coupon dates
+   through `conventions.business_day_rule`, so if the law does not rest Saturday those are
+   already wrong today. They are wrong *visibly*, which is CL-1's stated cost: the bond path is
+   reached only by `is_synthetic = true` fixtures the engine marks, and `year._due_on` moves
+   nothing because `data/tax/timing/ua.toml` declares `non_business_day_rule = "none"` on all
+   three categories. The fund path has no such cover, and it is the one that needs an
+   operator's calendar rather than this one.
+
+   What would settle the question is a provision naming Saturday, or a reading that the
+   five-day week's second rest day is fixed by legislation somewhere else — neither of which is
+   in the three articles retrieved. FR-002 predicted exactly this inheritance, which is why the
+   transcription rather than the familiar answer is what shipped.
 
 ## Recorded, not resolved: martial law is now three places
 

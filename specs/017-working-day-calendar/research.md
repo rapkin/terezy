@@ -22,8 +22,15 @@ putting it under `tax/` would suggest one.
 ## D2 — A row is representable-and-refused in TOML, unrepresentable in the record
 
 **Decision**: `[[day]]` carries `classification` (a closed set of three) and an explicit
-`pre_holiday` boolean; the core carries a two-member union where only the working member has a
+`pre_holiday` boolean; the core carries a **three-member row union** — holiday, rest day,
+working day — and a separate two-member **answer** union where only the working member has a
 `pre_holiday` field.
+
+**The row and the answer are different types, and collapsing them was a defect.** They were one
+type until review: a `working_day` row then had to carry a `decided_by`, so every pre-holiday
+Friday was reported as a *declared move* — an executive act on a date no act touched, in the
+field FR-012 exists to make traceable. What decided a date is a function of the row **and** the
+pattern, so only the calendar can answer it, and the row must not pretend to.
 
 This is what lets SC-004's *a pre-holiday day on a non-working date* be a load failure naming
 the file and the date, while the Key Entities line — "a pre-holiday non-working day is
@@ -142,8 +149,10 @@ rest day and puts the second rest day of a five-day week in the enterprise's own
 jurisdiction's civil calendar transcribes what the jurisdiction's law says; Saturday would need
 a source that says it, and there is none. This is precisely the fact FR-002 predicted would be
 inherited from the implementer, and `conventions._is_weekend` asserts it today with no citation.
-**Owner verification task 3** records the divergence. Nothing consumes either notion, so no
-figure moves (SC-010).
+**Owner verification task 3** records the divergence. Nothing consumes the *calendar*, so
+landing it moves no figure (SC-010) — which is not the same as the question being free of
+consequence: `_is_weekend`'s Saturday already reaches a fund settlement date and a bond's
+coupon dates, and CL-1 defers that with its cost stated.
 
 ## D10 — What was measured rather than supposed
 

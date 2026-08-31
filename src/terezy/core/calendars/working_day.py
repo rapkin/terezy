@@ -18,9 +18,8 @@ answer to that: **nothing extends the rest pattern past an end, repeats the last
 infers from an adjacent one** (FR-010), so the staleness is loud instead of silent. That was
 the whole of what a generative form was being considered for -- and a generative form would
 have keyed the martial-law suspension of a holiday regime to the war ending, adding one more
-mechanism to a belief this system already holds elsewhere and does not know it holds twice. An
-enumerated calendar
-conditions on nothing. **A refusal is not a belief.**
+mechanism to a belief this system already holds elsewhere and does not know it holds twice.
+An enumerated calendar conditions on nothing. **A refusal is not a belief.**
 
 ## Scope is a precondition, never a branch
 
@@ -94,9 +93,12 @@ class Missed(Enum):
     """Which way an out-of-coverage question missed.
 
     A discriminator on one reason rather than three reasons, because the remedy differs
-    within one situation: *the date was never covered* and *the date was covered and the
-    answer is not* send a reader to different fixes, and only the second is repaired by
-    extending the calendar forward (FR-011, FR-013).
+    within one situation. *The date was never covered* and *the date was covered and the
+    answer is not* send a reader to different places: the first says the question was outside
+    what anybody read the law for, the second says the question was inside it and the answer
+    is one day past an edge. Which **end** to extend is the discriminator's other half --
+    :attr:`BEFORE_WINDOW` and a backwards search that ran off need the window widened
+    earlier, :attr:`AFTER_WINDOW` and a forwards one need it widened later (FR-011, FR-013).
     """
 
     BEFORE_WINDOW = "before_window"
@@ -156,6 +158,46 @@ type DayClassification = WorkingDay | NonWorkingDay
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
+class DeclaredHoliday:
+    """A date the law names a public holiday. Non-working whatever the pattern says."""
+
+    on_date: date
+    provenance: Provenance
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class DeclaredRestDay:
+    """A date a declared act made a rest day. Refused at load where the pattern already rests
+    it, because a row that repeats the pattern would be reported as a move that never
+    happened."""
+
+    on_date: date
+    provenance: Provenance
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class DeclaredWorkingDay:
+    """A date the law works, and whether it shortens it because a holiday follows.
+
+    **Two different declarations wear this shape**, and :func:`classify` tells them apart from
+    the pattern rather than from the row: a rest day an act moved into working status is
+    decided by that move, while an ordinary working day declared *pre-holiday* is decided by
+    the rest pattern and the row only adds the shortening. Baking a move into every row of
+    this kind would report an executive act on a Friday no act touched -- the false statement
+    in exactly the field FR-012 exists to make traceable.
+    """
+
+    on_date: date
+    pre_holiday: bool
+    provenance: Provenance
+
+
+type ClassificationRow = DeclaredHoliday | DeclaredRestDay | DeclaredWorkingDay
+"""One date whose declaration departs from the rest pattern. A pre-holiday non-working day is
+unrepresentable here, and so is a row carrying no classification at all."""
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class WorkingDayCalendar:
     """One declared calendar: an identity, a scope, a window, a week and its exceptions."""
 
@@ -188,7 +230,7 @@ class WorkingDayCalendar:
 
     week: DeclaredWeek
 
-    rows: tuple[DayClassification, ...]
+    rows: tuple[ClassificationRow, ...]
     """The enumerated exceptions, strictly ascending by date, each dated inside the window.
 
     **Empty is a statement, not a gap** -- see :attr:`covered_by`, which is where a suspended
@@ -296,7 +338,7 @@ def _out_of_coverage(
     )
 
 
-def _row_on(calendar: WorkingDayCalendar, on_date: date) -> DayClassification | None:
+def row_on(calendar: WorkingDayCalendar, on_date: date) -> ClassificationRow | None:
     """The enumerated exception for a date, by bisection over the ascending rows."""
     position = bisect_left(calendar.rows, on_date, key=lambda row: row.on_date)
     if position < len(calendar.rows) and calendar.rows[position].on_date == on_date:
@@ -304,33 +346,51 @@ def _row_on(calendar: WorkingDayCalendar, on_date: date) -> DayClassification | 
     return None
 
 
+def rests_on(week: DeclaredWeek, on_date: date) -> bool:
+    """Whether the declared rest pattern alone makes this date a rest day."""
+    return on_date.weekday() in week.rest_days
+
+
 def _classified(calendar: WorkingDayCalendar, on_date: date) -> DayClassification:
-    """A covered date's classification: its own row, or what the declared pattern says."""
-    row = _row_on(calendar, on_date)
-    if row is not None:
-        return _marked(row, calendar.covered_by)
-    decided = prov.merge(calendar.covered_by, calendar.week.provenance)
-    if on_date.weekday() in calendar.week.rest_days:
-        return NonWorkingDay(on_date=on_date, decided_by=DecidedBy.REST_PATTERN, provenance=decided)
-    return WorkingDay(
-        on_date=on_date,
-        decided_by=DecidedBy.REST_PATTERN,
-        pre_holiday=False,
-        provenance=decided,
-    )
+    """A covered date's classification, and which declared fact decided it.
 
-
-def _marked(row: DayClassification, covered_by: Provenance) -> DayClassification:
-    """A stored row as an answer: its own citation, plus the window's."""
-    merged = prov.merge(covered_by, row.provenance)
-    if isinstance(row, WorkingDay):
+    Every answer carries the coverage window's citation as well as the deciding
+    declaration's: *no row for this date* means *the law declared no exception here* only
+    because somebody read the law for this window.
+    """
+    row = row_on(calendar, on_date)
+    pattern = prov.merge(calendar.covered_by, calendar.week.provenance)
+    if row is None:
+        if rests_on(calendar.week, on_date):
+            return NonWorkingDay(
+                on_date=on_date, decided_by=DecidedBy.REST_PATTERN, provenance=pattern
+            )
         return WorkingDay(
-            on_date=row.on_date,
-            decided_by=row.decided_by,
-            pre_holiday=row.pre_holiday,
-            provenance=merged,
+            on_date=on_date,
+            decided_by=DecidedBy.REST_PATTERN,
+            pre_holiday=False,
+            provenance=pattern,
         )
-    return NonWorkingDay(on_date=row.on_date, decided_by=row.decided_by, provenance=merged)
+    cited = prov.merge(calendar.covered_by, row.provenance)
+    match row:
+        case DeclaredHoliday():
+            return NonWorkingDay(
+                on_date=on_date,
+                decided_by=DecidedBy.ENUMERATED_NON_WORKING_DAY,
+                provenance=cited,
+            )
+        case DeclaredRestDay():
+            return NonWorkingDay(
+                on_date=on_date, decided_by=DecidedBy.DECLARED_MOVE, provenance=cited
+            )
+        case DeclaredWorkingDay():
+            moved = rests_on(calendar.week, on_date)
+            return WorkingDay(
+                on_date=on_date,
+                decided_by=DecidedBy.DECLARED_MOVE if moved else DecidedBy.REST_PATTERN,
+                pre_holiday=row.pre_holiday,
+                provenance=cited if moved else prov.merge(pattern, row.provenance),
+            )
 
 
 def classify(

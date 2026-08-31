@@ -57,22 +57,12 @@ FORTNIGHT = wd.WorkingDayCalendar(
     covered_by=_sources("coverage"),
     week=WEEK,
     rows=(
-        wd.WorkingDay(
-            on_date=PRE_HOLIDAY,
-            decided_by=wd.DecidedBy.DECLARED_MOVE,
-            pre_holiday=True,
-            provenance=_sources("pre_holiday"),
+        wd.DeclaredWorkingDay(
+            on_date=PRE_HOLIDAY, pre_holiday=True, provenance=_sources("pre_holiday")
         ),
-        wd.NonWorkingDay(
-            on_date=HOLIDAY,
-            decided_by=wd.DecidedBy.ENUMERATED_NON_WORKING_DAY,
-            provenance=_sources("holiday"),
-        ),
-        wd.WorkingDay(
-            on_date=MOVED_TO_WORKING,
-            decided_by=wd.DecidedBy.DECLARED_MOVE,
-            pre_holiday=False,
-            provenance=_sources("moved"),
+        wd.DeclaredHoliday(on_date=HOLIDAY, provenance=_sources("holiday")),
+        wd.DeclaredWorkingDay(
+            on_date=MOVED_TO_WORKING, pre_holiday=False, provenance=_sources("moved")
         ),
     ),
 )
@@ -284,10 +274,16 @@ def test_a_working_day_the_pattern_decided_says_the_pattern_decided_it() -> None
 
 
 def test_a_pre_holiday_day_is_reported_as_working_and_as_pre_holiday() -> None:
-    """FR-012, Story 3 scenario 3: the two facts are not collapsed into one."""
+    """FR-012, Story 3 scenario 3: the two facts are not collapsed into one.
+
+    And the working half is decided by the **rest pattern**: Wednesday 2026-03-04 is an
+    ordinary working day that a holiday follows, so the row adds the shortening and nothing
+    moved it. Reporting a declared move here would name an executive act that never happened.
+    """
     answer = wd.classify(CALENDARS, FORTNIGHT.id, scope=wd.CalendarScope.CIVIL, on_date=PRE_HOLIDAY)
     assert isinstance(answer, wd.WorkingDay)
     assert answer.pre_holiday is True
+    assert answer.decided_by is wd.DecidedBy.REST_PATTERN
 
 
 def test_a_pre_holiday_non_working_day_is_unrepresentable() -> None:
@@ -365,6 +361,7 @@ def test_the_last_working_day_on_or_before_a_holiday_is_the_day_before_it() -> N
     assert isinstance(answer, wd.WorkingDay)
     assert answer.on_date == PRE_HOLIDAY
     assert answer.pre_holiday is True
+    assert answer.decided_by is wd.DecidedBy.REST_PATTERN
 
 
 def test_an_unverified_row_marks_the_answer_it_decided() -> None:
@@ -397,10 +394,8 @@ def test_a_week_with_no_working_day_is_a_violated_invariant_rather_than_a_refusa
         covered_by=_sources("coverage"),
         week=WEEK,
         rows=tuple(
-            wd.NonWorkingDay(
-                on_date=date(2026, 3, 9) + wd.ONE_DAY * offset,
-                decided_by=wd.DecidedBy.ENUMERATED_NON_WORKING_DAY,
-                provenance=_sources("shut"),
+            wd.DeclaredHoliday(
+                on_date=date(2026, 3, 9) + wd.ONE_DAY * offset, provenance=_sources("shut")
             )
             for offset in range(5)
         ),

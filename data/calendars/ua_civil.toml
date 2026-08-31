@@ -15,8 +15,11 @@
 #
 # THIS FILE AND THE ENGINE DISAGREE ABOUT EVERY SATURDAY.
 # `core/primitives/conventions.py::_is_weekend` asserts Saturday and Sunday with no citation
-# at all. NEITHER NOTION IS CONSUMED BY ANYTHING (017 FR-015, CL-1), so no figure moves either
-# way, and the divergence is recorded rather than resolved by picking the familiar answer.
+# at all. NOTHING CONSUMES THE CALENDAR (017 FR-015, CL-1), so landing it moved no figure --
+# but the QUESTION is not free of consequence, and saying so would be the comfortable lie:
+# `_is_weekend`'s Saturday already travels into a fund settlement date and into a bond's
+# coupon dates, so if the law does not rest Saturday those are already wrong. CL-1 states
+# that cost and defers it; this file does not resolve it by picking the familiar answer.
 #
 # THE WINDOW BEGINS ON 2025-01-01 because every amendment touching статті 53, 67 і 73 predates
 # it -- № 3258-IX від 14.07.2023 for ст. 73, № 3494-IX від 22.11.2023 for ст. 67 -- so the

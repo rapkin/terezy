@@ -5907,9 +5907,20 @@ def _declared_week(path: Path, table: schema.CalendarWeekTable) -> wd.DeclaredWe
 
 
 def _classification_row(
-    path: Path, position: int, entry: schema.CalendarDayTable
-) -> wd.DayClassification:
-    """One ``[[day]]`` row, refusing the pre-holiday fact on a date it also calls non-working."""
+    path: Path, position: int, entry: schema.CalendarDayTable, week: wd.DeclaredWeek
+) -> wd.ClassificationRow:
+    """One ``[[day]]`` row.
+
+    Two refusals live here and both are about a row saying something it cannot mean:
+
+    * **a pre-holiday fact on a date the same row calls non-working.** A pre-holiday day is a
+      working day the law shortens, so the two facts cannot both hold. Writable in TOML on
+      purpose and refused here; the core has no field for it.
+    * **a row the declared pattern already gives.** A row is an exception *over* the pattern
+      (FR-008), and one that repeats it would be reported as a declared move that never
+      happened. A ``working_day`` row on a date the pattern already works is the one case that
+      still says something -- the pre-holiday shortening -- and it is kept for exactly that.
+    """
     field_prefix = f"{CALENDAR_DAY_TABLE}[{position}]"
     on_date = _parse_date(path, f"{field_prefix}.on_date", entry.on_date)
     classification = _literal(
@@ -5927,12 +5938,12 @@ def _classification_row(
             )
         ]
     )
+    rests = wd.rests_on(week, on_date)
     if classification == "working_day":
-        return wd.WorkingDay(
-            on_date=on_date,
-            decided_by=wd.DecidedBy.DECLARED_MOVE,
-            pre_holiday=entry.pre_holiday,
-            provenance=provenance,
+        if not rests and not entry.pre_holiday:
+            raise _says_nothing(path, field_prefix, on_date, "a working day")
+        return wd.DeclaredWorkingDay(
+            on_date=on_date, pre_holiday=entry.pre_holiday, provenance=provenance
         )
     if entry.pre_holiday:
         raise DeclarationError(
@@ -5943,14 +5954,24 @@ def _classification_row(
             "declared facts that cannot both hold.",
             "write pre_holiday = false, or declare the date a working day",
         )
-    return wd.NonWorkingDay(
-        on_date=on_date,
-        decided_by=(
-            wd.DecidedBy.ENUMERATED_NON_WORKING_DAY
-            if classification == "public_holiday"
-            else wd.DecidedBy.DECLARED_MOVE
-        ),
-        provenance=provenance,
+    if classification == "public_holiday":
+        # Kept even where the pattern already rests the date: that the law NAMES a date a
+        # holiday is a fact about the date, and it is a different fact from a Sunday.
+        return wd.DeclaredHoliday(on_date=on_date, provenance=provenance)
+    if rests:
+        raise _says_nothing(path, field_prefix, on_date, "a rest day")
+    return wd.DeclaredRestDay(on_date=on_date, provenance=provenance)
+
+
+def _says_nothing(path: Path, field_prefix: str, on_date: date, already: str) -> DeclarationError:
+    """A row the declared rest pattern already gives, refused rather than reported as a move."""
+    return DeclarationError(
+        path,
+        f"{field_prefix}.classification",
+        f"declares {on_date.isoformat()} a day the declared rest pattern already makes "
+        f"{already}. A row is an exception OVER the pattern, and keeping this one would make "
+        "the classification report a declared move on a date no act touched.",
+        "delete the row, or correct the date it names",
     )
 
 
@@ -6002,9 +6023,10 @@ def working_day_calendar_from_file(path: Path) -> wd.WorkingDayCalendar:
             "put the two dates in order",
         )
 
-    rows: list[wd.DayClassification] = []
+    week = _declared_week(path, declared.week)
+    rows: list[wd.ClassificationRow] = []
     for position, entry in enumerate(file.day):
-        row = _classification_row(path, position, entry)
+        row = _classification_row(path, position, entry, week)
         if rows and row.on_date <= rows[-1].on_date:
             raise DeclarationError(
                 path,
@@ -6062,7 +6084,7 @@ def working_day_calendar_from_file(path: Path) -> wd.WorkingDayCalendar:
                 )
             ]
         ),
-        week=_declared_week(path, declared.week),
+        week=week,
         rows=tuple(rows),
     )
     _shut_week(path, calendar)

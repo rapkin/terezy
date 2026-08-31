@@ -22,10 +22,12 @@ keeps this file from being narrowed into a green lie.
    string off a record; neither decides anything about a date, and neither is counted. A
    module that reached the notion by copying ``_is_weekend``'s body would be invisible here.
 2. **A holiday spelled as a computed date passes.** The literal scan reads ``date(y, m, d)``
-   constructions and comparisons against ``.month`` / ``.day``; a Paschalion, a
-   ``timedelta`` from another date, or a month-and-day assembled from variables is not seen.
-   FR-008 forbids the first outright, and that prohibition is not enforceable from a syntax
-   tree.
+   constructions and month-and-day pairs compared inside **one** boolean expression; a
+   Paschalion, a ``timedelta`` from another date, a month-and-day assembled from variables, and
+   a pair split across two ``if`` statements are all invisible to it. FR-008 forbids the first
+   outright, and that prohibition is not enforceable from a syntax tree. The pairing is scoped
+   to one ``BoolOp`` deliberately: a module-wide cross-product would report a holiday nobody
+   wrote, which is a worse failure than missing one, because it fails a correct module.
 3. **The literal scan finds nothing today, and that is a state rather than a proof.**
    Measured 2026-08-31: zero ``date(y, m, d)`` constructions and zero ``.month`` / ``.day``
    comparisons anywhere in ``src/``.
@@ -168,23 +170,32 @@ def _holiday_literals(tree: ast.AST) -> list[tuple[int, int]]:
             ]
             if len(parts) == _DATE_PARTS:
                 found.append((parts[1], parts[2]))
-    months = _constant_comparisons(tree, "month")
-    days = _constant_comparisons(tree, "day")
-    found.extend((month, day) for month in months for day in days)
+    for joined in ast.walk(tree):
+        if not isinstance(joined, ast.BoolOp):
+            continue
+        months = _constant_comparisons(joined, "month")
+        days = _constant_comparisons(joined, "day")
+        found.extend((month, day) for month in months for day in days)
     return [pair for pair in found if pair in HOLIDAY_MONTH_DAYS]
 
 
-def _constant_comparisons(tree: ast.AST, attribute: str) -> set[int]:
-    """The integers a module compares ``something.<attribute>`` against."""
+def _constant_comparisons(node: ast.BoolOp, attribute: str) -> set[int]:
+    """The integers **one** boolean expression compares ``something.<attribute>`` against.
+
+    Scoped to a single ``BoolOp`` rather than to a whole module, because the pair is what
+    names a date: taking the cross-product module-wide synthesises ``(12, 25)`` out of a
+    ``d.month == 12`` in one function and an unrelated ``other.day == 25`` in another, and
+    fails a module that writes down no holiday at all.
+    """
     against: set[int] = set()
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Compare):
+    for inner in ast.walk(node):
+        if not isinstance(inner, ast.Compare):
             continue
-        if not (isinstance(node.left, ast.Attribute) and node.left.attr == attribute):
+        if not (isinstance(inner.left, ast.Attribute) and inner.left.attr == attribute):
             continue
         against.update(
             operand.value
-            for operand in node.comparators
+            for operand in inner.comparators
             if isinstance(operand, ast.Constant) and isinstance(operand.value, int)
         )
     return against
@@ -213,6 +224,13 @@ def test_the_literal_scan_would_see_a_holiday_written_into_a_module() -> None:
     assert _holiday_literals(compared) == [(12, 25)]
     ordinary = ast.parse("from datetime import date\nSETTLED = date(2026, 2, 17)\n")
     assert _holiday_literals(ordinary) == []
+    apart = ast.parse(
+        "def a(d):\n    return d.month == 12\n\n\ndef b(d):\n    return d.day == 25\n"
+    )
+    assert _holiday_literals(apart) == [], (
+        "two unrelated comparisons in two functions are not a date, and reporting one would "
+        "fail a module that writes down no holiday"
+    )
 
 
 CHARTER = (

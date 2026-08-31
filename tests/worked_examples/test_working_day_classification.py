@@ -23,7 +23,7 @@ applied during martial law.
 | --- | --- | --- | --- | --- |
 | 2026-03-02 | Monday | yes | rest pattern | no |
 | 2026-03-03 | Tuesday | yes | rest pattern | no |
-| 2026-03-04 | Wednesday | yes | declared move | **yes** |
+| 2026-03-04 | Wednesday | yes | rest pattern | **yes** |
 | 2026-03-05 | Thursday | **no** | enumerated non-working day | — |
 | 2026-03-06 | Friday | yes | rest pattern | no |
 | 2026-03-07 | Saturday | **yes** | declared move | no |
@@ -36,10 +36,12 @@ applied during martial law.
 | 2026-03-14 | Saturday | no | rest pattern | — |
 | 2026-03-15 | Sunday | no | rest pattern | — |
 
-Ten working days out of fourteen, one of them shortened, and exactly three of the fourteen
-decided by something other than the pattern. Every one of those three is a declared row; the
-other eleven are the ordinary case, which is listed rather than assumed because an enumerated
-form could otherwise be read as needing a row per day.
+Ten working days out of fourteen, one of them shortened, and exactly **two** of the fourteen
+decided by something other than the pattern. Three dates carry a declared row and only two of
+them are decided by one: 2026-03-04 is an ordinary Wednesday, and its row adds the shortening
+without moving anything, so *what decided that it is a working day* is still the pattern. The
+other eleven dates are the ordinary case, listed rather than assumed because an enumerated form
+could otherwise be read as needing a row per day.
 """
 
 from __future__ import annotations
@@ -87,22 +89,12 @@ FORTNIGHT = wd.WorkingDayCalendar(
         provenance=_cited("week"),
     ),
     rows=(
-        wd.WorkingDay(
-            on_date=date(2026, 3, 4),
-            decided_by=wd.DecidedBy.DECLARED_MOVE,
-            pre_holiday=True,
-            provenance=_cited("pre_holiday"),
+        wd.DeclaredWorkingDay(
+            on_date=date(2026, 3, 4), pre_holiday=True, provenance=_cited("pre_holiday")
         ),
-        wd.NonWorkingDay(
-            on_date=date(2026, 3, 5),
-            decided_by=wd.DecidedBy.ENUMERATED_NON_WORKING_DAY,
-            provenance=_cited("holiday"),
-        ),
-        wd.WorkingDay(
-            on_date=date(2026, 3, 7),
-            decided_by=wd.DecidedBy.DECLARED_MOVE,
-            pre_holiday=False,
-            provenance=_cited("moved"),
+        wd.DeclaredHoliday(on_date=date(2026, 3, 5), provenance=_cited("holiday")),
+        wd.DeclaredWorkingDay(
+            on_date=date(2026, 3, 7), pre_holiday=False, provenance=_cited("moved")
         ),
     ),
 )
@@ -116,7 +108,7 @@ MOVE = wd.DecidedBy.DECLARED_MOVE
 BY_HAND: tuple[tuple[date, bool, wd.DecidedBy, bool], ...] = (
     (date(2026, 3, 2), True, PATTERN, False),
     (date(2026, 3, 3), True, PATTERN, False),
-    (date(2026, 3, 4), True, MOVE, True),
+    (date(2026, 3, 4), True, PATTERN, True),
     (date(2026, 3, 5), False, ENUMERATED, False),
     (date(2026, 3, 6), True, PATTERN, False),
     (date(2026, 3, 7), True, MOVE, False),
@@ -157,29 +149,33 @@ def test_the_counts_the_docstring_states_are_the_counts_the_table_holds() -> Non
     """The docstring's *ten working days, one shortened, three decided by a row* as a check."""
     assert sum(1 for _, working, _, _ in BY_HAND if working) == 10
     assert sum(1 for _, _, _, pre_holiday in BY_HAND if pre_holiday) == 1
-    assert sum(1 for _, _, decided_by, _ in BY_HAND if decided_by is not PATTERN) == 3
+    assert sum(1 for _, _, decided_by, _ in BY_HAND if decided_by is not PATTERN) == 2
     assert len(FORTNIGHT.rows) == 3
 
 
 def test_every_answer_carries_the_mark_of_the_declaration_that_decided_it() -> None:
     """Principle I's propagation, per date.
 
-    Two citations on every answer and not one: the deciding declaration's, and the coverage
-    window's. The second is load-bearing rather than decorative -- *no row for this date*
-    means *the law declared no exception here* only because somebody read the law for this
-    window, and without that claim it would mean *nobody transcribed this date*.
+    The coverage window is on **every** answer and is load-bearing rather than decorative:
+    *no row for this date* means *the law declared no exception here* only because somebody
+    read the law for this window, and without that claim it would mean *nobody transcribed
+    this date*.
+
+    2026-03-04 rests on three, which is the shape of what it declares: an ordinary Wednesday
+    the **pattern** works, that a **row** additionally shortens, inside a **window** somebody
+    read. Dropping the week there would mark the pre-holiday fact and leave the working half
+    of the same answer resting on nothing.
     """
     expected = {
-        date(2026, 3, 4): "synthetic_fortnight.pre_holiday",
-        date(2026, 3, 5): "synthetic_fortnight.holiday",
-        date(2026, 3, 7): "synthetic_fortnight.moved",
-        date(2026, 3, 9): "synthetic_fortnight.week",
+        date(2026, 3, 4): {"synthetic_fortnight.pre_holiday", "synthetic_fortnight.week"},
+        date(2026, 3, 5): {"synthetic_fortnight.holiday"},
+        date(2026, 3, 7): {"synthetic_fortnight.moved"},
+        date(2026, 3, 9): {"synthetic_fortnight.week"},
     }
-    for on_date, source_id in expected.items():
+    for on_date, deciding in expected.items():
         answer = wd.classify(CALENDARS, FORTNIGHT.id, scope=wd.CalendarScope.CIVIL, on_date=on_date)
         assert isinstance(answer, wd.WorkingDay | wd.NonWorkingDay)
         assert prov.is_unverified(answer.provenance)
-        assert {ref.id for ref in answer.provenance.sources} == {
-            source_id,
-            "synthetic_fortnight.coverage",
+        assert {ref.id for ref in answer.provenance.sources} == deciding | {
+            "synthetic_fortnight.coverage"
         }

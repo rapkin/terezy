@@ -39,9 +39,12 @@ day = []                        # written explicitly; an omitted key is a load f
 # verified_on    = ""
 ```
 
-`data/calendars/` joins `SOURCED_DIRS` in `scripts/check_provenance.py`. Every table above
-carries a date leaf outside `STRUCTURAL_KEYS`, so the gate requires the citation and the
-observation kind on each of the three — which is the hole `e6def2f` closed.
+`data/calendars/` joins `SOURCED_DIRS` in `scripts/check_provenance.py`, which reaches
+`[calendar.coverage]` and every `[[day]]` because each carries a **date** outside
+`STRUCTURAL_KEYS` — the hole `e6def2f` closed. It does **not** reach `[calendar.week]`, which
+holds weekday *names* and no date and no number: that table's citation is required by the
+loader and its observation kind by the resolver, and blanking either fails at load rather than
+at the gate.
 
 ## The core records — `terezy.core.calendars.working_day`
 
@@ -52,8 +55,17 @@ observation kind on each of the three — which is the hole `e6def2f` closed.
 | `DeclaredWeek` | `rest_days: frozenset[int]`, `starts_on: int`, `provenance` |
 | `WorkingDay` | `on_date`, `decided_by`, `pre_holiday: bool`, `provenance` |
 | `NonWorkingDay` | `on_date`, `decided_by`, `provenance` |
-| `DayClassification` | `WorkingDay \| NonWorkingDay` |
-| `WorkingDayCalendar` | `id`, `jurisdiction`, `authority`, `scope`, `covers: tuple[date, date]`, `covered_by: Provenance`, `week: DeclaredWeek`, `rows: tuple[DayClassification, ...]` |
+| `DayClassification` | `WorkingDay \| NonWorkingDay` — the **answer** |
+| `DeclaredHoliday` / `DeclaredRestDay` / `DeclaredWorkingDay` | a **row**: a date, its provenance, and for the third a `pre_holiday: bool` |
+| `ClassificationRow` | `DeclaredHoliday \| DeclaredRestDay \| DeclaredWorkingDay` |
+| `WorkingDayCalendar` | `id`, `jurisdiction`, `authority`, `scope`, `covers: tuple[date, date]`, `covered_by: Provenance`, `week: DeclaredWeek`, `rows: tuple[ClassificationRow, ...]` |
+
+**A row is not an answer, and that is the point.** A row says what the law declares about a
+date; `decided_by` says which fact settled the question, and only the calendar knows both. A
+`DeclaredWorkingDay` on a Saturday the pattern rests is decided by a **declared move**; the
+same record on an ordinary Wednesday, carrying only the pre-holiday shortening, is decided by
+the **rest pattern**. Baking the move into the row would report an executive act on a date no
+act touched — in exactly the field FR-012 exists to make traceable.
 
 Weekdays are `date.weekday()` indices — Monday 0 … Sunday 6 — throughout. `rows` is strictly
 ascending by `on_date` and looked up by bisection, exactly as `OfficialRateSeries.observations`
@@ -64,9 +76,10 @@ only onto the ones no row decided. *No row for this date* means *the law declare
 here* only because somebody read the law for this window; without that claim it would mean
 *nobody transcribed this date*.
 
-**`pre_holiday` exists only on `WorkingDay`.** That is the whole of FR-012's *"the answer MUST
-make a wrong state unrepresentable"*: there is no field for a pre-holiday non-working day, so
-the case SC-004 writes into a file cannot survive the load.
+**`pre_holiday` exists only on `WorkingDay` and on `DeclaredWorkingDay`.** That is the whole of
+FR-012's *"the answer MUST make a wrong state unrepresentable"*: there is no field for a
+pre-holiday non-working day anywhere in the core, so the case SC-004 writes into a file cannot
+survive the load.
 
 ## The refusal — `CalendarUnavailable`, exactly three members (FR-011)
 

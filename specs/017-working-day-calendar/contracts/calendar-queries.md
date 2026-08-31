@@ -21,9 +21,13 @@ Returns `WorkingDay` or `NonWorkingDay`, each stating `decided_by`:
 
 | `decided_by` | When |
 |---|---|
-| `REST_PATTERN` | no row mentions the date; the declared `rest_days` decided it |
+| `REST_PATTERN` | no row mentions the date — or a `working_day` row only adds the pre-holiday shortening to a date the pattern already works |
 | `ENUMERATED_NON_WORKING_DAY` | a row declares `classification = "public_holiday"` |
-| `DECLARED_MOVE` | a row declares `"rest_day"` or `"working_day"` |
+| `DECLARED_MOVE` | a row declares `"rest_day"` or `"working_day"` **against** what the pattern says |
+
+The second row of that table is what stops the answer naming an executive act on a Friday no
+act touched: a pre-holiday day is an ordinary working day the law shortens, and the shortening
+is a different fact from a move.
 
 Provenance on the answer is the deciding declaration's — the row's, or the week's where the
 pattern decided it — **merged with the coverage window's**, which every answer rests on. An
