@@ -37,8 +37,8 @@ against the register's whole membership.
 Left: one field, and the rest is **enforced** rather than promised. ``register`` refuses an
 issue or a payment row carrying a key this script does not write, so a field the endpoint adds
 stops the run instead of being dropped into a file that reads as complete. The exception is a
-payment row's ``array``, a constant ``"true"`` on all 3 634 rows that says nothing about the
-payment.
+payment row's ``array``, dropped because it is the constant ``"true"`` on all 3 634 rows -- and
+the constancy is checked on every retrieval rather than believed.
 
 Usage
 -----
@@ -59,6 +59,7 @@ import sys
 import tempfile
 import urllib.error
 import urllib.request
+from collections.abc import Mapping
 from typing import Any, Final
 
 ENDPOINT: Final = "https://bank.gov.ua/depo_securities?json"
@@ -101,12 +102,15 @@ DATES: Final = ("razm_date", "pgs_date")
 WRITTEN: Final = frozenset({"cpcode", "payments", *SCALARS, *OPTIONAL_SCALARS, *LABELS, *DATES})
 """Every key this script writes on an issue. An issue carrying anything else stops the run."""
 
-PAYMENT_WRITTEN: Final = frozenset({"pay_date", "pay_type", "pay_val", "array"})
-"""Every key this script reads on a payment row, `array` included -- it is a constant `"true"`
-on all 3 634 rows and carries nothing, so it is read and deliberately not written. A row
-carrying anything else stops the run, for the reason the issue-level guard exists: an accrual
-amount or a gross/net split added here would be dropped into a file whose header says it is the
-whole register."""
+PAYMENT_WRITTEN: Final = frozenset({"pay_date", "pay_type", "pay_val"})
+"""Every key this script writes on a payment row. A row carrying anything else stops the run,
+for the reason the issue-level guard exists: an accrual amount or a gross/net split added here
+would be dropped into a file whose header says it is the whole register."""
+
+TOLERATED: Final[Mapping[str, str]] = {"array": "true"}
+"""A key written nowhere because it says nothing -- and the VALUE is what licenses that, so the
+value is checked rather than described. `array` is `"true"` on all 3 634 rows; a row saying
+anything else is a field that has started carrying information, and it stops the run."""
 
 
 class FetchError(RuntimeError):
@@ -140,12 +144,19 @@ def _check_issue(issue: dict[str, Any], code: str) -> None:
     for row in payments:
         if not isinstance(row, dict):
             raise FetchError(f"{ENDPOINT}: {code} has a payment row that is not an object")
-        extra = sorted(set(row) - PAYMENT_WRITTEN)
+        extra = sorted(set(row) - PAYMENT_WRITTEN - set(TOLERATED))
         if extra:
             raise FetchError(
                 f"{ENDPOINT}: {code} has a payment row publishing {extra}, which this script "
                 "does not write; widen PAYMENT_WRITTEN and render() and re-run."
             )
+        for field, constant in TOLERATED.items():
+            if field in row and row[field] != constant:
+                raise FetchError(
+                    f"{ENDPOINT}: {code} has a payment row whose {field!r} is {row[field]!r} "
+                    f"rather than {constant!r}. That field is dropped because it says nothing; "
+                    "a row that varies it is a field carrying information and must be written."
+                )
         for field in ("pay_date", "pay_type", "pay_val"):
             if row.get(field) is None:
                 raise FetchError(f"{ENDPOINT}: {code} has a payment row with no {field!r}")

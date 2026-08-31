@@ -25,12 +25,13 @@ recorded as the `early-exit-ignores-a-coupon-inside-the-window` future entry.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 
 from terezy.core.decision.answer import section_evaluated
 from terezy.core.instruments.interface import EnumeratedTerms
+from terezy.core.primitives.tolerance import TOLERANCE
 from terezy.core.results.answer import Exclusion
 from tests import answer_registries as answers
 
@@ -54,10 +55,22 @@ none of them is signed the way this omission is."""
 WORKED = "UA4000236228"
 """Bought 2026-09-01 at 1089.32, pays 85.50 on 2026-09-09, sold 2026-10-01 at 1087.89.
 
-85.50 + 1087.89 = 1173.39 against an outlay of 1089.32 -- 7.7% in one month, on a bond whose
-coupon is 15.55% a year. The 85.50 is counted twice: once as income, once inside a sale price
-quoted while it was still attached.
+The whole arithmetic, on the owner's own 50 000 UAH and the declared minimum increment of one
+whole unit::
+
+    45 units x 1089.32 = 49 019.40 deployed, 980.60 left undeployed
+    45 x    85.50      =  3 847.50  coupon, collected on 2026-09-09
+    45 x  1 087.89     = 48 955.05  sale, at a price quoted 2026-08-24 -- BEFORE the coupon
+                         52 802.55  reached
+
+7.7% on the money deployed, in one month, on a bond whose coupon is 17.1% a year (`auk_proc`
+17.1 against a nominal of 1 000, halved for the 182-day period: 85.50). The 3 847.50
+is counted twice: once as income and once inside a sale price quoted while it was still
+attached.
 """
+
+REACHED = 52802.55
+DEPLOYED_UNITS = 45.0
 
 
 def _sold_early_with_a_payment_inside(horizon_index: int) -> list[str]:
@@ -76,8 +89,33 @@ def _sold_early_with_a_payment_inside(horizon_index: int) -> list[str]:
     return sorted(found)
 
 
+def test_the_window_and_the_holding_cannot_disagree_about_what_is_inside() -> None:
+    """The count above opens its window at the HORIZON start; the engine buys at the horizon
+    start plus the way in's declared latency, and credits only payments after that. The two
+    readings agree only while no declared payment falls in the gap between them -- which is
+    true today and is a fact about the data rather than about either rule, so it is asserted
+    rather than assumed.
+    """
+    latency = max(
+        leg.latency_days for route in answers.inputs().routes.values() for leg in route.legs
+    )
+    assert latency > 0, "a zero latency would make this check vacuous"
+    windows = [section.horizon.start for section in answers.answered().sections]
+    declared = answers.inputs().registries.instruments
+    inside_the_gap = [
+        (name, payment.on)
+        for name, item in declared.items()
+        if isinstance(item.terms, EnumeratedTerms)
+        for payment in item.terms.payments
+        for start in windows
+        if start < payment.on <= start + timedelta(days=latency)
+    ]
+    assert not inside_the_gap, inside_the_gap
+
+
 def test_the_gap_is_reached_at_every_horizon_the_owner_asked_about() -> None:
-    measured = tuple(len(_sold_early_with_a_payment_inside(index)) for index in range(3))
+    sections = len(answers.answered().sections)
+    measured = tuple(len(_sold_early_with_a_payment_inside(index)) for index in range(sections))
     assert measured == AFFECTED_PER_HORIZON
 
 
@@ -116,3 +154,16 @@ def test_no_exclusion_states_the_coupon_omission_today() -> None:
     stated = {item.what.value for item in section.excludes}
     assert stated >= EARLY_EXIT_CLAIMS, sorted(stated)
     assert not [name for name in stated if "coupon" in name]
+
+
+def test_the_engine_reports_the_figure_this_module_calls_overstated() -> None:
+    """The finding is load-bearing rather than illustrative: the number in the docstring is the
+    one the owner's own question produces, read back off the answer."""
+    section = answers.answered().sections[0]
+    worked = [item for item in section_evaluated(section) if item.key.instrument_id == WORKED]
+    assert len(worked) == 1
+    outcome = worked[0]
+    assert outcome.sold_early is not None
+    assert outcome.sold_early.price_per_unit.amount == 1087.89
+    assert outcome.reaches.amount == pytest.approx(REACHED, abs=TOLERANCE)
+    assert outcome.reaches.amount == pytest.approx(DEPLOYED_UNITS * (85.5 + 1087.89), abs=TOLERANCE)
