@@ -198,7 +198,7 @@ def test_an_unverified_rest_pattern_marks_a_moved_day_as_well_as_a_pattern_day()
     evidence that anything was moved -- and the answer has to carry it.
     """
     checked = wd.WorkingDayCalendar(
-        id="synthetic_checked",
+        id=FORTNIGHT.id,
         jurisdiction="XX",
         authority="a synthetic authority",
         scope=wd.CalendarScope.CIVIL,
