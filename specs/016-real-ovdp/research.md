@@ -196,3 +196,17 @@ which is what the loader requires. No rate, category or treatment is declared he
 | 1. the venue's minimum ticket and minimum unit | **closed** by D5's retrieval |
 | 2. which date governs a coupon's tax date where the sources disagree | **open**, unreached: the closest payment to a year boundary is five days away |
 | 3. whether the depository is sufficient for a completeness claim | **open**, and carried into every declaration's `coverage` verification task |
+
+## D8 — What still is not ranked, and why it is one word in his own file
+
+Feature 015's answer dropped five of seven candidates for a missing resale price. Four of those
+five were the invented bonds and one, `enumerated_out_of_order`, left the group entirely under
+FR-027a; the 24 real issues carry a quotation and evaluate at all three horizons.
+
+**The comparison is still `BenchmarkUnavailable`, and the reason moved.** The question names
+`ovdp_synthetic_a` as its benchmark, and that is one of the four fixtures that still refuses.
+010 FR-011 will not offer a ranking without the hurdle, which is right: the head of a list with
+no benchmark reads as a winner. So what is left between the owner and a ranked answer is a real
+ISIN in place of the fixture in `data/questions/fifty-thousand.toml` — and which issue
+everything is measured against is exactly the judgement that field exists to record, so it is
+his to write. Recorded as the `the-benchmark-is-a-fixture` future entry.
