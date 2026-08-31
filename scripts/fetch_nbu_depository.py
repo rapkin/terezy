@@ -157,7 +157,9 @@ def _check_issue(issue: dict[str, Any], code: str) -> None:
         if extra:
             raise FetchError(
                 f"{ENDPOINT}: {code} has a payment row publishing {extra}, which this script "
-                "does not write; widen PAYMENT_WRITTEN and render() and re-run."
+                "does not write; widen PAYMENT_TEXT or PAYMENT_NUMBERS above and re-run. Not "
+                "PAYMENT_WRITTEN, which is composed from them: a key added there alone is "
+                "required non-null and written nowhere."
             )
         for field, constant in TOLERATED.items():
             if field in row and row[field] != constant:

@@ -25,15 +25,18 @@ recorded as the `early-exit-ignores-a-coupon-inside-the-window` future entry.
 
 from __future__ import annotations
 
+import functools
 from datetime import date, timedelta
 
 import pytest
 
-from terezy.core.decision.answer import section_evaluated
+from terezy.core.decision.answer import AnswerInputs, section_evaluated
 from terezy.core.instruments.interface import EnumeratedTerms
 from terezy.core.primitives.tolerance import TOLERANCE
 from terezy.core.results.answer import Exclusion
+from terezy.core.results.ramp import RampCost
 from terezy.core.results.tuple import TupleOutcome
+from terezy.core.routes import cost
 from terezy.core.routes.path import segments_of
 from tests import answer_registries as answers
 
@@ -75,24 +78,33 @@ REACHED = 52802.55
 DEPLOYED_UNITS = 45.0
 
 
-def _bought_on(item: TupleOutcome, start: date) -> date:
-    """When the engine's own rule says the purchase happens: the window opens, then the way in
-    takes as long as its legs declare. The SUM along the chain, which is what `cost` accumulates
-    and `tuple_outcome` adds -- a chain of two one-day legs is two days, not one."""
-    routes = answers.inputs().routes
-    days = sum(
+@functools.cache
+def _supplied() -> AnswerInputs:
+    """The shipped registry, read once. `answers.inputs()` re-resolves the whole data root, and
+    the helpers below are called per payment."""
+    return answers.inputs()
+
+
+def _latency(item: TupleOutcome) -> int:
+    """How long the way in takes: the SUM along the chain, which is what `cost` accumulates and
+    `tuple_outcome` adds to the horizon start -- a chain of two one-day legs is two days."""
+    routes = _supplied().routes
+    return sum(
         leg.latency_days
         for segment in segments_of(item.key.route_in)
         for leg in routes[segment].legs
     )
-    return start + timedelta(days=days)
+
+
+def _bought_on(item: TupleOutcome, start: date) -> date:
+    return start + timedelta(days=_latency(item))
 
 
 def _sold_early_with_a_payment_inside(horizon_index: int) -> list[str]:
     answer = answers.answered()
     section = answer.sections[horizon_index]
     end = section.horizon.end
-    declared = answers.inputs().registries.instruments
+    declared = _supplied().registries.instruments
     found = []
     for item in section_evaluated(section):
         if item.sold_early is None:
@@ -111,23 +123,32 @@ def test_the_window_and_the_holding_cannot_disagree_about_what_is_inside() -> No
     agree only while no declared payment falls in the gap between them -- a fact about the data
     rather than about either rule, so it is asserted rather than assumed.
     """
-    answer = answers.answered()
-    declared = answers.inputs().registries.instruments
-    gaps = [
-        (item.key.instrument_id, payment.on)
-        for section in answer.sections
-        for item in section_evaluated(section)
-        if item.sold_early is not None
-        for payment in getattr(declared[item.key.instrument_id].terms, "payments", ())
-        if section.horizon.start < payment.on <= _bought_on(item, section.horizon.start)
-    ]
+    declared = _supplied().registries.instruments
+    gaps = []
+    latencies = []
+    for section in answers.answered().sections:
+        for item in section_evaluated(section):
+            if item.sold_early is None:
+                continue
+            # Not `getattr(terms, "payments", ())`: a generative bond has no payment list, and
+            # skipping one silently would drop it from a check whose subject IS which payments
+            # fall inside a window. None carries a resale price today; the day one does, this
+            # must be widened rather than quietly pass.
+            terms = declared[item.key.instrument_id].terms
+            assert isinstance(terms, EnumeratedTerms), item.key.instrument_id
+            latencies.append(_latency(item))
+            bought = _bought_on(item, section.horizon.start)
+            gaps += [
+                (item.key.instrument_id, payment.on)
+                for payment in terms.payments
+                if section.horizon.start < payment.on <= bought
+            ]
     assert not gaps, gaps
-    latencies = {
-        _bought_on(item, section.horizon.start) - section.horizon.start
-        for section in answer.sections
-        for item in section_evaluated(section)
-    }
-    assert latencies != {timedelta(0)}, "a zero latency everywhere would make this vacuous"
+    # Over the SAME population the check ranges over, and non-empty: an empty set, or one where
+    # only the candidates this check skips carry a latency, would make `gaps` empty for the
+    # vacuous reason rather than the true one.
+    assert latencies
+    assert set(latencies) != {0}
 
 
 def test_the_gap_is_reached_at_every_horizon_the_owner_asked_about() -> None:
@@ -142,7 +163,7 @@ def test_the_worked_instance_is_among_them_at_one_month() -> None:
 
 def test_the_worked_arithmetic_is_what_the_declarations_say() -> None:
     """The numbers in this module's docstring, read back off the files rather than retyped."""
-    declared = answers.inputs().registries
+    declared = _supplied().registries
     terms = declared.instruments[WORKED].terms
     assert isinstance(terms, EnumeratedTerms)
     inside = [
@@ -184,3 +205,31 @@ def test_the_engine_reports_the_figure_this_module_calls_overstated() -> None:
     assert outcome.sold_early.price_per_unit.amount == 1087.89
     assert outcome.reaches.amount == pytest.approx(REACHED, abs=TOLERANCE)
     assert outcome.reaches.amount == pytest.approx(DEPLOYED_UNITS * (85.5 + 1087.89), abs=TOLERANCE)
+
+
+def test_the_latency_this_module_sums_is_the_one_the_engine_adds() -> None:
+    """`_latency` re-derives `tuple_outcome`'s `horizon.start + routed.latency_days`, because
+    `TupleOutcome` exposes no purchase date. Re-deriving a rule is how a check quietly keeps
+    comparing against the old one, so the sum is pinned against the accumulator the engine
+    actually uses -- `cost.cost_one`, whose `RampCost.latency_days` is what the join adds.
+    """
+    supplied = _supplied()
+    declarations = answers.declarations()
+    section = answers.answered().sections[0]
+    checked = 0
+    for item in section_evaluated(section):
+        priced = cost.cost_one(
+            item.key.route_in,
+            item.outlay,
+            routes=supplied.routes,
+            channels=declarations.tuples.registries.channels,
+            streams=declarations.tuples.registries.streams,
+            kinds=declarations.tuples.registries.kinds,
+            on_date=section.horizon.start,
+            as_of=answers.AS_OF,
+            spendable=declarations.tuples.registries.spendable,
+        )
+        assert isinstance(priced, RampCost), item.key.instrument_id
+        assert priced.latency_days == _latency(item), item.key.instrument_id
+        checked += 1
+    assert checked
