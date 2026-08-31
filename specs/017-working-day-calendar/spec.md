@@ -902,10 +902,16 @@ FR-018's scan pins the three-site set so a fourth cannot appear quietly.
 
 ## Owner verification tasks
 
-No legal value has been filled in. Both tasks below are retrieval-and-reading, and until they
-close, the shipped calendar covers only the years the owner has verified and refuses outside
-that window (FR-010, FR-020). Neither is urgent — nothing consumes the calendar (FR-015) — and
-both are kept because the reading will be needed whenever something does.
+No legal value has been filled in from memory, and none of the three tasks below is urgent:
+nothing consumes the calendar (FR-015). Task 1's **retrieval** closed on 2026-08-31 and its
+*verification* half stays open; task 2 stays open by design; task 3 is new and is the one place
+this feature could have inherited a value from an implementer.
+
+**On FR-020's window.** The shipped window covers what somebody read the law for rather than
+what the owner has checked, because a calendar with an empty window is a load failure and no
+`verified_on` under `data/` is filled anywhere in this repository. Every citation on the file
+is empty-verified, so every classification it produces renders marked, and a date past
+2026-10-30 refuses by name (FR-010).
 
 1. **The holiday enumeration itself, and the acts that move working days.** The provision that
    sets Ukraine's святкові і неробочі дні is **стаття 73 Кодексу законів про працю України**
@@ -914,16 +920,36 @@ both are kept because the reading will be needed whenever something does.
    Положення that 011 cites records the Cabinet's power to move working days, which is
    exercised by an individual act each year and must be cited per year, per row.
 
-   **Not retrieved here, and the reason is recorded so nobody repeats the attempt blind.**
-   011's owner verification task 1 established the working retrieval form —
-   `https://zakon.rada.gov.ua/laws/show/<id>/print` with `curl --compressed`. On 2026-08-30
-   that form returned **HTTP 403** to `curl` for both documents tried, and a browser-equivalent
-   fetch of `322-08/print` returned the Code **truncated mid-стаття 40**, well before стаття 53.
-   The Labour Code is long enough that a whole-document fetch does not reach these articles.
-   Whoever retrieves them needs a per-article or per-section route, not the whole Code — and the
-   1300-plus dates of a decade of calendars are not a thing to transcribe from a summary page.
-   Per the owner's standing instruction, this is recorded and moved past rather than researched
-   further.
+   **RETRIEVED 2026-08-31, and this half of the task is closed.** The 2026-08-30 failure had
+   one cause and it was the request rather than the document: retrieval needs **both** a
+   browser `User-Agent` **and** `/print`. With both, `curl --compressed` returns the whole
+   consolidated Code — 141 KB, all three articles present. Without a `User-Agent` every path
+   returns HTTP 403; with one, the bare URL and `/card` return **HTTP 200 on an incomplete
+   document**, which is the more convincing false negative and is what the earlier attempt hit.
+   The `WebFetch` tool still truncates the Code mid-стаття 40 and is not a route to it.
+
+   **What the three articles say, and what the implementation therefore declares.** Стаття 73
+   (святкові і неробочі дні) and стаття 53 (the shortened передсвятковий день) each carry the
+   marker *«У період дії воєнного стану не застосовуються норми статті … згідно із Законом
+   № 2136-IX від 15.03.2022 з урахуванням змін, внесених Законом № 2352-IX від 01.07.2022»*, as
+   does частина третя статті 67. Частина друга статті 67 is **not** suspended and reads
+   *«Загальним вихідним днем є неділя»*, leaving the second rest day of a five-day week to the
+   enterprise's own schedule. So inside a martial-law window the Code enumerates **no** holidays
+   and **no** pre-holiday days, and makes exactly one weekday a rest day — which is what
+   `data/calendars/ua_civil.toml` declares, with the enumeration empty and the suspending act
+   cited on the coverage window.
+
+   **The Cabinet's power to move working days is not in статті 67 any more.** Частини п'ята і
+   шоста статті 67 were **excluded** by Закон № 3494-IX від 22.11.2023, and what remains puts
+   перенесення вихідних та робочих днів in a трудовий/колективний договір or an employer's
+   order. Пункт 11 розділу III of the НБУ Положення that 011 cites is a different instrument and
+   is unread here; the enumerated form is what makes either answer declarable without the engine
+   holding a rule.
+
+   **What is still open on this task**: the owner's own verification. Every citation in the
+   shipped file carries an empty `verified_on`, so every classification it produces renders
+   marked. Extending the window past 2026-10-30 is a retrieval of the next martial-law Указ
+   rather than a judgement, and the window refuses until somebody performs it.
 
 2. **Whether the National Bank's holiday vocabulary tracks the Labour Code's suspension.** This
    is the load-bearing one, and it is the martial-law trap in its concrete form.
@@ -961,6 +987,23 @@ both are kept because the reading will be needed whenever something does.
 
    **Read the consolidated text and the amendment markers under the provision you quote.** The
    lesson 011 records twice, and the reason the marker above is quoted with the provision.
+
+3. **Is Saturday a rest day as a matter of Ukrainian law?** The one place the implementation
+   could have inherited a value from an implementer rather than from a source, and it declined
+   to.
+
+   Стаття 67 ч. 2 КЗпП makes **Sunday** the general rest day and says the second rest day of a
+   five-day week, *«якщо він не визначений законодавством, визначається графіком роботи
+   підприємства»* — an enterprise's own schedule, which is not a fact about the jurisdiction.
+   So `data/calendars/ua_civil.toml` declares `rest_days = ["sunday"]`, and
+   `core/primitives/conventions.py::_is_weekend` asserts Saturday **and** Sunday with no
+   citation at all. **The two disagree about every Saturday in the window.**
+
+   Nothing consumes either (FR-015, CL-1), so no figure moves whichever way this resolves. What
+   would settle it is a provision naming Saturday, or a reading that the five-day week's second
+   rest day is fixed by legislation somewhere else — neither of which is in the three articles
+   retrieved. FR-002 predicted exactly this inheritance, which is why the transcription rather
+   than the familiar answer is what shipped.
 
 ## Recorded, not resolved: martial law is now three places
 

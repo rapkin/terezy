@@ -1,0 +1,122 @@
+# Ukraine's civil calendar: which dates the law calls working, 2025-01-01 to 2026-10-30.
+#
+# RETRIEVED, NOT VERIFIED. Every citation below carries the date it was read and an EMPTY
+# `verified_on`, because a provision somebody transcribed is not one the owner has checked.
+# Every classification struck from this file renders marked until he does.
+#
+# ---------------------------------------------------------------------------
+# THE ENUMERATION IS EMPTY, AND IT MEANS IT
+# ---------------------------------------------------------------------------
+#
+# `day = []` is not a file somebody forgot to fill in. Inside this window the Labour Code's
+# holiday regime IS NOT APPLIED: ч. 6 ст. 6 Закону № 2136-IX suspends статті 53 і 73 КЗпП for
+# the duration of martial law, стаття 73 being the list of святкові і неробочі дні and стаття
+# 53 the shortened передсвятковий день. So the law enumerates no holidays here and no
+# pre-holiday days, and the transcription of that is no rows.
+#
+# The distinction between "suspended" and "not transcribed" is carried by the WINDOW rather
+# than by the absence, which is why `[calendar.coverage]` carries the suspending act's
+# citation and why every answer this file gives rests on it.
+#
+# ---------------------------------------------------------------------------
+# THE REST PATTERN IS SUNDAY, AND SATURDAY IS AN OPEN QUESTION
+# ---------------------------------------------------------------------------
+#
+# ст. 67 ч. 2 КЗпП makes SUNDAY the general rest day and puts the second rest day of a
+# five-day week in the enterprise's own schedule -- «якщо він не визначений законодавством,
+# визначається графіком роботи підприємства». A civil calendar transcribes what the
+# JURISDICTION's law says, and the jurisdiction's law does not make Saturday a rest day.
+#
+# `core/primitives/conventions.py::_is_weekend` asserts Saturday and Sunday with no citation
+# at all, so this file and that function disagree about every Saturday. NEITHER IS CONSUMED
+# BY ANYTHING (017 FR-015, CL-1), so no figure moves either way, and the divergence is
+# recorded as owner verification task 3 in `specs/017-working-day-calendar/spec.md` rather
+# than resolved by picking whichever looks more familiar.
+#
+# ---------------------------------------------------------------------------
+# WHY THE WINDOW BEGINS ON 2025-01-01 AND ENDS ON 2026-10-30
+# ---------------------------------------------------------------------------
+#
+# BEGINS: every amendment touching статті 53, 67 і 73 predates it -- № 3258-IX від 14.07.2023
+# for ст. 73, № 3494-IX від 22.11.2023 for ст. 67 -- so the consolidated text retrieved on
+# 2026-08-31 is the text in force throughout the window. An earlier date would need the
+# edition in force then, which is a different retrieval and is not carried here.
+#
+# ENDS: martial law is in force continuously from 05:30 on 2022-02-24 to 05:30 on 2026-10-31
+# by the extension chain recorded on Указ № 64/2022, the last being Указ № 596/2026 від
+# 13.07.2026 -- 90 діб from 05:30 on 2026-08-02. 2026-10-30 is the last day that chain covers
+# whole. A date past it REFUSES by name, naming this calendar, the date and the window; the
+# rest pattern is never extended forward and the last year is never repeated. That refusal is
+# the answer to the enumerated form's one weakness, and extending the window is a retrieval
+# of the next Указ rather than a guess.
+#
+# ---------------------------------------------------------------------------
+# WHAT THIS FILE DOES NOT SETTLE
+# ---------------------------------------------------------------------------
+#
+# Whether the National Bank's «святкові дні» and «передсвятковий день» in пункт 10 розділу III
+# of its Положення track КЗпП's suspension is a reading nobody here has done, and it is owner
+# verification task 2. That the NBU publishes an official rate for 1 January 2026 FALSIFIES
+# the reading that it treats holidays as non-publication days; it does not establish what
+# пункт 10's own words mean, and 017 FR-004 forbids turning publication data into a calendar.
+
+# `day` sits above `[calendar]` because TOML binds a bare key to the table it follows:
+# written below, it would declare `calendar.day`.
+day = []
+
+[calendar]
+id           = "ua_civil"
+jurisdiction = "UA"
+authority    = "Верховна Рада України"
+scope        = "civil"
+
+[calendar.coverage]
+first        = "2025-01-01"
+last         = "2026-10-30"
+kind         = "tax_rule"
+source       = """
+Кодекс законів про працю України № 322-VIII, консолідований текст, \
+https://zakon.rada.gov.ua/laws/show/322-08/print (retrieval needs BOTH a browser \
+User-Agent AND the /print path: without a User-Agent every path returns HTTP 403, and \
+with one the bare URL and /card return HTTP 200 on an INCOMPLETE document). \
+Стаття 73 «Святкові і неробочі дні» and стаття 53 «Тривалість роботи напередодні \
+святкових, неробочих і вихідних днів» each carry the marker \
+«У період дії воєнного стану не застосовуються норми статті 73 згідно із Законом \
+№ 2136-IX від 15.03.2022 з урахуванням змін, внесених Законом № 2352-IX від 01.07.2022» \
+(and the same for статті 53), whose operative text is частина шоста статті 6 Закону \
+України «Про організацію трудових відносин в умовах воєнного стану» № 2136-IX, \
+https://zakon.rada.gov.ua/laws/show/2136-20/print: «У період дії воєнного стану не \
+застосовуються норми статті 53, частини першої статті 65, частин третьої - п'ятої статті \
+67, статей 71, 73, 78-1 Кодексу законів про працю України...». Martial law is in force \
+throughout this window by Указ Президента України № 64/2022, \
+https://zakon.rada.gov.ua/laws/show/64/2022/print, whose consolidated extension markers \
+run unbroken from 05:30 on 2022-02-24 to 05:30 on 2026-10-31, the last being \
+«Строк дії воєнного стану в Україні продовжено з 05 години 30 хвилин 2 серпня 2026 року \
+строком на 90 діб згідно з Указом Президента № 596/2026 від 13.07.2026». So inside this \
+window the Code enumerates no святкові дні and no передсвяткові дні.\
+"""
+retrieved_on = "2026-08-31"
+verified_on  = ""
+
+[calendar.week]
+rest_days    = ["sunday"]
+starts_on    = "monday"
+kind         = "tax_rule"
+source       = """
+Стаття 67 «Вихідні дні» Кодексу законів про працю України № 322-VIII, \
+https://zakon.rada.gov.ua/laws/show/322-08/print, частина друга: \
+«Загальним вихідним днем є неділя. Другий вихідний день при п'ятиденному робочому тижні, \
+якщо він не визначений законодавством, визначається графіком роботи підприємства, \
+установи, організації, погодженим з виборним органом первинної профспілкової організації \
+(профспілковим представником) підприємства, установи, організації, і, як правило, має \
+надаватися підряд з загальним вихідним днем.» ONLY SUNDAY is set by the law; the second \
+rest day of a five-day week is an enterprise's own schedule and is therefore not a fact \
+about the jurisdiction. Частина третя -- moving a rest day that coincides with a holiday \
+-- carries «У період дії воєнного стану не застосовуються норми частини третьої статті 67 \
+згідно із Законом № 2136-IX від 15.03.2022» and is not applied inside this window. \
+The Monday week start is ISO 8601's and is a convention rather than a provision: стаття 67 \
+does not name one, and it is declared here because «останній робочий день тижня» cannot be \
+answered without one.\
+"""
+retrieved_on = "2026-08-31"
+verified_on  = ""

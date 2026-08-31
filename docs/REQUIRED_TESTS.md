@@ -362,3 +362,33 @@ this feature's subject would conflate the two roles the constitution names expli
 the official-rate series a tax base rested on, which it could not before —
 `InputKind` had no member for it — so the golden gains that one input reference. An input
 digest is a witness, not a term (Principle V).
+
+**017-working-day-calendar** closes **no** row and moves two notes. It ships a declaration kind
+— which dates a jurisdiction's law calls working — with **no consumer**, by owner decision CL-1
+of 2026-08-30, so nothing it adds reaches a comparison, a figure or a golden.
+
+**H1** is exercised and not closed. `tests/contract/test_calendar_data_only.py` adds a second
+jurisdiction's calendar — a different rest pattern, a different week start, purely as data in a
+scratch root — and it loads, is addressable and classifies by its own pattern with no module in
+`src/` naming it. H1 asks for an instrument, a route, a tax class and a jurisdiction reaching
+**the comparison**, and a calendar reaches none: nothing consumes one. The two gaps H1 already
+records are untouched.
+
+**H2** is exercised on the existing loader path. Every way a calendar file can be wrong fails at
+load naming the file and the offending field or date, including two the shape validation cannot
+see — a pre-holiday fact on a date the same row calls non-working, and a week lying wholly
+inside the coverage window with no working day in it
+(`tests/contract/test_calendar_declaration_loading.py`). The row's own test stays
+`tests/contract/test_declaration_loading.py`.
+
+**E8** is not closed and not attempted, on 011's terms. Story 4 establishes the calendar's half
+of it — a second jurisdiction's calendar is a data-only addition — before a second jurisdiction
+discovers otherwise, and E8 itself is about two jurisdictions' tax terms differing while the
+gross market outcome stays bit-identical, which needs a consumer this feature deliberately does
+not build.
+
+What it *does* land that no row asks for is the mechanical half of the deferral it inherits:
+`tests/contract/test_no_calendar_free_working_day.py` pins the three sites that still decide a
+working day from an uncited weekend rule, counting the two that reach it through the
+declared-convention registry rather than by a direct call. A fourth fails the scan instead of
+being caught by review.

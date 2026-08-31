@@ -48,6 +48,11 @@ DATA_ROOT = REPO_ROOT / "data"
 # legal reference — the single input that turns a foreign amount into a hryvnia tax base —
 # so an uncited one is the confidently-wrong number this project exists to refuse.
 #
+# `calendars` joined in feature 017. A classification row is a date and a label and holds no
+# number at all, so it is reached only because the predicate below counts dates: an uncited
+# holiday is precisely the legal value from memory Principle I forbids, and this is the one
+# gate that would otherwise be believed to catch it.
+#
 # A subdirectory of a sourced directory needs no entry of its own: the walk below is `rglob`.
 SOURCED_DIRS = (
     "tax",
@@ -58,6 +63,7 @@ SOURCED_DIRS = (
     "access",
     "observations",
     "official_rates",
+    "calendars",
 )
 
 # The directories exempt from the citation requirement, each BY NAME and WITH ITS REASON.

@@ -363,3 +363,121 @@ def test_errors_stay_one_line_per_value(tmp_path: Path) -> None:
     assert outcome.returncode == 1
     planted = [line for line in _lines(outcome, "error") if PLANTED in line]
     assert len(planted) == 2, outcome.stdout
+
+
+# ---------------------------------------------------------------------------
+# 017 SC-005: the same demonstration on a real calendar file, measured as a delta
+# ---------------------------------------------------------------------------
+#
+# The planted rows above establish the predicate. What SC-005 adds is the measurement FR-006a
+# asks for: the gate's **complete finding set** before and after, because a widening would be
+# caught by CI and a narrowing would not — and a narrowing in the gate whose job is preventing
+# blind spots is the worst available outcome. Asserting only that one deleted `source` now
+# fails does not see a narrowing at all.
+
+PLANTED_CALENDAR = "calendars/planted_extra.toml"
+
+PLANTED_CALENDAR_FILE = """[calendar]
+id           = "planted_civil"
+jurisdiction = "XX"
+authority    = "planted by tests/contract/test_provenance_gate.py"
+scope        = "civil"
+
+[calendar.coverage]
+first        = "2026-03-01"
+last         = "2026-03-31"
+kind         = "tax_rule"
+source       = "planted by tests/contract/test_provenance_gate.py"
+retrieved_on = "2026-08-31"
+verified_on  = ""
+
+[calendar.week]
+rest_days    = ["sunday"]
+starts_on    = "monday"
+kind         = "tax_rule"
+source       = "planted by tests/contract/test_provenance_gate.py"
+retrieved_on = "2026-08-31"
+verified_on  = ""
+"""
+
+PLANTED_CALENDAR_ROW = """[[day]]
+on_date        = "2026-03-05"
+classification = "public_holiday"
+pre_holiday    = false
+kind           = "tax_rule"
+source         = "planted by tests/contract/test_provenance_gate.py"
+retrieved_on   = "2026-08-31"
+verified_on    = ""
+"""
+
+
+def _with_calendar(tmp_path: Path, text: str, under: str) -> subprocess.CompletedProcess[str]:
+    """A fresh scratch root carrying one planted calendar. ``under`` keeps two calls in one
+    test from copying the tree over each other."""
+    root = _scratch_root(tmp_path / under)
+    (root / PLANTED_CALENDAR).write_text(text, encoding="utf-8")
+    return _run(root)
+
+
+def _findings(outcome: subprocess.CompletedProcess[str], root: Path) -> set[str]:
+    """The gate's whole finding set, with the scratch root stripped off the front of each line.
+
+    Stripped because a `tmp_path` differs between two runs, and a set difference over
+    unstripped lines would report every file as both added and removed.
+    """
+    return {
+        line.replace(f"{root}/", "")
+        for line in outcome.stdout.splitlines()
+        if line.startswith(("error:", "warning:"))
+    }
+
+
+def test_adding_a_calendar_row_moves_the_gates_finding_set_by_exactly_that_file(
+    tmp_path: Path,
+) -> None:
+    """FR-006a's delta, on a real calendar file rather than a planted table.
+
+    The predicate `_has_observed_value` is shared by **every** entry in `SOURCED_DIRS`, so what
+    has to be shown is that reaching a calendar's rows did not stop the gate reaching anything
+    else. The set difference is what shows it; a single new assertion would not.
+    """
+    root = _scratch_root(tmp_path)
+    baseline = _findings(_run(root), root)
+    (root / PLANTED_CALENDAR).write_text(
+        PLANTED_CALENDAR_FILE + PLANTED_CALENDAR_ROW, encoding="utf-8"
+    )
+    withrow = _findings(_run(root), root)
+    added = withrow - baseline
+    assert added == {
+        "warning: calendars/planted_extra.toml: 2 unverified value(s); "
+        "each must render visibly marked"
+    }
+    assert not baseline - withrow, "the gate stopped reaching something it used to reach"
+
+
+def test_deleting_a_calendar_rows_citation_fails_the_gate(tmp_path: Path) -> None:
+    """SC-005: FR-006's fix bites on a real calendar row, shown by counting.
+
+    Two unverified values before -- the window and the row -- and after the deletion the row's
+    warning is replaced by an **error** naming it. The count is asserted
+    rather than the mere presence of a failure, because a gate that errored on the whole file
+    and a gate that errored on the row are different gates and only one of them is useful.
+    """
+    cited = _with_calendar(tmp_path, PLANTED_CALENDAR_FILE + PLANTED_CALENDAR_ROW, "cited")
+    assert cited.returncode == 0, cited.stdout
+    assert not _lines(cited, "error")
+
+    uncited = _with_calendar(
+        tmp_path,
+        PLANTED_CALENDAR_FILE
+        + PLANTED_CALENDAR_ROW.replace(
+            'source         = "planted by tests/contract/test_provenance_gate.py"\n', ""
+        ),
+        "uncited",
+    )
+    assert uncited.returncode == 1, uncited.stdout
+    errors = _lines(uncited, "error")
+    assert len(errors) == 1, errors
+    assert "calendars/planted_extra.toml" in errors[0]
+    assert "day[0]" in errors[0]
+    assert "has no 'source'" in errors[0]
