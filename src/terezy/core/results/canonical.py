@@ -291,6 +291,7 @@ def of_section(value: HorizonSection) -> tuple[Canonical, ...]:
             for item in value.arrives_after_horizon
         ),
         tuple(_of_verdict(item) for item in value.reserves),
+        tuple(_of_exclusion(item) for item in value.excludes),
     )
 
 

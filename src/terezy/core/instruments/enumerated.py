@@ -106,12 +106,19 @@ def events(
             )
         )
         retired += _units_retired(payment, principal=principal.amount, quantity=holding.quantity)
-    if early_exit is not None and len(inside) < len(receivable):
+    # **The residual decides whether there is a sale, not the payment count.** A schedule can
+    # repay its principal inside the window and pay a final coupon after it -- the shipped
+    # `enumerated_out_of_order` does exactly that -- and there is then nothing left to sell.
+    # Striking a sale for zero units would emit a disposal of nothing, which the ledger refuses
+    # by *raising*: an uncaught exception where a coupon the holding simply never receives is
+    # the honest answer.
+    residual = holding.quantity - retired
+    if early_exit is not None and residual > 0.0:
         stream.append(
             acquire.early_sale(
                 declaration,
                 holding,
-                holding.quantity - retired,
+                residual,
                 on=horizon.end,
                 exit_=early_exit,
                 sequence=len(stream) + 1,

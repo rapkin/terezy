@@ -95,10 +95,16 @@ class SubjectReached:
 class SubjectUnreached:
     """Declared, and none of its ids yielded a candidate here (FR-010, FR-011).
 
-    Distinct from :class:`SubjectUndeclared` because the remedy is a **corridor** rather than a
-    declaration, and from a *dropped* candidate because a drop is the rejection of an option
-    while this is the absence of one. Why each id yielded nothing is in the section's own
-    ``no_candidate`` column, in ``compose``'s words.
+    Distinct from :class:`SubjectUndeclared` because the remedy is a declaration of a different
+    kind, and from a *dropped* candidate because a drop is the rejection of an option while this
+    is the absence of one.
+
+    **Two things reach this state and the section does not tell them apart.** An id the routes
+    connect nothing to is in the section's ``no_candidate`` column, in ``compose``'s own words;
+    an id with no ``data/access/`` entry is in no column at all, because enumeration walks the
+    access declarations and never sees it. The second is a stated gap (2026-08-31): closing it
+    means a third population for *declared and unreachable-in-principle*, which is 014's
+    ``_considered`` to widen rather than this record's to guess at.
     """
 
     named: str
@@ -301,6 +307,16 @@ class HorizonSection:
     reserves: tuple[ReserveVerdict, ...]
     """One per ``(candidate x reserve)`` over the candidates this section evaluated."""
 
+    excludes: tuple[StatedExclusion, ...]
+    """What **this section's** figures do not account for, per candidate (FR-023a, FR-033).
+
+    On the section rather than on the answer, because a candidate is not sold early *as such*:
+    it is sold early **in a window that ends before its terms do**. One key can be an early exit
+    at one month and a hold-to-maturity at twelve, and an exclusion carried on the answer would
+    tag both -- a hold-to-maturity figure inheriting a mark it did not earn, which is the exact
+    defect FR-033's own edge case names.
+    """
+
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Answer:
@@ -324,7 +340,11 @@ class Answer:
     """One per declared horizon, in the question's declared order (FR-012)."""
 
     excludes: tuple[StatedExclusion, ...]
-    """What this answer does not account for, as typed records (FR-023a)."""
+    """What **every** figure in this answer does not account for (FR-023a).
+
+    Answer-wide only: an exclusion specific to one candidate in one window is on that section,
+    where the window is part of what it says.
+    """
 
     provenance: Provenance
     """The union of the marks on every declaration behind every figure reported (FR-024)."""

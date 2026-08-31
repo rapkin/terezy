@@ -96,7 +96,7 @@ from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.provenance import Provenance
 from terezy.core.primitives.rates import RealRate
 from terezy.core.results import canonical
-from terezy.core.results.answer import Answer
+from terezy.core.results.answer import Answer, Refused
 from terezy.core.results.project import Projection
 from terezy.core.results.question import Question
 from terezy.core.routes.legs import Route
@@ -144,7 +144,6 @@ InputKind = Literal[
     "inflation_assumption",
     "instrument",
     "observation_kind",
-    "official_rate_series",
     "question",
     "route",
     "scenario",
@@ -170,10 +169,12 @@ Listed alphabetically because :func:`input_refs` sorts by ``(kind, id)``, so the
 the order a manifest reads in.
 
 Widened by feature 015 from the five a single projection reads to every family an **answer**
-reads. SC-008 requires the manifest to name every file the run read, walked from the loader's
-inputs rather than sampled: a run that read a route, an access entry and a question and recorded
-none of them is a result that does not trace to what produced it, which Principle III says is
-not a result.
+reads, because SC-008 requires the manifest to name every file the run read: a run that read a
+route, an access entry and a question and recorded none of them is a result that does not trace
+to what produced it, which Principle III says is not a result.
+
+**A member nothing constructs is not in the set.** An unreachable kind reads as coverage the
+manifest does not have, which is the shape of claim the walk exists to make impossible.
 """
 
 
@@ -712,6 +713,21 @@ def _route_prov(route: Route) -> Provenance:
     return prov.merge_all(leg.provenance for leg in route.legs)
 
 
+def _digest_of(result: Answer | None, refusal: Refused | None) -> str:
+    """The digest of whatever the run produced: an answer, or the refusal that replaced it."""
+    if result is not None:
+        return digest_of_answer(result)
+    if refusal is None:
+        return digest(("refused",))
+    return digest(
+        (
+            "refused",
+            type(refusal).__name__,
+            tuple(str(getattr(refusal, name)) for name in getattr(type(refusal), "__slots__", ())),
+        )
+    )
+
+
 def digest_of_answer(result: Answer) -> str:
     """The digest of a whole answer: every section, every figure, every stated exclusion.
 
@@ -727,6 +743,7 @@ def of_answer(
     question: Question,
     as_of: date,
     result: Answer | None,
+    refusal: Refused | None = None,
 ) -> RunManifest:
     """The manifest of one answered question: its inputs, their versions, and its digest.
 
@@ -734,8 +751,10 @@ def of_answer(
     single holding, and inventing one to fill the field would be a false record rather than an
     incomplete one.
 
-    ``result`` is ``None`` where the question itself refused, and the digest then records that
-    the run produced no answer rather than a digest of nothing.
+    ``result`` is ``None`` where the question itself refused, and ``refusal`` is what it refused
+    with. The digest is then over that refusal's kind and its fields: a constant would give
+    every refused run one identity, so two different questions failing two different ways would
+    be reported as the same result.
     """
     return RunManifest(
         code_version=terezy.__version__,
@@ -746,6 +765,6 @@ def of_answer(
         projection=None,
         inputs=answer_input_refs(declarations),
         seed=None,
-        result_digest=digest(("refused",)) if result is None else digest_of_answer(result),
+        result_digest=_digest_of(result, refusal),
         unverified_sources=_unverified_ids(prov.EMPTY if result is None else result.provenance),
     )

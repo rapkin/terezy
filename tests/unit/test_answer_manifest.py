@@ -16,16 +16,18 @@ from __future__ import annotations
 
 import dataclasses
 import shutil
+from dataclasses import replace
 from pathlib import Path
-from typing import Any
+from typing import Any, get_args
 
 import pytest
 
 from terezy.api.answer import answer_question
 from terezy.core.primitives.currency import Currency
-from terezy.core.results.answer import Answer
+from terezy.core.results.answer import Answer, NoHorizonDeclared, PlanForNothing
 from terezy.core.results.coverage import IMPLICIT_REGIME_ID
 from terezy.data import manifest as run_manifest
+from terezy.data.manifest import InputKind
 from tests import answer_registries as fixtures
 
 
@@ -155,3 +157,43 @@ def test_the_roll_up_names_the_unverified_sources_behind_the_figures() -> None:
     run: Any = _answered()
     assert isinstance(run.answer, Answer)
     assert run.manifest.unverified_sources
+
+
+def test_two_refusals_of_two_kinds_do_not_share_one_digest() -> None:
+    """A constant would give every refused run one identity, and the CLI prints it as such."""
+    declarations = fixtures.declarations()
+    question = fixtures.owners_question()
+    digests = {
+        run_manifest.of_answer(
+            declarations=declarations,
+            question=question,
+            as_of=fixtures.AS_OF,
+            result=None,
+            refusal=refusal,
+        ).result_digest
+        for refusal in (
+            NoHorizonDeclared(),
+            PlanForNothing(named="one"),
+            PlanForNothing(named="another"),
+        )
+    }
+    assert len(digests) == 3
+
+    assert (
+        run_manifest.of_answer(
+            declarations=declarations,
+            question=replace(question, horizons=()),
+            as_of=fixtures.AS_OF,
+            result=None,
+            refusal=NoHorizonDeclared(),
+        ).result_digest
+        in digests
+    )
+
+
+def test_every_input_kind_the_set_admits_is_one_the_walk_produces() -> None:
+    """A member nothing constructs reads as coverage the manifest does not have."""
+    produced = {ref.kind for ref in run_manifest.answer_input_refs(fixtures.declarations())}
+    admitted = set(get_args(InputKind))
+    unreachable = admitted - produced - {"cpi_series", "inflation_assumption"}
+    assert not unreachable, sorted(unreachable)

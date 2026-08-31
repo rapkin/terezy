@@ -127,7 +127,7 @@ def answer(question: Question, inputs: AnswerInputs, as_of: date) -> Answer | Re
         as_of=as_of,
         subjects=subjects,
         sections=tuple(sections),
-        excludes=_excludes(sections),
+        excludes=_answer_wide_excludes(),
         provenance=prov.merge_all(_reported_provenance(sections)),
         staleness=staleness.merge_all(_reported_staleness(sections)),
     )
@@ -366,6 +366,12 @@ def _section(
             for reserve in question.reserves
             for verdict in _verdicts(outcome, reserve, withheld)
         ),
+        excludes=tuple(
+            stated
+            for item in _outcomes(outcome)
+            if item.sold_early is not None
+            for stated in _early_exit_exclusions(item.key, item.sold_early.assumption.id)
+        ),
     )
 
 
@@ -475,15 +481,14 @@ def _verdict(item: TupleOutcome, reserve: Reserve) -> ReserveVerdict:
 # ---------------------------------------------------------------------------
 
 
-def _excludes(sections: Sequence[HorizonSection]) -> tuple[StatedExclusion, ...]:
-    """The two an answer always states, plus FR-033's three per early-exit candidate.
+def _answer_wide_excludes() -> tuple[StatedExclusion, ...]:
+    """The two an answer always states, whatever it computed.
 
-    The three are attached to the candidates that actually sold early, read off
-    ``TupleOutcome.sold_early`` rather than searched for in a sentence -- and to no others,
-    because a hold-to-maturity figure inheriting an early exit's caveats would be a mark it did
-    not earn.
+    Every candidate-specific exclusion is on its **section**, because it is specific to a
+    candidate *in a window*: the same key can be an early exit at one month and a
+    hold-to-maturity at twelve.
     """
-    stated: list[StatedExclusion] = [
+    return (
         StatedExclusion(
             what=Exclusion.NO_REAL_TERMS_FIGURE,
             applies_to=None,
@@ -496,15 +501,7 @@ def _excludes(sections: Sequence[HorizonSection]) -> tuple[StatedExclusion, ...]
             supplied_by=INCOME_TAX_SUPPLIED_BY,
             direction=None,
         ),
-    ]
-    seen: set[Tuple] = set()
-    for section in sections:
-        for item in _outcomes(section.outcome):
-            if item.sold_early is None or item.key in seen:
-                continue
-            seen.add(item.key)
-            stated.extend(_early_exit_exclusions(item.key, item.sold_early.assumption.id))
-    return tuple(stated)
+    )
 
 
 def _early_exit_exclusions(key: Tuple, assumption_id: str) -> tuple[StatedExclusion, ...]:

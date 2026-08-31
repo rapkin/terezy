@@ -35,8 +35,8 @@
   dropped InstrumentRefused            1  inzhur_reit
   withheld inzhur_miltech           arrives 2028-01-20
 
-[excludes] no_real_terms_figure                                            
-[excludes] no_income_tax_on_the_stated_amount                              
+[excludes] no_real_terms_figure
+[excludes] no_income_tax_on_the_stated_amount
 
 [keys] SectionsAgreeByKey
-[digest] sha256:a413012f7ab2e3e9b91a739ced6cbb8cd6fa6f6fa8008d19febd49fb230ad98e
+[digest] sha256:e3d169700a636ea930f86a649b5b3a7ce851dacbf6aeeade4cc77b03fcabd4c6

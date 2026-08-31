@@ -22,7 +22,7 @@ from terezy.core.results.answer import Answer, Refused
 from terezy.core.results.coverage import IMPLICIT_REGIME_ID
 from terezy.core.scenarios.regimes import routes_in_force
 from terezy.data import manifest as run_manifest
-from terezy.data.declarations import resolver
+from terezy.data.declarations import loader, resolver
 from terezy.data.declarations.errors import DeclarationError
 
 if TYPE_CHECKING:  # pragma: no cover -- typing only
@@ -31,6 +31,7 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from pathlib import Path
 
     from terezy.core.primitives.currency import Currency
+    from terezy.core.results.question import Question
     from terezy.core.routes.legs import Route
     from terezy.core.scenarios.regimes import RegimeTransition
     from terezy.data.manifest import RunManifest
@@ -85,27 +86,29 @@ def _transitions(declarations: resolver.AnswerDeclarations) -> tuple[RegimeTrans
     return tuple(coverage.ramp.scenarios[scenario_id].transitions)
 
 
-def answer_question(
+def answer_declared(
+    question: Question,
     root: Path,
-    question_id: str,
     *,
     as_of: date,
     base_currency: Currency,
 ) -> AnsweredQuestion:
-    """Load one data root, answer one declared question, and record what it rested on.
+    """Answer a question record over one data root, and record what it rested on.
 
-    The scenario the run loads is decided by the **question's** regime: a question naming
+    The scenario the run loads is decided by the **question's** regime: one naming
     ``IMPLICIT_REGIME_ID`` is asked of the registry with no scenario in force, and one naming a
-    declared regime is asked under the scenario that declares it. Reading it off the question
-    rather than taking it as a second argument is what keeps the artefact self-contained.
+    declared regime is asked under the scenario that declares it. Both entry points go through
+    here, so a question built from flags searches the same world a file does.
+
+    **A question with no file contributes no input reference**, which is the honest record for
+    one typed on a command line: there is nothing to digest. The file is canonical precisely so
+    that the reproducible case is the one with an artefact behind it.
     """
-    regime_id = _regime_of(root, question_id, base_currency=base_currency)
     declarations = resolver.answer_from_data_root(
         root,
         base_currency=base_currency,
-        scenario_id=_scenario_of(root, regime_id, base_currency=base_currency),
+        scenario_id=_scenario_of(root, question.regime_id, base_currency=base_currency),
     )
-    question = declarations.questions[question_id]
     result = answer(question, inputs_of(declarations, on_date=question.horizons[0].start), as_of)
     return AnsweredQuestion(
         answer=result,
@@ -114,24 +117,41 @@ def answer_question(
             question=question,
             as_of=as_of,
             result=result if isinstance(result, Answer) else None,
+            refusal=None if isinstance(result, Answer) else result,
         ),
     )
 
 
-def _regime_of(root: Path, question_id: str, *, base_currency: Currency) -> str:
-    """Which regime the named question asks under, read without resolving a scenario yet."""
-    declarations = resolver.answer_from_data_root(
-        root, base_currency=base_currency, scenario_id=None
+def answer_question(
+    root: Path,
+    question_id: str,
+    *,
+    as_of: date,
+    base_currency: Currency,
+) -> AnsweredQuestion:
+    """Load one data root, answer one **declared** question, and record what it rested on."""
+    return answer_declared(
+        _declared_question(root, question_id), root, as_of=as_of, base_currency=base_currency
     )
-    if question_id not in declarations.questions:
-        raise DeclarationError(
-            root / resolver.QUESTIONS_DIR,
-            "",
-            f"declares no question with the id {question_id!r}. The declared ids are "
-            f"{sorted(declarations.questions)}.",
-            "name a declared question, or declare the one you meant to ask",
-        )
-    return declarations.questions[question_id].regime_id
+
+
+def _declared_question(root: Path, question_id: str) -> Question:
+    """The declared question with that id, read from the question files and nothing else.
+
+    Deliberately **not** a full resolution of the data root: the regime it names decides which
+    scenario the real load runs under, so resolving everything twice to read one string would
+    parse and cross-check the whole registry for nothing.
+    """
+    for path in sorted((root / resolver.QUESTIONS_DIR).glob("*.toml")):
+        declared = loader.question_from_file(path)
+        if declared.id == question_id:
+            return declared
+    raise DeclarationError(
+        root / resolver.QUESTIONS_DIR,
+        "",
+        f"declares no question with the id {question_id!r}.",
+        "name a declared question, or declare the one you meant to ask",
+    )
 
 
 def _scenario_of(root: Path, regime_id: str, *, base_currency: Currency) -> str | None:
@@ -157,4 +177,4 @@ def _scenario_of(root: Path, regime_id: str, *, base_currency: Currency) -> str 
     )
 
 
-__all__ = ["AnsweredQuestion", "answer_question", "inputs_of"]
+__all__ = ["AnsweredQuestion", "answer_declared", "answer_question", "inputs_of"]

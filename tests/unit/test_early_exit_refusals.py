@@ -135,3 +135,25 @@ def test_the_belief_is_read_from_the_registry_rather_than_written_here() -> None
         item for item in evaluated(after.comparison) if item.key.instrument_id == subject
     )
     assert any("a_different_belief" in claim for claim in outcome.rests_on), outcome.rests_on
+
+
+def test_a_schedule_whose_last_payment_is_a_coupon_sells_nothing_at_the_window_end() -> None:
+    """The residual decides whether there is a sale, and it can be zero.
+
+    ``enumerated_out_of_order`` repays its principal on 2027-03-31 and pays its final coupon the
+    day after, so a window ending on the repayment leaves **nothing to sell** while a payment
+    still falls outside it. Striking a sale for zero units emits a disposal of nothing, which
+    the ledger refuses by *raising* -- an uncaught exception where the honest answer is a coupon
+    the holding simply never receives.
+    """
+    registries = fixtures.shipped()
+    subject = "enumerated_out_of_order"
+    with_price = fixtures.with_access(
+        registries, subject, resale_price=VenueQuote(price=RESALE, kind="venue_terms")
+    )
+    result = _surveyed(with_price, DateRange(start=fixtures.OUTLAY_ON, end=date(2027, 3, 31)))
+    outcome = next(
+        item for item in evaluated(result.comparison) if item.key.instrument_id == subject
+    )
+    assert outcome.sold_early is None
+    assert all(claim for claim in outcome.rests_on)

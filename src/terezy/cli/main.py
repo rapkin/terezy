@@ -25,8 +25,7 @@ from datetime import date
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, assert_never
 
-from terezy.api.answer import AnsweredQuestion, answer_question, inputs_of
-from terezy.core.decision.answer import answer as answer_of
+from terezy.api.answer import AnsweredQuestion, answer_declared, answer_question
 from terezy.core.decision.answer import (
     benchmark_unavailable,
     key_agreement,
@@ -40,9 +39,11 @@ from terezy.core.results.answer import (
     CoveredByThePlan,
     HorizonSection,
     SectionsDisagreeByKey,
+    StatedExclusion,
     SubjectReached,
     SubjectUndeclared,
     SubjectUnreached,
+    UndeclaredSubject,
 )
 from terezy.core.results.candidates import (
     CandidateSurvey,
@@ -50,14 +51,20 @@ from terezy.core.results.candidates import (
     NothingConnects,
     NothingNeedsToConnect,
 )
-from terezy.data import manifest as run_manifest
-from terezy.data.declarations import loader, resolver
+from terezy.data.declarations import loader
+from terezy.data.declarations.errors import DeclarationError
 
 if TYPE_CHECKING:  # pragma: no cover -- typing only
     from collections.abc import Sequence
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+REFUSED = 1
+"""The question did not stand up. A **result**, and a different thing from a broken file."""
+
+LOAD_FAILED = 2
+"""A declaration would not load. Distinct, so a caller can tell a refusal from a crash."""
+
 FLAGS = Path("<flags>")
 """What a question built from the command line is named by when it refuses.
 
@@ -69,16 +76,23 @@ still has to say *where*, and *the flags you typed* is the honest answer.
 def main(argv: Sequence[str] | None = None) -> int:
     """Answer one question and print it. Returns 0 for an answer, 1 for a refusal."""
     args = _parser().parse_args(argv)
-    root = Path(args.data_root)
-    as_of = date.fromisoformat(args.as_of)
-    run = (
-        answer_question(root, args.question, as_of=as_of, base_currency=Currency.UAH)
-        if args.question is not None
-        else _from_flags(root, args.set, as_of=as_of)
-    )
+    try:
+        root = Path(args.data_root)
+        as_of = date.fromisoformat(args.as_of)
+        run = (
+            answer_question(root, args.question, as_of=as_of, base_currency=Currency.UAH)
+            if args.question is not None
+            else _from_flags(root, args.set, as_of=as_of)
+        )
+    except (DeclarationError, tomllib.TOMLDecodeError, ValueError) as broken:
+        # A declaration that will not load is not a refused question, and the exit code says
+        # so: 1 is *the question does not stand up*, which is a result. Printing a traceback
+        # here would be the one place this feature failed to reach a reader as words.
+        print(f"the declarations could not be loaded: {broken}")
+        return LOAD_FAILED
     for line in render(run):
         print(line)
-    return 0 if isinstance(run.answer, Answer) else 1
+    return 0 if isinstance(run.answer, Answer) else REFUSED
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -105,22 +119,16 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def _from_flags(root: Path, lines: Sequence[str], *, as_of: date) -> AnsweredQuestion:
-    """A question built from ``--set`` lines, answered over the same registry a file would be."""
+    """A question built from ``--set`` lines, answered over the same registry a file would be.
+
+    The scenario is resolved from the question's own regime, exactly as the file path does. A
+    flag run that searched every corridor while the manifest recorded a narrowed world would
+    assert a world the run did not search -- and *flags are sugar over the file* would be false
+    in the one place it matters.
+    """
     document: dict[str, Any] = tomllib.loads("\n".join(lines))
     question = loader.question_from_document(document, FLAGS)
-    declarations = resolver.answer_from_data_root(
-        root, base_currency=Currency.UAH, scenario_id=None
-    )
-    result = answer_of(question, inputs_of(declarations, on_date=question.horizons[0].start), as_of)
-    return AnsweredQuestion(
-        answer=result,
-        manifest=run_manifest.of_answer(
-            declarations=declarations,
-            question=question,
-            as_of=as_of,
-            result=result if isinstance(result, Answer) else None,
-        ),
-    )
+    return answer_declared(question, root, as_of=as_of, base_currency=Currency.UAH)
 
 
 def render(run: AnsweredQuestion) -> list[str]:
@@ -153,14 +161,18 @@ def _fields_of(record: object) -> list[tuple[str, object]]:
 
 
 def _subject_lines(result: Answer) -> list[str]:
+    """What each named word turned out to be.
+
+    Branched on the **type** and never on whether the id list is empty: a declared group nobody
+    has labelled yet resolves to no ids and is not undeclared, and collapsing the two would
+    erase the distinction the group vocabulary exists to preserve (FR-008a).
+    """
     lines = []
     for item in result.subjects:
-        ids = getattr(item, "ids", ())
-        lines.append(
-            f"  {item.named}: {len(ids)} instrument(s) -- {', '.join(ids)}"
-            if ids
-            else f"  {item.named}: NOTHING IS DECLARED BY THAT NAME"
-        )
+        if isinstance(item, UndeclaredSubject):
+            lines.append(f"  {item.named}: NOTHING IS DECLARED BY THAT NAME")
+        else:
+            lines.append(f"  {item.named}: {len(item.ids)} instrument(s) -- {', '.join(item.ids)}")
     return lines
 
 
@@ -204,6 +216,7 @@ def _section_lines(result: Answer, section: HorizonSection) -> list[str]:
     for pair in section.outcome.enumerated.no_candidate:
         lines.append(f"  NO CANDIDATE {pair.instrument_id} from {pair.stream_id}: {_why(pair.why)}")
     lines.extend(_reserve_lines(section))
+    lines.extend(f"  {line}" for line in _exclusion_lines(section.excludes))
     return lines
 
 
@@ -242,6 +255,17 @@ def _reserve_lines(section: HorizonSection) -> list[str]:
     return lines
 
 
+def _exclusion_lines(excludes: Sequence[StatedExclusion]) -> list[str]:
+    """One line per stated exclusion, saying what would supply it and which way it errs."""
+    return [
+        f"EXCLUDES {item.what.value}"
+        + (f" ({item.applies_to.instrument_id})" if item.applies_to is not None else "")
+        + f" -- would be supplied by {item.supplied_by}"
+        + (f"; errs {item.direction.value}" if item.direction is not None else "")
+        for item in excludes
+    ]
+
+
 def _why(reason: NoCandidateReason) -> str:
     """A no-candidate pair's reason, in compose's own words, carried verbatim (FR-011)."""
     match reason:
@@ -256,14 +280,8 @@ def _why(reason: NoCandidateReason) -> str:
 def _closing_lines(run: AnsweredQuestion, result: Answer) -> list[str]:
     agreement = key_agreement(result)
     return [
-        "excludes:",
-        *(
-            f"  {item.what.value}"
-            + (f" ({item.applies_to.instrument_id})" if item.applies_to is not None else "")
-            + f" -- would be supplied by {item.supplied_by}"
-            + (f"; errs {item.direction.value}" if item.direction is not None else "")
-            for item in result.excludes
-        ),
+        "excludes (every figure above):",
+        *(f"  {line}" for line in _exclusion_lines(result.excludes)),
         "",
         (
             f"the sections enumerated different candidates: {sorted(agreement.only_in)}"

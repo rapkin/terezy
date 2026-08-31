@@ -108,6 +108,12 @@ def _render(result: Answer) -> str:
                 lines.append(
                     f"  dropped {group.refusal:28} {group.count}  {','.join(group.instruments)}"
                 )
+        for item in section.excludes:
+            lines.append(
+                f"  excludes {item.what.value:38} "
+                f"{'' if item.applies_to is None else item.applies_to.instrument_id:24} "
+                f"{'' if item.direction is None else item.direction.value}"
+            )
         for withheld in section.arrives_after_horizon:
             lines.append(
                 f"  withheld {withheld.key.instrument_id:24} arrives "
@@ -115,9 +121,7 @@ def _render(result: Answer) -> str:
             )
         lines.append("")
     for item in result.excludes:
-        applies = "" if item.applies_to is None else item.applies_to.instrument_id
-        direction = "" if item.direction is None else item.direction.value
-        lines.append(f"[excludes] {item.what.value:38} {applies:24} {direction}")
+        lines.append(f"[excludes] {item.what.value}")
     lines.append("")
     lines.append(f"[keys] {type(key_agreement(result)).__name__}")
     lines.append(f"[digest] {run_manifest.digest_of_answer(result)}")

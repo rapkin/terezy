@@ -15,6 +15,8 @@ string in the output -- no blank, no dash, no zero, no omitted row.
 from __future__ import annotations
 
 import ast
+import shutil
+from dataclasses import replace
 from datetime import date
 from pathlib import Path
 
@@ -23,6 +25,7 @@ import pytest
 from terezy.api.answer import answer_question
 from terezy.cli import main as cli
 from terezy.core.decision.answer import benchmark_unavailable
+from terezy.core.instruments.groups import InstrumentGroup
 from terezy.core.primitives.currency import Currency
 from terezy.core.results.answer import Answer
 from terezy.core.results.candidates import CandidateSurvey
@@ -184,3 +187,72 @@ def test_main_returns_zero_for_an_answer_and_one_for_a_refusal(
         == 1
     )
     assert "BenchmarkOutsideTheSubjects" in capsys.readouterr().out
+
+
+def test_flags_search_the_same_world_the_file_does(tmp_path: Path) -> None:
+    """*Sugar over the file* has to hold for the **regime**, or the manifest asserts a lie.
+
+    A question naming a declared regime narrows the route set to that scenario's. A flag run
+    that searched every corridor while the manifest recorded the narrowed world would compare
+    corridors the question's own world says do not exist.
+    """
+    root = tmp_path / "data"
+    shutil.copytree(fixtures.DATA_ROOT, root)
+    wartime = fixtures.QUESTION_FILE.read_text(encoding="utf-8").replace(
+        'regime       = "(no regime declared)"', 'regime       = "wartime"', 1
+    )
+    (root / "questions" / "fifty-thousand.toml").write_text(wartime, encoding="utf-8")
+
+    from_file = answer_question(
+        root, fixtures.OWNERS_QUESTION, as_of=fixtures.AS_OF, base_currency=Currency.UAH
+    )
+    from_flags = cli._from_flags(root, [wartime], as_of=fixtures.AS_OF)
+    assert from_flags.answer == from_file.answer
+    assert from_flags.manifest.regime_id == "wartime"
+
+
+def test_a_declaration_that_will_not_load_reaches_the_reader_as_words(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A broken file is not a refused question, and the exit code says which happened."""
+    assert (
+        cli.main(
+            [
+                "--data-root",
+                str(fixtures.DATA_ROOT),
+                "--as-of",
+                fixtures.AS_OF.isoformat(),
+                "--set",
+                "this is not toml",
+            ]
+        )
+        == cli.LOAD_FAILED
+    )
+    printed = capsys.readouterr().out
+    assert "could not be loaded" in printed
+    assert "Traceback" not in printed
+    assert cli.LOAD_FAILED != cli.REFUSED
+
+
+def test_a_declared_group_nobody_labelled_is_not_printed_as_undeclared() -> None:
+    """FR-008a's whole guard: a group with no members and a word nobody declared differ.
+
+    Collapsing them would erase the distinction ``AnswerInputs.groups`` exists to preserve --
+    and the shipped failure mode is precisely an issue declared without its label.
+    """
+    supplied = fixtures.inputs()
+    widened = replace(
+        supplied,
+        groups={**supplied.groups, "unlabelled": InstrumentGroup(id="unlabelled", name="None")},
+    )
+    question = fixtures.owners_question()
+    result = fixtures.answered(
+        fixtures.with_plans(
+            fixtures.with_subjects(question, fixtures.OVDP, "unlabelled", "btc"),
+            {fixtures.OVDP: question.plans[fixtures.OVDP]},
+        ),
+        widened,
+    )
+    printed = "\n".join(cli._subject_lines(result))
+    assert "  unlabelled: 0 instrument(s) --" in printed
+    assert "  btc: NOTHING IS DECLARED BY THAT NAME" in printed

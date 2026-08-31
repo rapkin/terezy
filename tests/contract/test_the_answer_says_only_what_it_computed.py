@@ -18,6 +18,8 @@
 from __future__ import annotations
 
 import dataclasses
+from dataclasses import replace
+from datetime import date
 from pathlib import Path
 from typing import Any, Final
 
@@ -25,6 +27,7 @@ import pytest
 
 from terezy.core.decision import answer as verb
 from terezy.core.decision.answer import section_evaluated
+from terezy.core.instruments.interface import DateRange
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.rates import RealRate, RealTermsUnavailable
 from terezy.core.results import answer as records
@@ -214,10 +217,35 @@ def test_every_early_exit_figure_names_the_assumption_it_rests_on() -> None:
 def test_a_holding_the_window_reaches_carries_no_early_exit_claim() -> None:
     """The machinery is reachable only where an early exit actually happens."""
     result = fixtures.answered()
-    assert not [item for item in result.excludes if item.what in EARLY_EXIT_CLAIMS]
     for section in result.sections:
+        assert not [item for item in section.excludes if item.what in EARLY_EXIT_CLAIMS]
         for outcome in section_evaluated(section):
             assert outcome.sold_early is None
+
+
+def test_a_section_that_holds_to_maturity_inherits_no_early_exit_claim() -> None:
+    """The exclusion is specific to a candidate **in a window**, not to a candidate.
+
+    One key can be an early exit at one month and a hold-to-maturity at twelve. An exclusion
+    carried on the answer would tag both, which is a mark the second figure did not earn --
+    exactly the edge case FR-033 names.
+    """
+    question = fixtures.owners_question()
+    both = replace(
+        question,
+        horizons=(
+            DateRange(start=date(2026, 9, 1), end=date(2027, 6, 1)),
+            DateRange(start=date(2026, 9, 1), end=date(2028, 6, 1)),
+        ),
+    )
+    result = fixtures.answered(
+        both, fixtures.with_resale_price(fixtures.inputs(), "ovdp_synthetic_a")
+    )
+    sold, held = result.sections
+    assert any(item.sold_early is not None for item in section_evaluated(sold))
+    assert all(item.sold_early is None for item in section_evaluated(held))
+    assert [item.what for item in sold.excludes if item.what in EARLY_EXIT_CLAIMS]
+    assert not [item.what for item in held.excludes if item.what in EARLY_EXIT_CLAIMS]
 
 
 def test_an_early_exit_states_three_claims_and_signs_exactly_two() -> None:
@@ -230,8 +258,14 @@ def test_an_early_exit_states_three_claims_and_signs_exactly_two() -> None:
     result = fixtures.answered(
         supplied=fixtures.with_resale_price(fixtures.inputs(), "ovdp_synthetic_a")
     )
-    specific = [item for item in result.excludes if item.applies_to is not None]
+    specific = [
+        item
+        for section in result.sections
+        for item in section.excludes
+        if item.applies_to is not None
+    ]
     assert specific
+    assert not [item for item in result.excludes if item.applies_to is not None]
     by_claim = {item.what: item for item in specific}
     assert set(by_claim) == EARLY_EXIT_CLAIMS
     assert by_claim[Exclusion.EARLY_EXIT_IS_A_POINT_NOT_A_DISTRIBUTION].direction is not None
