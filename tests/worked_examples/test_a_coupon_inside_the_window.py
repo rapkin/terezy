@@ -83,8 +83,8 @@ DEPLOYED_UNITS = 45.0
 
 @functools.cache
 def _supplied() -> AnswerInputs:
-    """The shipped registry, read once. `answers.inputs()` re-resolves the whole data root at
-    69 ms a call, and this module reads it once per candidate across seven tests."""
+    """The shipped registry, read once. `answers.inputs()` re-resolves the whole data root, and
+    this module reads it once per candidate across seven tests."""
     return answers.inputs()
 
 
