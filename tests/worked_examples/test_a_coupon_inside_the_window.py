@@ -31,7 +31,7 @@ import pytest
 
 from terezy.core.decision.answer import section_evaluated
 from terezy.core.instruments.interface import EnumeratedTerms
-from terezy.core.results.tuple import EXCLUDES
+from terezy.core.results.answer import Exclusion
 from tests import answer_registries as answers
 
 pytestmark = pytest.mark.worked_example
@@ -40,6 +40,16 @@ AFFECTED_PER_HORIZON = (5, 11, 12)
 """How many candidates, at each of the owner's three horizons, are sold before their own terms
 end AND collect at least one payment inside the window. Measured 2026-08-31 on the shipped
 registry; the horizons are `data/questions/fifty-thousand.toml`'s."""
+
+EARLY_EXIT_CLAIMS = frozenset(
+    {
+        "early_exit_is_a_point_not_a_distribution",
+        "early_exit_spread_is_a_sellers_quote",
+        "early_exit_carries_no_rate_risk",
+    }
+)
+"""015 FR-033's three claims, and the reason a fourth is owed: none of them is about a coupon,
+none of them is signed the way this omission is."""
 
 WORKED = "UA4000236228"
 """Bought 2026-09-01 at 1089.32, pays 85.50 on 2026-09-09, sold 2026-10-01 at 1087.89.
@@ -93,10 +103,16 @@ def test_the_worked_arithmetic_is_what_the_declarations_say() -> None:
 
 
 def test_no_exclusion_states_the_coupon_omission_today() -> None:
-    """The half that makes this a gap rather than a stated approximation. When a feature adds
-    the claim, this test is what says so -- and it must be replaced by its opposite, not
-    deleted."""
-    assert not [name for name in EXCLUDES if "coupon" in name.lower()]
+    """The half that makes this a gap rather than a stated approximation.
+
+    Over the closed `Exclusion` set, which is where 015 FR-033's three claims live, and over
+    the exclusions the owner's own answer actually carries. When a feature states the fourth
+    claim, this test is what says so -- and it must be replaced by its opposite rather than
+    deleted, because a gap marker quietly removed is a gap nobody remembers.
+    """
+    assert {item.value for item in Exclusion} & EARLY_EXIT_CLAIMS == EARLY_EXIT_CLAIMS
+    assert not [item.value for item in Exclusion if "coupon" in item.value]
     section = answers.answered().sections[0]
     stated = {item.what.value for item in section.excludes}
-    assert not [name for name in stated if "coupon" in name.lower()], sorted(stated)
+    assert stated >= EARLY_EXIT_CLAIMS, sorted(stated)
+    assert not [name for name in stated if "coupon" in name]
