@@ -24,11 +24,14 @@ import pytest
 
 from terezy.api.answer import answer_question
 from terezy.cli import main as cli
-from terezy.core.decision.answer import benchmark_unavailable
+from terezy.core.decision.answer import benchmark_unavailable, section_ranking
 from terezy.core.instruments.groups import InstrumentGroup
 from terezy.core.primitives.currency import Currency
-from terezy.core.results.answer import Answer
+from terezy.core.results.answer import Answer, HorizonSection
 from terezy.core.results.candidates import CandidateSurvey
+from terezy.core.results.tuple import Comparison, TupleOutcome
+from terezy.core.routes.path import candidate_id
+from terezy.data.declarations import loader
 from tests import answer_registries as fixtures
 
 pytestmark = pytest.mark.contract
@@ -290,3 +293,114 @@ def test_a_malformed_as_of_is_not_blamed_on_a_declaration(
     printed = capsys.readouterr().out
     assert "--as-of is not an ISO date" in printed
     assert "declarations could not be loaded" not in printed
+
+
+def test_the_flags_path_runs_the_checks_that_only_the_file_path_used_to_run(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The owner and the currency are checked against the streams, however the record was built.
+
+    Two of ``resolver.check_question``'s three refusals are re-stated by the verb and two are
+    not. A flags path that skipped it would answer one person's question from another person's
+    money, or state fifty thousand of a currency the stream does not deliver -- and would do it
+    silently, because neither is representable as a ``Refused``.
+    """
+    for stated, edited, field in (
+        ('currency = "UAH"', 'currency = "USD"', f"{loader.QUESTION_TABLE}.amount.currency"),
+        ('id = "owner-001"', 'id = "somebody-else"', f"{loader.OWNER_TABLE}.id"),
+    ):
+        broken = fixtures.QUESTION_FILE.read_text(encoding="utf-8").replace(stated, edited, 1)
+        assert broken != fixtures.QUESTION_FILE.read_text(encoding="utf-8")
+        assert (
+            cli.main(
+                [
+                    "--data-root",
+                    str(fixtures.DATA_ROOT),
+                    "--as-of",
+                    fixtures.AS_OF.isoformat(),
+                    "--set",
+                    broken,
+                ]
+            )
+            == cli.LOAD_FAILED
+        )
+        printed = capsys.readouterr().out
+        assert field in printed, printed
+        assert str(cli.FLAGS) in printed, printed
+
+
+def test_a_data_root_is_required_rather_than_defaulted() -> None:
+    """The shipped ``data/`` is not part of the installed package (015 FR-020a).
+
+    A default computed from ``__file__`` resolves inside ``site-packages`` once this is a
+    console script, so it would name a directory that exists only in a source checkout -- and
+    the reader would meet that as a missing-file error rather than as a question about where
+    the declarations live.
+    """
+    with pytest.raises(SystemExit) as exit_status:
+        cli.main(["--as-of", fixtures.AS_OF.isoformat(), "--question", fixtures.OWNERS_QUESTION])
+    assert exit_status.value.code == 2
+
+
+def _ranked_section_with_an_unrankable_figure() -> tuple[HorizonSection, TupleOutcome]:
+    """A section that ranks four candidates and computed a fifth it could not rank.
+
+    Assembled by moving one outcome out of a **real** section's ranking rather than by hand,
+    for the reason the whole suite is built from ``data/``: 010 puts a rate on every candidate
+    the shipped registry reaches, so ``not_comparable`` is unreachable through the verb here,
+    and a hand-built ``Comparison`` would measure a shape the engine never produced.
+    """
+    supplied = fixtures.inputs()
+    for instrument_id in fixtures.declarations().tuples.registries.access:
+        supplied = fixtures.with_resale_price(supplied, instrument_id)
+    section = fixtures.answered(fixtures.owners_question(), supplied).sections[0]
+    assert isinstance(section.outcome, CandidateSurvey)
+    comparison = section.outcome.comparison
+    assert isinstance(comparison, Comparison)
+    assert comparison.not_comparable == ()
+    moved = comparison.ranked[-1]
+    assert comparison.benchmark < len(comparison.ranked) - 1
+    narrowed = replace(
+        comparison,
+        ranked=comparison.ranked[:-1],
+        not_comparable=(moved,),
+        ties=(),
+        beats_benchmark=tuple(
+            index for index in comparison.beats_benchmark if index < len(comparison.ranked) - 1
+        ),
+    )
+    return (
+        replace(section, outcome=replace(section.outcome, comparison=narrowed)),
+        moved,
+    )
+
+
+def test_a_figure_that_could_not_be_ranked_is_printed_beside_the_ranking() -> None:
+    """It cost a full projection, and its ``rests on`` lines print whether or not it does.
+
+    A renderer that showed unranked figures **only** when the ranking was empty would leave an
+    assumption attached to a number the reader was never shown -- the one shape of output this
+    feature exists to make impossible.
+    """
+    section, moved = _ranked_section_with_an_unrankable_figure()
+    printed = "\n".join(cli._ranking_lines(section))
+    assert f"  ranked: {len(section_ranking(section))}" in printed
+    assert f"{moved.key.instrument_id} from {moved.key.stream_id}" in printed
+    assert "NOT RANKED" in printed
+    for claim in moved.rests_on:
+        assert f"rests on ({moved.key.instrument_id}): {claim}" in printed
+
+
+def test_a_printed_figure_names_all_five_terms_of_its_key() -> None:
+    """Two candidates for one instrument are two options, and an id alone renders them alike.
+
+    The identity 010 fixes is the five declared terms, and the four that are not the amount are
+    what tell the reader which of them this row is.
+    """
+    section, _ = _ranked_section_with_an_unrankable_figure()
+    outcome = section_ranking(section)[0]
+    line = next(item for item in cli._figure_lines(outcome) if outcome.key.instrument_id in item)
+    assert outcome.key.stream_id in line
+    assert candidate_id(outcome.key.route_in) in line
+    assert cli._exit_choice(outcome.key.route_out) in line
+    assert type(outcome.key.exit_terms).__name__ in line

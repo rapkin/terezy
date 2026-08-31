@@ -309,7 +309,7 @@ def project(
             taxed_by=taxed_by,
         ),
         charges=charges,
-        at_purchase=_at_purchase(declaration, holding, assessment_rules),
+        at_purchase=_at_purchase(declaration, holding, assessment_rules, sold_early),
         sold_early=sold_early,
         hurdle=hurdle_figures.of_flows(
             contractual=_flows(contractual_events, holding, year_fraction),
@@ -414,18 +414,28 @@ def _at_purchase(
     declaration: InstrumentDeclaration,
     holding: Holding,
     rules: AssessmentRules | None,
+    sold: SoldEarly | None,
 ) -> PurchasePremium:
-    """What was paid against what this holding gets back as principal (FR-025, amended).
+    """What was paid against what this holding gets back (FR-025, amended).
 
     The declaration is **asked** what a unit returns to a buyer arriving on this date rather
     than having its face value read: the two answers differ for a schedule that has already
     repaid part of its principal, and the question both forms answer is the one that is true
     of both.
+
+    **A position sold before its terms end gets back the sale, not the principal** (015 FR-029).
+    The field says *what this holding gets back*, and a redemption that will not happen is not
+    it: reporting the paper's principal there would assert a premium or a discount realised at a
+    maturity the window ends before, while the ledger realises the sale's own gain or loss.
     """
-    returned = money.scale_sourced(
-        instrument_terms.principal_returned(declaration.terms, bought_on=holding.purchased_on),
-        holding.quantity,
-        declaration.terms.provenance,
+    returned = (
+        sold.proceeds
+        if sold is not None
+        else money.scale_sourced(
+            instrument_terms.principal_returned(declaration.terms, bought_on=holding.purchased_on),
+            holding.quantity,
+            declaration.terms.provenance,
+        )
     )
     disposal_class = declaration.tax_classes.get(TaxableEventKind.DISPOSAL_GAIN)
     return PurchasePremium(

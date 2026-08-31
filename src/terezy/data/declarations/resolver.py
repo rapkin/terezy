@@ -3267,13 +3267,19 @@ class AnswerDeclarations:
     """Which file declared each question, so the manifest can name it after the TOML is gone."""
 
 
-def _check_question(
+def check_question(
     question: Question,
     streams: Mapping[str, IncomeStream],
     *,
     path: Path,
 ) -> None:
-    """One question against the streams it names and the streams it does not."""
+    """One question against the streams it names and the streams it does not.
+
+    **Public, because a question built from flags has to go through it too** (015 FR-005). Two
+    of its three refusals are re-stated by the verb and two are not -- the owner and the
+    currency -- so a caller-built record that skipped this would answer one person's question
+    from another person's money, which the file path refuses by name.
+    """
     owners = sorted({stream.owner_id for stream in streams.values()})
     if question.owner_id not in owners:
         raise DeclarationError(
@@ -3349,7 +3355,7 @@ def answer_from_data_root(
                 declaring[declared.id],
                 path,
             )
-        _check_question(declared, tuples.registries.streams, path=path)
+        check_question(declared, tuples.registries.streams, path=path)
         questions[declared.id] = declared
         declaring[declared.id] = path
     return AnswerDeclarations(

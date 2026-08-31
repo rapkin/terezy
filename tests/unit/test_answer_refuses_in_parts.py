@@ -23,12 +23,12 @@ from terezy.core.decision.answer import (
     key_agreement,
     section_evaluated,
     section_ranking,
-    section_scored,
     subject_counts,
 )
 from terezy.core.decision.candidates import evaluated
 from terezy.core.instruments.interface import DateRange
 from terezy.core.primitives import provenance as prov
+from terezy.core.primitives import staleness
 from terezy.core.results.answer import (
     Answer,
     BenchmarkOutsideTheSubjects,
@@ -215,6 +215,24 @@ def test_a_horizon_that_starts_before_as_of_is_unremarkable() -> None:
     assert isinstance(fixtures.answered(earlier), Answer)
 
 
+def test_the_verbs_as_of_is_what_ages_the_sources() -> None:
+    """FR-006, from the other side: ``asked_on`` must not be able to stand in for it.
+
+    The two dates are a day apart in the shipped question and both are plausible arguments to
+    an aging function, so a section that passed ``question.asked_on`` down would look right on
+    every fixture and would report a registry as fresh for ever -- the answer would age with
+    the question rather than with the day it was answered.
+    """
+    question = fixtures.owners_question()
+    fresh = fixtures.answered(question)
+    later = fixtures.answered(question, as_of=date(2030, 1, 1))
+    assert staleness.any_stale(later.staleness)
+    assert later.staleness != fresh.staleness
+    assert (
+        fixtures.answered(replace(question, asked_on=date(2020, 1, 1))).staleness == fresh.staleness
+    )
+
+
 def test_a_section_that_refused_before_enumerating_says_so_rather_than_naming_a_corridor() -> None:
     """The remedy for a ceiling is ``data/candidates/``, not a corridor.
 
@@ -282,8 +300,8 @@ def test_a_section_with_no_benchmark_still_carries_the_figures_it_computed() -> 
     """
     twelve = fixtures.answered().sections[2]
     assert section_ranking(twelve) == ()
-    assert len(section_scored(twelve)) == 2
-    assert all(item.reaches.amount > 0.0 for item in section_scored(twelve))
+    assert len(section_evaluated(twelve)) == 2
+    assert all(item.reaches.amount > 0.0 for item in section_evaluated(twelve))
 
 
 def test_a_withheld_benchmark_leaves_nothing_ranked() -> None:
@@ -301,7 +319,7 @@ def test_a_withheld_benchmark_leaves_nothing_ranked() -> None:
         withheld = {item.key.instrument_id for item in section.arrives_after_horizon}
         assert fixtures.MILTECH in withheld
         assert section_ranking(section) == ()
-        assert section_scored(section)
+        assert section_evaluated(section)
 
 
 def test_a_disagreement_names_the_section_a_reader_can_count_to() -> None:

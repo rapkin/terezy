@@ -119,7 +119,9 @@ def answer(question: Question, inputs: AnswerInputs, as_of: date) -> Answer | Re
     plans = _expanded_plans(question, subjects)
     sections: list[HorizonSection] = []
     for horizon in question.horizons:
-        outcome = _section_outcome(question, inputs, horizon, considered, plans)
+        outcome = _section_outcome(
+            question, inputs, horizon, considered=considered, plans=plans, as_of=as_of
+        )
         if isinstance(outcome, BenchmarkYieldsSeveralCandidates):
             return outcome
         sections.append(_section(question, subjects, horizon, outcome))
@@ -290,10 +292,16 @@ def _section_outcome(
     question: Question,
     inputs: AnswerInputs,
     horizon: DateRange,
+    *,
     considered: frozenset[str],
     plans: Mapping[str, tuple[InstrumentPlan, ...]],
+    as_of: date,
 ) -> SectionOutcome | BenchmarkYieldsSeveralCandidates:
     """One horizon's whole survey, or the typed refusal that replaces it (FR-014).
+
+    ``as_of`` is the **verb's**, not the question's ``asked_on``: it decides staleness and
+    nothing else, and putting a clock in the artefact is what FR-006 refuses. Answering the same
+    file next year must age its sources a year, or the figure is more confident than its inputs.
 
     The set is enumerated **twice**: once here to resolve the benchmark's five-term key, and
     once inside ``survey``. Enumeration is a pure function of the same inputs, so the two agree
@@ -303,7 +311,7 @@ def _section_outcome(
     asked = candidate_results.Question(
         amounts=question.amounts,
         horizon=horizon,
-        as_of=_as_of_of(question),
+        as_of=as_of,
         continuation=question.continuation,
         plans=plans,
         bound=inputs.bound,
@@ -338,16 +346,6 @@ def _section_outcome(
         ceiling=inputs.ceiling,
         benchmark=keys[0],
     )
-
-
-def _as_of_of(question: Question) -> date:
-    """014's ``Question.as_of``, which decides staleness and nothing else.
-
-    The date the question was **asked** rather than the verb's ``as_of``: it is a field of the
-    file, so two runs of one artefact age its sources identically, and the answer's own
-    :attr:`Answer.as_of` records when it was answered.
-    """
-    return question.asked_on
 
 
 def _section(
@@ -611,6 +609,9 @@ def subject_counts(answer_: Answer, section: HorizonSection) -> SubjectCounts:
 def section_evaluated(section: HorizonSection) -> tuple[TupleOutcome, ...]:
     """The candidates this section reports figures for: 014's population, less FR-030's.
 
+    Ranked or not -- ``BenchmarkUnavailable.scored`` exists for exactly the unranked case, and
+    this is the population a reader is shown when :func:`section_ranking` is empty.
+
     Derived rather than rebuilt, because FR-014 requires 014's survey to be carried **whole**:
     reconstructing a ``Comparison`` without a candidate would be this feature computing a
     comparison it did not run, which is the privileged side channel 010 FR-012 forbids.
@@ -629,7 +630,7 @@ def section_ranking(section: HorizonSection) -> tuple[TupleOutcome, ...]:
     against is not being shown. 010 FR-011 says the hurdle is always scored and always shown,
     so a ranking without it is not offered.
 
-    :func:`section_scored` is what carries the figures in those cases: they were computed and
+    :func:`section_evaluated` is what carries the figures in those cases: they were computed and
     throwing them away would hide work the owner paid for.
     """
     if not isinstance(section.outcome, CandidateSurvey):
@@ -641,17 +642,6 @@ def section_ranking(section: HorizonSection) -> tuple[TupleOutcome, ...]:
     if comparison.ranked[comparison.benchmark].key in withheld:
         return ()
     return tuple(item for item in comparison.ranked if item.key not in withheld)
-
-
-def section_scored(section: HorizonSection) -> tuple[TupleOutcome, ...]:
-    """Every candidate this section produced a figure for, ranked or not, less the withheld.
-
-    The population a reader is shown when :func:`section_ranking` is empty. Both cases carry
-    the outcomes -- ``BenchmarkUnavailable.scored`` exists for exactly this -- and a renderer
-    that read only the ranking would print *nothing was ranked* over a section that computed
-    two complete figures.
-    """
-    return section_evaluated(section)
 
 
 def benchmark_unavailable(section: HorizonSection) -> BenchmarkUnavailable | None:
@@ -737,7 +727,6 @@ __all__ = [
     "key_agreement",
     "section_evaluated",
     "section_ranking",
-    "section_scored",
     "subject_counts",
     "undeclared",
 ]

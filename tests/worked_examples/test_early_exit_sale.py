@@ -229,3 +229,27 @@ def test_a_sale_says_the_contractual_figure_is_no_longer_to_maturity() -> None:
     )
     assert isinstance(to_maturity, Projection), to_maturity
     assert not [claim for claim in to_maturity.hurdle.excludes if "resale" in claim]
+
+
+def test_what_the_position_gets_back_is_the_sale_rather_than_the_principal() -> None:
+    """015 FR-029 at the record the disposal-gain rule reads.
+
+    ``PurchasePremium`` says what **this** holding gets back, and a maturity the window ends
+    before is not it: reporting the paper's 10 000.00 principal there would state a premium of
+    zero over a sale that realised a loss of 50.00, and the record and the ledger would then
+    disagree about the same trade -- one of them governing a tax class.
+    """
+    sold = _sold_at_the_horizon()
+    assert is_close(sold.at_purchase.principal_returned.amount, PROCEEDS)
+    assert is_close(sold.at_purchase.difference.amount, -REALISED)
+    assert is_close(sold.ledger.disposals[0].realised_gain_base_ccy.amount, REALISED)
+
+    to_maturity = project.project(
+        synthetic.declaration(),
+        synthetic.holding(),
+        synthetic.horizon(),
+        synthetic.assumptions(),
+        tax_classes=synthetic.TAX_PACK,
+    )
+    assert isinstance(to_maturity, Projection), to_maturity
+    assert to_maturity.at_purchase.principal_returned != sold.at_purchase.principal_returned

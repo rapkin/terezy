@@ -93,6 +93,7 @@ def answer_declared(
     *,
     as_of: date,
     base_currency: Currency,
+    declared_in: Path,
 ) -> AnsweredQuestion:
     """Answer a question record over one data root, and record what it rested on.
 
@@ -103,13 +104,20 @@ def answer_declared(
 
     **A question with no file contributes no input reference**, which is the honest record for
     one typed on a command line: there is nothing to digest. The file is canonical precisely so
-    that the reproducible case is the one with an artefact behind it.
+    that the reproducible case is the one with an artefact behind it -- and ``declared_in`` is
+    what a refusal names instead, so *where* is answered either way.
+
+    **The cross-file checks run here rather than at load**, so a caller-built record goes
+    through them too: two of the three -- the owner and the amount's currency -- are stated
+    nowhere else, and skipping them would answer one person's question from another person's
+    money (015 FR-005, Principle VII).
     """
     declarations = resolver.answer_from_data_root(
         root,
         base_currency=base_currency,
         scenario_id=_scenario_of(root, question.regime_id, base_currency=base_currency),
     )
+    resolver.check_question(question, declarations.tuples.registries.streams, path=declared_in)
     result = answer(question, inputs_of(declarations, regime_id=question.regime_id), as_of)
     return AnsweredQuestion(
         answer=result,
@@ -131,12 +139,17 @@ def answer_question(
     base_currency: Currency,
 ) -> AnsweredQuestion:
     """Load one data root, answer one **declared** question, and record what it rested on."""
+    declared, path = _declared_question(root, question_id)
     return answer_declared(
-        _declared_question(root, question_id), root, as_of=as_of, base_currency=base_currency
+        declared,
+        root,
+        as_of=as_of,
+        base_currency=base_currency,
+        declared_in=path,
     )
 
 
-def _declared_question(root: Path, question_id: str) -> Question:
+def _declared_question(root: Path, question_id: str) -> tuple[Question, Path]:
     """The declared question with that id, read from the question files and nothing else.
 
     Deliberately **not** a full resolution of the data root: the regime it names decides which
@@ -146,7 +159,7 @@ def _declared_question(root: Path, question_id: str) -> Question:
     for path in sorted((root / resolver.QUESTIONS_DIR).glob("*.toml")):
         declared = loader.question_from_file(path)
         if declared.id == question_id:
-            return declared
+            return declared, path
     ids = sorted(
         loader.question_from_file(path).id
         for path in sorted((root / resolver.QUESTIONS_DIR).glob("*.toml"))

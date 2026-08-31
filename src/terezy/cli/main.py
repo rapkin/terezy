@@ -29,8 +29,8 @@ from terezy.api.answer import AnsweredQuestion, answer_declared, answer_question
 from terezy.core.decision.answer import (
     benchmark_unavailable,
     key_agreement,
+    section_evaluated,
     section_ranking,
-    section_scored,
     subject_counts,
 )
 from terezy.core.primitives.currency import Currency
@@ -54,7 +54,13 @@ from terezy.core.results.candidates import (
     NothingNeedsToConnect,
 )
 from terezy.core.results.tuple import TupleOutcome
-from terezy.core.routes.path import candidate_id
+from terezy.core.routes.path import (
+    EXIT_BY_IDENTITY,
+    ExitChoice,
+    FromTheDeclaration,
+    candidate_id,
+    exit_segments_of,
+)
 from terezy.data.declarations import loader
 from terezy.data.declarations.errors import DeclarationError
 
@@ -62,7 +68,6 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from collections.abc import Sequence
 
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
 REFUSED = 1
 """The question did not stand up. A **result**, and a different thing from a broken file."""
 
@@ -107,7 +112,15 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="terezy", description=__doc__)
-    parser.add_argument("--data-root", default=str(REPO_ROOT / "data"))
+    parser.add_argument(
+        "--data-root",
+        required=True,
+        help=(
+            "the directory the declarations live in. Required: the shipped data/ is not part "
+            "of the installed package, so a default pointing at it would name a directory "
+            "that exists only in a source checkout."
+        ),
+    )
     parser.add_argument(
         "--as-of",
         required=True,
@@ -138,7 +151,9 @@ def _from_flags(root: Path, lines: Sequence[str], *, as_of: date) -> AnsweredQue
     """
     document: dict[str, Any] = tomllib.loads("\n".join(lines))
     question = loader.question_from_document(document, FLAGS)
-    return answer_declared(question, root, as_of=as_of, base_currency=Currency.UAH)
+    return answer_declared(
+        question, root, as_of=as_of, base_currency=Currency.UAH, declared_in=FLAGS
+    )
 
 
 def render(run: AnsweredQuestion) -> list[str]:
@@ -210,29 +225,7 @@ def _section_lines(result: Answer, section: HorizonSection) -> list[str]:
         lines.extend(_named_scalars(section.outcome))
         return lines
     lines.append(f"  {len(section.outcome.enumerated.candidates)} candidate(s) enumerated")
-    ranked = section_ranking(section)
-    scored = section_scored(section)
-    if ranked:
-        lines.append(f"  ranked: {len(ranked)}")
-    else:
-        lines.append(
-            "  ranked: NOTHING. There is no benchmark to rank against, so the figures below "
-            "are reported unranked rather than ordered."
-        )
-    for outcome in ranked or scored:
-        lines.extend(_figure_lines(outcome))
-    for outcome in scored:
-        for claim in outcome.rests_on:
-            lines.append(f"    rests on ({outcome.key.instrument_id}): {claim}")
-    unavailable = benchmark_unavailable(section)
-    if unavailable is not None:
-        lines.append(f"  NO BENCHMARK: {unavailable.reason}")
-    elif not ranked and scored:
-        lines.append(
-            "  NO BENCHMARK: the named benchmark's own money arrives after this window, so it "
-            "is withheld like any other candidate -- and a ranking with no hurdle in it "
-            "invites its own head to be read as a winner."
-        )
+    lines.extend(_ranking_lines(section))
     for item in section.arrives_after_horizon:
         lines.append(
             f"  WITHHELD {item.key.instrument_id}: its money arrives "
@@ -248,23 +241,78 @@ def _section_lines(result: Answer, section: HorizonSection) -> list[str]:
     return lines
 
 
+def _ranking_lines(section: HorizonSection) -> list[str]:
+    """The figures this section computed, ordered where there was a hurdle to order them by.
+
+    **Every scored candidate is printed, ranked or not.** A candidate 010 refused to rank --
+    a different currency, no comparable rate -- still cost the run a full projection, and its
+    ``rests on`` lines print below regardless; dropping its figure would leave an assumption
+    attached to a number the reader was never shown.
+    """
+    ranked = section_ranking(section)
+    scored = section_evaluated(section)
+    lines = [
+        f"  ranked: {len(ranked)}"
+        if ranked
+        else "  ranked: NOTHING. There is no benchmark to rank against, so the figures below "
+        "are reported unranked rather than ordered."
+    ]
+    for outcome in ranked:
+        lines.extend(_figure_lines(outcome))
+    for outcome in scored:
+        if outcome not in ranked:
+            lines.extend([*_figure_lines(outcome), "      NOT RANKED"])
+    for outcome in scored:
+        lines.extend(
+            f"    rests on ({outcome.key.instrument_id}): {claim}" for claim in outcome.rests_on
+        )
+    unavailable = benchmark_unavailable(section)
+    if unavailable is not None:
+        lines.append(f"  NO BENCHMARK: {unavailable.reason}")
+    elif not ranked and scored:
+        lines.append(
+            "  NO BENCHMARK: the named benchmark's own money arrives after this window, so it "
+            "is withheld like any other candidate -- and a ranking with no hurdle in it "
+            "invites its own head to be read as a winner."
+        )
+    return lines
+
+
 def _figure_lines(outcome: TupleOutcome) -> list[str]:
     """One candidate's figures, with the currency, the rate and the terms that identify it.
 
-    The **five** declared terms, because two candidates for one instrument over two routes are
-    two options and printing an id alone renders them identically. The currency, because the
+    All **five** terms of 010's key, because that is what makes two rows different rows: one
+    instrument bought over two ways in, or run to maturity against sold at the window's end, is
+    two options, and printing an id alone renders them identically. The currency, because the
     owner has two streams and a bare number in an ordered list is the Principle VI conflation
     ``Money`` exists to prevent.
+
+    ``exit_terms`` prints as the name of the plan record rather than its fields: which plan was
+    run is the identifying term, and the fields behind it are the question's own declaration.
     """
     rate = outcome.implied_rate
     return [
-        f"    {outcome.key.instrument_id} from {outcome.key.stream_id} via "
-        f"{candidate_id(outcome.key.route_in)}",
+        f"    {outcome.key.instrument_id} from {outcome.key.stream_id} "
+        f"via {candidate_id(outcome.key.route_in)} "
+        f"out {_exit_choice(outcome.key.route_out)} "
+        f"run as {type(outcome.key.exit_terms).__name__}",
         f"      reaches {outcome.reaches.amount} {outcome.reaches.currency.value}"
         + (
             f"; rate {rate.value}" if isinstance(rate, NominalRate) else f"; NO RATE: {rate.reason}"
         ),
     ]
+
+
+def _exit_choice(choice: ExitChoice) -> str:
+    """The way out of the venue: its declared ids, or the instruction standing in for one.
+
+    A chain with no segments is :data:`EXIT_BY_IDENTITY` -- the destination is already
+    spendable -- and it prints under that name rather than as an empty field, which a reader
+    would take for a missing one.
+    """
+    if isinstance(choice, FromTheDeclaration):
+        return choice.value
+    return "+".join(exit_segments_of(choice)) or EXIT_BY_IDENTITY.value
 
 
 def _standing_lines(section: HorizonSection) -> list[str]:

@@ -332,7 +332,10 @@ class RunManifest:
     """Whose run this was. Present from day one per Principle VII."""
 
     as_of: date
-    """When the question was asked. Decides staleness and nothing else.
+    """When the question was **answered**. Decides staleness and nothing else.
+
+    Not the same fact as the question's own ``asked_on``, which is a field of the artefact: the
+    verb takes this one so answering an unchanged file next year ages its sources a year.
 
     On the manifest rather than in the declaration it answers (015 FR-006): a file whose
     horizons moved with the calendar would be a different question every day under one digest,
@@ -609,15 +612,34 @@ def _reported_provenance(result: Projection) -> Provenance:
 # ---------------------------------------------------------------------------
 
 
-def _ref(kind: InputKind, identifier: str, path: Path, sources: Provenance) -> InputRef:
-    """One input reference, so every family below names its file and version the same way."""
+def _ref(
+    kind: InputKind,
+    identifier: str,
+    path: Path,
+    sources: Provenance,
+    *,
+    at_root: bool = False,
+) -> InputRef:
+    """One input reference, so every family below names its file and version the same way.
+
+    ``at_root`` names a declaration that lives at the data root rather than in a family
+    directory. :func:`file_name` keeps the parent so ``instruments/ua.toml`` and ``tax/ua.toml``
+    stay distinct -- but a root-level file's parent is *the data root's own directory name*,
+    which is one machine's layout, and two checkouts would then describe one declaration two
+    ways. That is the exact failure the function exists to prevent, so the parent is dropped.
+    """
     return InputRef(
         kind=kind,
         id=identifier,
-        file=file_name(path),
+        file=path.name if at_root else file_name(path),
         version=file_version(path),
         unverified_sources=_unverified_ids(sources),
     )
+
+
+GROUP_VOCABULARY_ID: Final = "groups"
+"""What the group vocabulary is recorded as. It declares no id of its own -- it *is* the set of
+them -- and ``InputRef.id`` is documented as a declared id rather than a file name."""
 
 
 def answer_input_refs(declarations: resolver.AnswerDeclarations) -> tuple[InputRef, ...]:
@@ -657,11 +679,11 @@ def answer_input_refs(declarations: resolver.AnswerDeclarations) -> tuple[InputR
             for identifier, channel in ramp.channels.items()
         ),
         *(
-            _ref("venue", identifier, path, prov.EMPTY)
+            _ref("venue", identifier, path, prov.EMPTY, at_root=True)
             for identifier, path in ramp.venue_files.items()
         ),
         *(
-            _ref("observation_kind", identifier, path, prov.EMPTY)
+            _ref("observation_kind", identifier, path, prov.EMPTY, at_root=True)
             for identifier, path in ramp.kind_files.items()
         ),
         *(
@@ -670,9 +692,10 @@ def answer_input_refs(declarations: resolver.AnswerDeclarations) -> tuple[InputR
         ),
         _ref(
             "group_vocabulary",
-            resolver.GROUPS_FILE,
+            GROUP_VOCABULARY_ID,
             declarations.tuples.instruments.groups_file,
             prov.EMPTY,
+            at_root=True,
         ),
         _ref(
             "composition",
