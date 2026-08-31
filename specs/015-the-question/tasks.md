@@ -124,7 +124,7 @@ each other. Every **Checkpoint** is a `/commit` through the skill with every gat
 
 ## Phase 5 — the answer records (FR-009 to FR-024)
 
-- [x] **T037 (test)** `tests/unit/test_answer_records.py` — the shapes are frozen; the three
+- [x] **T037 (test)** `tests/unit/test_answer_refuses_in_parts.py` — the shapes are frozen; the three
       subject standings are three types; `Refused` is disjoint from `Answer`; the exclusion set
       is closed and its three FR-033 members carry a direction on exactly two.
 - [x] **T038** `src/terezy/core/results/answer.py` — every record in
@@ -147,7 +147,7 @@ each other. Every **Checkpoint** is a `/commit` through the skill with every gat
       SC-020: a battery over every member of 014's `EnumerationRefused` and `SurveyRefused` and
       010's `BenchmarkUnavailable`, each planted in one section; the answer stands and exactly one
       section carries the planted refusal unmodified. Two `Refused` cases produce no answer.
-- [x] **T042 (test)** `tests/unit/test_answer_sections_align.py` — SC-012, SC-013: the three
+- [x] **T042 (test)** `tests/unit/test_answer_refuses_in_parts.py` — SC-012, SC-013: the three
       sections' candidate sets are equal by key on the shipped registry; a fixture where they
       differ reports a finding; the cross-horizon reading recomputed equals the reading reported.
 - [x] **T043 (test)** `tests/unit/test_subject_counts.py` — SC-030, SC-031, SC-033: an instrument
@@ -159,10 +159,10 @@ each other. Every **Checkpoint** is a `/commit` through the skill with every gat
       before and one day after a qualifying arrival flips the verdict, and the candidate is
       present, evaluated and ranked identically in both; a reserve in a currency the arrivals do
       not deliver is *a partial exit would be needed* and consults no rate.
-- [x] **T045 (test)** `tests/unit/test_money_arrives_after_horizon.py` — SC-027: `inzhur_miltech`
+- [x] **T045 (test)** `tests/worked_examples/test_the_owners_question.py` — SC-027: `inzhur_miltech`
       at a one-month horizon is in no evaluated population and the section carries the typed
       part-refusal naming it and the date its money arrives; the section ranks nothing.
-- [x] **T046 (test)** `tests/unit/test_owner_stated_exchange_rate.py` — SC-028: a question
+- [x] **T046 (test)** `tests/unit/test_owner_stated_assumptions.py` — SC-028: a question
       carrying an owner-stated rate on `inzhur_reit`'s plan evaluates where the baseline produces
       `PegUnsizable`; removing it returns the refusal naming `FundAssumptions.exchange_rate`.
 - [x] **T047 (test)** `tests/unit/test_cross_currency_candidate.py` — SC-016: a fixture registry
@@ -191,11 +191,11 @@ each other. Every **Checkpoint** is a `/commit` through the skill with every gat
 
 ## Phase 8 — the api entry point and the CLI (FR-020a, FR-020b, SC-019, SC-022)
 
-- [x] **T052 (test)** `tests/contract/test_cli_builds_the_same_record.py` — SC-019: a question
+- [x] **T052 (test)** `tests/contract/test_cli_is_sugar_over_the_file.py` — SC-019: a question
       built from flags equals one loaded from the equivalent file, field for field; the scan
       asserts the CLI declares no option expressing a question field the file cannot express,
       exempting `--as-of`, the segment bound and the candidate ceiling by name.
-- [x] **T053 (test)** `tests/contract/test_cli_renders_every_refusal.py` — SC-022: rendering the
+- [x] **T053 (test)** `tests/contract/test_cli_is_sugar_over_the_file.py` — SC-022: rendering the
       owner's answer produces output in which each of the three sections' refusal reasons appears
       by its own text; no blank, no dash, no zero, no omitted row.
 - [x] **T054** `src/terezy/api/answer.py` — load, call once, attach the manifest.
@@ -208,17 +208,17 @@ each other. Every **Checkpoint** is a `/commit` through the skill with every gat
 
 ## Phase 9 — the scans, the golden, and the docs
 
-- [x] **T057 (test)** `tests/contract/test_answer_composes_no_prose.py` — SC-003: a walk over the
+- [x] **T057 (test)** `tests/contract/test_the_answer_says_only_what_it_computed.py` — SC-003: a walk over the
       whole result asserts every string is an id, a date, or a byte-for-byte copy of a string a
       core record it carries already held.
-- [x] **T058 (test)** `tests/contract/test_answer_derives_no_rate.py` — SC-004: no module of this
+- [x] **T058 (test)** `tests/contract/test_the_answer_says_only_what_it_computed.py` — SC-004: no module of this
       feature imports `core.tax.official_rate` or derives a rate; scoped so FR-021a's declared
       assumption is not caught.
-- [x] **T059 (test)** `tests/contract/test_answer_marks_survive.py` — SC-017, SC-025: a walk over
+- [x] **T059 (test)** `tests/contract/test_the_answer_says_only_what_it_computed.py` — SC-017, SC-025: a walk over
       the whole result asserts every figure derived from an unverified or synthetic declaration
       carries the mark where it is reported, and every figure computed through the spread-holds
       assumption names it.
-- [x] **T060 (test)** `tests/contract/test_answer_states_its_exclusions.py` — SC-021, SC-026: the
+- [x] **T060 (test)** `tests/contract/test_the_answer_says_only_what_it_computed.py` — SC-021, SC-026: the
       exclusions and the absences are checked against each other; a direction is present on
       exactly two of FR-033's three claims and absent on the rate-risk one.
 - [x] **T061 (test)** `tests/golden/test_the_answer.py` + `the_answer.golden.txt` — SC-018: the
@@ -236,6 +236,10 @@ each other. Every **Checkpoint** is a `/commit` through the skill with every gat
 
 Recorded here rather than quietly, because each was forced by the data or by a criterion:
 
+- **Four planned test modules landed merged.** The four scans of Phase 9 are one file, because
+  each walks the same result and three of them would otherwise build it three times; the two CLI
+  modules are one, because the structural claim and the rendering claim are about one renderer.
+  Every path above names the file the assertion actually lives in.
 - **T010 moved into Phase 6's file.** SC-032's scan needs the *resolution* function, which does
   not exist until the verb does; asserting `declared.groups == ()` before then would have been
   asserting that a file equals itself. It lands in
