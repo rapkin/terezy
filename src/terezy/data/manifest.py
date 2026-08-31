@@ -650,6 +650,22 @@ def answer_input_refs(declarations: resolver.AnswerDeclarations) -> tuple[InputR
             _ref("stream", identifier, ramp.stream_files[identifier], stream.amount.provenance)
             for identifier, stream in ramp.streams.items()
         ),
+        *(
+            _ref("channel", identifier, ramp.channel_files[identifier], channel.provenance)
+            for identifier, channel in ramp.channels.items()
+        ),
+        *(
+            _ref("venue", identifier, path, prov.EMPTY)
+            for identifier, path in ramp.venue_files.items()
+        ),
+        *(
+            _ref("observation_kind", identifier, path, prov.EMPTY)
+            for identifier, path in ramp.kind_files.items()
+        ),
+        *(
+            _ref("scenario", identifier, path, prov.EMPTY)
+            for identifier, path in ramp.scenario_files.items()
+        ),
         _ref(
             "group_vocabulary",
             resolver.GROUPS_FILE,
