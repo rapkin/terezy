@@ -218,12 +218,13 @@ def test_a_horizon_that_starts_before_as_of_is_unremarkable() -> None:
 def test_the_verbs_as_of_is_what_ages_the_sources() -> None:
     """FR-006, from the other side: ``asked_on`` must not be able to stand in for it.
 
-    The two dates are a day apart in the shipped question and both are plausible arguments to
-    an aging function, so a section that passed ``question.asked_on`` down would look right on
-    every fixture and would report a registry as fresh for ever -- the answer would age with
-    the question rather than with the day it was answered.
+    The shipped question was asked on the day the fixture answers it, so the two dates are equal
+    and a section that passed ``question.asked_on`` down would look right on every fixture in
+    the suite. It would report the registry as fresh for ever: the answer would age with the
+    question rather than with the day it was answered.
     """
     question = fixtures.owners_question()
+    assert question.asked_on == fixtures.AS_OF
     fresh = fixtures.answered(question)
     later = fixtures.answered(question, as_of=date(2030, 1, 1))
     assert staleness.any_stale(later.staleness)

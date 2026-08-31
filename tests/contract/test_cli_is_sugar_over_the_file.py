@@ -330,7 +330,7 @@ def test_the_flags_path_runs_the_checks_that_only_the_file_path_used_to_run(
 
 
 def test_a_data_root_is_required_rather_than_defaulted() -> None:
-    """The shipped ``data/`` is not part of the installed package (015 FR-020a).
+    """The shipped ``data/`` is not part of the installed package.
 
     A default computed from ``__file__`` resolves inside ``site-packages`` once this is a
     console script, so it would name a directory that exists only in a source checkout -- and

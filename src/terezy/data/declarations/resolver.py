@@ -3275,10 +3275,10 @@ def check_question(
 ) -> None:
     """One question against the streams it names and the streams it does not.
 
-    **Public, because a question built from flags has to go through it too** (015 FR-005). Two
-    of its three refusals are re-stated by the verb and two are not -- the owner and the
+    **Public, because a question built from flags has to go through it too** (015 FR-005). One
+    of its three refusals is re-stated by the verb and two are not -- the owner and the amount's
     currency -- so a caller-built record that skipped this would answer one person's question
-    from another person's money, which the file path refuses by name.
+    from another person's money, and the refusal names the path it was declared in either way.
     """
     owners = sorted({stream.owner_id for stream in streams.values()})
     if question.owner_id not in owners:

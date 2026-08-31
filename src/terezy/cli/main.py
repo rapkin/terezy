@@ -244,10 +244,10 @@ def _section_lines(result: Answer, section: HorizonSection) -> list[str]:
 def _ranking_lines(section: HorizonSection) -> list[str]:
     """The figures this section computed, ordered where there was a hurdle to order them by.
 
-    **Every scored candidate is printed, ranked or not.** A candidate 010 refused to rank --
-    a different currency, no comparable rate -- still cost the run a full projection, and its
-    ``rests on`` lines print below regardless; dropping its figure would leave an assumption
-    attached to a number the reader was never shown.
+    **Every scored candidate is printed, ranked or not.** A candidate that produced a complete
+    outcome carrying no rate still cost the run a full projection, and its ``rests on`` lines
+    print below regardless; dropping its figure would leave an assumption attached to a number
+    the reader was never shown.
     """
     ranked = section_ranking(section)
     scored = section_evaluated(section)
