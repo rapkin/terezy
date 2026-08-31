@@ -345,4 +345,3 @@ def test_the_figure_is_marked_by_the_quote_and_not_by_the_terms() -> None:
     )
     assert isinstance(outcome, Projection), outcome
     assert set(outcome.at_purchase.principal_returned.provenance.sources) == {QUOTE_SOURCE}
-    assert synthetic.TERMS_SOURCE not in outcome.at_purchase.principal_returned.provenance.sources

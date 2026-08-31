@@ -445,12 +445,11 @@ def _at_purchase(
     The two cases cannot occur together, so the split is exact rather than an approximation:
     ``enumerated`` refuses ``reinvest`` outright, which is the only way units grow.
 
-    **The sale half is marked by the terms only where the terms decided how much was left.**
-    Nothing retired means the whole purchase is sold and the quantity is the holding's own, so
-    the figure is the quote times a number the terms had no part in; something retired means
-    the units sold are what the declared repayments left, and the terms are behind that figure
-    as much as behind the repaid half. A mark that named the terms in both cases would send a
-    reader chasing an unverified quote to the wrong declaration.
+    **Where nothing retired, the figure carries the quote's sources and no others.** It is the
+    resale price times the holding's own quantity, and the terms had no part in it: marking it
+    with them as well would send a reader chasing its unverified mark to a file that did not
+    supply it. Where something retired, both sources are on the figure and belong there -- the
+    units sold are what the declared repayments left, so the terms decided that quantity too.
     """
     per_unit = instrument_terms.principal_returned(
         declaration.terms, bought_on=holding.purchased_on

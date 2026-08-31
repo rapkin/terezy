@@ -87,7 +87,11 @@ still has to say *where*, and *the flags you typed* is the honest answer.
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Answer one question and print it. Returns 0 for an answer, 1 for a refusal."""
+    """Answer one question and print it.
+
+    Returns :data:`REFUSED` where the question does not stand up, :data:`LOAD_FAILED` where
+    nothing was answered at all, and zero otherwise.
+    """
     args = _parser().parse_args(argv)
     try:
         as_of = date.fromisoformat(args.as_of)
@@ -314,12 +318,12 @@ def _figure_lines(outcome: TupleOutcome) -> list[str]:
 def _plan_terms(plan: InstrumentPlan) -> str:
     """How the holding is run, in the words the question stated it in.
 
-    Rendered here rather than through ``canonical.of_plan``, which exists to be **hashed**: its
-    dates are tuples and its rates are ``float.hex()``, so a reader could not tell two yield
-    points apart by reading -- the very collision the five-term key exists to prevent. The two
-    renderings are kept in step by
-    ``tests/contract/test_cli_is_sugar_over_the_file.py``'s per-field walk, which fails if
-    either drops a field the other keeps.
+    Rendered here rather than through ``canonical.of_plan``, which exists to be **hashed**: it
+    loses nothing, but it renders a date as a tuple and a rate as ``float.hex()``, and nobody
+    reads ``0x1.0000000000000p-2`` as a quarter. Each rendering has a per-field walk of its own
+    -- this one's in ``tests/contract/test_cli_is_sugar_over_the_file.py``, the digest's in
+    ``tests/unit/test_results_canonical.py`` -- because one walk can only see the function it
+    calls, and the failure to catch is either of them quietly dropping a field.
     """
     match plan:
         case Assumptions():
