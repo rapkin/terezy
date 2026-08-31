@@ -582,8 +582,8 @@ without a calendar.
   refusal's reason is the cheap honest form (`_search` knows which bound it fell off, and the
   week query knows which end its week crosses), and it is **not** a fourth reason: which end to
   widen is a detail of the third, not a fourth remedy. Deferred because nothing consumes a
-  calendar (FR-015), so no output is degraded today, and a design change made against no
-  consumer is what four of these requirements exist to avoid. Recorded 2026-08-31 in review.
+  calendar (FR-015), so no output is degraded today and there is no consumer to design against.
+  Recorded 2026-08-31 in review.
 
   **There is deliberately no "no calendar is declared for this jurisdiction" reason**, because
   FR-003a forbids the engine from asking that question: nothing looks a calendar up by
