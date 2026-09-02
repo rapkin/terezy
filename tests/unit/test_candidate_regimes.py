@@ -49,7 +49,7 @@ def _worlds() -> tuple[Registries, Mapping[str, Route], Mapping[str, Route]]:
     subsets of the registry's own declarations, which is what a regime is: a belief about which
     declared corridors are open, never a declaration of its own.
     """
-    registries = fixtures.shipped()
+    registries = fixtures.declared()
     second = tuples.route(
         SECOND_WAY_IN,
         origin="monobank_uah",

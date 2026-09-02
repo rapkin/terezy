@@ -26,9 +26,9 @@ import pytest
 from terezy.core.instruments.interface import EnumeratedTerms, PaymentKind
 from terezy.data.declarations import loader
 from terezy.data.declarations.errors import DeclarationError
+from tests import data_roots
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-DECLARATION = REPO_ROOT / "data" / "instruments" / "enumerated_out_of_order.toml"
+DECLARATION = data_roots.FIXTURES / "instruments" / "enumerated_out_of_order.toml"
 DECLARED_ORDER = 'published_in_order = ["2026-10-01", "2027-04-01", "2027-03-31"]'
 
 

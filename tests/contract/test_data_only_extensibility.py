@@ -55,12 +55,12 @@ from terezy.core.results.project import Projection
 from terezy.core.tax.interface import TaxableEventKind
 from terezy.data.declarations import loader, resolver
 from terezy.data.declarations.errors import DeclarationError
-from tests import declared_terms, synthetic
+from tests import data_roots, declared_terms, synthetic
 
 pytestmark = pytest.mark.contract
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DATA_ROOT = REPO_ROOT / "data"
+DATA_ROOT = data_roots.with_fixtures()
 SOURCE_ROOT = REPO_ROOT / "src" / "terezy"
 
 # ⚙ Issue A's first *taxable* event is its 2026-07-15 coupon, fifteen days after the

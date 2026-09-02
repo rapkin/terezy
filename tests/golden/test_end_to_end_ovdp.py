@@ -130,12 +130,12 @@ from terezy.core.tax import year as tax_year
 from terezy.core.tax.interface import TaxCharge, TaxClass
 from terezy.data import manifest
 from terezy.data.declarations import loader, resolver
-from tests import declared_terms
+from tests import data_roots, declared_terms
 
 pytestmark = pytest.mark.golden
 
 REPO_ROOT: Final = Path(__file__).resolve().parents[2]
-DATA_ROOT: Final = REPO_ROOT / "data"
+DATA_ROOT: Final = data_roots.with_fixtures()
 GOLDEN_FILE: Final = Path(__file__).with_name("ovdp_synthetic_a.golden.txt")
 
 UPDATE_VARIABLE: Final = "TEREZY_UPDATE_GOLDEN"

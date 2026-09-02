@@ -127,8 +127,14 @@ def test_a_section_that_refuses_still_states_where_every_named_subject_stands() 
 
 
 def test_the_answer_stands_when_no_horizon_produced_a_ranking() -> None:
-    """SC-020's neighbour: an ``Answer``, never a ``Refused``. Measured today's behaviour."""
-    result = fixtures.answered()
+    """SC-020's neighbour: an ``Answer``, never a ``Refused``.
+
+    The benchmark is an invented bond quoting no resale price, so every section refuses to rank
+    -- 010 FR-011 will not offer a list whose head would read as a winner. That is a *section*
+    outcome and the answer around it still stands.
+    """
+    question = fixtures.owners_question()
+    result = fixtures.answered(replace(question, benchmark_instrument_id="ovdp_synthetic_a"))
     assert isinstance(result, Answer)
     assert all(section_ranking(section) == () for section in result.sections)
 
@@ -295,12 +301,14 @@ def test_the_answers_marks_describe_the_figures_it_reports() -> None:
 def test_a_section_with_no_benchmark_still_carries_the_figures_it_computed() -> None:
     """``BenchmarkUnavailable.scored`` exists so the work is not thrown away.
 
-    Nothing is *ranked* -- there is nothing to rank against -- but candidates did produce
-    complete outcomes at twelve months, and a reader told only "nothing was ranked" would never
-    learn they exist. The population is named rather than counted: it is the registry's and it
-    grew by 24 when the real ОВДП issues were declared.
+    Nothing is *ranked* -- the benchmark is an invented bond quoting no resale price -- but
+    candidates did produce complete outcomes at twelve months, and a reader told only "nothing
+    was ranked" would never learn they exist. The population is named rather than counted: it
+    is the registry's and it grew by 24 when the real ОВДП issues were declared.
     """
-    twelve = fixtures.answered().sections[2]
+    question = fixtures.owners_question()
+    result = fixtures.answered(replace(question, benchmark_instrument_id="ovdp_synthetic_a"))
+    twelve = result.sections[2]
     assert section_ranking(twelve) == ()
     scored = section_evaluated(twelve)
     assert scored

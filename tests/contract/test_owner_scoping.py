@@ -30,11 +30,12 @@ from terezy.core.ledger import seeds
 from terezy.core.primitives.currency import Currency
 from terezy.data.declarations import loader, resolver
 from terezy.data.declarations.errors import DeclarationError
+from tests import data_roots
 
 pytestmark = pytest.mark.contract
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DATA_ROOT = REPO_ROOT / "data"
+DATA_ROOT = data_roots.with_fixtures()
 SEEDS = DATA_ROOT / "seeds" / "owner-001.toml"
 GOALS = DATA_ROOT / "goals" / "owner-001.toml"
 OWNER = "owner-001"

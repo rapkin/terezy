@@ -120,7 +120,7 @@ def _registries(
     one declared value this feature added and the one whose ageing had nowhere to go: a leg
     was aged by 002's costing long before the join existed.
     """
-    registries = fixtures.shipped()
+    registries = fixtures.declared()
     routes = dict(registries.routes)
     for route_id, part in (
         (fixtures.DOMESTIC_IN, "route in"),
@@ -359,22 +359,20 @@ class TestStalenessSurfacesOnTheOutcome:
         # nobody has looked at in six years.
         outcome = _outcome(_registries(unverified_part=None, stale_price=True))
         assert stale.any_stale(outcome.staleness)
-        assert any(
-            item.source_id.startswith("access/instruments") for item in outcome.staleness.stale
-        )
+        assert any(item.source_id.startswith("access/") for item in outcome.staleness.stale)
 
     def test_a_fresh_quote_is_named_in_assessed_rather_than_skipped(self) -> None:
         # "Nothing was aged" and "everything was aged and nothing was stale" are different
         # claims, and before the quote was merged in it was the first one wearing the second
         # one's green tick.
         outcome = _outcome(_registries(unverified_part=None))
-        assert any(item.startswith("access/instruments") for item in outcome.staleness.assessed)
+        assert any(item.startswith("access/") for item in outcome.staleness.assessed)
         assert not stale.any_stale(outcome.staleness)
 
     def test_the_thresholds_are_the_declared_ones(self) -> None:
         # Stated as an assertion rather than assumed: the verdict above is only meaningful if
         # the kind the legs name is a kind somebody declared a threshold for.
-        registries = fixtures.shipped()
+        registries = fixtures.declared()
         kind = registries.kinds[registries.routes[fixtures.DOMESTIC_IN].legs[0].kind_of_observation]
         assert isinstance(kind, ObservationKind)
         assert kind.staleness_days > 0

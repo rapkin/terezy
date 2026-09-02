@@ -61,7 +61,12 @@ continuation = "hold_as_cash"
 
 # Everything is ranked against one issue. Named by instrument id: more than one candidate for
 # it refuses rather than settling by file order which figure the rest are measured against.
-benchmark    = "ovdp_synthetic_a"
+#
+# OWNER'S CHOICE, 2026-09-02. It matures 2026-09-16, inside every horizon here, so its proceeds
+# sit as cash to each horizon's end under the `hold_as_cash` continuation above — the hurdle is
+# therefore what a maturing issue plus idle cash returns, which is the comparison he asked for
+# and not a defect to be corrected in the engine.
+benchmark    = "UA4000235865"
 
 # The four words he said, in the order he said them. `subjects` and `every_declared_instrument`
 # are mutually exclusive and one of them is required: omission must never read as *everything*.

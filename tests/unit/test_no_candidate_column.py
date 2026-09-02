@@ -45,7 +45,7 @@ def _enumerate(registries: Registries) -> CandidateSet:
 
 class TestAnAbsentCorridorIsReportedAsAnAbsentCorridor:
     def test_the_dollar_stream_reaches_nothing_and_the_record_says_which_side(self) -> None:
-        pairs = _enumerate(fixtures.shipped()).no_candidate
+        pairs = _enumerate(fixtures.declared()).no_candidate
         assert pairs
         for pair in pairs:
             assert isinstance(pair.why, NothingConnects), pair
@@ -54,7 +54,7 @@ class TestAnAbsentCorridorIsReportedAsAnAbsentCorridor:
     def test_a_registry_with_no_way_out_reports_the_other_side(self) -> None:
         """The exit half, which the shipped registry never reaches: every instrument's
         proceeds land at `inzhur`, which `inzhur_to_monobank` carries out of."""
-        registries = fixtures.shipped()
+        registries = fixtures.declared()
         routes = {
             route_id: route
             for route_id, route in registries.routes.items()
@@ -87,7 +87,7 @@ class TestMoneyAlreadyWhereItWasWantedIsNotAGapInTheRegistry:
 
     @staticmethod
     def _bought_where_the_salary_lands() -> Registries:
-        return fixtures.with_access(fixtures.shipped(), OVDP, bought_at="monobank_uah")
+        return fixtures.with_access(fixtures.declared(), OVDP, bought_at="monobank_uah")
 
     def test_the_pair_is_reported_with_the_other_reason_type(self) -> None:
         pairs = _enumerate(self._bought_where_the_salary_lands()).no_candidate
@@ -148,7 +148,7 @@ class TestMoneyAlreadyWhereItWasWantedIsNotAGapInTheRegistry:
 
 def test_a_pair_yielding_nothing_is_never_among_the_candidates() -> None:
     """The populations are disjoint, which is what lets FR-009's identity be a partition."""
-    enumerated = _enumerate(fixtures.shipped())
+    enumerated = _enumerate(fixtures.declared())
     with_candidates = {
         (candidate.key.instrument_id, candidate.key.stream_id)
         for candidate in enumerated.candidates

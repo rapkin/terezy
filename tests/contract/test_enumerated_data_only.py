@@ -33,11 +33,12 @@ from terezy.core.results import project
 from terezy.core.results.project import Projection
 from terezy.data.declarations import resolver
 from terezy.data.declarations.errors import DeclarationError
+from tests import data_roots
 
 pytestmark = pytest.mark.contract
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DATA_ROOT = REPO_ROOT / "data"
+DATA_ROOT = data_roots.with_fixtures()
 SHIPPED = "ovdp_enumerated_a"
 THIRD = "ovdp_enumerated_c"
 

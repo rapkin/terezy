@@ -31,7 +31,7 @@ SPENDABLE_VENUE = "monobank_uah"
 
 
 def _proceeds_land_where_the_owner_spends() -> Registries:
-    return fixtures.with_access(fixtures.shipped(), OVDP, proceeds_to=SPENDABLE_VENUE)
+    return fixtures.with_access(fixtures.declared(), OVDP, proceeds_to=SPENDABLE_VENUE)
 
 
 def _set(registries: Registries) -> CandidateSet:
@@ -43,7 +43,7 @@ def _set(registries: Registries) -> CandidateSet:
 def test_the_shipped_registry_reaches_this_nowhere() -> None:
     """The control that makes the fixture mean something: on the shipped declarations every way
     out is a declared chain, so a test that found the sentinel there would be finding a bug."""
-    ways_out = {item.key.route_out for item in _set(fixtures.shipped()).candidates}
+    ways_out = {item.key.route_out for item in _set(fixtures.declared()).candidates}
     assert ways_out == {DeclaredExit(route_id="inzhur_to_monobank")}
 
 

@@ -161,7 +161,7 @@ def _repatriated(released: float) -> float:
 def _registries() -> Registries:
     """The shipped registry with one costed way in and one costed way out added."""
     registries = fixtures.with_new_route(
-        fixtures.shipped(),
+        fixtures.declared(),
         fixtures.route(
             IN_ROUTE,
             origin="monobank_uah",

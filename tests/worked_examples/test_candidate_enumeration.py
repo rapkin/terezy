@@ -46,7 +46,7 @@ pytestmark = pytest.mark.worked_example
 
 
 def _set() -> CandidateSet:
-    registries = fixtures.shipped()
+    registries = fixtures.declared()
     result = enumerate_candidates(
         registries=registries,
         routes=registries.routes,
@@ -59,7 +59,7 @@ def _set() -> CandidateSet:
 
 class TestTheShippedRegistryYieldsWhatItsDeclarationsConnect:
     def test_every_declared_pair_is_considered(self) -> None:
-        registries = fixtures.shipped()
+        registries = fixtures.declared()
         declared = [
             instrument_id
             for instrument_id in registries.access
@@ -68,7 +68,7 @@ class TestTheShippedRegistryYieldsWhatItsDeclarationsConnect:
         assert _set().pairs_considered == len(declared) * len(registries.streams)
 
     def test_one_candidate_per_instrument_and_all_of_them_from_the_hryvnia_salary(self) -> None:
-        registries = fixtures.shipped()
+        registries = fixtures.declared()
         produced = _set().candidates
         assert {candidate.key.stream_id for candidate in produced} == {fixtures.SALARY}
         assert sorted(candidate.key.instrument_id for candidate in produced) == sorted(
@@ -100,7 +100,7 @@ class TestTheShippedRegistryYieldsWhatItsDeclarationsConnect:
 
 class TestTheFiveTermsNameDeclaredThings:
     def test_every_route_id_in_every_candidate_resolves(self) -> None:
-        registries = fixtures.shipped()
+        registries = fixtures.declared()
         for candidate in _set().candidates:
             for route_id in segments(candidate.key.route_in):
                 assert route_id in registries.routes

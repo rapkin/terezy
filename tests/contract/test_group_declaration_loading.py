@@ -21,12 +21,13 @@ import pytest
 from terezy.data.declarations import loader, resolver
 from terezy.data.declarations.errors import DeclarationError
 from tests import answer_registries as fixtures
+from tests import data_roots
 from tests import observations as obs
 
 pytestmark = pytest.mark.contract
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DATA_ROOT = REPO_ROOT / "data"
+DATA_ROOT = data_roots.with_fixtures()
 GROUPS = DATA_ROOT / "groups.toml"
 
 OVDP = "ovdp"

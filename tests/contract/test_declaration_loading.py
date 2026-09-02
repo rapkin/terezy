@@ -52,12 +52,12 @@ from terezy.core.tax.interface import TaxableEventKind
 from terezy.core.tax.schedule import RateUndeclaredBefore
 from terezy.data.declarations import loader, resolver, schema
 from terezy.data.declarations.errors import DeclarationError
-from tests import declared_terms
+from tests import data_roots, declared_terms
 from tests import observations as obs
 
 pytestmark = pytest.mark.contract
 
-DATA_ROOT = Path(__file__).resolve().parents[2] / "data"
+DATA_ROOT = data_roots.with_fixtures()
 
 REAL_OVDP_ISINS: Final = frozenset(obs.declared_isins())
 """Derived from the two observation files rather than listed, so an issue leaving the

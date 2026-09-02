@@ -13,7 +13,6 @@ with dates of its own, and which of the two a declaration matches is the whole q
 from __future__ import annotations
 
 from datetime import date
-from pathlib import Path
 
 import pytest
 
@@ -23,11 +22,12 @@ from terezy.core.primitives.currency import Currency
 from terezy.core.results.tuple import TupleOutcome
 from terezy.data.declarations import resolver
 from tests import answer_registries as answers
+from tests import data_roots
 from tests import observations as obs
 
 pytestmark = pytest.mark.worked_example
 
-DATA_ROOT = Path(__file__).resolve().parents[2] / "data"
+DATA_ROOT = data_roots.with_fixtures()
 DAY_COUNT = "act/365"
 """013 FR-003a: a convention of computation, claiming nothing about the issue, and the same
 one the fixtures declare so the yields are comparable (016 FR-010)."""

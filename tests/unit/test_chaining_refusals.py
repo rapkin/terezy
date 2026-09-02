@@ -75,7 +75,7 @@ class TestTheShippedTupleChains:
     """The control. Without it, every assertion below could pass for the wrong reason."""
 
     def test_the_declared_domestic_round_trip_produces_an_outcome(self) -> None:
-        assert isinstance(_evaluated(fixtures.shipped()), TupleOutcome)
+        assert isinstance(_evaluated(fixtures.declared()), TupleOutcome)
 
 
 class TestTheFirstSeamTheWayInAndThePurchase:
@@ -86,7 +86,7 @@ class TestTheFirstSeamTheWayInAndThePurchase:
         # Moving the *access* declaration to `monobank_uah` -- a venue that also holds UAH,
         # so the currency check passes -- is the venue half on its own.
         refusal = _refused(
-            fixtures.with_access(fixtures.shipped(), fixtures.OVDP, bought_at="monobank_uah")
+            fixtures.with_access(fixtures.declared(), fixtures.OVDP, bought_at="monobank_uah")
         )
         assert refusal.seam == "route_in_to_purchase"
         assert refusal.left == "inzhur/UAH"
@@ -101,7 +101,7 @@ class TestTheFirstSeamTheWayInAndThePurchase:
         # arrived is dollars, and a conversion here would be an invented leg at an invented
         # rate.
         registries = fixtures.with_new_route(
-            fixtures.shipped(),
+            fixtures.declared(),
             fixtures.route(
                 "test_deel_to_binance",
                 origin="deel",
@@ -143,7 +143,7 @@ class TestTheSecondSeamTheProceedsAndTheWayOut:
         # `monobank_uah` -- again a UAH venue, so only the venue half differs -- is the case
         # feature 004 walked anyway: the exit chain would be priced with money it never had.
         registries = fixtures.with_access(
-            fixtures.shipped(), fixtures.OVDP, proceeds_to="monobank_uah"
+            fixtures.declared(), fixtures.OVDP, proceeds_to="monobank_uah"
         )
         # `monobank_uah` in hryvnia IS a declared spendable endpoint, so the derived way out
         # would be EXIT_BY_IDENTITY and no seam would be crossed at all. Naming the chain
@@ -161,7 +161,7 @@ class TestTheSecondSeamTheProceedsAndTheWayOut:
         # The exit route departs `inzhur` in hryvnia. A declared way out from the same venue
         # in dollars does not meet it, and the venue half matching is exactly what makes this
         # the case a venue-only check would miss.
-        registries = fixtures.shipped()
+        registries = fixtures.declared()
         registries = fixtures.with_new_route(
             registries,
             fixtures.route(
@@ -187,7 +187,7 @@ class TestTheSecondSeamTheProceedsAndTheWayOut:
         # is a statement about the far end. Unchecked it produced feature 004's defect in its
         # purest form: a complete round trip for money sitting where it cannot be spent.
         refusal = _refused(
-            fixtures.shipped(), fixtures.hurdle_tuple(route_out=fixtures.EXIT_BY_IDENTITY)
+            fixtures.declared(), fixtures.hurdle_tuple(route_out=fixtures.EXIT_BY_IDENTITY)
         )
         assert refusal.seam == "proceeds_to_route_out"
         assert refusal.left == "inzhur/UAH"
@@ -202,11 +202,11 @@ class TestNoSeamIsBridged:
         "registries",
         [
             pytest.param(
-                fixtures.with_access(fixtures.shipped(), fixtures.OVDP, bought_at="binance"),
+                fixtures.with_access(fixtures.declared(), fixtures.OVDP, bought_at="binance"),
                 id="purchase at a venue the way in does not reach",
             ),
             pytest.param(
-                fixtures.with_access(fixtures.shipped(), fixtures.OVDP, proceeds_to="binance"),
+                fixtures.with_access(fixtures.declared(), fixtures.OVDP, proceeds_to="binance"),
                 id="proceeds at a venue the way out does not depart from",
             ),
         ],
@@ -218,7 +218,7 @@ class TestNoSeamIsBridged:
         # 004's own lesson, restated where this feature can repeat it: the anchor is on the
         # *first* segment of the chain, so a two-segment way out starting somewhere the money
         # is not is refused exactly as a one-segment one is.
-        registries = fixtures.shipped()
+        registries = fixtures.declared()
         registries = fixtures.with_new_route(
             registries,
             fixtures.route(
@@ -259,7 +259,7 @@ class TestTheFundingSeamTheTupleAndItsWayIn:
         # exists to protect -- and it produced figures identical to the free route's, with no
         # refusal anywhere, because nothing compared the two strings.
         candidate = fixtures.replace(fixtures.hurdle_tuple(), stream_id="contract_usd")
-        refusal = _evaluated(fixtures.shipped(), candidate)
+        refusal = _evaluated(fixtures.declared(), candidate)
         assert isinstance(refusal, FundedFromAnotherStream), refusal
         assert refusal.tuple_stream_id == "contract_usd"
         assert refusal.route_stream_id == fixtures.SALARY
@@ -270,4 +270,4 @@ class TestTheFundingSeamTheTupleAndItsWayIn:
         # Not "costed and then flagged": which income pays is part of what a cost *is*, so
         # there is no figure to report and none is produced.
         candidate = fixtures.replace(fixtures.hurdle_tuple(), stream_id="contract_usd")
-        assert not isinstance(_evaluated(fixtures.shipped(), candidate), TupleOutcome)
+        assert not isinstance(_evaluated(fixtures.declared(), candidate), TupleOutcome)

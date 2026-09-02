@@ -43,11 +43,12 @@ from terezy.core.results import fund as fund_results
 from terezy.core.results.fund import FundAssumptions, FundProjection
 from terezy.core.tax.interface import TaxableEventKind
 from terezy.data.declarations import resolver
+from tests import data_roots
 
 pytestmark = pytest.mark.contract
 
 REPO_ROOT: Final = Path(__file__).resolve().parents[2]
-DATA_ROOT: Final = REPO_ROOT / "data"
+DATA_ROOT: Final = data_roots.with_fixtures()
 SOURCE_ROOT: Final = REPO_ROOT / "src" / "terezy"
 
 REIT: Final = "inzhur_reit"

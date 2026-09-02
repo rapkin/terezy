@@ -1,6 +1,6 @@
-"""Fixtures for the answer suites: the shipped question, and deliberate edits to it.
+"""Fixtures for the answer suites: the owner's question, and deliberate edits to it.
 
-Built from ``data/`` rather than by hand, on ``tests/candidate_registries.py``'s reasoning
+Built from a data root rather than by hand, on ``tests/candidate_registries.py``'s reasoning
 unchanged: the whole claim of this feature is that it answers a **declared** question over a
 **declared** registry, so a suite that hand-built both would measure a world the loader never
 validated.
@@ -22,6 +22,7 @@ from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.results.answer import Answer
 from terezy.data.declarations import loader, resolver
+from tests import data_roots
 
 if TYPE_CHECKING:  # pragma: no cover -- typing only
     from collections.abc import Mapping
@@ -29,29 +30,38 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.results.answer import Refused
     from terezy.core.results.question import Question
 
-REPO_ROOT: Final = Path(__file__).resolve().parents[1]
-DATA_ROOT: Final = REPO_ROOT / "data"
-QUESTION_FILE: Final = DATA_ROOT / "questions" / "fifty-thousand.toml"
+REPO_ROOT: Final = data_roots.REPO_ROOT
+SHIPPED_ROOT: Final = data_roots.SHIPPED
+DATA_ROOT: Final = data_roots.with_fixtures()
+"""What ships plus the invented instruments, composed. See :mod:`tests.data_roots`.
+
+``SHIPPED_ROOT`` is what the artefacts of the owner's own answer run against -- the golden, the
+CLI, the worked example -- because those record what he is actually offered. Everything else
+here is about a mechanism, and every mechanism's only example is a fixture.
+"""
+
+QUESTION_FILE: Final = data_roots.SHIPPED / "questions" / "fifty-thousand.toml"
+"""One file, read from the shipped root under either root: the overlay declares no question."""
 
 UAH: Final = Currency.UAH
 AS_OF: Final = date(2026, 8, 30)
 """The day the owner asked. Decides staleness and nothing else."""
 
 OWNERS_QUESTION: Final = "fifty-thousand-hryvnia"
-BENCHMARK: Final = "ovdp_synthetic_a"
+BENCHMARK: Final = "UA4000235865"
 OVDP: Final = "ovdp"
 INZHUR: Final = "inzhur"
 MILTECH: Final = "inzhur_miltech"
 REIT: Final = "inzhur_reit"
 
 
-def declarations() -> resolver.AnswerDeclarations:
-    """Every declaration the verb reads, under the shipped data root."""
-    return resolver.answer_from_data_root(DATA_ROOT, base_currency=UAH, scenario_id=None)
+def declarations(root: Path = DATA_ROOT) -> resolver.AnswerDeclarations:
+    """Every declaration the verb reads, under a data root."""
+    return resolver.answer_from_data_root(root, base_currency=UAH, scenario_id=None)
 
 
 def inputs(declared: resolver.AnswerDeclarations | None = None) -> AnswerInputs:
-    """The verb's second parameter for the shipped registry.
+    """The verb's second parameter for a resolved registry.
 
     Deliberately thin, on ``candidate_registries.enumerated``'s rule: a fixture that decided
     anything the function under test decides would let a suite pass on the fixture's judgement.
@@ -64,6 +74,11 @@ def inputs(declared: resolver.AnswerDeclarations | None = None) -> AnswerInputs:
         bound=resolved.candidates.composition.bound,
         ceiling=resolved.candidates.ceiling,
     )
+
+
+def shipped_inputs() -> AnswerInputs:
+    """The verb's second parameter over what ships, with no fixture in it."""
+    return inputs(declarations(SHIPPED_ROOT))
 
 
 def owners_question() -> Question:

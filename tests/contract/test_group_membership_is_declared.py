@@ -25,6 +25,7 @@ from terezy.core.primitives.currency import Currency
 from terezy.core.results.answer import Answer, DeclaredSubject
 from terezy.data.declarations import loader, resolver
 from tests import answer_registries as fixtures
+from tests import data_roots
 
 pytestmark = pytest.mark.contract
 
@@ -33,7 +34,7 @@ MODELLED_ON = "UA4000235865"
 """The fixture and the real issue whose published list it is shaped like."""
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DATA_ROOT = REPO_ROOT / "data"
+DATA_ROOT = data_roots.with_fixtures()
 
 LOOKALIKE = "ovdp_lookalike"
 """Named to trip the id-prefix inference: four of the six shipped bonds are ``ovdp_*``."""

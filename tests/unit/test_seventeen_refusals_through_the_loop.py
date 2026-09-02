@@ -62,7 +62,7 @@ def unchanged_no_candidates() -> int:
     One pair per declared instrument -- it was nine and became thirty-three when 016 declared
     the real ОВДП issues, and a literal here would have to be re-typed on every data change.
     """
-    enumerated = fixtures.enumerated(fixtures.shipped())
+    enumerated = fixtures.enumerated(fixtures.declared())
     assert isinstance(enumerated, CandidateSet), enumerated
     return len(enumerated.no_candidate)
 
@@ -126,7 +126,7 @@ def _a_foreign_taxable_bond() -> Registries:
     both the instrument and the two corridors are stated here. Without the corridors the pair
     yields no candidate and the refusal is never asked for at all.
     """
-    registries = fixtures.shipped()
+    registries = fixtures.declared()
     declared = registries.instruments[OVDP]
     return replace(
         registries,
@@ -140,7 +140,7 @@ def _a_foreign_taxable_bond() -> Registries:
 
 
 def _plans(**changes: tuple[InstrumentPlan, ...]) -> Mapping[str, tuple[InstrumentPlan, ...]]:
-    return {**fixtures.one_plan_each(fixtures.shipped()), **changes}
+    return {**fixtures.one_plan_each(fixtures.declared()), **changes}
 
 
 def _tiny() -> Mapping[str, Money]:
@@ -148,31 +148,31 @@ def _tiny() -> Mapping[str, Money]:
 
 
 PLANTED: dict[str, tuple[Registries, dict[str, object]]] = {
-    "InstrumentRefused": (fixtures.shipped(), {}),
+    "InstrumentRefused": (fixtures.declared(), {}),
     "DeclarationMissing": (
         replace(
-            fixtures.shipped(),
+            fixtures.declared(),
             tax_classes={
                 key: value
-                for key, value in fixtures.shipped().tax_classes.items()
+                for key, value in fixtures.declared().tax_classes.items()
                 if key != BOND_CLASS
             },
         ),
         {},
     ),
     "RouteInUnusable": (
-        tuples.with_route(fixtures.shipped(), "inzhur_direct", status="closed"),
+        tuples.with_route(fixtures.declared(), "inzhur_direct", status="closed"),
         {},
     ),
     "RouteInCapExceeded": (
         tuples.with_leg(
-            fixtures.shipped(), "inzhur_direct", monthly_cap=Money(100.0, fixtures.UAH, prov.EMPTY)
+            fixtures.declared(), "inzhur_direct", monthly_cap=Money(100.0, fixtures.UAH, prov.EMPTY)
         ),
         {},
     ),
     "WayOutUnusable": (
         tuples.with_leg(
-            fixtures.shipped(),
+            fixtures.declared(),
             "inzhur_to_monobank",
             minimum=Money(1_000_000.0, fixtures.UAH, prov.EMPTY),
         ),
@@ -180,15 +180,15 @@ PLANTED: dict[str, tuple[Registries, dict[str, object]]] = {
     ),
     "WayOutCapExceeded": (
         tuples.with_leg(
-            fixtures.shipped(),
+            fixtures.declared(),
             "inzhur_to_monobank",
             monthly_cap=Money(100.0, fixtures.UAH, prov.EMPTY),
         ),
         {},
     ),
-    "BelowMinimumTicket": (fixtures.shipped(), {"amounts": _tiny()}),
+    "BelowMinimumTicket": (fixtures.declared(), {"amounts": _tiny()}),
     "BuysNoWholeUnit": (
-        fixtures.shipped(),
+        fixtures.declared(),
         {"amounts": {fixtures.SALARY: Money(500.0, fixtures.UAH, prov.EMPTY)}},
     ),
     # 015 FR-029 narrowed this arm to the fund. A bond outliving its horizon is now **sold**
@@ -196,27 +196,27 @@ PLANTED: dict[str, tuple[Registries, dict[str, object]]] = {
     # still cannot span a horizon is a fund held with no exit requested, which owes no buyback
     # before it terminates and so has nothing to be liquidated into.
     "CannotSpanHorizon": (
-        fixtures.shipped(),
+        fixtures.declared(),
         {
             "horizon": DateRange(start=fixtures.OUTLAY_ON, end=date(2026, 5, 1)),
             "plans": _plans(
                 inzhur_miltech=(
-                    fixtures.fund_plan(fixtures.shipped().funds[MILTECH], exit_on=None),
+                    fixtures.fund_plan(fixtures.declared().funds[MILTECH], exit_on=None),
                 ),
-                inzhur_reit=(fixtures.fund_plan(fixtures.shipped().funds[REIT], exit_on=None),),
+                inzhur_reit=(fixtures.fund_plan(fixtures.declared().funds[REIT], exit_on=None),),
                 synthetic_fund_c=(
-                    fixtures.fund_plan(fixtures.shipped().funds["synthetic_fund_c"], exit_on=None),
+                    fixtures.fund_plan(fixtures.declared().funds["synthetic_fund_c"], exit_on=None),
                 ),
             ),
         },
     ),
     "NoExitTermsDeclared": (
-        fixtures.shipped(),
+        fixtures.declared(),
         {
             "plans": _plans(
                 inzhur_miltech=(
                     fixtures.fund_plan(
-                        fixtures.shipped().funds[MILTECH],
+                        fixtures.declared().funds[MILTECH],
                         liquidity_mode="legal",
                         buyback="unavailable",
                     ),
@@ -225,20 +225,20 @@ PLANTED: dict[str, tuple[Registries, dict[str, object]]] = {
         },
     ),
     "TwoFiguresNotOne": (
-        fixtures.shipped(),
+        fixtures.declared(),
         {
             "plans": _plans(
                 inzhur_miltech=(
-                    fixtures.fund_plan(fixtures.shipped().funds[MILTECH], yield_point=None),
+                    fixtures.fund_plan(fixtures.declared().funds[MILTECH], yield_point=None),
                 )
             )
         },
     ),
     "PlanDoesNotFitInstrument": (
-        fixtures.shipped(),
-        {"plans": _plans(ovdp_synthetic_a=(fixtures.fund_plan(fixtures.shipped().funds[REIT]),))},
+        fixtures.declared(),
+        {"plans": _plans(ovdp_synthetic_a=(fixtures.fund_plan(fixtures.declared().funds[REIT]),))},
     ),
-    "InstrumentDemandsCash": (_taxed_at(fixtures.shipped(), pit=0.9, levy=0.9), {}),
+    "InstrumentDemandsCash": (_taxed_at(fixtures.declared(), pit=0.9, levy=0.9), {}),
     "TaxCurrencyConversionUnavailable": (_a_foreign_taxable_bond(), {}),
 }
 """One registry-and-question per refusal this loop can actually reach."""
@@ -298,7 +298,7 @@ def test_the_baseline_puts_one_pair_per_declared_instrument_in_the_third_column(
     """What every planted case is measured against, and why that number is what it is: the
     dollar stream reaches the buying venue through no declared corridor, so every pair on it is
     the ABSENCE of an option rather than the rejection of one."""
-    registries = fixtures.shipped()
+    registries = fixtures.declared()
     enumerated = fixtures.enumerated(registries)
     assert isinstance(enumerated, CandidateSet), enumerated
     declared = len(registries.instruments) + len(registries.funds)
@@ -350,7 +350,7 @@ class TestTheThreeNoLoopCanReach:
 
     @staticmethod
     def _worlds() -> list[Registries]:
-        shipped = fixtures.shipped()
+        shipped = fixtures.declared()
         instruments = sorted(shipped.access)
         return [
             shipped,

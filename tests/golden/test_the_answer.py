@@ -1,9 +1,12 @@
 """The owner's question and its whole answer, recorded.
 
 015 SC-018. The artefact beside this file is what the engine answers today, and its value is
-that a diff to it is a *finding*: the day feature 016 declares real ОВДП issues, the same
-question over the same file produces marks that are no longer synthetic, and the diff is the
-evidence.
+that a diff to it is a *finding*: a declaration that changes, or a hurdle he renames, moves
+lines here and the diff is the evidence.
+
+**Over the shipped root, never the composed one.** This records what the owner is actually
+offered, so an invented instrument appearing in it would be a figure about a security nobody
+can buy.
 
 Regenerate deliberately, read the diff, and say in the commit message why every changed line is
 intended::
@@ -53,7 +56,7 @@ UPDATE_VARIABLE: Final = "TEREZY_UPDATE_GOLDEN"
 
 def _answered() -> Answer:
     run: Any = answer_question(
-        fixtures.DATA_ROOT,
+        fixtures.SHIPPED_ROOT,
         fixtures.OWNERS_QUESTION,
         as_of=fixtures.AS_OF,
         base_currency=Currency.UAH,
@@ -147,10 +150,15 @@ def test_the_answer_matches_the_recorded_artefact() -> None:
     )
 
 
-def test_the_recorded_artefact_says_nothing_was_ranked() -> None:
-    """The claim the whole feature exists to make, pinned in the artefact itself."""
-    assert "  ranked 0" in _recorded()
-    assert "ranked 1" not in _recorded()
+def test_the_recorded_artefact_ranks_every_bond_against_the_declared_benchmark() -> None:
+    """The claim the artefact is kept for, pinned in the artefact itself.
+
+    24 at every horizon, and the benchmark among them: a ranking of 23 would mean an issue
+    dropped out and a ranking of 0 would mean the hurdle went missing, and the digest alone
+    would say neither.
+    """
+    assert _recorded().count("  ranked 24") == len(_answered().sections)
+    assert f"[benchmark] {fixtures.BENCHMARK}" in _recorded()
 
 
 def test_verifying_every_source_would_not_move_the_digest() -> None:

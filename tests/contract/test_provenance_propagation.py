@@ -52,7 +52,6 @@ import dataclasses
 from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import replace
 from datetime import date
-from pathlib import Path
 
 import pytest
 
@@ -83,14 +82,14 @@ from terezy.core.tax import flat_rate
 from terezy.core.tax import year as tax_year
 from terezy.core.tax.interface import TaxableEventKind, TaxCharge, TaxClass, TaxContext
 from terezy.data.declarations import loader, resolver
-from tests import cpi_fixtures, declared_terms, synthetic, tax_years
+from tests import cpi_fixtures, data_roots, declared_terms, synthetic, tax_years
 
 pytestmark = pytest.mark.contract
 
 UAH = Currency.UAH
 
-DATA_ROOT = Path(__file__).resolve().parents[2] / "data"
-"""The curated declarations, read through the loader like any other run."""
+DATA_ROOT = data_roots.with_fixtures()
+"""The curated declarations plus the fixture overlay, read through the loader like any run."""
 
 KINDS_FILE = DATA_ROOT / "observation_kinds.toml"
 """Where the staleness thresholds are declared. Read, never assumed."""
@@ -163,8 +162,8 @@ def _from_code(*, verified: bool) -> Projection:
 def _from_data() -> Projection:
     """The same purchase, from the declaration files, through the loader.
 
-    Every ``verified_on`` in ``data/`` is empty, so this path is the unverified one by fact
-    rather than by construction -- there is no verified variant of it to build, and
+    Every ``verified_on`` under either root is empty, so this path is the unverified one by
+    fact rather than by construction -- there is no verified variant of it to build, and
     inventing one by editing a data file would falsify the citation it carries.
     """
     declarations = resolver.from_data_root(DATA_ROOT)

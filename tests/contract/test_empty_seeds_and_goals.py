@@ -34,6 +34,7 @@ import pytest
 from terezy.core.ledger import engine, lots, seeds
 from terezy.core.primitives.currency import Currency
 from terezy.data.declarations import resolver
+from tests import data_roots
 
 if TYPE_CHECKING:  # pragma: no cover -- typing only
     from types import ModuleType
@@ -41,7 +42,7 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
 pytestmark = pytest.mark.contract
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DATA_ROOT = REPO_ROOT / "data"
+DATA_ROOT = data_roots.with_fixtures()
 GATE = REPO_ROOT / "scripts" / "check_provenance.py"
 OPENS_ON = date(2026, 8, 23)
 """The date the empty projection opens. An argument, because there is no clock in the core."""

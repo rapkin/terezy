@@ -71,10 +71,13 @@ the whole repository refers to:
 5. **No real personal data, ever — public facts and labelled synthetic fixtures only.**
    This is the owner's own rule (2026-08-23) and it is the axis that matters. What may be
    committed here is a **general fact about the world** — a fee, a tax rate, a published
-   inflation figure, a corridor, a venue — or a **synthetic fixture that says on its face
-   that it is one**, so that logic and arithmetic can be checked quickly. A fixture shaped
-   like the owner's real situation is fine on the same terms. What may **never** be committed
-   is a figure that describes his actual position.
+   inflation figure, a corridor, a venue — or a **statement the owner makes about himself**,
+   shipped synthetic while his real figures are unstated. What may **never** be committed is a
+   figure that describes his actual position. **Narrowed on 2026-09-02 by the owner: an
+   invented instrument is no longer one of the things that may ship.** The rule permitted it
+   and the registry was mostly made of them, so what shipped could not be read as an inventory
+   of what he can buy; the fixtures moved to `tests/fixtures/data/`, which has its own README
+   saying what each is the only example of.
 
    That splits the tree in two, and the split is *not* the same as curated-versus-per-owner:
 

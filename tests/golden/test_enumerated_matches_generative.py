@@ -64,7 +64,7 @@ pytestmark = pytest.mark.golden
 MIRROR = "ovdp_enumerated_mirror"
 """``ovdp_synthetic_a``'s own computed schedule, transcribed as a list of payments."""
 
-REGISTRIES = fixtures.without_latency(fixtures.shipped())
+REGISTRIES = fixtures.without_latency(fixtures.declared())
 """Latency zeroed for the reason `tuple_registries.without_latency` gives: waiting is a
 cost and it is the same cost on both sides, but leaving it in would need a tolerance loose
 enough to hide the thing this test is looking for."""

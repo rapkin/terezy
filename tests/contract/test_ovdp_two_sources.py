@@ -26,11 +26,12 @@ from terezy.core.primitives.tolerance import TOLERANCE
 from terezy.core.results.tuple import BuysNoWholeUnit, TupleOutcome, TupleRefused
 from terezy.data.declarations import resolver
 from tests import answer_registries as answers
+from tests import data_roots
 from tests import observations as obs
 
 pytestmark = pytest.mark.contract
 
-DATA_ROOT: Final = Path(__file__).resolve().parents[2] / "data"
+DATA_ROOT: Final = data_roots.with_fixtures()
 INSTRUMENTS: Final = DATA_ROOT / "instruments"
 ACCESS: Final = DATA_ROOT / "access" / "instruments.toml"
 

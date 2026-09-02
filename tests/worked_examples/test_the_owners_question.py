@@ -1,16 +1,19 @@
 """The owner's own question, answered over the shipped registry.
 
-015 SC-001 and SC-002. This is the feature's deliverable and it is a **refusal**: at every one
-of the three horizons he asked about, nothing is ranked. Two of the four words he said are
-declared by nothing at all, and the other two resolve to seven ids of which five want a resale
-price nobody has quoted, one cannot be sized without a rate he has not stated, and one reports
-money that arrives sixteen months after the window it was compared over.
+015 SC-001 and SC-002. Two of the four words he said are declared by nothing at all; the other
+two reach every instrument that ships, and at each of his three horizons the 24 ОВДП issues are
+ranked against the one he named as his benchmark. The two funds are not: one refuses on its own
+terms and the other's money arrives in 2028.
 
-An answer that returned a number for each of his four subjects would have lied about all of it.
+**The benchmark matures inside every horizon** (2026-09-16), so its proceeds sit as cash to each
+window's end under the question's own `hold_as_cash` continuation. That is why nothing beats it
+at twelve months and five things beat it at one: the comparable rate annualises over the span
+the money was actually at work, and the benchmark's span is eighteen days. It is the hurdle he
+chose, reported as it stands.
 
 **Every count below is derived from the labels and declarations the test loads.** A criterion
-pinning nine would be pinning the whole registry, which is not the question he asked -- and the
-cheapest way to satisfy it would be the class-stands-in-for-the-group inference FR-007a forbids.
+pinning 24 would be pinning the whole ОВДП group, and the cheapest way to satisfy it would be
+the class-stands-in-for-the-group inference FR-007a forbids.
 """
 
 from __future__ import annotations
@@ -36,7 +39,7 @@ from terezy.core.results.answer import (
     SubjectUndeclared,
 )
 from terezy.core.results.candidates import CandidateSurvey
-from terezy.core.results.tuple import BenchmarkUnavailable, DeclarationMissing
+from terezy.core.results.tuple import Comparison, DeclarationMissing
 from tests import answer_registries as fixtures
 
 pytestmark = pytest.mark.worked_example
@@ -47,15 +50,18 @@ UNDECLARED_WORDS = ("cash", "btc")
 
 
 def _answer() -> Answer:
-    return fixtures.answered()
+    """His question over what ships, and nothing else: this is the deliverable, not a mechanism."""
+    return fixtures.answered(supplied=fixtures.shipped_inputs())
+
+
+def _labels() -> dict[str, tuple[str, ...]]:
+    return fixtures.declared_labels(fixtures.declarations(fixtures.SHIPPED_ROOT))
 
 
 def _expected_ids() -> frozenset[str]:
     """What ``ovdp`` and ``inzhur`` reach, derived from the labels rather than written out."""
     wanted = {fixtures.OVDP, fixtures.INZHUR}
-    return frozenset(
-        name for name, groups in fixtures.declared_labels().items() if wanted & set(groups)
-    )
+    return frozenset(name for name, groups in _labels().items() if wanted & set(groups))
 
 
 def test_the_question_names_four_subjects_and_two_of_them_are_declared_by_nothing() -> None:
@@ -74,17 +80,17 @@ def test_the_two_declared_words_resolve_to_the_ids_their_labels_carry() -> None:
     assert all(item.is_group for item in result.subjects if isinstance(item, DeclaredSubject))
 
 
-def test_it_is_seven_ids_and_not_the_whole_registry() -> None:
-    """Seven, because his four words are not *everything the registry declares*.
+def test_his_two_words_reach_exactly_what_their_labels_carry() -> None:
+    """Which today is everything that ships, and that is a fact about the registry.
 
-    The two instruments in neither group are out because their own files say what they are
-    for: one is fixed income and deliberately not an OVDP, and the other's whole purpose is
-    that it is different from the Inzhur funds.
+    It is not the group rule going slack: an instrument in neither group is reached by neither
+    word, which ``tests/contract/test_group_membership_is_declared.py`` plants and asserts. The
+    shipped registry simply has nothing outside the two families he asked about.
     """
-    registries = fixtures.declarations().tuples.registries
+    registries = fixtures.declarations(fixtures.SHIPPED_ROOT).tuples.registries
     declared = set(registries.instruments) | set(registries.funds)
     assert set(considered_ids(_answer())) == _expected_ids()
-    assert _expected_ids() < declared
+    assert _expected_ids() == declared
 
 
 def test_there_are_three_sections_and_each_enumerates_the_seven() -> None:
@@ -98,35 +104,54 @@ def test_there_are_three_sections_and_each_enumerates_the_seven() -> None:
         assert enumerated == _expected_ids()
 
 
-def test_nothing_is_ranked_at_any_horizon_he_asked_about() -> None:
-    """SC-001's second half, and the whole point of the feature."""
+def test_every_horizon_ranks_the_bonds_and_only_the_bonds() -> None:
+    """SC-001's second half. The ranked population is the ОВДП group, derived from the labels."""
+    bonds = frozenset(name for name, groups in _labels().items() if fixtures.OVDP in groups)
     for section in _answer().sections:
-        assert section_ranking(section) == ()
+        ranked = {item.key.instrument_id for item in section_ranking(section)}
+        assert ranked == bonds
 
 
-def test_every_section_has_no_benchmark_to_rank_against() -> None:
-    """The hurdle itself is one of the fixtures wanting a resale price, so nothing is ranked --
-    unchanged by 016, which priced the real issues and left every invented one refusing."""
+def test_every_section_measures_that_ranking_against_the_issue_he_named() -> None:
+    """FR-011: the hurdle is a position in the list, not a figure beside it.
+
+    ``Comparison.benchmark`` indexes ``ranked``, so "what beats it" is everything above it and
+    cannot disagree with the order printed underneath.
+    """
     for section in _answer().sections:
         assert isinstance(section.outcome, CandidateSurvey)
-        assert isinstance(section.outcome.comparison, BenchmarkUnavailable)
+        comparison = section.outcome.comparison
+        assert isinstance(comparison, Comparison), comparison
+        ranked = section_ranking(section)
+        assert ranked[comparison.benchmark].key.instrument_id == fixtures.BENCHMARK
+        assert comparison.beats_benchmark == tuple(range(comparison.benchmark))
 
 
-def test_only_the_invented_bonds_still_want_a_resale_price() -> None:
-    """SC-023, per section, and what 016 changed about it.
+def test_nothing_that_ships_wants_a_resale_price_and_an_invented_bond_still_does() -> None:
+    """SC-023, on both roots, because the two halves are different claims.
 
-    Every candidate still dropping for a missing resale price is an **invented** bond. Nobody
-    quotes a resale price for a bond that does not exist, and inventing one would put a made-up
-    spread inside the worked examples a reader checks on paper. The 24 real ОВДП issues carry
-    the seller's observed sell quotation on their access records and are sold at the window's
-    end instead -- which is where 015 FR-031 left the question for 016 to settle, and settling
-    it there is why `DeclarationMissing.part` stayed a five-member literal.
-
-    The population still differs by horizon: `ovdp_enumerated_a`'s own schedule ends inside the
-    twelve-month window and it is simply held to its end there.
+    Nobody quotes a resale price for a bond that does not exist, and inventing one would put a
+    made-up spread inside the worked examples a reader checks on paper -- so the invented bonds
+    in ``tests/fixtures/data/`` refuse, and every real issue carries the seller's observed sell
+    quotation and is sold at the window's end instead. The population differs by horizon:
+    ``ovdp_enumerated_a``'s own schedule ends inside the twelve-month window and it is simply
+    held to its end there.
     """
+    assert _wanting_a_resale_price(_answer()) == [[], [], []]
+
+    with_fixtures = fixtures.answered()
     declared = fixtures.inputs().registries
-    wanting = [
+    wanting = _wanting_a_resale_price(with_fixtures)
+    for names in wanting:
+        assert names, "the refusal must stay the behaviour for an invented bond"
+        assert all(declared.instruments[name].is_synthetic for name in names)
+    assert wanting[0] == wanting[1]
+    assert set(wanting[2]) < set(wanting[0])
+
+
+def _wanting_a_resale_price(result: Answer) -> list[list[str]]:
+    """Per section, the candidates dropped for a resale price nobody declared."""
+    return [
         sorted(
             item.key.instrument_id
             for item in dropped(section.outcome.comparison)
@@ -134,14 +159,9 @@ def test_only_the_invented_bonds_still_want_a_resale_price() -> None:
             and item.refusal.part == "access"
             and "access.resale_price" in item.refusal.what
         )
-        for section in _answer().sections
+        for section in result.sections
         if isinstance(section.outcome, CandidateSurvey)
     ]
-    for names in wanting:
-        assert names, "the refusal must stay the shipped behaviour for an invented bond"
-        assert all(declared.instruments[name].is_synthetic for name in names)
-    assert wanting[0] == wanting[1]
-    assert set(wanting[2]) < set(wanting[0])
 
 
 def test_the_one_fund_that_evaluates_is_withheld_because_its_money_arrives_in_2028() -> None:
@@ -182,4 +202,4 @@ def test_the_three_sections_enumerate_the_same_candidates() -> None:
 
 def test_answering_twice_produces_an_equal_answer() -> None:
     """FR-027. Pure: no clock, no I/O, no randomness."""
-    assert fixtures.answered() == fixtures.answered()
+    assert _answer() == _answer()

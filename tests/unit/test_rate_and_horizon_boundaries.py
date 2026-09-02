@@ -110,7 +110,7 @@ class TestATupleFundedInOneCurrencyAndSpentInAnother:
 
     def _registries(self) -> Registries:
         return fixtures.with_new_route(
-            fixtures.shipped(),
+            fixtures.declared(),
             fixtures.fx_route("test_deel_to_inzhur", origin="deel", destination="inzhur"),
         )
 
@@ -172,7 +172,7 @@ class TestATupleFundedInOneCurrencyAndSpentInAnother:
 def _expensive_way_out() -> Registries:
     """The shipped registry with a way out whose flat fee exceeds everything the bond pays."""
     return fixtures.with_new_route(
-        fixtures.shipped(),
+        fixtures.declared(),
         fixtures.route(
             "test_ruinous_out",
             origin="inzhur",
@@ -208,7 +208,7 @@ class TestASeriesWithNoRateToFind:
         # exit fee is charged on a movement that did not happen. The principal is not taxable
         # income and still comes back, which is why this leaves a rate rather than no series
         # at all.
-        outcome = _evaluated(_taxed_at(fixtures.shipped(), pit=0.5, levy=0.5))
+        outcome = _evaluated(_taxed_at(fixtures.declared(), pit=0.5, levy=0.5))
         assert isinstance(outcome, TupleOutcome), outcome
         assert [arrival.released_on for arrival in outcome.arrivals] == [date(2028, 1, 17)]
         assert outcome.reaches.amount == 10_000.0
@@ -239,7 +239,7 @@ class TestAnInstrumentThatCannotSpanTheHorizon:
 
     def test_a_bond_maturing_after_the_horizon_ends_wants_a_resale_price(self) -> None:
         refusal = _evaluated(
-            fixtures.shipped(),
+            fixtures.declared(),
             horizon=fixtures.DateRange(start=fixtures.ISSUE_DATE, end=date(2027, 6, 30)),
         )
         assert isinstance(refusal, DeclarationMissing), refusal
@@ -250,7 +250,7 @@ class TestAnInstrumentThatCannotSpanTheHorizon:
         # A holding is never sold because a projection ran out of dates. There is no round
         # trip to report, and an implicit liquidation would be a cash flow nobody asked for.
         refusal = _evaluated(
-            fixtures.shipped(),
+            fixtures.declared(),
             fixtures.fund_tuple(fixtures.MILTECH, exit_on=None, yield_point=fixtures.MILTECH_POINT),
         )
         assert isinstance(refusal, CannotSpanHorizon), refusal
@@ -260,7 +260,7 @@ class TestAnInstrumentThatCannotSpanTheHorizon:
         # MilTech stopped accepting subscriptions on 2026-12-31, and the reason the join
         # reports is the fund module's own words rather than this module's paraphrase.
         refusal = _evaluated(
-            fixtures.shipped(),
+            fixtures.declared(),
             fixtures.fund_tuple(
                 fixtures.MILTECH, exit_on=date(2029, 6, 1), yield_point=fixtures.MILTECH_POINT
             ),
@@ -278,7 +278,7 @@ class TestATaxBaseInTheWrongCurrency:
         # which is a property of today's data rather than of the arithmetic. Reaching it needs
         # a registry built in code, and the guard exists because unreachable-today is not the
         # same as never.
-        registries = fixtures.shipped()
+        registries = fixtures.declared()
         declared = registries.instruments[fixtures.OVDP]
         registries = replace(
             registries,
@@ -299,7 +299,7 @@ class TestTheOtherWaysAPartRefuses:
     """The remaining feasibility paths, so none of them is a branch nothing exercises."""
 
     def test_a_closed_way_in_is_002s_refusal_carried_whole(self) -> None:
-        registries = fixtures.with_route(fixtures.shipped(), fixtures.DOMESTIC_IN, status="closed")
+        registries = fixtures.with_route(fixtures.declared(), fixtures.DOMESTIC_IN, status="closed")
         refusal = _evaluated(registries)
         assert isinstance(refusal, RouteInUnusable), refusal
         assert refusal.refused.binding_constraint == "route.status"
@@ -309,7 +309,7 @@ class TestTheOtherWaysAPartRefuses:
         # cannot be repatriated at all, which is a real and non-obvious finding rather than a
         # rounding detail.
         registries = fixtures.with_leg(
-            fixtures.shipped(), fixtures.DOMESTIC_OUT, minimum=Money(5_000.0, UAH, prov.EMPTY)
+            fixtures.declared(), fixtures.DOMESTIC_OUT, minimum=Money(5_000.0, UAH, prov.EMPTY)
         )
         refusal = _evaluated(registries)
         assert isinstance(refusal, WayOutUnusable), refusal
@@ -322,14 +322,14 @@ class TestTheOtherWaysAPartRefuses:
         # Taxed at 180%, each coupon date takes more out than it pays in, so money would have
         # to travel *to* the instrument along a route nobody costed. Netting it against a
         # later receipt would move a real outflow to a date it did not happen on.
-        refusal = _evaluated(_taxed_at(fixtures.shipped(), pit=0.9, levy=0.9))
+        refusal = _evaluated(_taxed_at(fixtures.declared(), pit=0.9, levy=0.9))
         assert isinstance(refusal, InstrumentDemandsCash), refusal
         assert refusal.on == date(2026, 7, 15)
         assert refusal.shortfall.amount > 0.0
 
     def test_a_way_out_that_stops_short_of_somewhere_spendable(self) -> None:
         registries = fixtures.with_new_route(
-            fixtures.shipped(),
+            fixtures.declared(),
             fixtures.route(
                 "test_inzhur_to_binance",
                 origin="inzhur",
@@ -349,7 +349,7 @@ class TestTheOtherWaysAPartRefuses:
         # trip is complete the moment the instrument pays. Not a promoted one-way figure --
         # there is no way out left to travel.
         registries = fixtures.with_access(
-            fixtures.shipped(), fixtures.OVDP, bought_at="monobank_uah", proceeds_to="monobank_uah"
+            fixtures.declared(), fixtures.OVDP, bought_at="monobank_uah", proceeds_to="monobank_uah"
         )
         registries = fixtures.with_new_route(
             registries,
@@ -392,7 +392,7 @@ class TestAForeignInstrumentIsClosedByTwoGuardsAndNotByTheShippedData:
 
     def _foreign(self, *, declares_tax: bool) -> Registries:
         """The shipped bond redeclared in dollars, bought and sold at a dollar venue."""
-        registries = fixtures.shipped()
+        registries = fixtures.declared()
         declared = registries.instruments[fixtures.OVDP]
         registries = fixtures.replace(
             registries,

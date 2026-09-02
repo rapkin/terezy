@@ -56,7 +56,7 @@ def _survey(registries: Registries, benchmark: Tuple) -> CandidateSurvey | Surve
 
 
 def _shipped_survey() -> CandidateSurvey:
-    registries = fixtures.shipped()
+    registries = fixtures.declared()
     result = _survey(registries, fixtures.benchmark_key(registries, OVDP))
     assert isinstance(result, CandidateSurvey), result
     return result
@@ -73,7 +73,7 @@ class TestTheBenchmarkIsAMemberOfTheSet:
         """A tuple naming the same instrument through the declaration's own way out is a
         perfectly valid tuple and is **not** in this set: FR-004 forbids emitting the
         `FROM_THE_DECLARATION` sentinel, so the set holds the named chain instead."""
-        registries = fixtures.shipped()
+        registries = fixtures.declared()
         outsider = replace(fixtures.benchmark_key(registries, OVDP), route_out=FROM_THE_DECLARATION)
         result = _survey(registries, outsider)
         assert isinstance(result, BenchmarkNotACandidate), result
@@ -82,7 +82,7 @@ class TestTheBenchmarkIsAMemberOfTheSet:
     def test_the_refusal_replaces_the_survey_rather_than_weakening_it(self) -> None:
         """A ``CandidateSurvey`` whose comparison was built around an appended benchmark is what
         this returns *instead of*, so the type is the assertion."""
-        registries = fixtures.shipped()
+        registries = fixtures.declared()
         outsider = replace(fixtures.benchmark_key(registries, OVDP), route_out=FROM_THE_DECLARATION)
         result = _survey(registries, outsider)
         assert not isinstance(result, CandidateSurvey), result
@@ -92,7 +92,7 @@ class TestTheBenchmarkIsAMemberOfTheSet:
     ) -> None:
         """FR-018's third clause. The remedy is a declaration, not a different benchmark, so
         reporting *not among the candidates* here would point the owner at the wrong file."""
-        registries = fixtures.shipped()
+        registries = fixtures.declared()
         outsider = replace(
             fixtures.benchmark_key(registries, OVDP),
             route_in=FundingPath(
@@ -108,7 +108,7 @@ class TestTheBenchmarkIsAMemberOfTheSet:
 class TestTheLoopIsALoop:
     def test_each_outcome_is_what_evaluate_gives_the_same_key_directly(self) -> None:
         """SC-002, field for field, over **every** evaluated candidate rather than a sample."""
-        registries = fixtures.shipped()
+        registries = fixtures.declared()
         question = fixtures.question(registries)
         result = _shipped_survey()
         outcomes = evaluated(result.comparison)
@@ -126,7 +126,7 @@ class TestTheLoopIsALoop:
             assert direct == outcome
 
     def test_a_dropped_candidate_is_the_refusal_evaluate_gives_the_same_key(self) -> None:
-        registries = fixtures.shipped()
+        registries = fixtures.declared()
         question = fixtures.question(registries)
         result = _shipped_survey()
         for refused in result.comparison.refused:
@@ -150,7 +150,7 @@ class TestTwoStreamsAreRefusedRatherThanConverted:
         an inbound enumeration cannot see them and the dollar stream yields nothing. This adds
         the corridor the registry is missing, which is the only way to reach the case at all.
         """
-        registries = fixtures.shipped()
+        registries = fixtures.declared()
         return replace(
             registries,
             routes={
@@ -191,7 +191,7 @@ class TestTwoStreamsAreRefusedRatherThanConverted:
 
     def test_each_stream_keeps_its_own_amount_in_its_own_currency(self) -> None:
         """FR-005: nothing converts one into the other, so the two amounts stay two amounts."""
-        question = fixtures.question(fixtures.shipped())
+        question = fixtures.question(fixtures.declared())
         assert question.amounts[fixtures.SALARY].currency is fixtures.UAH
         assert question.amounts[fixtures.CONTRACT].currency is fixtures.USD
 
@@ -200,7 +200,7 @@ def test_a_question_stating_no_amount_for_the_funding_stream_raises() -> None:
     """A caller's incomplete question, not a fact about the money, so it raises rather than
     joining a registry gap in a typed column. Defaulting it to zero would score a real option
     at nothing and rank it last with nothing on the record to say why."""
-    registries = fixtures.shipped()
+    registries = fixtures.declared()
     benchmark = fixtures.benchmark_key(registries, OVDP)
     with pytest.raises(ValueError, match="no amount"):
         survey(
@@ -221,7 +221,7 @@ def test_an_amount_in_a_currency_its_stream_does_not_deliver_raises() -> None:
     question rather than a fact about the money -- and a typed refusal would put a caller's typo
     in the same column as a registry gap.
     """
-    registries = fixtures.shipped()
+    registries = fixtures.declared()
     benchmark = fixtures.benchmark_key(registries, OVDP)
     with pytest.raises(ValueError, match="currency"):
         survey(

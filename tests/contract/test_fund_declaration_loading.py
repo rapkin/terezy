@@ -37,10 +37,11 @@ from terezy.core.primitives.currency import Currency
 from terezy.core.tax.interface import TaxableEventKind
 from terezy.data.declarations import loader, resolver
 from terezy.data.declarations.errors import DeclarationError
+from tests import data_roots
 
 pytestmark = pytest.mark.contract
 
-DATA_ROOT = Path(__file__).resolve().parents[2] / "data"
+DATA_ROOT = data_roots.with_fixtures()
 REIT = DATA_ROOT / "instruments" / "inzhur_reit.toml"
 FUND_C = DATA_ROOT / "instruments" / "synthetic_fund_c.toml"
 BOND = DATA_ROOT / "instruments" / "ovdp_synthetic_a.toml"

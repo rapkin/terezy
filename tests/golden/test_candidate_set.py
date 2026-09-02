@@ -47,22 +47,24 @@ from terezy.core.results.candidates import (
 from terezy.core.results.tuple import Comparison
 from terezy.core.routes.path import ExitChain, candidate_id, exit_segments_of
 from tests import candidate_registries as fixtures
+from tests import data_roots
 
 pytestmark = pytest.mark.golden
 
 GOLDEN_FILE: Final = Path(__file__).with_name("candidate_set.golden.txt")
 UPDATE_VARIABLE: Final = "TEREZY_UPDATE_GOLDEN"
-BENCHMARK: Final = "ovdp_synthetic_a"
+BENCHMARK: Final = "UA4000235865"
+"""The issue the owner named in his own question file, so one artefact is measured once."""
 
 
 def _surveyed() -> CandidateSurvey:
-    registries = fixtures.shipped()
+    registries = fixtures.declared(data_roots.SHIPPED)
     question = fixtures.question(registries)
     result = survey(
         registries=registries,
         routes=registries.routes,
         question=question,
-        ceiling=fixtures.declarations().ceiling,
+        ceiling=fixtures.declarations(data_roots.SHIPPED).ceiling,
         benchmark=fixtures.benchmark_key(registries, BENCHMARK, question_=question),
     )
     assert isinstance(result, CandidateSurvey), result
@@ -214,7 +216,7 @@ class TestTheArtefactCannotBeGreenAndWrong:
     re-derived from the registry here rather than read out of the file."""
 
     def test_the_recorded_counts_are_the_counts_the_declarations_imply(self) -> None:
-        registries = fixtures.shipped()
+        registries = fixtures.declared(data_roots.SHIPPED)
         declared = [
             instrument_id
             for instrument_id in registries.access

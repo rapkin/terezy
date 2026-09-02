@@ -39,7 +39,7 @@ BENCHMARK_INSTRUMENT = "ovdp_synthetic_a"
 
 
 def _survey() -> CandidateSurvey:
-    registries = fixtures.shipped()
+    registries = fixtures.declared()
     question = fixtures.question(registries)
     ceiling = fixtures.declarations().ceiling
     result = survey(

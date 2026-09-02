@@ -38,7 +38,7 @@ pytestmark = pytest.mark.invariant
 Reached = Literal["refused", "empty", "uncomparable", "counted"]
 """How far one generated case got before there was nothing left to assert."""
 
-SHIPPED = fixtures.shipped()
+SHIPPED = fixtures.declared()
 INSTRUMENTS = sorted(SHIPPED.access)
 ROUTES = sorted(SHIPPED.routes)
 STREAMS = sorted(SHIPPED.streams)

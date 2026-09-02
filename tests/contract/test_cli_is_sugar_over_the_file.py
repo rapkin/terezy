@@ -24,7 +24,7 @@ from typing import Any, cast
 
 import pytest
 
-from terezy.api.answer import answer_question
+from terezy.api.answer import AnsweredQuestion, answer_question
 from terezy.cli import main as cli
 from terezy.core.decision.answer import benchmark_unavailable, section_ranking
 from terezy.core.instruments.groups import InstrumentGroup
@@ -55,12 +55,35 @@ push them into the question file, which is the opposite of what FR-006 decided.
 
 def _run() -> tuple[list[str], int]:
     answered = answer_question(
-        fixtures.DATA_ROOT,
+        fixtures.SHIPPED_ROOT,
         fixtures.OWNERS_QUESTION,
         as_of=fixtures.AS_OF,
         base_currency=Currency.UAH,
     )
     return cli.render(answered), 0
+
+
+def _rebenchmarked(instrument_id: str) -> str:
+    """The owner's own question document, measured against a different issue."""
+    document = fixtures.QUESTION_FILE.read_text(encoding="utf-8")
+    replaced = document.replace(
+        f'benchmark    = "{fixtures.BENCHMARK}"', f'benchmark    = "{instrument_id}"', 1
+    )
+    assert replaced != document, "the question file no longer names the benchmark it did"
+    return replaced
+
+
+def _unranked() -> AnsweredQuestion:
+    """The same question measured against the fund that refuses on its own terms.
+
+    ``inzhur_reit`` produces no outcome at any horizon, so every section reaches
+    ``BenchmarkUnavailable`` -- 010 FR-011 will not offer a list whose head would read as a
+    winner. The two tests below are about how the CLI *renders* that, and over the shipped
+    registry every bond is priced both ways, so a refusing benchmark is where it comes from.
+    """
+    return cli._from_flags(
+        fixtures.SHIPPED_ROOT, [_rebenchmarked(fixtures.REIT)], as_of=fixtures.AS_OF
+    )
 
 
 def _declared_flags() -> set[str]:
@@ -102,9 +125,9 @@ def test_it_builds_a_question_through_the_same_loader_the_file_goes_through() ->
 def test_flags_produce_a_record_equal_to_the_one_the_file_produces(tmp_path: Path) -> None:
     """SC-019's first half, field for field."""
     document = fixtures.QUESTION_FILE.read_text(encoding="utf-8")
-    built = cli._from_flags(fixtures.DATA_ROOT, [document], as_of=fixtures.AS_OF)
+    built = cli._from_flags(fixtures.SHIPPED_ROOT, [document], as_of=fixtures.AS_OF)
     loaded = answer_question(
-        fixtures.DATA_ROOT,
+        fixtures.SHIPPED_ROOT,
         fixtures.OWNERS_QUESTION,
         as_of=fixtures.AS_OF,
         base_currency=Currency.UAH,
@@ -117,12 +140,7 @@ def test_flags_produce_a_record_equal_to_the_one_the_file_produces(tmp_path: Pat
 
 def test_every_sections_refusal_reaches_the_reader_with_its_own_reason() -> None:
     """SC-022. Asserted by finding each reason string in the output, byte for byte."""
-    answered = answer_question(
-        fixtures.DATA_ROOT,
-        fixtures.OWNERS_QUESTION,
-        as_of=fixtures.AS_OF,
-        base_currency=Currency.UAH,
-    )
+    answered = _unranked()
     assert isinstance(answered.answer, Answer)
     output = "\n".join(cli.render(answered))
     for section in answered.answer.sections:
@@ -147,8 +165,7 @@ def test_a_withheld_candidate_is_named_rather_than_omitted() -> None:
 
 def test_no_ranking_is_rendered_as_a_sentence_rather_than_as_an_empty_table() -> None:
     """A blank where a ranking would be is the failure this project exists to prevent."""
-    lines, _ = _run()
-    assert any("ranked: NOTHING" in line for line in lines)
+    assert any("ranked: NOTHING" in line for line in cli.render(_unranked()))
 
 
 def test_the_undeclared_subjects_are_named_by_the_words_he_wrote() -> None:
@@ -166,7 +183,7 @@ def test_main_returns_zero_for_an_answer_and_one_for_a_refusal(
         cli.main(
             [
                 "--data-root",
-                str(fixtures.DATA_ROOT),
+                str(fixtures.SHIPPED_ROOT),
                 "--as-of",
                 fixtures.AS_OF.isoformat(),
                 "--question",
@@ -177,14 +194,12 @@ def test_main_returns_zero_for_an_answer_and_one_for_a_refusal(
     )
     assert capsys.readouterr().out
 
-    broken = fixtures.QUESTION_FILE.read_text(encoding="utf-8").replace(
-        'benchmark    = "ovdp_synthetic_a"', 'benchmark    = "enumerated_taxable_x"', 1
-    )
+    broken = _rebenchmarked("enumerated_taxable_x")
     assert (
         cli.main(
             [
                 "--data-root",
-                str(fixtures.DATA_ROOT),
+                str(fixtures.SHIPPED_ROOT),
                 "--as-of",
                 date(2026, 8, 30).isoformat(),
                 "--set",
@@ -204,7 +219,7 @@ def test_flags_search_the_same_world_the_file_does(tmp_path: Path) -> None:
     corridors the question's own world says do not exist.
     """
     root = tmp_path / "data"
-    shutil.copytree(fixtures.DATA_ROOT, root)
+    shutil.copytree(fixtures.SHIPPED_ROOT, root)
     wartime = fixtures.QUESTION_FILE.read_text(encoding="utf-8").replace(
         'regime       = "(no regime declared)"', 'regime       = "wartime"', 1
     )
@@ -226,7 +241,7 @@ def test_a_declaration_that_will_not_load_reaches_the_reader_as_words(
         cli.main(
             [
                 "--data-root",
-                str(fixtures.DATA_ROOT),
+                str(fixtures.SHIPPED_ROOT),
                 "--as-of",
                 fixtures.AS_OF.isoformat(),
                 "--set",
@@ -268,7 +283,7 @@ def test_a_declared_group_nobody_labelled_is_not_printed_as_undeclared() -> None
 def test_flags_answer_a_question_against_a_root_that_declares_none(tmp_path: Path) -> None:
     """The one place the file does not exist is the one place the flags path exists for."""
     root = tmp_path / "data"
-    shutil.copytree(fixtures.DATA_ROOT, root)
+    shutil.copytree(fixtures.SHIPPED_ROOT, root)
     (root / "questions" / "fifty-thousand.toml").unlink()
     run = cli._from_flags(
         root, [fixtures.QUESTION_FILE.read_text(encoding="utf-8")], as_of=fixtures.AS_OF
@@ -289,7 +304,7 @@ def test_a_malformed_as_of_is_not_blamed_on_a_declaration(
         cli.main(
             [
                 "--data-root",
-                str(fixtures.DATA_ROOT),
+                str(fixtures.SHIPPED_ROOT),
                 "--as-of",
                 "yesterday",
                 "--question",
@@ -323,7 +338,7 @@ def test_the_flags_path_runs_the_checks_that_only_the_file_path_used_to_run(
             cli.main(
                 [
                     "--data-root",
-                    str(fixtures.DATA_ROOT),
+                    str(fixtures.SHIPPED_ROOT),
                     "--as-of",
                     fixtures.AS_OF.isoformat(),
                     "--set",
@@ -489,7 +504,7 @@ def test_a_question_naming_an_undeclared_stream_is_refused_before_the_verb_sees_
         cli.main(
             [
                 "--data-root",
-                str(fixtures.DATA_ROOT),
+                str(fixtures.SHIPPED_ROOT),
                 "--as-of",
                 fixtures.AS_OF.isoformat(),
                 "--set",

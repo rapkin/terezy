@@ -245,6 +245,7 @@ def test_a_section_that_holds_to_maturity_inherits_no_early_exit_claim() -> None
         question,
         subjects=("ovdp_synthetic_a",),
         plans={"ovdp_synthetic_a": question.plans["ovdp"]},
+        benchmark_instrument_id="ovdp_synthetic_a",
         horizons=(
             DateRange(start=date(2026, 9, 1), end=date(2027, 6, 1)),
             DateRange(start=date(2026, 9, 1), end=date(2028, 6, 1)),
