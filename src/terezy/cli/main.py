@@ -55,7 +55,7 @@ from terezy.core.results.candidates import (
     NothingNeedsToConnect,
 )
 from terezy.core.results.fund import FundAssumptions
-from terezy.core.results.tuple import InstrumentPlan, TupleOutcome
+from terezy.core.results.tuple import Comparison, InstrumentPlan, TupleOutcome
 from terezy.core.routes.path import (
     ComposedExit,
     DeclaredExit,
@@ -262,14 +262,20 @@ def _ranking_lines(section: HorizonSection) -> list[str]:
     """
     ranked = section_ranking(section)
     scored = section_evaluated(section)
+    survey = section.outcome
+    comparison = survey.comparison if isinstance(survey, CandidateSurvey) else None
+    compared = comparison if isinstance(comparison, Comparison) and ranked else None
     lines = [
         f"  ranked: {len(ranked)}"
         if ranked
         else "  ranked: NOTHING. There is no benchmark to rank against, so the figures below "
         "are reported unranked rather than ordered."
     ]
-    for outcome in ranked:
-        lines.extend(_figure_lines(outcome))
+    if compared is not None:
+        lines.append(f"  {_beats_line(compared, ranked)}")
+    hurdle = None if compared is None else compared.benchmark
+    for position, outcome in enumerate(ranked):
+        lines.extend(_figure_lines(outcome, hurdle=position == hurdle))
     for outcome in scored:
         if outcome not in ranked:
             lines.extend([*_figure_lines(outcome), "      NOT RANKED"])
@@ -289,8 +295,35 @@ def _ranking_lines(section: HorizonSection) -> list[str]:
     return lines
 
 
-def _figure_lines(outcome: TupleOutcome) -> list[str]:
+def _beats_line(comparison: Comparison, ranked: tuple[TupleOutcome, ...]) -> str:
+    """How the ranking stands against its hurdle, in words, above the rows.
+
+    **``beats_benchmark`` is computed for this and was rendered nowhere.** Constitution
+    Principle I requires the naive baseline to be always scored *and always shown*, and an
+    empty tuple is the sentence the product exists to be able to say plainly -- *nothing beats
+    the hurdle*. Derived nowhere else either: `Comparison.beats_benchmark` applies the tie
+    tolerance, and a reader counting rows above the marked one would report a winner by a hair.
+    """
+    hurdle = ranked[comparison.benchmark].key.instrument_id
+    beaten = len(comparison.beats_benchmark)
+    verdict = (
+        f"NOTHING BEATS THE BENCHMARK {hurdle}"
+        if not beaten
+        else f"{beaten} of {len(ranked)} beat the benchmark {hurdle}"
+    )
+    tied = {index for group in comparison.ties for index in group}
+    if comparison.benchmark in tied:
+        verdict += ", and at least one candidate ties with it within the project tolerance"
+    return f"  {verdict}."
+
+
+def _figure_lines(outcome: TupleOutcome, *, hurdle: bool = False) -> list[str]:
     """One candidate's figures, with the currency, the rate and the terms that identify it.
+
+    ``hurdle`` marks the benchmark's own row. Unmarked, the head of the list reads as the
+    winner even when it is the thing everything else is measured against -- which is the trap
+    the empty-ranking branch above already names, and it does not stop being a trap because
+    the ranking is non-empty.
 
     All **five** terms of 010's key, because that is what makes two rows different rows: one
     instrument bought over two ways in, or run to maturity against sold at the window's end, is
@@ -304,7 +337,8 @@ def _figure_lines(outcome: TupleOutcome) -> list[str]:
     """
     rate = outcome.implied_rate
     return [
-        f"    {outcome.key.instrument_id} from {outcome.key.stream_id} "
+        f"    {'[BENCHMARK] ' if hurdle else ''}{outcome.key.instrument_id} "
+        f"from {outcome.key.stream_id} "
         f"via {candidate_id(outcome.key.route_in)} "
         f"out {_exit_choice(outcome.key.route_out)} "
         f"run as {_plan_terms(outcome.key.exit_terms)}",

@@ -49,6 +49,30 @@ def test_the_readme_names_every_invented_declaration() -> None:
     )
 
 
+REPLACES = frozenset({"seeds/owner-001.toml"})
+"""The one shipped path the overlay is allowed to stand in for.
+
+``seeds/`` resolves at most one file per data root, so the fixture lots have to carry the
+shipped file's own name. Everywhere else the overlay JOINS a globbed directory, and that is
+the difference the test below pins.
+"""
+
+
+def test_the_overlay_replaces_one_shipped_file_and_only_that_one() -> None:
+    """A silent substitution is the confusion the owner's decision exists to prevent.
+
+    ``shutil.copytree(..., dirs_exist_ok=True)`` overwrites any shipped path the overlay
+    repeats, without a diff in ``data/`` and without a gate noticing. An overlay file named
+    ``instruments/UA4000235865.toml`` -- the very ISIN ``enumerated_out_of_order`` is modelled
+    on -- would put an invented declaration under a real security's id in every mechanism
+    suite. Nothing else in the tree can see that happen, so it is asserted here.
+    """
+    shipped = {
+        str(path.relative_to(data_roots.SHIPPED)) for path in data_roots.SHIPPED.rglob("*.toml")
+    }
+    assert _on_disk() & shipped == REPLACES
+
+
 def test_the_readme_names_nothing_that_is_not_there() -> None:
     phantom = _named() - _on_disk()
     assert not phantom, (

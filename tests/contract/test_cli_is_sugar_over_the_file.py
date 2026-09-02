@@ -168,6 +168,49 @@ def test_no_ranking_is_rendered_as_a_sentence_rather_than_as_an_empty_table() ->
     assert any("ranked: NOTHING" in line for line in cli.render(_unranked()))
 
 
+def test_a_ranking_marks_its_own_hurdle_and_says_what_beat_it() -> None:
+    """Principle I: the naive baseline is always scored **and always shown**.
+
+    The head of a ranked list reads as the winner, and over the shipped registry it is the
+    benchmark itself at twelve months on a nominal loss. Both halves are asserted: the row is
+    marked, and ``beats_benchmark`` -- computed for exactly this and rendered nowhere before --
+    reaches the reader as a sentence rather than as something to count off the rows.
+    """
+    lines, _ = _run()
+    output = "\n".join(lines)
+    sections = [
+        section for section in _answered().sections if isinstance(section.outcome, CandidateSurvey)
+    ]
+    marked = [line for line in lines if "[BENCHMARK]" in line]
+    assert len(marked) == len(sections)
+    assert all(fixtures.BENCHMARK in line for line in marked)
+
+    for section in sections:
+        assert isinstance(section.outcome, CandidateSurvey)
+        comparison = section.outcome.comparison
+        assert isinstance(comparison, Comparison)
+        ranked = section_ranking(section)
+        beaten = len(comparison.beats_benchmark)
+        expected = (
+            f"NOTHING BEATS THE BENCHMARK {fixtures.BENCHMARK}."
+            if not beaten
+            else f"{beaten} of {len(ranked)} beat the benchmark {fixtures.BENCHMARK}."
+        )
+        assert expected in output, expected
+
+
+def _answered() -> Answer:
+    """The owner's answer over what ships, asserted to be one."""
+    run = answer_question(
+        fixtures.SHIPPED_ROOT,
+        fixtures.OWNERS_QUESTION,
+        as_of=fixtures.AS_OF,
+        base_currency=Currency.UAH,
+    )
+    assert isinstance(run.answer, Answer), run.answer
+    return run.answer
+
+
 def test_the_undeclared_subjects_are_named_by_the_words_he_wrote() -> None:
     lines, _ = _run()
     output = "\n".join(lines)
@@ -194,12 +237,16 @@ def test_main_returns_zero_for_an_answer_and_one_for_a_refusal(
     )
     assert capsys.readouterr().out
 
+    # Over the COMPOSED root, because the refusal under test is "declared, but not among the
+    # subjects" and the shipped root declares no instrument outside his two groups -- there,
+    # `enumerated_taxable_x` would reach the same refusal for the weaker reason that nobody
+    # declares it, and the case would pass without being exercised.
     broken = _rebenchmarked("enumerated_taxable_x")
     assert (
         cli.main(
             [
                 "--data-root",
-                str(fixtures.SHIPPED_ROOT),
+                str(fixtures.DATA_ROOT),
                 "--as-of",
                 date(2026, 8, 30).isoformat(),
                 "--set",

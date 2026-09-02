@@ -37,7 +37,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DATA_ROOT = data_roots.with_fixtures()
 
 LOOKALIKE = "ovdp_lookalike"
-"""Named to trip the id-prefix inference: four of the six shipped bonds are ``ovdp_*``."""
+"""Named to trip the id-prefix inference: four of the overlay's six bonds are ``ovdp_*``,
+and no shipped instrument is."""
 
 ACCESS_ENTRY = """
 [[access]]
