@@ -3849,7 +3849,9 @@ window is therefore **sold** on the window's last day rather than reported as im
 hold. The figure is:
 
 ```
-proceeds = units still held x the declared resale price per unit
+price per unit = the declared resale quotation
+               - every coupon per unit detaching in (purchase, sale]
+proceeds       = units still held x price per unit
 ```
 
 where `units still held` is the purchase plus every reinvestment, less whatever payments inside
@@ -3859,11 +3861,28 @@ a loss under the instrument's declared disposal-gain class, exactly as a redempt
 does. A sale below basis is what a spread *is*, and reporting it as a cash receipt would make
 the cost of the early exit invisible in the ledger.
 
+**The subtraction is the whole of the second line, and it is not a refinement.** A quotation is
+a **dated observation** — every shipped one was read on 2026-08-24 — and a bond's price falls by
+its coupon on the day the coupon detaches. Carrying the quotation to the sale date unchanged
+credits the holding a coupon it collects inside the window *and* sells it at a price that still
+contains that coupon: measured on UA4000236228 at one month, 52 802.55 where 48 955.05 is right,
++141% annualised where −1.5% is. A coupon dated **on** the sale day counts as detached — the
+holder receives it, and the schedule generators already pay it.
+
+**The window opens at the purchase, not at the quotation's day**, because the *buy* quotation of
+the same morning is carried to the purchase date unadjusted by the code that sizes the purchase.
+Two shipped issues pay a coupon on 2026-08-26, between the two dates; taking it out of the sell
+leg alone would report a loss of a whole coupon that nobody took.
+
+What the subtraction leaves behind is **accrued interest** — the quotation carried an accrual on
+the day it was read and the sale date carries a different one — and no declaration states the
+basis interest accrues on. It is stated as a typed exclusion, unsigned, rather than estimated.
+
 Payments falling after the window are **absent** from the stream rather than moved. Nothing is
 paid early and nothing is folded into the sale.
 
-**No shipped declaration carries a resale price**, so on today's registry every early exit
-refuses by name — `DeclarationMissing(part="access")`, naming `access.resale_price` — and the
+Where an access declaration carries **no** resale price — four fixture instruments — the early
+exit refuses by name, `DeclarationMissing(part="access")` naming `access.resale_price`, and the
 remedy is a file rather than a longer window. The price is not inferred from the face value or
 from the purchase quote: either would report a spread of **zero** that nobody observed.
 
@@ -3875,13 +3894,14 @@ assumption exists because none does. It is declared under `data/scenarios/early_
 default — an absent belief refuses at load — and every figure computed through it names it in
 `TupleOutcome.rests_on`.
 
-Three claims travel with such a figure, and **exactly two of them carry a direction**:
+Four claims travel with such a figure, and **exactly two of them carry a direction**:
 
 | claim | direction | why |
 | --- | --- | --- |
 | it is a point where the world is a distribution | **more certain than it is** | the optionality is the reason the option was chosen |
 | the spread is a seller's quote under today's conditions | **understated** | a seller's quote widens exactly when a forced sale is most likely |
 | it carries no rate risk | **none** | rate risk is symmetric: a bond sold after rates rise fetches less than its spread implies, and one sold after rates fall fetches more |
+| it ignores accrued interest | **none** | the residual runs either way depending on where the quotation and the sale fall inside their accrual periods, and its size cannot be stated while the accrual basis is undeclared |
 
 An approximation whose sign is unstated is incomplete; one whose sign is asserted without a
 warrant is a number more confident than its inputs, which is worse.

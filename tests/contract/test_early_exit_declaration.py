@@ -56,7 +56,7 @@ def test_the_shipped_data_root_carries_it_into_the_registries() -> None:
     declarations = resolver.tuple_from_data_root(
         DATA_ROOT, base_currency=Currency.UAH, scenario_id=None
     )
-    assert declarations.registries.spread_holds.rationale.strip()
+    assert declarations.registries.quotation_holds.rationale.strip()
 
 
 def test_a_missing_rationale_is_refused(tmp_path: Path) -> None:

@@ -77,6 +77,7 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
 REAL_TERMS_SUPPLIED_BY = "a real-terms rate on TupleOutcome, which feature 010 does not produce"
 INCOME_TAX_SUPPLIED_BY = "a deployable-capacity figure, which is a question about a stream"
 RATE_RISK_SUPPLIED_BY = "[[future]] secondary-market-rate-risk"
+ACCRUED_INTEREST_SUPPLIED_BY = "[[future]] enumerated-accrued-interest"
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -536,13 +537,16 @@ def _answer_wide_excludes() -> tuple[StatedExclusion, ...]:
 
 
 def _early_exit_exclusions(key: Tuple, assumption_id: str) -> tuple[StatedExclusion, ...]:
-    """FR-033's three claims, with a direction on exactly two of them.
+    """What an early-exit figure does not account for, with a direction on exactly two.
 
     Rate risk is **symmetric** -- a bond sold after rates rise fetches less than its spread
     implies and one sold after rates fall fetches more -- so it carries no direction, and SC-026
-    asserts that absence rather than tolerating it. The other two are signed: the figure is a
-    point where the world is a distribution, and a seller's quote widens exactly when a forced
-    sale is most likely.
+    asserts that absence rather than tolerating it. Accrued interest is unsigned for a different
+    reason: the residual between the accrual inside the quotation and the accrual on the sale
+    date runs either way depending on where each date falls in its period, and a magnitude
+    cannot be stated at all while the accrual basis is undeclared. The other two are FR-033's
+    signed pair: the figure is a point where the world is a distribution, and a seller's quote
+    widens exactly when a forced sale is most likely.
     """
     return (
         StatedExclusion(
@@ -561,6 +565,12 @@ def _early_exit_exclusions(key: Tuple, assumption_id: str) -> tuple[StatedExclus
             what=Exclusion.EARLY_EXIT_CARRIES_NO_RATE_RISK,
             applies_to=key,
             supplied_by=RATE_RISK_SUPPLIED_BY,
+            direction=None,
+        ),
+        StatedExclusion(
+            what=Exclusion.EARLY_EXIT_IGNORES_ACCRUED_INTEREST,
+            applies_to=key,
+            supplied_by=ACCRUED_INTEREST_SUPPLIED_BY,
             direction=None,
         ),
     )

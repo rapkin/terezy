@@ -69,7 +69,7 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.routes.channels import FxChannel
     from terezy.core.routes.legs import Leg, Route
     from terezy.core.routes.venues import Venue
-    from terezy.core.scenarios.early_exit import SpreadHolds
+    from terezy.core.scenarios.early_exit import QuotationHolds
     from terezy.core.scenarios.regimes import Regime
     from terezy.core.streams.streams import IncomeStream
     from terezy.core.tax import year as tax_year
@@ -2745,12 +2745,12 @@ as scenario documents, and ``glob`` does not recurse.
 
 def _resolved_early_exit(
     root: Path, streams: Mapping[str, IncomeStream]
-) -> tuple[SpreadHolds, Path]:
+) -> tuple[QuotationHolds, Path]:
     """The one declared belief under a data root, checked against the streams' owner.
 
     An absent directory is an **error**, not an absent belief (015 FR-032): reading it as
-    *the spread holds* would put a figure in the model that no file declares, which is the one
-    thing the declaration exists to prevent.
+    *the quotation holds* would put a figure in the model that no file declares, which is the
+    one thing the declaration exists to prevent.
     """
     declared = sorted((root / EARLY_EXIT_DIR).glob("*.toml"))
     if not declared:
@@ -2758,8 +2758,8 @@ def _resolved_early_exit(
             root / EARLY_EXIT_DIR,
             "",
             f"contains no *.toml declarations. An empty {EARLY_EXIT_DIR} directory is reported "
-            "rather than read as 'the observed spread holds': a horizon means the money comes "
-            "out at its end, so every comparison can reach an early exit, and a run that "
+            "rather than read as 'the observed quotation holds': a horizon means the money "
+            "comes out at its end, so every comparison can reach an early exit, and a run that "
             "assumed the belief would report a figure no file declares.",
             "check the data root, or declare what an early exit is struck under",
         )
@@ -2840,7 +2840,7 @@ def tuple_from_data_root(
             streams=covered.ramp.streams,
             kinds=covered.ramp.kinds,
             spendable=covered.spendable,
-            spread_holds=early_exit,
+            quotation_holds=early_exit,
             base_currency=covered.ramp.base_currency,
         ),
     )

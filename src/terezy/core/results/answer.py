@@ -250,6 +250,13 @@ class Exclusion(Enum):
     """A bond's resale price also moves with market rates, and this figure does not model it.
     Modelling it is a secondary-market model and is out of scope."""
 
+    EARLY_EXIT_IGNORES_ACCRUED_INTEREST = "early_exit_ignores_accrued_interest"
+    """The quotation carried an accrual on the day it was observed and the sale date carries a
+    different one, and nothing separates either out: no declaration states the basis interest
+    accrues on. What the carried-forward price subtracts is whole coupons, so this residual is
+    what it leaves behind -- smaller than a coupon, and **unsigned**, because which way it runs
+    depends on where the quotation and the sale fall inside their accrual periods."""
+
 
 class Direction(Enum):
     """Which way an approximation errs, where it has a warranted direction."""

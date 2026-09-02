@@ -64,6 +64,7 @@ EARLY_EXIT_CLAIMS: Final = frozenset(
         Exclusion.EARLY_EXIT_IS_A_POINT_NOT_A_DISTRIBUTION,
         Exclusion.EARLY_EXIT_SPREAD_IS_A_SELLERS_QUOTE,
         Exclusion.EARLY_EXIT_CARRIES_NO_RATE_RISK,
+        Exclusion.EARLY_EXIT_IGNORES_ACCRUED_INTEREST,
     }
 )
 
@@ -133,7 +134,8 @@ def _vocabulary(result: Answer) -> set[str]:
         verb.REAL_TERMS_SUPPLIED_BY,
         verb.INCOME_TAX_SUPPLIED_BY,
         verb.RATE_RISK_SUPPLIED_BY,
-        registries.spread_holds.id,
+        verb.ACCRUED_INTEREST_SUPPLIED_BY,
+        registries.quotation_holds.id,
     }
 
 
@@ -209,7 +211,7 @@ def test_every_early_exit_figure_names_the_assumption_it_rests_on() -> None:
         if outcome.sold_early is not None
     ]
     assert sold, "the fixture must actually reach an early exit"
-    expected = early_exit.rests_on(supplied.registries.spread_holds)
+    expected = early_exit.rests_on(supplied.registries.quotation_holds)
     for outcome in sold:
         assert expected in outcome.rests_on, outcome.rests_on
 
@@ -263,12 +265,14 @@ def test_a_section_that_holds_to_maturity_inherits_no_early_exit_claim() -> None
     assert not [item.what for item in held.excludes if item.what in EARLY_EXIT_CLAIMS]
 
 
-def test_an_early_exit_states_three_claims_and_signs_exactly_two() -> None:
-    """SC-026. The absence of a direction on rate risk is **asserted**, not tolerated.
+def test_an_early_exit_states_four_claims_and_signs_exactly_two() -> None:
+    """SC-026, widened by one. Two absences of a direction are **asserted**, not tolerated.
 
     Rate risk is symmetric -- a bond sold after rates rise fetches less than its spread implies
     and one sold after rates fall fetches more -- and an approximation whose sign is asserted
-    without a warrant is a number more confident than its inputs, which is worse than none.
+    without a warrant is a number more confident than its inputs, which is worse than none. The
+    accrued-interest residual is unsigned for its own reason: it runs either way depending on
+    where the quotation and the sale fall inside their accrual periods.
     """
     result = fixtures.answered(
         supplied=fixtures.with_resale_price(fixtures.inputs(), "ovdp_synthetic_a")
@@ -286,6 +290,7 @@ def test_an_early_exit_states_three_claims_and_signs_exactly_two() -> None:
     assert by_claim[Exclusion.EARLY_EXIT_IS_A_POINT_NOT_A_DISTRIBUTION].direction is not None
     assert by_claim[Exclusion.EARLY_EXIT_SPREAD_IS_A_SELLERS_QUOTE].direction is not None
     assert by_claim[Exclusion.EARLY_EXIT_CARRIES_NO_RATE_RISK].direction is None
+    assert by_claim[Exclusion.EARLY_EXIT_IGNORES_ACCRUED_INTEREST].direction is None
 
 
 def test_every_exclusion_names_what_would_supply_it() -> None:

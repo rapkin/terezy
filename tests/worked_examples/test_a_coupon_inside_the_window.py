@@ -1,26 +1,29 @@
-"""A coupon collected inside a window, and a sale struck at a price quoted before it.
+"""A coupon collected inside a window, and the sale price it has already left.
 
-**A recorded gap with a sign, measured rather than argued.** It is not a defect this feature
-introduced and it is not one this feature may fix: 016 is data-only by the owner's decision,
-and correcting it needs a secondary-market price, which nobody has declared.
+A bond's market price falls by its coupon on the day the coupon detaches. An early exit is
+struck at a **dated observation** -- Inzhur's sell quotation of 2026-08-24 -- so a window
+containing a coupon date would credit the holding the coupon **and** sell it at a price observed
+while that coupon was still attached, counting the same money twice. The sale is therefore
+struck at the quotation **less every coupon that detached while this holding held the paper**
+(``core.scenarios.early_exit.price_at``), which is the clean-price-is-constant reading of the
+owner's declared belief.
 
-What happens. 015 strikes an early exit at the resale price on the access record, and that price
-is a **dated observation** -- Inzhur's sell quotation of 2026-08-24. A bond's market price drops
-by roughly its coupon on the ex-date, so where the window contains a coupon date the holding is
-credited the coupon **and** sold at a price observed while that coupon was still attached. The
-figure is overstated by roughly the coupon.
+**A coupon dated on the sale day counts as detached.** That is the convention the schedule
+generators already fix rather than a new one: ``enumerated`` pays every payment with
+``payment.on <= horizon.end`` and ``fixed_income`` pays a coupon whose ``paid_on`` equals the
+window's end while refusing to reinvest it. The holder receives it, so it has left the price.
 
-**Why 015's three stated exclusions do not cover it.** FR-033 has the figure state that it is
-more certain than the truth (signed), that the spread is understated (signed), and that rate
-risk is unsigned because it is symmetric. A coupon drop is none of those: it is not rate risk,
-it is not symmetric, and its direction is known. Nothing in the record says so today.
+**The window opens at the later of the quotation and the purchase, and the purchase half is
+load-bearing.** Two shipped issues pay a coupon on 2026-08-26 -- after the 2026-08-24 quotation
+and before the owner's window opens -- while the *buy* quotation of the same morning is carried
+to the purchase date unadjusted. Subtracting such a coupon from the sell leg alone would report
+a loss of a whole coupon that nobody took, so the population is named and pinned below.
 
-**Why it was invisible until now.** No shipped declaration carried a resale price before 016,
-so no early exit produced a figure at all; and the two fixtures that could have shown it have
-invented schedules with no coupon inside the owner's windows.
-
-The measurement is asserted here so the gap has a number that cannot go stale, and it is
-recorded as the `early-exit-ignores-a-coupon-inside-the-window` future entry.
+**What is left behind is accrued interest**, and it is stated rather than fixed: the quotation
+carried an accrual on 2026-08-24 and the sale date carries a different one, no declaration
+states the basis interest accrues on (the ``enumerated-accrued-interest`` future entry), and the
+residual is smaller than a coupon and unsigned. It reaches the reader as the fourth typed
+exclusion on every early-exit figure.
 """
 
 from __future__ import annotations
@@ -44,21 +47,23 @@ pytestmark = pytest.mark.worked_example
 
 AFFECTED_PER_HORIZON = (5, 11, 12)
 """How many candidates, at each of the owner's three horizons, are sold before their own terms
-end AND collect at least one payment inside the window. Measured 2026-08-31 on the shipped
-registry; the horizons are `data/questions/fifty-thousand.toml`'s."""
+end AND collect at least one payment inside the window -- the population whose sale price the
+carry-forward moves. Measured 2026-08-31 on the shipped registry; the horizons are
+`data/questions/fifty-thousand.toml`'s."""
 
 EARLY_EXIT_CLAIMS = frozenset(
     {
         "early_exit_is_a_point_not_a_distribution",
         "early_exit_spread_is_a_sellers_quote",
         "early_exit_carries_no_rate_risk",
+        "early_exit_ignores_accrued_interest",
     }
 )
-"""015 FR-033's three claims, and the reason a fourth is owed: none of them is about a coupon,
-none of them is signed the way this omission is."""
+"""What an early-exit figure states it does not account for. The fourth is this module's: the
+coupon itself is now computed, and what remains of it is the accrual on either side."""
 
 WORKED = "UA4000236228"
-"""Bought 2026-09-02 at 1089.32, pays 85.50 on 2026-09-09, sold 2026-10-01 at 1087.89.
+"""Bought 2026-09-02 at 1089.32, pays 85.50 on 2026-09-09, sold 2026-10-01.
 
 The purchase is a day after the window opens, not on it: `inzhur_direct` declares one leg of
 `latency_days = 1`, and the engine buys at `horizon.start` plus the way in's own latency.
@@ -68,17 +73,28 @@ whole unit::
 
     45 units x 1089.32 = 49 019.40 deployed, 980.60 left undeployed
     45 x    85.50      =  3 847.50  coupon, collected on 2026-09-09
-    45 x  1 087.89     = 48 955.05  sale, at a price quoted 2026-08-24 -- BEFORE the coupon
-                         52 802.55  reached
+         1 087.89
+       -    85.50      =  1 002.39  the 2026-08-24 quotation, net of the coupon that detached
+    45 x  1 002.39     = 45 107.55  sale on 2026-10-01
+                         48 955.05  reached
 
-7.7% on the money deployed, in one month, on a bond whose coupon is 17.1% a year (`auk_proc`
-17.1 against a nominal of 1 000, halved for the 182-day period: 85.50). The 3 847.50
-is counted twice: once as income and once inside a sale price quoted while it was still
-attached.
+Against 49 019.40 deployed that is **-64.35 over the month, -0.1313%** -- and the check that
+makes it more than a subtraction is that 64.35 is 45 x 1.43, the whole of the gap between the
+buy quotation of 1 089.32 and the sell quotation of 1 087.89. A month of a 17.1% coupon bought
+and sold at one morning's two prices returns the spread and nothing else, which is what a
+constant clean price means.
+
+Carrying the quotation forward unchanged reached 52 802.55 instead -- +7.72% in one month on a
+bond whose coupon is 17.1% a year (`auk_proc` 17.1 against a nominal of 1 000, halved for the
+182-day period: 85.50) -- because the 3 847.50 was counted once as income and once inside a
+sale price quoted while it was still attached.
 """
 
-REACHED = 52802.55
+QUOTED_ON = date(2026, 8, 24)
+REACHED = 48955.05
+DEPLOYED = 49019.40
 DEPLOYED_UNITS = 45.0
+SPREAD_PER_UNIT = 1089.32 - 1087.89
 
 
 @functools.cache
@@ -154,6 +170,47 @@ def test_the_window_and_the_holding_cannot_disagree_about_what_is_inside() -> No
     assert set(latencies) != {0}
 
 
+BETWEEN_THE_QUOTATION_AND_THE_PURCHASE = {("UA4000231195", 87.5), ("UA4000239081", 82.2)}
+"""The issues paying a coupon after the 2026-08-24 quotation and before the owner's window
+opens, with the amount per unit. Measured 2026-09-02 on the shipped registry."""
+
+
+def test_a_coupon_before_the_purchase_is_left_in_the_sale_price() -> None:
+    """The case that decides the window's lower bound, and it is reached rather than argued.
+
+    Both legs of one morning's quotation must treat such a coupon the same way, and the buy leg
+    that sizes the purchase carries its quotation to the purchase date **unadjusted**. So these
+    two sell at the full quotation, and a rule that opened the window at the quotation's own day
+    would report each of them a whole coupon poorer than it is.
+    """
+    declared = _supplied().registries
+    found = set()
+    for section in answers.answered().sections:
+        for item in section_evaluated(section):
+            if item.sold_early is None:
+                continue
+            quote = declared.access[item.key.instrument_id].resale_price
+            assert quote is not None, item.key.instrument_id
+            terms = declared.instruments[item.key.instrument_id].terms
+            assert isinstance(terms, EnumeratedTerms), item.key.instrument_id
+            bought = _bought_on(item, section.horizon.start)
+            before = [
+                payment for payment in terms.payments if quote.observed_on < payment.on <= bought
+            ]
+            if not before:
+                continue
+            found |= {(item.key.instrument_id, payment.amount.amount) for payment in before}
+            inside = [
+                payment.amount.amount
+                for payment in terms.payments
+                if bought < payment.on <= section.horizon.end
+            ]
+            assert item.sold_early.price_per_unit.amount == pytest.approx(
+                quote.price.amount - sum(inside), abs=TOLERANCE
+            ), item.key.instrument_id
+    assert found == BETWEEN_THE_QUOTATION_AND_THE_PURCHASE
+
+
 def test_the_gap_is_reached_at_every_horizon_the_owner_asked_about() -> None:
     sections = len(answers.answered().sections)
     measured = tuple(len(_sold_early_with_a_payment_inside(index)) for index in range(sections))
@@ -181,35 +238,68 @@ def test_the_worked_arithmetic_is_what_the_declarations_say() -> None:
     assert access.quote.price.amount == 1089.32
     assert access.resale_price.price.amount == 1087.89
     assert access.resale_price.kind == "venue_terms"
+    assert access.resale_price.observed_on == QUOTED_ON
+    assert access.quote.observed_on == QUOTED_ON
 
 
-def test_no_exclusion_states_the_coupon_omission_today() -> None:
-    """The half that makes this a gap rather than a stated approximation.
-
-    Over the closed `Exclusion` set, which is where 015 FR-033's three claims live, and over
-    the exclusions the owner's own answer actually carries. When a feature states the fourth
-    claim, this test is what says so -- and it must be replaced by its opposite rather than
-    deleted, because a gap marker quietly removed is a gap nobody remembers.
+def test_the_accrued_residual_is_stated_and_the_coupon_no_longer_is() -> None:
+    """What the figure still leaves out, over the closed `Exclusion` set and over the owner's
+    own answer. The coupon is **computed**, so nothing claims it as an omission; the accrual on
+    either side of it is not, so exactly one claim names it and it carries no direction.
     """
     assert {item.value for item in Exclusion} & EARLY_EXIT_CLAIMS == EARLY_EXIT_CLAIMS
-    assert not [item.value for item in Exclusion if "coupon" in item.value]
     section = answers.answered().sections[0]
-    stated = {item.what.value for item in section.excludes}
-    assert stated >= EARLY_EXIT_CLAIMS, sorted(stated)
-    assert not [name for name in stated if "coupon" in name]
+    stated = [item for item in section.excludes if item.what.value in EARLY_EXIT_CLAIMS]
+    assert {item.what.value for item in stated} == EARLY_EXIT_CLAIMS
+    accrued = [
+        item for item in stated if item.what is Exclusion.EARLY_EXIT_IGNORES_ACCRUED_INTEREST
+    ]
+    assert accrued
+    assert all(item.direction is None for item in accrued)
 
 
-def test_the_engine_reports_the_figure_this_module_calls_overstated() -> None:
-    """The finding is load-bearing rather than illustrative: the number in the docstring is the
-    one the owner's own question produces, read back off the answer."""
+def test_the_engine_strikes_the_sale_at_the_quotation_net_of_the_coupon() -> None:
+    """The docstring's arithmetic, read back off the owner's own answer.
+
+    The whole month returns the spread: 45 x 1 002.39 sold plus 45 x 85.50 collected is
+    45 x 1 087.89, which is 45 x 1.43 short of the 45 x 1 089.32 that was deployed.
+    """
     section = answers.answered().sections[0]
     worked = [item for item in section_evaluated(section) if item.key.instrument_id == WORKED]
     assert len(worked) == 1
     outcome = worked[0]
     assert outcome.sold_early is not None
-    assert outcome.sold_early.price_per_unit.amount == 1087.89
+    assert outcome.sold_early.units == DEPLOYED_UNITS
+    assert outcome.sold_early.price_per_unit.amount == pytest.approx(1002.39, abs=TOLERANCE)
     assert outcome.reaches.amount == pytest.approx(REACHED, abs=TOLERANCE)
-    assert outcome.reaches.amount == pytest.approx(DEPLOYED_UNITS * (85.5 + 1087.89), abs=TOLERANCE)
+    assert outcome.reaches.amount == pytest.approx(DEPLOYED_UNITS * 1087.89, abs=TOLERANCE)
+    assert outcome.reaches.amount - DEPLOYED == pytest.approx(
+        -DEPLOYED_UNITS * SPREAD_PER_UNIT, abs=TOLERANCE
+    )
+
+
+def test_the_carried_price_keeps_the_quotes_unverified_mark() -> None:
+    """Principle I: the sale price is an assumption derived from an unverified quotation, and
+    subtracting a declared coupon from it may not launder either source away."""
+    declared = _supplied().registries
+    quote = declared.access[WORKED].resale_price
+    assert quote is not None
+    terms = declared.instruments[WORKED].terms
+    assert isinstance(terms, EnumeratedTerms)
+    section = answers.answered().sections[0]
+    outcome = next(item for item in section_evaluated(section) if item.key.instrument_id == WORKED)
+    assert outcome.sold_early is not None
+    inside = [
+        payment
+        for payment in terms.payments
+        if date(2026, 9, 2) < payment.on <= section.horizon.end
+    ]
+    assert inside
+    behind = outcome.sold_early.price_per_unit.provenance.sources
+    assert quote.price.provenance.sources <= behind
+    for payment in inside:
+        assert payment.amount.provenance.sources <= behind
+    assert not any(source.verified_on for source in behind)
 
 
 def test_the_latency_this_module_sums_is_the_one_the_engine_adds() -> None:

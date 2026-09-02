@@ -114,19 +114,20 @@ def test_declaring_the_price_produces_a_figure_at_the_windows_end() -> None:
     assert outcome.sold_early.proceeds.amount > 0.0
 
 
-def test_the_figure_names_the_belief_and_states_three_claims_about_it() -> None:
+def test_the_figure_names_the_belief_and_states_four_claims_about_it() -> None:
     """FR-032 and FR-033 together: the mark and the exclusions travel with the figure."""
     supplied = fixtures.with_resale_price(fixtures.inputs(), SUBJECT)
     result = fixtures.answered(supplied=supplied)
     outcome = next(
         item for item in section_evaluated(result.sections[0]) if item.key.instrument_id == SUBJECT
     )
-    assert early_exit.rests_on(supplied.registries.spread_holds) in outcome.rests_on
+    assert early_exit.rests_on(supplied.registries.quotation_holds) in outcome.rests_on
     claims = {item.what for item in result.sections[0].excludes if item.applies_to == outcome.key}
     assert claims == {
         Exclusion.EARLY_EXIT_IS_A_POINT_NOT_A_DISTRIBUTION,
         Exclusion.EARLY_EXIT_SPREAD_IS_A_SELLERS_QUOTE,
         Exclusion.EARLY_EXIT_CARRIES_NO_RATE_RISK,
+        Exclusion.EARLY_EXIT_IGNORES_ACCRUED_INTEREST,
     }
 
 
