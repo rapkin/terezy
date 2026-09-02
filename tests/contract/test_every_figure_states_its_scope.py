@@ -74,7 +74,7 @@ CLASSIFIED: Final[frozenset[str]] = frozenset(
         # How the position closed, where the horizon closed it rather than its own terms
         # (015 FR-029). Not a figure of its own -- every amount in it is already in the
         # arrivals -- and typed rather than readable off `rests_on`, because an early-exit
-        # figure carries three stated exclusions and deciding to attach them by searching a
+        # figure carries stated exclusions and deciding to attach them by searching a
         # sentence is the string-matching a case field exists to avoid.
         "sold_early",
         # Marks travel with every figure; they are not figures.

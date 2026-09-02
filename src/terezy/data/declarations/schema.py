@@ -2017,7 +2017,7 @@ class InflationAssumptionTable(BaseModel):
 
 
 class EarlyExitTable(BaseModel):
-    """``[early_exit]`` -- that an observed resale spread holds at a future exit date."""
+    """``[early_exit]`` -- what an observed resale quotation is worth at a future exit date."""
 
     model_config = STRICT
 

@@ -377,9 +377,8 @@ class TupleOutcome:
     did (015 FR-029).
 
     Typed rather than left to be read out of :attr:`rests_on`: an early-exit figure carries
-    three stated exclusions of its own (FR-033), and deciding whether to attach them by
-    searching a sentence is the string-matching 014 FR-014a already refuses for a refusal's
-    case.
+    stated exclusions of its own (FR-033), and deciding whether to attach them by searching a
+    sentence is the string-matching 014 FR-014a already refuses for a refusal's case.
     """
 
     rests_on: tuple[str, ...]

@@ -86,7 +86,7 @@ def test_declaring_the_price_moves_exactly_that_instrument_and_no_other() -> Non
     with_price = fixtures.with_access(
         registries,
         subject,
-        resale_price=VenueQuote(price=RESALE, kind="venue_terms"),
+        resale_price=VenueQuote(price=RESALE, kind="venue_terms", observed_on=fixtures.OUTLAY_ON),
     )
     after = _surveyed(with_price)
 
@@ -102,13 +102,19 @@ def test_the_figure_it_produces_names_the_declared_belief() -> None:
     subject = _wanting_a_resale_price(_surveyed(registries))[0]
     after = _surveyed(
         fixtures.with_access(
-            registries, subject, resale_price=VenueQuote(price=RESALE, kind="venue_terms")
+            registries,
+            subject,
+            resale_price=VenueQuote(
+                price=RESALE, kind="venue_terms", observed_on=fixtures.OUTLAY_ON
+            ),
         )
     )
     outcome = next(
         item for item in evaluated(after.comparison) if item.key.instrument_id == subject
     )
-    assert any(registries.spread_holds.id in claim for claim in outcome.rests_on), outcome.rests_on
+    assert any(registries.quotation_holds.id in claim for claim in outcome.rests_on), (
+        outcome.rests_on
+    )
 
 
 def test_a_holding_the_window_reaches_carries_no_such_claim() -> None:
@@ -116,7 +122,7 @@ def test_a_holding_the_window_reaches_carries_no_such_claim() -> None:
     registries = fixtures.shipped()
     whole = _surveyed(registries, fixtures.HORIZON)
     for outcome in evaluated(whole.comparison):
-        assert all(registries.spread_holds.id not in claim for claim in outcome.rests_on)
+        assert all(registries.quotation_holds.id not in claim for claim in outcome.rests_on)
 
 
 def test_the_belief_is_read_from_the_registry_rather_than_written_here() -> None:
@@ -124,11 +130,15 @@ def test_the_belief_is_read_from_the_registry_rather_than_written_here() -> None
     registries = fixtures.shipped()
     subject = _wanting_a_resale_price(_surveyed(registries))[0]
     renamed = replace(
-        registries, spread_holds=replace(registries.spread_holds, id="a_different_belief")
+        registries, quotation_holds=replace(registries.quotation_holds, id="a_different_belief")
     )
     after = _surveyed(
         fixtures.with_access(
-            renamed, subject, resale_price=VenueQuote(price=RESALE, kind="venue_terms")
+            renamed,
+            subject,
+            resale_price=VenueQuote(
+                price=RESALE, kind="venue_terms", observed_on=fixtures.OUTLAY_ON
+            ),
         )
     )
     outcome = next(
@@ -149,7 +159,9 @@ def test_a_schedule_whose_last_payment_is_a_coupon_sells_nothing_at_the_window_e
     registries = fixtures.shipped()
     subject = "enumerated_out_of_order"
     with_price = fixtures.with_access(
-        registries, subject, resale_price=VenueQuote(price=RESALE, kind="venue_terms")
+        registries,
+        subject,
+        resale_price=VenueQuote(price=RESALE, kind="venue_terms", observed_on=fixtures.OUTLAY_ON),
     )
     result = _surveyed(with_price, DateRange(start=fixtures.OUTLAY_ON, end=date(2027, 3, 31)))
     outcome = next(

@@ -261,9 +261,9 @@ def project(
     :data:`~terezy.core.primitives.staleness.UNASSESSED` rather than as freshness.
 
     **``early_exit`` is what a window shorter than the instrument's own terms is closed with**
-    (015 FR-029). ``None`` is not a silence and is the shipped state: no access declaration
-    quotes a resale price, so such a window refuses naming ``access.resale_price`` rather than
-    striking a sale at a figure nobody declared.
+    (015 FR-029). ``None`` is not a silence: where the access declaration quotes no resale
+    price such a window refuses naming ``access.resale_price`` rather than striking a sale at a
+    figure nobody declared.
     """
     ops = instrument_registry.ops_for(declaration.instrument_class)
     produced = ops.events(declaration, holding, horizon, assumptions, early_exit)
@@ -358,7 +358,8 @@ def _sale_excludes(sold: SoldEarly | None) -> frozenset[str]:
         {
             "the contractual figure closes at a declared resale price rather than at maturity "
             f"({sold.on.isoformat()}), under the stated belief {sold.assumption.id!r} that the "
-            "observed spread holds at that date -- neither is a term of the paper"
+            "observed quotation holds at that date less the coupons that detached since it "
+            "was observed -- neither is a term of the paper"
         }
     )
 
@@ -379,10 +380,16 @@ def _sold_early(events: Sequence[Event], early_exit: EarlyExit | None) -> SoldEa
         return None
     if sale.quantity is None:  # pragma: no cover -- `early_sale` always carries one
         return None
+    # Divided back out of the sale rather than read off `early_exit`, which carries the
+    # quotation as OBSERVED: the price struck is that quotation net of the coupons that detached
+    # before the sale, and a record quoting the pre-detachment figure beside post-detachment
+    # proceeds would be two numbers for one trade.
+    struck = money.scale(sale.amount, 1.0 / sale.quantity)
     return SoldEarly(
         on=sale.occurred_on,
         units=sale.quantity,
-        price_per_unit=early_exit.price_per_unit,
+        price_per_unit=struck,
+        detached_per_unit=money.sub(early_exit.price_per_unit, struck),
         proceeds=sale.amount,
         assumption=early_exit.assumption,
     )

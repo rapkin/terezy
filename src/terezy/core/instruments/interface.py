@@ -49,7 +49,7 @@ from terezy.core.ledger.events import Event, EventKind
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance
-from terezy.core.scenarios.early_exit import SpreadHolds
+from terezy.core.scenarios.early_exit import QuotationHolds
 from terezy.core.tax.interface import TaxableEventKind
 
 
@@ -435,14 +435,23 @@ class EarlyExit:
     access record -- and the belief that it still holds on the exit date is the owner's, stated
     beside it so every figure computed through it can name it.
 
-    ``None`` where an implementation is handed one is the shipped state and refuses by name: no
-    declaration carries a resale price today (015 FR-031).
+    ``None`` where an implementation is handed one refuses by name, naming
+    ``access.resale_price`` (015 FR-031): a sale struck at a face value or at the purchase
+    quote would report a spread of zero that nobody observed.
     """
 
     price_per_unit: Money
-    """The declared seller's quote, carrying its own citation, in the instrument's currency."""
+    """The declared seller's quote **as observed**, carrying its own citation, in the
+    instrument's currency. What a unit fetches on the sale date is
+    the quotation less
+    :func:`terezy.core.scenarios.early_exit.detached_since`, which is the only place that
+    decides what left it.
+    """
 
-    assumption: SpreadHolds
+    observed_on: date
+    """The day the quote described the market, from the access record's own quote."""
+
+    assumption: QuotationHolds
     """The owner's belief that the quote holds at the exit date. Named on every figure."""
 
 
@@ -466,9 +475,11 @@ Obligations, all of them checkable by reading one implementation:
   ``InstrumentFailure`` -- a typed value, not an exception and not an empty tuple. An
   empty tuple means "legitimately no events in this horizon" and nothing else.
 * **The horizon is when the money comes out** (015 FR-029). An instrument whose own terms
-  run past ``horizon.end`` emits its flows up to that day and a sale on it, at the
-  :class:`EarlyExit` price; handed ``None`` it returns an ``InconsistentTerms`` naming
-  ``access.resale_price``, which the join turns into a missing declaration.
+  run past ``horizon.end`` emits its flows up to that day and a sale on it, priced by
+  :func:`terezy.core.scenarios.early_exit.detached_since` from the :class:`EarlyExit`
+  quote and this instrument's own per-unit coupon schedule; handed ``None`` it returns an
+  ``InconsistentTerms`` naming ``access.resale_price``, which the join turns into a missing
+  declaration.
 """
 
 TaxClassesFn = Callable[[InstrumentDeclaration], Mapping[TaxableEventKind, str]]

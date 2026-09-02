@@ -73,6 +73,7 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.results.question import Question, Reserve
     from terezy.core.results.tuple import Arrival, InstrumentPlan
     from terezy.core.routes.legs import Route
+    from terezy.core.scenarios.early_exit import SoldEarly
 
 REAL_TERMS_SUPPLIED_BY = "a real-terms rate on TupleOutcome, which feature 010 does not produce"
 INCOME_TAX_SUPPLIED_BY = "a deployable-capacity figure, which is a question about a stream"
@@ -378,7 +379,7 @@ def _section(
             stated
             for item in _outcomes(outcome)
             if item.sold_early is not None and item.key not in withheld
-            for stated in _early_exit_exclusions(item.key, item.sold_early.assumption.id)
+            for stated in _early_exit_exclusions(item.key, item.sold_early)
         ),
     )
 
@@ -536,28 +537,32 @@ def _answer_wide_excludes() -> tuple[StatedExclusion, ...]:
     )
 
 
-def _early_exit_exclusions(key: Tuple, assumption_id: str) -> tuple[StatedExclusion, ...]:
-    """What an early-exit figure does not account for, with a direction on exactly two.
+def _early_exit_exclusions(key: Tuple, sold: SoldEarly) -> tuple[StatedExclusion, ...]:
+    """What an early-exit figure does not account for, and which way each one errs.
 
-    Two of them carry no direction, for reasons that differ and are on the members themselves.
-    SC-026 asserts those absences rather than tolerating them: an approximation whose sign is
-    asserted without a warrant is a number more confident than its inputs, which is worse than
-    one whose sign is unstated.
+    Rate risk is **symmetric** -- a bond sold after rates rise fetches less than its spread
+    implies and one sold after rates fall fetches more -- so it carries no direction, and SC-026
+    asserts that absence rather than tolerating it: a sign asserted without a warrant is a number
+    more confident than its inputs, which is worse than one left unstated.
+
+    **The accrued-interest claim is attached to the sale rather than to the candidate**, because
+    it is the residual of an adjustment that did not happen: a sale from which no coupon detached
+    is struck at the quotation itself and has no accrual left over to state. Read off
+    ``detached_per_unit`` rather than off the instrument's declaration form, so a zero-coupon
+    issue and a window that simply contains no coupon date are the same case here -- which they
+    are.
     """
-    # FR-033 named three claims; the fourth is the accrued-interest double count, which the
-    # measurement in tests/worked_examples/test_a_coupon_inside_the_window.py found and no
-    # figure corrects. Stating it here is what the `enumerated-accrued-interest` deferral costs.
-    return (
+    stated = (
         StatedExclusion(
             what=Exclusion.EARLY_EXIT_IS_A_POINT_NOT_A_DISTRIBUTION,
             applies_to=key,
-            supplied_by=assumption_id,
+            supplied_by=sold.assumption.id,
             direction=Direction.MORE_CERTAIN_THAN_IT_IS,
         ),
         StatedExclusion(
             what=Exclusion.EARLY_EXIT_SPREAD_IS_A_SELLERS_QUOTE,
             applies_to=key,
-            supplied_by=assumption_id,
+            supplied_by=sold.assumption.id,
             direction=Direction.UNDERSTATED,
         ),
         StatedExclusion(
@@ -566,11 +571,16 @@ def _early_exit_exclusions(key: Tuple, assumption_id: str) -> tuple[StatedExclus
             supplied_by=RATE_RISK_SUPPLIED_BY,
             direction=None,
         ),
+    )
+    if sold.detached_per_unit.amount == 0.0:
+        return stated
+    return (
+        *stated,
         StatedExclusion(
             what=Exclusion.EARLY_EXIT_IGNORES_ACCRUED_INTEREST,
             applies_to=key,
             supplied_by=ACCRUED_INTEREST_SUPPLIED_BY,
-            direction=None,
+            direction=Direction.UNDERSTATED,
         ),
     )
 

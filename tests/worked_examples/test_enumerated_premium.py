@@ -72,7 +72,7 @@ from terezy.core.primitives.money import Money
 from terezy.core.primitives.tolerance import is_close
 from terezy.core.results import project
 from terezy.core.results.project import GovernedBy, Projection, PurchasePremium
-from terezy.core.scenarios.early_exit import SpreadHolds
+from terezy.core.scenarios.early_exit import QuotationHolds
 from terezy.core.tax import flat_rate
 from terezy.core.tax import year as tax_year
 from terezy.core.tax.interface import TaxableEventKind, TaxCharge, TaxContext
@@ -361,8 +361,11 @@ class TestAPurchaseMadeAfterARepaymentOfPrincipal:
             assessment_rules=RULES["synthetic_fixture"],
             early_exit=EarlyExit(
                 price_per_unit=Money(self.RESALE, UAH, prov.EMPTY),
-                assumption=SpreadHolds(
-                    id="test_spread_holds",
+                # Quoted on the sale day: this example is about which UNITS a sale prices, and
+                # a quotation carried across a coupon would move the per-unit figure too.
+                observed_on=self.SOLD_ON,
+                assumption=QuotationHolds(
+                    id="test_quotation_holds",
                     is_assumption=True,
                     rationale="TEST FIXTURE -- the quoted resale price still holds at the exit.",
                 ),

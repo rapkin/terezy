@@ -251,12 +251,16 @@ class Exclusion(Enum):
     Modelling it is a secondary-market model and is out of scope."""
 
     EARLY_EXIT_IGNORES_ACCRUED_INTEREST = "early_exit_ignores_accrued_interest"
-    """The resale quotation is a **dirty** price -- clean plus the interest accrued by the day
-    it was observed -- and it is carried to the sale date unchanged, so a window that collects
-    a coupon is credited that accrual twice: once in the coupon, once inside the sale price.
-    Separating the two needs the basis interest accrues on, which no declaration states. The
-    error is bounded by one coupon and is **unsigned**: it runs whichever way the accrual at
-    the purchase and the accrual at the sale differ."""
+    """A resale quotation is a **dirty** price -- clean plus the interest accrued by the day it
+    was observed -- and what the sale price subtracts is whole coupons, because separating the
+    accrual out needs a basis no declaration states.
+
+    So the sale price is struck **below** what the same assumption implies, by the coupons
+    detached less the accrual the quotation carried plus the accrual the sale date carries. That
+    quantity is positive whenever a coupon detached -- the accrual within a period is less than
+    that period's coupon -- which is why this exclusion carries a direction where rate risk
+    cannot. It grows with the number of coupons inside the window, so it is not bounded by one
+    of them; the worked example measures it."""
 
 
 class Direction(Enum):

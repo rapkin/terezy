@@ -219,8 +219,10 @@ quotation observed on 2026-08-24 is a sale at a price quoted while a coupon stil
 the holding is credited that coupon as well. 5, 11 and 12 candidates are affected at the
 owner's three horizons.
 
-Recorded rather than fixed, with its measurement asserted in
-`tests/worked_examples/test_a_coupon_inside_the_window.py` and its remedy named in the
-`early-exit-ignores-a-coupon-inside-the-window` future entry. 016 is data-only, and pricing a
-sale correctly needs a secondary-market price nobody has declared — inventing one is what this
-whole feature exists not to do.
+Recorded rather than fixed here: 016 is data-only, and this is a change to how a sale is
+struck. **Fixed on 2026-09-03**, outside this feature — the sale is struck at the quotation
+less every coupon that detached after it was observed, and the measurement stayed in
+`tests/worked_examples/test_a_coupon_inside_the_window.py`, where the counts above were
+recomputed against the quotation's date rather than the purchase's. What a secondary-market
+price would still buy is the rate risk the spread does not carry, which is the
+`secondary-market-rate-risk` future entry.
