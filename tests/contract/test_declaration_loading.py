@@ -71,7 +71,7 @@ TAX_UA = DATA_ROOT / "tax" / "ua.toml"
 def _is_comment(line: str) -> bool:
     """Whether a line is a TOML comment.
 
-    Both helpers below skip comments, and they have to: the shipped fixtures explain
+    Both helpers below skip comments, and they have to: the instrument fixtures explain
     themselves in prose that quotes their own field names, so a naive text search would
     edit the explanation of ``is_synthetic`` instead of the declaration of it -- leaving
     the file valid and the test asserting an error that never came.
@@ -1082,11 +1082,11 @@ class TestTheRegistryRefusesAnUncoveredEvent:
     because the Tax Code's own commencement had not been retrieved. Feature 009 retrieved it
     (пп. 165.1.2 and пп. 165.1.52 from 2017-01-01; the levy carve-out struck by № 466-IX from
     2020-05-23), so widening the date stopped being the invented legal fact D2 forbids and
-    became the fact. The shipped registry now covers that coupon, and the last test below is
+    became the fact. The tax pack now covers that coupon, and the last test below is
     what says so.
 
     **What must not be lost with it is the demonstration.** So the refusal is watched on a
-    copy of the shipped data root with exactly one field changed -- still the real loader,
+    copy of the data root with exactly one field changed -- still the real loader,
     the real resolver and the real projection, not a hand-built class. A refusal the wiring
     could swallow is worse than no refusal at all, and that is a property of the wiring
     rather than of any particular date.

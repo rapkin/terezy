@@ -1,11 +1,11 @@
-"""SC-001: what the shipped declarations actually connect, counted rather than described.
+"""SC-001: what the declarations actually connect, counted rather than described.
 
 **Every number here is derived from the registry the test loads.** Nothing is hard-coded, and
 that is the point rather than a style: a literal 9 would keep passing after a tenth instrument
 was declared, and the count it agreed with would be the code's rather than the declarations'.
 
-The arithmetic a reader can check, re-measured on the shipped registry on 2026-08-31 after
-feature 016 declared 24 real ОВДП issues:
+The arithmetic a reader can check, over the composed registry -- what ships plus the invented
+declarations in ``tests/fixtures/data/``:
 
    33 instruments with an access declaration
   x 2 declared income streams

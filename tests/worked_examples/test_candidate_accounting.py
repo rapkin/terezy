@@ -6,8 +6,9 @@ and a sentence can:
     pairs considered      = pairs enumerated + pairs yielding no candidate
     candidates enumerated = evaluated        + dropped
 
-The arithmetic on the shipped registry, re-measured on 2026-08-31 under this module's own
-question (an outlay on 2026-04-01, a horizon ending 2030-06-30, one plan per instrument):
+The arithmetic on the composed registry -- what ships plus ``tests/fixtures/data/`` -- under
+this module's own question (an outlay on 2026-04-01, a horizon ending 2030-06-30, one plan per
+instrument):
 
     66 pairs considered  =  33 pairs enumerated  + 33 pairs yielding no candidate
     33 candidates        =  27 evaluated         +  6 dropped

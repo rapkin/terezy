@@ -133,11 +133,11 @@ def test_the_same_instrument_with_the_label_joins_the_group(tmp_path: Path) -> N
     assert _members(without, fixtures.INZHUR) == _members(with_label, fixtures.INZHUR)
 
 
-def test_the_shipped_count_is_unchanged_by_an_unlabelled_addition(tmp_path: Path) -> None:
-    """SC-033's first half, stated against the shipped registry it is measured from."""
-    shipped = fixtures.answered()
+def test_the_declared_count_is_unchanged_by_an_unlabelled_addition(tmp_path: Path) -> None:
+    """SC-033's first half, stated against the registry it is measured from."""
+    before = fixtures.answered()
     without = _answered(_root_with_lookalike(tmp_path, labelled=False))
-    assert _members(without, fixtures.OVDP) == _members(shipped, fixtures.OVDP)
+    assert _members(without, fixtures.OVDP) == _members(before, fixtures.OVDP)
 
 
 def test_no_group_holds_one_piece_of_paper_twice() -> None:
