@@ -321,10 +321,37 @@ def _beats_line(comparison: Comparison, ranked: tuple[TupleOutcome, ...]) -> str
         if not beaten
         else f"{beaten} of {len(ranked)} beat the benchmark {hurdle.key.instrument_id}"
     )
-    tied = {comparison.ranked[index].key for group in comparison.ties for index in group} & reported
-    if hurdle.key in tied:
+    if any(
+        hurdle.key in {comparison.ranked[index].key for index in group}
+        and len({comparison.ranked[index].key for index in group} & reported) > 1
+        for group in comparison.ties
+    ):
         verdict += ", and at least one candidate ties with it within the project tolerance"
-    return f"  {verdict}."
+    return f"  {verdict}.{_span_caveat(comparison, hurdle)}"
+
+
+def _span_caveat(comparison: Comparison, hurdle: TupleOutcome) -> str:
+    """What the verdict above is silent about when the hurdle undershoots the horizon.
+
+    ``implied_rate`` is an IRR over the span the money was **at work**, so a hurdle whose own
+    terms end inside the window is annualised over that shorter span and the rest of the list
+    over the window. "Nothing beats it" is then a claim about two different questions, and it
+    is the most confident sentence this renderer prints -- Principle I forbids emitting one
+    more confident than its inputs, and the input here is two incomparable spans.
+
+    Stated rather than suppressed: the figures are real and the owner chose the hurdle, so
+    withholding the verdict would hide work he asked for. What he cannot be left to infer is
+    that the two numbers span different periods. Recorded as
+    ``the-hurdle-undershoots-every-horizon`` in ``specs/features.toml``; the remedy -- a
+    different benchmark, or a declared rule for a candidate that undershoots -- is his.
+    """
+    if hurdle.span.end >= comparison.horizon.end:
+        return ""
+    return (
+        f" ITS RATE IS NOT COMPARABLE WITH THEIRS: {hurdle.key.instrument_id}'s own terms end "
+        f"{hurdle.span.end.isoformat()}, inside this window, so its rate is annualised over "
+        f"that span and every other row's over the window to {comparison.horizon.end.isoformat()}."
+    )
 
 
 def _figure_lines(outcome: TupleOutcome, *, hurdle: bool = False) -> list[str]:

@@ -1,4 +1,4 @@
-"""What a horizon shorter than an instrument's own terms now reports, over the shipped registry.
+"""What a horizon shorter than an instrument's own terms now reports, over the composed registry.
 
 015 FR-029 and FR-031, at the tuple level. Before this feature such a candidate dropped as
 ``CannotSpanHorizon`` binding on ``instrument.maturity_date`` -- *shorten nothing, it is
@@ -25,7 +25,7 @@ from terezy.core.results.tuple import CannotSpanHorizon, DeclarationMissing
 from tests import candidate_registries as fixtures
 
 SHORT = DateRange(start=fixtures.OUTLAY_ON, end=date(2027, 6, 30))
-"""A window that ends before several shipped instruments' own terms do, and after others'."""
+"""A window that ends before several declared instruments' own terms do, and after others'."""
 
 RESALE = Money(995.0, fixtures.UAH, prov.EMPTY)
 

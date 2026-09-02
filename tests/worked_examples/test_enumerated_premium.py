@@ -116,8 +116,8 @@ def _holding(*, on: date, paid: float) -> Holding:
 
 
 LOT_A = _holding(on=date(2026, 1, 5), paid=10_300.00)
-"""The premium purchase: 10 units at 1 030.00, the quote `data/access/instruments.toml`
-declares for this fixture."""
+"""The premium purchase: 10 units at 1 030.00, the quote
+`tests/fixtures/data/access/fixtures.toml` declares for this fixture."""
 
 LOT_B = _holding(on=date(2026, 1, 6), paid=9_000.00)
 """The same instrument a day later at a discount, so the year has a same-category gain to

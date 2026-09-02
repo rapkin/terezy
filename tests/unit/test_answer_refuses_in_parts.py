@@ -174,9 +174,9 @@ def test_a_benchmark_that_yields_no_candidate_is_this_sections_own_refusal() -> 
 def test_sections_are_computed_independently_of_one_another() -> None:
     """SC-009's claim, over horizons that genuinely differ.
 
-    Over the shipped registry the twelve-month section evaluates two candidates the shorter two
-    cannot, so the three sections are demonstrably not copies of one another -- which is what an
-    assertion about independence has to rest on.
+    Over the composed registry the twelve-month section evaluates two candidates the shorter
+    two cannot, so the three sections are demonstrably not copies of one another -- which is
+    what an assertion about independence has to rest on.
     """
     result = fixtures.answered()
     dropped_counts = [

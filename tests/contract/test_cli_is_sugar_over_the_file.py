@@ -211,6 +211,62 @@ def _answered() -> Answer:
     return run.answer
 
 
+def test_a_hurdle_that_undershoots_the_window_says_its_rate_is_not_comparable() -> None:
+    """Principle I: the verdict is the most confident sentence this renderer prints.
+
+    The owner's own benchmark matures inside all three windows, so its rate is an IRR over 18
+    days and every other row's is annualised over one, three or twelve months. "Nothing beats
+    it" over two different spans is a number more confident than its inputs, and the caveat is
+    what stops it being read as a comparison.
+    """
+    lines, _ = _run()
+    verdicts = [line for line in lines if "beat the benchmark" in line or "NOTHING BEATS" in line]
+    sections = [
+        section for section in _answered().sections if isinstance(section.outcome, CandidateSurvey)
+    ]
+    assert len(verdicts) == len(sections)
+    for section, verdict in zip(sections, verdicts, strict=True):
+        assert isinstance(section.outcome, CandidateSurvey)
+        comparison = section.outcome.comparison
+        assert isinstance(comparison, Comparison)
+        hurdle = comparison.ranked[comparison.benchmark]
+        assert hurdle.span.end < section.horizon.end, "the fixture must actually undershoot"
+        assert "ITS RATE IS NOT COMPARABLE WITH THEIRS" in verdict, verdict
+        assert hurdle.span.end.isoformat() in verdict
+        assert section.horizon.end.isoformat() in verdict
+
+
+def test_a_tie_with_the_hurdle_is_claimed_only_when_a_printed_row_ties() -> None:
+    """A tie group whose only other member is withheld is not a tie the reader can see.
+
+    The same two index spaces as the count beside it: ``ties`` addresses ``comparison.ranked``,
+    the rows come from ``section_ranking``. Asserted by construction rather than by the shipped
+    data, which has no such group today -- so the guard would be unreachable and untested.
+    """
+    section = next(
+        section for section in _answered().sections if isinstance(section.outcome, CandidateSurvey)
+    )
+    assert isinstance(section.outcome, CandidateSurvey)
+    comparison = section.outcome.comparison
+    assert isinstance(comparison, Comparison)
+    ranked = section_ranking(section)
+    withheld = next(
+        index
+        for index, item in enumerate(comparison.ranked)
+        if item.key not in {shown.key for shown in ranked}
+    )
+    tied_only_with_a_withheld_row = replace(comparison, ties=((comparison.benchmark, withheld),))
+    assert "ties with it" not in cli._beats_line(tied_only_with_a_withheld_row, ranked)
+
+    shown = next(
+        index
+        for index, item in enumerate(comparison.ranked)
+        if index != comparison.benchmark and item.key in {row.key for row in ranked}
+    )
+    tied_with_a_printed_row = replace(comparison, ties=((comparison.benchmark, shown),))
+    assert "ties with it" in cli._beats_line(tied_with_a_printed_row, ranked)
+
+
 BELOW_A_WITHHELD_CANDIDATE = "UA4000238281"
 """A benchmark that `inzhur_miltech` outranks, so the two index spaces disagree about it.
 

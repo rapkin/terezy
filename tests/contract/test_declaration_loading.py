@@ -1280,7 +1280,7 @@ class TestTheBatteryCoversTheContract:
             "TestAnImpossibleInstrumentIsNotALoadError",
             "TestTheBatteryCoversTheContract",
             "TestNoFieldDefaultStandsInForAValue",
-            "TestEveryShippedInstrumentSaysWhetherItIsAFixture",
+            "TestEveryDeclaredInstrumentSaysWhetherItIsAFixture",
         }
 
     def test_the_second_issue_is_a_file_and_not_a_special_case(self) -> None:
@@ -1407,8 +1407,8 @@ class TestNoFieldDefaultStandsInForAValue:
                 assert model.model_fields[field].default is None, f"{name}.{field}"
 
 
-class TestEveryShippedInstrumentSaysWhetherItIsAFixture:
-    """`docs/METHODOLOGY.md` §0's claim about `data/instruments/`, as a check.
+class TestEveryDeclaredInstrumentSaysWhetherItIsAFixture:
+    """`docs/METHODOLOGY.md` §0's claim about a declared instrument, as a check.
 
     Which declarations are invented is a fact about files, and §0 states it in prose. So the
     prose is held here: a fixture says so on its face — a bond through `is_synthetic`, a fund
@@ -1417,6 +1417,10 @@ class TestEveryShippedInstrumentSaysWhetherItIsAFixture:
 
     The property is stated rather than a file list, because a count of files goes stale on the
     next data change and this one already had, twice.
+
+    **Over the composed root**, which is where both populations exist at once — and the first
+    test below is what makes the pair meaningful. What SHIPS is the narrower claim, and it has
+    its own test at the foot of this class.
     """
 
     def test_a_bond_declares_itself_a_fixture_exactly_when_its_identity_is_not_an_isin(
@@ -1451,3 +1455,21 @@ class TestEveryShippedInstrumentSaysWhetherItIsAFixture:
         for identifier, instrument in sorted(declared.instruments.items()):
             assert prov.is_unverified(instrument.terms.provenance), identifier
             assert prov.is_unverified(instrument.constraints.provenance), identifier
+
+    def test_what_ships_declares_no_fixture_at_all(self) -> None:
+        """The owner's rule of 2026-09-02, which was stated in three READMEs and checked by
+        nothing.
+
+        `data/README.md` rule 5 no longer admits an invented instrument, so `data/instruments/`
+        is an inventory of what he can actually buy. Nothing else in the suite would notice a
+        `foo_synthetic.toml` landing there: every mechanism battery reads the composed root, and
+        the one artefact that would move is a golden, which is regenerated rather than refused.
+        """
+        declared = resolver.from_data_root(data_roots.SHIPPED)
+        invented = sorted(name for name, item in declared.instruments.items() if item.is_synthetic)
+        assert not invented, (
+            "an invented instrument may not ship (data/README.md rule 5, narrowed by the owner "
+            f"on 2026-09-02); these belong in tests/fixtures/data/instruments/: {invented}"
+        )
+        assert set(declared.instruments) == set(obs.declared_isins())
+        assert declared.funds, "the two real Inzhur funds still ship"
