@@ -81,6 +81,7 @@ from typing import TYPE_CHECKING, Final, Literal, assert_never
 
 from terezy.core.errors import InconsistentTerms, LedgerInvariantError
 from terezy.core.instruments import fund as fund_terms
+from terezy.core.instruments import registry as instrument_registry
 from terezy.core.instruments import terms as instrument_terms
 from terezy.core.instruments.fund import FundDeclaration
 from terezy.core.instruments.interface import (
@@ -163,7 +164,7 @@ from terezy.core.tax.interface import TaxClass
 if TYPE_CHECKING:  # pragma: no cover -- typing only
     from collections.abc import Mapping
 
-    from terezy.core.instruments.access import InstrumentAccess
+    from terezy.core.instruments.access import InstrumentAccess, VenueQuote
     from terezy.core.primitives.staleness import ObservationKind
     from terezy.core.results.coverage import SpendableEndpoint
     from terezy.core.routes.channels import FxChannel
@@ -401,13 +402,14 @@ def _hold(
     registries: Registries,
 ) -> TupleOutcome | TupleRefused:
     """Buy with what arrived, live the declared lifecycle, and send every release home."""
-    bought = _acquire(prepared, tuple_.route_in, routed.one_way.arrived)
+    purchased_on = horizon.start + timedelta(days=routed.latency_days)
+    bought = _acquire(prepared, tuple_.route_in, routed.one_way.arrived, purchased_on=purchased_on)
     if not isinstance(bought, _Acquisition):
         return bought
     projected = _project(
         prepared,
         bought,
-        purchased_on=horizon.start + timedelta(days=routed.latency_days),
+        purchased_on=purchased_on,
         horizon=horizon,
         tax_classes=registries.tax_classes,
         registries=registries,
@@ -834,7 +836,9 @@ class _Acquisition:
     undeployed: UndeployedCash | None
 
 
-def _acquire(prepared: _Prepared, path: Candidate, arrived: Money) -> _Acquisition | TupleRefused:
+def _acquire(
+    prepared: _Prepared, path: Candidate, arrived: Money, *, purchased_on: date
+) -> _Acquisition | TupleRefused:
     """Turn what arrived into units, at the declared price and the declared increment.
 
     **Bought with what arrived, never with what departed** (FR-003). The two differ by the way
@@ -847,7 +851,9 @@ def _acquire(prepared: _Prepared, path: Candidate, arrived: Money) -> _Acquisiti
     a term its declaration does not state; the minimum *number* of units it does declare is
     its own projection's check, refused there with its own shortfall.
     """
-    price = _price_for(prepared)
+    price = _price_for(prepared, purchased_on=purchased_on)
+    if not isinstance(price, Money):
+        return price
     minimum = _minimum_ticket(prepared)
     if minimum is not None and money.compare(arrived, minimum) < 0:
         return BelowMinimumTicket(
@@ -934,8 +940,8 @@ def _undeployed(
     )
 
 
-def _price_for(prepared: _Prepared) -> Money:
-    """What one unit costs, from whichever declaration states it.
+def _price_for(prepared: _Prepared, *, purchased_on: date) -> Money | TupleRefused:
+    """What one unit costs on the day it is bought, from whichever declaration states it.
 
     A fund prices itself -- its declared net asset value plus the entry markup the assumed
     liquidity mode charges -- through the fund module's own function, so the price the join
@@ -943,11 +949,18 @@ def _price_for(prepared: _Prepared) -> Money:
     face value is what it repays), so the venue's declared quote is the price, and the
     resolver has already refused an access declaration that omits one for a bond or supplies
     one for a fund.
+
+    **A bond's quote is carried to the purchase date the same way the resale quote is carried
+    to the sale date**, and both legs must follow the belief or neither does. Two shipped
+    issues pay a coupon between the 2026-08-24 quotation and the day the owner's window buys;
+    pricing the sale net of it and the purchase gross of it would charge a coupon nobody
+    received. There is no branch on the declaration form here -- ``terms.coupons_per_unit``
+    answers for both.
     """
     match prepared.declared, prepared.plan:
         case FundDeclaration(), FundAssumptions():
             return fund_terms.entry_price_for(prepared.declared, prepared.plan.liquidity_mode)
-        case _:
+        case InstrumentDeclaration(), _:
             quoted = prepared.access.quote
             if quoted is None:  # pragma: no cover -- the resolver refuses this at load
                 raise ValueError(
@@ -956,7 +969,44 @@ def _price_for(prepared: _Prepared) -> Money:
                     "load, so reaching here means a Registries was built in code with a "
                     "declaration the data boundary would not have accepted."
                 )
-            return quoted.price
+            return _carried_to(prepared.declared, quoted, on=purchased_on)
+        case _:  # pragma: no cover -- `_plan_for` has already refused a mismatched pair
+            raise ValueError(
+                f"{prepared.declared.id!r} reached pricing with run settings of type "
+                f"{type(prepared.plan).__name__}, which _plan_for refuses."
+            )
+
+
+def _carried_to(
+    declaration: InstrumentDeclaration, quoted: VenueQuote, *, on: date
+) -> Money | TupleRefused:
+    """A dated quotation as the price on a later day: itself, less what detached in between.
+
+    The refusal mirrors ``acquire.early_sale``'s and for the same reason: a quotation worth
+    less than the coupons still inside it is two declarations that cannot both be true. It is
+    unreachable on the shipped registry.
+    """
+    detached = early_exit.detached_since(
+        observed_on=quoted.observed_on,
+        sold_on=on,
+        coupons=instrument_registry.ops_for(declaration.instrument_class).coupons_per_unit(
+            declaration
+        ),
+        currency=quoted.price.currency,
+    )
+    price = money.sub(quoted.price, detached)
+    if price.amount <= 0.0:
+        return InstrumentRefused(
+            instrument_id=declaration.id,
+            reason=(
+                f"the venue quotes {quoted.price.amount!r} "
+                f"{quoted.price.currency.value} per unit as of "
+                f"{quoted.observed_on.isoformat()} and {detached.amount!r} of coupon detaches "
+                f"before the purchase on {on.isoformat()}. A quotation cannot hold less than "
+                "the coupons it still contains."
+            ),
+        )
+    return price
 
 
 def _minimum_ticket(prepared: _Prepared) -> Money | None:

@@ -482,6 +482,16 @@ Obligations, all of them checkable by reading one implementation:
   declaration.
 """
 
+CouponsPerUnitFn = Callable[[InstrumentDeclaration], tuple[tuple[date, Money], ...]]
+"""Every coupon **one unit** pays over the whole life of the paper, by paid date, ascending.
+
+Not a holding's coupons and not a window's: the caller is
+:func:`terezy.core.scenarios.early_exit.detached_since`, which decides what has left a dated
+quotation against the *quotation's* day. An implementation that trimmed the list to a buyer
+would be a second opinion about that. Empty is a real answer -- a zero-coupon issue -- and
+never a stand-in for "this form cannot say".
+"""
+
 TaxClassesFn = Callable[[InstrumentDeclaration], Mapping[TaxableEventKind, str]]
 """Which declared tax class governs each kind of income this instrument produces."""
 
@@ -507,3 +517,6 @@ class InstrumentOps:
 
     constraints: ConstraintsFn
     """The feasibility constraints."""
+
+    coupons_per_unit: CouponsPerUnitFn
+    """Every coupon one unit pays over the life of the paper. See :data:`CouponsPerUnitFn`."""

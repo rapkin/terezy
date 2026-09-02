@@ -27,6 +27,7 @@ from terezy.core.decision import candidates as enumeration
 from terezy.core.decision.tuple_outcome import Registries
 from terezy.core.primitives import money, staleness
 from terezy.core.primitives import provenance as prov
+from terezy.core.primitives.tolerance import TOLERANCE
 from terezy.core.results import candidates as candidate_results
 from terezy.core.results.answer import (
     AmountForAnUndeclaredStream,
@@ -78,7 +79,10 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
 REAL_TERMS_SUPPLIED_BY = "a real-terms rate on TupleOutcome, which feature 010 does not produce"
 INCOME_TAX_SUPPLIED_BY = "a deployable-capacity figure, which is a question about a stream"
 RATE_RISK_SUPPLIED_BY = "[[future]] secondary-market-rate-risk"
-ACCRUED_INTEREST_SUPPLIED_BY = "[[future]] enumerated-accrued-interest"
+ACCRUED_INTEREST_SUPPLIED_BY = (
+    "a declared accrual basis, and for a listed schedule the [[future]] "
+    "enumerated-accrued-interest entry"
+)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -572,7 +576,10 @@ def _early_exit_exclusions(key: Tuple, sold: SoldEarly) -> tuple[StatedExclusion
             direction=None,
         ),
     )
-    if sold.detached_per_unit.amount == 0.0:
+    # `> tolerance`, not `!= 0`: the claim is that the struck price is BELOW the one the belief
+    # implies, so a residual at or under the project tolerance is nothing to state and a
+    # negative one would be the opposite claim wearing this one's direction.
+    if not sold.detached_per_unit.amount > TOLERANCE:
         return stated
     return (
         *stated,

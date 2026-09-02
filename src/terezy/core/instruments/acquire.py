@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from terezy.core.errors import InconsistentTerms
 from terezy.core.ledger.events import CausationKind, CausationRef, Event, EventKind, LotRef
 from terezy.core.primitives import money
 from terezy.core.scenarios import early_exit
@@ -79,7 +80,7 @@ def early_sale(
     exit_: EarlyExit,
     coupons: Iterable[tuple[date, Money]],
     sequence: int,
-) -> Event:
+) -> Event | InconsistentTerms:
     """Cash in, units out, at the carried-forward resale price, on the horizon's last day.
 
     015 FR-029. A **disposal**, like a redemption at maturity and unlike a cash receipt: it
@@ -102,6 +103,11 @@ def early_sale(
 
     ``quantity`` is passed rather than read off the holding, for the reason a redemption's is:
     under a reinvesting policy the units sold are the purchase plus every reinvestment.
+
+    **A typed refusal rather than a figure**, unreachable on the shipped registry and not
+    guarded by a comment claiming it is: a quotation worth less than the coupons still inside
+    it is a pair of declarations that cannot both describe the same paper, and striking a sale
+    at it would hand the ledger a disposal of a negative amount.
     """
     detached = early_exit.detached_since(
         observed_on=exit_.observed_on,
@@ -110,6 +116,19 @@ def early_sale(
         currency=exit_.price_per_unit.currency,
     )
     price = money.sub(exit_.price_per_unit, detached)
+    if price.amount <= 0.0:
+        return InconsistentTerms(
+            first_term="access.resale_price.per_unit",
+            second_term="instrument.schedule.payment",
+            reason=(
+                f"{declaration.id!r} quotes {exit_.price_per_unit.amount!r} "
+                f"{exit_.price_per_unit.currency.value} per unit as of "
+                f"{exit_.observed_on.isoformat()}, and {detached.amount!r} of coupon detaches "
+                f"from it before the sale on {on.isoformat()}. A quotation cannot hold less "
+                "than the coupons it still contains: the two declarations describe different "
+                "paper, and striking the sale would post a disposal of a negative amount."
+            ),
+        )
     return Event(
         sequence=sequence,
         occurred_on=on,

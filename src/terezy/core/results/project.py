@@ -64,6 +64,7 @@ from terezy.core.instruments.interface import (
     EarlyExit,
     Holding,
     InstrumentDeclaration,
+    InstrumentOps,
 )
 from terezy.core.ledger import engine
 from terezy.core.ledger.engine import LedgerState
@@ -77,6 +78,7 @@ from terezy.core.results import hurdle as hurdle_figures
 from terezy.core.results import schedule as schedule_rows
 from terezy.core.results.hurdle import CashFlow, HurdleRate
 from terezy.core.results.schedule import CashFlowSchedule, ChargedOn
+from terezy.core.scenarios import early_exit as early_exit_scenario
 from terezy.core.scenarios.early_exit import SoldEarly
 from terezy.core.tax import registry as tax_registry
 from terezy.core.tax import year as tax_year
@@ -302,7 +304,7 @@ def project(
     # would then move when the owner changed their mind about coupons -- a figure
     # labelled "contractual" that is not (FR-005). Policy-invariance is asserted by
     # tests/unit/test_contractual_yield_is_policy_invariant.py.
-    sold_early = _sold_early(gross_events, early_exit)
+    sold_early = _sold_early(declaration, ops, gross_events, early_exit)
     contractual_events = _contractual_events(declaration, holding, horizon, assumptions, early_exit)
     if isinstance(contractual_events, InfeasiblePurchase | InconsistentTerms):
         return contractual_events  # pragma: no cover -- the policy run already succeeded
@@ -364,7 +366,12 @@ def _sale_excludes(sold: SoldEarly | None) -> frozenset[str]:
     )
 
 
-def _sold_early(events: Sequence[Event], early_exit: EarlyExit | None) -> SoldEarly | None:
+def _sold_early(
+    declaration: InstrumentDeclaration,
+    ops: InstrumentOps,
+    events: Sequence[Event],
+    early_exit: EarlyExit | None,
+) -> SoldEarly | None:
     """The sale that closed the position, read off the stream that closed it.
 
     A bond emits ``EventKind.REDEMPTION`` for one reason only -- an early sale; it repays
@@ -380,16 +387,22 @@ def _sold_early(events: Sequence[Event], early_exit: EarlyExit | None) -> SoldEa
         return None
     if sale.quantity is None:  # pragma: no cover -- `early_sale` always carries one
         return None
-    # Divided back out of the sale rather than read off `early_exit`, which carries the
-    # quotation as OBSERVED: the price struck is that quotation net of the coupons that detached
-    # before the sale, and a record quoting the pre-detachment figure beside post-detachment
-    # proceeds would be two numbers for one trade.
-    struck = money.scale(sale.amount, 1.0 / sale.quantity)
+    # Recomputed from the declaration rather than divided back out of the proceeds. The two
+    # agree to within a float or two, and that is the problem: `detached_per_unit == 0` is what
+    # says no coupon detached, and a round-trip through a division makes that answer depend on
+    # the quantity. Both sides read the same schedule through the same function, so this cannot
+    # drift from what `early_sale` struck.
+    detached = early_exit_scenario.detached_since(
+        observed_on=early_exit.observed_on,
+        sold_on=sale.occurred_on,
+        coupons=ops.coupons_per_unit(declaration),
+        currency=early_exit.price_per_unit.currency,
+    )
     return SoldEarly(
         on=sale.occurred_on,
         units=sale.quantity,
-        price_per_unit=struck,
-        detached_per_unit=money.sub(early_exit.price_per_unit, struck),
+        price_per_unit=money.sub(early_exit.price_per_unit, detached),
+        detached_per_unit=detached,
         proceeds=sale.amount,
         assumption=early_exit.assumption,
     )

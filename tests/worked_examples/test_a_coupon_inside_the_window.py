@@ -34,7 +34,7 @@ from datetime import date, timedelta
 import pytest
 
 from terezy.core.decision.answer import AnswerInputs, section_evaluated
-from terezy.core.instruments.interface import EnumeratedTerms
+from terezy.core.instruments.interface import EnumeratedTerms, PaymentKind
 from terezy.core.primitives.tolerance import TOLERANCE
 from terezy.core.results.answer import Direction, Exclusion
 from terezy.core.results.ramp import RampCost
@@ -45,7 +45,7 @@ from tests import answer_registries as answers
 
 pytestmark = pytest.mark.worked_example
 
-DETACHED_PER_HORIZON = (9, 15, 12)
+DETACHED_PER_HORIZON = (7, 13, 12)
 """How many of each section's early exits have a coupon detach between the 2026-08-24 quotation
 and the sale -- the population whose sale price the subtraction moves. Measured 2026-09-03 on
 the shipped registry; the horizons are `data/questions/fifty-thousand.toml`'s."""
@@ -102,11 +102,17 @@ COUPON_PER_UNIT = 85.50
 QUOTED_SELL = 1087.89
 SPREAD_PER_UNIT = 1089.32 - QUOTED_SELL
 
-DETACHED_BEFORE_THE_PURCHASE = {("UA4000231195", 87.5), ("UA4000239081", 82.2)}
-"""The issues paying a coupon after the quotation and before the owner's window opens, with the
-amount per unit. Their sale price is struck net of it while the **buy** quotation of the same
-morning is carried to the purchase date gross of it -- an asymmetry on the other leg, recorded
-here because nothing else would say so. Measured 2026-09-03."""
+BOTH_LEGS_CARRIED = {
+    # id: units, buy quotation, sell quotation, coupon detaching 2026-08-26 -- after the
+    # 2026-08-24 quotation and before the 2026-09-02 purchase, so out of BOTH legs.
+    "UA4000231195": (48.0, 1110.24, 1107.43, 87.50),
+    "UA4000239081": (49.0, 1085.00, 1078.09, 82.20),
+}
+"""The two shipped issues whose coupon detaches between the quotation and the purchase.
+
+They are what says the belief is applied to the pair of quotations rather than to one of them:
+the holder never receives that coupon, and a purchase priced gross of it against a sale priced
+net of it would charge him for it. Measured 2026-09-03."""
 
 
 @functools.cache
@@ -175,55 +181,133 @@ def test_the_window_and_the_holding_cannot_disagree_about_what_is_inside() -> No
     assert set(latencies) != {0}
 
 
+def _coupons_declared_between(name: str, opens: date, closes: date) -> list[float]:
+    """The declared coupon amounts per unit falling in ``(opens, closes]``, read off the file.
+
+    Deliberately not ``SoldEarly.detached_per_unit``: a population counted with the same field
+    the engine branches on is a tautology, and the previous version of this module pinned a
+    float artefact for exactly that reason.
+    """
+    terms = _supplied().registries.instruments[name].terms
+    assert isinstance(terms, EnumeratedTerms), name
+    return [
+        payment.amount.amount
+        for payment in terms.payments
+        if payment.pays is PaymentKind.COUPON and opens < payment.on <= closes
+    ]
+
+
 def test_the_subtraction_is_reached_at_every_horizon_the_owner_asked_about() -> None:
     """And does not reach every sale: a window with no coupon date in it is struck at the
-    quotation itself, which is what makes the count a measurement rather than a tautology."""
+    quotation itself, which is what makes the count a measurement rather than a tautology.
+
+    The expected population is computed from the **declared schedules**, so the engine and the
+    check reach it by different routes; the counts are the measurement.
+    """
+    declared = _supplied().registries.access
     measured = []
-    for index in range(len(answers.answered().sections)):
+    untouched = []
+    for index, section in enumerate(answers.answered().sections):
         sold = _sold_early(index)
         assert sold
-        detached = [item for item in sold if _detached(item) > 0.0]
-        measured.append(len(detached))
+        expected = set()
+        for item in sold:
+            quote = declared[item.key.instrument_id].resale_price
+            assert quote is not None, item.key.instrument_id
+            coupons = _coupons_declared_between(
+                item.key.instrument_id, quote.observed_on, section.horizon.end
+            )
+            if coupons:
+                expected.add(item.key.instrument_id)
+            assert _detached(item) == pytest.approx(sum(coupons), abs=TOLERANCE), (
+                item.key.instrument_id
+            )
+        assert {item.key.instrument_id for item in sold if _detached(item) > 0.0} == expected
+        measured.append(len(expected))
+        untouched += [item for item in sold if not _detached(item)]
     assert tuple(measured) == DETACHED_PER_HORIZON
-    untouched = [item for item in _sold_early(0) if _detached(item) == 0.0]
     assert untouched
 
 
-def test_a_coupon_between_the_quotation_and_the_purchase_still_leaves_the_price() -> None:
-    """The window opens at the quotation's own day, and this is the population that proves it.
+MULTI_COUPON = ("UA4000239081", 3, 82.20)
+"""An issue detaching MORE than one coupon inside the owner's twelve-month window, with how
+many and what each pays per unit. The residual this leaves grows with every one of them, which
+is why it is not bounded by a coupon. Measured 2026-09-03."""
 
-    Such a coupon is one the holder never receives, and it comes out of the sale price anyway --
-    because it came out of the market price too. What is *not* symmetric is the other leg: the
-    buy quotation of the same morning sizes the purchase gross of it. Named here so the
-    asymmetry is a recorded measurement rather than a silence.
+
+def test_more_than_one_coupon_detaches_and_every_one_of_them_comes_out() -> None:
+    """The multi-coupon case, which is where "not bounded by one coupon" stops being a claim.
+
+    Three coupons of 82.20 leave the quotation over the owner's year, so the sale is struck
+    246.60 per unit below it -- nearly three times the largest single-coupon adjustment on the
+    registry. Under the same belief the price also rebuilds by accrual between them, and none
+    of that is carried, which is what the accrued-interest exclusion states.
+    """
+    name, count, per_coupon = MULTI_COUPON
+    twelve = answers.answered().sections[2]
+    quote = _supplied().registries.access[name].resale_price
+    assert quote is not None
+    coupons = _coupons_declared_between(name, quote.observed_on, twelve.horizon.end)
+    assert len(coupons) == count
+    assert coupons == [per_coupon] * count
+    item = next(one for one in _sold_early(2) if one.key.instrument_id == name)
+    assert item.sold_early is not None
+    assert _detached(item) == pytest.approx(count * per_coupon, abs=TOLERANCE)
+    assert item.sold_early.price_per_unit.amount == pytest.approx(
+        quote.price.amount - count * per_coupon, abs=TOLERANCE
+    )
+
+
+def test_a_coupon_between_the_quotation_and_the_purchase_leaves_both_legs() -> None:
+    """One morning's two quotations are carried the same way, and here it is worth 87.50.
+
+    UA4000231195, over the owner's one month::
+
+        coupon 2026-08-26   87.50 per unit, after the quotation and before the purchase
+        bought 2026-09-02   1 110.24 - 87.50 = 1 022.74  x 48 units = 49 091.52
+        sold   2026-10-01   1 107.43 - 87.50 = 1 019.93  x 48 units = 48 956.64
+                            the month returns 48 x 2.81 = 134.88 less than it deployed
+
+    That difference is the bid-ask spread and nothing else, which is the whole content of a
+    constant clean price. Pricing the sale net of the coupon and the purchase gross of it would
+    have reported a loss of 48 x 87.50 on top, for a coupon the holder never received.
+    """
+    section = answers.answered().sections[0]
+    for name, (units, buy, sell, coupon) in BOTH_LEGS_CARRIED.items():
+        item = next(one for one in _sold_early(0) if one.key.instrument_id == name)
+        assert item.sold_early is not None
+        assert item.sold_early.units == units
+        assert _detached(item) == pytest.approx(coupon, abs=TOLERANCE)
+        assert item.reaches.amount == pytest.approx(units * (sell - coupon), abs=TOLERANCE)
+        deployed = units * (buy - coupon)
+        assert item.reaches.amount - deployed == pytest.approx(-units * (buy - sell), abs=TOLERANCE)
+    assert section.horizon.end == date(2026, 10, 1)
+
+
+def test_no_declared_coupon_falls_on_the_quotation_day() -> None:
+    """The lower bound is strict, so a coupon dated ON the quotation day counts as still inside
+    it -- and whether a morning quotation on a payment date holds that coupon is something
+    nobody has declared. Unreachable on the shipped registry, asserted rather than supposed,
+    because the day it is reachable the convention has to be chosen rather than inherited from
+    a comparison operator.
     """
     declared = _supplied().registries
-    found = set()
-    on_the_quotation_day = set()
-    for index, section in enumerate(answers.answered().sections):
+    checked = 0
+    landed = []
+    for index in range(len(answers.answered().sections)):
         for item in _sold_early(index):
             quote = declared.access[item.key.instrument_id].resale_price
             assert quote is not None, item.key.instrument_id
             terms = declared.instruments[item.key.instrument_id].terms
             assert isinstance(terms, EnumeratedTerms), item.key.instrument_id
-            bought = _bought_on(item, section.horizon.start)
-            found |= {
-                (item.key.instrument_id, payment.amount.amount)
-                for payment in terms.payments
-                if quote.observed_on < payment.on <= bought
-            }
-            on_the_quotation_day |= {
-                item.key.instrument_id
+            checked += 1
+            landed += [
+                (item.key.instrument_id, payment.on)
                 for payment in terms.payments
                 if payment.on == quote.observed_on
-            }
-    assert found == DETACHED_BEFORE_THE_PURCHASE
-    # The lower bound is strict, so a coupon dated ON the quotation day would be treated as
-    # still inside it -- and whether a morning quotation on a payment date holds that coupon is
-    # something nobody has declared. Unreachable on the shipped registry, asserted rather than
-    # supposed, because the day it is reachable the convention has to be chosen rather than
-    # inherited from a comparison operator.
-    assert not on_the_quotation_day
+            ]
+    assert checked
+    assert not landed, landed
 
 
 def test_the_worked_arithmetic_is_what_the_declarations_say() -> None:

@@ -74,7 +74,7 @@ as a later feature, and a stub would invite a caller to depend on it.
 from __future__ import annotations
 
 import math
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import date
 from typing import TYPE_CHECKING, Final
@@ -181,19 +181,21 @@ def events(
         ):
             stream.append(_reinvestment(declaration, holding, period, sequence=len(stream) + 1))
             units += period.reinvestment.units_bought
-    stream.append(
-        acquire.early_sale(
+    if sells_early and early_exit is not None:
+        sale = acquire.early_sale(
             declaration,
             holding,
             units,
             on=horizon.end,
             exit_=early_exit,
-            coupons=coupons_per_unit(terms),
+            coupons=coupons_per_unit(declaration),
             sequence=len(stream) + 1,
         )
-        if sells_early and early_exit is not None
-        else _redemption(declaration, holding, units, sequence=len(stream) + 1)
-    )
+        if isinstance(sale, InconsistentTerms):
+            return sale
+        stream.append(sale)
+    else:
+        stream.append(_redemption(declaration, holding, units, sequence=len(stream) + 1))
     return tuple(stream)
 
 
@@ -564,10 +566,10 @@ def coupon_plan(
 
     periods: list[CouponPeriod] = []
     units = holding.quantity
-    for accrual_start, accrual_end in _accrual_periods(terms):
+    for accrual_start, accrual_end in terms_of.accrual_periods(terms):
         if accrual_end > holding.purchased_on:
             fraction = year_fraction(accrual_start, accrual_end)
-            coupon = _coupon_amount(terms, units, fraction)
+            coupon = terms_of.coupon_amount(terms, units, fraction)
             decision = _decide(declaration, coupon, buy, accrual_end=accrual_end)
             periods.append(
                 CouponPeriod(
@@ -584,34 +586,27 @@ def coupon_plan(
     return tuple(periods)
 
 
-def _accrual_periods(terms: BondTerms) -> Iterator[tuple[date, date]]:
-    """``(accrual_start, accrual_end)`` for every period the declared terms describe.
+def coupons_per_unit(declaration: InstrumentDeclaration) -> tuple[tuple[date, Money], ...]:
+    """Every coupon one unit pays over the whole life of the paper, in payment order.
 
-    One iterator rather than the same three lines in :func:`coupon_plan` and
-    :func:`coupons_per_unit`: the two must agree about the period boundaries or a coupon
-    subtracted from a resale price would be dated differently from the coupon paid.
+    **The whole life, and per unit**, because the question it answers is what has left a dated
+    quotation -- decided against the quotation's own day and against no holding
+    (``core.scenarios.early_exit.detached_since``). A schedule trimmed to a buyer here would be
+    a second opinion about that, and the two would part company the first time a purchase
+    landed between a quotation and a coupon.
+
+    Dates are the **paid** dates, through the same declared business-day rule
+    :func:`coupon_plan` applies, because a coupon leaves the price when it is paid. Empty for a
+    zero-coupon issue, which is an answer rather than an absence.
     """
-    schedule = conventions.periodicity(terms.periodicity)(terms.issue_date, terms.maturity_date)
-    accrual_start = terms.issue_date
-    for accrual_end in schedule:
-        yield accrual_start, accrual_end
-        accrual_start = accrual_end
-
-
-def coupons_per_unit(terms: BondTerms) -> tuple[tuple[date, Money], ...]:
-    """Every coupon one unit of this issue pays over the whole life of the paper.
-
-    The whole life rather than a holding's own, which is :func:`coupon_plan`'s: which of them
-    have left a resale quotation is ``early_exit.detached_since``'s single rule, and a schedule
-    pre-trimmed here would be a second opinion about it.
-    """
+    terms = terms_of.narrowed(declaration, BondTerms)
     if terms.coupon_rate == 0.0:
         return ()
     year_fraction = conventions.day_count(terms.day_count)
     adjust = conventions.business_day_rule(terms.business_day_rule)
     return tuple(
-        (adjust(accrual_end), _coupon_amount(terms, 1.0, year_fraction(accrual_start, accrual_end)))
-        for accrual_start, accrual_end in _accrual_periods(terms)
+        (adjust(end), terms_of.coupon_amount(terms, 1.0, year_fraction(start, end)))
+        for start, end in terms_of.accrual_periods(terms)
     )
 
 
@@ -815,22 +810,6 @@ def _reinvestment(
         quantity=decision.units_bought,
         allocated_to=None,
         capacity_pool=None,
-    )
-
-
-def _coupon_amount(terms: BondTerms, quantity: float, fraction: float) -> Money:
-    """``face x rate x fraction x units``, carrying the terms it was computed from.
-
-    Through ``money.scale_sourced`` rather than ``money.scale``, because the rate and the
-    day-count fraction are *declared* values: the factor has sources of its own, and
-    ``scale`` would carry only the face value's. The two usually coincide -- a file
-    declares face and coupon in one table -- and relying on that coincidence is how a
-    mark gets lost the day they are separated.
-    """
-    return money.scale_sourced(
-        terms.face_value,
-        terms.coupon_rate * fraction * quantity,
-        terms.provenance,
     )
 
 

@@ -21,6 +21,7 @@ import pytest
 from terezy.core.decision.answer import section_evaluated
 from terezy.core.decision.candidates import dropped, evaluated
 from terezy.core.instruments.fund import ExchangeRateAssumption
+from terezy.core.primitives.tolerance import is_close
 from terezy.core.results.answer import Answer, Exclusion
 from terezy.core.results.candidates import CandidateSurvey
 from terezy.core.results.fund import FundAssumptions
@@ -128,7 +129,7 @@ def test_the_figure_names_the_belief_and_states_the_claims_about_it() -> None:
     assert early_exit.rests_on(supplied.registries.quotation_holds) in outcome.rests_on
     claims = {item.what for item in result.sections[0].excludes if item.applies_to == outcome.key}
     assert outcome.sold_early is not None
-    assert outcome.sold_early.detached_per_unit.amount == 0.0
+    assert is_close(outcome.sold_early.detached_per_unit.amount, 0.0)
     assert claims == {
         Exclusion.EARLY_EXIT_IS_A_POINT_NOT_A_DISTRIBUTION,
         Exclusion.EARLY_EXIT_SPREAD_IS_A_SELLERS_QUOTE,

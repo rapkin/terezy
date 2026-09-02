@@ -370,6 +370,33 @@ def test_a_coupon_paid_on_the_day_of_the_sale_has_already_left_the_price() -> No
     assert is_close(outcome.sold_early.price_per_unit.amount, CARRIED_PER_UNIT)
 
 
+def test_a_quotation_worth_less_than_its_own_coupons_refuses_by_name() -> None:
+    """Two declarations that cannot both describe the same paper, refused rather than struck.
+
+    Unreachable on the shipped registry -- at most three coupons of ~85 leave a quotation of
+    ~1 000 -- and reached here by quoting one unit at 100.00 while 76.86 of coupon detaches
+    twice over a window that spans two of them. Without the guard the sale is struck at a
+    negative price and the ledger posts a disposal of a negative amount, which is a raise from
+    the pure core on a condition two data files produced.
+    """
+    outcome = project.project(
+        synthetic.declaration(),
+        synthetic.holding(),
+        synthetic.horizon(end=date(2027, 7, 15)),
+        synthetic.assumptions(),
+        tax_classes=synthetic.TAX_PACK,
+        early_exit=EarlyExit(
+            price_per_unit=Money(100.0, synthetic.UAH, synthetic.TERMS_PROVENANCE),
+            observed_on=QUOTED_ON,
+            assumption=QUOTATION_HOLDS,
+        ),
+    )
+    assert isinstance(outcome, InconsistentTerms), outcome
+    assert outcome.first_term == "access.resale_price.per_unit"
+    assert outcome.second_term == "instrument.schedule.payment"
+    assert "cannot hold less than the coupons it still contains" in outcome.reason
+
+
 def test_a_coupon_before_the_quotation_is_already_out_of_it() -> None:
     """The lower bound is the quotation's own day, and it is not the purchase date.
 

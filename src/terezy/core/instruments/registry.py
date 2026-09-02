@@ -56,6 +56,7 @@ OPS: Final[InstrumentOps] = InstrumentOps(
     events=fixed_income.events,
     tax_classes=fixed_income.tax_classes,
     constraints=fixed_income.constraints,
+    coupons_per_unit=fixed_income.coupons_per_unit,
 )
 """``fixed_income``'s three functions, gathered into the interface's record.
 
@@ -68,6 +69,7 @@ ENUMERATED_OPS: Final[InstrumentOps] = InstrumentOps(
     events=enumerated.events,
     tax_classes=enumerated.tax_classes,
     constraints=enumerated.constraints,
+    coupons_per_unit=enumerated.coupons_per_unit,
 )
 """``enumerated``'s three functions, gathered into the same record, unchanged."""
 

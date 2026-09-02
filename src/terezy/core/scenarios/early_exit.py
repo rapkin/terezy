@@ -99,11 +99,17 @@ def detached_since(
     equals the window's end and refuses to reinvest it. The holder receives it, so it has left
     the price by the time he sells.
 
-    **The window opens at the quotation's own day, not at the purchase.** A coupon detaching
-    between the two left the price before the sale as surely as any other, and it is subtracted.
-    That the *buy* quotation of the same morning is carried to the purchase date unadjusted is a
-    defect on the **other** leg, not a reason to leave this one wrong; it is measured and named
-    in ``tests/worked_examples/test_a_coupon_inside_the_window.py``.
+    **Carrying is forward-only, and a quotation newer than the date asked about is used
+    unchanged.** The window is empty then, and that is the answer rather than an oversight: it
+    is what a backdated scenario did before any of this existed -- several shipped fixtures ask
+    about windows that closed months before the quotation was taken -- and adding the coupons
+    back on would be a second, unstated assumption in the opposite direction. What ages a
+    quotation is the staleness verdict, which already covers it.
+
+    **The window opens at the quotation's own day, not at the purchase**, and the same is true
+    of the *buy* quotation this function also prices: one morning's two quotations are carried
+    by one rule, so a coupon detaching between the quotation and the purchase leaves both legs
+    or neither. Taking it out of one alone would charge the holder a coupon he never received.
 
     **No accrued-interest figure is computed here, and no price is split.** This subtracts whole
     declared coupon amounts on their declared dates, so 013 FR-017 is untouched -- and what it

@@ -214,15 +214,14 @@ his to write. Recorded as the `the-benchmark-is-a-fixture` future entry.
 ## D9 — What declaring a real coupon date made visible, and did not fix
 
 The first early-exit figures this project has ever produced are also the first struck against
-real coupon dates, and they carry a **signed overstatement nothing states**: a sale at a
+real coupon dates, and they carried a **signed overstatement nothing stated**: a sale at a
 quotation observed on 2026-08-24 is a sale at a price quoted while a coupon still attached, and
-the holding is credited that coupon as well. 5, 11 and 12 candidates are affected at the
-owner's three horizons.
+the holding was credited that coupon as well.
 
 Recorded rather than fixed here: 016 is data-only, and this is a change to how a sale is
-struck. **Fixed on 2026-09-03**, outside this feature — the sale is struck at the quotation
-less every coupon that detached after it was observed, and the measurement stayed in
-`tests/worked_examples/test_a_coupon_inside_the_window.py`, where the counts above were
-recomputed against the quotation's date rather than the purchase's. What a secondary-market
-price would still buy is the rate risk the spread does not carry, which is the
-`secondary-market-rate-risk` future entry.
+struck. **Fixed on 2026-09-03**, outside this feature — both of the morning's quotations are
+now carried to the day they price, net of every coupon that detached since. The affected
+population is counted in `tests/worked_examples/test_a_coupon_inside_the_window.py` against
+the quotation's date, which is not the date the count in an earlier draft of this paragraph
+used, so no figure is repeated here. What a secondary-market price would still buy is the rate
+risk the spread does not carry, which is the `secondary-market-rate-risk` future entry.

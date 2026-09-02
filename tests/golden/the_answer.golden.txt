@@ -16,7 +16,7 @@
   enumerated 30  no_candidate 30  pairs 60  comparison BenchmarkUnavailable
   evaluated UA4000207518             reaches 0x1.816a000000000p+15
   evaluated UA4000230270             reaches 0x1.8179333333333p+15
-  evaluated UA4000231195             reaches 0x1.6691b33333334p+15
+  evaluated UA4000231195             reaches 0x1.7e7947ae147aep+15
   evaluated UA4000233712             reaches 0x1.7ddf333333333p+15
   evaluated UA4000234223             reaches 0x1.7e249eb851eb8p+15
   evaluated UA4000234413             reaches 0x1.7fbfae147ae15p+15
@@ -36,7 +36,7 @@
   evaluated UA4000239008             reaches 0x1.8188a3d70a3d6p+15
   evaluated UA4000239016             reaches 0x1.84b43851eb852p+15
   evaluated UA4000239040             reaches 0x1.82036147ae148p+15
-  evaluated UA4000239081             reaches 0x1.65e5e147ae147p+15
+  evaluated UA4000239081             reaches 0x1.7d3d3851eb851p+15
   evaluated UA4000239107             reaches 0x1.7fd4ae147ae14p+15
   ranked 0
   dropped DeclarationMissing           4  ovdp_enumerated_a,ovdp_enumerated_mirror,ovdp_synthetic_a,ovdp_synthetic_b
@@ -104,7 +104,6 @@
   excludes early_exit_is_a_point_not_a_distribution UA4000239008             more_certain_than_it_is
   excludes early_exit_spread_is_a_sellers_quote   UA4000239008             understated
   excludes early_exit_carries_no_rate_risk        UA4000239008             
-  excludes early_exit_ignores_accrued_interest    UA4000239008             understated
   excludes early_exit_is_a_point_not_a_distribution UA4000239016             more_certain_than_it_is
   excludes early_exit_spread_is_a_sellers_quote   UA4000239016             understated
   excludes early_exit_carries_no_rate_risk        UA4000239016             
@@ -118,14 +117,13 @@
   excludes early_exit_is_a_point_not_a_distribution UA4000239107             more_certain_than_it_is
   excludes early_exit_spread_is_a_sellers_quote   UA4000239107             understated
   excludes early_exit_carries_no_rate_risk        UA4000239107             
-  excludes early_exit_ignores_accrued_interest    UA4000239107             understated
   withheld inzhur_miltech           arrives 2028-01-20
 
 [section] 2026-09-01..2026-12-01  CandidateSurvey  reached=2 unreached=0 undeclared=2 ids=30
   enumerated 30  no_candidate 30  pairs 60  comparison BenchmarkUnavailable
   evaluated UA4000207518             reaches 0x1.8169fffffffffp+15
   evaluated UA4000230270             reaches 0x1.8179333333333p+15
-  evaluated UA4000231195             reaches 0x1.6691b33333334p+15
+  evaluated UA4000231195             reaches 0x1.7e7947ae147aep+15
   evaluated UA4000233712             reaches 0x1.7ddf333333333p+15
   evaluated UA4000234223             reaches 0x1.7e249eb851eb8p+15
   evaluated UA4000234413             reaches 0x1.7fbfae147ae15p+15
@@ -145,7 +143,7 @@
   evaluated UA4000239008             reaches 0x1.8188a3d70a3d6p+15
   evaluated UA4000239016             reaches 0x1.84b43851eb852p+15
   evaluated UA4000239040             reaches 0x1.82036147ae148p+15
-  evaluated UA4000239081             reaches 0x1.65e5e147ae147p+15
+  evaluated UA4000239081             reaches 0x1.7d3d3851eb851p+15
   evaluated UA4000239107             reaches 0x1.7fd4ae147ae14p+15
   ranked 0
   dropped DeclarationMissing           4  ovdp_enumerated_a,ovdp_enumerated_mirror,ovdp_synthetic_a,ovdp_synthetic_b
@@ -212,7 +210,6 @@
   excludes early_exit_is_a_point_not_a_distribution UA4000239008             more_certain_than_it_is
   excludes early_exit_spread_is_a_sellers_quote   UA4000239008             understated
   excludes early_exit_carries_no_rate_risk        UA4000239008             
-  excludes early_exit_ignores_accrued_interest    UA4000239008             understated
   excludes early_exit_is_a_point_not_a_distribution UA4000239016             more_certain_than_it_is
   excludes early_exit_spread_is_a_sellers_quote   UA4000239016             understated
   excludes early_exit_carries_no_rate_risk        UA4000239016             
@@ -227,14 +224,13 @@
   excludes early_exit_is_a_point_not_a_distribution UA4000239107             more_certain_than_it_is
   excludes early_exit_spread_is_a_sellers_quote   UA4000239107             understated
   excludes early_exit_carries_no_rate_risk        UA4000239107             
-  excludes early_exit_ignores_accrued_interest    UA4000239107             understated
   withheld inzhur_miltech           arrives 2028-01-20
 
 [section] 2026-09-01..2027-09-01  CandidateSurvey  reached=2 unreached=0 undeclared=2 ids=30
   enumerated 30  no_candidate 30  pairs 60  comparison BenchmarkUnavailable
   evaluated UA4000207518             reaches 0x1.acde000000000p+15
   evaluated UA4000230270             reaches 0x1.b31e000000000p+15
-  evaluated UA4000231195             reaches 0x1.9d16000000000p+15
+  evaluated UA4000231195             reaches 0x1.b8a0000000000p+15
   evaluated UA4000233712             reaches 0x1.7ddf333333332p+15
   evaluated UA4000234223             reaches 0x1.aaac000000000p+15
   evaluated UA4000234413             reaches 0x1.9624ccccccccdp+15
@@ -254,7 +250,7 @@
   evaluated UA4000239008             reaches 0x1.8188a3d70a3d7p+15
   evaluated UA4000239016             reaches 0x1.b8cf000000000p+15
   evaluated UA4000239040             reaches 0x1.82036147ae148p+15
-  evaluated UA4000239081             reaches 0x1.65e5e147ae147p+15
+  evaluated UA4000239081             reaches 0x1.7d3d3851eb851p+15
   evaluated UA4000239107             reaches 0x1.7fd4ae147ae14p+15
   evaluated ovdp_enumerated_a        reaches 0x1.9d70000000000p+15
   ranked 0
@@ -314,4 +310,4 @@
 [excludes] no_income_tax_on_the_stated_amount
 
 [keys] SectionsAgreeByKey
-[digest] sha256:088d38b3a5ebcc9cb22187b6be0ab4c1c8e5a633976fe4452329a137bcb17cc7
+[digest] sha256:940c0ae0bfe6d5c405143527de9a7ab5ffb7c8b82e85100e91a537fccde8e60f

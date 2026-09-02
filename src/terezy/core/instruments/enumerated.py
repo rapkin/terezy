@@ -48,6 +48,8 @@ from terezy.core.primitives import money
 from terezy.core.primitives.tolerance import is_close
 
 if TYPE_CHECKING:  # pragma: no cover -- import-time cycle avoidance
+    from datetime import date
+
     from terezy.core.instruments.interface import (
         Assumptions,
         DateRange,
@@ -56,6 +58,7 @@ if TYPE_CHECKING:  # pragma: no cover -- import-time cycle avoidance
         InstrumentConstraints,
         InstrumentDeclaration,
     )
+    from terezy.core.primitives.money import Money
     from terezy.core.tax.interface import TaxableEventKind
 
 
@@ -120,26 +123,35 @@ def events(
     # the ledger for units no lot holds.
     residual = holding.quantity - retired
     if early_exit is not None and not is_close(residual, 0.0) and residual > 0.0:
-        stream.append(
-            acquire.early_sale(
-                declaration,
-                holding,
-                residual,
-                on=horizon.end,
-                exit_=early_exit,
-                # The WHOLE declared list, not `receivable` and not `inside`: which of them
-                # left the quoted price is one rule in one place, and a caller pre-filtering it
-                # is how the two declaration forms would come to answer differently. Declared
-                # payment amounts are already per unit.
-                coupons=tuple(
-                    (payment.on, payment.amount)
-                    for payment in terms.payments
-                    if payment.pays is PaymentKind.COUPON
-                ),
-                sequence=len(stream) + 1,
-            )
+        sale = acquire.early_sale(
+            declaration,
+            holding,
+            residual,
+            on=horizon.end,
+            exit_=early_exit,
+            coupons=coupons_per_unit(declaration),
+            sequence=len(stream) + 1,
         )
+        if isinstance(sale, InconsistentTerms):
+            return sale
+        stream.append(sale)
     return tuple(stream)
+
+
+def coupons_per_unit(declaration: InstrumentDeclaration) -> tuple[tuple[date, Money], ...]:
+    """Every coupon one unit pays, per the declared list. Declared amounts are already per unit.
+
+    A repayment of principal is **not** here. It leaves the price too, and the schedule accounts
+    for it the other way: `_units_retired`'s share of it retires units, so pricing the remainder
+    at an unreduced per-unit quotation is what carries the reduction. Subtracting it here as
+    well would take it out twice.
+    """
+    terms = terms_of.narrowed(declaration, EnumeratedTerms)
+    return tuple(
+        (payment.on, payment.amount)
+        for payment in terms.payments
+        if payment.pays is PaymentKind.COUPON
+    )
 
 
 def tax_classes(declaration: InstrumentDeclaration) -> Mapping[TaxableEventKind, str]:

@@ -15,14 +15,15 @@ from dataclasses import replace
 from datetime import date
 
 from terezy.core.decision.candidates import dropped, evaluated, survey
-from terezy.core.decision.tuple_outcome import Registries
+from terezy.core.decision.tuple_outcome import Registries, evaluate
 from terezy.core.instruments.access import VenueQuote
 from terezy.core.instruments.interface import DateRange
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.money import Money
 from terezy.core.results.candidates import CandidateSet, CandidateSurvey
-from terezy.core.results.tuple import CannotSpanHorizon, DeclarationMissing
+from terezy.core.results.tuple import CannotSpanHorizon, DeclarationMissing, InstrumentRefused
 from tests import candidate_registries as fixtures
+from tests import tuple_registries as tuple_fixtures
 
 SHORT = DateRange(start=fixtures.OUTLAY_ON, end=date(2027, 6, 30))
 """A window that ends before several shipped instruments' own terms do, and after others'."""
@@ -169,3 +170,70 @@ def test_a_schedule_whose_last_payment_is_a_coupon_sells_nothing_at_the_window_e
     )
     assert outcome.sold_early is None
     assert all(claim for claim in outcome.rests_on)
+
+
+NOT_ENOUGH = Money(10.0, fixtures.UAH, prov.EMPTY)
+"""A quotation worth less than one of the issue's own coupons. Unreachable on the shipped
+registry -- the smallest declared quote is three figures against coupons of tens -- and the
+whole point of the refusals below is that it is a **declaration** conflict rather than a
+number to be clamped."""
+
+
+def _refusal_reasons(registries: Registries) -> list[str]:
+    result = _surveyed(registries)
+    return [item.refusal.reason for item in dropped(result.comparison)]
+
+
+def test_a_sale_price_below_the_coupons_still_in_it_refuses_rather_than_going_negative() -> None:
+    """The sell leg's guard, reached on a listed schedule.
+
+    Striking the sale anyway posts a disposal of a negative amount, which the ledger answers by
+    raising -- an uncaught exception out of the pure core on a condition two data files
+    produced between them.
+    """
+    registries = fixtures.shipped()
+    subject = _wanting_a_resale_price(_surveyed(registries))[0]
+    starved = fixtures.with_access(
+        registries,
+        subject,
+        resale_price=VenueQuote(
+            price=NOT_ENOUGH, kind="venue_terms", observed_on=fixtures.OUTLAY_ON
+        ),
+    )
+    assert [
+        reason
+        for reason in _refusal_reasons(starved)
+        if "cannot hold less than the coupons it still contains" in reason
+    ]
+
+
+def test_a_purchase_price_below_the_coupons_still_in_it_refuses_the_same_way() -> None:
+    """The buy leg's guard, which is the same rule on the other quotation.
+
+    Both legs are carried by one function, so a quotation that cannot hold the coupons that
+    detached from it is refused wherever it is used rather than only where the sale reads it.
+    Reached over one candidate rather than a survey: the window has to open long after the
+    quotation for anything to detach before the purchase, and by then most of the registry has
+    redeemed.
+    """
+    registries = tuple_fixtures.shipped()
+    starved = tuple_fixtures.with_access(
+        registries,
+        tuple_fixtures.OVDP,
+        quote=VenueQuote(
+            price=Money(10.0, fixtures.UAH, prov.EMPTY),
+            kind="venue_terms",
+            observed_on=tuple_fixtures.OUTLAY_ON,
+        ),
+    )
+    outcome = evaluate(
+        tuple_fixtures.hurdle_tuple(),
+        amount=tuple_fixtures.AMOUNT,
+        horizon=DateRange(start=date(2027, 6, 1), end=date(2027, 12, 31)),
+        as_of=tuple_fixtures.AS_OF,
+        continuation=tuple_fixtures.HOLD_AS_CASH,
+        registries=starved,
+    )
+    assert isinstance(outcome, InstrumentRefused), outcome
+    assert "cannot hold less than the coupons it still contains" in outcome.reason
+    assert "before the purchase on" in outcome.reason

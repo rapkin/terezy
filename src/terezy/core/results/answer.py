@@ -259,8 +259,9 @@ class Exclusion(Enum):
     detached less the accrual the quotation carried plus the accrual the sale date carries. That
     quantity is positive whenever a coupon detached -- the accrual within a period is less than
     that period's coupon -- which is why this exclusion carries a direction where rate risk
-    cannot. It grows with the number of coupons inside the window, so it is not bounded by one
-    of them; the worked example measures it."""
+    cannot. It is **not** bounded by one coupon: every further coupon inside the window adds its
+    whole amount to what came out, which
+    ``tests/worked_examples/test_a_coupon_inside_the_window.py`` reaches at three."""
 
 
 class Direction(Enum):
