@@ -121,7 +121,7 @@ def test_the_figure_names_the_belief_and_states_four_claims_about_it() -> None:
     outcome = next(
         item for item in section_evaluated(result.sections[0]) if item.key.instrument_id == SUBJECT
     )
-    assert early_exit.rests_on(supplied.registries.quotation_holds) in outcome.rests_on
+    assert early_exit.rests_on(supplied.registries.spread_holds) in outcome.rests_on
     claims = {item.what for item in result.sections[0].excludes if item.applies_to == outcome.key}
     assert claims == {
         Exclusion.EARLY_EXIT_IS_A_POINT_NOT_A_DISTRIBUTION,

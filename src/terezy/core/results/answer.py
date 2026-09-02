@@ -251,11 +251,12 @@ class Exclusion(Enum):
     Modelling it is a secondary-market model and is out of scope."""
 
     EARLY_EXIT_IGNORES_ACCRUED_INTEREST = "early_exit_ignores_accrued_interest"
-    """The quotation carried an accrual on the day it was observed and the sale date carries a
-    different one, and nothing separates either out: no declaration states the basis interest
-    accrues on. What the carried-forward price subtracts is whole coupons, so this residual is
-    what it leaves behind -- smaller than a coupon, and **unsigned**, because which way it runs
-    depends on where the quotation and the sale fall inside their accrual periods."""
+    """The resale quotation is a **dirty** price -- clean plus the interest accrued by the day
+    it was observed -- and it is carried to the sale date unchanged, so a window that collects
+    a coupon is credited that accrual twice: once in the coupon, once inside the sale price.
+    Separating the two needs the basis interest accrues on, which no declaration states. The
+    error is bounded by one coupon and is **unsigned**: it runs whichever way the accrual at
+    the purchase and the accrual at the sale differ."""
 
 
 class Direction(Enum):

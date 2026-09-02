@@ -3,8 +3,8 @@
 # **Everything in this file is an assumption, and that is what it carries instead of a
 # citation.** `data/scenarios/` is exempt from the provenance requirement by design (see
 # `data/README.md`), and this file is a stronger case than most: there is nothing a source
-# could vouch for. A platform that *committed* to its quoted buyback price would have declared a
-# TERM, and the term would live on the access declaration beside the price. The assumption
+# could vouch for. A platform that *committed* to its quoted buyback price would have declared
+# a TERM, and the term would live on the access declaration beside the price. The assumption
 # exists precisely because none does.
 #
 # **A subdirectory, and the nesting is deliberate.** `data/scenarios/*.toml` is globbed and
@@ -14,22 +14,27 @@
 #
 # **No default, and the absence of the file is the absence of the policy** (015 FR-032). A run
 # with no belief declared here refuses at load naming this directory rather than assuming the
-# quotation holds: a forgotten line must never read as a chosen policy, and the figure the
-# default would produce is exactly the invented number Principle I exists to prevent.
+# spread holds: a forgotten line must never read as a chosen policy, and the figure the default
+# would produce is exactly the invented number Principle I exists to prevent.
 #
 # **What it is not.** It is not a claim that an early exit is free, and it does not decide
-# whether one is possible: an instrument whose access declaration quotes no resale price refuses
-# by name instead, and this belief is never reached for it.
+# whether one is possible: no shipped declaration carries a resale price at all, so on today's
+# registry every early exit refuses for a missing declaration and this belief is never reached.
+# The day feature 016 declares a seller's quote, this is what says the quote may be used for a
+# date nobody has quoted.
 #
 # **The direction of the error is stated, not hidden.** The figure it produces is more certain
 # than the world is, and understates the spread; rate risk is symmetric and is deliberately not
-# signed, and so is the accrued-interest residual this belief leaves behind. Those four claims
-# reach a reader as typed exclusions on every early-exit figure (015 FR-033), so they cannot be
-# dropped by a renderer that did not know to print them.
+# signed. Nor is ACCRUED INTEREST: the quotation is a dirty price carried to the sale date
+# unchanged, so the accrual it contained on 2026-08-24 is credited a second time inside any
+# coupon the window collects, and which way that runs depends on where the purchase and the
+# sale fall inside their coupon periods. Those claims reach a reader as typed exclusions on
+# every early-exit figure (015 FR-033), so they cannot be dropped by a renderer that did not
+# know to print them.
 
 [early_exit]
-id            = "quotation_holds_and_falls_by_detached_coupons"
+id            = "observed_spread_holds"
 owner_id      = "owner-001"
 is_assumption = true
 
-rationale     = "OWNER'S BELIEF, not an observation. Inzhur publishes a buy and a sell price for every active issue and the gap between them is 0.000% to 0.637% of the buy price (median 0.237%, five issues quoting buy equal to sell, retrieved 2026-08-24). What is assumed is that the sell quotation IS THIS HOLDING'S PRICE ON THE DAY IT IS BOUGHT, and that from there it FALLS BY EVERY COUPON THAT DETACHES before the sale — the clean price is taken as constant and the price moves only by detachment. Carrying the quotation to the sale date unchanged instead is not the smaller assumption, it is a wrong number: a bond's price falls by its coupon on the day the coupon detaches, so a holding credited a coupon inside the window and sold at a price that still contained it would be credited that coupon twice. The window opens at the PURCHASE and not at the quotation's own day because the buy quotation of the same morning is carried to the purchase date unadjusted: a coupon paid between the two — two shipped issues pay one on 2026-08-26 — is out of both legs or in both, and taking it out of one would report a loss nobody took. Taking the gap to hold at all is the smallest assumption that makes an early exit representable — the alternative is refusing every horizon shorter than an instrument's own terms, which answers a different question from the one asked. It is a belief about the future and nobody knows it: a seller's quote widens exactly when a forced sale is most likely, and eleven of the twenty-four active issues publish available_quantity = 0 without saying what that field constrains. What it still does not carry is accrued interest — the quotation contained an accrual on the day it was read and the sale date carries a different one — because the accrual basis is not declared anywhere and inventing one would be the number this project exists to refuse."
+rationale     = "OWNER'S BELIEF, not an observation. Inzhur publishes a buy and a sell price for every active issue and the gap between them is 0.000% to 0.637% of the buy price (median 0.237%, five issues quoting buy equal to sell, retrieved 2026-08-24). Taking that gap to hold at a future exit date is the smallest assumption that makes an early exit representable at all — the alternative is refusing every horizon shorter than an instrument's own terms, which answers a different question from the one asked. It is a belief about the future and nobody knows it: a seller's quote widens exactly when a forced sale is most likely, and eleven of the twenty-four active issues publish available_quantity = 0 without saying what that field constrains."

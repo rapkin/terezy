@@ -385,10 +385,6 @@ def access(
     )
 
 
-def quote(price: float, *, kind: str = "venue_terms", observed_on: date = OUTLAY_ON) -> VenueQuote:
-    """One venue quote in hryvnia, ageing under a declared kind. A test fixture.
-
-    Observed no later than the day the money goes out by default, which is what makes a coupon
-    inside the window detach from a resale quote rather than stay in it.
-    """
-    return VenueQuote(price=Money(price, UAH, prov.EMPTY), kind=kind, observed_on=observed_on)
+def quote(price: float, *, kind: str = "venue_terms") -> VenueQuote:
+    """One venue quote in hryvnia, ageing under a declared kind. A test fixture."""
+    return VenueQuote(price=Money(price, UAH, prov.EMPTY), kind=kind)

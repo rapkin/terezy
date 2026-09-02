@@ -135,7 +135,7 @@ def _vocabulary(result: Answer) -> set[str]:
         verb.INCOME_TAX_SUPPLIED_BY,
         verb.RATE_RISK_SUPPLIED_BY,
         verb.ACCRUED_INTEREST_SUPPLIED_BY,
-        registries.quotation_holds.id,
+        registries.spread_holds.id,
     }
 
 
@@ -211,7 +211,7 @@ def test_every_early_exit_figure_names_the_assumption_it_rests_on() -> None:
         if outcome.sold_early is not None
     ]
     assert sold, "the fixture must actually reach an early exit"
-    expected = early_exit.rests_on(supplied.registries.quotation_holds)
+    expected = early_exit.rests_on(supplied.registries.spread_holds)
     for outcome in sold:
         assert expected in outcome.rests_on, outcome.rests_on
 

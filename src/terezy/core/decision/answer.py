@@ -544,6 +544,9 @@ def _early_exit_exclusions(key: Tuple, assumption_id: str) -> tuple[StatedExclus
     asserted without a warrant is a number more confident than its inputs, which is worse than
     one whose sign is unstated.
     """
+    # FR-033 named three claims; the fourth is the accrued-interest double count, which the
+    # measurement in tests/worked_examples/test_a_coupon_inside_the_window.py found and no
+    # figure corrects. Stating it here is what the `enumerated-accrued-interest` deferral costs.
     return (
         StatedExclusion(
             what=Exclusion.EARLY_EXIT_IS_A_POINT_NOT_A_DISTRIBUTION,

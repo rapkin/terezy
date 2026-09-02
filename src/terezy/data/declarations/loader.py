@@ -118,7 +118,7 @@ from terezy.core.routes import capacity, legs
 from terezy.core.routes.channels import ChannelSide, FxChannel, Side, effective_rate
 from terezy.core.routes.legs import Leg, Route
 from terezy.core.routes.venues import Venue
-from terezy.core.scenarios.early_exit import QuotationHolds
+from terezy.core.scenarios.early_exit import SpreadHolds
 from terezy.core.scenarios.regimes import Regime, RegimeTransition
 from terezy.core.streams import streams
 from terezy.core.streams.streams import IncomeStream, Indexation
@@ -3918,7 +3918,7 @@ EARLY_EXIT_TABLE: Final = "early_exit"
 """Root table of an early-exit belief file, and the prefix of every field path in one."""
 
 
-def early_exit_from_file(path: Path) -> tuple[str, QuotationHolds]:
+def early_exit_from_file(path: Path) -> tuple[str, SpreadHolds]:
     """One ``data/scenarios/early_exit/<owner>.toml`` as its owner id and the declared belief.
 
     ``inflation_assumption_from_file``'s shape, with **no citation read and none expected**: a
@@ -3931,7 +3931,7 @@ def early_exit_from_file(path: Path) -> tuple[str, QuotationHolds]:
         raise DeclarationError(
             path,
             f"{EARLY_EXIT_TABLE}.is_assumption",
-            "is declared false. Whether a quotation still holds on a future date is nobody's "
+            "is declared false. Whether a quoted spread still holds on a future date is nobody's "
             "observation: a platform that committed to its price would have declared a term, "
             "and the term would live on the access declaration beside the price. The field "
             "exists to make the belief unmissable on every figure it touches, not to be "
@@ -3946,7 +3946,7 @@ def early_exit_from_file(path: Path) -> tuple[str, QuotationHolds]:
             "a belief about the future is one person's, and every declaration carries its "
             "owner from the first commit (Principle VII)",
         ),
-        QuotationHolds(
+        SpreadHolds(
             id=_require_text(
                 path,
                 f"{EARLY_EXIT_TABLE}.id",
@@ -4494,22 +4494,7 @@ def _access_price(
     """
     if declared is None:
         return None
-    # One parse of one declared date, reaching both the citation and the record: the day the
-    # quotation described the market is what a carried-forward resale price subtracts coupons
-    # from, and a second parse is where the arithmetic and the staleness verdict would come to
-    # disagree about which day that was.
-    cited = _source_ref(
-        path,
-        field,
-        source=declared.source,
-        retrieved_on=declared.retrieved_on,
-        verified_on=declared.verified_on,
-        # Checked below, at ``VenueQuote.kind``, naming ``[access.price].kind``.
-        kind=declared.kind,
-        check_kind=False,
-    )
     return VenueQuote(
-        observed_on=cited.retrieved_on,
         price=Money(
             _positive(
                 path,
@@ -4520,7 +4505,20 @@ def _access_price(
                 "meaningless rather than merely large",
             ),
             _currency(path, f"{field}.currency", declared.currency),
-            prov.of([cited]),
+            prov.of(
+                [
+                    _source_ref(
+                        path,
+                        field,
+                        source=declared.source,
+                        retrieved_on=declared.retrieved_on,
+                        verified_on=declared.verified_on,
+                        # Checked below, at ``VenueQuote.kind``, naming ``[access.price].kind``.
+                        kind=declared.kind,
+                        check_kind=False,
+                    )
+                ]
+            ),
         ),
         kind=_require_text(
             path,

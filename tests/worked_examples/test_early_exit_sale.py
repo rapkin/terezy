@@ -21,11 +21,6 @@ par on 2026-01-15 for 10 000.00, maturing 2028-01-15.
 Two claims the schedule alone would not make, and both are asserted: the sale is a **disposal**
 that consumes basis, and the coupon the holding would have received in 2027 is **absent** rather
 than moved.
-
-**A fixture whose subject is the sale quotes the resale price on its own sale day**, so nothing
-detaches between the quotation and the sale and the arithmetic above is the whole of it. What a
-quotation taken *earlier* is worth on the sale day is a separate rule with its own tests below;
-separating the two is what lets each be checked on paper.
 """
 
 from __future__ import annotations
@@ -44,7 +39,7 @@ from terezy.core.primitives.provenance import SourceRef
 from terezy.core.primitives.tolerance import is_close
 from terezy.core.results import project
 from terezy.core.results.project import Projection
-from terezy.core.scenarios.early_exit import QuotationHolds
+from terezy.core.scenarios.early_exit import SpreadHolds
 from tests import synthetic
 
 pytestmark = pytest.mark.worked_example
@@ -59,8 +54,8 @@ COUPON = COUPON_PER_UNIT * UNITS
 PROCEEDS = RESALE_PER_UNIT * UNITS
 REALISED = PROCEEDS - 10_000.0
 
-QUOTATION_HOLDS = QuotationHolds(
-    id="test_quotation_holds",
+SPREAD_HOLDS = SpreadHolds(
+    id="test_spread_holds",
     is_assumption=True,
     rationale="TEST FIXTURE -- the belief that a quoted resale price still holds at the exit.",
 )
@@ -75,8 +70,7 @@ def _sold_at_the_horizon() -> Projection:
         tax_classes=synthetic.TAX_PACK,
         early_exit=EarlyExit(
             price_per_unit=Money(RESALE_PER_UNIT, synthetic.UAH, synthetic.TERMS_PROVENANCE),
-            observed_on=HORIZON_END,
-            assumption=QUOTATION_HOLDS,
+            assumption=SPREAD_HOLDS,
         ),
     )
     assert isinstance(outcome, Projection), outcome
@@ -129,7 +123,7 @@ def test_the_projection_reports_the_sale_and_names_the_belief() -> None:
     assert sold.on == HORIZON_END
     assert sold.units == UNITS
     assert is_close(sold.proceeds.amount, PROCEEDS)
-    assert sold.assumption.id == QUOTATION_HOLDS.id
+    assert sold.assumption.id == SPREAD_HOLDS.id
 
 
 def test_holding_to_maturity_is_unchanged_by_the_declared_price() -> None:
@@ -146,8 +140,7 @@ def test_holding_to_maturity_is_unchanged_by_the_declared_price() -> None:
         tax_classes=synthetic.TAX_PACK,
         early_exit=EarlyExit(
             price_per_unit=Money(RESALE_PER_UNIT, synthetic.UAH, synthetic.TERMS_PROVENANCE),
-            observed_on=synthetic.horizon().end,
-            assumption=QUOTATION_HOLDS,
+            assumption=SPREAD_HOLDS,
         ),
     )
     without = project.project(
@@ -191,8 +184,7 @@ def test_the_window_may_not_end_before_the_purchase_settles() -> None:
         tax_classes=synthetic.TAX_PACK,
         early_exit=EarlyExit(
             price_per_unit=Money(RESALE_PER_UNIT, synthetic.UAH, synthetic.TERMS_PROVENANCE),
-            observed_on=date(2026, 2, 1),
-            assumption=QUOTATION_HOLDS,
+            assumption=SPREAD_HOLDS,
         ),
     )
     assert isinstance(outcome, InconsistentTerms), outcome
@@ -216,8 +208,7 @@ def test_a_coupon_paid_on_the_day_of_the_sale_is_not_reinvested() -> None:
         tax_classes=synthetic.TAX_PACK,
         early_exit=EarlyExit(
             price_per_unit=Money(RESALE_PER_UNIT, synthetic.UAH, synthetic.TERMS_PROVENANCE),
-            observed_on=coupon_day,
-            assumption=QUOTATION_HOLDS,
+            assumption=SPREAD_HOLDS,
         ),
     )
     assert isinstance(outcome, Projection), outcome
@@ -267,86 +258,6 @@ def test_what_the_position_gets_back_is_the_sale_rather_than_the_principal() -> 
     assert to_maturity.at_purchase.principal_returned != sold.at_purchase.principal_returned
 
 
-QUOTED_ON = date(2026, 1, 15)
-"""The purchase day, so the one coupon inside the window detaches after the quotation."""
-
-CARRIED_PER_UNIT = RESALE_PER_UNIT - COUPON_PER_UNIT
-CARRIED_PROCEEDS = CARRIED_PER_UNIT * UNITS
-
-
-def test_the_sale_price_is_the_quotation_less_the_coupon_that_detached() -> None:
-    """A quotation taken before the coupon does not still contain it on the sale day.
-
-        quoted 2026-01-15    995.000000000000 per unit
-        coupon 2026-07-15    1 000.00 x 15.5% x 181/365   =   76.863013698630 per unit
-        sale   2026-12-31    995.00 - 76.863013698630     =  918.136986301370 per unit
-                             x 10 units                   = 9 181.369863013699
-
-    The check that makes it more than a subtraction: the coupon and the sale together come to
-    768.630136986301 + 9 181.369863013699 = **9 950.00**, which is ten units at the quoted
-    995.00 exactly. Carrying the quotation forward unchanged reached 9 950.00 + 768.63 instead
-    -- the coupon once as income and once inside a price quoted while it was still attached.
-    """
-    outcome = project.project(
-        synthetic.declaration(),
-        synthetic.holding(),
-        synthetic.horizon(end=HORIZON_END),
-        synthetic.assumptions(),
-        tax_classes=synthetic.TAX_PACK,
-        early_exit=EarlyExit(
-            price_per_unit=Money(RESALE_PER_UNIT, synthetic.UAH, synthetic.TERMS_PROVENANCE),
-            observed_on=QUOTED_ON,
-            assumption=QUOTATION_HOLDS,
-        ),
-    )
-    assert isinstance(outcome, Projection), outcome
-    sold = outcome.sold_early
-    assert sold is not None
-    assert is_close(sold.price_per_unit.amount, CARRIED_PER_UNIT)
-    assert is_close(sold.proceeds.amount, CARRIED_PROCEEDS)
-    assert is_close(COUPON + CARRIED_PROCEEDS, PROCEEDS)
-    assert is_close(
-        outcome.ledger.disposals[0].realised_gain_base_ccy.amount,
-        CARRIED_PROCEEDS - 10_000.0,
-    )
-
-
-def test_a_zero_coupon_issue_sells_at_the_whole_quotation() -> None:
-    """Nothing detaches from a bond that pays nothing before it redeems, whenever it is quoted.
-
-    The guard that says so is a real branch rather than a shortcut: a zero-coupon declaration is
-    a valid instrument, and generating a schedule of zero-amount periods to subtract would put
-    an empty sum in every sale price.
-    """
-    outcome = project.project(
-        synthetic.declaration(terms=synthetic.terms(coupon_rate=0.0)),
-        synthetic.holding(),
-        synthetic.horizon(end=HORIZON_END),
-        synthetic.assumptions(),
-        tax_classes=synthetic.TAX_PACK,
-        early_exit=EarlyExit(
-            price_per_unit=Money(RESALE_PER_UNIT, synthetic.UAH, synthetic.TERMS_PROVENANCE),
-            observed_on=QUOTED_ON,
-            assumption=QUOTATION_HOLDS,
-        ),
-    )
-    assert isinstance(outcome, Projection), outcome
-    assert outcome.sold_early is not None
-    assert is_close(outcome.sold_early.price_per_unit.amount, RESALE_PER_UNIT)
-
-
-def test_a_coupon_before_the_quotation_is_already_out_of_it() -> None:
-    """The lower bound is the quotation's own day, and it is not the purchase date.
-
-    Quoted on the sale day, the same holding pays the same 2026-07-15 coupon and sells at the
-    full 995.00: a coupon that detached *before* the quotation was taken was never in it, so
-    subtracting it would report a loss the holder never took.
-    """
-    sold = _sold_at_the_horizon().sold_early
-    assert sold is not None
-    assert is_close(sold.price_per_unit.amount, RESALE_PER_UNIT)
-
-
 REINVEST_UNITS = 100.0
 REINVEST_COST = 100_000.0
 REINVEST_END = date(2027, 12, 31)
@@ -370,8 +281,7 @@ def _reinvested_then_sold() -> Projection:
         tax_classes=synthetic.TAX_PACK,
         early_exit=EarlyExit(
             price_per_unit=Money(RESALE_PER_UNIT, synthetic.UAH, synthetic.TERMS_PROVENANCE),
-            observed_on=REINVEST_END,
-            assumption=QUOTATION_HOLDS,
+            assumption=SPREAD_HOLDS,
         ),
     )
     assert isinstance(outcome, Projection), outcome
@@ -430,8 +340,7 @@ def test_the_figure_is_marked_by_the_quote_and_not_by_the_terms() -> None:
         tax_classes=synthetic.TAX_PACK,
         early_exit=EarlyExit(
             price_per_unit=Money(RESALE_PER_UNIT, synthetic.UAH, prov.of([QUOTE_SOURCE])),
-            observed_on=HORIZON_END,
-            assumption=QUOTATION_HOLDS,
+            assumption=SPREAD_HOLDS,
         ),
     )
     assert isinstance(outcome, Projection), outcome

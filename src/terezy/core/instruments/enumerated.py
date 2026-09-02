@@ -127,15 +127,6 @@ def events(
                 residual,
                 on=horizon.end,
                 exit_=early_exit,
-                # The WHOLE declared list, not `receivable` and not `inside`: which of them
-                # left the quoted price is one rule in one place, and a caller pre-filtering it
-                # is how the two declaration forms would come to answer differently. Declared
-                # payment amounts are already per unit.
-                coupons=tuple(
-                    (payment.on, payment.amount)
-                    for payment in terms.payments
-                    if payment.pays is PaymentKind.COUPON
-                ),
                 sequence=len(stream) + 1,
             )
         )

@@ -46,7 +46,6 @@ where the file and the field can be named.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
 
 from terezy.core.primitives.money import Money
 
@@ -63,17 +62,6 @@ class VenueQuote:
 
     price: Money
     """The quote, in the instrument's own currency (the resolver refuses any other)."""
-
-    observed_on: date
-    """The day this price described the market. **Arithmetic, not only staleness.**
-
-    A quotation carried to a later date is carried *net of what left the price in between*, so
-    a resale price struck at a horizon's end subtracts every coupon that detached after this
-    day (:func:`terezy.core.scenarios.early_exit.price_at`). A field rather than a read of
-    ``price.provenance``, because a ``Provenance`` is a **set** with no distinguished member
-    and is legitimately ``EMPTY`` for a figure built in code -- so the date a term of the sale
-    price is computed from would be a lookup that can come back empty.
-    """
 
     kind: str
     """The ``ObservationKind`` this quote ages under. A price goes out of date faster than a

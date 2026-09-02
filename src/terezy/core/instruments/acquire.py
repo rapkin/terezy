@@ -21,14 +21,11 @@ from typing import TYPE_CHECKING
 
 from terezy.core.ledger.events import CausationKind, CausationRef, Event, EventKind, LotRef
 from terezy.core.primitives import money
-from terezy.core.scenarios import early_exit
 
 if TYPE_CHECKING:  # pragma: no cover -- the records live beside the interface
-    from collections.abc import Iterable
     from datetime import date
 
     from terezy.core.instruments.interface import EarlyExit, Holding, InstrumentDeclaration
-    from terezy.core.primitives.money import Money
 
 
 def lot_id_for(holding: Holding) -> str:
@@ -77,20 +74,13 @@ def early_sale(
     *,
     on: date,
     exit_: EarlyExit,
-    coupons: Iterable[tuple[date, Money]],
     sequence: int,
 ) -> Event:
-    """Cash in, units out, at the carried-forward resale price, on the horizon's last day.
+    """Cash in, units out, at the declared resale price, on the horizon's last day.
 
     015 FR-029. A **disposal**, like a redemption at maturity and unlike a cash receipt: it
     consumes basis and realises a gain or a loss, and the loss is what a spread *is*. Reporting
     it as cash would make the cost of the early exit invisible in the ledger.
-
-    ``coupons`` is this instrument's whole per-unit coupon schedule, dates and amounts, and it
-    is a **required** argument rather than an adjustment a caller may apply first: the sale
-    price is the quotation net of what detached from it while the holding held it
-    (:func:`early_exit.price_at`), and a caller that forgot would credit a coupon and sell at a
-    price that still contained it.
 
     ``EventKind.REDEMPTION`` rather than ``PRINCIPAL_REPAYMENT``, on the reasoning that kind's
     own docstring already gives for a fund buyback: nothing is repaying principal here, the
@@ -103,28 +93,19 @@ def early_sale(
     ``quantity`` is passed rather than read off the holding, for the reason a redemption's is:
     under a reinvesting policy the units sold are the purchase plus every reinvestment.
     """
-    price = early_exit.price_at(
-        exit_.price_per_unit,
-        observed_on=exit_.observed_on,
-        held_from=holding.purchased_on,
-        sold_on=on,
-        coupons=coupons,
-    )
     return Event(
         sequence=sequence,
         occurred_on=on,
         kind=EventKind.REDEMPTION,
-        amount=money.scale_sourced(price, quantity, price.provenance),
+        amount=money.scale_sourced(exit_.price_per_unit, quantity, exit_.price_per_unit.provenance),
         owner_id=holding.owner_id,
         caused_by=CausationRef(
             kind=CausationKind.ACCESS_TERM,
             id=f"{declaration.id}:resale_price",
             detail=(
-                f"sale of {quantity!r} units at {price.amount!r} {price.currency.value} on "
-                f"{on.isoformat()}, the last day of the horizon: the resale quotation declared "
-                f"as of {exit_.observed_on.isoformat()}, net of every coupon detached while "
-                f"the holding held it, "
-                f"under the assumption {exit_.assumption.id!r}"
+                f"sale of {quantity!r} units at the declared resale price on "
+                f"{on.isoformat()}, the last day of the horizon, under the assumption "
+                f"{exit_.assumption.id!r}"
             ),
         ),
         lot_ref=LotRef(instrument_id=declaration.id, lot_id=None),

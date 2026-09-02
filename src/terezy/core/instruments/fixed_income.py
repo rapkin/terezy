@@ -74,7 +74,7 @@ as a later feature, and a stub would invite a caller to depend on it.
 from __future__ import annotations
 
 import math
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import date
 from typing import TYPE_CHECKING, Final
@@ -188,7 +188,6 @@ def events(
             units,
             on=horizon.end,
             exit_=early_exit,
-            coupons=coupons_per_unit(terms),
             sequence=len(stream) + 1,
         )
         if sells_early and early_exit is not None
@@ -560,11 +559,13 @@ def coupon_plan(
 
     year_fraction = conventions.day_count(terms.day_count)
     adjust = conventions.business_day_rule(terms.business_day_rule)
+    schedule = conventions.periodicity(terms.periodicity)(terms.issue_date, terms.maturity_date)
     buy = coupon_policy(assumptions.coupon_policy)
 
     periods: list[CouponPeriod] = []
     units = holding.quantity
-    for accrual_start, accrual_end in _accrual_periods(terms):
+    accrual_start = terms.issue_date
+    for accrual_end in schedule:
         if accrual_end > holding.purchased_on:
             fraction = year_fraction(accrual_start, accrual_end)
             coupon = _coupon_amount(terms, units, fraction)
@@ -581,38 +582,8 @@ def coupon_plan(
                 )
             )
             units += decision.units_bought
-    return tuple(periods)
-
-
-def _accrual_periods(terms: BondTerms) -> Iterator[tuple[date, date]]:
-    """``(accrual_start, accrual_end)`` for every period the declared terms describe.
-
-    One iterator rather than the same three lines in :func:`coupon_plan` and
-    :func:`coupons_per_unit`: the two must agree about the period boundaries or a coupon
-    subtracted from a resale price would be dated differently from the coupon paid.
-    """
-    schedule = conventions.periodicity(terms.periodicity)(terms.issue_date, terms.maturity_date)
-    accrual_start = terms.issue_date
-    for accrual_end in schedule:
-        yield accrual_start, accrual_end
         accrual_start = accrual_end
-
-
-def coupons_per_unit(terms: BondTerms) -> tuple[tuple[date, Money], ...]:
-    """Every coupon one unit of this issue pays over the whole life of the paper.
-
-    The whole life rather than a holding's own, which is :func:`coupon_plan`'s: which of them
-    have left a resale quotation is ``early_exit.price_at``'s single rule, and a schedule
-    pre-trimmed here would be a second opinion about it.
-    """
-    if terms.coupon_rate == 0.0:
-        return ()
-    year_fraction = conventions.day_count(terms.day_count)
-    adjust = conventions.business_day_rule(terms.business_day_rule)
-    return tuple(
-        (adjust(accrual_end), _coupon_amount(terms, 1.0, year_fraction(accrual_start, accrual_end)))
-        for accrual_start, accrual_end in _accrual_periods(terms)
-    )
+    return tuple(periods)
 
 
 def _decide(

@@ -106,11 +106,6 @@ def one_horizon(question: Question, index: int = 0) -> Question:
     return replace(question, horizons=(question.horizons[index],))
 
 
-QUOTED_ON: Final = date(2026, 8, 24)
-"""The retrieval date the shipped access quotations carry, borrowed so that a fixture resale
-price is carried across the owner's windows exactly as a declared one is."""
-
-
 def with_resale_price(
     supplied: AnswerInputs, instrument_id: str, per_unit: float = 995.0
 ) -> AnswerInputs:
@@ -123,9 +118,7 @@ def with_resale_price(
     access = dict(supplied.registries.access)
     access[instrument_id] = replace(
         access[instrument_id],
-        resale_price=VenueQuote(
-            price=Money(per_unit, UAH, prov.EMPTY), kind="venue_terms", observed_on=QUOTED_ON
-        ),
+        resale_price=VenueQuote(price=Money(per_unit, UAH, prov.EMPTY), kind="venue_terms"),
     )
     return replace(supplied, registries=replace(supplied.registries, access=access))
 

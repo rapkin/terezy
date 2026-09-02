@@ -157,7 +157,7 @@ from terezy.core.routes.path import (
     segments_of,
 )
 from terezy.core.scenarios import early_exit
-from terezy.core.scenarios.early_exit import QuotationHolds
+from terezy.core.scenarios.early_exit import SpreadHolds
 from terezy.core.tax.interface import TaxClass
 
 if TYPE_CHECKING:  # pragma: no cover -- typing only
@@ -202,8 +202,8 @@ class Registries:
     kinds: Mapping[str, ObservationKind]
     spendable: frozenset[SpendableEndpoint]
 
-    quotation_holds: QuotationHolds
-    """The owner's declared belief about what a future early exit is struck at.
+    spread_holds: SpreadHolds
+    """The owner's declared belief that a quoted resale spread holds at a future exit date.
 
     On the registries rather than on the question, because it is not a property of one question:
     two questions asked on one day must not be able to disagree about how a platform's quote
@@ -1076,20 +1076,15 @@ def _project(
 def _early_exit(prepared: _Prepared, registries: Registries) -> EarlyExit | None:
     """What this holding is sold for if the horizon ends before its own terms do (015 FR-029).
 
-    ``None`` where the access declaration quotes no resale price: the instrument then refuses
-    naming ``access.resale_price`` and :func:`_bond_outcome` turns that into a missing
-    declaration. Nothing is inferred from the purchase quote or the face value -- either would
-    report a spread of zero. The quotation's own date travels with it, because what the price
-    is worth on a later day depends on what detached from it in between.
+    ``None`` where the access declaration quotes no resale price, which is every shipped
+    declaration: the instrument then refuses naming ``access.resale_price`` and
+    :func:`_bond_outcome` turns that into a missing declaration. Nothing is inferred from the
+    purchase quote or the face value -- either would report a spread of zero.
     """
     quote = prepared.access.resale_price
     if quote is None:
         return None
-    return EarlyExit(
-        price_per_unit=quote.price,
-        observed_on=quote.observed_on,
-        assumption=registries.quotation_holds,
-    )
+    return EarlyExit(price_per_unit=quote.price, assumption=registries.spread_holds)
 
 
 def _bond_outcome(
