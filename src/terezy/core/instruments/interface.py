@@ -436,16 +436,15 @@ class EarlyExit:
     beside it so every figure computed through it can name it.
 
     ``None`` where an implementation is handed one refuses by name, naming
-    ``access.resale_price`` (015 FR-031): four fixture instruments still declare no resale
-    price, and a sale struck at a face value or at the purchase quote would report a spread of
-    zero that nobody observed.
+    ``access.resale_price`` (015 FR-031): a sale struck at a face value or at the purchase
+    quote would report a spread of zero that nobody observed.
     """
 
     price_per_unit: Money
     """The declared seller's quote **as observed**, carrying its own citation, in the
-    instrument's currency. What a unit fetches on the sale date is this less what detached from
-    it since :attr:`observed_on` -- see
-    :func:`terezy.core.scenarios.early_exit.price_at`, which is the only place that decides it.
+    instrument's currency. What a unit fetches on the sale date is
+    :func:`terezy.core.scenarios.early_exit.price_at`'s answer, which is the only place that
+    decides it.
     """
 
     observed_on: date

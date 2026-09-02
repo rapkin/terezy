@@ -3881,8 +3881,8 @@ basis interest accrues on. It is stated as a typed exclusion, unsigned, rather t
 Payments falling after the window are **absent** from the stream rather than moved. Nothing is
 paid early and nothing is folded into the sale.
 
-Where an access declaration carries **no** resale price — four fixture instruments — the early
-exit refuses by name, `DeclarationMissing(part="access")` naming `access.resale_price`, and the
+Where an access declaration carries **no** resale price the early exit refuses by name —
+`DeclarationMissing(part="access")`, naming `access.resale_price` — and the
 remedy is a file rather than a longer window. The price is not inferred from the face value or
 from the purchase quote: either would report a spread of **zero** that nobody observed.
 

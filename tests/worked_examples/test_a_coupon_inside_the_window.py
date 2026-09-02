@@ -14,15 +14,15 @@ generators already fix rather than a new one: ``enumerated`` pays every payment 
 window's end while refusing to reinvest it. The holder receives it, so it has left the price.
 
 **The window opens at the later of the quotation and the purchase, and the purchase half is
-load-bearing.** Two shipped issues pay a coupon on 2026-08-26 -- after the 2026-08-24 quotation
-and before the owner's window opens -- while the *buy* quotation of the same morning is carried
-to the purchase date unadjusted. Subtracting such a coupon from the sell leg alone would report
-a loss of a whole coupon that nobody took, so the population is named and pinned below.
+load-bearing.** Shipped issues pay a coupon after the quotation and before the owner's window
+opens, while the *buy* quotation of the same morning is carried to the purchase date unadjusted.
+Subtracting such a coupon from the sell leg alone would report a loss of a whole coupon that
+nobody took, so that population is named and pinned below rather than argued about.
 
 **What is left behind is accrued interest**, and it is stated rather than fixed: the quotation
-carried an accrual on 2026-08-24 and the sale date carries a different one, no declaration
-states the basis interest accrues on (the ``enumerated-accrued-interest`` future entry), and the
-residual is smaller than a coupon and unsigned. It reaches the reader as the fourth typed
+carried an accrual on the day it was read and the sale date carries a different one, no
+declaration states the basis interest accrues on (the ``enumerated-accrued-interest`` future
+entry), and the residual is smaller than a coupon and unsigned. It reaches the reader as a typed
 exclusion on every early-exit figure.
 """
 

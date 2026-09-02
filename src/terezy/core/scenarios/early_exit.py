@@ -16,13 +16,10 @@ committed to its quoted buyback price would have declared a *term*, and there wo
 assumption to make. The assumption exists precisely because none does -- which is also why this
 record carries no citation keys: there is nothing for a source to vouch for.
 
-**The figure it produces errs in stated directions.** It replaces a distribution with a point
-for the one option chosen for its optionality, so the early exit is reported as more certain
-than it is; the quote is a seller's, which widens exactly when a forced sale is most likely, so
-the spread is understated; rate risk is symmetric and is **not** signed; and accrued interest is
-not modelled at all, so what :func:`price_at` leaves behind is the difference between the
-accrual carried in the quotation and the accrual on the sale date, which is unsigned too. The
-four claims reach a reader as this feature's typed exclusions (FR-033).
+**The figure it produces errs in stated directions**, and what it does not account for reaches
+a reader as this feature's typed exclusions rather than as prose here (FR-033;
+``core.results.answer.Exclusion``, where each claim carries its own warrant for having a sign
+or not having one).
 """
 
 from __future__ import annotations
@@ -100,17 +97,17 @@ def price_at(
     the price by the time he sells.
 
     **The window opens at the LATER of the quotation and the purchase**, and the purchase half
-    is what stops this fix from becoming its own wrong number. Two shipped issues pay a coupon
-    on 2026-08-26 -- after the 2026-08-24 quotation and before the owner's window opens -- and
-    the *purchase* quote observed the same morning is carried to the purchase date **unadjusted**
-    by the code that sizes the purchase. Subtracting such a coupon here would price one leg of
-    one morning's two quotations net of it and the other gross, reporting a loss of a whole
-    coupon that nobody took. What is double-counted, and all that is, is a coupon the holding
-    both **receives** and is still credited with inside its sale price.
+    is what stops this fix from becoming its own wrong number: the *buy* quotation of the same
+    morning is carried to the purchase date **unadjusted** by the code that sizes the purchase,
+    so a coupon detaching between the two dates is out of both legs or in neither. Subtracting
+    it here alone would report a loss of a whole coupon that nobody took. What is double-counted,
+    and all that is, is a coupon the holding both **receives** and is still credited with inside
+    its sale price. Reached on the shipped registry, and pinned in
+    ``tests/worked_examples/test_a_coupon_inside_the_window.py`` rather than described here.
 
     **Accrued interest is not modelled** and this does not model it: the residual between the
-    accrual inside the quotation and the accrual on the sale date is a known, smaller error,
-    stated as its own exclusion because its sign cannot be warranted.
+    accrual inside the quotation and the accrual on the sale date is what this subtraction
+    leaves behind, and it is stated as its own exclusion rather than estimated.
     """
     since = max(observed_on, held_from)
     detached = [amount for on, amount in coupons if since < on <= sold_on]

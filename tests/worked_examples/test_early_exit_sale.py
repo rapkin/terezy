@@ -22,11 +22,10 @@ Two claims the schedule alone would not make, and both are asserted: the sale is
 that consumes basis, and the coupon the holding would have received in 2027 is **absent** rather
 than moved.
 
-**Every fixture below quotes the resale price on its own sale day**, so nothing detaches between
-the quotation and the sale and the arithmetic above is the whole of it. What a quotation taken
-*earlier* is worth on the sale day is one function's rule and is measured once, in
-:func:`test_the_sale_price_is_the_quotation_less_the_coupon_that_detached`; separating the two is
-what lets each be checked on paper.
+**A fixture whose subject is the sale quotes the resale price on its own sale day**, so nothing
+detaches between the quotation and the sale and the arithmetic above is the whole of it. What a
+quotation taken *earlier* is worth on the sale day is a separate rule with its own tests below;
+separating the two is what lets each be checked on paper.
 """
 
 from __future__ import annotations
@@ -269,10 +268,9 @@ def test_what_the_position_gets_back_is_the_sale_rather_than_the_principal() -> 
 
 
 QUOTED_ON = date(2026, 1, 15)
-"""The purchase day: a quotation taken before the window, which is the shipped shape."""
+"""The purchase day, so the one coupon inside the window detaches after the quotation."""
 
-DETACHED_PER_UNIT = COUPON_PER_UNIT
-CARRIED_PER_UNIT = RESALE_PER_UNIT - DETACHED_PER_UNIT
+CARRIED_PER_UNIT = RESALE_PER_UNIT - COUPON_PER_UNIT
 CARRIED_PROCEEDS = CARRIED_PER_UNIT * UNITS
 
 

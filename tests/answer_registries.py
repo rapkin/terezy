@@ -107,8 +107,8 @@ def one_horizon(question: Question, index: int = 0) -> Question:
 
 
 QUOTED_ON: Final = date(2026, 8, 24)
-"""The day every shipped access quotation was retrieved, which a fixture quote borrows so it
-is carried across the owner's windows exactly as a declared one is."""
+"""The retrieval date the shipped access quotations carry, borrowed so that a fixture resale
+price is carried across the owner's windows exactly as a declared one is."""
 
 
 def with_resale_price(

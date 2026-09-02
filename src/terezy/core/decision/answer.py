@@ -539,14 +539,10 @@ def _answer_wide_excludes() -> tuple[StatedExclusion, ...]:
 def _early_exit_exclusions(key: Tuple, assumption_id: str) -> tuple[StatedExclusion, ...]:
     """What an early-exit figure does not account for, with a direction on exactly two.
 
-    Rate risk is **symmetric** -- a bond sold after rates rise fetches less than its spread
-    implies and one sold after rates fall fetches more -- so it carries no direction, and SC-026
-    asserts that absence rather than tolerating it. Accrued interest is unsigned for a different
-    reason: the residual between the accrual inside the quotation and the accrual on the sale
-    date runs either way depending on where each date falls in its period, and a magnitude
-    cannot be stated at all while the accrual basis is undeclared. The other two are FR-033's
-    signed pair: the figure is a point where the world is a distribution, and a seller's quote
-    widens exactly when a forced sale is most likely.
+    Two of them carry no direction, for reasons that differ and are on the members themselves.
+    SC-026 asserts those absences rather than tolerating them: an approximation whose sign is
+    asserted without a warrant is a number more confident than its inputs, which is worse than
+    one whose sign is unstated.
     """
     return (
         StatedExclusion(
