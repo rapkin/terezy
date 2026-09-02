@@ -4,9 +4,10 @@
 that a diff to it is a *finding*: a declaration that changes, or a hurdle he renames, moves
 lines here and the diff is the evidence.
 
-**Over the shipped root, never the composed one.** This records what the owner is actually
-offered, so an invented instrument appearing in it would be a figure about a security nobody
-can buy.
+**Over the shipped root, never the composed one**, so an invented *instrument* never appears
+in it. That is narrower than "what he is actually offered": every route these figures are
+costed through is still an invented corridor (`data/routes/`, `SIMULATOR_SPEC.md` §11 item 1),
+so the securities are real and the journey to them is not.
 
 Regenerate deliberately, read the diff, and say in the commit message why every changed line is
 intended::

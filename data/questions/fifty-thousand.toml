@@ -62,10 +62,16 @@ continuation = "hold_as_cash"
 # Everything is ranked against one issue. Named by instrument id: more than one candidate for
 # it refuses rather than settling by file order which figure the rest are measured against.
 #
-# OWNER'S CHOICE, 2026-09-02. It matures 2026-09-16, inside every horizon here, so its proceeds
-# sit as cash to each horizon's end under the `hold_as_cash` continuation above — the hurdle is
-# therefore what a maturing issue plus idle cash returns, which is the comparison he asked for
-# and not a defect to be corrected in the engine.
+# OWNER'S CHOICE, 2026-09-02, and it has a consequence worth stating rather than discovering.
+# It matures 2026-09-16 and its proceeds are home on 2026-09-19, inside every horizon here, so
+# under the `hold_as_cash` continuation above they sit as cash and earn nothing — which the
+# answer says in the outcome's own words. What it does NOT say is that the comparable rate is an
+# IRR over the SPAN the money was at work, and this issue's span is the same 18 days at all
+# three horizons: identical proceeds, an identical 19.79%, ranked against rates annualised over
+# one, three and twelve months. At twelve months that puts the hurdle at the head of the list
+# on a nominal loss and leaves `beats_benchmark` empty. The figure is right and the comparison
+# it sits in is not; the remedy is the owner's — a different benchmark, or a rule about a
+# candidate that undershoots its horizon — and not an implementer's to invent.
 benchmark    = "UA4000235865"
 
 # The four words he said, in the order he said them. `subjects` and `every_declared_instrument`

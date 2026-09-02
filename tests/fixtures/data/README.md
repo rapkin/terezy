@@ -14,8 +14,8 @@ asserts the table and the tree hold the same set of files, in both directions.
 |---|---|
 | `instruments/ovdp_synthetic_a.toml` | A bond declared generatively — rate, periodicity, issue date — with the schedule computed. Feature 001's hurdle and `tests/golden/ovdp_synthetic_a.golden.txt`. |
 | `instruments/ovdp_synthetic_b.toml` | A second generative bond differing in its conventions and its minimum ticket, so no test can pass by there being one. |
-| `instruments/ovdp_enumerated_a.toml` | The enumerated half of the pair `tests/golden/test_enumerated_matches_generative.py` compares: one schedule, two declaration forms. |
-| `instruments/ovdp_enumerated_mirror.toml` | The generative half of that pair. |
+| `instruments/ovdp_enumerated_a.toml` | A schedule declared as a list of dated payments — what a secondary-market buyer can honestly say, with each of the four things a transcription infers declared as an `INFERENCE:` and carrying a verification task. Quoted above face, so a premium at purchase is exercised. |
+| `instruments/ovdp_enumerated_mirror.toml` | `ovdp_synthetic_a` said the other way round: the same paper transcribed as its payments. The enumerated half of the pair `tests/golden/test_enumerated_matches_generative.py` compares against the generative one, which is 013 SC-002's whole assertion. |
 | `instruments/enumerated_out_of_order.toml` | 013 FR-020a: a transcription recording the source's own row order while paying in date order. The real issue it was modelled on, `UA4000235865`, turned out **not** to be out of order — the seller published it wrongly — so no real instance is left. |
 | `instruments/enumerated_taxable_x.toml` | 013 FR-010: an enumerated schedule whose coupons are taxable, so premium netting has something to net against. Every real ОВДП here is exempt. |
 | `instruments/synthetic_fund_c.toml` | A fund whose liquidity terms, spread, peg and tax schedule all differ from the two real Inzhur funds, so a fund refusal has something to refuse. |

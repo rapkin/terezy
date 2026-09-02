@@ -77,7 +77,10 @@ the whole repository refers to:
    invented instrument is no longer one of the things that may ship.** The rule permitted it
    and the registry was mostly made of them, so what shipped could not be read as an inventory
    of what he can buy; the fixtures moved to `tests/fixtures/data/`, which has its own README
-   saying what each is the only example of.
+   saying what each is the only example of. **The narrowing stops at instruments**: every file
+   in `routes/` and `channels/` is still an invented corridor (§11 item 1), so a figure over
+   this tree is a real security reached by an imagined journey, and no ranking it produces is
+   yet a claim about what an actual purchase costs.
 
    That splits the tree in two, and the split is *not* the same as curated-versus-per-owner:
 

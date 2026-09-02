@@ -91,17 +91,17 @@ def _assert_names_file_and_field(exc: DeclarationError, file: Path, contains: st
 
 
 # ---------------------------------------------------------------------------
-# The shipped vocabulary, and the shipped labels
+# The shipped vocabulary, and the labels declared against it
 # ---------------------------------------------------------------------------
 
 
-def test_the_shipped_groups_file_loads() -> None:
+def test_the_groups_file_loads() -> None:
     declared = loader.groups_from_file(GROUPS)
     assert {group.id for group in declared} == set(DECLARED_MEMBERSHIP)
     assert all(group.name for group in declared)
 
 
-def test_the_shipped_labels_are_what_the_owners_words_resolve_to() -> None:
+def test_the_declared_labels_are_what_the_owners_words_resolve_to() -> None:
     labelled: dict[str, set[str]] = {group: set() for group in DECLARED_MEMBERSHIP}
     for identifier, labels in fixtures.declared_labels().items():
         for group in labels:

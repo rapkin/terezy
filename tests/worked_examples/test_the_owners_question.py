@@ -7,9 +7,11 @@ own terms and the other's money arrives in 2028.
 
 **The benchmark matures inside every horizon** (2026-09-16), so its proceeds sit as cash to each
 window's end under the question's own `hold_as_cash` continuation, and the comparable rate
-annualises over the eighteen days the money was actually at work rather than over the window.
-That is what makes the hurdle harder to beat the longer the horizon is. It is the issue he
-chose, reported as it stands.
+annualises over the eighteen days the money was at work rather than over the window. The idle
+cash therefore reaches no figure at all: the same span, the same proceeds and the same rate at
+one, three and twelve months, ranked against rates annualised over those three windows. That is
+asserted below rather than described, because it is the hurdle the whole answer is measured
+against and it is the owner's to overrule.
 
 **Every count below is derived from the labels and declarations the test loads.** A criterion
 pinning 24 would be pinning the whole ОВДП group, and the cheapest way to satisfy it would be
@@ -93,7 +95,7 @@ def test_his_two_words_reach_exactly_what_their_labels_carry() -> None:
     assert _expected_ids() == declared
 
 
-def test_there_are_three_sections_and_each_enumerates_the_seven() -> None:
+def test_there_are_three_sections_and_each_enumerates_the_same_ids() -> None:
     """SC-001's first half."""
     result = _answer()
     assert len(result.sections) == HORIZONS
@@ -110,6 +112,24 @@ def test_every_horizon_ranks_the_bonds_and_only_the_bonds() -> None:
     for section in _answer().sections:
         ranked = {item.key.instrument_id for item in section_ranking(section)}
         assert ranked == bonds
+
+
+def test_the_benchmark_is_the_same_figure_in_every_section() -> None:
+    """The hurdle undershoots every horizon, so nothing about it varies with the window.
+
+    An IRR over the span the money was at work, and this issue's span ends 2026-09-19 whatever
+    the window is. The three sections therefore rank against one 18-day rate — the comparability
+    break the question file records at the ``benchmark`` field, pinned here so that a rule about
+    an undershooting candidate would show up as this test going red rather than as a figure
+    quietly moving.
+    """
+    figures = {
+        (item.span, item.reaches, item.implied_rate)
+        for section in _answer().sections
+        for item in section_ranking(section)
+        if item.key.instrument_id == fixtures.BENCHMARK
+    }
+    assert len(figures) == 1, figures
 
 
 def test_every_section_measures_that_ranking_against_the_issue_he_named() -> None:
