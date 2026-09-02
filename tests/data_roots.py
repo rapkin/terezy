@@ -9,10 +9,9 @@ root: ``data/`` copied, then that tree copied over it, so a fixture file replace
 of the same path and joins a globbed directory otherwise.
 
 **A copy rather than symlinks or a second registry argument.** The resolver takes one root and
-globs it, so composing has to happen on disk; and copying is what
-``tests/contract/test_cli_is_sugar_over_the_file.py`` and four others already do to edit a root
-without touching the repository. Paths a manifest records are relative to the root it was given,
-so the composed root produces the same input ids as the shipped one.
+globs it, so composing has to happen on disk, and copying a root to edit it is what the suites
+that plant a malformed declaration already do. Paths a manifest records are relative to the root
+it was given, so the composed root produces the same input ids as the shipped one.
 """
 
 from __future__ import annotations
@@ -27,7 +26,7 @@ from typing import Final
 REPO_ROOT: Final = Path(__file__).resolve().parents[1]
 
 SHIPPED: Final = REPO_ROOT / "data"
-"""What the tool ships: 24 real ОВДП issues and the two real Inzhur funds."""
+"""What the tool ships. Real securities only, since 2026-09-02."""
 
 FIXTURES: Final = REPO_ROOT / "tests" / "fixtures" / "data"
 """The overlay of invented declarations. See its own README for what each one is for."""

@@ -39,11 +39,9 @@ from tests import data_roots
 
 REPO_ROOT: Final = data_roots.REPO_ROOT
 DATA_ROOT: Final = data_roots.with_fixtures()
-"""What ships plus the invented instruments, composed. See :mod:`tests.data_roots`.
-
-Every suite importing this module reaches for a fixture instrument somewhere -- the hurdle
-below is one -- so the composed root is the default here and ``data_roots.SHIPPED`` is what a
-suite names when it is asserting about what ships.
+"""The composed root, because every suite importing this module reaches for a fixture
+instrument somewhere -- the hurdle below is one. ``data_roots.SHIPPED`` is what a suite names
+when it is asserting about what ships.
 """
 
 UAH: Final = Currency.UAH
@@ -379,8 +377,8 @@ def access(
 ) -> InstrumentAccess:
     """One access declaration, built in code. A test fixture.
 
-    ``resale_price`` defaults to absent because that is what every shipped declaration says, and
-    it is the state 015 FR-031 refuses by name. A battery about an early exit states its own.
+    ``resale_price`` defaults to absent because that is the state 015 FR-031 refuses by name.
+    A battery about an early exit states its own.
     """
     return InstrumentAccess(
         instrument_id=instrument_id,

@@ -1,14 +1,14 @@
 """The owner's own question, answered over the shipped registry.
 
 015 SC-001 and SC-002. Two of the four words he said are declared by nothing at all; the other
-two reach every instrument that ships, and at each of his three horizons the 24 ОВДП issues are
-ranked against the one he named as his benchmark. The two funds are not: one refuses on its own
-terms and the other's money arrives in 2028.
+two reach every instrument that ships, and at each of his three horizons the ОВДП group is
+ranked against the issue he named as his benchmark. The two funds are not: one refuses on its
+own terms and the other's money arrives in 2028.
 
 **The benchmark matures inside every horizon** (2026-09-16), so its proceeds sit as cash to each
-window's end under the question's own `hold_as_cash` continuation. That is why nothing beats it
-at twelve months and five things beat it at one: the comparable rate annualises over the span
-the money was actually at work, and the benchmark's span is eighteen days. It is the hurdle he
+window's end under the question's own `hold_as_cash` continuation, and the comparable rate
+annualises over the eighteen days the money was actually at work rather than over the window.
+That is what makes the hurdle harder to beat the longer the horizon is. It is the issue he
 chose, reported as it stands.
 
 **Every count below is derived from the labels and declarations the test loads.** A criterion

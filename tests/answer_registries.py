@@ -33,15 +33,13 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
 REPO_ROOT: Final = data_roots.REPO_ROOT
 SHIPPED_ROOT: Final = data_roots.SHIPPED
 DATA_ROOT: Final = data_roots.with_fixtures()
-"""What ships plus the invented instruments, composed. See :mod:`tests.data_roots`.
-
-``SHIPPED_ROOT`` is what the artefacts of the owner's own answer run against -- the golden, the
-CLI, the worked example -- because those record what he is actually offered. Everything else
-here is about a mechanism, and every mechanism's only example is a fixture.
+"""The composed root. ``SHIPPED_ROOT`` is what the artefacts of the owner's own answer run
+against -- the golden, the CLI, the worked example -- because those record what he is actually
+offered; everything else here is about a mechanism whose only example is a fixture.
 """
 
 QUESTION_FILE: Final = data_roots.SHIPPED / "questions" / "fifty-thousand.toml"
-"""One file, read from the shipped root under either root: the overlay declares no question."""
+"""His question. Read from the shipped root under either root: the overlay declares none."""
 
 UAH: Final = Currency.UAH
 AS_OF: Final = date(2026, 8, 30)

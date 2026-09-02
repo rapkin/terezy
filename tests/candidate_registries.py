@@ -43,11 +43,9 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
 
 REPO_ROOT: Final = data_roots.REPO_ROOT
 DATA_ROOT: Final = data_roots.with_fixtures()
-"""What ships plus the invented instruments, composed. See :mod:`tests.data_roots`.
-
-The composed root is the default because a drop, a refusal and a tie all need an instrument
-whose terms were chosen to produce one. ``tests/golden/test_candidate_set.py`` passes
-``data_roots.SHIPPED`` instead: its artefact is a record of what the shipped registry offers.
+"""The composed root, because a drop, a refusal and a tie all need an instrument whose terms
+were chosen to produce one. ``tests/golden/test_candidate_set.py`` passes ``data_roots.SHIPPED``
+instead: its artefact is a record of what the shipped registry offers.
 """
 
 UAH: Final = Currency.UAH
