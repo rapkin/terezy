@@ -70,9 +70,8 @@ class SoldEarly:
     """What one unit fetched: the quotation less :attr:`detached_per_unit`."""
 
     detached_per_unit: Money
-    """What :func:`detached_since` took out of the quotation. Zero where nothing detached, and
-    that zero is what says an early-exit figure carries no coupon adjustment -- the answer's
-    accrual exclusion is attached on it rather than on the instrument's declaration form."""
+    """What :func:`detached_since` took out of the quotation, per unit. Zero is a real answer
+    and not an absence: it says this sale carried no coupon adjustment at all."""
 
     proceeds: Money
     """``units x price_per_unit``. Gross: the disposal's tax is charged like any other."""

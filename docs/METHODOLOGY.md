@@ -3869,9 +3869,8 @@ that coupon. A coupon dated **on** the sale day counts as detached: the holder r
 the schedule generators already pay it.
 
 The subtraction opens at the **quotation's** own day rather than at the purchase, because a
-coupon that detached in between left the market price just as surely. That the *buy* quotation
-of the same morning is carried to the purchase date unadjusted is an asymmetry on the other
-leg; it reaches two shipped issues and is measured rather than assumed away.
+coupon that detached in between left the market price just as surely — leaving an asymmetry
+with the buy quotation of the same morning, which sizes the purchase unadjusted.
 
 Payments falling after the window are **absent** from the stream rather than moved. Nothing is
 paid early and nothing is folded into the sale.
