@@ -8,7 +8,7 @@ Every declaration here is invented, and the shipped registry carries only real s
 (owner decision, 2026-09-02). Each one is the sole example of a live mechanism, which is why
 none was retired: **retiring one deletes the only reachable case of the mechanism, and the
 deletion looks like tidying.** `tests/contract/test_every_fixture_says_what_it_is_for.py`
-asserts that this table names every file below it and no other.
+asserts the table and the tree hold the same set of files, in both directions.
 
 | File | The mechanism it is the only example of |
 |---|---|
