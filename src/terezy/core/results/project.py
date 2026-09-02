@@ -388,9 +388,9 @@ def _sold_early(
     if sale.quantity is None:  # pragma: no cover -- `early_sale` always carries one
         return None
     # Recomputed from the declaration rather than divided back out of the proceeds. The two
-    # agree to within a float or two, and that is the problem: `detached_per_unit == 0` is what
-    # says no coupon detached, and a round-trip through a division makes that answer depend on
-    # the quantity. Both sides read the same schedule through the same function, so this cannot
+    # agree to within a float or two, and that is the problem: whether anything detached is
+    # read off this figure, and a round-trip through a division makes that answer depend on the
+    # quantity. Both sides read the same schedule through the same function, so this cannot
     # drift from what `early_sale` struck.
     detached = early_exit_scenario.detached_since(
         observed_on=early_exit.observed_on,

@@ -139,7 +139,7 @@ def events(
 
 
 def coupons_per_unit(declaration: InstrumentDeclaration) -> tuple[tuple[date, Money], ...]:
-    """Every coupon one unit pays, per the declared list. Declared amounts are already per unit.
+    """:data:`CouponsPerUnitFn` for a listed schedule. Declared amounts are already per unit.
 
     A repayment of principal is **not** here. It leaves the price too, and the schedule accounts
     for it the other way: `_units_retired`'s share of it retires units, so pricing the remainder

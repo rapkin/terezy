@@ -587,17 +587,10 @@ def coupon_plan(
 
 
 def coupons_per_unit(declaration: InstrumentDeclaration) -> tuple[tuple[date, Money], ...]:
-    """Every coupon one unit pays over the whole life of the paper, in payment order.
-
-    **The whole life, and per unit**, because the question it answers is what has left a dated
-    quotation -- decided against the quotation's own day and against no holding
-    (``core.scenarios.early_exit.detached_since``). A schedule trimmed to a buyer here would be
-    a second opinion about that, and the two would part company the first time a purchase
-    landed between a quotation and a coupon.
+    """:data:`CouponsPerUnitFn` for a generated schedule.
 
     Dates are the **paid** dates, through the same declared business-day rule
-    :func:`coupon_plan` applies, because a coupon leaves the price when it is paid. Empty for a
-    zero-coupon issue, which is an answer rather than an absence.
+    :func:`coupon_plan` applies, because a coupon leaves the price on the day it is paid.
     """
     terms = terms_of.narrowed(declaration, BondTerms)
     if terms.coupon_rate == 0.0:

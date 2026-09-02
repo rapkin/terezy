@@ -154,9 +154,9 @@ def payments_after(
 def accrual_periods(terms: BondTerms) -> Iterator[tuple[date, date]]:
     """``(accrual_start, accrual_end)`` for every period a generated schedule describes.
 
-    One iterator rather than the same three lines in the schedule generator and in
-    :func:`coupons_per_unit`: the two must agree about the period boundaries, or a coupon
-    subtracted from a resale quotation would be dated differently from the coupon paid.
+    One iterator rather than the same three lines in each of ``fixed_income``'s two schedule
+    walks: they must agree about the period boundaries, or a coupon subtracted from a resale
+    quotation would be dated differently from the coupon paid.
     """
     schedule = conventions.periodicity(terms.periodicity)(terms.issue_date, terms.maturity_date)
     accrual_start = terms.issue_date

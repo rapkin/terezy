@@ -954,8 +954,8 @@ def _price_for(prepared: _Prepared, *, purchased_on: date) -> Money | TupleRefus
     to the sale date**, and both legs must follow the belief or neither does. Two shipped
     issues pay a coupon between the 2026-08-24 quotation and the day the owner's window buys;
     pricing the sale net of it and the purchase gross of it would charge a coupon nobody
-    received. There is no branch on the declaration form here -- ``terms.coupons_per_unit``
-    answers for both.
+    received. There is no branch on the declaration form here: the schedule comes from the
+    instrument's own ``InstrumentOps``.
     """
     match prepared.declared, prepared.plan:
         case FundDeclaration(), FundAssumptions():

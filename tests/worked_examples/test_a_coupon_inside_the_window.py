@@ -7,23 +7,12 @@ coupon it collects inside the window *and* sell it at a price that still contain
 money. The sale is therefore struck at the quotation **less every coupon that detached after it
 was observed** (``core.scenarios.early_exit.detached_since``).
 
-**A coupon dated on the sale day counts as detached.** That is the convention the schedule
-generators already fix rather than a new one: ``enumerated`` pays every payment with
-``payment.on <= horizon.end`` and ``fixed_income`` pays a coupon whose ``paid_on`` equals the
-window's end while refusing to reinvest it. The holder receives it, so it has left the price.
-
-**What comes out is a whole coupon where what was in the quotation was an accrual**, and the
-gap that leaves is signed. Under the same constant-clean-price assumption the price also
-*rebuilds* by accrual between coupons, so the sale price struck here is **below** the one the
-assumption implies -- by the coupons detached, less the accrual the quotation carried, plus the
-accrual the sale date carries. Every one of those terms needs a basis that no declaration states
-(013 FR-017 forbids inferring one; `enumerated-accrued-interest` in `specs/features.toml`), so
-what ships is the direction and not the size: `Exclusion.EARLY_EXIT_IGNORES_ACCRUED_INTEREST`,
-**understated**, on every sale a coupon detached from.
-
-The residual is visible without any accrual figure at all, and this module asserts it: a
-three-month hold of the worked issue reaches exactly what a one-month hold reaches, because the
-two extra months build accrual the model does not carry.
+**What comes out is a whole coupon where what was in the quotation was an accrual**, which is
+why `Exclusion.EARLY_EXIT_IGNORES_ACCRUED_INTEREST` is signed and why closing it needs a basis
+no declaration states (`enumerated-accrued-interest` in `specs/features.toml`). The residual is
+visible here without any accrual figure at all, and this module asserts it: a three-month hold
+of the worked issue reaches exactly what a one-month hold reaches, because the two extra months
+build accrual the model does not carry.
 """
 
 from __future__ import annotations
@@ -118,7 +107,7 @@ net of it would charge him for it. Measured 2026-09-03."""
 @functools.cache
 def _supplied() -> AnswerInputs:
     """The shipped registry, read once. `answers.inputs()` re-resolves the whole data root, and
-    this module reads it once per candidate across eight tests."""
+    this module reads it once per candidate in every test below."""
     return answers.inputs()
 
 
