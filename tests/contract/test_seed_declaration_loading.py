@@ -3,9 +3,14 @@
 ``contracts/owner-declarations.md`` has a table of refusals and this module is the seed half
 of it executed. The construction is ``tests/contract/test_spendable_declaration_loading.py``'s
 and it is restated rather than imported so neither battery can break the other: **every broken
-variant is a mutation of the shipped file**, so each case also proves
-``data/seeds/owner-001.toml`` contains what the test thinks it contains. A battery written
-against an invented template keeps passing after the shipped format changes underneath it.
+variant is a mutation of a declared file**, so each case also proves that file contains what
+the test thinks it contains. A battery written against a template invented inline keeps
+passing after the declared format changes underneath it.
+
+The file mutated is ``tests/fixtures/data/seeds/owner-001.toml``, because a lot has to name an
+instrument and only invented instruments have invented lots (``data/README.md`` rule 5, as the
+owner narrowed it on 2026-09-02). What ships declares an owner and no lot at all, which is a
+different thing to check and is checked at the foot of this module.
 
 **Two assertions apply to every case** (FR-023): the raised
 :class:`~terezy.data.declarations.errors.DeclarationError` names the *file* and its
@@ -375,9 +380,30 @@ def test_a_seed_naming_an_undeclared_instrument_is_refused_at_load(tmp_path: Pat
     assert "inzhur_reit" in caught.value.problem
 
 
-def test_the_shipped_data_root_resolves() -> None:
-    """The whole shipped tree, through the resolver a run would use."""
+def test_the_composed_data_root_resolves() -> None:
+    """The whole tree the battery above mutates, through the resolver a run would use."""
     declared = resolver.seeds_and_goals_from_data_root(DATA_ROOT, base_currency=Currency.UAH)
     assert declared.owner_id == "owner-001"
     assert len(declared.seeds) == 2
     assert declared.seed_file == SEEDS
+
+
+def test_what_ships_declares_an_owner_and_no_lot() -> None:
+    """The shipped file's own format check, which the battery above no longer covers.
+
+    An empty lot list is an ordinary state and not a missing declaration (FR-024), and it is
+    the only state ``data/seeds/`` can be in while rule 5 admits no invented instrument: a lot
+    names one, and there is none to name. Asserted rather than left to the battery, which
+    mutates the overlay's file and would stay green if this one stopped parsing entirely.
+    """
+    shipped = data_roots.SHIPPED / "seeds" / "owner-001.toml"
+    owner_id, declared = loader.seeds_from_file(shipped, base_currency=Currency.UAH)
+    assert owner_id == "owner-001"
+    assert declared == ()
+
+    resolved = resolver.seeds_and_goals_from_data_root(
+        data_roots.SHIPPED, base_currency=Currency.UAH
+    )
+    assert resolved.seed_file == shipped
+    assert resolved.seeds == ()
+    assert resolved.owner_id == "owner-001", "the goals file still names him"

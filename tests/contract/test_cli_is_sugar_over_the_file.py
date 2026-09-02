@@ -211,6 +211,51 @@ def _answered() -> Answer:
     return run.answer
 
 
+BELOW_A_WITHHELD_CANDIDATE = "UA4000238281"
+"""A benchmark that `inzhur_miltech` outranks, so the two index spaces disagree about it.
+
+`Comparison.benchmark`, `ties` and `beats_benchmark` index `comparison.ranked`; the rows the
+CLI prints are `section_ranking`, which is that tuple with every withheld candidate removed
+(FR-030). The owner's own benchmark outranks the one withheld candidate at all three horizons,
+so under it the two spaces agree by luck and every mix-up passes. This one does not.
+"""
+
+
+def test_the_hurdle_is_marked_by_identity_and_not_by_position() -> None:
+    """A withheld candidate above the benchmark must not shift the marker or the count.
+
+    Reached through the CLI rather than asserted on the record, because the mix-up is a
+    rendering bug: the record is right and the printed hurdle was a different instrument.
+    """
+    document = _rebenchmarked(BELOW_A_WITHHELD_CANDIDATE)
+    answered = cli._from_flags(fixtures.SHIPPED_ROOT, [document], as_of=fixtures.AS_OF)
+    assert isinstance(answered.answer, Answer)
+    lines = cli.render(answered)
+
+    marked = [line for line in lines if "[BENCHMARK]" in line]
+    verdicts = [line for line in lines if "beat the benchmark" in line or "NOTHING BEATS" in line]
+    assert marked, "the ranking prints no hurdle at all"
+    assert len(verdicts) == len(marked)
+    assert all(BELOW_A_WITHHELD_CANDIDATE in line for line in marked), marked
+    assert all(BELOW_A_WITHHELD_CANDIDATE in line for line in verdicts), verdicts
+
+    # And the count is over the rows the section actually prints: `inzhur_miltech` beats this
+    # benchmark on the record and is withheld, so counting it would give a total the reader
+    # cannot reconcile with the rows -- while two lines below, the same section says no figure
+    # for it is reported.
+    for section, verdict in zip(answered.answer.sections, verdicts, strict=True):
+        assert isinstance(section.outcome, CandidateSurvey)
+        comparison = section.outcome.comparison
+        assert isinstance(comparison, Comparison)
+        shown = {item.key for item in section_ranking(section)}
+        beaten = sum(1 for i in comparison.beats_benchmark if comparison.ranked[i].key in shown)
+        withheld = {item.key for item in section.arrives_after_horizon}
+        assert any(comparison.ranked[i].key in withheld for i in comparison.beats_benchmark), (
+            "the fixture must actually place a withheld candidate above the benchmark"
+        )
+        assert f"{beaten} of {len(shown)} beat the benchmark" in verdict, verdict
+
+
 def test_the_undeclared_subjects_are_named_by_the_words_he_wrote() -> None:
     lines, _ = _run()
     output = "\n".join(lines)

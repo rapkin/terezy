@@ -271,11 +271,11 @@ def _ranking_lines(section: HorizonSection) -> list[str]:
         else "  ranked: NOTHING. There is no benchmark to rank against, so the figures below "
         "are reported unranked rather than ordered."
     ]
+    hurdle = None if compared is None else compared.ranked[compared.benchmark].key
     if compared is not None:
-        lines.append(f"  {_beats_line(compared, ranked)}")
-    hurdle = None if compared is None else compared.benchmark
-    for position, outcome in enumerate(ranked):
-        lines.extend(_figure_lines(outcome, hurdle=position == hurdle))
+        lines.append(_beats_line(compared, ranked))
+    for outcome in ranked:
+        lines.extend(_figure_lines(outcome, hurdle=outcome.key == hurdle))
     for outcome in scored:
         if outcome not in ranked:
             lines.extend([*_figure_lines(outcome), "      NOT RANKED"])
@@ -303,16 +303,26 @@ def _beats_line(comparison: Comparison, ranked: tuple[TupleOutcome, ...]) -> str
     empty tuple is the sentence the product exists to be able to say plainly -- *nothing beats
     the hurdle*. Derived nowhere else either: `Comparison.beats_benchmark` applies the tie
     tolerance, and a reader counting rows above the marked one would report a winner by a hair.
+
+    **Two index spaces meet here, and mixing them is silent.** Every index on ``comparison`` --
+    ``benchmark``, ``ties``, ``beats_benchmark`` -- addresses ``comparison.ranked``, while
+    ``ranked`` is what ``section_ranking`` reports: the same order with every withheld
+    candidate removed (010 FR-030). So each index is resolved to a *key* against
+    ``comparison.ranked`` and then matched by identity, and a candidate this section refuses to
+    show is not counted as having beaten anything.
     """
-    hurdle = ranked[comparison.benchmark].key.instrument_id
-    beaten = len(comparison.beats_benchmark)
-    verdict = (
-        f"NOTHING BEATS THE BENCHMARK {hurdle}"
-        if not beaten
-        else f"{beaten} of {len(ranked)} beat the benchmark {hurdle}"
+    hurdle = comparison.ranked[comparison.benchmark]
+    reported = frozenset(item.key for item in ranked)
+    beaten = sum(
+        1 for index in comparison.beats_benchmark if comparison.ranked[index].key in reported
     )
-    tied = {index for group in comparison.ties for index in group}
-    if comparison.benchmark in tied:
+    verdict = (
+        f"NOTHING BEATS THE BENCHMARK {hurdle.key.instrument_id}"
+        if not beaten
+        else f"{beaten} of {len(ranked)} beat the benchmark {hurdle.key.instrument_id}"
+    )
+    tied = {comparison.ranked[index].key for group in comparison.ties for index in group} & reported
+    if hurdle.key in tied:
         verdict += ", and at least one candidate ties with it within the project tolerance"
     return f"  {verdict}."
 

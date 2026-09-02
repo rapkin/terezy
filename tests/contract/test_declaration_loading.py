@@ -7,7 +7,7 @@ field, and no such case results in a substituted default"*. The enforced-rules t
 below, and the rows are the reason the cases exist rather than the other way round.
 
 **Every case is a mutation of a file that is shipped and valid.** The broken variants are
-produced by editing the text of ``data/instruments/ovdp_synthetic_a.toml`` and
+produced by editing the text of ``tests/fixtures/data/instruments/ovdp_synthetic_a.toml`` and
 ``data/tax/ua.toml``, so each test also proves the real file contains what the test
 thinks it contains -- a battery written against an invented template would keep passing
 after the shipped format changed underneath it, which is the way a suite like this rots.

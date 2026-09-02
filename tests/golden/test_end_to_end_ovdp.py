@@ -1,7 +1,8 @@
 """K3 -- the whole path, from a file on disk to a hurdle rate, against a recorded artefact.
 
-``data/instruments/ovdp_synthetic_a.toml`` -> loader -> resolver -> ``project.project`` ->
-``HurdleRate``, compared line for line against ``ovdp_synthetic_a.golden.txt``, which was
+``tests/fixtures/data/instruments/ovdp_synthetic_a.toml`` -> loader -> resolver ->
+``project.project`` -> ``HurdleRate``, compared line for line against
+``ovdp_synthetic_a.golden.txt``, which was
 produced by an earlier run and is checked into the repository.
 
 **Why this is not a duplicate of the contract suite.**

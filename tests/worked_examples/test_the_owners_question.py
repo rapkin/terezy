@@ -135,16 +135,22 @@ def test_the_benchmark_is_the_same_figure_in_every_section() -> None:
 def test_every_section_measures_that_ranking_against_the_issue_he_named() -> None:
     """FR-011: the hurdle is a position in the list, not a figure beside it.
 
-    ``Comparison.benchmark`` indexes ``ranked``, so "what beats it" is everything above it and
-    cannot disagree with the order printed underneath.
+    **Every index on ``Comparison`` addresses ``comparison.ranked``**, which is not the tuple
+    ``section_ranking`` reports: that one has the withheld candidates removed (FR-030). So the
+    hurdle is resolved to a key against ``comparison.ranked`` and then found by identity, and
+    what beats it is read off ``beats_benchmark`` rather than off a position -- ``ties`` means
+    a candidate can outrank the hurdle in the ordering without beating it.
     """
     for section in _answer().sections:
         assert isinstance(section.outcome, CandidateSurvey)
         comparison = section.outcome.comparison
         assert isinstance(comparison, Comparison), comparison
-        ranked = section_ranking(section)
-        assert ranked[comparison.benchmark].key.instrument_id == fixtures.BENCHMARK
-        assert comparison.beats_benchmark == tuple(range(comparison.benchmark))
+        hurdle = comparison.ranked[comparison.benchmark].key
+        assert hurdle.instrument_id == fixtures.BENCHMARK
+        assert hurdle in {item.key for item in section_ranking(section)}
+        assert all(
+            comparison.ranked[index].key != hurdle for index in comparison.beats_benchmark
+        ), "the hurdle cannot be among the things that beat it"
 
 
 def test_nothing_that_ships_wants_a_resale_price_and_an_invented_bond_still_does() -> None:

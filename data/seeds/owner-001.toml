@@ -32,5 +32,11 @@
 # which arrives with the FX features, and an assumed rate under a tax figure is exactly the
 # confident wrongness this project exists to remove.
 
+# Stated, not omitted, and ABOVE `[owner]` because a bare key after a table header joins that
+# table. The key is required and nothing is substituted for a missing one (008 FR-016), so an
+# absent `seed` is a file that does not load rather than a person who holds nothing -- and
+# those are different claims.
+seed = []
+
 [owner]
 id = "owner-001"
