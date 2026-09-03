@@ -138,7 +138,7 @@ note   = "FOUR CLARIFICATIONS OPEN, so planning may not start; they are in the s
 
 [[feature]]
 id     = "020-http-api"
-status = "spec"
+status = "in-progress"
 needs  = ["007-cpi-real-terms", "008-seed-and-goals", "009-tax-depth", "011-official-rate", "012-fop-group-3", "015-the-question", "017-working-day-calendar", "018-nbu-rate-series"]
 why    = "one endpoint per declaration category, so every feature that OWNS a category must exist before there is a response type to write: 007 CPI, 008 seeds and goals, 009 tax timing, 011 official rates, 012 schemes and destinations, 017 calendars. 015 brings the answer endpoint; 018 makes a windowed series read testable against data rather than an empty file. All eight are done, so this blocks nothing -- the list is long because the surface is wide."
 note   = "Lifts D-B (owner decision 2026-09-03, specs/decisions/2026-09-03-web-stack.toml lands with 021). ALL THREE CLARIFICATIONS ANSWERED 2026-09-03 (specs/decisions/2026-09-03-clarify-020.toml) and written into the requirements they govern; do not restate them here. The first defers the display switch ENTIRELY -- no parameter, no block, no conversion -- which is wider than the standing behaviour the draft shipped, so REQUIRED_TESTS F2 stays open and the three options travel on the display-currency-switch future entry below. The load-bearing measurement: 314 frozen core records carry no kind tag and ten groups share an identical field set -- OneWayCost and RoundTripCost among them, whose separation Principle VI requires and mypy currently supplies. Serialisation is where that guard is lost."
