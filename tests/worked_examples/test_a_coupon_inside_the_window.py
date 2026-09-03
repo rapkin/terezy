@@ -283,6 +283,34 @@ def test_a_coupon_paid_before_the_purchase_stays_in_both_prices() -> None:
         )
 
 
+def test_no_early_exit_window_contains_a_repayment_of_principal() -> None:
+    """The one place the two per-unit conventions would disagree, asserted to be out of reach.
+
+    A repayment retires units, so what *a unit* means changes at that date; a coupon declared
+    after one is per original unit while the quotation it is subtracted from is per remaining
+    unit. Both mechanisms are right on their own and they do not compose, so the subtraction
+    would be too small by the ratio. Nothing on the shipped registry pays principal inside an
+    early-exit window -- every real issue repays once, at maturity, past the owner's horizons.
+    """
+    declared = _supplied().registries.instruments
+    checked = 0
+    inside = []
+    for index, section in enumerate(answers.answered().sections):
+        for item in _sold_early(index):
+            terms = declared[item.key.instrument_id].terms
+            assert isinstance(terms, EnumeratedTerms), item.key.instrument_id
+            assert item.sold_early is not None
+            checked += 1
+            inside += [
+                (item.key.instrument_id, payment.on)
+                for payment in terms.payments
+                if payment.pays is PaymentKind.PRINCIPAL_REPAYMENT
+                and section.horizon.start < payment.on <= item.sold_early.on
+            ]
+    assert checked
+    assert not inside, inside
+
+
 def test_no_declared_coupon_falls_on_the_quotation_day() -> None:
     """The lower bound is strict, so a coupon dated ON the quotation day counts as still inside
     it -- and whether a morning quotation on a payment date holds that coupon is something
