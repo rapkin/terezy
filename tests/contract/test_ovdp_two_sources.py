@@ -218,7 +218,7 @@ def test_the_mark_would_still_rest_on_the_quotation_if_every_term_were_verified(
 
 
 def _with_verified_terms() -> Any:
-    """The shipped registry with every register-sourced citation given a verification date.
+    """The declared registry with every register-sourced citation given a verification date.
 
     Built in memory rather than as a scratch data root, because `scripts/check_provenance.py`
     refuses a verification date on an enumerated schedule and the point here is what the

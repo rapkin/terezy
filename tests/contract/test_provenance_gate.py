@@ -179,7 +179,7 @@ def test_an_inference_with_no_verification_task_is_an_error(tmp_path: Path) -> N
 
 def test_the_checks_run_on_no_other_declaration_kind(tmp_path: Path) -> None:
     """A bond declared by its terms infers none of this, and a fund's verification tasks
-    answer a different question. The shipped tree contains both and stays clean."""
+    answer a different question. The composed tree contains both and stays clean."""
     root = _scratch_root(tmp_path)
     (root / ENUMERATED).unlink()
     assert _run(root).returncode == 0

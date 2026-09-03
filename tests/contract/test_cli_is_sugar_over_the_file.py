@@ -219,11 +219,10 @@ def _answered() -> Answer:
 def test_a_section_whose_rows_span_different_periods_says_so() -> None:
     """Principle I: the verdict is the most confident sentence this renderer prints.
 
-    ``implied_rate`` annualises over the span the money was at work, so a row ending inside
-    the window is not measured over the same period as one that ran to it -- and the ordering
-    puts both in one list. The caveat is keyed on the **set** of spans: a hurdle that runs to
-    the window's end says nothing about the rows that did not, and gating on the hurdle alone
-    printed the bare verdict over exactly that table.
+    ``implied_rate`` annualises over the span the money was at work, so an ordering across
+    rows measured over different numbers of days compares different questions. The caveat is
+    keyed on **the set of span lengths** and on nothing narrower: keying it on the hurdle, or
+    on any row ending inside the window, goes quiet on tables that are just as incomparable.
     """
     lines, _ = _run()
     verdicts = [
@@ -238,23 +237,22 @@ def test_a_section_whose_rows_span_different_periods_says_so() -> None:
         comparison = section.outcome.comparison
         assert isinstance(comparison, Comparison)
         ranked = section_ranking(section)
-        short = [item for item in ranked if item.span.end < section.horizon.end]
-        assert short, "every one of his horizons has a row ending inside it"
-        assert "RATES HERE SPAN DIFFERENT PERIODS" in verdict, verdict
-        assert (
-            f"{len(short)} of {len(ranked)} ranked row(s) have their money home before"
-        ) in verdict, verdict
-        assert section.horizon.end.isoformat() in verdict
+        lengths = {(item.span.end - item.span.start).days for item in ranked}
+        assert len(lengths) > 1, "every one of his horizons ranks rows of differing spans"
 
-        # And whether the hurdle is one of them is said, not left to be inferred: it is at
-        # twelve months and is not at one or three, so both branches are exercised by his
-        # own question.
+        window = (section.horizon.end - section.horizon.start).days
+        assert "RATES HERE SPAN DIFFERENT PERIODS" in verdict, verdict
+        assert f"spans of {min(lengths)} to {max(lengths)} days against a window of {window}" in (
+            verdict
+        ), verdict
+
+        # The hurdle's own span, named: a reader comparing it against the declaration checks
+        # the date the money is home, not the date the paper's terms end.
         hurdle = comparison.ranked[comparison.benchmark]
-        if hurdle in short:
-            assert f"The benchmark is one of them: {fixtures.BENCHMARK}" in verdict
-            assert hurdle.span.end.isoformat() in verdict
-        else:
-            assert "The benchmark is not one of them" in verdict
+        assert f"The benchmark's span is {(hurdle.span.end - hurdle.span.start).days} days" in (
+            verdict
+        )
+        assert hurdle.span.end.isoformat() in verdict
 
 
 def test_the_caveat_is_silent_when_every_row_runs_to_the_window() -> None:
@@ -285,6 +283,9 @@ def test_the_caveat_is_silent_when_every_row_runs_to_the_window() -> None:
         beats_benchmark=(),
     )
     assert squared.ranked[squared.benchmark].key == hurdle, "the rebuild must keep the hurdle"
+    assert len({(i.span.end - i.span.start).days for i in to_the_end}) == 1, (
+        "the fixture must actually square every span, or the silence proves nothing"
+    )
     assert "RATES HERE SPAN DIFFERENT PERIODS" not in cli._beats_line(squared, to_the_end)
 
 

@@ -52,7 +52,7 @@ SEEDS = DATA_ROOT / "seeds" / "owner-001.toml"
 def _is_comment(line: str) -> bool:
     """Whether a line is a TOML comment.
 
-    The shipped fixture explains itself in prose that quotes its own field names, so a naive
+    The overlay's file explains itself in prose that quotes its own field names, so a naive
     text search would edit the explanation of ``basis`` instead of the declaration of it --
     leaving the file valid and the test asserting an error that never came.
     """
@@ -66,7 +66,7 @@ def _replace(text: str, old: str, new: str) -> str:
         if old in line and not _is_comment(line):
             lines[index] = line.replace(old, new, 1)
             return "".join(lines)
-    pytest.fail(f"the shipped fixture no longer declares {old!r}; this test is stale")
+    pytest.fail(f"the fixture no longer declares {old!r}; this test is stale")
 
 
 def _drop_line(text: str, needle: str) -> str:
@@ -75,7 +75,7 @@ def _drop_line(text: str, needle: str) -> str:
     for index, line in enumerate(lines):
         if needle in line and not _is_comment(line):
             return "".join(lines[:index] + lines[index + 1 :])
-    pytest.fail(f"the shipped fixture no longer declares {needle!r}; this test is stale")
+    pytest.fail(f"the fixture no longer declares {needle!r}; this test is stale")
 
 
 def _broken(tmp_path: Path, old: str, new: str) -> Path:

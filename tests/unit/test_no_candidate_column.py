@@ -52,7 +52,7 @@ class TestAnAbsentCorridorIsReportedAsAnAbsentCorridor:
             assert pair.why.side == "route_in"
 
     def test_a_registry_with_no_way_out_reports_the_other_side(self) -> None:
-        """The exit half, which the shipped registry never reaches: every instrument's
+        """The exit half, which no declared registry reaches: every instrument's
         proceeds land at `inzhur`, which `inzhur_to_monobank` carries out of."""
         registries = fixtures.declared()
         routes = {

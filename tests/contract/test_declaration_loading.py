@@ -120,7 +120,7 @@ def _replace(text: str, old: str, new: str) -> str:
         if old in line and not _is_comment(line):
             lines[index] = line.replace(old, new, 1)
             return "".join(lines)
-    pytest.fail(f"the shipped fixture no longer declares {old!r}; this test is stale")
+    pytest.fail(f"the fixture no longer declares {old!r}; this test is stale")
 
 
 def _drop_line(text: str, needle: str) -> str:
@@ -895,7 +895,7 @@ class TestDatedRateSchedules:
         """
         text = TAX_UA.read_text(encoding="utf-8")
         marker = "  [[jurisdiction.tax_class.rate]]"
-        assert marker in text, "the shipped fixture no longer declares a rate block"
+        assert marker in text, "the fixture no longer declares a rate block"
         return text[: text.index(marker)]
 
     def _schedule_block(self, effective_from: str) -> str:

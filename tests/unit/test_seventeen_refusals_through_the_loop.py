@@ -57,7 +57,7 @@ REIT = "inzhur_reit"
 
 
 def unchanged_no_candidates() -> int:
-    """What the shipped registry puts in the third column, derived rather than written.
+    """What the declared registry puts in the third column, derived rather than written.
 
     One pair per declared instrument -- it was nine and became thirty-three when 016 declared
     the real ОВДП issues, and a literal here would have to be re-typed on every data change.
@@ -339,10 +339,10 @@ class TestTheThreeNoLoopCanReach:
 
     Compared as **junctions** -- ``(venue, currency)`` -- because that is what the refusals
     standing in for them compare. A venue-only check would pass on exactly the currency-mismatched
-    chain that reaches ``SeamDoesNotChain``, and a shipped registry with one currency could never
+    chain that reaches ``SeamDoesNotChain``, and a registry with one currency could never
     tell the two apart.
 
-    Run over several narrowings of the shipped registry rather than over it alone, so "no loop
+    Run over several narrowings of the declared registry rather than over it alone, so "no loop
     can reach this" is checked against more than one shape of world. That is still not every
     registry: the claim rests on `compose` anchoring both ends exactly, and these are the
     executable half of it.

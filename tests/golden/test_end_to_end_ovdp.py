@@ -904,7 +904,7 @@ class TestTaxDepthChangedNothingAboutTheExemptPath:
     already says so -- as one assertion over 230 lines, which tells a reader that *something*
     moved rather than *what*. These pin the two claims that matter separately, because they
     are separate: a statement of zero still exists, and **no cash moves for it**. Both are
-    asserted below, against the shipped declarations rather than against a fixture.
+    asserted below, against a loaded declaration rather than against a hand-built record.
     """
 
     def test_no_tax_charge_in_the_exempt_run_moves_any_cash(self) -> None:

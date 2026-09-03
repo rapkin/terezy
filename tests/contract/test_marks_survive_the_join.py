@@ -110,10 +110,10 @@ def _registries(
     stale_instrument: bool = False,
     stale_nav: bool = False,
 ) -> Registries:
-    """The shipped registry with everything verified except the named part.
+    """The declared registry with everything verified except the named part.
 
     ``None`` verifies everything, which is the control: without it the whole battery could
-    pass on a join that never propagated anything, because the shipped repository has no
+    pass on a join that never propagated anything, because no declaration in this repository has
     verified value in it at all.
 
     ``stale_price`` backdates the **venue quote** rather than a route leg, because that is the
@@ -248,7 +248,7 @@ class TestOneUnverifiedValueInEachPartMarksTheOutcome:
     def test_with_everything_verified_the_outcome_carries_no_mark(self) -> None:
         # The control. Without it the four assertions below would pass on a join that marked
         # every outcome unconditionally -- and on one that never propagated at all, since the
-        # shipped repository has no verified value in it.
+        # repository has no verified value in it, under either root.
         assert not prov.is_unverified(_outcome(_registries(unverified_part=None)).provenance)
 
     @pytest.mark.parametrize("part", PART_NAMES)

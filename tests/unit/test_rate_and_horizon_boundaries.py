@@ -170,7 +170,7 @@ class TestATupleFundedInOneCurrencyAndSpentInAnother:
 
 
 def _expensive_way_out() -> Registries:
-    """The shipped registry with a way out whose flat fee exceeds everything the bond pays."""
+    """The declared registry with a way out whose flat fee exceeds everything the bond pays."""
     return fixtures.with_new_route(
         fixtures.declared(),
         fixtures.route(

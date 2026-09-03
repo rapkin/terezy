@@ -447,7 +447,7 @@ class TestTheCrossFileRelationsAreCheckedToo:
 
 
 def _scratch_root(tmp_path: Path) -> Path:
-    """A copy of the shipped data root, so a case changes exactly one thing about it."""
+    """A copy of the composed data root, so a case changes exactly one thing about it."""
     root = tmp_path / "data"
     shutil.copytree(DATA_ROOT, root)
     return root
