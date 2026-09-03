@@ -69,9 +69,10 @@ continuation = "hold_as_cash"
 # IRR over the SPAN the money was at work, and this issue's span is the same 18 days at all
 # three horizons: identical proceeds, an identical 19.79%, ranked against rates annualised over
 # one, three and twelve months. At twelve months that puts the hurdle at the head of the list
-# on a nominal loss and leaves `beats_benchmark` empty. The figure is right and the comparison
-# it sits in is not; the remedy is the owner's — a different benchmark, or a rule about a
-# candidate that undershoots its horizon — and not an implementer's to invent.
+# with `beats_benchmark` empty, above rows returning some 7 000 UAH more over the same window.
+# The figure is right and the comparison it sits in is not; the remedy is the owner's — a
+# different benchmark, or a rule about a candidate that undershoots its horizon — and not an
+# implementer's to invent.
 benchmark    = "UA4000235865"
 
 # The four words he said, in the order he said them. `subjects` and `every_declared_instrument`

@@ -172,9 +172,9 @@ def test_a_ranking_marks_its_own_hurdle_and_says_what_beat_it() -> None:
     """Principle I: the naive baseline is always scored **and always shown**.
 
     The head of a ranked list reads as the winner, and over the shipped registry it is the
-    benchmark itself at twelve months on a nominal loss. Both halves are asserted: the row is
-    marked, and ``beats_benchmark`` -- computed for exactly this and rendered nowhere before --
-    reaches the reader as a sentence rather than as something to count off the rows.
+    benchmark itself at twelve months, above rows that return more. Both halves are asserted:
+    the row is marked, and ``beats_benchmark`` -- computed for exactly this and rendered
+    nowhere before -- reaches the reader as a sentence rather than as rows to count off.
     """
     lines, _ = _run()
     output = "\n".join(lines)
@@ -194,7 +194,7 @@ def test_a_ranking_marks_its_own_hurdle_and_says_what_beat_it() -> None:
         expected = (
             f"NOTHING BEATS THE BENCHMARK {fixtures.BENCHMARK}."
             if not beaten
-            else f"{beaten} of {len(ranked)} beat the benchmark {fixtures.BENCHMARK}."
+            else f"{beaten} of {len(ranked) - 1} beat the benchmark {fixtures.BENCHMARK}."
         )
         assert expected in output, expected
 
@@ -231,9 +231,15 @@ def test_a_hurdle_that_undershoots_the_window_says_its_rate_is_not_comparable() 
         assert isinstance(comparison, Comparison)
         hurdle = comparison.ranked[comparison.benchmark]
         assert hurdle.span.end < section.horizon.end, "the fixture must actually undershoot"
-        assert "ITS RATE IS NOT COMPARABLE WITH THEIRS" in verdict, verdict
+        assert "ITS RATE DOES NOT SPAN THIS WINDOW" in verdict, verdict
         assert hurdle.span.end.isoformat() in verdict
         assert section.horizon.end.isoformat() in verdict
+        # Counted, never assumed: the hurdle is not the only row ending inside the window, and
+        # a caveat naming it against "the rest of the list" would be false about the rest.
+        ranked = section_ranking(section)
+        short = sum(1 for item in ranked if item.span.end < section.horizon.end)
+        assert short >= 1
+        assert f"{short} of {len(ranked)} ranked row(s) end inside the window" in verdict
 
 
 def test_a_tie_with_the_hurdle_is_claimed_only_when_a_printed_row_ties() -> None:
@@ -309,7 +315,7 @@ def test_the_hurdle_is_marked_by_identity_and_not_by_position() -> None:
         assert any(comparison.ranked[i].key in withheld for i in comparison.beats_benchmark), (
             "the fixture must actually place a withheld candidate above the benchmark"
         )
-        assert f"{beaten} of {len(shown)} beat the benchmark" in verdict, verdict
+        assert f"{beaten} of {len(shown) - 1} beat the benchmark" in verdict, verdict
 
 
 def test_the_undeclared_subjects_are_named_by_the_words_he_wrote() -> None:

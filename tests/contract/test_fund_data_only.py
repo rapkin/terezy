@@ -1,6 +1,6 @@
 """SC-010: a third fund, different in every term, projected with zero source lines changed.
 
-Constitution Principle II's executable claim, for funds. ``data/instruments/
+Constitution Principle II's executable claim, for funds. ``tests/fixtures/data/instruments/
 synthetic_fund_c.toml`` differs from both real funds in **every** axis the spec names — its
 liquidity terms, its spread, its peg and its tax schedule — plus a subscription cutoff the
 REIT does not have, a payout share below 100% so its NAV moves, and a two-entry dated

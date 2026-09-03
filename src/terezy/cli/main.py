@@ -319,7 +319,7 @@ def _beats_line(comparison: Comparison, ranked: tuple[TupleOutcome, ...]) -> str
     verdict = (
         f"NOTHING BEATS THE BENCHMARK {hurdle.key.instrument_id}"
         if not beaten
-        else f"{beaten} of {len(ranked)} beat the benchmark {hurdle.key.instrument_id}"
+        else f"{beaten} of {len(ranked) - 1} beat the benchmark {hurdle.key.instrument_id}"
     )
     if any(
         hurdle.key in {comparison.ranked[index].key for index in group}
@@ -327,30 +327,40 @@ def _beats_line(comparison: Comparison, ranked: tuple[TupleOutcome, ...]) -> str
         for group in comparison.ties
     ):
         verdict += ", and at least one candidate ties with it within the project tolerance"
-    return f"  {verdict}.{_span_caveat(comparison, hurdle)}"
+    return f"  {verdict}.{_span_caveat(comparison, hurdle, ranked)}"
 
 
-def _span_caveat(comparison: Comparison, hurdle: TupleOutcome) -> str:
+def _span_caveat(
+    comparison: Comparison, hurdle: TupleOutcome, ranked: tuple[TupleOutcome, ...]
+) -> str:
     """What the verdict above is silent about when the hurdle undershoots the horizon.
 
-    ``implied_rate`` is an IRR over the span the money was **at work**, so a hurdle whose own
-    terms end inside the window is annualised over that shorter span and the rest of the list
-    over the window. "Nothing beats it" is then a claim about two different questions, and it
-    is the most confident sentence this renderer prints -- Principle I forbids emitting one
-    more confident than its inputs, and the input here is two incomparable spans.
+    ``implied_rate`` is an IRR over the span the money was **at work**, so a row whose own
+    terms end inside the window is annualised over that shorter span rather than over the
+    window. "Nothing beats it" is then a claim across periods of different length, and it is
+    the most confident sentence this renderer prints -- Principle I forbids emitting one more
+    confident than its inputs, and the input here is a set of incomparable spans.
+
+    **How many rows undershoot is counted, not assumed.** The hurdle is rarely the only one:
+    on the owner's own question one row undershoots at a month and twelve do at a year, so a
+    caveat naming the hurdle against "the rest of the list" would be false about half the
+    table -- which is the defect the caveat exists to prevent, committed by the caveat.
 
     Stated rather than suppressed: the figures are real and the owner chose the hurdle, so
     withholding the verdict would hide work he asked for. What he cannot be left to infer is
-    that the two numbers span different periods. Recorded as
+    that the numbers span different periods. Recorded as
     ``the-hurdle-undershoots-every-horizon`` in ``specs/features.toml``; the remedy -- a
     different benchmark, or a declared rule for a candidate that undershoots -- is his.
     """
     if hurdle.span.end >= comparison.horizon.end:
         return ""
+    short = sum(1 for item in ranked if item.span.end < comparison.horizon.end)
     return (
-        f" ITS RATE IS NOT COMPARABLE WITH THEIRS: {hurdle.key.instrument_id}'s own terms end "
-        f"{hurdle.span.end.isoformat()}, inside this window, so its rate is annualised over "
-        f"that span and every other row's over the window to {comparison.horizon.end.isoformat()}."
+        f" ITS RATE DOES NOT SPAN THIS WINDOW: {hurdle.key.instrument_id}'s own terms end "
+        f"{hurdle.span.end.isoformat()}, so its rate is annualised over that span and not over "
+        f"the window to {comparison.horizon.end.isoformat()}. {short} of {len(ranked)} ranked "
+        "row(s) end inside the window and are annualised over their own spans the same way; "
+        "rates measured over periods of different length are not comparable."
     )
 
 
