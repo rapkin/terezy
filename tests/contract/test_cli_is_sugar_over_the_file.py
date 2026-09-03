@@ -171,10 +171,11 @@ def test_no_ranking_is_rendered_as_a_sentence_rather_than_as_an_empty_table() ->
 def test_a_ranking_marks_its_own_hurdle_and_says_what_beat_it() -> None:
     """Principle I: the naive baseline is always scored **and always shown**.
 
-    The head of a ranked list reads as the winner, and over the shipped registry it is the
-    benchmark itself at twelve months, above rows that return more. Both halves are asserted:
-    the row is marked, and ``beats_benchmark`` -- computed for exactly this and rendered
-    nowhere before -- reaches the reader as a sentence rather than as rows to count off.
+    The head of a ranked list reads as the winner whether or not it is one, and the hurdle is
+    somewhere in the list rather than beside it -- 14th of 24 at one month and last at twelve,
+    where every shown row beats it. Both halves are asserted: the row is marked, and
+    ``beats_benchmark`` -- computed for exactly this and rendered nowhere before -- reaches the
+    reader as a sentence rather than as rows to count off.
     """
     lines, _ = _run()
     output = "\n".join(lines)
@@ -237,7 +238,9 @@ def test_a_section_whose_rows_span_different_periods_says_so() -> None:
         short = [item for item in ranked if item.span.end < section.horizon.end]
         assert short, "every one of his horizons has a row ending inside it"
         assert "RATES HERE SPAN DIFFERENT PERIODS" in verdict, verdict
-        assert f"{len(short)} of {len(ranked)} ranked row(s) end before" in verdict
+        assert (
+            f"{len(short)} of {len(ranked)} ranked row(s) have their money home before"
+        ) in verdict, verdict
         assert section.horizon.end.isoformat() in verdict
 
         # And whether the hurdle is one of them is said, not left to be inferred: it is at
@@ -252,7 +255,13 @@ def test_a_section_whose_rows_span_different_periods_says_so() -> None:
 
 
 def test_the_caveat_is_silent_when_every_row_runs_to_the_window() -> None:
-    """No caveat where there is nothing to caution about -- otherwise it is noise and unread."""
+    """No caveat where there is nothing to caution about -- otherwise it is noise and unread.
+
+    The ``Comparison`` is rebuilt around the printed rows rather than edited in place: its
+    ``benchmark`` indexes ``comparison.ranked``, which carries the withheld candidate too, so
+    swapping in the filtered tuple and keeping the index resolves a different bond as the
+    hurdle -- the very mix-up the marker exists to prevent, committed by its own test.
+    """
     section = next(
         section for section in _answered().sections if isinstance(section.outcome, CandidateSurvey)
     )
@@ -260,10 +269,19 @@ def test_the_caveat_is_silent_when_every_row_runs_to_the_window() -> None:
     comparison = section.outcome.comparison
     assert isinstance(comparison, Comparison)
     ranked = section_ranking(section)
+    hurdle = comparison.ranked[comparison.benchmark].key
+
     to_the_end = tuple(
         replace(item, span=replace(item.span, end=comparison.horizon.end)) for item in ranked
     )
-    squared = replace(comparison, ranked=to_the_end, ties=())
+    squared = replace(
+        comparison,
+        ranked=to_the_end,
+        benchmark=next(i for i, item in enumerate(to_the_end) if item.key == hurdle),
+        ties=(),
+        beats_benchmark=(),
+    )
+    assert squared.ranked[squared.benchmark].key == hurdle, "the rebuild must keep the hurdle"
     assert "RATES HERE SPAN DIFFERENT PERIODS" not in cli._beats_line(squared, to_the_end)
 
 

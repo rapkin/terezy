@@ -57,9 +57,10 @@ BENCHMARK: Final = "UA4000231195"
 """This artefact's own hurdle, and not a copy of the owner's choice.
 
 The question below is not his -- its horizon, its as-of and its amounts are this module's --
-so naming the issue his question file names would be a coincidence maintained by hand. What it
-must be is an issue that outlives this horizon, or the artefact fails the day the issue matures
-out of the observation files: `UA4000231195` runs to 2027-08-25.
+so tracking whichever issue his question file names would be a coincidence maintained by hand.
+What it must be is an issue that survives the next observation refresh, which the one it
+replaced (`UA4000235865`, matured 2026-09-16) will not. Every shipped issue matures inside this
+horizon, so "outlives the window" is not available to any choice.
 """
 
 

@@ -337,9 +337,11 @@ def _span_caveat(
 
     ``implied_rate`` is an IRR over the span the money was **at work**, so a row whose own
     terms end inside the window is annualised over that shorter span rather than over the
-    window. An ordering across periods of different length is a comparison of different
-    questions, and the verdict above is the most confident sentence this renderer prints --
-    Principle I forbids emitting one more confident than its inputs.
+    window -- and one that runs past it is annualised over the window PLUS the way out's
+    latency, because waiting is inside the span (010 FR-015). Either way the periods differ,
+    an ordering across them compares different questions, and the verdict above is the most
+    confident sentence this renderer prints -- Principle I forbids emitting one more confident
+    than its inputs.
 
     **Keyed on the set, not on the hurdle.** Incomparability is a property of the spans in the
     list: a hurdle that runs to the window's end tells the reader nothing about the eleven rows
@@ -348,33 +350,37 @@ def _span_caveat(
     them -- and where **every** row ends inside the window there is no "rest" to contrast with,
     which is a different sentence rather than the same one read loosely.
 
+    **``span.end`` is when the money is home, not when the paper's terms end.** It carries the
+    exit route's latency, so naming it as the issue's own last payment date puts the reader
+    three days out against the declaration they would check it against.
+
     Stated rather than suppressed: the figures are real and the owner chose the hurdle, so
     withholding the verdict would hide work he asked for. What he cannot be left to infer is
     that the numbers span different periods. Recorded as
-    ``the-hurdle-undershoots-every-horizon`` in ``specs/features.toml``; the remedy -- a
+    ``rates-in-one-ranking-span-different-periods`` in ``specs/features.toml``; the remedy -- a
     different benchmark, or a declared rule for a candidate that undershoots -- is his.
     """
     short = [item for item in ranked if item.span.end < comparison.horizon.end]
     if not short:
         return ""
     window = comparison.horizon.end.isoformat()
+    population = (
+        f"all {len(ranked)} ranked row(s) have their money home before {window}"
+        if len(short) == len(ranked)
+        else f"{len(short)} of {len(ranked)} ranked row(s) have their money home before "
+        f"{window} and the rest after it"
+    )
     hurdle_note = (
-        f" The benchmark is one of them: {hurdle.key.instrument_id}'s own terms end "
+        f" The benchmark is one of them: {hurdle.key.instrument_id}'s money is home "
         f"{hurdle.span.end.isoformat()}."
         if hurdle in short
-        else f" The benchmark is not one of them; its rate does span the window to {window}."
-    )
-    every = len(short) == len(ranked)
-    rest = (
-        " and NONE runs to it, so there is no row here measured over the window at all"
-        if every
-        else ", so each is annualised over its own shorter span while the rest are annualised "
-        "over the window"
+        else f" The benchmark is not one of them; its money is home "
+        f"{hurdle.span.end.isoformat()}, after the window."
     )
     return (
-        f" RATES HERE SPAN DIFFERENT PERIODS: {len(short)} of {len(ranked)} ranked row(s) end "
-        f"before {window}{rest}. Rates measured over periods of different length are not "
-        f"comparable, and the ordering above is across them.{hurdle_note}"
+        f" RATES HERE SPAN DIFFERENT PERIODS: {population}, and each rate is annualised over "
+        "its own span rather than over the window. Rates measured over periods of different "
+        f"length are not comparable, and the ordering above is across them.{hurdle_note}"
     )
 
 

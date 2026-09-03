@@ -71,7 +71,7 @@ continuation = "hold_as_cash"
 # It supersedes `UA4000235865`, which matured 2026-09-16 — inside every horizon — and was
 # therefore annualised over 18 days at all three while the rest of the list was annualised over
 # one, three and twelve months. That comparability break is recorded as
-# `the-hurdle-undershoots-every-horizon` in `specs/features.toml` and is NOT closed by this
+# `rates-in-one-ranking-span-different-periods` in `specs/features.toml` and is NOT closed by this
 # choice: it is a property of any candidate whose terms end inside the window, and the renderer
 # says so per section. This benchmark simply does not trip it except by seven days.
 benchmark    = "UA4000231195"

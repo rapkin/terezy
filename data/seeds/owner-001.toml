@@ -1,8 +1,10 @@
-# The owner holds nothing. An empty lot list is an ordinary state, not a missing declaration:
-# his real figures are unstated (`SIMULATOR_SPEC.md` §11 item 3) and will land here when they
-# arrive. A synthetic lot could be declared here against any shipped issue, and none is: what
-# would make one worth committing is a mechanism that needs it, and the ones that do are in
-# `tests/fixtures/data/seeds/` beside the invented instruments they hold.
+# NOTHING IS DECLARED HERE YET, and that is not a claim that the owner holds nothing. His real
+# figures are unstated (`SIMULATOR_SPEC.md` §11 item 3) and will land here when they arrive;
+# until then this file says only that no lot has been declared, which is an ordinary state and
+# not a missing declaration (008 FR-024). Rule 5 of `data/README.md` is why it cannot say more:
+# a figure describing his actual position may never be committed, and a synthetic stand-in
+# would be a lot no test needs — the ones that are needed live in `tests/fixtures/data/seeds/`
+# beside the invented instruments they hold.
 #
 # **Per-owner data, not curated.** Beside `data/streams/`, `data/spendable/` and
 # `data/composition/`, on the boundary Principle VII draws: instruments, routes and tax packs
