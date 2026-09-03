@@ -355,8 +355,9 @@ of addresses it may bind to.
   direction were deleted — `.importlinter`'s FR-012/FR-013 pair states this reasoning at its own
   site and it applies unchanged.
 
-- **FR-007a**: Every category's path MUST be a **single flat segment**, and every **route group**
-  the application serves MUST own a distinct first segment. A route group is a category together
+- **FR-007a**: Every category's path MUST be a **single flat segment beneath the `/api` prefix**
+  (FR-056), and every **route group** the application serves MUST own a distinct first segment
+  within it. A route group is a category together
   with everything nested under its own segment, or a fixed endpoint that is not inside a category's
   subtree.
 
@@ -796,9 +797,20 @@ layer.
   restated. An exemption served as an absent citation is indistinguishable from a citation nobody
   wrote, which is the distinction the whole provenance mechanism exists to keep.
 
+- **FR-056**: Every endpoint MUST be served beneath a single **`/api` prefix**, declared in one
+  place and carried by the OpenAPI document, so a client generated from that document is correct
+  by construction. The alternative — the client's dev server rewriting paths — is this feature's
+  route table copied into a proxy configuration, which is the second copy the whole gated-document
+  arrangement exists to avoid.
+
 - **FR-055**: Where a built client is present at `web/dist`, the API MUST serve it from its own
   origin with an SPA fallback, and where that directory is **absent the mount MUST be inert** —
-  no route, no error, and nothing the Python suite has to build. 021 FR-049 makes production one
+  no route, no error, and nothing the Python suite has to build.
+
+  **A path beneath `/api` that the API does not serve MUST return a typed JSON refusal**, never
+  the fallback document. An SPA page served with status 200 for an unknown API path reaches a
+  generated client as a parse error rather than as the missing route it is, and a healthy service
+  then looks broken in the one place a reader would not think to look. 021 FR-049 makes production one
   container serving both, which is what removes the cross-origin question in FR-032a; the inert
   case is what keeps `uv run pytest` free of a Node build (FR-035).
 
@@ -1435,7 +1447,10 @@ to a feature about the answer's vocabulary rather than about serialising it.
   two lists turns the suite red. (FR-054)
 - **SC-030**: With no `web/dist` present the application registers no static route and every test
   passes; with a directory present, a request for an unknown path under it returns the fallback
-  document and a request for a known asset returns it. (FR-055)
+  document and a request for a known asset returns it. **With the fallback mounted, an unknown
+  path beneath `/api` still returns a JSON refusal and never `200 text/html`.** (FR-055)
+- **SC-031**: Every path in the committed OpenAPI document begins with `/api`, and the prefix is
+  one constant in the module rather than a string repeated per route. (FR-056)
 
 ---
 
