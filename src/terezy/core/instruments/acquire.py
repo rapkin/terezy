@@ -104,10 +104,9 @@ def early_sale(
     ``quantity`` is passed rather than read off the holding, for the reason a redemption's is:
     under a reinvesting policy the units sold are the purchase plus every reinvestment.
 
-    **A typed refusal rather than a figure**, unreachable on the shipped registry and not
-    guarded by a comment claiming it is: a quotation worth less than the coupons still inside
-    it is a pair of declarations that cannot both describe the same paper, and striking a sale
-    at it would hand the ledger a disposal of a negative amount.
+    **A quotation worth less than the coupons still inside it refuses**, in the words below.
+    Unreachable on the shipped registry, where the smallest quote is three figures against
+    coupons of tens, and reached deliberately in the worked examples rather than asserted here.
     """
     detached = early_exit.detached_since(
         observed_on=exit_.observed_on,
