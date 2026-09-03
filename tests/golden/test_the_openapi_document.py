@@ -79,15 +79,19 @@ def test_every_published_path_is_under_the_prefix() -> None:
 @pytest.mark.golden
 def test_the_generator_leaves_an_unmodified_tree_unchanged() -> None:
     before = document.PATH.read_bytes()
-    finished = subprocess.run(
-        [sys.executable, str(REPO_ROOT / "scripts" / "generate_openapi.py")],
-        cwd=REPO_ROOT,
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    assert "unchanged" in finished.stdout
-    assert document.PATH.read_bytes() == before
+    try:
+        finished = subprocess.run(
+            [sys.executable, str(REPO_ROOT / "scripts" / "generate_openapi.py")],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        assert "unchanged" in finished.stdout
+        assert document.PATH.read_bytes() == before
+    finally:
+        # The script writes; this test must not leave a tracked file altered when it fails.
+        document.PATH.write_bytes(before)
 
 
 @pytest.mark.golden
