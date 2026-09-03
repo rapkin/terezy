@@ -252,15 +252,16 @@ class Exclusion(Enum):
 
     EARLY_EXIT_IGNORES_ACCRUED_INTEREST = "early_exit_ignores_accrued_interest"
     """A resale quotation is a **dirty** price -- clean plus the interest accrued by the day it
-    was observed -- and what the sale price subtracts is whole coupons, because separating the
-    accrual out needs a basis no declaration states.
+    was observed -- and it is carried to the sale date net of whole coupons only, because
+    separating the accrual out needs a basis no declaration states.
 
     So the sale price is struck **below** what the same assumption implies, by the coupons
-    detached less the accrual the quotation carried plus the accrual the sale date carries. That
-    quantity is positive whenever a coupon detached -- the accrual within a period is less than
-    that period's coupon -- which is why this exclusion carries a direction where rate risk
-    cannot. It is **not** bounded by one coupon: every further coupon inside the window adds its
-    whole amount to what came out, which
+    detached less the accrual the quotation carried plus the accrual the sale date carries.
+    That quantity is positive whether or not a coupon detached: with none, both dates sit in one
+    period and accrual only grows; with some, the accrual a quotation had built is smaller than
+    the coupon that ends its period. That is why this exclusion carries a direction where rate
+    risk cannot, and it is **not** bounded by one coupon -- every further coupon inside the
+    window adds its whole amount to what came out, which
     ``tests/worked_examples/test_a_coupon_inside_the_window.py`` reaches at three."""
 
 

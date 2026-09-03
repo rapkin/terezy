@@ -219,9 +219,8 @@ quotation observed on 2026-08-24 is a sale at a price quoted while a coupon stil
 the holding was credited that coupon as well.
 
 Recorded rather than fixed here: 016 is data-only, and this is a change to how a sale is
-struck. **Fixed on 2026-09-03**, outside this feature — both of the morning's quotations are
-now carried to the day they price, net of every coupon that detached since. The affected
-population is counted in `tests/worked_examples/test_a_coupon_inside_the_window.py` against
-the quotation's date, which is not the date the count in an earlier draft of this paragraph
-used, so no figure is repeated here. What a secondary-market price would still buy is the rate
+struck. **Fixed on 2026-09-03**, outside this feature — the sale is struck at the quotation
+less every coupon that detached while the holding held the paper. The affected population is
+counted in `tests/worked_examples/test_a_coupon_inside_the_window.py` rather than repeated
+here. What a secondary-market price would still buy is the rate
 risk the spread does not carry, which is the `secondary-market-rate-risk` future entry.

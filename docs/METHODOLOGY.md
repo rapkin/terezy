@@ -3850,7 +3850,7 @@ hold. The figure is:
 
 ```
 price per unit = the declared resale quotation
-               - every coupon per unit detaching in (quotation date, sale date]
+               - every coupon per unit detaching in (max(quotation, purchase), sale]
 proceeds       = units still held x price per unit
 ```
 
@@ -3868,11 +3868,13 @@ holding a coupon it collects inside the window *and* sells it at a price that st
 that coupon. A coupon dated **on** the sale day counts as detached: the holder receives it, and
 the schedule generators already pay it.
 
-The subtraction opens at the **quotation's** own day rather than at the purchase, because a
-coupon that detached in between left the market price just as surely. The **buy** quotation of
-the same morning is carried to the purchase date by the same rule and in the same function, so
-one morning's two prices never disagree about which coupons they still hold — pricing the sale
-net of a coupon and the purchase gross of it would charge the holder one he never received.
+The subtraction opens at the **later of the quotation and the purchase**, and the purchase half
+is what keeps one morning's two prices coherent. The buy quotation sizes the purchase as
+declared, so a coupon detaching between the quotation and the purchase sits in both prices and
+is received by neither holder — two shipped issues pay one on 2026-08-26, eight days before the
+owner's window buys. Taking it out of the sale alone would report a loss of a whole coupon that
+nobody took. What is double-counted, and all that is, is a coupon the holding both receives and
+is still credited with inside its sale price.
 
 Payments falling after the window are **absent** from the stream rather than moved. Nothing is
 paid early and nothing is folded into the sale.
@@ -3899,9 +3901,10 @@ Up to four claims travel with such a figure, and **only rate risk carries no dir
 | it carries no rate risk | **none** | rate risk is symmetric: a bond sold after rates rise fetches less than its spread implies, and one sold after rates fall fetches more |
 | it ignores accrued interest | **understated** | a whole coupon comes out of the quotation where what was in it was that period's accrual, and an accrual within a period is smaller than the period's own coupon |
 
-The fourth is attached only where a coupon actually detached: a sale struck at the quotation
-itself has no accrual left over to state. Closing it needs a declared accrual basis, which
-§31.5 deliberately does not carry, so what ships is the direction and not the size.
+The fourth is on every early exit, not only on the ones a coupon detached from: a quotation
+carried across any gap omits the accrual that gap builds. Closing it needs a declared accrual
+basis, which §31.5 deliberately does not carry, so what ships is the direction and not the
+size.
 
 An approximation whose sign is unstated is incomplete; one whose sign is asserted without a
 warrant is a number more confident than its inputs, which is worse.

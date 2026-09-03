@@ -116,11 +116,7 @@ def test_declaring_the_price_produces_a_figure_at_the_windows_end() -> None:
 
 
 def test_the_figure_names_the_belief_and_states_the_claims_about_it() -> None:
-    """FR-032 and FR-033 together: the mark and the exclusions travel with the figure.
-
-    Three of them, not four: this fixture's window contains no coupon date, so nothing detached
-    from its quotation and there is no accrued residual to state.
-    """
+    """FR-032 and FR-033 together: the mark and the exclusions travel with the figure."""
     supplied = fixtures.with_resale_price(fixtures.inputs(), SUBJECT)
     result = fixtures.answered(supplied=supplied)
     outcome = next(
@@ -129,11 +125,15 @@ def test_the_figure_names_the_belief_and_states_the_claims_about_it() -> None:
     assert early_exit.rests_on(supplied.registries.quotation_holds) in outcome.rests_on
     claims = {item.what for item in result.sections[0].excludes if item.applies_to == outcome.key}
     assert outcome.sold_early is not None
+    # Nothing detached from this fixture's quotation, and the accrued-interest claim is stated
+    # anyway: a dirty price carried across the window omits the accrual that window builds
+    # whether or not a coupon interrupts it.
     assert is_close(outcome.sold_early.detached_per_unit.amount, 0.0)
     assert claims == {
         Exclusion.EARLY_EXIT_IS_A_POINT_NOT_A_DISTRIBUTION,
         Exclusion.EARLY_EXIT_SPREAD_IS_A_SELLERS_QUOTE,
         Exclusion.EARLY_EXIT_CARRIES_NO_RATE_RISK,
+        Exclusion.EARLY_EXIT_IGNORES_ACCRUED_INTEREST,
     }
 
 

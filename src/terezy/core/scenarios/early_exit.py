@@ -7,7 +7,7 @@ that declaration still describes the market on the exit date is not.
 **The quotation is not carried forward unchanged.** A quoted bond price is a *dirty* price, and
 it falls by a coupon on the day that coupon detaches, so a holding credited a coupon inside the
 window and sold at a price quoted before it is credited that money twice. What is assumed to
-hold is the quotation **net of every coupon that detached after it was observed** -- the clean
+hold is the quotation **net of every coupon that detached while the holding held it** -- the clean
 price is taken as constant and the price moves only by detachment (:func:`detached_since`).
 
 **Nobody can observe it, and that is why it is a belief rather than a term.** A platform that
@@ -83,6 +83,7 @@ class SoldEarly:
 def detached_since(
     *,
     observed_on: date,
+    held_from: date,
     sold_on: date,
     coupons: Iterable[tuple[date, Money]],
     currency: Currency,
@@ -106,17 +107,21 @@ def detached_since(
     back on would be a second, unstated assumption in the opposite direction. What ages a
     quotation is the staleness verdict, which already covers it.
 
-    **The window opens at the quotation's own day, not at the purchase**, and the same is true
-    of the *buy* quotation this function also prices: one morning's two quotations are carried
-    by one rule, so a coupon detaching between the quotation and the purchase leaves both legs
-    or neither. Taking it out of one alone would charge the holder a coupon he never received.
+    **The window opens at the LATER of the quotation and the purchase**, and the purchase half
+    is what keeps the pair of quotations coherent. The *buy* quotation of the same morning
+    sizes the purchase and is used as declared, so a coupon detaching between the quotation and
+    the purchase is in both legs; subtracting it here alone would report a loss of a whole
+    coupon that nobody took. Two shipped issues pay one on 2026-08-26, eight days before the
+    owner's window buys. What is double-counted, and all that is, is a coupon the holding both
+    **receives** and is still credited with inside its sale price.
 
     **No accrued-interest figure is computed here, and no price is split.** This subtracts whole
     declared coupon amounts on their declared dates, so 013 FR-017 is untouched -- and what it
     leaves behind is the accrual on either side, which is the exclusion every early-exit figure
     carries.
     """
-    return money.total([amount for on, amount in coupons if observed_on < on <= sold_on], currency)
+    since = max(observed_on, held_from)
+    return money.total([amount for on, amount in coupons if since < on <= sold_on], currency)
 
 
 def rests_on(assumption: QuotationHolds) -> str:
@@ -127,7 +132,8 @@ def rests_on(assumption: QuotationHolds) -> str:
     """
     return (
         f"the observed resale quotation is assumed to hold at the exit date, less every coupon "
-        f"that detached after it was observed ({assumption.id}): {assumption.rationale}"
+        f"that detached while the holding held the paper ({assumption.id}): "
+        f"{assumption.rationale}"
     )
 
 

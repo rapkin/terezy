@@ -89,7 +89,7 @@ def early_sale(
 
     ``coupons`` is this instrument's whole per-unit coupon schedule, dates and amounts, and it
     is a **required** argument rather than an adjustment a caller may apply first: the sale
-    price is the quotation net of what detached from it since the quotation's own day
+    price is the quotation net of what detached from it while the holding held it
     (:func:`early_exit.detached_since`), and a caller that forgot would credit a coupon and sell
     at a price that still contained it.
 
@@ -111,6 +111,7 @@ def early_sale(
     """
     detached = early_exit.detached_since(
         observed_on=exit_.observed_on,
+        held_from=holding.purchased_on,
         sold_on=on,
         coupons=coupons,
         currency=exit_.price_per_unit.currency,
@@ -142,7 +143,7 @@ def early_sale(
                 f"sale of {quantity!r} units at {price.amount!r} {price.currency.value} on "
                 f"{on.isoformat()}, the last day of the horizon: the resale quotation declared "
                 f"as of {exit_.observed_on.isoformat()}, less the {detached.amount!r} per "
-                f"unit that detached from it since, under the assumption "
+                f"unit that detached from it while the holding held it, under the assumption "
                 f"{exit_.assumption.id!r}"
             ),
         ),

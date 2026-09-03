@@ -27,7 +27,6 @@ from terezy.core.decision import candidates as enumeration
 from terezy.core.decision.tuple_outcome import Registries
 from terezy.core.primitives import money, staleness
 from terezy.core.primitives import provenance as prov
-from terezy.core.primitives.tolerance import TOLERANCE
 from terezy.core.results import candidates as candidate_results
 from terezy.core.results.answer import (
     AmountForAnUndeclaredStream,
@@ -549,14 +548,13 @@ def _early_exit_exclusions(key: Tuple, sold: SoldEarly) -> tuple[StatedExclusion
     asserts that absence rather than tolerating it: a sign asserted without a warrant is a number
     more confident than its inputs, which is worse than one left unstated.
 
-    **The accrued-interest claim is attached to the sale rather than to the candidate**, because
-    it is the residual of an adjustment that did not happen: a sale from which no coupon detached
-    is struck at the quotation itself and has no accrual left over to state. Read off
-    ``detached_per_unit`` rather than off the instrument's declaration form, so a zero-coupon
-    issue and a window that simply contains no coupon date are the same case here -- which they
-    are.
+    **The accrued-interest claim is on every early exit, not only on the ones a coupon detached
+    from.** What it states is that a dirty quotation is carried across a gap without the accrual
+    that gap builds, and the gap exists whenever the sale is not struck on the quotation's own
+    day -- which for a horizon's end is always. Gating it on a detachment would have left it
+    unstated on the majority of the owner's sales while the figure was understated all the same.
     """
-    stated = (
+    return (
         StatedExclusion(
             what=Exclusion.EARLY_EXIT_IS_A_POINT_NOT_A_DISTRIBUTION,
             applies_to=key,
@@ -575,14 +573,6 @@ def _early_exit_exclusions(key: Tuple, sold: SoldEarly) -> tuple[StatedExclusion
             supplied_by=RATE_RISK_SUPPLIED_BY,
             direction=None,
         ),
-    )
-    # `> tolerance`, not `!= 0`: the claim is that the struck price is BELOW the one the belief
-    # implies, so a residual at or under the project tolerance is nothing to state and a
-    # negative one would be the opposite claim wearing this one's direction.
-    if not sold.detached_per_unit.amount > TOLERANCE:
-        return stated
-    return (
-        *stated,
         StatedExclusion(
             what=Exclusion.EARLY_EXIT_IGNORES_ACCRUED_INTEREST,
             applies_to=key,

@@ -67,8 +67,7 @@ EARLY_EXIT_CLAIMS: Final = frozenset(
         Exclusion.EARLY_EXIT_IGNORES_ACCRUED_INTEREST,
     }
 )
-"""The fourth is conditional: a sale from which no coupon detached is struck at the quotation
-itself and has no accrued residual to state."""
+"""015 FR-033's three, and the fourth that carrying a dated quotation added."""
 
 
 def _walk(value: object, seen: set[int] | None = None) -> list[object]:
@@ -269,16 +268,14 @@ def test_a_section_that_holds_to_maturity_inherits_no_early_exit_claim() -> None
 
 
 def test_an_early_exit_states_its_claims_and_leaves_rate_risk_unsigned() -> None:
-    """SC-026. The absence of a direction on rate risk is **asserted**, not tolerated.
+    """SC-026, **widened by one claim on 2026-09-03**: it was written for FR-033's three, and
+    carrying a dirty quotation net of detached coupons added a fourth. The criterion's shape is
+    unchanged -- state every claim, sign only the ones with a warrant -- and rate risk is still
+    the one that has none.
 
     Rate risk is symmetric -- a bond sold after rates rise fetches less than its spread implies
     and one sold after rates fall fetches more -- and an approximation whose sign is asserted
     without a warrant is a number more confident than its inputs, which is worse than none.
-
-    The accrued-interest claim is conditional -- a sale from which no coupon detached has no
-    residual to state -- and *which* sales carry it is asserted where the population can be
-    named: `test_owner_stated_assumptions` for a window holding no coupon date, and
-    `tests/worked_examples/test_a_coupon_inside_the_window.py` over the owner's own answer.
     """
     fixture = fixtures.answered(
         supplied=fixtures.with_resale_price(fixtures.inputs(), "ovdp_synthetic_a")

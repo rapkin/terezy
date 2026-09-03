@@ -440,6 +440,35 @@ def _reinvested_then_sold() -> Projection:
     return outcome
 
 
+def test_reinvestment_plus_a_moved_quotation_is_refused_rather_than_priced() -> None:
+    """One quotation cannot price units bought on different days.
+
+    The sale applies a single per-unit adjustment to every unit held, and a unit bought out of
+    the 2026-07-15 coupon was not in existence when that coupon detached -- so it would be
+    discounted for a coupon it never contained. Quoted on the sale day (the fixture above)
+    nothing detaches and the sale stands; quoted earlier it refuses by name.
+    """
+    outcome = project.project(
+        synthetic.declaration(),
+        synthetic.holding(
+            quantity=REINVEST_UNITS,
+            cost=Money(REINVEST_COST, synthetic.UAH, synthetic.holding().cost.provenance),
+        ),
+        synthetic.horizon(end=REINVEST_END),
+        synthetic.assumptions(coupon_policy=fixed_income.REINVEST),
+        tax_classes=synthetic.TAX_PACK,
+        early_exit=EarlyExit(
+            price_per_unit=Money(RESALE_PER_UNIT, synthetic.UAH, synthetic.TERMS_PROVENANCE),
+            observed_on=QUOTED_ON,
+            assumption=QUOTATION_HOLDS,
+        ),
+    )
+    assert isinstance(outcome, InconsistentTerms), outcome
+    assert outcome.first_term == "assumptions.coupon_policy"
+    assert outcome.second_term == "access.resale_price"
+    assert "units acquired on different dates" in outcome.reason
+
+
 def test_the_premium_measures_the_units_the_purchase_paid_for() -> None:
     """A schedule that reinvests ends holding more units than the outlay bought.
 

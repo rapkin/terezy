@@ -2624,8 +2624,8 @@ def _check_resale_price(
 ) -> None:
     """A resale price is optional, is in the instrument's currency, and is not a fund's.
 
-    Optional because its absence is the shipped state and the thing 015 FR-031 refuses by name:
-    an early exit that cannot be struck reports a missing declaration rather than a figure. A
+    Optional because its absence is what 015 FR-031 refuses by name: an early exit that cannot
+    be struck reports a missing declaration rather than a figure. A
     **fund** may not declare one, on the purchase quote's reasoning: it prices its own exit from
     its declared NAV and its declared exit discount, and a second price in a second file is one
     fact in two places.

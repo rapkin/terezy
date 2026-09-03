@@ -30,10 +30,13 @@ class, venue, tax class or id prefix (FR-007a, SC-032).
 
 ### `[access.resale_price]` → `InstrumentAccess.resale_price: VenueQuote | None`
 
-The same `VenueQuote` an `[access.price]` builds — a `Money` per unit with its citation, and the
-`ObservationKind` it ages under. `None` is the shipped state and is what FR-031 refuses by name.
+The same `VenueQuote` an `[access.price]` builds — a `Money` per unit with its citation, the
+`ObservationKind` it ages under, and (added 2026-09-03) `observed_on`, the declaration's own
+`retrieved_on`: the day the quotation described the market, which is what a sale carried to a
+later date subtracts detached coupons from. `None` is what FR-031 refuses by name; the fixture
+instruments still make that statement and every real issue declares a quote.
 
-### `data/scenarios/early_exit/<owner>.toml` → `core.scenarios.early_exit.SpreadHolds`
+### `data/scenarios/early_exit/<owner>.toml` → `core.scenarios.early_exit.QuotationHolds`
 
 | Field | Type | Requirement |
 |---|---|---|

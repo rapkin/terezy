@@ -34,10 +34,10 @@ from tests import answer_registries as answers
 
 pytestmark = pytest.mark.worked_example
 
-DETACHED_PER_HORIZON = (7, 13, 12)
-"""How many of each section's early exits have a coupon detach between the 2026-08-24 quotation
-and the sale -- the population whose sale price the subtraction moves. Measured 2026-09-03 on
-the shipped registry; the horizons are `data/questions/fifty-thousand.toml`'s."""
+DETACHED_PER_HORIZON = (5, 11, 12)
+"""How many of each section's early exits have a coupon detach while the holding held the paper
+-- the population whose sale price the subtraction moves. Measured 2026-09-03 on the shipped
+registry; the horizons are `data/questions/fifty-thousand.toml`'s."""
 
 EARLY_EXIT_CLAIMS = frozenset(
     {
@@ -77,7 +77,7 @@ income and once inside a sale price quoted while it was still attached.
 **What is still missing is the accrual, and it is signed.** On a straight-line reading of the
 declared payment dates -- 2026-03-11 to 2026-09-09 is 182 days, so the quotation of 2026-08-24
 sat 166 days into the period and the 2026-10-01 sale sits 22 days into the next -- the quotation
-carried 77.99 of accrual and the sale date carries 10.34, so the sale is struck about 17.85 per
+carried 77.98 of accrual and the sale date carries 10.34, so the sale is struck about 17.85 per
 unit below what the same assumption implies. That reading is an **illustration and not a figure
 this engine emits**: nothing declares the basis, and choosing one is what
 `enumerated-accrued-interest` is for.
@@ -91,17 +91,18 @@ COUPON_PER_UNIT = 85.50
 QUOTED_SELL = 1087.89
 SPREAD_PER_UNIT = 1089.32 - QUOTED_SELL
 
-BOTH_LEGS_CARRIED = {
-    # id: units, buy quotation, sell quotation, coupon detaching 2026-08-26 -- after the
-    # 2026-08-24 quotation and before the 2026-09-02 purchase, so out of BOTH legs.
-    "UA4000231195": (48.0, 1110.24, 1107.43, 87.50),
-    "UA4000239081": (49.0, 1085.00, 1078.09, 82.20),
+BEFORE_THE_PURCHASE = {
+    # id: units, buy quotation, sell quotation, coupon paid 2026-08-26 -- after the 2026-08-24
+    # quotation and before the 2026-09-02 purchase, so in BOTH prices and received by neither.
+    "UA4000231195": (45.0, 1110.24, 1107.43, 87.50),
+    "UA4000239081": (46.0, 1085.00, 1078.09, 82.20),
 }
-"""The two shipped issues whose coupon detaches between the quotation and the purchase.
+"""The two shipped issues paying a coupon between the quotation and the purchase.
 
-They are what says the belief is applied to the pair of quotations rather than to one of them:
-the holder never receives that coupon, and a purchase priced gross of it against a sale priced
-net of it would charge him for it. Measured 2026-09-03."""
+They are what fixes the subtraction's lower bound at the **purchase** rather than at the
+quotation: the buy quotation of the same morning sizes the purchase as declared, so taking that
+coupon out of the sell leg alone would report a loss of a whole coupon nobody took. Measured
+2026-09-03."""
 
 
 @functools.cache
@@ -204,7 +205,9 @@ def test_the_subtraction_is_reached_at_every_horizon_the_owner_asked_about() -> 
             quote = declared[item.key.instrument_id].resale_price
             assert quote is not None, item.key.instrument_id
             coupons = _coupons_declared_between(
-                item.key.instrument_id, quote.observed_on, section.horizon.end
+                item.key.instrument_id,
+                max(quote.observed_on, _bought_on(item, section.horizon.start)),
+                section.horizon.end,
             )
             if coupons:
                 expected.add(item.key.instrument_id)
@@ -218,7 +221,7 @@ def test_the_subtraction_is_reached_at_every_horizon_the_owner_asked_about() -> 
     assert untouched
 
 
-MULTI_COUPON = ("UA4000239081", 3, 82.20)
+MULTI_COUPON = ("UA4000239081", 2, 82.20)
 """An issue detaching MORE than one coupon inside the owner's twelve-month window, with how
 many and what each pays per unit. The residual this leaves grows with every one of them, which
 is why it is not bounded by a coupon. Measured 2026-09-03."""
@@ -227,19 +230,23 @@ is why it is not bounded by a coupon. Measured 2026-09-03."""
 def test_more_than_one_coupon_detaches_and_every_one_of_them_comes_out() -> None:
     """The multi-coupon case, which is where "not bounded by one coupon" stops being a claim.
 
-    Three coupons of 82.20 leave the quotation over the owner's year, so the sale is struck
-    246.60 per unit below it -- nearly three times the largest single-coupon adjustment on the
-    registry. Under the same belief the price also rebuilds by accrual between them, and none
-    of that is carried, which is what the accrued-interest exclusion states.
+    Two coupons of 82.20 leave the quotation over the owner's year, so the sale is struck
+    164.40 per unit below it -- twice the largest single-coupon adjustment on the registry.
+    Under the same belief the price also rebuilds by accrual between them, and none of that is
+    carried, which is what the accrued-interest exclusion states.
     """
     name, count, per_coupon = MULTI_COUPON
     twelve = answers.answered().sections[2]
     quote = _supplied().registries.access[name].resale_price
     assert quote is not None
-    coupons = _coupons_declared_between(name, quote.observed_on, twelve.horizon.end)
+    item = next(one for one in _sold_early(2) if one.key.instrument_id == name)
+    coupons = _coupons_declared_between(
+        name,
+        max(quote.observed_on, _bought_on(item, twelve.horizon.start)),
+        twelve.horizon.end,
+    )
     assert len(coupons) == count
     assert coupons == [per_coupon] * count
-    item = next(one for one in _sold_early(2) if one.key.instrument_id == name)
     assert item.sold_early is not None
     assert _detached(item) == pytest.approx(count * per_coupon, abs=TOLERANCE)
     assert item.sold_early.price_per_unit.amount == pytest.approx(
@@ -247,30 +254,33 @@ def test_more_than_one_coupon_detaches_and_every_one_of_them_comes_out() -> None
     )
 
 
-def test_a_coupon_between_the_quotation_and_the_purchase_leaves_both_legs() -> None:
-    """One morning's two quotations are carried the same way, and here it is worth 87.50.
+def test_a_coupon_paid_before_the_purchase_stays_in_both_prices() -> None:
+    """The case that fixes the lower bound at the purchase, and it is worth 87.50 a unit.
 
     UA4000231195, over the owner's one month::
 
-        coupon 2026-08-26   87.50 per unit, after the quotation and before the purchase
-        bought 2026-09-02   1 110.24 - 87.50 = 1 022.74  x 48 units = 49 091.52
-        sold   2026-10-01   1 107.43 - 87.50 = 1 019.93  x 48 units = 48 956.64
-                            the month returns 48 x 2.81 = 134.88 less than it deployed
+        coupon 2026-08-26   87.50 per unit -- after the quotation, before the purchase,
+                            and received by whoever held the paper that morning
+        bought 2026-09-02   1 110.24 x 45 units = 49 960.80
+        sold   2026-10-01   1 107.43 x 45 units = 49 834.35
+                            the month returns 45 x 2.81 = 126.45 less than it deployed
 
-    That difference is the bid-ask spread and nothing else, which is the whole content of a
-    constant clean price. Pricing the sale net of the coupon and the purchase gross of it would
-    have reported a loss of 48 x 87.50 on top, for a coupon the holder never received.
+    Neither price moves, and the month returns the bid-ask spread and nothing else. Opening the
+    subtraction at the quotation instead would have taken 87.50 out of the sale while the buy
+    quotation of the same morning still held it -- a loss of 45 x 87.50 that nobody took.
     """
-    section = answers.answered().sections[0]
-    for name, (units, buy, sell, coupon) in BOTH_LEGS_CARRIED.items():
+    assert answers.answered().sections[0].horizon.end == date(2026, 10, 1)
+    for name, (units, buy, sell, coupon) in BEFORE_THE_PURCHASE.items():
         item = next(one for one in _sold_early(0) if one.key.instrument_id == name)
         assert item.sold_early is not None
+        assert _coupons_declared_between(name, QUOTED_ON, date(2026, 9, 2)) == [coupon]
         assert item.sold_early.units == units
-        assert _detached(item) == pytest.approx(coupon, abs=TOLERANCE)
-        assert item.reaches.amount == pytest.approx(units * (sell - coupon), abs=TOLERANCE)
-        deployed = units * (buy - coupon)
-        assert item.reaches.amount - deployed == pytest.approx(-units * (buy - sell), abs=TOLERANCE)
-    assert section.horizon.end == date(2026, 10, 1)
+        assert _detached(item) == 0.0
+        assert item.sold_early.price_per_unit.amount == pytest.approx(sell, abs=TOLERANCE)
+        assert item.reaches.amount == pytest.approx(units * sell, abs=TOLERANCE)
+        assert item.reaches.amount - units * buy == pytest.approx(
+            -units * (buy - sell), abs=TOLERANCE
+        )
 
 
 def test_no_declared_coupon_falls_on_the_quotation_day() -> None:
@@ -342,7 +352,13 @@ def test_the_engine_strikes_the_sale_at_the_quotation_net_of_the_coupon() -> Non
     )
     assert outcome.reaches.amount == pytest.approx(REACHED, abs=TOLERANCE)
     assert outcome.reaches.amount == pytest.approx(DEPLOYED_UNITS * QUOTED_SELL, abs=TOLERANCE)
-    assert outcome.reaches.amount - DEPLOYED == pytest.approx(
+    # What was deployed, read off the outcome rather than retyped: `outlay` less what the join
+    # could not deploy is what it actually spent, so the spread identity below is a claim about
+    # the engine and not about the two literals above it.
+    assert outcome.undeployed is not None
+    paid = outcome.outlay.amount - outcome.undeployed.amount.amount
+    assert paid == pytest.approx(DEPLOYED, abs=TOLERANCE)
+    assert outcome.reaches.amount - paid == pytest.approx(
         -DEPLOYED_UNITS * SPREAD_PER_UNIT, abs=TOLERANCE
     )
 
@@ -364,13 +380,18 @@ def test_two_extra_months_of_accrual_reach_nothing_at_all() -> None:
     assert three_months.reaches.amount == pytest.approx(one_month.reaches.amount, abs=TOLERANCE)
 
 
-def test_the_accrued_residual_is_stated_where_a_coupon_detached_and_nowhere_else() -> None:
+def test_the_accrued_residual_is_stated_on_every_early_exit() -> None:
     """FR-023a at the level that matters: an omission that is not stated is a silent default.
 
-    Signed, and the sign is warranted rather than assumed: what came out of the quotation is a
-    whole coupon where what was in it was that period's accrual, and an accrual within a period
-    is smaller than the period's own coupon -- so the struck price is below the one the belief
-    implies, always. A sale from which nothing detached has no such residual and states none.
+    **On every sale, not only the ones a coupon detached from.** The quotation is a dirty price
+    carried across the gap between its own day and the sale, and that gap builds accrual whether
+    or not a coupon interrupts it -- so 18 of this section's 23 sales would have stated nothing
+    while being understated all the same.
+
+    Signed, and the sign is warranted rather than assumed. With no coupon detaching, both dates
+    sit inside one accrual period and accrual only grows, so the carried price is below the true
+    one. With a coupon detaching, what came out is the whole coupon where what was in the
+    quotation was the part of it that had accrued -- smaller, by definition.
     """
     assert {item.value for item in Exclusion} & EARLY_EXIT_CLAIMS == EARLY_EXIT_CLAIMS
     section = answers.answered().sections[0]
@@ -379,11 +400,12 @@ def test_the_accrued_residual_is_stated_where_a_coupon_detached_and_nowhere_else
         for item in section.excludes
         if item.what is Exclusion.EARLY_EXIT_IGNORES_ACCRUED_INTEREST
     ]
-    assert accrued
     assert all(item.direction is Direction.UNDERSTATED for item in accrued)
-    assert {item.applies_to for item in accrued} == {
-        item.key for item in _sold_early(0) if _detached(item) > 0.0
-    }
+    sold = _sold_early(0)
+    assert {item.applies_to for item in accrued} == {item.key for item in sold}
+    # Non-vacuous in the direction that matters: most of this population detached nothing, so a
+    # gate on the detachment would have left them silent.
+    assert [item for item in sold if _detached(item) == 0.0]
     stated = {item.what.value for item in section.excludes if item.what.value in EARLY_EXIT_CLAIMS}
     assert stated == EARLY_EXIT_CLAIMS
 

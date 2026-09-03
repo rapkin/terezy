@@ -304,7 +304,7 @@ def project(
     # would then move when the owner changed their mind about coupons -- a figure
     # labelled "contractual" that is not (FR-005). Policy-invariance is asserted by
     # tests/unit/test_contractual_yield_is_policy_invariant.py.
-    sold_early = _sold_early(declaration, ops, gross_events, early_exit)
+    sold_early = _sold_early(declaration, ops, holding, gross_events, early_exit)
     contractual_events = _contractual_events(declaration, holding, horizon, assumptions, early_exit)
     if isinstance(contractual_events, InfeasiblePurchase | InconsistentTerms):
         return contractual_events  # pragma: no cover -- the policy run already succeeded
@@ -360,8 +360,8 @@ def _sale_excludes(sold: SoldEarly | None) -> frozenset[str]:
         {
             "the contractual figure closes at a declared resale price rather than at maturity "
             f"({sold.on.isoformat()}), under the stated belief {sold.assumption.id!r} that the "
-            "observed quotation holds at that date less the coupons that detached since it "
-            "was observed -- neither is a term of the paper"
+            "observed quotation holds at that date less the coupons that detached while the "
+            "holding held the paper -- neither is a term of the paper"
         }
     )
 
@@ -369,6 +369,7 @@ def _sale_excludes(sold: SoldEarly | None) -> frozenset[str]:
 def _sold_early(
     declaration: InstrumentDeclaration,
     ops: InstrumentOps,
+    holding: Holding,
     events: Sequence[Event],
     early_exit: EarlyExit | None,
 ) -> SoldEarly | None:
@@ -394,6 +395,7 @@ def _sold_early(
     # drift from what `early_sale` struck.
     detached = early_exit_scenario.detached_since(
         observed_on=early_exit.observed_on,
+        held_from=holding.purchased_on,
         sold_on=sale.occurred_on,
         coupons=ops.coupons_per_unit(declaration),
         currency=early_exit.price_per_unit.currency,
