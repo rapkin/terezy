@@ -18,12 +18,13 @@ build accrual the model does not carry.
 from __future__ import annotations
 
 import functools
+from dataclasses import replace
 from datetime import date, timedelta
 
 import pytest
 
 from terezy.core.decision.answer import AnswerInputs, section_evaluated
-from terezy.core.instruments.interface import EnumeratedTerms, PaymentKind
+from terezy.core.instruments.interface import DateRange, EnumeratedTerms, PaymentKind
 from terezy.core.primitives.tolerance import TOLERANCE
 from terezy.core.results.answer import Direction, Exclusion
 from terezy.core.results.ramp import RampCost
@@ -231,9 +232,9 @@ def test_more_than_one_coupon_detaches_and_every_one_of_them_comes_out() -> None
     """The multi-coupon case, which is where "not bounded by one coupon" stops being a claim.
 
     Two coupons of 82.20 leave the quotation over the owner's year, so the sale is struck
-    164.40 per unit below it -- twice the largest single-coupon adjustment on the registry.
-    Under the same belief the price also rebuilds by accrual between them, and none of that is
-    carried, which is what the accrued-interest exclusion states.
+    164.40 per unit below it. Under the same belief the price also rebuilds by accrual between
+    them, and none of that is carried -- which is what the accrued-interest exclusion states,
+    and why the residual is not bounded by a coupon.
     """
     name, count, per_coupon = MULTI_COUPON
     twelve = answers.answered().sections[2]
@@ -419,7 +420,10 @@ def test_the_accrued_residual_is_stated_on_every_early_exit() -> None:
     Signed, and the sign is warranted rather than assumed. With no coupon detaching, both dates
     sit inside one accrual period and accrual only grows, so the carried price is below the true
     one. With a coupon detaching, what came out is the whole coupon where what was in the
-    quotation was the part of it that had accrued -- smaller, by definition.
+    quotation was the part of it that had accrued -- smaller, by definition. Both arguments
+    need the quotation to **predate** the sale, which every one of the owner's does; a backdated
+    window states the claim without a direction, and that split is asserted where a backdated
+    window exists rather than here.
     """
     assert {item.value for item in Exclusion} & EARLY_EXIT_CLAIMS == EARLY_EXIT_CLAIMS
     section = answers.answered().sections[0]
@@ -428,7 +432,7 @@ def test_the_accrued_residual_is_stated_on_every_early_exit() -> None:
         for item in section.excludes
         if item.what is Exclusion.EARLY_EXIT_IGNORES_ACCRUED_INTEREST
     ]
-    assert all(item.direction is Direction.UNDERSTATED for item in accrued)
+    assert all(item.direction is Direction.SALE_STRUCK_TOO_LOW for item in accrued)
     sold = _sold_early(0)
     assert {item.applies_to for item in accrued} == {item.key for item in sold}
     # Non-vacuous in the direction that matters: most of this population detached nothing, so a
@@ -436,6 +440,35 @@ def test_the_accrued_residual_is_stated_on_every_early_exit() -> None:
     assert [item for item in sold if _detached(item) == 0.0]
     stated = {item.what.value for item in section.excludes if item.what.value in EARLY_EXIT_CLAIMS}
     assert stated == EARLY_EXIT_CLAIMS
+
+
+def test_a_backdated_window_states_the_residual_without_a_direction() -> None:
+    """The half of the sign the warrant does not cover, reached rather than argued.
+
+    Both arguments for `the_sale_is_struck_too_low` need the quotation to predate the sale. Ask
+    the same question over a window that closed before the 2026-08-24 quotation was taken and
+    the quotation is used unchanged, the accrual runs the other way, and the claim is stated
+    with no direction at all -- which is what SC-026's rule about unwarranted signs requires.
+    """
+    closed = replace(
+        answers.owners_question(),
+        horizons=(DateRange(start=date(2026, 5, 1), end=date(2026, 8, 1)),),
+    )
+    section = answers.answered(question=closed).sections[0]
+    sold = [
+        (item, item.sold_early)
+        for item in section_evaluated(section)
+        if item.sold_early is not None
+    ]
+    assert sold
+    assert all(sale.quoted_on > sale.on for _, sale in sold)
+    accrued = [
+        item
+        for item in section.excludes
+        if item.what is Exclusion.EARLY_EXIT_IGNORES_ACCRUED_INTEREST
+    ]
+    assert {item.applies_to for item in accrued} == {item.key for item, _ in sold}
+    assert all(item.direction is None for item in accrued)
 
 
 def test_the_carried_price_keeps_the_marks_of_both_the_quote_and_the_coupon() -> None:

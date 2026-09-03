@@ -1,7 +1,7 @@
 """The ``Instrument`` plugin interface: function signatures gathered into a record.
 
 One of the four plugin interfaces permitted by constitution Principle II. An instrument
-kind is a frozen record of three functions, and dispatch is a mapping
+kind is a frozen record of four functions, and dispatch is a mapping
 (``terezy.core.instruments.registry``).
 
 **What this interface covers is a projection that produces a stream of ledger events.**
@@ -442,10 +442,11 @@ class EarlyExit:
 
     price_per_unit: Money
     """The declared seller's quote **as observed**, carrying its own citation, in the
-    instrument's currency. What a unit fetches on the sale date is
-    the quotation less
-    :func:`terezy.core.scenarios.early_exit.detached_since`, which is the only place that
-    decides what left it.
+    instrument's currency.
+
+    What a unit fetches on the sale date is this less
+    :func:`terezy.core.scenarios.early_exit.detached_since`, the only place that decides what
+    left the quotation in between.
     """
 
     observed_on: date

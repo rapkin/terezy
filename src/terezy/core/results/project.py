@@ -405,6 +405,7 @@ def _sold_early(
         units=sale.quantity,
         price_per_unit=money.sub(early_exit.price_per_unit, detached),
         detached_per_unit=detached,
+        quoted_on=early_exit.observed_on,
         proceeds=sale.amount,
         assumption=early_exit.assumption,
     )
@@ -467,12 +468,14 @@ def _at_purchase(
     The two cases cannot occur together, so the split is exact rather than an approximation:
     ``enumerated`` refuses ``reinvest`` outright, which is the only way units grow.
 
-    **Where a sale retired nothing, the figure carries the quote's sources and no others.** It
-    is the resale price times the holding's own quantity, and the terms had no part in it:
-    marking it with them as well would send a reader chasing its unverified mark to a file that
-    did not supply it. Where something retired, both sources are on the figure and belong
-    there: the units sold are what the declared repayments left, so the terms decided that
-    quantity too.
+    **Where a sale retired nothing, the figure adds no source of its own.** It is the struck
+    resale price times the holding's own quantity, and the *quantity* came from the holding:
+    marking the figure with the terms on that account would send a reader chasing its
+    unverified mark to a file that did not supply it. What the struck price already carries it
+    keeps -- since 2026-09-03 that is the quotation's sources **and**, where a coupon detached,
+    the schedule's, because the price is the quotation less those declared amounts. Where
+    something retired, the terms are on the figure for the second reason too: the units sold
+    are what the declared repayments left, so the terms decided that quantity.
     """
     per_unit = instrument_terms.principal_returned(
         declaration.terms, bought_on=holding.purchased_on

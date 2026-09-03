@@ -150,9 +150,12 @@ because waiting is a cost. Testing the arrival would withhold every early exit t
 
 `Exclusion` members: `NO_REAL_TERMS_FIGURE`, `NO_INCOME_TAX_ON_THE_STATED_AMOUNT`,
 `EARLY_EXIT_CARRIES_NO_RATE_RISK`, `EARLY_EXIT_IS_A_POINT_NOT_A_DISTRIBUTION`,
-`EARLY_EXIT_SPREAD_IS_A_SELLERS_QUOTE`. The last three are FR-033's split: the certainty claim
-and the spread claim carry a direction, the rate-risk one carries `None`, and SC-026 asserts the
-absence rather than tolerating it.
+`EARLY_EXIT_SPREAD_IS_A_SELLERS_QUOTE`, and (added 2026-09-03)
+`EARLY_EXIT_IGNORES_ACCRUED_INTEREST`. The first three early-exit members are FR-033's split:
+the certainty claim and the spread claim carry a direction, the rate-risk one carries `None`,
+and SC-026 asserts the absence rather than tolerating it. The fourth is what carrying a dirty
+quotation to a later date leaves behind; it carries a direction only where the quotation
+predates the sale, which is the case its warrant covers.
 
 ### `core.results.answer.Refused`
 

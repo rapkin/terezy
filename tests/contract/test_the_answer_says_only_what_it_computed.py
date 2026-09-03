@@ -293,9 +293,8 @@ def test_an_early_exit_states_its_claims_and_leaves_rate_risk_unsigned() -> None
     assert by_claim[Exclusion.EARLY_EXIT_IS_A_POINT_NOT_A_DISTRIBUTION].direction is not None
     assert by_claim[Exclusion.EARLY_EXIT_SPREAD_IS_A_SELLERS_QUOTE].direction is not None
     assert by_claim[Exclusion.EARLY_EXIT_CARRIES_NO_RATE_RISK].direction is None
-    assert (
-        by_claim[Exclusion.EARLY_EXIT_IGNORES_ACCRUED_INTEREST].direction is Direction.UNDERSTATED
-    )
+    accrued = by_claim[Exclusion.EARLY_EXIT_IGNORES_ACCRUED_INTEREST]
+    assert accrued.direction is Direction.SALE_STRUCK_TOO_LOW
 
 
 def test_every_exclusion_names_what_would_supply_it() -> None:

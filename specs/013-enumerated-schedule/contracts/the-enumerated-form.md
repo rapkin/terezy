@@ -9,7 +9,8 @@ What this feature promises to the rest of the engine, in the form a later change
 ## 1. The instrument interface is unchanged
 
 `enumerated_schedule` is an entry in `core.instruments.registry.REGISTRY` beside
-`fixed_income`, built from the same three functions with the same signatures:
+`fixed_income`, built from the same functions with the same signatures (a fourth,
+`coupons_per_unit`, was added on 2026-09-03 for the early-exit sale price):
 
 ```python
 events(InstrumentDeclaration, Holding, DateRange, Assumptions)

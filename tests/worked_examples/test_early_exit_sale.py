@@ -314,9 +314,10 @@ def test_the_sale_price_is_the_quotation_less_the_coupon_that_detached() -> None
 def test_a_zero_coupon_issue_sells_at_the_whole_quotation() -> None:
     """Nothing detaches from a bond that pays nothing before it redeems, whenever it is quoted.
 
-    The guard that says so is a real branch rather than a shortcut: a zero-coupon declaration is
-    a valid instrument, and generating a schedule of zero-amount periods to subtract would put
-    an empty sum in every sale price.
+    A zero-coupon declaration is a valid instrument and not a missing rate, so the sale is
+    struck at the whole quotation. ``coupons_per_unit`` returns early rather than generating a
+    schedule of zero-amount periods -- the two give the same price, and the early return is
+    what keeps a reader from looking for a coupon that does not exist.
     """
     outcome = project.project(
         synthetic.declaration(terms=synthetic.terms(coupon_rate=0.0)),
@@ -395,6 +396,49 @@ def test_a_quotation_worth_less_than_its_own_coupons_refuses_by_name() -> None:
     assert outcome.first_term == "access.resale_price.per_unit"
     assert outcome.second_term == "instrument.schedule.payment"
     assert "cannot hold less than the coupons it still contains" in outcome.reason
+
+
+MOVED_ISSUE = date(2026, 1, 5)
+MOVED_ACCRUAL_END = date(2026, 7, 5)
+MOVED_PAID_ON = date(2026, 7, 6)
+"""A coupon whose accrual ends on a Saturday and is therefore paid on the Monday, bought on the
+Saturday itself. The only pair of dates on this fixture that can tell the two readings of
+*whose coupon is it* apart."""
+
+
+def test_a_coupon_the_business_day_rule_moves_past_the_purchase_is_bought_with_the_paper() -> None:
+    """Ownership and detachment read the **same** date, and this is the day they could differ.
+
+    The accrual ends 2026-07-05, a Saturday, so ``following`` pays it on the Monday. Buy on the
+    Saturday and the two readings disagree: the unadjusted end is not after the purchase, the
+    paid date is. Reading the unadjusted one for ownership and the paid one for detachment
+    would take the coupon out of the sale price while crediting it to the seller -- the branch's
+    own defect, one leg over.
+
+        coupon paid 2026-07-06   1 000.00 x 15.5% x 171/365   =   72.616438356164 per unit
+        sale        2026-12-31   995.00 - 72.616438356164     =  922.383561643836 per unit
+    """
+    terms = synthetic.terms(issue_date=MOVED_ISSUE, maturity_date=date(2028, 1, 5))
+    accrued_days = (MOVED_ACCRUAL_END - MOVED_ISSUE).days
+    per_unit = 1_000.0 * 0.155 * accrued_days / 365
+    outcome = project.project(
+        synthetic.declaration(terms=terms),
+        synthetic.holding(purchased_on=MOVED_ACCRUAL_END),
+        synthetic.horizon(start=MOVED_ISSUE, end=HORIZON_END),
+        synthetic.assumptions(),
+        tax_classes=synthetic.TAX_PACK,
+        early_exit=EarlyExit(
+            price_per_unit=Money(RESALE_PER_UNIT, synthetic.UAH, synthetic.TERMS_PROVENANCE),
+            observed_on=MOVED_ISSUE,
+            assumption=QUOTATION_HOLDS,
+        ),
+    )
+    assert isinstance(outcome, Projection), outcome
+    paid = [event for event in outcome.ledger.applied if event.kind is EventKind.COUPON]
+    assert [event.occurred_on for event in paid] == [MOVED_PAID_ON]
+    assert outcome.sold_early is not None
+    assert is_close(outcome.sold_early.detached_per_unit.amount, per_unit)
+    assert is_close(outcome.sold_early.price_per_unit.amount, RESALE_PER_UNIT - per_unit)
 
 
 def test_a_coupon_before_the_quotation_is_already_out_of_it() -> None:
@@ -508,10 +552,16 @@ QUOTE_SOURCE = SourceRef(
 def test_the_figure_is_marked_by_the_quote_and_not_by_the_terms() -> None:
     """Principle I at the level a gate cannot see: which file a reader is sent to.
 
-    The whole purchase is sold here, so what comes back is the quote times a quantity the
-    holding declared and the terms had no part in. Carrying the terms' sources would say the
-    figure rests on the issue's declaration, and a reader chasing the unverified mark would
-    open the wrong file. Nothing is dropped either: the quote's own mark is on the figure.
+    The whole purchase is sold here, so what comes back is the struck price times a quantity the
+    holding declared and the terms had no part in. Carrying the terms' sources **on account of
+    the quantity** would say the figure rests on the issue's declaration, and a reader chasing
+    the unverified mark would open the wrong file. Nothing is dropped either: the quote's own
+    mark is on the figure.
+
+    **Quoted on the sale day, so nothing detached and the struck price is the quotation.** That
+    is what makes the set equality below a statement about the *quantity* rather than about the
+    price: where a coupon does detach the schedule's sources join the price and belong there,
+    which `test_a_coupon_inside_the_window.py` asserts on the owner's own answer.
     """
     outcome = project.project(
         synthetic.declaration(),

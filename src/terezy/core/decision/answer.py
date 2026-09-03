@@ -548,13 +548,18 @@ def _early_exit_exclusions(key: Tuple, sold: SoldEarly) -> tuple[StatedExclusion
     asserts that absence rather than tolerating it: a sign asserted without a warrant is a number
     more confident than its inputs, which is worse than one left unstated.
 
-    **The accrued-interest claim is on every early exit, not only on the ones a coupon detached
-    from.** What it states is that a dirty quotation is carried across a gap without the accrual
-    that gap builds, and the gap exists whenever the sale is not struck on the quotation's own
-    day -- which for a horizon's end is always. Gating it on a detachment would have left it
-    unstated on the majority of the owner's sales while the figure was understated all the same.
+    **The accrued-interest claim is on every early exit a quotation was carried to, not only on
+    the ones a coupon detached from.** What it states is that a dirty quotation crossed a gap
+    without the accrual that gap builds, and the gap exists whenever the sale is not struck on
+    the quotation's own day. Gating it on a detachment would have left it unstated on the
+    majority of the owner's sales while the figure was understated all the same.
+
+    **Its direction is stated only where the quotation predates the sale**, which is where the
+    warrant holds. A quotation dated *after* the sale is used unchanged
+    (``early_exit.detached_since``), and the residual then runs the other way; struck on the
+    quotation's own day there is no residual and no claim to make.
     """
-    return (
+    stated = (
         StatedExclusion(
             what=Exclusion.EARLY_EXIT_IS_A_POINT_NOT_A_DISTRIBUTION,
             applies_to=key,
@@ -573,11 +578,16 @@ def _early_exit_exclusions(key: Tuple, sold: SoldEarly) -> tuple[StatedExclusion
             supplied_by=RATE_RISK_SUPPLIED_BY,
             direction=None,
         ),
+    )
+    if sold.quoted_on == sold.on:
+        return stated
+    return (
+        *stated,
         StatedExclusion(
             what=Exclusion.EARLY_EXIT_IGNORES_ACCRUED_INTEREST,
             applies_to=key,
             supplied_by=ACCRUED_INTEREST_SUPPLIED_BY,
-            direction=Direction.UNDERSTATED,
+            direction=(Direction.SALE_STRUCK_TOO_LOW if sold.quoted_on < sold.on else None),
         ),
     )
 

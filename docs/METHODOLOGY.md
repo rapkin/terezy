@@ -3892,17 +3892,20 @@ assumption exists because none does. It is declared under `data/scenarios/early_
 default — an absent belief refuses at load — and every figure computed through it names it in
 `TupleOutcome.rests_on`.
 
-Up to four claims travel with such a figure, and **only rate risk carries no direction**:
+Four claims travel with such a figure, and **rate risk is the one that carries no direction**:
 
 | claim | direction | why |
 | --- | --- | --- |
 | it is a point where the world is a distribution | **more certain than it is** | the optionality is the reason the option was chosen |
 | the spread is a seller's quote under today's conditions | **understated** | a seller's quote widens exactly when a forced sale is most likely |
 | it carries no rate risk | **none** | rate risk is symmetric: a bond sold after rates rise fetches less than its spread implies, and one sold after rates fall fetches more |
-| it ignores accrued interest | **understated** | a whole coupon comes out of the quotation where what was in it was that period's accrual, and an accrual within a period is smaller than the period's own coupon |
+| it ignores accrued interest | **the sale is struck too low** | a whole coupon comes out of the quotation where what was in it was that period's accrual, and an accrual within a period is smaller than the period's own coupon. Stated only where the quotation predates the sale, which is where that holds |
 
-The fourth is on every early exit, not only on the ones a coupon detached from: a quotation
-carried across any gap omits the accrual that gap builds. Closing it needs a declared accrual
+The fourth is on every early exit a quotation was carried to, not only on the ones a coupon
+detached from: a quotation crossing any gap omits the accrual that gap builds. The two signed
+claims err in **opposite** directions — a seller's quote understates the spread, which flatters
+the figure, while the unmodelled accrual strikes the sale below what the belief implies — so
+each names what errs rather than only which way. Closing the fourth needs a declared accrual
 basis, which §31.5 deliberately does not carry, so what ships is the direction and not the
 size.
 

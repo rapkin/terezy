@@ -257,19 +257,27 @@ class Exclusion(Enum):
 
     So the sale price is struck **below** what the same assumption implies, by the coupons
     detached less the accrual the quotation carried plus the accrual the sale date carries.
-    That quantity is positive whether or not a coupon detached: with none, both dates sit in one
-    period and accrual only grows; with some, the accrual a quotation had built is smaller than
-    the coupon that ends its period. That is why this exclusion carries a direction where rate
-    risk cannot, and it is **not** bounded by one coupon -- every further coupon inside the
-    window adds its whole amount to what came out, which
-    ``tests/worked_examples/test_a_coupon_inside_the_window.py`` reaches at three."""
+    That quantity is positive **where the quotation predates the sale**: with no coupon between
+    them both dates sit in one accrual period and accrual only grows, and with one the accrual
+    the quotation had built is smaller than the coupon that ends its period. A quotation dated
+    *after* the sale is carried nowhere and the residual reverses, so the direction is stated
+    only in the forward case. It is **not** bounded by one coupon -- every further coupon inside
+    the window adds its whole amount to what came out."""
 
 
 class Direction(Enum):
-    """Which way an approximation errs, where it has a warranted direction."""
+    """Which way an approximation errs, where it has a warranted direction.
+
+    Each member names what errs, not merely which way, because two claims on one candidate can
+    err in opposite directions: a seller's quote understates the **spread**, which flatters the
+    figure, while an unmodelled accrual strikes the **sale** below what the belief implies,
+    which does the reverse. Rendered side by side under one word a reader nets them as
+    reinforcing.
+    """
 
     MORE_CERTAIN_THAN_IT_IS = "more_certain_than_it_is"
-    UNDERSTATED = "understated"
+    UNDERSTATED = "the_spread_is_understated"
+    SALE_STRUCK_TOO_LOW = "the_sale_is_struck_too_low"
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

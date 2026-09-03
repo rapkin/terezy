@@ -42,97 +42,97 @@
   dropped DeclarationMissing           4  ovdp_enumerated_a,ovdp_enumerated_mirror,ovdp_synthetic_a,ovdp_synthetic_b
   dropped InstrumentRefused            1  inzhur_reit
   excludes early_exit_is_a_point_not_a_distribution UA4000207518             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000207518             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000207518             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000207518             
-  excludes early_exit_ignores_accrued_interest    UA4000207518             understated
+  excludes early_exit_ignores_accrued_interest    UA4000207518             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000230270             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000230270             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000230270             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000230270             
-  excludes early_exit_ignores_accrued_interest    UA4000230270             understated
+  excludes early_exit_ignores_accrued_interest    UA4000230270             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000231195             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000231195             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000231195             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000231195             
-  excludes early_exit_ignores_accrued_interest    UA4000231195             understated
+  excludes early_exit_ignores_accrued_interest    UA4000231195             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000233712             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000233712             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000233712             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000233712             
-  excludes early_exit_ignores_accrued_interest    UA4000233712             understated
+  excludes early_exit_ignores_accrued_interest    UA4000233712             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000234223             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000234223             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000234223             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000234223             
-  excludes early_exit_ignores_accrued_interest    UA4000234223             understated
+  excludes early_exit_ignores_accrued_interest    UA4000234223             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000234413             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000234413             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000234413             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000234413             
-  excludes early_exit_ignores_accrued_interest    UA4000234413             understated
+  excludes early_exit_ignores_accrued_interest    UA4000234413             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000235196             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000235196             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000235196             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000235196             
-  excludes early_exit_ignores_accrued_interest    UA4000235196             understated
+  excludes early_exit_ignores_accrued_interest    UA4000235196             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000235782             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000235782             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000235782             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000235782             
-  excludes early_exit_ignores_accrued_interest    UA4000235782             understated
+  excludes early_exit_ignores_accrued_interest    UA4000235782             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000236228             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000236228             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000236228             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000236228             
-  excludes early_exit_ignores_accrued_interest    UA4000236228             understated
+  excludes early_exit_ignores_accrued_interest    UA4000236228             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000236475             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000236475             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000236475             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000236475             
-  excludes early_exit_ignores_accrued_interest    UA4000236475             understated
+  excludes early_exit_ignores_accrued_interest    UA4000236475             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000236624             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000236624             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000236624             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000236624             
-  excludes early_exit_ignores_accrued_interest    UA4000236624             understated
+  excludes early_exit_ignores_accrued_interest    UA4000236624             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000237416             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000237416             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000237416             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000237416             
-  excludes early_exit_ignores_accrued_interest    UA4000237416             understated
+  excludes early_exit_ignores_accrued_interest    UA4000237416             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000237556             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000237556             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000237556             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000237556             
-  excludes early_exit_ignores_accrued_interest    UA4000237556             understated
+  excludes early_exit_ignores_accrued_interest    UA4000237556             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000237804             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000237804             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000237804             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000237804             
-  excludes early_exit_ignores_accrued_interest    UA4000237804             understated
+  excludes early_exit_ignores_accrued_interest    UA4000237804             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000238281             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000238281             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000238281             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000238281             
-  excludes early_exit_ignores_accrued_interest    UA4000238281             understated
+  excludes early_exit_ignores_accrued_interest    UA4000238281             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000238968             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000238968             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000238968             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000238968             
-  excludes early_exit_ignores_accrued_interest    UA4000238968             understated
+  excludes early_exit_ignores_accrued_interest    UA4000238968             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000238976             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000238976             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000238976             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000238976             
-  excludes early_exit_ignores_accrued_interest    UA4000238976             understated
+  excludes early_exit_ignores_accrued_interest    UA4000238976             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000238992             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000238992             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000238992             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000238992             
-  excludes early_exit_ignores_accrued_interest    UA4000238992             understated
+  excludes early_exit_ignores_accrued_interest    UA4000238992             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000239008             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000239008             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000239008             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000239008             
-  excludes early_exit_ignores_accrued_interest    UA4000239008             understated
+  excludes early_exit_ignores_accrued_interest    UA4000239008             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000239016             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000239016             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000239016             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000239016             
-  excludes early_exit_ignores_accrued_interest    UA4000239016             understated
+  excludes early_exit_ignores_accrued_interest    UA4000239016             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000239040             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000239040             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000239040             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000239040             
-  excludes early_exit_ignores_accrued_interest    UA4000239040             understated
+  excludes early_exit_ignores_accrued_interest    UA4000239040             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000239081             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000239081             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000239081             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000239081             
-  excludes early_exit_ignores_accrued_interest    UA4000239081             understated
+  excludes early_exit_ignores_accrued_interest    UA4000239081             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000239107             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000239107             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000239107             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000239107             
-  excludes early_exit_ignores_accrued_interest    UA4000239107             understated
+  excludes early_exit_ignores_accrued_interest    UA4000239107             the_sale_is_struck_too_low
   withheld inzhur_miltech           arrives 2028-01-20
 
 [section] 2026-09-01..2026-12-01  CandidateSurvey  reached=2 unreached=0 undeclared=2 ids=30
@@ -165,89 +165,89 @@
   dropped DeclarationMissing           4  ovdp_enumerated_a,ovdp_enumerated_mirror,ovdp_synthetic_a,ovdp_synthetic_b
   dropped InstrumentRefused            1  inzhur_reit
   excludes early_exit_is_a_point_not_a_distribution UA4000207518             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000207518             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000207518             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000207518             
-  excludes early_exit_ignores_accrued_interest    UA4000207518             understated
+  excludes early_exit_ignores_accrued_interest    UA4000207518             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000230270             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000230270             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000230270             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000230270             
-  excludes early_exit_ignores_accrued_interest    UA4000230270             understated
+  excludes early_exit_ignores_accrued_interest    UA4000230270             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000231195             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000231195             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000231195             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000231195             
-  excludes early_exit_ignores_accrued_interest    UA4000231195             understated
+  excludes early_exit_ignores_accrued_interest    UA4000231195             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000233712             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000233712             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000233712             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000233712             
-  excludes early_exit_ignores_accrued_interest    UA4000233712             understated
+  excludes early_exit_ignores_accrued_interest    UA4000233712             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000234223             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000234223             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000234223             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000234223             
-  excludes early_exit_ignores_accrued_interest    UA4000234223             understated
+  excludes early_exit_ignores_accrued_interest    UA4000234223             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000234413             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000234413             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000234413             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000234413             
-  excludes early_exit_ignores_accrued_interest    UA4000234413             understated
+  excludes early_exit_ignores_accrued_interest    UA4000234413             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000235196             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000235196             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000235196             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000235196             
-  excludes early_exit_ignores_accrued_interest    UA4000235196             understated
+  excludes early_exit_ignores_accrued_interest    UA4000235196             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000235782             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000235782             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000235782             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000235782             
-  excludes early_exit_ignores_accrued_interest    UA4000235782             understated
+  excludes early_exit_ignores_accrued_interest    UA4000235782             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000236228             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000236228             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000236228             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000236228             
-  excludes early_exit_ignores_accrued_interest    UA4000236228             understated
+  excludes early_exit_ignores_accrued_interest    UA4000236228             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000236475             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000236475             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000236475             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000236475             
-  excludes early_exit_ignores_accrued_interest    UA4000236475             understated
+  excludes early_exit_ignores_accrued_interest    UA4000236475             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000237556             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000237556             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000237556             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000237556             
-  excludes early_exit_ignores_accrued_interest    UA4000237556             understated
+  excludes early_exit_ignores_accrued_interest    UA4000237556             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000237804             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000237804             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000237804             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000237804             
-  excludes early_exit_ignores_accrued_interest    UA4000237804             understated
+  excludes early_exit_ignores_accrued_interest    UA4000237804             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000238281             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000238281             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000238281             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000238281             
-  excludes early_exit_ignores_accrued_interest    UA4000238281             understated
+  excludes early_exit_ignores_accrued_interest    UA4000238281             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000238968             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000238968             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000238968             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000238968             
-  excludes early_exit_ignores_accrued_interest    UA4000238968             understated
+  excludes early_exit_ignores_accrued_interest    UA4000238968             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000238976             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000238976             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000238976             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000238976             
-  excludes early_exit_ignores_accrued_interest    UA4000238976             understated
+  excludes early_exit_ignores_accrued_interest    UA4000238976             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000238992             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000238992             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000238992             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000238992             
-  excludes early_exit_ignores_accrued_interest    UA4000238992             understated
+  excludes early_exit_ignores_accrued_interest    UA4000238992             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000239008             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000239008             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000239008             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000239008             
-  excludes early_exit_ignores_accrued_interest    UA4000239008             understated
+  excludes early_exit_ignores_accrued_interest    UA4000239008             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000239016             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000239016             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000239016             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000239016             
-  excludes early_exit_ignores_accrued_interest    UA4000239016             understated
+  excludes early_exit_ignores_accrued_interest    UA4000239016             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000239040             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000239040             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000239040             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000239040             
-  excludes early_exit_ignores_accrued_interest    UA4000239040             understated
+  excludes early_exit_ignores_accrued_interest    UA4000239040             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000239081             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000239081             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000239081             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000239081             
-  excludes early_exit_ignores_accrued_interest    UA4000239081             understated
+  excludes early_exit_ignores_accrued_interest    UA4000239081             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000239107             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000239107             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000239107             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000239107             
-  excludes early_exit_ignores_accrued_interest    UA4000239107             understated
+  excludes early_exit_ignores_accrued_interest    UA4000239107             the_sale_is_struck_too_low
   withheld inzhur_miltech           arrives 2028-01-20
 
 [section] 2026-09-01..2027-09-01  CandidateSurvey  reached=2 unreached=0 undeclared=2 ids=30
@@ -281,57 +281,57 @@
   dropped DeclarationMissing           3  ovdp_enumerated_mirror,ovdp_synthetic_a,ovdp_synthetic_b
   dropped InstrumentRefused            1  inzhur_reit
   excludes early_exit_is_a_point_not_a_distribution UA4000233712             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000233712             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000233712             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000233712             
-  excludes early_exit_ignores_accrued_interest    UA4000233712             understated
+  excludes early_exit_ignores_accrued_interest    UA4000233712             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000235196             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000235196             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000235196             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000235196             
-  excludes early_exit_ignores_accrued_interest    UA4000235196             understated
+  excludes early_exit_ignores_accrued_interest    UA4000235196             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000235782             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000235782             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000235782             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000235782             
-  excludes early_exit_ignores_accrued_interest    UA4000235782             understated
+  excludes early_exit_ignores_accrued_interest    UA4000235782             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000236475             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000236475             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000236475             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000236475             
-  excludes early_exit_ignores_accrued_interest    UA4000236475             understated
+  excludes early_exit_ignores_accrued_interest    UA4000236475             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000237556             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000237556             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000237556             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000237556             
-  excludes early_exit_ignores_accrued_interest    UA4000237556             understated
+  excludes early_exit_ignores_accrued_interest    UA4000237556             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000237804             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000237804             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000237804             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000237804             
-  excludes early_exit_ignores_accrued_interest    UA4000237804             understated
+  excludes early_exit_ignores_accrued_interest    UA4000237804             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000238968             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000238968             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000238968             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000238968             
-  excludes early_exit_ignores_accrued_interest    UA4000238968             understated
+  excludes early_exit_ignores_accrued_interest    UA4000238968             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000238992             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000238992             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000238992             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000238992             
-  excludes early_exit_ignores_accrued_interest    UA4000238992             understated
+  excludes early_exit_ignores_accrued_interest    UA4000238992             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000239008             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000239008             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000239008             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000239008             
-  excludes early_exit_ignores_accrued_interest    UA4000239008             understated
+  excludes early_exit_ignores_accrued_interest    UA4000239008             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000239040             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000239040             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000239040             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000239040             
-  excludes early_exit_ignores_accrued_interest    UA4000239040             understated
+  excludes early_exit_ignores_accrued_interest    UA4000239040             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000239081             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000239081             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000239081             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000239081             
-  excludes early_exit_ignores_accrued_interest    UA4000239081             understated
+  excludes early_exit_ignores_accrued_interest    UA4000239081             the_sale_is_struck_too_low
   excludes early_exit_is_a_point_not_a_distribution UA4000239107             more_certain_than_it_is
-  excludes early_exit_spread_is_a_sellers_quote   UA4000239107             understated
+  excludes early_exit_spread_is_a_sellers_quote   UA4000239107             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000239107             
-  excludes early_exit_ignores_accrued_interest    UA4000239107             understated
+  excludes early_exit_ignores_accrued_interest    UA4000239107             the_sale_is_struck_too_low
   withheld inzhur_miltech           arrives 2028-01-20
 
 [excludes] no_real_terms_figure
 [excludes] no_income_tax_on_the_stated_amount
 
 [keys] SectionsAgreeByKey
-[digest] sha256:24523bffbc267ce07b35ca468764ed7838e222e6073ad94514a5a9459e1fe746
+[digest] sha256:15060b522cdd60099e6de9cc1008e38f0d2c522a306f487c5ef54a038aff806b

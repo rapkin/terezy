@@ -73,6 +73,11 @@ class SoldEarly:
     """What :func:`detached_since` took out of the quotation, per unit. Zero is a real answer
     and not an absence: it says this sale carried no coupon adjustment at all."""
 
+    quoted_on: date
+    """The day the quotation described the market. Reported because the gap between it and
+    :attr:`on` is what the accrued-interest exclusion is about, and its **sign** is what decides
+    whether that exclusion may state a direction at all."""
+
     proceeds: Money
     """``units x price_per_unit``. Gross: the disposal's tax is charged like any other."""
 
