@@ -53,18 +53,28 @@ pytestmark = pytest.mark.golden
 
 GOLDEN_FILE: Final = Path(__file__).with_name("candidate_set.golden.txt")
 UPDATE_VARIABLE: Final = "TEREZY_UPDATE_GOLDEN"
-BENCHMARK: Final = "UA4000235865"
-"""The issue the owner named in his own question file, so one artefact is measured once."""
+BENCHMARK: Final = "UA4000231195"
+"""This artefact's own hurdle, and not a copy of the owner's choice.
+
+The question below is not his -- its horizon, its as-of and its amounts are this module's --
+so naming the issue his question file names would be a coincidence maintained by hand. What it
+must be is an issue that outlives this horizon, or the artefact fails the day the issue matures
+out of the observation files: `UA4000231195` runs to 2027-08-25.
+"""
 
 
 def _surveyed() -> CandidateSurvey:
     registries = fixtures.declared(data_roots.SHIPPED)
-    question = fixtures.question(registries)
+    shipped = fixtures.declarations(data_roots.SHIPPED)
+    # Every term from the shipped root, the bound included: `question`'s default reads the
+    # composed one, and an artefact headed "what the shipped declarations offer" must not
+    # record a bound no shipped file declares.
+    question = fixtures.question(registries, bound=shipped.composition.bound)
     result = survey(
         registries=registries,
         routes=registries.routes,
         question=question,
-        ceiling=fixtures.declarations(data_roots.SHIPPED).ceiling,
+        ceiling=shipped.ceiling,
         benchmark=fixtures.benchmark_key(registries, BENCHMARK, question_=question),
     )
     assert isinstance(result, CandidateSurvey), result

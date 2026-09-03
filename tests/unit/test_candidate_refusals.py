@@ -53,7 +53,7 @@ def _run(
     )
 
 
-def _shipped_count() -> int:
+def _declared_count() -> int:
     result = _run(fixtures.declared())
     assert isinstance(result, CandidateSet)
     return len(result.candidates)
@@ -61,14 +61,14 @@ def _shipped_count() -> int:
 
 class TestTheCeilingRefusesAndNeverTruncates:
     def test_a_count_one_above_the_ceiling_refuses_naming_both_numbers(self) -> None:
-        reached = _shipped_count()
+        reached = _declared_count()
         result = _run(fixtures.declared(), ceiling=fixtures.ceiling(reached - 1))
         assert isinstance(result, CeilingExceeded), result
         assert (result.ceiling, result.reached) == (reached - 1, reached)
 
     def test_a_count_exactly_at_the_ceiling_is_admitted(self) -> None:
         """The boundary, because off-by-one here refuses a question the owner asked."""
-        reached = _shipped_count()
+        reached = _declared_count()
         result = _run(fixtures.declared(), ceiling=fixtures.ceiling(reached))
         assert isinstance(result, CandidateSet), result
         assert len(result.candidates) == reached

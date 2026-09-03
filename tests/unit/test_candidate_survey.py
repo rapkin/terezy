@@ -55,7 +55,7 @@ def _survey(registries: Registries, benchmark: Tuple) -> CandidateSurvey | Surve
     )
 
 
-def _shipped_survey() -> CandidateSurvey:
+def _declared_survey() -> CandidateSurvey:
     registries = fixtures.declared()
     result = _survey(registries, fixtures.benchmark_key(registries, OVDP))
     assert isinstance(result, CandidateSurvey), result
@@ -64,7 +64,7 @@ def _shipped_survey() -> CandidateSurvey:
 
 class TestTheBenchmarkIsAMemberOfTheSet:
     def test_the_index_points_at_a_candidate_the_same_loop_produced(self) -> None:
-        result = _shipped_survey()
+        result = _declared_survey()
         assert isinstance(result.comparison, Comparison)
         pointed = result.comparison.ranked[result.comparison.benchmark].key
         assert pointed in {item.key for item in result.enumerated.candidates}
@@ -110,7 +110,7 @@ class TestTheLoopIsALoop:
         """SC-002, field for field, over **every** evaluated candidate rather than a sample."""
         registries = fixtures.declared()
         question = fixtures.question(registries)
-        result = _shipped_survey()
+        result = _declared_survey()
         outcomes = evaluated(result.comparison)
         assert outcomes
         for outcome in outcomes:
@@ -128,7 +128,7 @@ class TestTheLoopIsALoop:
     def test_a_dropped_candidate_is_the_refusal_evaluate_gives_the_same_key(self) -> None:
         registries = fixtures.declared()
         question = fixtures.question(registries)
-        result = _shipped_survey()
+        result = _declared_survey()
         for refused in result.comparison.refused:
             direct = evaluate(
                 refused.key,

@@ -320,7 +320,9 @@ def test_the_hurdle_is_marked_by_identity_and_not_by_position() -> None:
     lines = cli.render(answered)
 
     marked = [line for line in lines if "[BENCHMARK]" in line]
-    verdicts = [line for line in lines if "beat the benchmark" in line or "NOTHING BEATS" in line]
+    verdicts = [
+        line for line in lines if "beat the benchmark" in line or "NOTHING SHOWN HERE" in line
+    ]
     assert marked, "the ranking prints no hurdle at all"
     assert len(verdicts) == len(marked)
     assert all(BELOW_A_WITHHELD_CANDIDATE in line for line in marked), marked

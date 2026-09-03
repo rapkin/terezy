@@ -345,7 +345,8 @@ def _span_caveat(
     list: a hurdle that runs to the window's end tells the reader nothing about the eleven rows
     that did not, and gating the caveat on the hurdle alone printed the bare verdict over
     exactly that table. So the rows are counted and the hurdle is named only when it is one of
-    them.
+    them -- and where **every** row ends inside the window there is no "rest" to contrast with,
+    which is a different sentence rather than the same one read loosely.
 
     Stated rather than suppressed: the figures are real and the owner chose the hurdle, so
     withholding the verdict would hide work he asked for. What he cannot be left to infer is
@@ -363,11 +364,17 @@ def _span_caveat(
         if hurdle in short
         else f" The benchmark is not one of them; its rate does span the window to {window}."
     )
+    every = len(short) == len(ranked)
+    rest = (
+        " and NONE runs to it, so there is no row here measured over the window at all"
+        if every
+        else ", so each is annualised over its own shorter span while the rest are annualised "
+        "over the window"
+    )
     return (
         f" RATES HERE SPAN DIFFERENT PERIODS: {len(short)} of {len(ranked)} ranked row(s) end "
-        f"before {window}, so each is annualised over its own shorter span while the rest are "
-        f"annualised over the window. Rates measured over periods of different length are not "
-        f"comparable, and the ordering above is across both.{hurdle_note}"
+        f"before {window}{rest}. Rates measured over periods of different length are not "
+        f"comparable, and the ordering above is across them.{hurdle_note}"
     )
 
 

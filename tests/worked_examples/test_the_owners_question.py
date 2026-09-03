@@ -5,13 +5,16 @@ two reach every instrument that ships, and at each of his three horizons the О�
 ranked against the issue he named as his benchmark. The two funds are not: one refuses on its
 own terms and the other's money arrives in 2028.
 
-**The benchmark matures inside every horizon** (2026-09-16), so its proceeds sit as cash to each
-window's end under the question's own `hold_as_cash` continuation, and the comparable rate
-annualises over the eighteen days the money was at work rather than over the window. The idle
-cash therefore reaches no figure at all: the same span, the same proceeds and the same rate at
-one, three and twelve months, ranked against rates annualised over those three windows. That is
-asserted below rather than described, because it is the hurdle the whole answer is measured
-against and it is the owner's to overrule.
+**The benchmark's own terms end 2027-08-25**, a week short of his longest horizon, so at twelve
+months the hurdle is a bond held very nearly to maturity and at one and three it is sold at the
+window's end like any other candidate. That is why he chose it, and it is asserted below rather
+than described.
+
+What the choice does **not** settle is that a comparable rate is an IRR over the span the money
+was at work: 1, 3 and 12 of the 24 ranked rows end inside his three windows and are annualised
+over their own spans while the rest are annualised over the window, so the ordering is across
+periods of different length whatever the hurdle is. `specs/features.toml` records it as
+`the-hurdle-undershoots-every-horizon`; the renderer states the count per section.
 
 **Every count below is derived from the labels and declarations the test loads.** A criterion
 pinning 24 would be pinning the whole ОВДП group, and the cheapest way to satisfy it would be
