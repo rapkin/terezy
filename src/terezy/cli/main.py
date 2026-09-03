@@ -317,7 +317,7 @@ def _beats_line(comparison: Comparison, ranked: tuple[TupleOutcome, ...]) -> str
         1 for index in comparison.beats_benchmark if comparison.ranked[index].key in reported
     )
     verdict = (
-        f"NOTHING BEATS THE BENCHMARK {hurdle.key.instrument_id}"
+        f"NOTHING SHOWN HERE BEATS THE BENCHMARK {hurdle.key.instrument_id}"
         if not beaten
         else f"{beaten} of {len(ranked) - 1} beat the benchmark {hurdle.key.instrument_id}"
     )
@@ -333,18 +333,19 @@ def _beats_line(comparison: Comparison, ranked: tuple[TupleOutcome, ...]) -> str
 def _span_caveat(
     comparison: Comparison, hurdle: TupleOutcome, ranked: tuple[TupleOutcome, ...]
 ) -> str:
-    """What the verdict above is silent about when the hurdle undershoots the horizon.
+    """What the verdict above is silent about when the ranked rows span different periods.
 
     ``implied_rate`` is an IRR over the span the money was **at work**, so a row whose own
     terms end inside the window is annualised over that shorter span rather than over the
-    window. "Nothing beats it" is then a claim across periods of different length, and it is
-    the most confident sentence this renderer prints -- Principle I forbids emitting one more
-    confident than its inputs, and the input here is a set of incomparable spans.
+    window. An ordering across periods of different length is a comparison of different
+    questions, and the verdict above is the most confident sentence this renderer prints --
+    Principle I forbids emitting one more confident than its inputs.
 
-    **How many rows undershoot is counted, not assumed.** The hurdle is rarely the only one:
-    on the owner's own question one row undershoots at a month and twelve do at a year, so a
-    caveat naming the hurdle against "the rest of the list" would be false about half the
-    table -- which is the defect the caveat exists to prevent, committed by the caveat.
+    **Keyed on the set, not on the hurdle.** Incomparability is a property of the spans in the
+    list: a hurdle that runs to the window's end tells the reader nothing about the eleven rows
+    that did not, and gating the caveat on the hurdle alone printed the bare verdict over
+    exactly that table. So the rows are counted and the hurdle is named only when it is one of
+    them.
 
     Stated rather than suppressed: the figures are real and the owner chose the hurdle, so
     withholding the verdict would hide work he asked for. What he cannot be left to infer is
@@ -352,15 +353,21 @@ def _span_caveat(
     ``the-hurdle-undershoots-every-horizon`` in ``specs/features.toml``; the remedy -- a
     different benchmark, or a declared rule for a candidate that undershoots -- is his.
     """
-    if hurdle.span.end >= comparison.horizon.end:
+    short = [item for item in ranked if item.span.end < comparison.horizon.end]
+    if not short:
         return ""
-    short = sum(1 for item in ranked if item.span.end < comparison.horizon.end)
+    window = comparison.horizon.end.isoformat()
+    hurdle_note = (
+        f" The benchmark is one of them: {hurdle.key.instrument_id}'s own terms end "
+        f"{hurdle.span.end.isoformat()}."
+        if hurdle in short
+        else f" The benchmark is not one of them; its rate does span the window to {window}."
+    )
     return (
-        f" ITS RATE DOES NOT SPAN THIS WINDOW: {hurdle.key.instrument_id}'s own terms end "
-        f"{hurdle.span.end.isoformat()}, so its rate is annualised over that span and not over "
-        f"the window to {comparison.horizon.end.isoformat()}. {short} of {len(ranked)} ranked "
-        "row(s) end inside the window and are annualised over their own spans the same way; "
-        "rates measured over periods of different length are not comparable."
+        f" RATES HERE SPAN DIFFERENT PERIODS: {len(short)} of {len(ranked)} ranked row(s) end "
+        f"before {window}, so each is annualised over its own shorter span while the rest are "
+        f"annualised over the window. Rates measured over periods of different length are not "
+        f"comparable, and the ordering above is across both.{hurdle_note}"
     )
 
 

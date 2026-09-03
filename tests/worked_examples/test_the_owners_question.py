@@ -20,7 +20,7 @@ the class-stands-in-for-the-group inference FR-007a forbids.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 
@@ -36,17 +36,24 @@ from terezy.core.decision.candidates import dropped
 from terezy.core.results.answer import (
     Answer,
     DeclaredSubject,
+    HorizonSection,
     SectionsAgreeByKey,
     SubjectReached,
     SubjectUndeclared,
 )
 from terezy.core.results.candidates import CandidateSurvey
-from terezy.core.results.tuple import Comparison, DeclarationMissing
+from terezy.core.results.tuple import Comparison, DeclarationMissing, TupleOutcome
 from tests import answer_registries as fixtures
 
 pytestmark = pytest.mark.worked_example
 
 HORIZONS = 3
+EXIT_LATENCY_DAYS = 3
+"""What `inzhur_to_monobank` declares. Waiting is inside the span (010 FR-015), so a
+candidate sold at the window's end has its money home this many days after it."""
+
+FINAL_PAYMENT = date(2027, 8, 25)
+"""When the benchmark's own terms end: its last coupon and its principal, on one date."""
 NAMED = 4
 UNDECLARED_WORDS = ("cash", "btc")
 
@@ -114,22 +121,41 @@ def test_every_horizon_ranks_the_bonds_and_only_the_bonds() -> None:
         assert ranked == bonds
 
 
-def test_the_benchmark_is_the_same_figure_in_every_section() -> None:
-    """The hurdle undershoots every horizon, so nothing about it varies with the window.
+def test_the_benchmark_spans_each_window_within_the_exit_latency() -> None:
+    """Why the owner picked this issue, asserted rather than left in the question file.
 
-    An IRR over the span the money was at work, and this issue's span ends 2026-09-19 whatever
-    the window is. The three sections therefore rank against one 18-day rate — the comparability
-    break the question file records at the ``benchmark`` field, pinned here so that a rule about
-    an undershooting candidate would show up as this test going red rather than as a figure
-    quietly moving.
+    Its final coupon and its principal both fall on 2027-08-25, so at twelve months it runs to
+    its own terms and its money is home 2027-08-28 -- four days short of the window, a bond
+    held very nearly to maturity over the longest horizon he asked about. At one and three
+    months it is sold at the window's end like any other candidate and the money arrives three
+    days later, which is the declared latency of the way out rather than anything about the
+    paper (`horizon-as-a-latency-budget` records that the way out is unrefused).
+
+    Either way the span is within days of the window, which is the whole point of the choice:
+    the issue it replaced was annualised over 18 days at all three horizons
+    (`the-hurdle-undershoots-every-horizon` in `specs/features.toml`).
     """
-    figures = {
-        (item.span, item.reaches, item.implied_rate)
-        for section in _answer().sections
-        for item in section_ranking(section)
-        if item.key.instrument_id == fixtures.BENCHMARK
-    }
-    assert len(figures) == 1, figures
+    short, mid, long = _answer().sections
+
+    for section in (short, mid):
+        hurdle = _hurdle(section)
+        assert hurdle.sold_early is not None, "sold at the window's end"
+        assert hurdle.span.end == section.horizon.end + timedelta(days=EXIT_LATENCY_DAYS), (
+            "and home exactly the way out's declared latency later"
+        )
+
+    hurdle = _hurdle(long)
+    assert hurdle.sold_early is None, "held to its own terms at twelve months"
+    assert hurdle.span.end == FINAL_PAYMENT + timedelta(days=EXIT_LATENCY_DAYS)
+    assert hurdle.span.end < long.horizon.end, "which fall inside that window"
+    assert (long.horizon.end - hurdle.span.end).days <= 7, "and only just -- that is the choice"
+
+
+def _hurdle(section: HorizonSection) -> TupleOutcome:
+    """The benchmark's own outcome in one section."""
+    return next(
+        item for item in section_ranking(section) if item.key.instrument_id == fixtures.BENCHMARK
+    )
 
 
 def test_every_section_measures_that_ranking_against_the_issue_he_named() -> None:

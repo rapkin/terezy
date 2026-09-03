@@ -46,7 +46,7 @@ AS_OF: Final = date(2026, 8, 30)
 """The day the owner asked. Decides staleness and nothing else."""
 
 OWNERS_QUESTION: Final = "fifty-thousand-hryvnia"
-BENCHMARK: Final = "UA4000235865"
+BENCHMARK: Final = "UA4000231195"
 OVDP: Final = "ovdp"
 INZHUR: Final = "inzhur"
 MILTECH: Final = "inzhur_miltech"

@@ -190,9 +190,10 @@ def test_a_ranking_marks_its_own_hurdle_and_says_what_beat_it() -> None:
         comparison = section.outcome.comparison
         assert isinstance(comparison, Comparison)
         ranked = section_ranking(section)
-        beaten = len(comparison.beats_benchmark)
+        shown = {item.key for item in ranked}
+        beaten = sum(1 for i in comparison.beats_benchmark if comparison.ranked[i].key in shown)
         expected = (
-            f"NOTHING BEATS THE BENCHMARK {fixtures.BENCHMARK}."
+            f"NOTHING SHOWN HERE BEATS THE BENCHMARK {fixtures.BENCHMARK}."
             if not beaten
             else f"{beaten} of {len(ranked) - 1} beat the benchmark {fixtures.BENCHMARK}."
         )
@@ -211,16 +212,19 @@ def _answered() -> Answer:
     return run.answer
 
 
-def test_a_hurdle_that_undershoots_the_window_says_its_rate_is_not_comparable() -> None:
+def test_a_section_whose_rows_span_different_periods_says_so() -> None:
     """Principle I: the verdict is the most confident sentence this renderer prints.
 
-    The owner's own benchmark matures inside all three windows, so its rate is an IRR over 18
-    days and every other row's is annualised over one, three or twelve months. "Nothing beats
-    it" over two different spans is a number more confident than its inputs, and the caveat is
-    what stops it being read as a comparison.
+    ``implied_rate`` annualises over the span the money was at work, so a row ending inside
+    the window is not measured over the same period as one that ran to it -- and the ordering
+    puts both in one list. The caveat is keyed on the **set** of spans: a hurdle that runs to
+    the window's end says nothing about the rows that did not, and gating on the hurdle alone
+    printed the bare verdict over exactly that table.
     """
     lines, _ = _run()
-    verdicts = [line for line in lines if "beat the benchmark" in line or "NOTHING BEATS" in line]
+    verdicts = [
+        line for line in lines if "beat the benchmark" in line or "NOTHING SHOWN HERE" in line
+    ]
     sections = [
         section for section in _answered().sections if isinstance(section.outcome, CandidateSurvey)
     ]
@@ -229,17 +233,38 @@ def test_a_hurdle_that_undershoots_the_window_says_its_rate_is_not_comparable() 
         assert isinstance(section.outcome, CandidateSurvey)
         comparison = section.outcome.comparison
         assert isinstance(comparison, Comparison)
-        hurdle = comparison.ranked[comparison.benchmark]
-        assert hurdle.span.end < section.horizon.end, "the fixture must actually undershoot"
-        assert "ITS RATE DOES NOT SPAN THIS WINDOW" in verdict, verdict
-        assert hurdle.span.end.isoformat() in verdict
-        assert section.horizon.end.isoformat() in verdict
-        # Counted, never assumed: the hurdle is not the only row ending inside the window, and
-        # a caveat naming it against "the rest of the list" would be false about the rest.
         ranked = section_ranking(section)
-        short = sum(1 for item in ranked if item.span.end < section.horizon.end)
-        assert short >= 1
-        assert f"{short} of {len(ranked)} ranked row(s) end inside the window" in verdict
+        short = [item for item in ranked if item.span.end < section.horizon.end]
+        assert short, "every one of his horizons has a row ending inside it"
+        assert "RATES HERE SPAN DIFFERENT PERIODS" in verdict, verdict
+        assert f"{len(short)} of {len(ranked)} ranked row(s) end before" in verdict
+        assert section.horizon.end.isoformat() in verdict
+
+        # And whether the hurdle is one of them is said, not left to be inferred: it is at
+        # twelve months and is not at one or three, so both branches are exercised by his
+        # own question.
+        hurdle = comparison.ranked[comparison.benchmark]
+        if hurdle in short:
+            assert f"The benchmark is one of them: {fixtures.BENCHMARK}" in verdict
+            assert hurdle.span.end.isoformat() in verdict
+        else:
+            assert "The benchmark is not one of them" in verdict
+
+
+def test_the_caveat_is_silent_when_every_row_runs_to_the_window() -> None:
+    """No caveat where there is nothing to caution about -- otherwise it is noise and unread."""
+    section = next(
+        section for section in _answered().sections if isinstance(section.outcome, CandidateSurvey)
+    )
+    assert isinstance(section.outcome, CandidateSurvey)
+    comparison = section.outcome.comparison
+    assert isinstance(comparison, Comparison)
+    ranked = section_ranking(section)
+    to_the_end = tuple(
+        replace(item, span=replace(item.span, end=comparison.horizon.end)) for item in ranked
+    )
+    squared = replace(comparison, ranked=to_the_end, ties=())
+    assert "RATES HERE SPAN DIFFERENT PERIODS" not in cli._beats_line(squared, to_the_end)
 
 
 def test_a_tie_with_the_hurdle_is_claimed_only_when_a_printed_row_ties() -> None:
@@ -535,15 +560,21 @@ def _ranked_section_with_an_unrankable_figure() -> tuple[HorizonSection, TupleOu
     comparison = section.outcome.comparison
     assert isinstance(comparison, Comparison)
     assert comparison.not_comparable == ()
-    moved = comparison.ranked[-1]
-    assert comparison.benchmark < len(comparison.ranked) - 1
+    # The LAST row that is not the hurdle. Taking the last unconditionally broke the moment a
+    # benchmark that ranks worst was declared: the hurdle would be the one moved out, and
+    # `section_ranking` then reports nothing at all rather than a ranking beside an unranked
+    # figure, which is the shape these two tests are about.
+    at = max(index for index in range(len(comparison.ranked)) if index != comparison.benchmark)
+    moved = comparison.ranked[at]
+    kept = comparison.ranked[:at] + comparison.ranked[at + 1 :]
     narrowed = replace(
         comparison,
-        ranked=comparison.ranked[:-1],
+        ranked=kept,
+        benchmark=comparison.benchmark - (1 if comparison.benchmark > at else 0),
         not_comparable=(moved,),
         ties=(),
         beats_benchmark=tuple(
-            index for index in comparison.beats_benchmark if index < len(comparison.ranked) - 1
+            index - (1 if index > at else 0) for index in comparison.beats_benchmark if index != at
         ),
     )
     return (
