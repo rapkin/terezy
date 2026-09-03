@@ -60,7 +60,9 @@ HTTP.
 `Money`, calls a staleness function, or imports `core.results.canonical`; every set is serialised in a
 declared total order; the committed OpenAPI document is byte-gated.
 
-**Scale/Scope**: 25 categories, 3 fixed endpoints, 2 windowed series reads, 155 generated models.
+**Scale/Scope**: 25 categories, 3 fixed endpoints, 2 windowed series reads, and a 352 KB OpenAPI
+document. Every endpoint sits under one `/api` prefix, declared in `document.py` and carried by
+that document, so a generated client is correct by construction.
 
 ## Constitution Check
 
@@ -96,22 +98,25 @@ specs/020-http-api/
 
 ```text
 src/terezy/api/http/
-├── __init__.py        # the app, and the only name a server command may address
+├── __init__.py        # re-exports the app, and states what this layer may not do
+├── service.py         # the routed application, built from the category registry
 ├── shapes.py          # annotation -> Shape; the hint resolution and its fallback namespace
 ├── tags.py            # <leaf>.<ClassName>, the override table, injectivity
 ├── models.py          # Shape -> pydantic model (memoised), discriminated unions
 ├── encode.py          # Shape + value -> JSON-able body, in a declared total order
-├── categories.py      # the registry: id -> (path, shape, entry point, reader, record type)
-├── envelopes.py       # the four response envelopes and their refusals
-├── summary.py         # the registry summary (FR-009, FR-010)
+├── categories.py      # the registry: id -> (constant, shape, entry point, record type)
+├── envelopes.py       # the response containers, their refusals, and the field descriptors
+├── summary.py         # the registry summary (FR-009, FR-010, FR-054)
 ├── series.py          # windowed reads and the out-of-coverage refusal
 ├── answers.py         # the answer endpoint over declared questions
-├── bind.py            # bind context, the loopback guard, the container marker
+├── bind.py            # bind context, the loopback rule, the container marker
+├── middleware.py      # the per-request client check and the Host allowlist
 ├── serve.py           # the process entry point that applies the guard, then serves
-├── middleware.py      # the per-request client check, the Host allowlist
-├── document.py        # info.version, the canonical dump, the committed-file route
+├── __main__.py        # `python -m terezy.api.http`
+├── document.py        # info.version, the /api prefix, the canonical dump
 └── openapi.json       # the gated artefact
 
+src/terezy/data/citation_policy.py   # the gate's lists, now imported by the gate and served
 scripts/generate_openapi.py
 docker-compose.yml
 Dockerfile
@@ -150,7 +155,8 @@ tests/golden/      the committed OpenAPI document, and the endpoint that serves 
    singleton), whether it takes a scenario, and the record type its reads serialise.
 5. **`envelopes.py`**, **`summary.py`**, **`series.py`**, **`answers.py`** — the four response families.
 6. **`bind.py`**, **`middleware.py`**, **`serve.py`** — the guard, in the order FR-029 ranks them: the
-   per-request check is the load-bearing half and is built first.
+   per-request check is the load-bearing half and is built first. No cross-origin allowance is
+   declared: 021 is same-origin with this service in both of its modes.
 7. **`document.py`**, `scripts/generate_openapi.py`, the committed `openapi.json`.
 8. `docker-compose.yml`, `Dockerfile`, and the tests that parse them as text.
 
@@ -158,7 +164,8 @@ tests/golden/      the committed OpenAPI document, and the endpoint that serves 
 
 | Where | What | Requirement |
 |---|---|---|
-| `pyproject.toml` | exact pins for `fastapi`, `starlette`, `pydantic`; `starlette` added to the `api` extra | FR-037 |
+| `pyproject.toml` | exact pins for `fastapi`, `starlette`, `pydantic`; `starlette` added to the `api` extra; `httpx2` in the dev group, which is what Starlette 1.6's test client requires | FR-037, FR-050 |
+| `src/terezy/data/citation_policy.py` | the provenance gate's two directory lists, moved into the package so the gate and the API read one definition | FR-054 |
 | `.importlinter` | the `frameworks-only-in-the-http-module` contract | FR-002 |
 | `scripts/generate_openapi.py` | the regeneration command | FR-040 |
 | repository root | `docker-compose.yml`, `Dockerfile` | FR-032 to FR-035 |

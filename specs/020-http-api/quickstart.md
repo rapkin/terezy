@@ -23,9 +23,9 @@ to edit the JSON.
 
 ```bash
 uv run python -m terezy.api.http --host 127.0.0.1 --port 8000
-curl 'http://127.0.0.1:8000/routes?as_of=2026-09-03'
-curl 'http://127.0.0.1:8000/questions/fifty-thousand-hryvnia/answer?as_of=2026-09-03'
-curl 'http://127.0.0.1:8000/registry?as_of=2026-09-03'
+curl 'http://127.0.0.1:8000/api/routes?as_of=2026-09-03'
+curl 'http://127.0.0.1:8000/api/questions/fifty-thousand-hryvnia/answer?as_of=2026-09-03'
+curl 'http://127.0.0.1:8000/api/registry?as_of=2026-09-03'
 ```
 
 `--host 0.0.0.0` exits non-zero naming the constitution's release gate. A bare

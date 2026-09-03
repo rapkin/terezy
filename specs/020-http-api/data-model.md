@@ -45,10 +45,16 @@ core record and carry `envelopes.<Name>` tags.
 
 | Envelope | Fields | Where the refusal comes from |
 |---|---|---|
-| **listing** — `GET /{category}` | `tag`, `category`, `shape`, `as_of`, `scenario_id`, `ids`, `coverage` | none: an empty category is an empty list (B10) |
-| **read** — `GET /{category}/{id}` | `tag`, `category`, `as_of`, `scenario_id`, `result` | `CategoryHasNoSuchId(category, wanted_id, declared_ids, reason)` |
-| **singleton** — `GET /{category}` for the seven | `tag`, `category`, `as_of`, `scenario_id`, `result` | `NothingDeclared(category, reason)` |
-| **observations** — `GET /{series}/{id}/observations` | `tag`, `category`, `as_of`, `series_id`, `window`, `observations` or a refusal | `CategoryHasNoSuchId`, `WindowOutsideCoverage(series_id, asked, covers, reason)` |
+| **listing** — `GET /api/{category}` | `tag`, `category`, `as_of`, `scenario_id`, `ids`, and `coverage` on the two series | none: an empty category is an empty list (B10) |
+| **read** — `GET /api/{category}/{id}` | `tag`, `category`, `as_of`, `scenario_id`, `declared_in`, `fields`, `result` | `CategoryHasNoSuchId(category, wanted_id, declared_ids, reason)` |
+| **singleton** — `GET /api/{category}` for the seven | the same, with `result` the document or its refusal | `NothingDeclared(category, reason)` |
+| **observations** — `GET /api/{series}/{id}/observations` | `tag`, `category`, `as_of`, `result` — and inside it `series_id`, `window`, `covers`, `observations` **and** `outside` | `CategoryHasNoSuchId`; `WindowOutsideCoverage(series_id, asked, covers, missing, reason)` **beside** the covered observations, never instead of them |
+
+`declared_in` is the declaring file relative to the data root, or a typed `FileNotRecorded`
+carrying the reason where the resolver exposes no file map — one category, `tax-timing`.
+`fields` is the ordered descriptor of whichever record the read returned: a name, a kind from a
+closed vocabulary, what it names where the kind names something, and whether it is optional. No
+label: one invented here would be a second vocabulary nobody could correct.
 
 Beside them, three fixed endpoints with their own models: the registry summary, the answer, and the
 committed OpenAPI document served verbatim.
@@ -105,12 +111,16 @@ resolver is named by a row. Two tests, each red on its own.
 
 ## The registry summary
 
-Per category: its shape; for a keyed one the number of declared ids, for a singleton **whether the
+Per category: its shape; whether its directory is **sourced or exempt from the citation
+requirement**, and for an exempt one the gate's own recorded reason; for a keyed one the number of declared ids, for a singleton **whether the
 document resolved**; the files behind it with each file's digest; the merged provenance of every
 record in it; and the count of unverified sources within it.
 
 Digests come from `terezy.data.manifest`'s `file_version`/`file_name` — the same functions
-`input_refs` uses — never from a second hashing path. Merged provenance is
+`input_refs` uses — never from a second hashing path, and a file at the data root is named by
+its bare name for the reason the manifest gives: keeping the parent would name it after one
+machine's layout. The citation verdict comes from `terezy.data.citation_policy`, which the
+provenance gate imports, so there is one definition rather than a copy. Merged provenance is
 `terezy.core.primitives.provenance.merge` folded over the category's records, so the monoid stays
 the single definition of what a union of marks is.
 
@@ -141,9 +151,11 @@ honoured; what that verification is worth is stated in FR-027b's terms and nowhe
 | a window outside a series' coverage | 200 | the observations envelope carrying `envelopes.WindowOutsideCoverage` |
 | an answer the verb refuses | 200 | the answer envelope carrying the `Refused` member, tagged |
 | a malformed declaration | 500 | `envelopes.DeclarationFailed`, carrying `file`, `field_path`, `problem`, `remedy` verbatim |
+| a path beneath `/api` that is served by nothing | 404 | `service.PathNotServed`, in JSON even where the SPA fallback is mounted |
+| any other unknown path, with a built client present | 200 | the client's `index.html` |
 | a missing or malformed query parameter | 422 | the framework's validation body, naming the parameter |
-| a non-loopback or absent client under `LOOPBACK` | 403 | `envelopes.NotOnLoopback`, naming the release gate |
-| a `Host` header the service does not declare | 400 | `envelopes.HostNotDeclared`, naming the declared hosts |
+| a non-loopback or absent client under `LOOPBACK` | 403 | `middleware.NotOnLoopback`, naming the release gate |
+| a `Host` header the service does not declare | 400 | `middleware.HostNotDeclared`, naming the declared hosts |
 
 A typed refusal is never a status code alone, and the envelope shape is the same whether the result
 was a record or a refusal.

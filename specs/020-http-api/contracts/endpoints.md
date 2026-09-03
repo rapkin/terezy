@@ -30,6 +30,6 @@ category's group rather than new owners of one. The check is over owners, not pa
 - the framework's two documentation routes, and any other route serving markup or a script
   (FR-031).
 
-**Headers.** A cross-origin allowance naming exact loopback origins, no wildcard, no pattern, no
-credentials; and a `Host` allowlist of loopback hosts, which is the one of the two that refuses and
-the only one that sees a DNS-rebinding request.
+**Headers.** No cross-origin allowance at all — 021 is same-origin in both of its modes — and a
+`Host` allowlist of loopback hosts, which is what refuses and the only check that sees a
+DNS-rebinding request.
