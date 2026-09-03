@@ -319,7 +319,8 @@ def _beats_line(comparison: Comparison, ranked: tuple[TupleOutcome, ...]) -> str
     verdict = (
         f"NOTHING SHOWN HERE BEATS THE BENCHMARK {hurdle.key.instrument_id}"
         if not beaten
-        else f"{beaten} of {len(ranked) - 1} beat the benchmark {hurdle.key.instrument_id}"
+        else f"{beaten} of the {len(ranked) - 1} other row(s) beat the benchmark "
+        f"{hurdle.key.instrument_id}"
     )
     if any(
         hurdle.key in {comparison.ranked[index].key for index in group}
@@ -344,11 +345,11 @@ def _span_caveat(
     than its inputs.
 
     **Keyed on the set, not on the hurdle.** Incomparability is a property of the spans in the
-    list: a hurdle that runs to the window's end tells the reader nothing about the eleven rows
-    that did not, and gating the caveat on the hurdle alone printed the bare verdict over
-    exactly that table. So the rows are counted and the hurdle is named only when it is one of
-    them -- and where **every** row ends inside the window there is no "rest" to contrast with,
-    which is a different sentence rather than the same one read loosely.
+    list: a hurdle whose money is home after the window tells the reader nothing about the rows
+    whose money is home before it, and gating the caveat on the hurdle alone printed the bare
+    verdict over exactly those tables. So the rows are counted and the hurdle is named only
+    when it is one of them -- and where **every** row is short there is no "rest" to contrast
+    with, which is a different sentence rather than the same one read loosely.
 
     **``span.end`` is when the money is home, not when the paper's terms end.** It carries the
     exit route's latency, so naming it as the issue's own last payment date puts the reader
@@ -368,19 +369,18 @@ def _span_caveat(
         f"all {len(ranked)} ranked row(s) have their money home before {window}"
         if len(short) == len(ranked)
         else f"{len(short)} of {len(ranked)} ranked row(s) have their money home before "
-        f"{window} and the rest after it"
+        f"{window} and the rest on or after it"
     )
     hurdle_note = (
         f" The benchmark is one of them: {hurdle.key.instrument_id}'s money is home "
         f"{hurdle.span.end.isoformat()}."
         if hurdle in short
-        else f" The benchmark is not one of them; its money is home "
-        f"{hurdle.span.end.isoformat()}, after the window."
+        else f" The benchmark is not one of them; its money is home {hurdle.span.end.isoformat()}."
     )
     return (
         f" RATES HERE SPAN DIFFERENT PERIODS: {population}, and each rate is annualised over "
         "its own span rather than over the window. Rates measured over periods of different "
-        f"length are not comparable, and the ordering above is across them.{hurdle_note}"
+        f"length are not comparable, and the ordering below is across them.{hurdle_note}"
     )
 
 

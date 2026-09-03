@@ -196,7 +196,10 @@ def test_a_ranking_marks_its_own_hurdle_and_says_what_beat_it() -> None:
         expected = (
             f"NOTHING SHOWN HERE BEATS THE BENCHMARK {fixtures.BENCHMARK}."
             if not beaten
-            else f"{beaten} of {len(ranked) - 1} beat the benchmark {fixtures.BENCHMARK}."
+            else (
+                f"{beaten} of the {len(ranked) - 1} other row(s) beat the benchmark "
+                f"{fixtures.BENCHMARK}."
+            )
         )
         assert expected in output, expected
 
@@ -360,7 +363,9 @@ def test_the_hurdle_is_marked_by_identity_and_not_by_position() -> None:
         assert any(comparison.ranked[i].key in withheld for i in comparison.beats_benchmark), (
             "the fixture must actually place a withheld candidate above the benchmark"
         )
-        assert f"{beaten} of {len(shown) - 1} beat the benchmark" in verdict, verdict
+        assert f"{beaten} of the {len(shown) - 1} other row(s) beat the benchmark" in verdict, (
+            verdict
+        )
 
 
 def test_the_undeclared_subjects_are_named_by_the_words_he_wrote() -> None:
