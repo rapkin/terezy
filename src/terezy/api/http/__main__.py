@@ -6,5 +6,5 @@ import sys
 
 from terezy.api.http.serve import main
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover -- the process entry point itself
     sys.exit(main())

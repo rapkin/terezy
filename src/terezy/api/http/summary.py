@@ -85,7 +85,7 @@ def _summary(category: categories.Category, ask: categories.Ask) -> KeyedSummary
             files = (
                 ()
                 if isinstance(resolved.files, categories.NoFileMap)
-                else _refs(resolved.files.values())
+                else _refs(resolved.files.values(), root=ask.root)
             )
             return KeyedSummary(
                 category=category.id,
@@ -104,7 +104,7 @@ def _summary(category: categories.Category, ask: categories.Ask) -> KeyedSummary
                 directory=categories.directory_of(category),
                 citations=citations,
                 resolved=single.record is not None,
-                files=() if single.file is None else _refs((single.file,)),
+                files=() if single.file is None else _refs((single.file,), root=ask.root),
                 provenance=marks,
                 unverified_sources=len(prov.unverified_sources(marks)),
             )
@@ -116,7 +116,7 @@ def _summary(category: categories.Category, ask: categories.Ask) -> KeyedSummary
                 directory=categories.directory_of(category),
                 citations=citations,
                 resolved=many.file is not None,
-                files=() if many.file is None else _refs((many.file,)),
+                files=() if many.file is None else _refs((many.file,), root=ask.root),
                 provenance=marks,
                 unverified_sources=len(prov.unverified_sources(marks)),
             )
@@ -133,8 +133,16 @@ def _merged(record: object, values: Iterable[object]) -> Provenance:
     )
 
 
-def _refs(paths: Iterable[Path]) -> tuple[FileRef, ...]:
-    unique = {manifest.file_name(path): path for path in paths}
+def _refs(paths: Iterable[Path], *, root: Path) -> tuple[FileRef, ...]:
+    """Named the way the manifest names them, root-level files included.
+
+    A file at the data root is named by its bare name: keeping the parent would name it after
+    the data root's own directory, which is one machine's layout, so two checkouts would
+    describe one declaration two ways.
+    """
+    unique = {
+        (path.name if path.parent == root else manifest.file_name(path)): path for path in paths
+    }
     return tuple(
         FileRef(file=name, version=manifest.file_version(path))
         for name, path in sorted(unique.items())
