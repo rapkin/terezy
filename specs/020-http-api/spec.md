@@ -574,22 +574,22 @@ future reader to re-derive the three options and re-propose the one that was dec
 and `docs/REQUIRED_TESTS.md` rows F2, F3 and F4 stay open with their notes unchanged: a switch that
 does not exist closes none of them.
 
-- **FR-021**: The display currency MUST be a **request parameter**, resolved on the server. The
+- **FR-021** *(deferred, not in this feature)*: The display currency MUST be a **request parameter**, resolved on the server. The
   client computes nothing. Constitution Principle VI gives currency three roles, and a client that
   converted for display would be a fourth place a rate lives.
 
-- **FR-022**: A display switch MUST change **only** an explicitly declared display block attached
+- **FR-022** *(deferred, not in this feature)*: A display switch MUST change **only** an explicitly declared display block attached
   beside each amount. It MUST NOT change the amount, its currency, its provenance, any tax figure,
   any ranking, any ordering, or any field a ranking is computed from. A test MUST request the same
   resource under each declared display currency and assert that every field outside the display
   block is **byte-identical** across the responses.
 
-- **FR-023**: The display block MUST be **additive**. The originally-computed amount and its own
+- **FR-023** *(deferred, not in this feature)*: The display block MUST be **additive**. The originally-computed amount and its own
   currency stay in the body under the same field names regardless of the display choice. A display
   that replaced the amount would make FR-022's byte-identity claim untestable, because the field it
   is about would be the field that moved.
 
-- **FR-024**: Every converted display figure MUST carry the **rate as its source declares it, the
+- **FR-024** *(deferred, not in this feature)*: Every converted display figure MUST carry the **rate as its source declares it, the
   direction that declaration is in, the factor actually applied, the source of the rate, and the
   merged provenance of the amount and the rate**. The display path MUST go through
   `terezy.core.primitives.money.convert`, which already demands the rate's provenance in its
@@ -606,7 +606,7 @@ does not exist closes none of them.
   cannot check it against the declaration. Both, with the direction named, and a worked example
   (SC-011a) is what proves the pair agrees.
 
-- **FR-024a**: Where the requested display currency **is already the amount's own currency**, the
+- **FR-024a** *(deferred, not in this feature)*: Where the requested display currency **is already the amount's own currency**, the
   amount MUST carry **no display block at all**, and `convert` MUST NOT be called for it. It is not a
   conversion and the core says so by raising: *"a conversion from UAH to UAH is not a conversion.
   Same-currency arithmetic goes through scale, add or sub; reaching here means a currency was lost
@@ -619,7 +619,7 @@ does not exist closes none of them.
   own terms: an amount shown in its own currency has nothing to add beside it, and a display block
   echoing the same number at a rate of 1 would be a rate nobody quoted.
 
-- **FR-025**: Where no declared rate is available for a requested display currency, the response
+- **FR-025** *(deferred, not in this feature)*: Where no declared rate is available for a requested display currency, the response
   MUST **refuse the display block by name**, with the figure and its own currency left intact. Not a
   missing block, not a null, not the amount shown unconverted as though it had been converted.
 
@@ -765,6 +765,46 @@ does not exist closes none of them.
   opposite of what it claims: a citation the client never fetches is the provenance mark working,
   and a script tag is the defect.
 
+### What a generic client needs, and this feature owes
+
+These four are obligations feature 021 rests on (its OB-2, OB-3 and OB-6, and its FR-049). They
+are requirements here rather than assumptions there, because a client that has to know each
+category's schema turns a generic screen into a per-category branch — Principle II broken in a new
+layer.
+
+- **FR-052**: A record read MUST be **self-describing**: beside the record, the response MUST carry
+  the ordered **field descriptors** of the record it returned — each field's name and its kind, and
+  for a field whose kind names another record or an enum, which one. Derived from the same shape the
+  body is encoded from, never written out per category.
+
+  Names and kinds, and deliberately **no label**: a human label is presentation, and a serialiser
+  that invented one would be adding a fact the record does not carry (FR-015). Title-casing a field
+  name is the client's to do and is reversible; a label chosen here would be a second vocabulary
+  nobody could correct.
+
+- **FR-053**: Every record read MUST state **which file declared it**, as a path relative to the
+  data root. Where the resolver exposes no file for a category, the response MUST say so as a
+  **typed absence carrying the reason**, never as a null or a missing key — and a test MUST pin the
+  set of categories in that state, so it is a measured gap rather than a silent one. Measured
+  2026-09-03 the set has one member, `tax-timing`, whose entry point returns rules by jurisdiction
+  and no file map.
+
+- **FR-054**: Every category MUST state whether its directory is **sourced or exempt from the
+  citation requirement**, and for an exempt one **the recorded reason**. `scripts/check_provenance.py`
+  holds both lists by name and fail-closed, and it is the single definition: a test MUST assert the
+  API's verdict for every category equals that script's, so the reason is served rather than
+  restated. An exemption served as an absent citation is indistinguishable from a citation nobody
+  wrote, which is the distinction the whole provenance mechanism exists to keep.
+
+- **FR-055**: Where a built client is present at `web/dist`, the API MUST serve it from its own
+  origin with an SPA fallback, and where that directory is **absent the mount MUST be inert** —
+  no route, no error, and nothing the Python suite has to build. 021 FR-049 makes production one
+  container serving both, which is what removes the cross-origin question in FR-032a; the inert
+  case is what keeps `uv run pytest` free of a Node build (FR-035).
+
+  The served bytes stay inside FR-031's scan: a built asset referencing an external host is the
+  defect that scan exists to catch, and 021 FR-036 checks the same property over its own build.
+
 ### Packaging
 
 - **FR-032**: A `docker-compose.yml` at the repository root MUST declare an `api` service running
@@ -776,28 +816,24 @@ does not exist closes none of them.
   origin arrangement FR-032a settles. Everything the web client shows comes through those. This
   specification declares no web service; 021 does, and adds its own service to the same file.
 
-- **FR-032a**: The API MUST declare a **cross-origin allowance** naming exact loopback origins. The
-  decision is taken here rather than left to 021 because a browser takes it either way and a
-  requirement neither specification owns is a requirement neither tests.
+- **FR-032a**: The API MUST declare **no cross-origin allowance at all**, and a test MUST assert
+  the absence: no CORS middleware is installed and no `access-control-allow-origin` header is ever
+  emitted.
 
-  Two services on `127.0.0.1` at different ports are different origins, so the alternative was for
-  the API to serve the built client from its own origin — which would give a read-only API a
-  static-file responsibility, and would break 021's development loop, where the client runs on its
-  own port against this service. A declared allowance is the smaller thing.
+  **The premise the first draft argued from was false.** It said the alternative — the API serving
+  the built client from its own origin — *"would break 021's development loop, where the client runs
+  on its own port against this service"*. It does not: 021 FR-033 proxies `/api` through its dev
+  server, so the browser sees one origin in development, and 021 FR-049 makes production **one
+  container** whose API serves `web/dist`. There is no supported arrangement in which the two are
+  different origins, so an allowance would be a widening declared for a case that does not arise —
+  and the one thing it would then do is admit a page the owner merely visited, on a service holding
+  his whole position.
 
-  It MUST name **exact origins**, every one of them a loopback origin, with **no wildcard, no
-  pattern and no credentials allowance**. A wildcard origin on a service holding one person's
-  finances is a non-loopback exposure reached by a different route: any page the owner's browser
-  loads, from any site, could then read the whole registry. A test MUST assert that every configured
-  origin is a loopback origin and that no wildcard or pattern appears.
-
-  **What the allowance does MUST NOT be overstated: a CORS allowance withholds, it does not refuse.**
-  Starlette's `CORSMiddleware` serves a simple `GET` carrying a disallowed `Origin` in full and merely
-  omits the `access-control-allow-origin` header, leaving the **browser** to block the read. So the
-  allowance protects a browser-mediated caller and nothing else, and a criterion asserting that such a
-  request is refused would be red against the very mechanism this requirement names. Refusal is
-  FR-032b's job, on the `Host` header, which is also the only one of the two that survives DNS
-  rebinding.
+  What the draft's last paragraph established stands and is the reason the allowance would not have
+  been worth much anyway: **a CORS allowance withholds, it does not refuse.** Starlette's
+  `CORSMiddleware` serves a simple `GET` carrying a disallowed `Origin` in full and merely omits the
+  header, leaving the *browser* to block the read. Refusal is FR-032b's job, on the `Host` header,
+  which is also the only one of the two that survives DNS rebinding.
 
 - **FR-032b**: The service MUST also refuse any request whose **`Host` header** is not one it
   declares, from a closed list of loopback hosts.
@@ -990,6 +1026,12 @@ does not exist closes none of them.
   uncovered date — interpolate, extrapolate, carry forward, snap — every one *"produces a number
   indistinguishable from a correct one"*, and quietly returning fewer rows than were asked for is a
   fifth.
+
+  **Silently is the operative word, and 021 depends on it.** A response carrying the observations
+  that *are* covered **beside** a typed refusal naming the part that is not is the required shape,
+  not a violation of this requirement: the refusal is what makes the body non-silent, and refusing
+  the whole window would force the client to trim the window itself, which is a computation 021
+  FR-001 forbids it (021 OB-7). What is forbidden is a short body with nothing saying it is short.
 
 - **FR-047**: Every observation returned MUST carry its own provenance, not the series'. Both record
   types already hold one per observation; collapsing them to a series-level mark would lose which
@@ -1323,11 +1365,10 @@ to a feature about the answer's vocabulary rather than about serialising it.
   external host, and both documentation routes serve nothing. Asserted by scanning the served
   bytes, not by reading the configuration. Serialised citations are outside the scan by
   construction — they are data in a JSON body, never a fetch. (FR-031)
-- **SC-016a**: Every origin the service admits is a loopback origin; no wildcard, no pattern and no
-  credentials allowance appears in the configuration; and a response to a request carrying a
-  non-loopback origin carries **no** `access-control-allow-origin` header. Stated as the header
-  withheld rather than the request refused, because that is what a CORS allowance does — the refusal
-  is SC-016c's, on the `Host` header. (FR-032a)
+- **SC-016a**: The service installs no CORS middleware and emits no `access-control-allow-origin`
+  header on any response, including one carrying an `Origin` of its own loopback. Asserted as an
+  absence, because the arrangement 021 declares is same-origin in both development and production.
+  (FR-032a)
 - **SC-016b**: The runtime closure of the `api` extra in the lock file equals the reviewed list.
   Adding a dependency turns the suite red until a line describing its network behaviour is written.
   (FR-036)
@@ -1347,7 +1388,8 @@ to a feature about the answer's vocabulary rather than about serialising it.
 - **SC-019**: Every answer response carries a manifest, and no code path returns one without.
   (FR-044)
 - **SC-020**: A given window reaching outside a series' declared coverage refuses by name in 100% of
-  cases and returns zero observations; no window ever returns a truncated result. An omitted window
+  cases, in a body that also carries whatever part of the window the series does cover; no window
+  ever returns a short body with nothing saying it is short. An omitted window
   returns every declared observation, and the coverage a client would need to construct a window is
   on the list read of the same category. (FR-045, FR-045a, FR-046)
 - **SC-021**: Every observation in a series response carries its own provenance, and a series in
@@ -1381,6 +1423,19 @@ to a feature about the answer's vocabulary rather than about serialising it.
   names a declared question id. Asserted as an absence over the route table, so that FR-043's
   deferral is measured rather than merely stated — an out-of-scope requirement that nothing checks is
   the shape by which scope creeps back in. (FR-043)
+- **SC-027**: Every record read carries the ordered field descriptors of the record it returned,
+  and the descriptor set equals the record's own fields — swept in both directions, so a descriptor
+  can neither omit a field nor name one the body does not carry. No descriptor carries a label.
+  (FR-052)
+- **SC-028**: Every record read states its declaring file relative to the data root, and the
+  categories that cannot are exactly the set the test pins, each carrying a typed absence with its
+  reason. (FR-053)
+- **SC-029**: Every category's citation verdict equals `scripts/check_provenance.py`'s own lists,
+  and every exempt one is served with that script's recorded reason. Moving a directory between the
+  two lists turns the suite red. (FR-054)
+- **SC-030**: With no `web/dist` present the application registers no static route and every test
+  passes; with a directory present, a request for an unknown path under it returns the fallback
+  document and a request for a known asset returns it. (FR-055)
 
 ---
 
@@ -1429,7 +1484,10 @@ to a feature about the answer's vocabulary rather than about serialising it.
   approach it. What it does is keep the gate's condition from being reached by any supported path —
   FR-026 to FR-030, whose reach FR-029 tables exactly and whose limits FR-027b states rather than
   dressing up as impossibility.
-- **The web client.** Feature 021. What passes between them is FR-032's contract and nothing else.
+- **The web client.** Feature 021. What passes between them is FR-032's contract, the four
+  obligations under "What a generic client needs", and nothing else. Serving its *built output* is
+  not the same thing as building it: FR-055 is a mount that is inert until 021's image puts a
+  directory there.
 - **Ad-hoc questions over HTTP.** FR-043, recorded as a future entry.
 - **Triggering a fetcher.** The scripts under `scripts/` stay commands a person runs and reads the
   diff of. An HTTP endpoint that fetched would be a network call from a service whose dependency
