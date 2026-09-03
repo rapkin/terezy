@@ -1,6 +1,17 @@
 <!--
 Sync Impact Report
 ==================
+Version change: 1.3.0 → 1.4.0 (2026-09-03)
+Rationale: MINOR — a founding decision discharged, not removed. D-B deferred the web UI
+framework until the result schema had stabilised against real output; the registry now
+declares real securities and a real published rate series, and the owner chose on
+2026-09-03 (specs/decisions/2026-09-03-web-stack.toml): an HTTP layer inside api/ (feature
+020) and a web client at web/ that is a client of the published schema and of nothing else
+(feature 021). The deferral's term — the schema, not a framework, is the contract —
+survives as a rule. Principle VII's release gate is unchanged. Invalidates no spec, plan or
+test; the layer line `ui/` becomes `web/` and leaves the Python import rule, which cannot
+see a TypeScript tree.
+
 Version change: 1.2.0 → 1.3.0 (2026-08-30)
 Rationale: MINOR — guidance materially expanded. "Documentation is part of the feature"
 gains a prose discipline: a comment states a contract or an inferable-only reason, no
@@ -46,6 +57,8 @@ Founding decisions recorded (owner-approved 2026-08-21):
   D-A  Money is float64 with a documented tolerance policy (Principle IV).
   D-B  Delivery surface at foundation stage is core + typed API + CLI; the web
        UI framework is deliberately deferred (Architecture Constraints).
+       DISCHARGED 2026-09-03 by the HTTP + web-client choice recorded there; its
+       term — the schema is the contract — survives it.
   D-C  Fresh rewrite from the reference docs. No code is carried over from
        stock-bond-inv-simulation (Engineering Standards → Provenance of behaviour).
   D-D  CI gates: property-based invariant tests, golden result files, strict
@@ -239,17 +252,32 @@ core/     pure, deterministic, no I/O — instruments, routes, ledger, tax, metr
 data/     providers, caching with provenance, offline snapshot, run manifest
 api/      orchestration + the typed result schema
 cli/      thin client over api/
-ui/       deferred (see below) — a client over api/, never over core/
+web/      a client over api/ over HTTP, never over core/ — a TypeScript tree outside the
+          Python package (see below)
 ```
 
-`core/` may not import from `data/`, `api/`, `cli/` or `ui/`. `data/` may not import
-from `api/` upward. A violation fails the build.
+`core/` may not import from `data/`, `api/` or `cli/`. `data/` may not import from
+`api/` upward. A violation fails the build. `web/` is absent from that rule deliberately:
+`lint-imports` governs a Python package and cannot see a TypeScript one, and `core/` could
+not import from it if it tried — so *the UI may not import the core* is enforced by the
+client having no way to name it: its types are generated from the checked-in OpenAPI
+document and from nothing else.
 
-**Delivery surface (owner decision D-B).** The foundation ships the core, a typed API
-exposing the result schema, and a thin CLI. The web UI framework is deliberately
-unchosen until the result schema has stabilised against real output. This is a
-recorded deferral, not an omission: the API is designed as the UI's only contract so
-that choice stays cheap.
+**Delivery surface (owner decision D-B, discharged 2026-09-03).** The foundation shipped
+the core, a typed API exposing the result schema, and a thin CLI, with the web UI
+framework deliberately unchosen until the result schema had stabilised against real
+output. That condition is met — the registry declares real securities and a real
+published rate series — and the owner has chosen: an HTTP layer inside `api/`, and a web
+client at `web/` that is a client of its published schema and of nothing else
+(`specs/decisions/2026-09-03-web-stack.toml`). **The deferral is discharged, not
+deleted.** What it bought was that the schema, rather than a framework, is the contract,
+and that survives the choice: the schema is a checked-in artefact regenerated under a
+gate, so a client is generated from it and cannot drift from it; the client reads the
+schema and never `core/`; and the UI computes no figure the schema does not carry,
+because a figure computed in a client is a figure with no provenance. Principle VII's
+release gate is unchanged — authentication before the application listens on anything
+but loopback stays a blocking gate, and the delivery surface's job is to keep every
+supported path from reaching that condition rather than to weaken it.
 
 **Language and stack.** Python. The core keeps to the scientific stack (numpy,
 pandas, scipy) and typed models for the declarative layer. Dependencies are pinned
@@ -371,4 +399,4 @@ skipped, marked expected-to-fail, or deleted without an amendment.
 **Runtime guidance.** Day-to-day development guidance for coding agents lives in
 `CLAUDE.md`, which is subordinate to this document and may not contradict it.
 
-**Version**: 1.3.0 | **Ratified**: 2026-08-21 | **Last Amended**: 2026-08-30
+**Version**: 1.4.0 | **Ratified**: 2026-08-21 | **Last Amended**: 2026-09-03

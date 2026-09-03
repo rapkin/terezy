@@ -143,6 +143,13 @@ needs  = ["007-cpi-real-terms", "008-seed-and-goals", "009-tax-depth", "011-offi
 why    = "one endpoint per declaration category, so every feature that OWNS a category must exist before there is a response type to write: 007 CPI, 008 seeds and goals, 009 tax timing, 011 official rates, 012 schemes and destinations, 017 calendars. 015 brings the answer endpoint; 018 makes a windowed series read testable against data rather than an empty file. All eight are done, so this blocks nothing -- the list is long because the surface is wide."
 note   = "Lifts D-B (owner decision 2026-09-03, specs/decisions/2026-09-03-web-stack.toml lands with 021). THREE CLARIFICATIONS OPEN, each shipping a stated default until answered, so the stack bootstrap may start (owner instruction 2026-09-03). The load-bearing measurement: 314 frozen core records carry no kind tag and ten groups share an identical field set -- OneWayCost and RoundTripCost among them, whose separation Principle VI requires and mypy currently supplies. Serialisation is where that guard is lost."
 
+[[feature]]
+id     = "021-web-declared-data"
+status = "drafted"
+needs  = ["020-http-api"]
+why    = "the client generates its types from 020's checked-in OpenAPI document and reads nothing else; every figure, mark and refusal on screen is one of 020's responses, and OB-1 to OB-9 in the spec are the obligations it must satisfy"
+note   = "The first surface on which a mark and a refusal have to survive being looked at, built while the only thing on it is declared data -- which is the cheapest place to get that wrong and find out. Read-only by design: no editing, no fetchers, no answer or compare screens. Lifts owner decision D-B together with 020; the constitution amendment (1.4.0) landed with this spec. `drafted` is factual -- three [NEEDS CLARIFICATION] are open -- and owner decision 2026-09-03 (specs/decisions/2026-09-03-web-stack.toml) overrides the rule that planning may not start, on the ground that each of the three states its own blast radius in the spec's Status header."
+
 # Named future work — seams already recorded inside landed specs, not yet features.
 
 [[future]]
