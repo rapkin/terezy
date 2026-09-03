@@ -1,0 +1,19 @@
+# The image carries code, never data: `data/` is mounted read-only at runtime (020 FR-033), so
+# an image built here holds no part of one person's finances even if it is pushed somewhere.
+data
+.venv
+.git
+.github
+.claude
+.specify
+.hypothesis
+.mypy_cache
+.pytest_cache
+.ruff_cache
+.import_linter_cache
+.coverage
+**/__pycache__
+docs
+specs
+scripts
+tests

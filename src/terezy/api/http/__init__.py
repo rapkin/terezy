@@ -11,3 +11,7 @@ document generated from these types is checked in and byte-gated, because a clie
 generated from it and a published copy that is not gated is a second schema going quietly out
 of step with the first.
 """
+
+from terezy.api.http.service import app, create_app
+
+__all__ = ["app", "create_app"]

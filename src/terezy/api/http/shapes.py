@@ -16,7 +16,7 @@ from __future__ import annotations
 import dataclasses
 import types
 import typing
-from collections.abc import Callable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from enum import Enum
@@ -35,6 +35,7 @@ from terezy.core.routes.channels import FxChannel
 from terezy.core.routes.legs import Route
 from terezy.core.streams.streams import IncomeStream
 from terezy.core.tax.interface import TaxableEventKind, TaxClass
+from terezy.data.manifest import RunManifest
 
 
 class UnserialisableAnnotationError(TypeError):
@@ -156,6 +157,7 @@ _DERIVED: Final[Mapping[type, tuple[tuple[str, DerivedShape], ...]]] = {
 _SCALARS: Final[frozenset[type]] = frozenset({str, int, float, bool, date})
 
 _FALLBACK: Final[Mapping[str, object]] = {
+    "date": date,
     "Mapping": Mapping,
     "Sequence": Sequence,
     "Provenance": Provenance,
@@ -170,6 +172,7 @@ _FALLBACK: Final[Mapping[str, object]] = {
     "IncomeStream": IncomeStream,
     "TaxClass": TaxClass,
     "TaxableEventKind": TaxableEventKind,
+    "RunManifest": RunManifest,
 }
 """Names that appear in annotations under ``TYPE_CHECKING`` and so are absent at run time.
 
@@ -185,6 +188,10 @@ _IN_PROGRESS: Final[set[type]] = set()
 
 def plan_of(annotation: object) -> Shape:
     """The shape of one annotated type."""
+    if isinstance(annotation, typing.TypeAliasType):
+        # A `type X = ...` alias resolves to itself rather than to what it names, so a field
+        # annotated with one would otherwise have no arm.
+        return plan_of(annotation.__value__)
     if isinstance(annotation, type):
         if dataclasses.is_dataclass(annotation):
             return _record(annotation)
@@ -238,6 +245,39 @@ def _children(shape: Shape) -> tuple[Shape, ...]:  # noqa: PLR0911 -- exhaustive
             return (key, value)
         case _:
             return ()
+
+
+def records_in(shape: Shape, value: object) -> Iterator[object]:  # noqa: PLR0912 -- exhaustive match
+    """Every record *value* reachable from one value, described by its shape.
+
+    The value-side companion of :func:`walk`, and the reason a category's merged mark does not
+    rest on a per-record list of which fields carry provenance -- a list which would be one more
+    enumeration of things declared elsewhere.
+    """
+    match shape:
+        case RecordShape(fields=fields):
+            yield value
+            for name, field in fields:
+                if not isinstance(field, DerivedShape):
+                    yield from records_in(field, getattr(value, name))
+        case OptionalShape(inner=inner):
+            if value is not None:
+                yield from records_in(inner, value)
+        case UnionShape(members=members):
+            for member in members:
+                if isinstance(member, RecordShape) and type(value) is member.record:
+                    yield from records_in(member, value)
+        case SequenceShape(element=element) | SetShape(element=element):
+            for item in typing.cast("Iterable[object]", value):
+                yield from records_in(element, item)
+        case TupleShape(elements=elements):
+            for part, item in zip(elements, typing.cast("Iterable[object]", value), strict=True):
+                yield from records_in(part, item)
+        case MappingShape(value=inner):
+            for item in typing.cast("Mapping[object, object]", value).values():
+                yield from records_in(inner, item)
+        case _:
+            return
 
 
 def record_of(record: type) -> RecordShape:
@@ -298,9 +338,22 @@ def _hints(record: type) -> Mapping[str, object]:
 
 
 def _union(args: tuple[object, ...]) -> Shape:
-    members = tuple(plan_of(arg) for arg in args if arg is not type(None))
+    """One flat union, whatever nesting the annotation reached it through.
+
+    ``Answer | Refused`` is a union whose second arm is itself a union alias, and a nested
+    ``UnionShape`` would leave the outer one with a member that is not a record -- which is
+    exactly the test the discriminator rule applies, so the document would come out with an
+    undiscriminated ``anyOf`` and a client with nothing to narrow on.
+    """
+    members = tuple(
+        flattened for arg in args if arg is not type(None) for flattened in _flattened(plan_of(arg))
+    )
     inner: Shape = members[0] if len(members) == 1 else UnionShape(members)
-    return OptionalShape(inner) if len(members) != len(args) else inner
+    return OptionalShape(inner) if any(arg is type(None) for arg in args) else inner
+
+
+def _flattened(shape: Shape) -> tuple[Shape, ...]:
+    return shape.members if isinstance(shape, UnionShape) else (shape,)
 
 
 def _tuple(args: tuple[object, ...]) -> Shape:

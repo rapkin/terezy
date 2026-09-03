@@ -28,125 +28,13 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
+from terezy.data import citation_policy
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DATA_ROOT = REPO_ROOT / "data"
 
-# Directories whose observed values are legal, tax, fee or market observations and
-# therefore require a citation.
-#
-# `channels` joined in feature 002: a two-sided rate is the most decision-relevant
-# observation in the ramp model, and an uncited premium is exactly the figure that gets
-# believed without checking.
-#
-# `access` joined in feature 010. Most of an `[[access]]` entry is references — an instrument
-# id, two venue ids, a risk-class label — and cites nothing, which the predicate below gets
-# right on its own. Its one observed value is `[access.price]`, the price of one unit at the
-# venue the instrument is bought from, and that is a market quote: exactly the kind of figure
-# that gets believed without checking, and the number every purchase in a comparison is sized
-# by.
-# `official_rates` joined in feature 011. Every `[[observation]]` is one date's published
-# legal reference — the single input that turns a foreign amount into a hryvnia tax base —
-# so an uncited one is the confidently-wrong number this project exists to refuse.
-#
-# `calendars` joined in feature 017. A classification row is a date and a label and holds no
-# number at all, so it is reached only because the predicate below counts dates: an uncited
-# holiday is precisely the legal value from memory Principle I forbids, and this is the one
-# gate that would otherwise be believed to catch it.
-#
-# A subdirectory of a sourced directory needs no entry of its own: the walk below is `rglob`.
-SOURCED_DIRS = (
-    "tax",
-    "instruments",
-    "routes",
-    "channels",
-    "cpi",
-    "access",
-    "observations",
-    "official_rates",
-    "calendars",
-)
-
-# The directories exempt from the citation requirement, each BY NAME and WITH ITS REASON.
-# Together with SOURCED_DIRS this list is exhaustive: a directory under data/ that appears
-# in neither is an **error**, never a blind spot (`unknown_directories` below).
-EXEMPT_DIRS: dict[str, str] = {
-    "scenarios": (
-        "the owner's own stated beliefs -- regimes, transitions, event probabilities. An "
-        "assumption needs a label and a visible consequence, not a source (data/README.md)"
-    ),
-    "objectives": (
-        "the owner's own objective and constraint sets -- stated preferences, not "
-        "observations (data/README.md)"
-    ),
-    "strategies": (
-        "the owner's own named allocations -- decisions, not observations. A strategy "
-        "file that ever carries a market observation must move that value into a sourced "
-        "directory rather than widen this exemption"
-    ),
-    "streams": (
-        "an owner's own salary is a statement of fact by the only person who can make it: "
-        "an amount, a cadence, the venues it lands at and is credited to, and which "
-        "taxation scheme he is in. Feature 012 removed the one thing here the exemption "
-        "never covered -- a tax RATE, which is a public legal fact about the Republic "
-        "rather than a statement about him. The rates of every scheme now live in "
-        "data/tax/schemes/, where a citation is required (data/README.md)"
-    ),
-    "composition": (
-        "the owner's own policy on how far a search may run -- how many declared routes may "
-        "be chained into one candidate. Nothing here describes the world, so there is nothing "
-        "for a source to vouch for: it is the same exemption `objectives` and `strategies` "
-        "carry, and for the same reason. Every *number* that describes a corridor lives on a "
-        "leg, in data/routes/, cited (004 research.md D8)"
-    ),
-    "questions": (
-        "the owner's own questions -- an amount, some subjects, some horizons and a run plan "
-        "per subject. A question is one person's stated preference, not an observation about "
-        "the world, so there is nothing for a source to vouch for: the same exemption "
-        "`objectives`, `strategies`, `composition` and `candidates` carry. If a number "
-        "describing the world ever has to live in a question it moves to a sourced directory "
-        "rather than this exemption widening (015 FR-003)"
-    ),
-    "candidates": (
-        "the owner's own policy on how many options a search may enumerate before it refuses "
-        "-- a single integer, and nothing here describes the world. It is the same exemption "
-        "`composition` carries and for the same reason: how far and how wide this person will "
-        "let a search run is a fact about him. Every *number* that describes a corridor lives "
-        "on a leg, in data/routes/, cited (014 research.md D9)"
-    ),
-    "spendable": (
-        "the owner's own statement of where he spends -- a venue id and a currency code, "
-        "and nothing a source could vouch for. It is the same exemption `streams` has and "
-        "for the same reason: where a person's money counts as having come back out is a "
-        "fact about his life rather than an observation of the world. Every *number* "
-        "attached to a venue lives on a leg, in data/routes/, cited (003 research.md D4)"
-    ),
-    "user": (
-        "gitignored per-user data -- what a *run produces* rather than what a person declares: "
-        "results, caches, scratch output. Never curated, never committed, and outside this gate "
-        "by the Principle VII boundary. The owner's own declarations are committed and live in "
-        "the per-owner directories above (008 research.md D2)"
-    ),
-    # --- feature 008: the owner's own holdings and targets ---
-    "seeds": (
-        "the owner's own opening lots -- what he already holds, what he paid, and whether he "
-        "knows the price or is stating it from memory. What a person paid for a lot is his own "
-        "record rather than an observation of the world, so there is nothing for a source to "
-        "vouch for: the same exemption `objectives`, `strategies`, `streams` and `spendable` "
-        'carry. A cost he is unsure of is not uncited, it is *marked* -- `basis = "estimated"` '
-        "puts a propagating mark on the gain and on the tax charged on it, which is the honest "
-        "answer where a citation is not available to anybody (008 research.md D2). If a market "
-        "*value* ever has to live here it moves to a sourced directory rather than this "
-        "exemption widening to cover it"
-    ),
-    "goals": (
-        "the owner's own targets -- a sum, a date, a contribution. A target is a decision, not "
-        "an observation, so there is nothing for a source to vouch for: the same exemption "
-        "`objectives` and `strategies` carry, and for the same reason. The growth assumption a "
-        "goal is evaluated against is deliberately *not* declared here (008 FR-012); it is an "
-        "input carrying its own provenance, so no rate this gate would want to check ever "
-        "lands in this directory"
-    ),
-}
+SOURCED_DIRS = citation_policy.SOURCED_DIRS
+EXEMPT_DIRS = citation_policy.EXEMPT_DIRS
 
 REQUIRED_WITH_SOURCE = ("source", "retrieved_on")
 
