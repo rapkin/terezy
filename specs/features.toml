@@ -136,6 +136,13 @@ needs  = ["015-the-question", "016-real-ovdp"]
 why    = "015 because a dominance pass runs over what a horizon section evaluated -- section_evaluated is 015's, and its FR-030 withholding is what the pass must not decide standings from; 016 because the reason 014 gave for not building the non-dominated set was the measured size of the set, and 24 real issues is what expires it. Transitively covers 014 (every dimension the pass reads is 014 FR-020's) and 010 (the ranking, tie and benchmark rules it carries unchanged)."
 note   = "FOUR CLARIFICATIONS OPEN, so planning may not start; they are in the spec with options and a recommendation each -- do not restate them. Written for the registry AFTER the owner's 2026-09-02 decision (OVDP fixtures out, a real ISIN as benchmark), and the spec defines 'the shipped registry' as that state, once. Closes I2 only; Section A moves by nothing and the reason per row is decided rather than left. Four pieces of work sit outside this feature's module: the question schema's objective-set field (015), a slack-width function in core/primitives/tolerance.py, an InputKind member for the objective set, and the CLI rendering -- which includes Comparison.ties and Comparison.beats_benchmark, computed by the core today and appearing nowhere in src/terezy/cli/."
 
+[[feature]]
+id     = "020-http-api"
+status = "drafted"
+needs  = ["007-cpi-real-terms", "008-seed-and-goals", "009-tax-depth", "011-official-rate", "012-fop-group-3", "015-the-question", "017-working-day-calendar", "018-nbu-rate-series"]
+why    = "one endpoint per declaration category, so every feature that OWNS a category must exist before there is a response type to write: 007 CPI, 008 seeds and goals, 009 tax timing, 011 official rates, 012 schemes and destinations, 017 calendars. 015 brings the answer endpoint; 018 makes a windowed series read testable against data rather than an empty file. All eight are done, so this blocks nothing -- the list is long because the surface is wide."
+note   = "Lifts D-B (owner decision 2026-09-03, specs/decisions/2026-09-03-web-stack.toml lands with 021). THREE CLARIFICATIONS OPEN, each shipping a stated default until answered, so the stack bootstrap may start (owner instruction 2026-09-03). The load-bearing measurement: 314 frozen core records carry no kind tag and ten groups share an identical field set -- OneWayCost and RoundTripCost among them, whose separation Principle VI requires and mypy currently supplies. Serialisation is where that guard is lost."
+
 # Named future work — seams already recorded inside landed specs, not yet features.
 
 [[future]]
