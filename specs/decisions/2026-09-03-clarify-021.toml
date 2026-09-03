@@ -1,0 +1,75 @@
+# Owner answers — the three [NEEDS CLARIFICATION] markers of specs/021-web-declared-data/spec.md.
+#
+# The spec shipped `drafted` with three open questions and an owner override
+# (specs/decisions/2026-09-03-web-stack.toml, decision 4) permitting the bootstrap to start on
+# the recommended default for each. These are the answers, and one of them is not an answer to
+# the question as asked: Q2 was overtaken by a decision taken the same day about the subject the
+# question was about.
+#
+# Relayed in English, as the same day's web-stack decisions were. The reasoning under `notes` is
+# the owner's; the wording is not.
+exported_on = "2026-09-03"
+
+[[answer]]
+q       = 1
+feature = "021-web-declared-data"
+title   = "What language is the interface written in?"
+options = ["A — English only (recommended)", "B — Ukrainian only", "C — Both, switchable"]
+choice  = "A — English only"
+notes   = """
+The screen's job is to show what the declaration says. A label that differs from the field name
+in the TOML file is one more thing that can quietly stop matching, and the citation strings,
+refusal reasons and observation kinds arrive from the engine in English regardless -- so B buys a
+Ukrainian frame around English content, and C buys the same content as A plus a translation file
+whose second entry is the one that drifts.
+
+Zero work follows: no translation layer is built, so nothing has to be undone if this is revisited.
+B or C would be a layer added later around labels that already exist.
+"""
+
+[[answer]]
+q       = 2
+feature = "021-web-declared-data"
+title   = "Is the display-currency selector offered while nothing can convert?"
+options = ["A — the selector offers every currency and an unconvertible figure refuses (recommended)", "B — the selector offers only what can be shown"]
+choice  = "Neither — MOOT. The display-currency switch is deferred as a subject."
+notes   = """
+Taken the same day and after the question was written: the display switch is deferred entirely, on
+both sides of the wire. 020 is to ship no `display` request parameter and 021 no selector, so the
+question -- what a selector lists -- has no selector to be about.
+
+Note what is a decision and what is not yet a fact: 020's spec as written still REQUIRES the
+parameter (its FR-021 to FR-025 and its clarification 1). Withdrawing them is the change this
+decision asks of 020, and until it is made 021's deferral rests on an intention rather than on a
+contract.
+
+Recorded as moot rather than as A, because the two are different facts and only one of them is
+true. A would mean a control exists and lists everything; what is true is that no control exists.
+A spec that recorded A would have a component nobody built.
+
+The question becomes live again, unchanged, on the day the switch is picked up. Its scope is the
+`[[future]]` entry `web-display-currency-switch`.
+"""
+
+[[answer]]
+q       = 3
+feature = "021-web-declared-data"
+title   = "Does the browser show the owner's own declarations, or only the public ones?"
+options = ["A — show every category, each per-owner record labelled as the owner's own statement (recommended)", "B — show only the public categories"]
+choice  = "A — show them, each labelled as the owner's statement rather than an observation"
+notes   = """
+The screen answers *what does the tool rest on*. Under B half of a run's inputs are invisible on
+the one surface built to show inputs, which makes it half a feature.
+
+The label is the operative half of this answer and is not decoration: a per-owner figure must
+read as the owner's statement and never as an observation. The mechanism already exists -- the
+directory is exempt from the citation requirement *because* it holds the owner's own statements,
+and FR-013 renders that exemption with its reason on every such record.
+
+It changes who can reach the app not at all: loopback, one machine, behind the authentication
+gate that must exist before anything else listens. That is what Principle VII already permits.
+
+And it is the answer the shipped tree needs: every directory `check_provenance.py` exempts *and
+that ships records* is an owner-statement directory, so under B no exempt record is reachable at
+all and US1 acceptance scenario 3 could not be exercised.
+"""
