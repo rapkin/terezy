@@ -37,7 +37,7 @@ def _three_faults() -> Registries:
     instrument's proceeds land where no exit departs from; and the two pegged funds still refuse
     on their own declared terms, untouched.
     """
-    registries = fixtures.shipped()
+    registries = fixtures.declared()
     classes = {
         class_id: declared
         for class_id, declared in registries.tax_classes.items()
@@ -144,7 +144,7 @@ def test_the_groups_are_sorted_so_two_runs_report_them_in_one_order() -> None:
 def test_the_tally_moves_with_the_amount_the_question_states() -> None:
     """SC-016: two amounts over one registry produce two tallies, so a count reported without
     its question is a figure more confident than its inputs."""
-    registries = fixtures.shipped()
+    registries = fixtures.declared()
     generous = {group.refusal: group.count for group in _groups(registries)}
     stingy = {
         group.refusal: group.count
@@ -158,7 +158,7 @@ def test_the_tally_moves_with_the_horizon_too() -> None:
     """The other half of SC-016. The horizon sets the projection window, so a date-carrying
     refusal moves with it -- which is why FR-012 states the requirement over the whole
     question rather than over a list of the amount-sensitive members."""
-    registries = fixtures.shipped()
+    registries = fixtures.declared()
     question = fixtures.question(registries)
     short = replace(question, horizon=replace(question.horizon, end=question.horizon.start))
     result = survey(

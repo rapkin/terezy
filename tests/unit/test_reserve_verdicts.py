@@ -26,7 +26,7 @@ from terezy.core.results.tuple import Arrival
 from tests import answer_registries as fixtures
 
 TWELVE_MONTHS = 2
-"""The index of the horizon that evaluates anything at all over the shipped registry."""
+"""The index of the horizon that evaluates anything at all over the declared registry."""
 
 
 def _twelve_month_only() -> Answer:

@@ -10,7 +10,7 @@
   FR-021a requires a question to carry an owner-**stated** rate and the loader that reads one is
   shared with every other declaration.
 * **Marks survive.** Verified by a walk over the whole result rather than by sampling: the
-  shipped set is both unverified and synthetic, so an answer presenting a clean figure would be
+  declared set is both unverified and synthetic, so an answer presenting a clean figure would be
   presenting a fixture as an observation.
 * **The exclusions and the absences are checked against each other**, so neither can drift.
 """
@@ -180,7 +180,7 @@ def test_no_real_terms_figure_appears_anywhere_in_the_result() -> None:
 def test_every_figure_the_shipped_answer_reports_carries_the_marks_of_its_registry() -> None:
     """SC-017, by a walk over the whole result rather than by sampling.
 
-    The shipped registry is entirely unverified, so a figure that came back clean would be
+    Every declaration is unverified under either root, so a figure that came back clean would be
     reporting a fixture as an observation.
     """
     result = fixtures.answered()
@@ -245,6 +245,7 @@ def test_a_section_that_holds_to_maturity_inherits_no_early_exit_claim() -> None
         question,
         subjects=("ovdp_synthetic_a",),
         plans={"ovdp_synthetic_a": question.plans["ovdp"]},
+        benchmark_instrument_id="ovdp_synthetic_a",
         horizons=(
             DateRange(start=date(2026, 9, 1), end=date(2027, 6, 1)),
             DateRange(start=date(2026, 9, 1), end=date(2028, 6, 1)),

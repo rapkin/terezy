@@ -71,17 +71,22 @@ the whole repository refers to:
 5. **No real personal data, ever — public facts and labelled synthetic fixtures only.**
    This is the owner's own rule (2026-08-23) and it is the axis that matters. What may be
    committed here is a **general fact about the world** — a fee, a tax rate, a published
-   inflation figure, a corridor, a venue — or a **synthetic fixture that says on its face
-   that it is one**, so that logic and arithmetic can be checked quickly. A fixture shaped
-   like the owner's real situation is fine on the same terms. What may **never** be committed
-   is a figure that describes his actual position.
+   inflation figure, a corridor, a venue — or a **statement the owner makes about himself**,
+   shipped synthetic while his real figures are unstated. What may **never** be committed is a
+   figure that describes his actual position. **Narrowed on 2026-09-02 by the owner: an invented
+   instrument may not ship**, so that `instruments/` reads as an inventory of what he can
+   actually buy. Invented ones a test needs live in `tests/fixtures/data/`, which has its own
+   README saying what each is the only example of. **The narrowing stops at instruments**:
+   every file in `routes/` and `channels/` is still an invented corridor (§11 item 1), so a
+   figure over this tree is a real security reached by an imagined journey, and no ranking it
+   produces is yet a claim about what an actual purchase costs.
 
    That splits the tree in two, and the split is *not* the same as curated-versus-per-owner:
 
    | Kind | Directories | Rule |
    |---|---|---|
    | Public facts about the world | `instruments/`, `routes/`, `channels/`, `tax/`, `cpi/`, `venues.toml`, `observation_kinds.toml` | Cited: `source`, `retrieved_on`, `verified_on` (rules 2 and 4 above). |
-   | The owner's own statements, shipped **synthetic** | `seeds/`, `goals/`, `streams/`, `spendable/`, `composition/`, `scenarios/`, `strategies/`, `objectives/` | Nothing to cite — see the next section for each one's argument. Labelled synthetic while the real figures are unstated (`SIMULATOR_SPEC.md` §11 item 3) — `seeds/` and `goals/` carry `is_synthetic` as a **required field**, so the label is readable by the tool and not only by a reader. |
+   | The owner's own statements, shipped **synthetic** | `seeds/`, `goals/`, `streams/`, `spendable/`, `composition/`, `scenarios/`, `strategies/`, `objectives/` | Nothing to cite — see the next section for each one's argument. Labelled synthetic while the real figures are unstated (`SIMULATOR_SPEC.md` §11 item 3) — `seeds/` and `goals/` carry `is_synthetic` as a **required field**, so the label is readable by the tool and not only by a reader. `seeds/` ships **no lot at all** — an ordinary state (008 FR-024). It records that nothing has been declared, never that nothing is held: the second would be a figure describing his actual position, which rule 5 forbids. |
    | What a run *produces* | `data/user/`, `cache/`, `runs/` | Gitignored. Never curated, never committed, outside every gate. |
 
    The second row is committed **because what ships in it is synthetic**, not because
@@ -165,7 +170,8 @@ be fail-open in the one script whose job is the opposite.
 
 Per-owner data being *inside* `data/` is a narrower claim than it looks. `streams/` holds one
 committed, reviewed declaration of where money lands and in what currency, with its amounts at
-`0.0` because the real figures have not been stated (§11 item 3); `seeds/` and `goals/` hold
-holdings and targets on the same footing, as labelled synthetic fixtures until real ones
-arrive. Every one of them is committed **because what ships in it is synthetic** — rule 5
-above, and the owner's own rule. None of them is a licence to commit his actual position.
+`0.0` because the real figures have not been stated (§11 item 3); `goals/` holds targets on the
+same footing, as labelled synthetic fixtures until real ones arrive; and `seeds/` declares no
+lot at all, which says that none has been stated rather than that he holds none. Every one of them is committed **because
+what ships in it is synthetic** — rule 5 above, and the owner's own rule. None of them is a
+licence to commit his actual position.

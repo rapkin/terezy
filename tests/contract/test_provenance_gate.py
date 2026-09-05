@@ -28,12 +28,19 @@ from pathlib import Path
 import pytest
 
 from terezy.data.declarations.loader import INFERENCE_MARKER, INFERENCES
+from tests import data_roots
 
 pytestmark = pytest.mark.contract
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = REPO_ROOT / "scripts" / "check_provenance.py"
-DATA_ROOT = REPO_ROOT / "data"
+SCRIPT = data_roots.REPO_ROOT / "scripts" / "check_provenance.py"
+
+DATA_ROOT = data_roots.with_fixtures()
+"""**The fixture overlay is scanned, and this is where.** CI runs the script bare, over
+``data/`` alone, so the invented declarations in ``tests/fixtures/data/`` would otherwise sit
+outside the one gate that reads a citation -- and they carry the same four keys every shipped
+table does. Scanning them here rather than teaching the script a second default root keeps the
+gate CI runs identical to the gate a reader runs by hand.
+"""
 
 
 def _run(root: Path) -> subprocess.CompletedProcess[str]:
@@ -52,8 +59,14 @@ def _scratch_root(tmp_path: Path) -> Path:
     return root
 
 
-def test_the_shipped_data_root_is_clean(tmp_path: Path) -> None:
-    """The baseline the cases below mutate: the shipped tree passes, warnings and all."""
+def test_the_shipped_data_root_is_clean() -> None:
+    """What CI checks, checked here too: the tree the script scans by default passes."""
+    outcome = _run(data_roots.SHIPPED)
+    assert outcome.returncode == 0, outcome.stdout
+
+
+def test_the_fixture_overlay_is_clean_too(tmp_path: Path) -> None:
+    """The baseline the cases below mutate, and the only scan the fixtures ever get."""
     outcome = _run(_scratch_root(tmp_path))
     assert outcome.returncode == 0, outcome.stdout
 
@@ -166,7 +179,7 @@ def test_an_inference_with_no_verification_task_is_an_error(tmp_path: Path) -> N
 
 def test_the_checks_run_on_no_other_declaration_kind(tmp_path: Path) -> None:
     """A bond declared by its terms infers none of this, and a fund's verification tasks
-    answer a different question. The shipped tree contains both and stays clean."""
+    answer a different question. The composed tree contains both and stays clean."""
     root = _scratch_root(tmp_path)
     (root / ENUMERATED).unlink()
     assert _run(root).returncode == 0

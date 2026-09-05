@@ -3,7 +3,7 @@
     pairs considered      = pairs enumerated + pairs yielding no candidate
     candidates enumerated = evaluated        + dropped
 
-Both are asserted rather than described, over variations of the shipped registry: subsets of
+Both are asserted rather than described, over variations of the declared registry: subsets of
 the access declarations, of the routes and of the streams, with the amount and the horizon
 varied. Varying the registry rather than generating one from nothing keeps every case a world
 the loader validated, which is `tests/tuple_registries.py`'s reasoning applied to a strategy.
@@ -38,14 +38,14 @@ pytestmark = pytest.mark.invariant
 Reached = Literal["refused", "empty", "uncomparable", "counted"]
 """How far one generated case got before there was nothing left to assert."""
 
-SHIPPED = fixtures.shipped()
+SHIPPED = fixtures.declared()
 INSTRUMENTS = sorted(SHIPPED.access)
 ROUTES = sorted(SHIPPED.routes)
 STREAMS = sorted(SHIPPED.streams)
 
 
 def _narrowed(instruments: list[str], routes: list[str], streams: list[str]) -> Registries:
-    """The shipped registry with three of its families narrowed to the named members."""
+    """The declared registry with three of its families narrowed to the named members."""
     return replace(
         SHIPPED,
         access={key: SHIPPED.access[key] for key in instruments},
@@ -88,7 +88,7 @@ def _both_identities(registries: Registries, amount: Money) -> Reached:
 
 
 DOMESTIC = ("inzhur_direct", "inzhur_to_monobank")
-"""The one pair the shipped declarations connect anything with.
+"""The one pair the declarations connect anything with.
 
 Unioned into half the generated route sets on purpose: without it almost every case is an
 empty set, and the second identity -- the one over evaluated and dropped -- would be asserted

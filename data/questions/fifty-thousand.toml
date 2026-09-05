@@ -61,7 +61,20 @@ continuation = "hold_as_cash"
 
 # Everything is ranked against one issue. Named by instrument id: more than one candidate for
 # it refuses rather than settling by file order which figure the rest are measured against.
-benchmark    = "ovdp_synthetic_a"
+#
+# OWNER'S CHOICE, 2026-09-03, and chosen for its DATE: its final coupon and its principal both
+# fall on 2027-08-25, a week short of the twelve-month horizon, so the hurdle is a bond held
+# very nearly to its own maturity over the longest window he asked about. At one and three
+# months it is sold at the window's end like any other candidate, so its rate spans the window
+# plus the three days the way out declares — waiting is inside the span (010 FR-015).
+#
+# It supersedes `UA4000235865`, which matured 2026-09-16 — inside every horizon — and was
+# therefore annualised over 18 days at all three while the rest of the list was annualised over
+# one, three and twelve months. That comparability break is recorded as
+# `rates-in-one-ranking-span-different-periods` in `specs/features.toml` and is NOT closed by this
+# choice: it is a property of any candidate whose terms end inside the window, and the renderer
+# says so per section. This benchmark simply does not trip it except by seven days.
+benchmark    = "UA4000231195"
 
 # The four words he said, in the order he said them. `subjects` and `every_declared_instrument`
 # are mutually exclusive and one of them is required: omission must never read as *everything*.

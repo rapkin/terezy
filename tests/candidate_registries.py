@@ -1,6 +1,6 @@
-"""Fixtures for the candidate suites: the shipped question, and deliberate edits to it.
+"""Fixtures for the candidate suites: the declared question, and deliberate edits to it.
 
-Built from ``data/`` rather than by hand, on ``tests/tuple_registries.py``'s reasoning
+Built from a data root rather than by hand, on ``tests/tuple_registries.py``'s reasoning
 unchanged: enumeration's whole claim is that it walks declarations, so a suite that hand-built
 every record would be measuring a world the loader never validated.
 
@@ -31,6 +31,7 @@ from terezy.core.results.coverage import IMPLICIT_REGIME_ID, SpendableEndpoint
 from terezy.core.results.fund import FundAssumptions
 from terezy.core.results.tuple import HOLD_AS_CASH, Tuple
 from terezy.data.declarations import resolver
+from tests import data_roots
 
 if TYPE_CHECKING:  # pragma: no cover -- typing only
     from collections.abc import Mapping
@@ -40,8 +41,12 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.results.tuple import InstrumentPlan
     from terezy.core.routes.legs import Route
 
-REPO_ROOT: Final = Path(__file__).resolve().parents[1]
-DATA_ROOT: Final = REPO_ROOT / "data"
+REPO_ROOT: Final = data_roots.REPO_ROOT
+DATA_ROOT: Final = data_roots.with_fixtures()
+"""The composed root, because a drop, a refusal and a tie all need an instrument whose terms
+were chosen to produce one. ``tests/golden/test_candidate_set.py`` passes ``data_roots.SHIPPED``
+instead: its artefact is a record of what the shipped registry offers.
+"""
 
 UAH: Final = Currency.UAH
 USD: Final = Currency.USD
@@ -52,7 +57,7 @@ CONTRACT: Final = "contract_usd"
 OUTLAY_ON: Final = date(2026, 4, 1)
 """When the money leaves.
 
-On or after every shipped instrument's issue date and schedule start, so a bond bought here is
+On or after every declared instrument's issue date and schedule start, so a bond bought here is
 bought into terms that are already complete. An earlier outlay refuses most of the registry as
 ``InstrumentRefused`` before anything else can be exercised, which would leave a battery
 measuring the date rather than what it planted.
@@ -118,14 +123,14 @@ def fund_plan(
     )
 
 
-def declarations() -> resolver.CandidateDeclarations:
-    """Every declaration an enumeration needs, under the shipped data root."""
-    return resolver.candidates_from_data_root(DATA_ROOT, base_currency=UAH, scenario_id=None)
+def declarations(root: Path = DATA_ROOT) -> resolver.CandidateDeclarations:
+    """Every declaration an enumeration needs, under a data root."""
+    return resolver.candidates_from_data_root(root, base_currency=UAH, scenario_id=None)
 
 
-def shipped() -> Registries:
-    """The join's registries for the shipped data root."""
-    return resolver.tuple_from_data_root(DATA_ROOT, base_currency=UAH, scenario_id=None).registries
+def declared(root: Path = DATA_ROOT) -> Registries:
+    """The join's registries for a data root."""
+    return resolver.tuple_from_data_root(root, base_currency=UAH, scenario_id=None).registries
 
 
 def one_plan_each(registries: Registries) -> dict[str, tuple[InstrumentPlan, ...]]:

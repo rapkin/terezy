@@ -32,7 +32,7 @@ OVDP = "ovdp_synthetic_a"
 
 
 def _surveyed() -> CandidateSurvey:
-    registries = fixtures.shipped()
+    registries = fixtures.declared()
     question = fixtures.question(registries)
     result = survey(
         registries=registries,
@@ -127,7 +127,7 @@ def test_the_result_states_how_many_plans_were_supplied_per_instrument() -> None
 
 def test_a_tuple_naming_something_undeclared_is_in_none_of_the_three_populations() -> None:
     """FR-015: never constructed, never counted. It was not a candidate; it was a typo."""
-    registries = fixtures.shipped()
+    registries = fixtures.declared()
     access = {**registries.access, "no_such_instrument": registries.access[OVDP]}
     enumerated = fixtures.enumerated(dataclasses.replace(registries, access=access))
     assert isinstance(enumerated, CandidateSet), enumerated

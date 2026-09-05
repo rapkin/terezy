@@ -25,6 +25,7 @@ from terezy.core.primitives.currency import Currency
 from terezy.core.results.answer import Answer, DeclaredSubject
 from terezy.data.declarations import loader, resolver
 from tests import answer_registries as fixtures
+from tests import data_roots
 
 pytestmark = pytest.mark.contract
 
@@ -33,10 +34,11 @@ MODELLED_ON = "UA4000235865"
 """The fixture and the real issue whose published list it is shaped like."""
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DATA_ROOT = REPO_ROOT / "data"
+DATA_ROOT = data_roots.with_fixtures()
 
 LOOKALIKE = "ovdp_lookalike"
-"""Named to trip the id-prefix inference: four of the six shipped bonds are ``ovdp_*``."""
+"""Named to trip the id-prefix inference: four of the overlay's six bonds are ``ovdp_*``,
+and no shipped instrument is."""
 
 ACCESS_ENTRY = """
 [[access]]
@@ -58,7 +60,7 @@ risk_class    = "sovereign_debt"
 def _root_with_lookalike(tmp_path: Path, *, labelled: bool) -> Path:
     """A whole data root plus one instrument that looks like an OVDP and may or may not say so.
 
-    Built by copying and editing the **shipped** declarations rather than by writing a template,
+    Built by copying and editing a **declared** instrument rather than by writing a template,
     so the fixture cannot drift into a shape the loader would reject for an unrelated reason.
     """
     root = tmp_path / "data"
@@ -132,11 +134,11 @@ def test_the_same_instrument_with_the_label_joins_the_group(tmp_path: Path) -> N
     assert _members(without, fixtures.INZHUR) == _members(with_label, fixtures.INZHUR)
 
 
-def test_the_shipped_count_is_unchanged_by_an_unlabelled_addition(tmp_path: Path) -> None:
-    """SC-033's first half, stated against the shipped registry it is measured from."""
-    shipped = fixtures.answered()
+def test_the_declared_count_is_unchanged_by_an_unlabelled_addition(tmp_path: Path) -> None:
+    """SC-033's first half, stated against the registry it is measured from."""
+    before = fixtures.answered()
     without = _answered(_root_with_lookalike(tmp_path, labelled=False))
-    assert _members(without, fixtures.OVDP) == _members(shipped, fixtures.OVDP)
+    assert _members(without, fixtures.OVDP) == _members(before, fixtures.OVDP)
 
 
 def test_no_group_holds_one_piece_of_paper_twice() -> None:

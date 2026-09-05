@@ -36,12 +36,13 @@ from terezy.core.tax import year as tax_year
 from terezy.core.tax.interface import TaxableEventKind, TaxCharge, TaxContext
 from terezy.data.declarations import loader, resolver
 from terezy.data.declarations.errors import DeclarationError
-from tests import tax_years
+from tests import data_roots, tax_years
 
 pytestmark = pytest.mark.contract
 
-REPO_ROOT: Final = Path(__file__).resolve().parents[2]
-DATA_ROOT: Final = REPO_ROOT / "data"
+REPO_ROOT: Final = data_roots.REPO_ROOT
+DATA_ROOT: Final = data_roots.with_fixtures()
+"""Composed, because the second jurisdiction below is an invented one and lives in the overlay."""
 SHIPPED_TIMING: Final = DATA_ROOT / "tax" / "timing" / "ua.toml"
 SHIPPED_POSITIONS: Final = DATA_ROOT / "scenarios" / "tax" / "owner-001.toml"
 
@@ -446,7 +447,7 @@ class TestTheCrossFileRelationsAreCheckedToo:
 
 
 def _scratch_root(tmp_path: Path) -> Path:
-    """A copy of the shipped data root, so a case changes exactly one thing about it."""
+    """A copy of the composed data root, so a case changes exactly one thing about it."""
     root = tmp_path / "data"
     shutil.copytree(DATA_ROOT, root)
     return root
@@ -460,11 +461,16 @@ class TestTheShippedFilesLoad:
         rules = resolver.tax_rules_from_data_root(DATA_ROOT, declarations)
 
         assert sorted(rules) == ["synthetic_fixture", "ua"], (
-            "⚙ 013 declared assessment rules for the synthetic fixture jurisdiction, so that "
-            "a netting category could be exercised rather than warned about. Every "
-            "jurisdiction with rules is named here rather than the list being loosened, "
-            "because a set read off the directory would agree by construction"
+            "013 declared assessment rules for the synthetic fixture jurisdiction so that a "
+            "netting category could be exercised rather than warned about. Every jurisdiction "
+            "with rules is named here rather than the list being loosened, because a set read "
+            "off the directory would agree by construction"
         )
+        assert sorted(
+            resolver.tax_rules_from_data_root(
+                data_roots.SHIPPED, resolver.from_data_root(data_roots.SHIPPED)
+            )
+        ) == ["ua"], "what ships declares one jurisdiction; the invented one is a fixture"
         assert set(rules["ua"].methods) == set(LotMethod)
         for jurisdiction in rules.values():
             for class_id in jurisdiction.category_of_class:

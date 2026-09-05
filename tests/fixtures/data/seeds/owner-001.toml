@@ -1,0 +1,31 @@
+# SYNTHETIC FIXTURE. Two invented opening lots, on two instruments only
+# `tests/fixtures/data/instruments/` declares.
+#
+# It REPLACES `data/seeds/owner-001.toml` in the composed root rather than joining it: a data
+# root resolves at most one file under `seeds/`, so the overlay has to carry the same name.
+# What a seed is, and why nothing here is cited, is stated once in the file it replaces.
+
+[owner]
+id = "owner-001"
+
+# A lot whose cost the owner knows: he has the confirmation from the purchase.
+[[seed]]
+is_synthetic  = true
+instrument_id = "ovdp_synthetic_a"
+quantity      = 10.0
+acquired_on   = "2026-03-14"
+cost          = 9_800.0
+basis         = "known"
+
+# A lot whose cost he does not. The estimate is accepted and marked: a disposal of this lot
+# yields a gain that says it rests on a guess, and so does the tax charged on that gain.
+# `reason` is required here and forbidden above — a reason on a known basis means one of the
+# two fields is wrong, and guessing which would be the loader inventing a declaration.
+[[seed]]
+is_synthetic  = true
+instrument_id = "ovdp_synthetic_b"
+quantity      = 5.0
+acquired_on   = "2026-04-02"
+cost          = 5_400.0
+basis         = "estimated"
+reason        = "bought across several weeks; the cabinet shows units, not the prices paid"

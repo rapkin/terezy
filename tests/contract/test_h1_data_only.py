@@ -28,8 +28,9 @@ jurisdiction field. So the fourth of H1's four declaration kinds is exercised **
 container** -- a new file with a new id parses and the classes inside it resolve and charge --
 and not as a *term*: no figure below would move if this fixture's jurisdiction id were the
 shipped one, and its ``base_currency = "UAH"`` matches the shipped pack, so the tax-currency
-role is not exercised either. ``data/tax/synthetic_fixture.toml`` already shipped on ``main``,
-so "a second tax file parses" was true before this feature.
+role is not exercised either. ``tests/fixtures/data/tax/synthetic_fixture.toml`` is a second
+tax file that already parsed before this feature, so "a second tax file parses" is not what is
+missing.
 
 Closing it is a feature rather than a line: a jurisdiction record carrying the base currency,
 keyed in ``Registries``, and a jurisdiction on ``TaxClass`` so a charge can name the pack it

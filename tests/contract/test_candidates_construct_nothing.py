@@ -101,7 +101,7 @@ def _declared(registries: Registries, instrument_id: str) -> tuple[object, objec
 def test_every_way_in_is_object_identical_to_something_compose_emitted(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    produced, emitted = _recorded(fixtures.shipped(), monkeypatch)
+    produced, emitted = _recorded(fixtures.declared(), monkeypatch)
     assert produced.candidates
     identities = {id(item) for item in emitted}
     for candidate in produced.candidates:
@@ -109,7 +109,7 @@ def test_every_way_in_is_object_identical_to_something_compose_emitted(
 
 
 def test_every_non_identity_way_out_equals_exit_chain_of_something_compose_emitted() -> None:
-    registries = fixtures.shipped()
+    registries = fixtures.declared()
     for candidate in _set(registries).candidates:
         way_out = candidate.key.route_out
         if way_out is EXIT_BY_IDENTITY:
@@ -122,14 +122,14 @@ def test_every_non_identity_way_out_equals_exit_chain_of_something_compose_emitt
 def test_the_sentinel_that_settles_a_journey_after_the_fact_is_never_emitted() -> None:
     """FR-004. A set holding `FROM_THE_DECLARATION` holds a journey whose identity is decided
     later, and a reader cannot tell which chain was costed."""
-    for candidate in _set(fixtures.shipped()).candidates:
+    for candidate in _set(fixtures.declared()).candidates:
         assert candidate.key.route_out is not FROM_THE_DECLARATION
 
 
 def test_the_only_way_out_this_feature_builds_is_the_identity_exit() -> None:
     """The carve-out, bounded from the other side: where `compose` *can* answer, its answer is
     what travels; where it cannot, the one thing constructed is the sentinel 003 declared."""
-    registries = fixtures.with_access(fixtures.shipped(), OVDP, proceeds_to="monobank_uah")
+    registries = fixtures.with_access(fixtures.declared(), OVDP, proceeds_to="monobank_uah")
     built = [
         candidate
         for candidate in _set(registries).candidates
@@ -141,7 +141,7 @@ def test_the_only_way_out_this_feature_builds_is_the_identity_exit() -> None:
 def test_no_produced_chain_holds_a_segment_compose_did_not_put_there() -> None:
     """A chain extended by one hop would still be a valid `ExitChain` and would still pass a
     type check, so the segments are compared against the enumeration rather than the type."""
-    registries = fixtures.shipped()
+    registries = fixtures.declared()
     for candidate in _set(registries).candidates:
         way_out = candidate.key.route_out
         assert isinstance(way_out, ExitChain)
@@ -161,7 +161,7 @@ def test_a_registry_offering_two_ways_in_yields_both_and_invents_no_third(
         direction="inbound",
         fee_pct=0.02,
     )
-    registries = tuples.with_new_route(fixtures.shipped(), second)
+    registries = tuples.with_new_route(fixtures.declared(), second)
     ways_in, _ = _declared(registries, OVDP)
     assert isinstance(ways_in, Enumeration)
     assert len(ways_in.candidates) == 2
@@ -179,7 +179,7 @@ def test_narrowing_the_route_set_removes_the_candidates_that_needed_it() -> None
     declares -- is `tests/unit/test_candidate_refusals.py::TestARouteTheRegistryDoesNotDeclare`,
     where it refuses as a whole rather than dropping one identical candidate per pair.
     """
-    registries = fixtures.shipped()
+    registries = fixtures.declared()
     narrowed = {key: value for key, value in registries.routes.items() if key != "inzhur_direct"}
     enumerated = fixtures.enumerated(replace(registries, routes=narrowed), routes=narrowed)
     assert isinstance(enumerated, CandidateSet), enumerated

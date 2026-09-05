@@ -42,7 +42,7 @@ canonical_encoding terezy-canonical-v3
 cpi_series           ua_cpi_monthly               cpi/ua.toml                              sha256:d75f814e2940eec463499e39ea2adea07da6149ff79bfac4681d08a051b26c7e
 fund                 inzhur_miltech               instruments/inzhur_miltech.toml          sha256:80d0de1e1b51417e286adeb580b2f848b27a63f986af245691f64b9b76918fb8
 fund                 inzhur_reit                  instruments/inzhur_reit.toml             sha256:90999351e1dfcaf1e8bc0ef700b8e48b9973bd9e98973d9069ca5642034fb798
-fund                 synthetic_fund_c             instruments/synthetic_fund_c.toml        sha256:4c5a0a8ffc220428353c2cce3f9e5d1105778f005f19fd4e983fe2736ba2bc78
+fund                 synthetic_fund_c             instruments/synthetic_fund_c.toml        sha256:ea7b6bc4e90c54e08ddadc6d14ed3bb6adb5d7e2ba4f83be0fd7baafc5f6656a
 inflation_assumption owner_placeholder_inflation  inflation/owner-001.toml                 sha256:624e2b5124527c2b30bc4c0773b2d8c79e9ffcfd38b0f253ab5080c36cd71d6c
 instrument           UA4000207518                 instruments/UA4000207518.toml            sha256:6d7baf22dc1743ddb612caa3a85b8c610cc8d7be4abb4fb0a135650f8d71ff14
 instrument           UA4000230270                 instruments/UA4000230270.toml            sha256:98d66395f926bec164839363729146eefb4e11aaefa64327734a7207d7324b8a

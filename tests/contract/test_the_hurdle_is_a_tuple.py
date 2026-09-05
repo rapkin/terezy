@@ -99,14 +99,14 @@ class TestTheBenchmarkIsOneOfTheThingsItBenchmarks:
         # The whole of research.md D3 in one line. There is no `benchmark: TupleOutcome` field
         # for a separately computed figure to occupy, so the hurdle cannot drift from the
         # tuples it is compared against: it *is* one of them.
-        comparison = _ranked(fixtures.shipped())
+        comparison = _ranked(fixtures.declared())
         assert 0 <= comparison.benchmark < len(comparison.ranked)
         assert comparison.ranked[comparison.benchmark].key == fixtures.hurdle_tuple()
 
     def test_the_benchmark_carries_the_same_parts_as_any_other_tuple(self) -> None:
         # A privileged figure would be a bare rate. This one has a way in, a purchase, a
         # lifecycle, a tax line, exit terms and a way out, like everything it is ranked with.
-        benchmark = _ranked(fixtures.shipped()).ranked[_ranked(fixtures.shipped()).benchmark]
+        benchmark = _ranked(fixtures.declared()).ranked[_ranked(fixtures.declared()).benchmark]
         assert [line.part for line in benchmark.parts] == [
             "ramp_in",
             "entry",
@@ -120,7 +120,7 @@ class TestTheBenchmarkIsOneOfTheThingsItBenchmarks:
         # The falsifying experiment. A benchmark computed beside the comparison would survive
         # a missing access declaration, because it would never have consulted one. This one
         # refuses, and the refusal is the same typed value any other tuple would have got.
-        comparison = _compared(fixtures.without_access(fixtures.shipped(), fixtures.OVDP))
+        comparison = _compared(fixtures.without_access(fixtures.declared(), fixtures.OVDP))
         assert isinstance(comparison, BenchmarkUnavailable)
         assert isinstance(comparison.refusal, DeclarationMissing)
         assert comparison.refusal.part == "access"
@@ -130,7 +130,7 @@ class TestTheBenchmarkIsOneOfTheThingsItBenchmarks:
         # away would hide work. What is withheld is the *ranking*, because a ranking with no
         # benchmark invites its own head to be read as a winner (FR-011).
         comparison = _compared(
-            fixtures.without_access(fixtures.shipped(), fixtures.OVDP),
+            fixtures.without_access(fixtures.declared(), fixtures.OVDP),
             (
                 fixtures.fund_tuple(
                     fixtures.MILTECH,
@@ -151,7 +151,7 @@ class TestTheBenchmarkIsOneOfTheThingsItBenchmarks:
         # and its own `reason` says so: a ranking with no benchmark invites its own head to be
         # read as a winner.
         registries = fixtures.with_new_route(
-            fixtures.without_access(fixtures.shipped(), fixtures.OVDP),
+            fixtures.without_access(fixtures.declared(), fixtures.OVDP),
             fixtures.route(
                 "test_costly_in",
                 origin="monobank_uah",
@@ -188,7 +188,7 @@ class TestTheHurdleReproducesFeatureOnesFigure:
     """SC-002, at the project tolerance, over routes that cost and delay nothing."""
 
     def _one_hundred_percent_domestic(self) -> Registries:
-        return fixtures.without_latency(fixtures.shipped())
+        return fixtures.without_latency(fixtures.declared())
 
     def _feature_001_hurdle(self, registries: Registries) -> float:
         """Feature 001's own figure for the very holding the join built.
@@ -254,9 +254,9 @@ class TestWaitingIsACostAndTheShippedRoutesCharge:
         # waiting is a cost (owner decision, 2026-08-22), and a rate that ignored them would
         # report the same figure for a route that settles today and one that settles in a
         # month.
-        shipped = _outcome(fixtures.shipped(), fixtures.hurdle_tuple(), AT_ISSUE)
+        shipped = _outcome(fixtures.declared(), fixtures.hurdle_tuple(), AT_ISSUE)
         instant = _outcome(
-            fixtures.without_latency(fixtures.shipped()), fixtures.hurdle_tuple(), AT_ISSUE
+            fixtures.without_latency(fixtures.declared()), fixtures.hurdle_tuple(), AT_ISSUE
         )
         assert is_close(shipped.reaches.amount, instant.reaches.amount)
         slow, quick = shipped.implied_rate, instant.implied_rate
@@ -276,9 +276,9 @@ class TestWaitingIsACostAndTheShippedRoutesCharge:
         # a fee out is the sibling assertion above -- a fee changes what *arrives*, and
         # `reaches` is equal at the project tolerance, which fails for a fee as small as
         # 0.05%. The two assertions together say "the dates moved and the amounts did not".
-        shipped = _outcome(fixtures.shipped(), fixtures.hurdle_tuple(), AT_ISSUE)
+        shipped = _outcome(fixtures.declared(), fixtures.hurdle_tuple(), AT_ISSUE)
         instant = _outcome(
-            fixtures.without_latency(fixtures.shipped()), fixtures.hurdle_tuple(), AT_ISSUE
+            fixtures.without_latency(fixtures.declared()), fixtures.hurdle_tuple(), AT_ISSUE
         )
         slow, quick = shipped.implied_rate, instant.implied_rate
         assert isinstance(slow, NominalRate)
@@ -287,7 +287,7 @@ class TestWaitingIsACostAndTheShippedRoutesCharge:
 
     def test_the_arrivals_are_three_days_after_the_releases(self) -> None:
         # The mechanism behind the gap, so the band above rests on something checkable.
-        for arrival in _outcome(fixtures.shipped(), fixtures.hurdle_tuple(), AT_ISSUE).arrivals:
+        for arrival in _outcome(fixtures.declared(), fixtures.hurdle_tuple(), AT_ISSUE).arrivals:
             assert (arrival.arrived_on - arrival.released_on).days == 3
 
 
@@ -304,7 +304,7 @@ class TestEveryTupleOfferedLandsInExactlyOneOfTheThreePlaces:
     def _all_three(self) -> Registries:
         """A twin of the free way in, and a way out whose flat fee exceeds every release."""
         registries = fixtures.with_new_route(
-            fixtures.shipped(),
+            fixtures.declared(),
             fixtures.route(
                 "test_twin_in",
                 origin="monobank_uah",
@@ -376,13 +376,13 @@ class TestEveryComparisonCarriesTheBenchmark:
         ],
     )
     def test_the_benchmark_is_present_and_scored(self, others: tuple[Tuple, ...]) -> None:
-        comparison = _ranked(fixtures.shipped(), others)
+        comparison = _ranked(fixtures.declared(), others)
         assert 0 <= comparison.benchmark < len(comparison.ranked)
 
     def test_the_benchmark_listed_twice_is_evaluated_once(self) -> None:
         # Otherwise a comparison would rank the hurdle against itself and report a tie with
         # itself, which is a sentence nobody should have to read.
-        comparison = _ranked(fixtures.shipped(), (fixtures.hurdle_tuple(),))
+        comparison = _ranked(fixtures.declared(), (fixtures.hurdle_tuple(),))
         assert len(comparison.ranked) == 1
 
     def test_when_nothing_beats_the_hurdle_the_output_says_so_plainly(self) -> None:
@@ -391,7 +391,7 @@ class TestEveryComparisonCarriesTheBenchmark:
         # being empty is that verdict as a value rather than as something a reader infers
         # from the order of a list.
         registries = fixtures.with_new_route(
-            fixtures.shipped(),
+            fixtures.declared(),
             fixtures.route(
                 "test_expensive_in",
                 origin="monobank_uah",
@@ -423,7 +423,7 @@ class TestEveryComparisonCarriesTheBenchmark:
         # And the other half, so the empty list above is a finding rather than a function
         # that always returns nothing.
         comparison = _ranked(
-            fixtures.shipped(),
+            fixtures.declared(),
             (
                 fixtures.fund_tuple(
                     fixtures.MILTECH,

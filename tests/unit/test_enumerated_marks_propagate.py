@@ -115,7 +115,7 @@ class TestEveryFigureDerivedFromThemCarriesTheMark:
 
 def test_verifying_every_source_would_lift_the_mark() -> None:
     """The other direction, so the assertions above cannot pass because `is_unverified` is
-    simply always true. Nothing in the shipped tree is verified, so this constructs the
+    simply always true. Nothing in either tree is verified, so this constructs the
     counterfactual rather than waiting for one."""
     verified = prov.of(
         [replace(source, verified_on=fixtures.AS_OF) for source in _terms().provenance.sources]

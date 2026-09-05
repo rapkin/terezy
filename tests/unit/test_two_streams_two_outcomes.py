@@ -51,8 +51,8 @@ def _registries() -> Registries:
     a cost must be keyed by.
     """
     registries = fixtures.with_stream(
-        fixtures.shipped(),
-        replace(fixtures.shipped().streams[fixtures.SALARY], id=SECOND_STREAM),
+        fixtures.declared(),
+        replace(fixtures.declared().streams[fixtures.SALARY], id=SECOND_STREAM),
     )
     for route_id, fee in ((FREE_ROUTE, 0.0), (COSTLY_ROUTE, RAMP_PCT)):
         registries = fixtures.with_new_route(
