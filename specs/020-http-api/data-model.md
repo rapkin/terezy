@@ -57,7 +57,7 @@ closed vocabulary, what it names where the kind names something, and whether it 
 label: one invented here would be a second vocabulary nobody could correct.
 
 Beside them, three fixed endpoints with their own models: the registry summary, the answer, and the
-committed OpenAPI document served verbatim.
+OpenAPI document rendered from the running application.
 
 `coverage` is filled only by the two series categories, and it is what FR-045a requires: a client
 that has never seen the series can construct a window from the list read.

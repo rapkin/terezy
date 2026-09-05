@@ -405,7 +405,7 @@ their price from Inzhur's quotation, with the two sources never sharing a citati
 | **J3** | Untouched. An early exit is now struck at a declared resale price for every real issue, which is a *price*, not a redemption window or a haircut. |
 
 **020-http-api** closes **no** row and puts the whole schema on a socket: twenty-five declared
-categories, the answer, and a byte-gated OpenAPI document a second codebase is generated from.
+categories, the answer, and an OpenAPI document a second codebase is generated from.
 
 | Row | How, and why the box does not move |
 |---|---|

@@ -15,7 +15,7 @@ GET /cpi/{id}/observations             ?from=&to=      two-ended or omitted
 GET /official-rates/{id}/observations  ?from=&to=      two-ended or omitted
 GET /questions/{id}/answer             the answer and its manifest
 GET /registry                          the per-category summary
-GET /openapi.json                      the committed artefact, verbatim
+GET /openapi.json                      rendered from the running application
 ```
 
 **Route groups own a first segment.** Twenty-five categories plus `registry` plus `openapi.json` is

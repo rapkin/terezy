@@ -4,6 +4,11 @@ Within one process a `frozenset` iterates stably, so a check run twice in one se
 while the property fails -- the bodies diverge only between runs, on a colleague's machine or
 after a restart. The subprocesses below differ in `PYTHONHASHSEED`, which is the only way to
 see it (020 FR-019, SC-009).
+
+The OpenAPI document is read here too. It is generated rather than checked in, so nothing else
+would catch a schema whose member order follows a set's iteration: a build that regenerated the
+client's types would emit a different file on every machine and the diff would name no cause
+(020 FR-039).
 """
 
 from __future__ import annotations
@@ -23,7 +28,7 @@ from tests.http_client import served
 from terezy.api.http import document
 
 client = served(Path("data"))
-for path in ("/venues", "/tax-classes", "/calendars", "/registry"):
+for path in ("/venues", "/tax-classes", "/calendars", "/registry", "/openapi.json"):
     response = client.get(f"{document.PREFIX}{path}", params={"as_of": "2026-09-03"})
     sys.stdout.write(response.text)
 """

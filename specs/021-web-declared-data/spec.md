@@ -85,7 +85,7 @@ against, and are not reopened by planning.
 | TanStack Query for all server state | `useEffect` + `fetch` | Caching, retry and staleness of a *request* belong in one place; hand-rolling them per screen is where a stale response silently outlives a parameter change. |
 | No client-side store initially — URL + React context | Redux, or MobX from the start | There is no client state yet: everything on screen is a function of the URL and a response, so a store would be a cache of the router and of TanStack Query. Which store to reach for when that stops being true is a standing preference of the owner's and is recorded in `specs/decisions/2026-09-03-web-stack.toml`, not here. |
 | Recharts | D3 by hand, or a canvas library | Two series, both simple, both needing an accessible DOM the a11y check can read. |
-| `openapi-typescript` + `openapi-fetch` over the checked-in OpenAPI document of feature **020-http-api**, generated types committed, CI regenerating and failing on difference | hand-written response types | A hand-written type is a second copy of the contract, and the drift is silent in exactly the direction that matters: a refusal member added server-side and never rendered. |
+| `openapi-typescript` + `openapi-fetch` over feature **020-http-api**'s OpenAPI document, types generated at build time and gitignored | hand-written response types | A hand-written type is a second copy of the contract, and the drift is silent in exactly the direction that matters: a refusal member added server-side and never rendered. |
 | Vitest + React Testing Library, MSW handlers typed from the same document | untyped fixtures | A fixture that has drifted from the contract must fail to compile, not pass. |
 | Playwright end-to-end against the **real** API on loopback over the shipped `data/`, offline | a mocked end-to-end run | A mocked E2E proves the mock. The whole claim of this feature is that a mark survives from a TOML file to a pixel, and only the real stack can be asked that question. |
 
@@ -281,9 +281,12 @@ survive have been renumbered and a stale ordinal would now point at a live scena
   level up. `display` was the third and is deferred.
 - **FR-002**: The client MAY order a list by a field the API returned, and MUST NOT derive a
   field to order by. An ordering the client computed is a ranking the engine did not make.
-- **FR-003**: Response types MUST be generated from the checked-in OpenAPI document of feature
-  020-http-api, committed to the repository, and regenerated in CI with the build failing when
-  the regenerated output differs from the committed one.
+- **FR-003**: Response types MUST be generated **at build time** from feature 020's OpenAPI
+  document generator — `scripts/generate_openapi.py` piped into `openapi-typescript` — and the
+  generated `.d.ts` MUST be gitignored rather than committed. The build MUST fail when generation
+  fails. *(Owner decision 2026-09-05: 020's document is generated on the fly and stored nowhere, so
+  there is no committed artefact to generate from and none to compare against. What replaces the
+  difference gate is `tsc`: a client naming a shape the document does not carry fails to compile.)*
 - **FR-004**: Every closed union the document declares MUST be consumed exhaustively, with no
   `default` arm and no fallthrough. A member added to the document MUST fail typecheck at every
   site that does not handle it. This is the mechanical form of *the UI has a place for every
@@ -571,7 +574,9 @@ feature's part of it.
   both themes.
 - **SC-012**: `web/src` contains no category id declared by the API outside the paths in the
   scan's checked-in exception list, and that list contains no module under `/data/` (FR-015).
-- **SC-013**: Regenerating the client types produces output identical to what is committed.
+- **SC-013**: Generating the client types from 020's generator succeeds and `tsc` passes over the
+  result. A response record renamed on the Python side turns it red at every site naming the old
+  shape.
 - **SC-014**: Bringing the production stack up starts exactly one container, publishes on
   `127.0.0.1` only, and serves both the API and the client from one origin.
 - **SC-015**: The production image contains the built assets and no `node_modules`, no Node
@@ -580,7 +585,7 @@ feature's part of it.
 ## How `web/` enters the gates
 
 **Seven CI jobs, all blocking**, and all of them **unconditional** rather than filtered on a
-`web/` path. The path filter is the tempting half and the wrong one: the type-sync job exists
+`web/` path. The path filter is the tempting half and the wrong one: the types-generate job exists
 precisely to turn red when a *Python* change moves the OpenAPI document, and a filter that skips
 it on a Python-only change disables it on the only change it was built for.
 
@@ -590,7 +595,7 @@ it on a Python-only change disables it on the only change it was built for.
 | Lint | ESLint over `web/`, including the rule set that forbids a `default` arm on a discriminated-union switch. |
 | Unit | Vitest + React Testing Library, mocks typed from the document (FR-044), plus the component properties no route can reach (FR-031, FR-031a). |
 | End-to-end | Playwright against the real API on loopback, offline (FR-045 to FR-048); the accessibility check of FR-043; and the category-id scan of FR-015, which needs the running API's index to know what to look for. |
-| Type sync | Regenerate the client types; fail on any difference from the committed output (FR-003). |
+| Types generate | Generate the client types from 020's generator, then `tsc --noEmit` over them; fail if either fails (FR-003, SC-013). |
 | Bundle URLs | Absolute URLs against the allowlist, over the local build **and** over the assets extracted from the built image (FR-036, FR-054). |
 | Compose smoke | Statically: every published port in `docker-compose.yml` names `127.0.0.1`, across every service and profile (FR-052). Then at runtime: the image builds from the lockfile with nothing resolved (FR-050), one container comes up, it serves the client and the API from one origin, and it carries no Node toolchain (FR-049, FR-053). |
 
@@ -719,7 +724,7 @@ dependency with anything in it is refused.
 | Radix UI primitives, `class-variance-authority`, `clsx`, `tailwind-merge`, the icon set | Install only. All render locally; icons are components, never fetched. |
 | TanStack Router, TanStack Query | Install only. Query issues exactly the requests the app asks it to, at the app's own origin. |
 | Recharts | Install only. Renders from data passed in. |
-| `openapi-typescript` | Install, plus **generation** time — reads the OpenAPI document **from the local filesystem**, not from a URL. |
+| `openapi-typescript` | Install, plus **generation** time — reads the OpenAPI document from standard input or a local path, never from a URL. |
 | `openapi-fetch` | Install only. A thin typed wrapper over `fetch`; every request is the app's own. |
 | Vitest, React Testing Library, jsdom | Install only. |
 | MSW | Install only. Intercepts in-process for Node tests; where the browser worker is used, the worker file is generated into the repository rather than fetched. |
@@ -732,7 +737,7 @@ pulled when the image is built, pinned by digest, and reached by nothing at run 
 
 ## Assumptions
 
-- Feature 020-http-api ships the checked-in OpenAPI document this feature generates from, and
+- Feature 020-http-api ships the OpenAPI document generator this feature generates from, and
   satisfies OB-1 to OB-8 (OB-9 is withdrawn with the display switch). **020's spec exists and the document does not**, so every
   requirement here that names the document is unverifiable until 020 lands — the shape of the
   dependency rather than a gap in this spec. Which of OB-1 to OB-8 that draft satisfies is audited
