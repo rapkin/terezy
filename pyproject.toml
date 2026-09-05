@@ -40,6 +40,7 @@ cli = [
 dev = [
     "pytest>=8.3",
     "pytest-cov>=6.0",
+    "pytest-xdist>=3.6",
     "hypothesis>=6.115",
     "mypy>=1.13",
     "ruff>=0.8",

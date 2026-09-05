@@ -51,25 +51,26 @@ place**. A comment claiming what another module does, a helper restating a compu
 fields holding one truth — all the same shape, and in this repository the duplicate is where
 the drift happened every time. It keeps what prevents a named defect and what makes a wrong
 state unrepresentable; collapsing a tagged union into a flag is not simplification, it is
-moving the complexity into the reader's head.
+moving the complexity into the reader's head. It runs before the review because it is the
+only pass that re-reads every comment on the branch, and because the review will not spend a
+round on prose it could have deleted.
 
-**Before the review, not after**, for two reasons: the review then reads what will land, and
-its own check on unverifiable claims applies to the condensed version rather than to prose
-about to be deleted. It is also the one pass that re-reads every comment on the branch, which
-is where a stale claim otherwise survives.
+**A code review is a blocking gate before anything lands on `main`, and it is capped at two
+rounds.** Run `/code-review` over the branch diff; the commit grant does **not** extend to
+landing unreviewed work. A finding is one of exactly three things: **a wrong number, lost
+provenance, or a false guard** — a guard whose message does not match what it does, or a test
+that passes for the wrong reason (it asserts nothing, or would survive the mutation it claims
+to catch). Everything else the review notices is not a finding. **A stale comment or docstring
+is deleted, not rewritten**, which is what kept the loop running: each fix falsified a nearby
+comment, and the rewrite became the next round's finding. After round two, what is still open
+is recorded — in the branch's report, and as a `[[future]]` entry or a spec issue when it is a
+defect — and the branch lands.
 
-**A code review is a blocking gate before anything lands on `main`.** Not a courtesy pass
-and not something to note as skipped: run `/code-review` over the diff and iterate until it
-comes back clean. It is the only gate that catches what the machine cannot — a guard whose
-message is false, a test that passes for the wrong reason, a claim in a docstring that the
-code stopped honouring. The commit grant does **not** extend to landing unreviewed work.
-
-**The review must cover the diff that is actually merged.** If the branch changes after a
-review — new commits fixing the findings, or `main` merged in — that review is spent, and
-the new work is reviewed before landing. Merging `main` in counts: it can turn a gate red
-that was green (a stricter gate on `main` meeting a file the branch added) and it can change
-a function the branch's tests pin. "The earlier round was reviewed" is not a review of what
-is being merged. Say plainly which diff was reviewed and which was not.
+**A review covers the diff that lands.** Round one's fixes are read by round two, and round
+two's own fixes are read before it closes — the round's last act, not a third round. The cap
+counts rounds over one diff, so merging `main` in afterwards makes a different diff: when that
+merge touches `src/` it gets a round of its own; when it touches only docs, specs, tests or
+data it needs the full gates re-run, not a round. Say plainly which diff was reviewed.
 
 **Worktrees for parallel work.** Work that must not collide with `main`'s working tree
 (parallel spec-writing, an isolated experiment) runs in a git worktree under
@@ -85,8 +86,8 @@ after landing. Details: `specs/README.md`.
 
 ```bash
 uv sync --all-extras --dev
-uv run pytest                                 # fast: no coverage instrumentation
-uv run pytest --cov                           # coverage floor enforced (blocking in CI)
+uv run pytest -x -q -n auto                   # checkpoint gate: parallel, no coverage
+uv run pytest --cov                           # landing and CI gate: coverage floor
 uv run pytest -m "contract or invariant"      # constitution compliance tests
 uv run ruff check . && uv run ruff format .
 uv run mypy                                   # strict
@@ -96,7 +97,8 @@ uv run python scripts/check_prose_budget.py   # prose share ratchet (not in CI)
 uv run python scripts/check_enumerations.py  # prose lists vs the sets they list (not in CI)
 ```
 
-Every one but the last two is blocking in CI. Run them all before claiming a change is done.
+Every one but the last two stands for a gate that is blocking in CI. At a checkpoint run
+the parallel suite; the coverage floor is a landing gate, not a per-commit one.
 
 ## Non-negotiables, in the form you will actually hit them
 
@@ -173,10 +175,13 @@ practice:
 alternative, a trap with a name, a gap stated with its date. Restating what the code says
 earns nothing, and restating the constitution earns less: the copy is what drifts.
 
-**Prefer the mechanical form.** A claim worth making is usually worth asserting — a scan
-that pins how many places construct a record, an `emitted == applied` equality. A check
-cannot go stale silently; a sentence can. That is why an enumeration of things declared
-elsewhere is a check, or it is not written.
+**Make a claim mechanical only where necessary.** A check cannot go stale silently and a
+sentence can, but a check has its own cost, and a test that reads source files as text — a
+scan for a docstring, a count of construction sites, a phrase — pins the shape of the code
+rather than its behaviour: it goes red on a rename and stays green on a wrong number. Write
+one only where it catches a named defect that the type system, a golden or an ordinary test
+cannot, and say why in one sentence at the site. Otherwise delete the prose instead of
+asserting it. The scans already written stay.
 
 **`⚙` is retired.** Nothing reads it and nothing defines it; measured on 2026-08-30, the
 blocks it introduced ran three times the length of ordinary prose and were five times as
@@ -187,8 +192,9 @@ and drop the marker and the history.
 is a ratchet, not a cap: it fails only when a tree's prose share rises above the ceiling
 recorded in the script, so deleting is never required and adding prose faster than code is.
 
-Reviews treat prose that makes an unverifiable claim about elsewhere as a finding, at the
-same weight as a guard whose message is false — because it is the same defect.
+Prose is never a review finding. A comment the change falsified is deleted on the spot — by
+`/condense`, or by whoever notices it — because rewriting one is how a review earns a round
+it cannot close.
 
 ## Privacy
 

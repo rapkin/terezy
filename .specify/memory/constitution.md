@@ -1,6 +1,19 @@
 <!--
 Sync Impact Report
 ==================
+Version change: 1.4.0 → 1.5.0 (2026-09-05)
+Rationale: MINOR — guidance on review and on making a claim checkable materially changed.
+Review is capped at two rounds, a finding is one of three named classes, prose the change
+falsified is deleted rather than rewritten and is not a finding, and merging `main` into a
+branch spends the review only when the merge touches `src/`. "A prose enumeration is a check
+or it is not written" becomes "made mechanical only where necessary", which also drops the
+requirement that every layer carry a docstring charter. Added because an audit measured
+features 015 and 016 at eight and seven review rounds, with rounds 3–7 of 016 changing zero
+lines in `src/`: each code fix falsified a nearby comment, the stale comment was counted a
+finding of the same weight as a false guard, and its rewrite fed the next round. Invalidates
+no spec, plan or data file; removes `tests/unit/test_package_layout.py::test_layer_documents_its_charter`
+and no other test.
+
 Version change: 1.3.0 → 1.4.0 (2026-09-03)
 Rationale: MINOR — a founding decision discharged, not removed. D-B deferred the web UI
 framework until the result schema had stabilised against real output; the registry now
@@ -197,6 +210,13 @@ by design, precisely so that filling in a `verified_on` later cannot disturb a f
 instance was caught by expensive review and none by a gate — because a golden that does not
 move is a green build.*
 
+**A test that reads source files as text is a last resort, not a way of making a claim
+checkable.** It is written only where it catches a named defect that the type system, a
+golden or an ordinary test cannot, and it states that necessity in one sentence at its site.
+The default when a claim does not clear that bar is to delete the prose making it, not to
+write a scan for it: a scan pins the shape of the code rather than its behaviour, so it goes
+red on a rename and stays green on a wrong number. The scans already written stay.
+
 The acceptance tests enumerated in `SIMULATOR_SPEC.md` §9 and `REWRITE_BRIEF.md` §7
 are the standing definition of done. They are not aspirational: a feature they name
 is incomplete until its tests are green.
@@ -343,9 +363,12 @@ Beyond that, prose is held to the same standard as code:
 - **No comment narrates a change.** Not what a previous version did, not which review
   found what, not what a paragraph used to say. The commit message holds that, and holds
   it without being read as a claim about the present.
-- **A prose enumeration of things declared elsewhere is a check, or it is not written.**
-  A sentence counting cases, listing kinds, or naming what a registry contains is false
-  the moment anything else moves, and nothing sees it.
+- **A prose enumeration of things declared elsewhere is deleted.** A sentence counting
+  cases, listing kinds, or naming what a registry contains is false the moment anything
+  else moves, and nothing sees it. Making one mechanical instead is warranted only where
+  the count catches a named defect nothing cheaper catches — `scripts/check_enumerations.py`
+  exists because two modules put the observation kinds at five and at six while the data
+  declared eleven.
 - **Prose volume is ratcheted, not capped.** `scripts/check_prose_budget.py` records the
   comment-and-docstring share of each source tree and fails when it rises. Deleting is
   never required; adding prose faster than code is. Raising a ceiling is a deliberate
@@ -366,10 +389,33 @@ for a legal or tax value, which must come from a cited source.
 **Every change lands green.** Each phase closes with a passing suite and updated
 methodology docs.
 
-**Review checklist.** Every change is reviewed against, at minimum: does it keep the
-core pure and deterministic; does provenance survive end to end; is a new domain fact
-data rather than code; is every new number tested by a worked example, an invariant,
-or a golden file; and does any new legal or tax value carry a source.
+**Review checklist, and a cap of two rounds.** Every change is reviewed before it lands,
+against, at minimum: does it keep the core pure and deterministic; does provenance survive
+end to end; is a new domain fact data rather than code; is every new number tested by a
+worked example, an invariant, or a golden file; and does any new legal or tax value carry a
+source.
+
+The review runs **at most two rounds**, and a finding is one of exactly three things: a
+wrong number, lost provenance, or a false guard — which includes a test that passes for the
+wrong reason, meaning it asserts nothing or would survive the mutation it claims to catch.
+**Prose is never a finding.** A comment or docstring the change falsified is deleted, not
+rewritten. Whatever is still open after the second round is recorded — in the branch's
+report, and as a `[[future]]` entry or an issue in the spec when it is a defect — and the
+branch lands.
+
+*Rationale: unbounded rounds have no exit. Features 015 and 016 took eight and seven rounds,
+and rounds 3–7 of 016 changed no line of `src/` at all: each fix falsified a nearby comment,
+the comment was scored like a false guard, and its rewrite supplied the next round's finding.
+A cap converts that loop into a recorded gap, which is the honest artefact.*
+
+**A review covers the diff that lands.** Round one's fixes are read by round two, and round
+two's own fixes are read before it closes — that reading is the round's last act, not a third
+round, and it is what keeps "covers the diff that lands" true under the cap.
+
+**The cap counts rounds over one diff.** Merging `main` into the branch afterwards makes a
+different diff, so when that merge touches `src/` — a conflict there, or a change auto-merged
+into it — it gets one round of its own rather than being waved through as already reviewed. A
+merge touching only docs, specs, tests or data needs the full gates re-run, not a round.
 
 **Complexity must be justified.** The simple option is the default, and the pull
 request says why it was insufficient when it is not taken.
@@ -391,7 +437,7 @@ decisions are recorded in the header comment; superseding one is an amendment.
 - **MINOR** — a principle or section added, or guidance materially expanded.
 - **PATCH** — clarification, wording, or non-semantic refinement.
 
-**Compliance review.** Pull requests are verified against the review checklist above.
+**Compliance review.** Pull requests are verified against the review paragraphs above.
 The `data-only extensibility` test (Principle II) and the ledger invariant suite
 (Principle IV) are treated as compliance tests for this constitution and may not be
 skipped, marked expected-to-fail, or deleted without an amendment.
@@ -399,4 +445,4 @@ skipped, marked expected-to-fail, or deleted without an amendment.
 **Runtime guidance.** Day-to-day development guidance for coding agents lives in
 `CLAUDE.md`, which is subordinate to this document and may not contradict it.
 
-**Version**: 1.4.0 | **Ratified**: 2026-08-21 | **Last Amended**: 2026-09-03
+**Version**: 1.5.0 | **Ratified**: 2026-08-21 | **Last Amended**: 2026-09-05

@@ -16,6 +16,11 @@
 # needs: features that must be `done` on main before THIS feature's implementation
 # starts. Spec-writing is always parallelisable and ignores `needs`.
 # Two features are parallelisable iff neither transitively needs the other.
+#
+# note: on a NEW [[feature]] or [[future]] entry, at most two lines, pointing at the spec or
+# the decisions file that holds the reasoning. This file is read to answer what is blocked
+# and what is deferred; an argument made here as well as in the spec is where the two drift
+# apart. Notes already written are not rewritten.
 
 [[feature]]
 id     = "001-ovdp-hurdle-rate"
@@ -301,3 +306,8 @@ note  = "A tuple has NO real-terms rate. Read in the code on 2026-08-30 rather t
 id    = "secondary-market-rate-risk"
 after = ["015-the-question", "016-real-ovdp"]
 note  = "A bond sold before maturity fetches what the market pays that day, and 015 prices such a sale with the PLATFORM'S SPREAD ALONE. **The measured spreads are in 015's spec under 'Clarifications' and are reproducible from `data/observations/inzhur.toml`; do not restate them here** -- the 015 note above says exactly that, and a copy in the same commit would be the shape those notes exist to prevent. What the spread does NOT carry is rate risk, and 015 FR-033 requires the omission to be stated as TWO claims because only one of them has a sign: the figure is unconditionally MORE CERTAIN than the truth, since a distribution is replaced by a point for the option chosen for its optionality; but the LEVEL is not signed, because rate risk is symmetric -- a bond sold after rates FALL fetches more than its spread implies. A separate and genuinely signed omission sits beside it, that a seller's quote widens exactly when a forced sale is most likely, so the SPREAD ITSELF is understated. The first draft folded all three into one directional claim about the level, which was an approximation asserting a sign it could not warrant. Building this is a secondary-market model -- a discount curve, or at minimum a declared rate-shock scenario the resale price is struck under -- and it belongs after 016, because it needs real issues with real maturities before it can be checked against anything. Recorded 2026-08-30 while specifying 015; deliberately not built."
+
+[[future]]
+id    = "cli-renders-raw-floats"
+after = ["015-the-question"]
+note  = "The CLI prints unrounded floats -- an amount as 49834.350000000006, a rate as 3.7e-16 -- so a correct figure reads as a broken one. Formatting only; see specs/015-the-question/spec.md for what the answer output carries."
