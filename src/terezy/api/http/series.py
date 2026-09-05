@@ -16,12 +16,24 @@ from typing import TYPE_CHECKING, Final
 from terezy.api.http import envelopes
 from terezy.core.inflation import series as cpi
 from terezy.core.inflation.series import CpiObservation, CpiSeries
-from terezy.core.primitives.periods import Window
+from terezy.core.primitives.periods import Window, is_period
 from terezy.core.tax import official_rate
 from terezy.core.tax.official_rate import OfficialRateObservation, OfficialRateSeries
 
 if TYPE_CHECKING:  # pragma: no cover -- typing only
-    from collections.abc import Callable, Sequence
+    from collections.abc import Sequence
+
+from collections.abc import Callable
+
+
+@dataclass(frozen=True, slots=True)
+class WindowMalformed:
+    """A window that is not a window: an end in the wrong shape, or one that ends before it
+    begins. A request-shape fault rather than a fact about the series, so it never reaches the
+    coverage question -- an inverted window covers no period, and reporting that as *the series
+    declares none of it* would name the series for the caller's typo."""
+
+    reason: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,6 +59,57 @@ def coverage_of(series: object) -> envelopes.SeriesCoverage | None:
             )
         case _:
             return None
+
+
+def window_of(
+    series: object, first: str | None, last: str | None
+) -> tuple[str, str] | WindowMalformed | None:
+    """The window a request asked for, checked against the shape the series is keyed by.
+
+    Omitted is a window of its own (the whole declared coverage); one end alone is not, because
+    the other would have to be inferred and the inference is what a coverage refusal exists to
+    prevent.
+    """
+    if first is None and last is None:
+        return None
+    if first is None or last is None:
+        return WindowMalformed(
+            reason=(
+                "a window is two-ended: give both `from` and `to`, or neither. One end alone "
+                "would leave the other to be inferred."
+            )
+        )
+    shape = _shape_of(series)
+    malformed = [end for end in (first, last) if not shape.matches(end)]
+    if malformed:
+        return WindowMalformed(
+            reason=f"{malformed} is not {shape.description}, which is what this series is keyed by."
+        )
+    if first > last:
+        return WindowMalformed(reason=f"the window {(first, last)} ends before it begins.")
+    return (first, last)
+
+
+@dataclass(frozen=True, slots=True)
+class _Keying:
+    """How one series' periods are spelled, so a request's ends can be checked before use."""
+
+    description: str
+    matches: Callable[[str], bool]
+
+
+def _shape_of(series: object) -> _Keying:
+    if isinstance(series, CpiSeries):
+        return _Keying("a calendar month as YYYY-MM", is_period)
+    return _Keying("a calendar date as YYYY-MM-DD", _is_date)
+
+
+def _is_date(text: str) -> bool:
+    try:
+        date.fromisoformat(text)
+    except ValueError:
+        return False
+    return True
 
 
 def read(series: object, window: tuple[str, str] | None) -> Read:
@@ -122,10 +185,9 @@ def _outside(
         covers=None if coverage is None else (coverage.first, coverage.last),
         missing=missing,
         reason=(
-            f"the series {series_id!r} declares no observation for "
-            f"{len(missing)} of the periods asked for, the first being {missing[0]!r}. "
-            "The covered part is returned beside this refusal; nothing is interpolated, "
-            "carried forward or snapped to a neighbouring period."
+            f"the series {series_id!r} declares no observation for {len(missing)} of the "
+            f"periods asked for. The covered part is returned beside this refusal; nothing is "
+            "interpolated, carried forward or snapped to a neighbouring period."
         ),
     )
 

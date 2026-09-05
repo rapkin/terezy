@@ -14,11 +14,20 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 HTTP = REPO_ROOT / "src" / "terezy" / "api" / "http"
-HTTP_TESTS = (
-    REPO_ROOT / "tests" / "http_client.py",
-    *sorted((REPO_ROOT / "tests").rglob("test_the_*.py")),
-    *sorted((REPO_ROOT / "tests").rglob("test_a_*.py")),
-)
+
+
+def _http_tests() -> list[Path]:
+    """Every test module that touches the HTTP layer, found by what it imports.
+
+    A glob over file names would leave whichever module was named differently outside the scan,
+    which is how the listening half of the no-network rule comes to cover less than it says.
+    """
+    return [
+        path
+        for path in sorted((REPO_ROOT / "tests").rglob("*.py"))
+        if "terezy.api.http" in path.read_text(encoding="utf-8")
+    ]
+
 
 MONEY = re.compile(r"\bMoney\s*\(|\bmoney\.(add|sub|scale|total|convert|zero|from_pegged_term)\b")
 CANONICAL = re.compile(r"results\.canonical|from terezy\.core\.results import canonical")
@@ -71,7 +80,9 @@ def test_no_module_ages_a_source() -> None:
 @pytest.mark.contract
 def test_no_test_starts_a_server() -> None:
     """The other half of the no-network rule: the guard covers outbound, this covers listening."""
-    assert not _hits(SERVER, [path for path in HTTP_TESTS if path.is_file()])
+    covered = _http_tests()
+    assert len(covered) > 10, "the scan found suspiciously few HTTP test modules"
+    assert not _hits(SERVER, covered)
 
 
 @pytest.mark.contract

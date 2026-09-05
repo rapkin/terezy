@@ -160,3 +160,24 @@ def test_the_categories_with_no_file_map_are_the_ones_pinned() -> None:
         and isinstance(category.shape.resolve(_ask()).files, categories.NoFileMap)
     }
     assert without == {"tax-timing"}
+
+
+@pytest.mark.contract
+def test_a_scenario_nobody_declares_is_refused_as_a_parameter(client: Any) -> None:
+    """Not as a broken data root: the resolver's error means `data/` is at fault, and a caller
+    who named an undeclared scenario would be sent there to look for a fault that is not there.
+    """
+    response = client.get(
+        f"{document.PREFIX}/spendable", params={**AS_OF, "scenario_id": "nothing-declares-this"}
+    )
+    assert response.status_code == 422
+    assert "war_end" in response.text
+
+
+@pytest.mark.contract
+def test_a_mapping_field_is_described_by_what_its_values_are(client: Any) -> None:
+    """Found by review: the generic walk visits a mapping's key first, so an enum-keyed mapping
+    was labelled with the type of its keys."""
+    described = {held["name"]: held for held in _get(client, "/tax-timing/ua")["fields"]}
+    assert described["methods"]["kind"] == "mapping"
+    assert described["methods"]["of"] == "year.MethodStanding"

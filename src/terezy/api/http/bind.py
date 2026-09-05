@@ -80,6 +80,21 @@ class ContextNotRecognised:
 
 
 @dataclass(frozen=True)
+class ContainerClaimUnverified:
+    """The container context was declared on a machine carrying no container marker.
+
+    What the check buys is that publishing to a network stops being one environment variable and
+    becomes forging a marker. That is a different property from impossibility.
+    """
+
+    value: str
+    reason: str
+
+
+ContextRefused = ContextNotRecognised | ContainerClaimUnverified
+
+
+@dataclass(frozen=True)
 class ClientPermitted:
     client_address: str | None
     reason: str
@@ -91,8 +106,34 @@ class ClientRefused:
     reason: str
 
 
+def context_in_force(value: str | None, *, marker: str | None) -> BindContext | ContextRefused:
+    """The context this process may act under, or the refusal that stops it acting at all.
+
+    Both guards go through here, and that is the point: the marker verification used to live in
+    the startup path alone, so a bare server command under the container context lifted the
+    per-request check on a laptop -- one environment variable, which FR-030 forbids and FR-029
+    lists as guaranteed against.
+    """
+    declared = context_of(value)
+    match declared:
+        case ContextNotRecognised():
+            return declared
+        case BindContext.CONTAINER_PUBLISHED_TO_LOOPBACK if marker is None:
+            return ContainerClaimUnverified(
+                value=declared.value,
+                reason=(
+                    f"{CONTEXT_VARIABLE} declares {declared.value}, and this process is not "
+                    f"inside a container: no {DOCKER_MARKER} and no container runtime named in "
+                    f"{CGROUP_PATH}. {RELEASE_GATE}"
+                ),
+            )
+        case _:
+            return declared
+
+
 def context_of(value: str | None) -> BindContext | ContextNotRecognised:
-    """The declared context, with an unset variable meaning loopback."""
+    """The declared context, with an unset variable meaning loopback. Says nothing about where
+    the process is actually running: :func:`context_in_force` is what verifies the claim."""
     if value is None:
         return BindContext.LOOPBACK
     for member in BindContext:
@@ -126,9 +167,7 @@ def container_marker(root: Path) -> str | None:
     return None
 
 
-def check_bind(
-    address: str, *, context: BindContext, marker: str | None
-) -> BindPermitted | BindRefused:
+def check_bind(address: str, *, context: BindContext) -> BindPermitted | BindRefused:
     """Whether the service may bind ``address`` under ``context``.
 
     Takes an address and never a hostname. Resolving a name is a network act, and a guard that
@@ -165,23 +204,13 @@ def check_bind(
                 ),
             )
         case BindContext.CONTAINER_PUBLISHED_TO_LOOPBACK:
-            if marker is None:
-                return BindRefused(
-                    address=address,
-                    context=context,
-                    reason=(
-                        f"{CONTEXT_VARIABLE} declares {context.value}, and this process is not "
-                        f"inside a container: no {DOCKER_MARKER} and no container runtime named "
-                        f"in {CGROUP_PATH}. {RELEASE_GATE}"
-                    ),
-                )
             if parsed.is_loopback or parsed.is_unspecified:
                 return BindPermitted(
                     address=address,
                     context=context,
                     reason=(
                         f"{address} is the interface a container has to offer, and the container "
-                        f"claim is verified by {marker}."
+                        "claim was verified before this context was honoured."
                     ),
                 )
             return BindRefused(

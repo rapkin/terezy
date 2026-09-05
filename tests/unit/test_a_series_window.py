@@ -115,3 +115,30 @@ def test_every_observation_carries_its_own_provenance(client: Any) -> None:
         assert isinstance(held["provenance"]["is_unverified"], bool)
     marks = {held["provenance"]["is_unverified"] for held in result["observations"]}
     assert marks == {True}, "the shipped series is unverified throughout, and says so per row"
+
+
+def test_an_inverted_window_is_refused_rather_than_named_a_coverage_gap(client: Any) -> None:
+    """Found by review: it used to reach the coverage question, where a window covering no
+    period read as *the series declares none of it* -- the series named for a caller's typo."""
+    for category, series_id, window in (
+        ("cpi", CPI, {"from": "2025-06", "to": "2024-01"}),
+        ("official-rates", RATES, {"from": "2025-06-01", "to": "2024-01-01"}),
+    ):
+        response = client.get(
+            f"{document.PREFIX}/{category}/{series_id}/observations", params={**AS_OF, **window}
+        )
+        assert response.status_code == 422, category
+        assert "ends before it begins" in response.text
+
+
+def test_a_window_end_in_the_wrong_shape_is_refused(client: Any) -> None:
+    for category, series_id, expected in (
+        ("cpi", CPI, "YYYY-MM"),
+        ("official-rates", RATES, "YYYY-MM-DD"),
+    ):
+        response = client.get(
+            f"{document.PREFIX}/{category}/{series_id}/observations",
+            params={**AS_OF, "from": "banana", "to": "zzz"},
+        )
+        assert response.status_code == 422, category
+        assert expected in response.text

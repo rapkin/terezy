@@ -19,7 +19,13 @@ from terezy.api.http import encode, shapes
 if TYPE_CHECKING:  # pragma: no cover -- typing only
     from collections.abc import Mapping, Sequence
 
-_MODELS: Final[dict[str, type[BaseModel]]] = {}
+_MODELS: Final[dict[type, type[BaseModel]]] = {}
+"""Keyed by the record, not by the model's name.
+
+Two applications built in one process declare distinct envelope records that happen to share a
+name; keyed by name, the second would be validated against the first one's model -- harmless
+while their fields agree and silent when they stop.
+"""
 
 CONFIG: Final[ConfigDict] = ConfigDict(extra="forbid")
 
@@ -51,7 +57,7 @@ def annotation_of(shape: shapes.Shape) -> object:  # noqa: PLR0911 -- exhaustive
 
 def model_of(shape: shapes.RecordShape) -> type[BaseModel]:
     """The model one record serialises to, built once and reused wherever the record appears."""
-    known = _MODELS.get(shape.model_name)
+    known = _MODELS.get(shape.record)
     if known is not None:
         return known
     fields = {
@@ -67,7 +73,7 @@ def model_of(shape: shapes.RecordShape) -> type[BaseModel]:
             **{encode.TAG_FIELD: (Literal[shape.tag], ...), **fields},  # type: ignore[call-overload]
         ),
     )
-    _MODELS[shape.model_name] = built
+    _MODELS[shape.record] = built
     return built
 
 

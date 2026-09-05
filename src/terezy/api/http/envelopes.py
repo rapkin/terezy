@@ -296,11 +296,26 @@ def _kind(shape: shapes.Shape) -> FieldKind:  # noqa: PLR0911 -- exhaustive matc
 
 
 def _names(shape: shapes.Shape) -> str | None:
-    """The record tag or enum name this field's values are, at whatever depth the shape names
-    one -- so a list of records says which record, not merely that it is a list."""
-    for node in shapes.walk(shape):
-        if isinstance(node, shapes.RecordShape):
-            return node.tag
-        if isinstance(node, shapes.EnumShape):
-            return node.enum.__name__
-    return None
+    """The record tag or enum name this field's **values** are, at whatever depth the shape
+    names one -- so a list of records says which record, not merely that it is a list.
+
+    A mapping is descended by its value alone. The generic walk visits the key first, so an
+    enum-keyed mapping to a record used to be described by the type of its keys -- which is a
+    label a client would put on the wrong half of the field.
+    """
+    match shape:
+        case shapes.RecordShape(tag=tag):
+            return tag
+        case shapes.EnumShape(enum=enum):
+            return enum.__name__
+        case shapes.MappingShape(value=value):
+            return _names(value)
+        case _:
+            return next(
+                (
+                    found
+                    for child in shapes.children_of(shape)
+                    if (found := _names(child)) is not None
+                ),
+                None,
+            )

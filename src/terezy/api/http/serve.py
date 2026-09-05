@@ -62,11 +62,13 @@ def main(
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     arguments = parser.parse_args(argv)
 
-    context = bind.context_of(os.environ.get(bind.CONTEXT_VARIABLE))
-    if isinstance(context, bind.ContextNotRecognised):
+    context = bind.context_in_force(
+        os.environ.get(bind.CONTEXT_VARIABLE), marker=bind.container_marker(root)
+    )
+    if isinstance(context, bind.ContextNotRecognised | bind.ContainerClaimUnverified):
         return _refuse(context.reason)
 
-    outcome = bind.check_bind(arguments.host, context=context, marker=bind.container_marker(root))
+    outcome = bind.check_bind(arguments.host, context=context)
     match outcome:
         case bind.BindRefused(reason=reason):
             return _refuse(reason)

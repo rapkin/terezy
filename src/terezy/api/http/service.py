@@ -34,6 +34,7 @@ from terezy.api.http import (
     summary,
 )
 from terezy.core.primitives.currency import Currency
+from terezy.data.declarations import resolver
 from terezy.data.declarations.errors import DeclarationError
 
 DATA_ROOT_VARIABLE: Final[str] = "TEREZY_DATA_ROOT"
@@ -95,7 +96,8 @@ def _reader(root: Path, *, scenario: bool) -> Callable[..., Read]:
     if scenario:
 
         def with_scenario(as_of: AsOf, scenario_id: ScenarioId = None) -> Read:
-            return Read(categories.Ask(root, BASE_CURRENCY, scenario_id), as_of)
+            ask = categories.Ask(root, BASE_CURRENCY, _declared_scenario(root, scenario_id))
+            return Read(ask, as_of)
 
         return with_scenario
 
@@ -103,6 +105,29 @@ def _reader(root: Path, *, scenario: bool) -> Callable[..., Read]:
         return Read(categories.Ask(root, BASE_CURRENCY, None), as_of)
 
     return without_scenario
+
+
+def _declared_scenario(root: Path, scenario_id: str | None) -> str | None:
+    """The scenario the request named, checked against the ones `data/scenarios/` declares.
+
+    Refused as a parameter rather than left to the resolver, which raises the error that means
+    *this data root is broken* -- and a caller who named a scenario nobody declares would then be
+    sent to `data/` to look for a fault that is not there. It is the same trap FR-008 names for
+    an undeclared record id, arriving through a query parameter.
+    """
+    if scenario_id is None:
+        return None
+    declared = sorted(resolver.ramp_from_data_root(root, base_currency=BASE_CURRENCY).scenarios)
+    if scenario_id not in declared:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"no scenario with the id {scenario_id!r} is declared. The declared ids are "
+                f"{declared}. A read under a scenario nobody declared would answer under a world "
+                "nobody asked for."
+            ),
+        )
+    return scenario_id
 
 
 def _model(built: type) -> type[BaseModel]:
@@ -224,7 +249,9 @@ def _register_observations(
         if held is None:
             result: object = _no_such_id(category.id, record_id, resolved)
         else:
-            window = _window(window_from, window_to)
+            window = series.window_of(held, window_from, window_to)
+            if isinstance(window, series.WindowMalformed):
+                raise HTTPException(status_code=422, detail=window.reason)
             read = series.read(held, window)
             result = held_in(
                 series_id=record_id,
@@ -279,21 +306,6 @@ def _coverage(records: Mapping[str, object]) -> dict[str, envelopes.SeriesCovera
         for series_id, held in sorted(records.items())
         if (window := series.coverage_of(held)) is not None
     }
-
-
-def _window(first: str | None, last: str | None) -> tuple[str, str] | None:
-    if first is None and last is None:
-        return None
-    if first is None or last is None:
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                "a window is two-ended: give both `from` and `to`, or neither. One end alone "
-                "would leave the other to be inferred, and the inference is what a coverage "
-                "refusal exists to prevent."
-            ),
-        )
-    return (first, last)
 
 
 def _no_such_id(
@@ -403,15 +415,25 @@ async def _declaration_failed(_: Request, exc: Exception) -> Response:
     return JSONResponse(status_code=500, content=body)
 
 
-def bind_context() -> bind.BindContext:
-    """The declared bind context, or a refusal to start at all.
+FILESYSTEM_ROOT: Final[Path] = Path("/")
+
+
+def bind_context(*, root: Path = FILESYSTEM_ROOT) -> bind.BindContext:
+    """The context this process may act under, with the container claim verified.
 
     Raised rather than defaulted: a value the person who typed it believed in, silently read as
-    the default, is the malformed-field default Principle IV forbids in its worst form.
+    the default, is the malformed-field default Principle IV forbids in its worst form. The
+    marker is checked here as well as in the entry point, because a bare server command reaches
+    this module and not that one -- and the per-request guard is the half that has to hold when
+    terezy did not start the process.
     """
-    resolved = bind.context_of(os.environ.get(bind.CONTEXT_VARIABLE))
+    resolved = bind.context_in_force(
+        os.environ.get(bind.CONTEXT_VARIABLE), marker=bind.container_marker(root)
+    )
     match resolved:
-        case bind.ContextNotRecognised(reason=reason):
+        case (
+            bind.ContextNotRecognised(reason=reason) | bind.ContainerClaimUnverified(reason=reason)
+        ):
             raise ValueError(reason)
         case _:
             return resolved

@@ -223,13 +223,13 @@ def walk(shape: Shape) -> Iterator[Shape]:
             return
         seen.add(id(node))
         yield node
-        for child in _children(node):
+        for child in children_of(node):
             yield from visit(child)
 
     return visit(shape)
 
 
-def _children(shape: Shape) -> tuple[Shape, ...]:  # noqa: PLR0911 -- exhaustive match
+def children_of(shape: Shape) -> tuple[Shape, ...]:  # noqa: PLR0911 -- exhaustive match
     match shape:
         case RecordShape(fields=fields):
             return tuple(field for _, field in fields)

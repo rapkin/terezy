@@ -10,11 +10,11 @@ created by someone who wants to, and FR-027b requires that to be said rather tha
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 import pytest
 
-from terezy.api.http import serve
+from terezy.api.http import bind, serve, service
 from terezy.api.http.bind import (
     CGROUP_PATH,
     CONTEXT_VARIABLE,
@@ -25,9 +25,6 @@ from terezy.api.http.bind import (
     check_bind,
     container_marker,
 )
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 CONTAINER = BindContext.CONTAINER_PUBLISHED_TO_LOOPBACK
 
@@ -72,18 +69,23 @@ def test_an_ordinary_init_cgroup_is_not_a_marker(tmp_path: Path) -> None:
     assert container_marker(tmp_path) is None
 
 
-def test_the_container_context_with_no_marker_refuses_naming_the_marker() -> None:
-    outcome = check_bind("0.0.0.0", context=CONTAINER, marker=None)
+def test_the_container_context_with_no_marker_is_never_in_force() -> None:
+    """Decided once, before either guard acts on it: a claim nobody verified admits nothing."""
+    outcome = bind.context_in_force(CONTAINER.value, marker=None)
 
-    assert isinstance(outcome, BindRefused)
+    assert isinstance(outcome, bind.ContainerClaimUnverified)
     assert DOCKER_MARKER in outcome.reason
     assert CGROUP_PATH in outcome.reason
     assert "Principle VII" in outcome.reason
 
 
+def test_the_context_is_in_force_once_a_marker_is_found() -> None:
+    assert bind.context_in_force(CONTAINER.value, marker=DOCKER_MARKER) is CONTAINER
+
+
 @pytest.mark.parametrize("address", ["0.0.0.0", "::", "127.0.0.1", "::1"])
 def test_the_container_interface_passes_once_the_claim_is_verified(address: str) -> None:
-    outcome = check_bind(address, context=CONTAINER, marker=DOCKER_MARKER)
+    outcome = check_bind(address, context=CONTAINER)
 
     assert isinstance(outcome, BindPermitted)
     assert outcome.address == address
@@ -93,7 +95,7 @@ def test_the_container_interface_passes_once_the_claim_is_verified(address: str)
 def test_a_named_lan_address_is_still_refused_inside_a_container(address: str) -> None:
     """The container context admits the interface a container actually has, not any address:
     binding a routable address inside a container is not something the runtime offers."""
-    outcome = check_bind(address, context=CONTAINER, marker=DOCKER_MARKER)
+    outcome = check_bind(address, context=CONTAINER)
 
     assert isinstance(outcome, BindRefused)
 
@@ -132,3 +134,24 @@ def test_the_entry_point_starts_when_the_marker_is_there(
 
     assert code == 0
     assert started == [("0.0.0.0", 8000)]
+
+
+def test_the_served_app_refuses_the_claim_on_a_machine_with_no_marker(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """`uvicorn terezy.api.http:app` never calls the entry point, so the module that builds the
+    application verifies the claim itself. Without this, one environment variable on a laptop
+    relaxes the per-request check and every LAN client is answered."""
+    monkeypatch.setenv(CONTEXT_VARIABLE, CONTAINER.value)
+
+    with pytest.raises(ValueError, match=DOCKER_MARKER):
+        service.bind_context(root=tmp_path)
+
+
+def test_the_served_app_honours_the_claim_where_a_marker_is_present(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv(CONTEXT_VARIABLE, CONTAINER.value)
+    (tmp_path / ".dockerenv").touch()
+
+    assert service.bind_context(root=tmp_path) is CONTAINER

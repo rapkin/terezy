@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any, NoReturn
 
 import pytest
 
-from terezy.api.http import serve
+from terezy.api.http import bind, serve
 from terezy.api.http.bind import (
     CONTEXT_VARIABLE,
     BindContext,
@@ -102,7 +102,7 @@ def test_a_hostname_is_refused_as_a_hostname(
 
 @pytest.mark.parametrize("address", LOOPBACK)
 def test_the_guard_itself_permits_only_loopback_under_the_default_context(address: str) -> None:
-    outcome = check_bind(address, context=BindContext.LOOPBACK, marker=None)
+    outcome = check_bind(address, context=BindContext.LOOPBACK)
 
     assert isinstance(outcome, BindPermitted)
     assert outcome.address == address
@@ -112,7 +112,7 @@ def test_the_guard_itself_permits_only_loopback_under_the_default_context(addres
 def test_the_guard_itself_refuses_a_public_address_under_the_default_context(
     address: str,
 ) -> None:
-    outcome = check_bind(address, context=BindContext.LOOPBACK, marker=None)
+    outcome = check_bind(address, context=BindContext.LOOPBACK)
 
     assert isinstance(outcome, BindRefused)
     assert "Principle VII" in outcome.reason
@@ -120,7 +120,10 @@ def test_the_guard_itself_refuses_a_public_address_under_the_default_context(
 
 def test_a_marker_does_not_widen_the_default_context() -> None:
     """The context is what admits the container interface; being inside a container is not."""
-    outcome = check_bind("0.0.0.0", context=BindContext.LOOPBACK, marker="/.dockerenv")
+    assert bind.context_in_force(None, marker="/.dockerenv") is BindContext.LOOPBACK, (
+        "a marker on a machine whose context is unset still means loopback"
+    )
+    outcome = check_bind("0.0.0.0", context=BindContext.LOOPBACK)
 
     assert isinstance(outcome, BindRefused)
 
