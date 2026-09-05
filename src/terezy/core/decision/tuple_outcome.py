@@ -953,8 +953,8 @@ def _price_for(prepared: _Prepared) -> Money:
 
     **Where the window holds to maturity there is no second leg to cancel it**, and that is a
     signed overstatement of the purchase price which nothing states: the
-    ``the-buy-quotation-is-not-carried`` entry in ``specs/features.toml`` records it with its
-    measurement and what would close it.
+    ``specs/022-accrued-interest/spec.md`` measures it and carries the requirement that closes
+    it.
     """
     match prepared.declared, prepared.plan:
         case FundDeclaration(), FundAssumptions():

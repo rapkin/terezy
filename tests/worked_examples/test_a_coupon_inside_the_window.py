@@ -9,7 +9,7 @@ was observed** (``core.scenarios.early_exit.detached_since``).
 
 **What comes out is a whole coupon where what was in the quotation was an accrual**, which is
 why `Exclusion.EARLY_EXIT_IGNORES_ACCRUED_INTEREST` is signed and why closing it needs a basis
-no declaration states (`enumerated-accrued-interest` in `specs/features.toml`). The residual is
+no declaration states (`specs/022-accrued-interest/spec.md`). The residual is
 visible here without any accrual figure at all, and this module asserts it: a three-month hold
 of the worked issue reaches exactly what a one-month hold reaches, because the two extra months
 build accrual the model does not carry.
@@ -81,7 +81,7 @@ sat 166 days into the period and the 2026-10-01 sale sits 22 days into the next 
 carried 77.98 of accrual and the sale date carries 10.34, so the sale is struck about 17.85 per
 unit below what the same assumption implies. That reading is an **illustration and not a figure
 this engine emits**: nothing declares the basis, and choosing one is what
-`enumerated-accrued-interest` is for.
+`specs/022-accrued-interest/spec.md` is for.
 """
 
 QUOTED_ON = date(2026, 8, 24)

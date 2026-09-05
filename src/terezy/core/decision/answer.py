@@ -78,10 +78,7 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
 REAL_TERMS_SUPPLIED_BY = "a real-terms rate on TupleOutcome, which feature 010 does not produce"
 INCOME_TAX_SUPPLIED_BY = "a deployable-capacity figure, which is a question about a stream"
 RATE_RISK_SUPPLIED_BY = "[[future]] secondary-market-rate-risk"
-ACCRUED_INTEREST_SUPPLIED_BY = (
-    "a declared accrual basis, and for a listed schedule the [[future]] "
-    "enumerated-accrued-interest entry"
-)
+ACCRUED_INTEREST_SUPPLIED_BY = "a declared accrual basis, which is feature 022-accrued-interest"
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
