@@ -130,6 +130,15 @@ def accrual_opens_at(terms: DeclaredTerms) -> date | None:
     claim about where the published **list** begins, and opening the first period there would
     accrue a whole coupon over a stub whose true length nobody published (013 FR-021). Hence
     ``None``, which the accrual reads as *this form bounds no period before its first coupon*.
+
+    **Unadjusted, while the boundary that closes the period is a paid date and has been through
+    the declared business-day rule** (``fixed_income.coupons_per_unit``). The two conventions
+    part company by up to three days on ``modified_following``, so a generative issue's first
+    accrual is divided by a span its coupon was not earned over. Unreachable on the shipped
+    registry -- every declared issue states its payments, where a date is a date -- and recorded
+    as `generative-accrual-boundaries` in `specs/features.toml` rather than closed here, because
+    the fix is either a fourth site reaching 017's uncited weekend notion or a schedule that
+    pairs boundaries with amounts by position.
     """
     match terms:
         case BondTerms():

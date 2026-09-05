@@ -64,10 +64,16 @@ EARLY_EXIT_CLAIMS: Final = frozenset(
         Exclusion.EARLY_EXIT_IS_A_POINT_NOT_A_DISTRIBUTION,
         Exclusion.EARLY_EXIT_SPREAD_IS_A_SELLERS_QUOTE,
         Exclusion.EARLY_EXIT_CARRIES_NO_RATE_RISK,
-        Exclusion.QUOTED_CLEAN_PRICE_IS_ASSUMED_CONSTANT,
     }
 )
-"""015 FR-033's three, and the fourth that carrying a dated quotation across a gap adds."""
+"""015 FR-033's three, and only those: each is a claim about a **sale** struck at a quotation.
+
+022 FR-018's fourth claim is deliberately **not** here. It is about a price a dated quotation
+was carried to, and the buy leg is carried for every bond -- so a candidate held to its own
+maturity states it while stating none of these three, which is the distinction
+`test_a_section_that_holds_to_maturity_inherits_no_early_exit_claim` turns on."""
+
+CARRIED_CLAIM: Final = Exclusion.QUOTED_CLEAN_PRICE_IS_ASSUMED_CONSTANT
 
 
 def _walk(value: object, seen: set[int] | None = None) -> list[object]:
@@ -266,6 +272,12 @@ def test_a_section_that_holds_to_maturity_inherits_no_early_exit_claim() -> None
     assert all(item.sold_early is None for item in section_evaluated(held))
     assert [item.what for item in sold.excludes if item.what in EARLY_EXIT_CLAIMS]
     assert not [item.what for item in held.excludes if item.what in EARLY_EXIT_CLAIMS]
+    # And the carried-quotation claim is on **both**, which is what says the two populations
+    # are different rather than the second being a quieter version of the first: the held
+    # candidate bought from a quotation read on another day, so its purchase price rests on
+    # the belief even though nothing was ever sold (022 FR-018).
+    assert [item.what for item in held.excludes if item.what is CARRIED_CLAIM]
+    assert all(item.carried_quotation is not None for item in section_evaluated(held))
 
 
 def test_an_early_exit_states_its_claims_and_leaves_rate_risk_unsigned() -> None:
@@ -292,7 +304,7 @@ def test_an_early_exit_states_its_claims_and_leaves_rate_risk_unsigned() -> None
     directions: dict[Exclusion, set[Direction | None]] = {}
     for item in specific:
         directions.setdefault(item.what, set()).add(item.direction)
-    assert set(directions) == EARLY_EXIT_CLAIMS
+    assert set(directions) == EARLY_EXIT_CLAIMS | {CARRIED_CLAIM}
     assert None not in directions[Exclusion.EARLY_EXIT_IS_A_POINT_NOT_A_DISTRIBUTION]
     assert None not in directions[Exclusion.EARLY_EXIT_SPREAD_IS_A_SELLERS_QUOTE]
     assert directions[Exclusion.EARLY_EXIT_CARRIES_NO_RATE_RISK] == {None}

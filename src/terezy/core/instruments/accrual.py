@@ -18,11 +18,11 @@ depository publishes ``pay_date``, ``pay_val`` and ``pay_type`` and nothing abou
 builds between them, so the issuer's own formula is not available and a linear reading is a
 choice. It is stated on the owner's declared belief and in ``docs/METHODOLOGY.md`` §31.5.
 
-**A period is bounded by two consecutive declared accrual boundaries**, and the two forms
-declare a different number of them (:func:`terms.accrual_opens_at`): a bond declared by its
-terms opens its first period at its declared issue date, and one declared by its payments
-bounds nothing before its first listed coupon, because ``covers_from`` states where the
-published list begins and not when interest began. A date in no period **refuses by name**
+**A period runs between two consecutive dates a coupon leaves the price on**, plus the opening
+one form declares before its first coupon (:func:`terms.accrual_opens_at`): a bond declared by
+its terms opens its first period at its issue date, and one declared by its payments bounds
+nothing before its first listed coupon, because ``covers_from`` states where the published list
+begins and not when interest began. A date in no period **refuses by name**
 (FR-008) rather than being priced from a boundary nobody declared.
 
 The day count enters **only as a ratio of two year fractions inside one period**, which is
@@ -100,14 +100,34 @@ def schedule_of(
     an accrual is always the one at the period's far end.
     """
     opens = terms_of.accrual_opens_at(declaration.terms)
-    if opens is not None and coupons:
-        coupons = ((opens, money.zero(coupons[0][1].currency)), *coupons)
+    boundaries = _merged(coupons)
+    if opens is not None and boundaries:
+        boundaries = ((opens, money.zero(boundaries[0][1].currency)), *boundaries)
     return Schedule(
         instrument_id=declaration.id,
-        coupons=coupons,
+        coupons=boundaries,
         day_count=terms_of.day_count_of(declaration.terms),
         declared_by=terms_of.coupon_term_of(declaration.terms),
     )
+
+
+def _merged(coupons: tuple[tuple[date, Money], ...]) -> tuple[tuple[date, Money], ...]:
+    """One boundary per date, carrying everything that leaves the price on it.
+
+    Two coupons declared on one date are two payments -- the ledger records them separately and
+    the tax layer may assess them under different classes -- and they are **one** boundary:
+    both leave the price that morning, so the accrual toward it is sized on their sum. Reading
+    only the first would understate every accrual in the period by the rest, silently, which is
+    a wrong number rather than a refusal. Reachable through the loader, which refuses a
+    decreasing payment list and permits a repeated date.
+    """
+    merged: list[tuple[date, Money]] = []
+    for when, amount in coupons:
+        if merged and merged[-1][0] == when:
+            merged[-1] = (when, money.add(merged[-1][1], amount))
+        else:
+            merged.append((when, amount))
+    return tuple(merged)
 
 
 def accrued_on(

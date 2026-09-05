@@ -224,6 +224,38 @@ def test_a_carried_price_at_or_below_zero_refuses_rather_than_going_negative() -
     ]
 
 
+def test_a_carried_purchase_price_at_or_below_zero_refuses_rather_than_sizing_a_purchase() -> None:
+    """The **buy** leg's guard, which the sell leg has carried since 015.
+
+    Before 022 the purchase price was the declared quote, which the data boundary vets. It is
+    now that quote net of one accrual and plus another, a figure the resolver cannot see: at
+    zero `_whole_increments` divides by it, and below zero it buys a negative number of units
+    and reports `BuysNoWholeUnit` -- whose message blames an owner who could afford it, which
+    is a guard whose message is false.
+    """
+    registries = fixtures.declared()
+    subject = _wanting_a_resale_price(_surveyed(registries))[0]
+    declared = registries.instruments[subject]
+    coupons = registry.ops_for(declared.instrument_class).coupons_per_unit(declared)
+    detaches = next(on for on, _ in coupons if on > fixtures.OUTLAY_ON)
+    starved = fixtures.with_access(
+        registries,
+        subject,
+        quote=VenueQuote(
+            price=NOT_ENOUGH, kind="venue_terms", observed_on=detaches - timedelta(days=1)
+        ),
+    )
+    refused = {
+        item.key.instrument_id: item.refusal
+        for item in dropped(
+            _surveyed(starved, DateRange(start=fixtures.OUTLAY_ON, end=detaches)).comparison
+        )
+    }
+    assert isinstance(refused[subject], InstrumentRefused), refused[subject]
+    assert "A unit cannot cost nothing or less" in refused[subject].reason
+    assert "will not buy one increment" not in refused[subject].reason
+
+
 def test_only_a_missing_price_is_reported_as_a_missing_declaration() -> None:
     """Two refusals name `access.resale_price`, and only one is a gap in the declarations.
 

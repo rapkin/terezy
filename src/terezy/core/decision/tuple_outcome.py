@@ -984,7 +984,29 @@ def _price_for(prepared: _Prepared, *, purchased_on: date) -> Money | Instrument
             )
             if isinstance(carried, InconsistentTerms):
                 return InstrumentRefused(instrument_id=prepared.declared.id, reason=carried.reason)
-            return accrual.price(carried)
+            price = accrual.price(carried)
+            if price.amount <= 0.0:
+                # **The same guard the sell leg carries** (`acquire.early_sale`), and the buy
+                # leg needs it for the same reason since 022: the price is no longer the
+                # declared quote the data boundary vets, it is that quote net of one accrual
+                # and plus another, and the resolver cannot see the result. Zero divides in
+                # `_whole_increments`; negative buys a negative number of units and reports
+                # `BuysNoWholeUnit`, whose message would blame an owner who can afford it.
+                return InstrumentRefused(
+                    instrument_id=prepared.declared.id,
+                    reason=(
+                        f"{prepared.declared.id!r} is quoted {quoted.price.amount!r} "
+                        f"{quoted.price.currency.value} as of "
+                        f"{quoted.observed_on.isoformat()}, which is a clean "
+                        f"{carried.clean.amount!r} plus the accrual of that day; carried to the "
+                        f"purchase on {purchased_on.isoformat()} that clean price plus "
+                        f"{carried.accrued.amount!r} of accrual leaves {price.amount!r}. A unit "
+                        "cannot cost nothing or less: the quotation and the payment schedule "
+                        "describe different paper, and sizing a purchase from this would report "
+                        "a holding nobody could buy."
+                    ),
+                )
+            return price
         case _:  # pragma: no cover -- `_plan_for` has already refused a mismatched pair
             raise ValueError(
                 f"{prepared.declared.id!r} reached pricing with run settings of type "
@@ -1449,6 +1471,9 @@ def _assemble(
     reader who added them up would be double-counting. What adds up is the series of arrivals,
     and that is :attr:`~terezy.core.results.tuple.TupleOutcome.reaches`.
     """
+    carried = _carried_quotation(
+        prepared, projected, purchased_on=purchased_on, quotation_holds=quotation_holds
+    )
     reaches = money.total([arrival.amount for arrival in arrivals], endpoint_currency)
     provenance = prov.merge_all(
         [
@@ -1482,14 +1507,14 @@ def _assemble(
         routes=_standing(routed, way_out_costs),
         risk_class=prepared.access.risk_class,
         sold_early=projected.sold_early if isinstance(projected, Projection) else None,
+        carried_quotation=carried,
         rests_on=_rests_on(
             prepared,
             projected,
             span=span,
             horizon=horizon,
-            purchased_on=purchased_on,
             continuation=continuation,
-            quotation_holds=quotation_holds,
+            carried=carried,
         ),
         accounts_for=ACCOUNTS_FOR,
         excludes=_excludes_of(prepared),
@@ -1846,9 +1871,8 @@ def _rests_on(
     *,
     span: DateRange,
     horizon: DateRange,
-    purchased_on: date,
     continuation: ContinuationAssumption,
-    quotation_holds: QuotationHolds,
+    carried: QuotationHolds | None,
 ) -> tuple[str, ...]:
     """The stated assumptions this outcome depends on, sorted and in words (FR-025).
 
@@ -1881,18 +1905,19 @@ def _rests_on(
                 f"of type {type(projected).__name__} and run settings of type "
                 f"{type(prepared.plan).__name__}, a pairing _plan_for refuses."
             )
-    if _carried_a_quotation(prepared, projected, purchased_on=purchased_on):
-        stated.append(quotation.rests_on(quotation_holds))
+    if carried is not None:
+        stated.append(quotation.rests_on(carried))
     return tuple(sorted(stated))
 
 
-def _carried_a_quotation(
+def _carried_quotation(
     prepared: _Prepared,
     projected: Projection | FundProjection,
     *,
     purchased_on: date,
-) -> bool:
-    """Whether either leg of this round trip was priced from a quotation of an earlier day.
+    quotation_holds: QuotationHolds,
+) -> QuotationHolds | None:
+    """The belief either leg of this round trip leaned on, or ``None`` where neither did.
 
     FR-018, and either leg is enough. A hold-to-maturity candidate states no early exit and its
     purchase price is still a quotation carried to the settlement date -- which is why the
@@ -1901,6 +1926,8 @@ def _carried_a_quotation(
     """
     quoted = prepared.access.quote
     if quoted is not None and quoted.observed_on != purchased_on:
-        return True
+        return quotation_holds
     sold = projected.sold_early if isinstance(projected, Projection) else None
-    return sold is not None and sold.quoted_on != sold.on
+    if sold is not None and sold.quoted_on != sold.on:
+        return quotation_holds
+    return None

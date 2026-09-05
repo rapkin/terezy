@@ -97,6 +97,7 @@
   excludes early_exit_spread_is_a_sellers_quote   UA4000235782             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000235782             
   excludes quoted_clean_price_is_assumed_constant UA4000235782             
+  excludes quoted_clean_price_is_assumed_constant UA4000235865             
   excludes early_exit_is_a_point_not_a_distribution UA4000235196             more_certain_than_it_is
   excludes early_exit_spread_is_a_sellers_quote   UA4000235196             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000235196             
@@ -204,14 +205,17 @@
   excludes early_exit_spread_is_a_sellers_quote   UA4000234223             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000234223             
   excludes quoted_clean_price_is_assumed_constant UA4000234223             
+  excludes quoted_clean_price_is_assumed_constant UA4000237416             
   excludes early_exit_is_a_point_not_a_distribution UA4000238992             more_certain_than_it_is
   excludes early_exit_spread_is_a_sellers_quote   UA4000238992             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000238992             
   excludes quoted_clean_price_is_assumed_constant UA4000238992             
+  excludes quoted_clean_price_is_assumed_constant UA4000236624             
   excludes early_exit_is_a_point_not_a_distribution UA4000239008             more_certain_than_it_is
   excludes early_exit_spread_is_a_sellers_quote   UA4000239008             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000239008             
   excludes quoted_clean_price_is_assumed_constant UA4000239008             
+  excludes quoted_clean_price_is_assumed_constant UA4000235865             
   excludes early_exit_is_a_point_not_a_distribution UA4000207518             more_certain_than_it_is
   excludes early_exit_spread_is_a_sellers_quote   UA4000207518             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000207518             
@@ -279,10 +283,22 @@
   excludes early_exit_spread_is_a_sellers_quote   UA4000239008             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000239008             
   excludes quoted_clean_price_is_assumed_constant UA4000239008             
+  excludes quoted_clean_price_is_assumed_constant UA4000239016             
+  excludes quoted_clean_price_is_assumed_constant UA4000207518             
+  excludes quoted_clean_price_is_assumed_constant UA4000231195             
+  excludes quoted_clean_price_is_assumed_constant UA4000238976             
+  excludes quoted_clean_price_is_assumed_constant UA4000238281             
+  excludes quoted_clean_price_is_assumed_constant UA4000234223             
+  excludes quoted_clean_price_is_assumed_constant UA4000230270             
+  excludes quoted_clean_price_is_assumed_constant UA4000236228             
+  excludes quoted_clean_price_is_assumed_constant UA4000234413             
+  excludes quoted_clean_price_is_assumed_constant UA4000237416             
+  excludes quoted_clean_price_is_assumed_constant UA4000236624             
+  excludes quoted_clean_price_is_assumed_constant UA4000235865             
   withheld inzhur_miltech           arrives 2028-01-20
 
 [excludes] no_real_terms_figure
 [excludes] no_income_tax_on_the_stated_amount
 
 [keys] SectionsAgreeByKey
-[digest] sha256:4fafcf4fdb549a2dff980702120faab3a016a8b51cb1d175f5b0b38e5274b158
+[digest] sha256:e422dff2035da51b00400a126fdce073ffcd756dbcb3e612314eb03cb4d33f01

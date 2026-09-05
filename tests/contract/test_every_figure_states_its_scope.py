@@ -77,6 +77,11 @@ CLASSIFIED: Final[frozenset[str]] = frozenset(
         # figure carries stated exclusions and deciding to attach them by searching a
         # sentence is the string-matching a case field exists to avoid.
         "sold_early",
+        # Which declared belief a price leaned on, or None where none did (022 FR-018). Not a
+        # figure and not a second spelling of `rests_on`: the answer layer attaches a stated
+        # exclusion off it, and reading a belief out of a sentence is the same string matching
+        # `sold_early` exists to avoid.
+        "carried_quotation",
         # Marks travel with every figure; they are not figures.
         "provenance",
         "staleness",

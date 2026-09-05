@@ -378,8 +378,8 @@ def _section(
         excludes=tuple(
             stated
             for item in _outcomes(outcome)
-            if item.sold_early is not None and item.key not in withheld
-            for stated in _early_exit_exclusions(item.key, item.sold_early)
+            if item.key not in withheld
+            for stated in _stated_exclusions(item)
         ),
     )
 
@@ -537,6 +537,30 @@ def _answer_wide_excludes() -> tuple[StatedExclusion, ...]:
     )
 
 
+def _stated_exclusions(item: TupleOutcome) -> tuple[StatedExclusion, ...]:
+    """What this candidate's figure does not account for, in the two groups it falls into.
+
+    **They are not the same population, and that is the whole of 022 FR-018.** Three claims
+    belong to the *early exit*: the figure is a point, the spread is a seller's quote, and no
+    rate risk is modelled. The fourth belongs to any price a **dated quotation was carried to**
+    -- and the buy leg is carried for every bond, including one held to its own maturity, which
+    strikes no sale and would otherwise rest on the belief while stating nothing.
+    """
+    stated: tuple[StatedExclusion, ...] = ()
+    if item.sold_early is not None:
+        stated += _early_exit_exclusions(item.key, item.sold_early)
+    if item.carried_quotation is not None:
+        stated += (
+            StatedExclusion(
+                what=Exclusion.QUOTED_CLEAN_PRICE_IS_ASSUMED_CONSTANT,
+                applies_to=item.key,
+                supplied_by=CLEAN_PRICE_SUPPLIED_BY,
+                direction=None,
+            ),
+        )
+    return stated
+
+
 def _early_exit_exclusions(key: Tuple, sold: SoldEarly) -> tuple[StatedExclusion, ...]:
     """What an early-exit figure does not account for, and which way each one errs.
 
@@ -544,12 +568,8 @@ def _early_exit_exclusions(key: Tuple, sold: SoldEarly) -> tuple[StatedExclusion
     implies and one sold after rates fall fetches more -- so it carries no direction, and
     SC-026 asserts that absence rather than tolerating it: a sign asserted without a warrant is
     a number more confident than its inputs, which is worse than one left unstated.
-
-    **The constant-clean-price claim is on every sale a quotation was carried to**, and it
-    carries no direction for the same reason rate risk does not: the two are one cause. Struck
-    on the quotation's own day nothing was carried and there is no claim to make.
     """
-    stated = (
+    return (
         StatedExclusion(
             what=Exclusion.EARLY_EXIT_IS_A_POINT_NOT_A_DISTRIBUTION,
             applies_to=key,
@@ -566,17 +586,6 @@ def _early_exit_exclusions(key: Tuple, sold: SoldEarly) -> tuple[StatedExclusion
             what=Exclusion.EARLY_EXIT_CARRIES_NO_RATE_RISK,
             applies_to=key,
             supplied_by=RATE_RISK_SUPPLIED_BY,
-            direction=None,
-        ),
-    )
-    if sold.quoted_on == sold.on:
-        return stated
-    return (
-        *stated,
-        StatedExclusion(
-            what=Exclusion.QUOTED_CLEAN_PRICE_IS_ASSUMED_CONSTANT,
-            applies_to=key,
-            supplied_by=CLEAN_PRICE_SUPPLIED_BY,
             direction=None,
         ),
     )

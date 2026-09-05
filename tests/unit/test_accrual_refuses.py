@@ -21,10 +21,13 @@ import pytest
 
 from terezy.core.errors import InconsistentTerms
 from terezy.core.instruments import accrual
+from terezy.core.instruments.interface import InstrumentDeclaration
 from terezy.core.primitives import money
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
+from terezy.core.primitives.tolerance import TOLERANCE
+from tests import answer_registries as answers
 
 UAH = Currency.UAH
 
@@ -55,6 +58,17 @@ SCHEDULE = accrual.Schedule(
     day_count="act/365",
     declared_by="instrument.schedule.payment",
 )
+
+
+def _declaration() -> InstrumentDeclaration:
+    """The one declaration in this module, and it is enumerated: `schedule_of` prepends an
+    accrual opening only for a form that declares an issue date, and this module is about the
+    boundaries a payment list states."""
+    return next(
+        declared
+        for declared in answers.shipped_inputs().registries.instruments.values()
+        if declared.id == "UA4000236228"
+    )
 
 
 def _accrued(on: date, schedule: accrual.Schedule = SCHEDULE) -> Money | InconsistentTerms:
@@ -162,3 +176,36 @@ def test_a_coupon_date_opens_its_own_period(on: date) -> None:
     figure = _accrued(on)
     assert isinstance(figure, Money)
     assert figure.amount == 0.0
+
+
+def test_two_coupons_on_one_date_are_one_boundary_carrying_both() -> None:
+    """Both leave the price that morning, so the accrual toward them is sized on their sum.
+
+    Reading only the first understates every accrual in the period by the rest -- a wrong
+    number with no refusal beside it, which is the shape Principle IV puts at top severity. The
+    loader permits the shape: it refuses a *decreasing* payment list, not a repeated date.
+    """
+    split = accrual.schedule_of(
+        _declaration(),
+        (
+            (FIRST, Money(30.0, UAH, DECLARED)),
+            (SECOND, Money(55.50, UAH, DECLARED)),
+            (SECOND, Money(30.0, UAH, DECLARED)),
+        ),
+    )
+    assert [when for when, _ in split.coupons] == [FIRST, SECOND]
+    on = date(2026, 6, 11)
+    both = accrual.accrued_on(split, on=on, currency=UAH, dated_term="holding.purchased_on")
+    one = accrual.accrued_on(
+        accrual.schedule_of(
+            _declaration(),
+            ((FIRST, Money(30.0, UAH, DECLARED)), (SECOND, Money(55.50, UAH, DECLARED))),
+        ),
+        on=on,
+        currency=UAH,
+        dated_term="holding.purchased_on",
+    )
+    assert isinstance(both, Money)
+    assert isinstance(one, Money)
+    # The same elapsed fraction of the same period, sized on 85.50 rather than on 55.50.
+    assert both.amount == pytest.approx(one.amount * 85.50 / 55.50, abs=TOLERANCE)

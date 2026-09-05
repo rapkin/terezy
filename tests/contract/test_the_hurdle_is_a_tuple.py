@@ -288,9 +288,8 @@ class TestWaitingIsACostAndTheShippedRoutesCharge:
         #
         # The band does **not** rule out a fee, and saying it did would be over-claiming: a
         # 0.10% exit fee moves the two rates 0.00143 apart, inside the 0.002 bound. What rules
-        # a fee out is the sibling assertion above -- a fee changes what *arrives*, and
-        # `reaches` is equal at the project tolerance, which fails for a fee as small as
-        # 0.05%. The two assertions together say "the dates moved and the amounts did not".
+        # a fee out is the sibling assertion above, which reads the two routes' own ramp
+        # contributions and finds them zero.
         shipped = _outcome(fixtures.declared(), fixtures.hurdle_tuple(), AT_ISSUE)
         instant = _outcome(
             fixtures.without_latency(fixtures.declared()), fixtures.hurdle_tuple(), AT_ISSUE
