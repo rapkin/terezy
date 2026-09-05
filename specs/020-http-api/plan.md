@@ -58,7 +58,7 @@ HTTP.
 
 **Constraints**: the core is untouched (SC-023a); no module under `terezy.api.http` constructs a
 `Money`, calls a staleness function, or imports `core.results.canonical`; every set is serialised in a
-declared total order; the committed OpenAPI document is byte-gated.
+declared total order; the OpenAPI document is byte-reproducible across processes.
 
 **Scale/Scope**: 25 categories, 3 fixed endpoints, 2 windowed series reads, and a 352 KB OpenAPI
 document. Every endpoint sits under one `/api` prefix, declared in `document.py` and carried by
@@ -72,7 +72,7 @@ that document, so a generated client is correct by construction.
 | **II — Framework, not script** | **PASS.** The category set is a mapping from id to entry point and shape (FR-005), fail-closed against `data/` in both directions (FR-006, FR-007). A new declaration directory is a row plus its response type — and until it is one, the suite is red. |
 | **III — Pure deterministic core** | **PASS.** The core gains nothing: the tag is derived by the HTTP layer from the record's identity (FR-011) and no core file is in the diff. Two runs of one request produce identical bytes across processes with different `PYTHONHASHSEED` (SC-009). No clock is read anywhere: `as_of` is required. |
 | **IV — Reliability through contracts** | **PASS.** A refusal is a typed body, never a bare status. A missing id is a refusal and not a load error — the trap FR-008 names. `extra="forbid"` on every generated model makes an encoder that invents a field fail loudly. No tolerance is defined here; this feature compares no floats. |
-| **V — Test-first** | **PASS.** Every module lands after a test that fails without it. The OpenAPI document is a gated artefact with a mutation check, and the refusal-union scan is a walk with no hand list. |
+| **V — Test-first** | **PASS.** Every module lands after a test that fails without it. The OpenAPI document is generated and its bytes are gated across processes, and the refusal-union scan is a walk with no hand list. |
 | **VI — The whole tuple** | **PASS, and this is the feature that carries it across the socket.** `OneWayCost` and `RoundTripCost` have the same nine fields; tagged, they serialise to different bodies (SC-006). Currency's display role is deferred by the owner, so nothing here can conflate it with the base or tax roles. |
 | **VII — Owner-scoped and private** | **PASS.** The release gate is untouched and no supported path reaches its condition: a per-request client check under the default context, a startup refusal on the address, a verified container claim, a gated compose file. The documentation UI is off, so no page fetches from a CDN. |
 
@@ -113,8 +113,7 @@ src/terezy/api/http/
 ├── middleware.py      # the per-request client check and the Host allowlist
 ├── serve.py           # the process entry point that applies the guard, then serves
 ├── __main__.py        # `python -m terezy.api.http`
-├── document.py        # info.version, the /api prefix, the canonical dump
-└── openapi.json       # the gated artefact
+└── document.py        # info.version, the /api prefix, the canonical dump
 
 src/terezy/data/citation_policy.py   # the gate's lists, now imported by the gate and served
 scripts/generate_openapi.py
@@ -136,7 +135,7 @@ tests/contract/    the boundary claims: the category set both ways, tags, unions
                    the lock-file closure, the compose file, the bind guard's closed set
 tests/unit/        the shape algebra, the encoder's ordering, the series window, the
                    refusals, the registry summary
-tests/golden/      the committed OpenAPI document, and the endpoint that serves it
+tests/golden/      end-to-end results on the shipped root
 ```
 
 ## The mechanism, in the order it has to be built
@@ -157,7 +156,7 @@ tests/golden/      the committed OpenAPI document, and the endpoint that serves 
 6. **`bind.py`**, **`middleware.py`**, **`serve.py`** — the guard, in the order FR-029 ranks them: the
    per-request check is the load-bearing half and is built first. No cross-origin allowance is
    declared: 021 is same-origin with this service in both of its modes.
-7. **`document.py`**, `scripts/generate_openapi.py`, the committed `openapi.json`.
+7. **`document.py`** and `scripts/generate_openapi.py`, one renderer between them.
 8. `docker-compose.yml`, `Dockerfile`, and the tests that parse them as text.
 
 ## What sits outside this feature's module and is required by it
@@ -167,7 +166,7 @@ tests/golden/      the committed OpenAPI document, and the endpoint that serves 
 | `pyproject.toml` | exact pins for `fastapi`, `starlette`, `pydantic`; `starlette` added to the `api` extra; `httpx2` in the dev group, which is what Starlette 1.6's test client requires | FR-037, FR-050 |
 | `src/terezy/data/citation_policy.py` | the provenance gate's two directory lists, moved into the package so the gate and the API read one definition | FR-054 |
 | `.importlinter` | the `frameworks-only-in-the-http-module` contract | FR-002 |
-| `scripts/generate_openapi.py` | the regeneration command | FR-040 |
+| `scripts/generate_openapi.py` | the document, written to a path or to standard output | FR-040 |
 | repository root | `docker-compose.yml`, `Dockerfile` | FR-032 to FR-035 |
 | `specs/features.toml` | `status = "in-progress"`, then the landing commit's `done` | `specs/README.md` |
 | `docs/REQUIRED_TESTS.md` | test paths recorded on the rows this feature reinforces; **no box flipped** | FR-051 |

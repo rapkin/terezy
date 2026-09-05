@@ -7,8 +7,8 @@ nothing and owns no type for a response body (FR-005). What follows is therefore
 **what arrives and how it is rendered**, and every type below is one of three things, marked in
 the *Origin* column:
 
-- **generated** — comes from `web/src/api/schema.d.ts`, produced from `src/terezy/api/http/openapi.json`
-  and committed (FR-003). Never hand-written, never cast over.
+- **generated** — comes from `web/src/api/schema.d.ts`, produced at build time by 020's
+  `scripts/generate_openapi.py` and gitignored (FR-003). Never hand-written, never cast over.
 - **narrowed** — a generated type reached through a runtime guard in `lib/provenance.ts`. A guard
   *tests* and narrows; a cast *asserts*. FR-005 forbids the second and permits the first, and the
   two compile to the same thing, which is why the distinction is written down.

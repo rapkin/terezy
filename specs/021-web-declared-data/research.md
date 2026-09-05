@@ -238,7 +238,7 @@ covers a hole the others leave.
    rather than defaulted. **Risk R1**: the rule's exact name and the option that forbids
    `default` (rather than accepting it as coverage) must be read off the installed version's
    documentation at implementation time, not assumed.
-3. **SC-003's demonstration**: a test that adds a member to a **copy** of the OpenAPI document,
+3. **SC-003's demonstration**: a test that adds a member to a **copy** of the generator's output,
    regenerates types into a scratch directory, and asserts `tsc` fails. This is what proves 1 and
    2 are actually wired, and it is the only one of the three that cannot pass vacuously.
 
@@ -254,10 +254,9 @@ one, and the refusal's own tag and verbatim fields where there is not. FR-008 fo
 ## D5 — What the generated client actually generates, and the two things to check
 
 **`openapi-typescript`** reads an OpenAPI document and emits a `.d.ts` of `paths`, `components`
-and `operations`. It reads a **local file path**, which is what makes FR-003 a checked-in
-artefact-to-artefact transform with no server running — the generation input is
-`src/terezy/api/http/openapi.json` (020 FR-038), resolved by package path so it works the same
-from a source checkout and from a built wheel (020 FR-038's own argument for that location).
+and `operations`. It reads standard input or a local path, never a URL, which is what makes FR-003
+a build step with no server running — the generation input is what
+`uv run python scripts/generate_openapi.py` writes (020 FR-040, owner decision 2026-09-05).
 
 **`openapi-fetch`** is a thin typed wrapper over `fetch`: a client is created with a `baseUrl`
 and the generated `paths` as its type parameter, and `client.GET("/instruments", {...})` types

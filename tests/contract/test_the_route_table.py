@@ -8,19 +8,25 @@ would put `/scenarios/inflation` beside `/scenarios/{id}` and a scenario declare
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import pytest
 
 from terezy.api.http import categories, document, service
 from tests.data_roots import SHIPPED
+from tests.http_client import served
 
 DATA_ROOT = SHIPPED
 
 
 def _published() -> dict[str, dict[str, Any]]:
-    """The route table as the document publishes it, which is what a client is generated from."""
-    paths: dict[str, dict[str, Any]] = service.create_app(DATA_ROOT, client=None).openapi()["paths"]
+    """The route table as the *served* document publishes it, which is what a client is generated
+    from -- read off the endpoint rather than off `app.openapi()`, because the document is no
+    longer a file anyone can compare against and the endpoint is the only thing a client sees."""
+    body = served(DATA_ROOT).get(f"{document.PREFIX}/openapi.json")
+    assert body.status_code == 200
+    paths: dict[str, dict[str, Any]] = json.loads(body.text)["paths"]
     return paths
 
 

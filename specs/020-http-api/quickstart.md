@@ -9,15 +9,15 @@ uv run pytest tests/contract -q -k http           # the boundary claims
 uv run lint-imports                               # includes frameworks-only-in-the-http-module
 ```
 
-## Regenerate the OpenAPI document
+## Write out the OpenAPI document
+
+The document is generated, never stored (owner decision 2026-09-05). The endpoint renders it, and
+this writes the same bytes for a build that generates a client from them.
 
 ```bash
-uv run python scripts/generate_openapi.py
-git diff src/terezy/api/http/openapi.json          # read the diff; that is the point of the gate
+uv run python scripts/generate_openapi.py            # to standard output
+uv run python scripts/generate_openapi.py --out /tmp/openapi.json
 ```
-
-A red byte-gate means the schema moved. The response is to run the script and read the diff, never
-to edit the JSON.
 
 ## Serve it locally
 

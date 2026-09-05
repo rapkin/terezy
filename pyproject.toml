@@ -11,8 +11,9 @@ dependencies = [
     "numpy>=2.1",
     "pandas>=2.2",
     "scipy>=1.14",
-    # Pinned exactly: the gated OpenAPI document's bytes are a function of the JSON Schema
-    # this emits, so an unpinned minor is a red byte-gate with no source change (020 FR-037).
+    # Pinned exactly: the OpenAPI document a second codebase is generated from is a function of
+    # the JSON Schema this emits, so an unpinned minor moves the wire contract with no source
+    # change and no diff to read (020 FR-037).
     "pydantic==2.13.4",
 ]
 
@@ -23,9 +24,9 @@ terezy = "terezy.cli.main:main"
 
 [project.optional-dependencies]
 api = [
-    # All three pinned exactly, for one reason: `src/terezy/api/http/openapi.json` is a gated
-    # artefact and its bytes come from all of them -- Starlette owns the paths, FastAPI assembles
-    # the document, Pydantic emits every schema inside it. `fastapi` declares `starlette>=0.46.0`
+    # All three pinned exactly, for one reason: the OpenAPI document's bytes come from all of
+    # them -- Starlette owns the paths, FastAPI assembles the document, Pydantic emits every
+    # schema inside it. `fastapi` declares `starlette>=0.46.0`
     # with no upper bound, so a resolver may legitimately cross a major version (020 FR-037).
     "fastapi==0.141.1",
     "starlette==1.6.0",

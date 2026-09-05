@@ -1,0 +1,38 @@
+# Owner decision of 2026-09-05: where the OpenAPI document lives.
+#
+# Volunteered rather than asked, and it supersedes requirements already written and
+# implemented in feature 020, which is why it is recorded here and marked in place in
+# specs/020-http-api/spec.md rather than folded silently into the text.
+#
+# Relayed in English. The reasoning under `notes` is the owner's; the wording is not.
+exported_on = "2026-09-05"
+
+[[decision]]
+n        = 1
+feature  = "020-http-api"
+title    = "The OpenAPI document is generated on the fly, not checked in"
+question = "Should the OpenAPI document be a file in the repository, gated byte for byte?"
+options  = [
+    "A checked-in artefact at src/terezy/api/http/openapi.json, regenerated under a gate that fails on any difference",
+    "Generated on the fly: rendered by /api/openapi.json at serve time and by scripts/generate_openapi.py at build time",
+]
+choice   = "Generated on the fly"
+reason   = "a generated artefact in the repository is a second copy of the types"
+notes    = """
+The gate was built to stop the document drifting from the response types. A file that is
+regenerated from those types and compared against them cannot drift, but it also cannot say
+anything they do not already say -- and the copy is what has to be kept in step, in every
+commit, by everyone.
+
+What the decision does not touch: byte-reproducibility. It is now the whole of what makes a
+regenerated client readable, since there is no committed file whose diff names the change.
+020 FR-039 stands unchanged and is gated over the served document. FR-041 stands and is
+UNGATED -- the file's diff was the only thing that ever told anyone a bump was due, and
+`openapi-wire-change-is-unannounced` in specs/features.toml records the gap.
+
+This also supersedes the last paragraph of decision 2 in
+specs/decisions/2026-09-03-web-stack.toml. Feature 021 generates its TypeScript types at build
+time from the generator's output rather than from a committed file. There is no type-sync gate
+on a committed artefact to replace: the build fails if generation fails, and `tsc` fails if the
+client names a shape the document does not carry.
+"""

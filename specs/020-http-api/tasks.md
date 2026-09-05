@@ -132,9 +132,9 @@ bytes.
 **Independent test**: regenerate and compare bytes; then move one field on one response record and
 watch it go red.
 
-- [x] T048 [P] [US3] Write `tests/golden/test_the_openapi_document.py`: regenerating produces bytes identical to `src/terezy/api/http/openapi.json`; the body served at `/openapi.json` is byte-identical to the file; `info.version` is a literal and no path behind the document reads distribution metadata (FR-038, FR-038a, FR-039, FR-041, SC-007, SC-007a, SC-007c).
+- [x] T048 [P] [US3] Write `tests/golden/test_the_openapi_document.py`: regenerating produces bytes identical to `src/terezy/api/http/openapi.json`; the body served at `/openapi.json` is byte-identical to the file; `info.version` is a literal and no path behind the document reads distribution metadata (FR-038, FR-038a, FR-039, FR-041, SC-007, SC-007a, SC-007c). *Owner decision 2026-09-05 moved this to `tests/contract/test_the_openapi_document.py` and the file gate to a generator-against-endpoint one.*
 - [x] T049 [US3] Implement `src/terezy/api/http/document.py` — the version literal, the canonical dump, and the route serving the committed file verbatim.
-- [x] T050 [US3] Write `scripts/generate_openapi.py` and generate `src/terezy/api/http/openapi.json` (FR-040, SC-007b).
+- [x] T050 [US3] Write `scripts/generate_openapi.py` and generate `src/terezy/api/http/openapi.json` (FR-040, SC-007b). *Owner decision 2026-09-05: the script writes to a path the caller names, or to standard output, and the artefact is not stored.*
 - [x] T051 [US3] Mutation check, recorded in the report rather than in prose: add a field to one response record, confirm T048 fails naming the path that moved, revert.
 
 **Checkpoint**: commit.
@@ -158,7 +158,7 @@ watch it go red.
 - [x] T057 Confirm `docs/METHODOLOGY.md` gains nothing, as a check rather than an assumption (SC-025).
 - [ ] T058 Run `uv run python scripts/check_prose_budget.py` and `scripts/check_enumerations.py`; then `/condense` over the branch diff.
 - [ ] T059 `/code-review` at high effort with the explicit target `main...feat/020-http-api`, run inside this worktree; fix findings and repeat until clean.
-- [ ] T060 Mutation checks recorded: the loopback guard made to accept a public bind fails a test; the OpenAPI golden fails on a changed response model (both reverted).
+- [ ] T060 Mutation checks recorded: the loopback guard made to accept a public bind fails a test; a renamed response-model field fails the union and tag tests over the served document (both reverted).
 
 ---
 

@@ -64,10 +64,10 @@ pnpm -C web test                       # Vitest + RTL over MSW handlers typed fr
 pnpm -C web build                      # and then:
 node web/tools/check-bundle-urls.mjs web/dist    # FR-036 — every absolute URL against the allowlist
 
-# type sync — FR-003, SC-013. `gen-types` is 021's own web script (T043); it reads the
-# committed src/terezy/api/http/openapi.json, which 020's own regeneration script under
-# scripts/ (its FR-040) is what rewrites when the Python response types move.
-pnpm -C web gen-types && git diff --exit-code web/src/api/schema.d.ts
+# types generate — FR-003, SC-013. `gen:types` is 021's own web script (T043); it runs 020's
+# scripts/generate_openapi.py (its FR-040) and pipes the document into openapi-typescript. The
+# output is gitignored, so what proves the types are current is that tsc passes over them.
+pnpm -C web gen:types && pnpm -C web exec tsc --noEmit
 
 # end-to-end — FR-045 to FR-048, plus the a11y pass and the category-id scan inside it
 pnpm -C web exec playwright test

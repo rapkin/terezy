@@ -8,8 +8,8 @@ and lands by `--no-ff`, and **may not start until `020-http-api` is `done` on `m
 
 ## Summary
 
-A read-only TypeScript client at `web/`, generated from feature 020's checked-in OpenAPI document
-and reading nothing else, that browses what `data/` declares: a category overview, a record card
+A read-only TypeScript client at `web/`, its types generated at build time from feature 020's
+OpenAPI document generator and reading nothing else, that browses what `data/` declares: a category overview, a record card
 carrying every field with its citation and its mark, and the two declared series as charts with
 their tables. It computes nothing.
 
@@ -126,7 +126,7 @@ web/
 ├── src/
 │   ├── main.tsx
 │   ├── api/
-│   │   ├── schema.d.ts                    GENERATED from src/terezy/api/http/openapi.json, COMMITTED (FR-003)
+│   │   ├── schema.d.ts                    GENERATED at build time by `pnpm gen:types`, GITIGNORED (FR-003)
 │   │   ├── client.ts                      openapi-fetch; same origin always, base path unsettled (D3a)
 │   │   └── queries.ts                     TanStack Query options; one place a request is described
 │   ├── search/params.ts                   as_of (global) and the series window: validators (FR-020, FR-027)
@@ -170,12 +170,12 @@ built.
 | Lint | `pnpm -C web lint`. Carries R1's exhaustiveness rule and FR-021a's clock rule. |
 | Unit | `pnpm -C web test` (Vitest, jsdom, MSW). |
 | End-to-end | `uv sync` + Node setup; starts `uvicorn` on `127.0.0.1` through 020's own entry point (its FR-026b), then `pnpm -C web exec playwright test`. Carries the a11y pass and the category-id scan **inside it** (spec's table). |
-| Type sync | Regenerate `web/src/api/schema.d.ts` from `src/terezy/api/http/openapi.json`; `git diff --exit-code` on it. |
+| Types generate | `pnpm -C web gen:types` (020's `scripts/generate_openapi.py` piped into `openapi-typescript`), then `tsc --noEmit` over the result. Red if generation fails, and red where the client names a shape the document no longer carries. |
 | Bundle URLs | `pnpm -C web build`, then `node web/tools/check-bundle-urls.mjs web/dist`. Its second input — the assets extracted from the image — is produced by the smoke job ([research D9](./research.md)). |
 | Compose smoke | Static parse of `docker-compose.yml` across **every service and every profile** for a published port not naming `127.0.0.1`; then build, `up`, and assert one container, one origin, no Node toolchain, and the extracted-asset URL check. |
 
 **All seven are unconditional**, not filtered on a `web/` path. The spec gives the reason and it is
-the whole point of the type-sync job: it exists to turn red when a **Python** change moves the
+the whole point of the types-generate job: it exists to turn red when a **Python** change moves the
 OpenAPI document, and a path filter would disable it on the only change it was built for.
 
 ## Ordering, and why it is shaped by the block
@@ -183,8 +183,9 @@ OpenAPI document, and a path filter would disable it on the only change it was b
 Implementation cannot start before 020 is `done`, so the order minimises what waits on it.
 
 **API-independent** — everything below can be written, run and reviewed against fixtures, with no
-OpenAPI document and no server: the scaffold and the toolchain; four of the seven CI jobs (type
-sync waits for something to compare, and the two that need a browser or an image wait too); `assertNever` and the lint that protects it; the router with
+OpenAPI document and no server: the scaffold and the toolchain; four of the seven CI jobs (types
+generate waits for a client API layer to typecheck, and the two that need a browser or an image wait
+too); `assertNever` and the lint that protects it; the router with
 its typed `as_of` and window validators, the redirect and the one clock read; every figure, record,
 category and series component; the chart properties no route can reach (FR-031, FR-031a); the
 bundle-URL check; the a11y harness. These are written against **hand-written fixtures shaped like

@@ -39,7 +39,7 @@ Radix and class-composition rows above, and nothing named `shadcn`.
 | `typescript` | the typechecker FR-004 and FR-005 are enforced by | no |
 | `vite`, `@vitejs/plugin-react` | dev server (proxying `/api` — never a third party) and build | no |
 | Tailwind CSS and its Vite plugin | CSS generated at **build** time; the CDN script build is not used ([research D10](../research.md), risk R6 on the config shape) | no |
-| `openapi-typescript` | reads the OpenAPI document **from the local filesystem**, not from a URL, and emits `schema.d.ts` | no |
+| `openapi-typescript` | reads the OpenAPI document from standard input or a local path, never from a URL, and emits `schema.d.ts` | no |
 | `vitest`, `@testing-library/react`, `jsdom` | the unit suite | no |
 | `msw` | intercepts in-process for Node tests; where the browser worker is used its file is **generated into the repository** rather than fetched | no |
 | `@playwright/test` | install downloads browser binaries — the one entry with real install-time egress, cached and outside the test run. The tests run with no network reachable (FR-045) | no |
