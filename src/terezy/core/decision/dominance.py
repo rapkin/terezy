@@ -540,6 +540,12 @@ def _report(
 
     Every sequence is in 014 FR-016's candidate order and in **no** objective's order (FR-025):
     an order by an objective is the ranking this feature exists to refuse to present.
+
+    **FR-008's identity is asserted from outside rather than here.** The three populations are
+    built by subtraction from one another, so a check written at this site would compare the
+    construction with itself and pass whatever the pass did;
+    ``tests/unit/test_dominance_populations.py`` compares them with ``section_evaluated``, which
+    is an independent reading of what the section reports.
     """
     directions = tuple(objective.direction for objective in objectives.objectives)
     criteria = tuple(objective.criterion for objective in objectives.objectives)
@@ -584,7 +590,6 @@ def _report(
     non_dominated = tuple(
         item.key for item in population if item.key not in beaten and item.key not in unplaced
     )
-    _check_the_populations_partition(population, non_dominated, dominated, not_placed)
     return DominanceResult(
         objectives=objectives,
         resolved_bands=widths.reported,
@@ -701,28 +706,6 @@ def _marked(
         provenance=prov.merge(left_prov, right_prov),
         staleness=staleness.merge(left_stale, right_stale),
     )
-
-
-def _check_the_populations_partition(
-    population: Sequence[TupleOutcome],
-    non_dominated: Sequence[Tuple],
-    dominated: Sequence[Dominated],
-    not_placed: Sequence[NotPlaced],
-) -> None:
-    """FR-008's identity, asserted rather than claimed in prose (014 FR-009's rule).
-
-    ``evaluated = non_dominated + dominated + not placed``, and no candidate in two of them. It
-    raises rather than returning a verdict because a population that does not partition is a
-    broken pass rather than a fact about the money.
-    """
-    counted = len(non_dominated) + len(dominated) + len(not_placed)
-    placed = {*non_dominated} | {item.key for item in dominated} | {item.key for item in not_placed}
-    if counted != len(population) or len(placed) != len(population):
-        raise AssertionError(
-            f"{len(population)} evaluated candidate(s) sorted into {counted} place(s) across "
-            f"{len(placed)} distinct key(s); the three populations must be disjoint and cover "
-            "the evaluated set exactly"
-        )
 
 
 def _separating(

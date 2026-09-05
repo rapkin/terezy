@@ -61,7 +61,18 @@ def inputs_of(
     question naming ``normalized`` with horizons starting 2026-09-01 was answered over
     ``wartime``'s eight routes, two corridors short, under the label ``normalized``.
     """
-    objectives = declarations.objective_sets[objective_set_id]
+    declared = declarations.objective_sets
+    if objective_set_id not in declared:
+        raise DeclarationError(
+            declarations.candidates.candidates_file.parent.parent / resolver.OBJECTIVES_DIR,
+            "",
+            f"declares no objective set {objective_set_id!r}, which a question is answered "
+            f"under. Declared sets: {sorted(declared)}. There is no default: a run under "
+            "criteria nobody declared would take its dominance verdicts over a set the file "
+            "does not name (019 FR-001a).",
+            f"name one of {sorted(declared)}, or declare the set you meant",
+        )
+    objectives = declared[objective_set_id]
     coverage = declarations.candidates.composition.coverage
     routes = coverage.ramp.routes
     if not coverage.regimes:

@@ -258,10 +258,7 @@ def _is_readable(value: object) -> bool:
 def _readable(value: object) -> str:
     """One such field, in the words its own type carries."""
     if isinstance(value, Tuple):
-        return (
-            f"{value.instrument_id} from {value.stream_id} "
-            f"via {candidate_id(value.route_in)} out {_exit_choice(value.route_out)}"
-        )
+        return _candidate(value)
     if isinstance(value, AbsoluteBand | FractionOfTheQuestionAmount | DaysBand):
         return _band_words(value)
     if isinstance(value, tuple):
@@ -343,29 +340,33 @@ def _dominance_lines(section: HorizonSection) -> list[str]:
         f"placed, {len(result.incomparable)} incomparable pair(s)",
         *(f"    {line}" for line in _objective_lines(result)),
     ]
-    lines.extend(f"    NON-DOMINATED {key.instrument_id}" for key in result.non_dominated)
-    lines.extend(
-        f"    DOMINATED {item.key.instrument_id} by {len(item.dominated_by)}, each at least as "
-        f"good on every objective above and strictly better on: {_dominators(item)}"
-        for item in result.dominated
-    )
-    lines.extend(
-        f"    NOT PLACED {item.key.instrument_id}: every one of its "
-        f"{len(item.every_pair)} pair(s) is incomparable, each listed below"
-        for item in result.not_placed
-    )
-    lines.extend(
-        f"    INCOMPARABLE {pair.left.instrument_id} and {pair.right.instrument_id} on "
-        f"{pair.criterion.value}: {_why_incomparable(pair)}"
-        for pair in result.incomparable
-    )
-    lines.extend(
-        f"    INDISTINGUISHABLE {item.key.instrument_id} from "
-        f"{', '.join(key.instrument_id for key in item.neighbours)} -- a relation between "
-        "pairs, not a group: closeness within a band does not chain"
-        for item in result.indistinguishable
-    )
+    lines.extend(f"    NON-DOMINATED {_candidate(key)}" for key in result.non_dominated)
+    for beaten in result.dominated:
+        lines.append(f"    DOMINATED {_candidate(beaten.key)}")
+        lines.extend(f"      {line}" for line in _dominators(beaten))
+    for unplaced in result.not_placed:
+        lines.append(f"    NOT PLACED {_candidate(unplaced.key)}")
+        lines.append(
+            f"      every one of its {len(unplaced.every_pair)} pair(s) is incomparable, "
+            "each listed below"
+        )
+    for pair in result.incomparable:
+        lines.append(f"    INCOMPARABLE on {pair.criterion.value}: {_why_incomparable(pair)}")
+        lines.append(f"      {_candidate(pair.left)}")
+        lines.append(f"      {_candidate(pair.right)}")
+    for close in result.indistinguishable:
+        lines.append(f"    INDISTINGUISHABLE {_candidate(close.key)}")
+        lines.extend(f"      from {_candidate(key)}" for key in close.neighbours)
+    if result.indistinguishable:
+        lines.append(
+            "      -- a relation between pairs and never a group: closeness within a band "
+            "does not chain, so no partition of them exists"
+        )
     lines.append(f"    {_hurdle_line(result.benchmark_standing)}")
+    if isinstance(result.benchmark_standing, HurdleIsDominated):
+        lines.extend(
+            f"      by {_candidate(verdict.dominates)}" for verdict in result.benchmark_standing.by
+        )
     if result.non_dominated:
         # An empty set has no members to be separated by anything, and the record's
         # *they rest on the same stated assumptions* is a claim about a population that is not
@@ -410,19 +411,22 @@ def _band_words(band: Band) -> str:
             assert_never(band)
 
 
-def _dominators(item: Dominated) -> str:
+def _dominators(item: Dominated) -> list[str]:
     """Every candidate that dominates this one, with the objectives each was strictly better on.
 
     The **weak** half is not printed per dominator, and its absence is deliberate: by FR-007's
     definition it holds on every declared objective, so printing it beside each of twenty
     dominators is one sentence repeated twenty times. It is on the verdict record, where a
     reader of one verdict finds it without the rule in hand.
+
+    One dominator per line, because a candidate is five terms and a run of them on one line is
+    a row nobody can read to its end.
     """
-    return "; ".join(
-        f"{verdict.dominates.instrument_id} on "
+    return [
+        f"by {_candidate(verdict.dominates)}, strictly better on "
         + ", ".join(criterion.value for criterion in verdict.strictly_better_on)
         for verdict in item.dominated_by
-    )
+    ]
 
 
 def _why_incomparable(pair: IncomparablePair) -> str:
@@ -447,10 +451,12 @@ def _hurdle_line(standing: BenchmarkStanding) -> str:
     """
     match standing:
         case NothingDominatesTheHurdle():
-            return f"NOTHING DOMINATES THE HURDLE {standing.key.instrument_id}"
+            return f"NOTHING DOMINATES THE HURDLE {_candidate(standing.key)}"
         case HurdleIsDominated():
-            named = ", ".join(sorted({item.dominates.instrument_id for item in standing.by}))
-            return f"THE HURDLE {standing.key.instrument_id} IS DOMINATED by {named}"
+            return (
+                f"THE HURDLE IS DOMINATED, by {len(standing.by)} of them: "
+                f"{_candidate(standing.key)}"
+            )
         case _:  # pragma: no cover -- mypy proves this unreachable
             assert_never(standing)
 
@@ -468,9 +474,9 @@ def _separating_lines(
     lines = ["what the members do not share (which of them decides is NOT tested):"]
     for member in separating.per_member:
         carried = [*member.rests_on, *(item.what.value for item in member.excludes)]
-        lines.append(
-            f"  {member.key.instrument_id}: "
-            + ("; ".join(carried) if carried else "nothing the others do not also carry")
+        lines.append(f"  {_candidate(member.key)}")
+        lines.extend(
+            f"    {claim}" for claim in (carried or ["nothing the others do not also carry"])
         )
     return lines
 
@@ -523,7 +529,10 @@ def _ranking_lines(section: HorizonSection) -> list[str]:
     ties = section_ties(section)
     if compared is not None:
         lines.append(_beats_line(compared, ranked, section_beats_benchmark(section), ties))
-    lines.extend(_tie_lines(ties))
+        # Inside the guard, not beside it: the tie groups are read off the very ranking the
+        # branch above refuses to show when there is no hurdle to rank against, and printing
+        # them there would put the ordering back in front of a reader one line later.
+        lines.extend(_tie_lines(ties))
     for outcome in ranked:
         lines.extend(_figure_lines(outcome, hurdle=outcome.key == hurdle))
     for outcome in scored:
@@ -606,11 +615,11 @@ def _tie_lines(ties: Sequence[Sequence[Tuple]]) -> list[str]:
     printed without its tie groups is the machinery that keeps the head of a tied group from
     reading as a winner, computed and withheld from the only person who reads it.
     """
-    return [
-        "  TIED within the project tolerance, in no order: "
-        + ", ".join(key.instrument_id for key in group)
-        for group in ties
-    ]
+    lines = []
+    for group in ties:
+        lines.append("  TIED within the project tolerance, in no order:")
+        lines.extend(f"    {_candidate(key)}" for key in group)
+    return lines
 
 
 def _span_caveat(
@@ -656,6 +665,23 @@ def _span_caveat(
     )
 
 
+def _candidate(key: Tuple) -> str:
+    """One candidate, by **all five** of 010's declared terms.
+
+    That is what makes two rows different rows, and an id alone renders them identically: one
+    instrument bought over two ways in, funded from two streams, or run to maturity against sold
+    at the window's end is two options. A question may also state several plans for one
+    instrument -- the shipped one states two that differ in their exit date -- so the plan's own
+    choices are printed rather than the name of its record.
+    """
+    return (
+        f"{key.instrument_id} from {key.stream_id} "
+        f"via {candidate_id(key.route_in)} "
+        f"out {_exit_choice(key.route_out)} "
+        f"run as {_plan_terms(key.exit_terms)}"
+    )
+
+
 def _figure_lines(outcome: TupleOutcome, *, hurdle: bool = False) -> list[str]:
     """One candidate's figures, with the currency, the rate and the terms that identify it.
 
@@ -676,11 +702,7 @@ def _figure_lines(outcome: TupleOutcome, *, hurdle: bool = False) -> list[str]:
     """
     rate = outcome.implied_rate
     return [
-        f"    {'[BENCHMARK] ' if hurdle else ''}{outcome.key.instrument_id} "
-        f"from {outcome.key.stream_id} "
-        f"via {candidate_id(outcome.key.route_in)} "
-        f"out {_exit_choice(outcome.key.route_out)} "
-        f"run as {_plan_terms(outcome.key.exit_terms)}",
+        f"    {'[BENCHMARK] ' if hurdle else ''}{_candidate(outcome.key)}",
         f"      reaches {outcome.reaches.amount} {outcome.reaches.currency.value}"
         + (
             f"; rate {rate.value}" if isinstance(rate, NominalRate) else f"; NO RATE: {rate.reason}"

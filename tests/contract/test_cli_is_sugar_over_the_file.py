@@ -856,7 +856,8 @@ def test_each_dominated_candidates_dominator_is_named() -> None:
 
 def test_the_benchmarks_standing_and_the_objectives_behind_it_are_rendered() -> None:
     output = "\n".join(_run()[0])
-    assert f"THE HURDLE {fixtures.BENCHMARK} IS DOMINATED by" in output
+    assert "THE HURDLE IS DOMINATED" in output
+    assert f"{fixtures.BENCHMARK} from salary_uah" in output
     assert "objective money_at_the_endpoint more_is_better, band 0.0001" in output
     assert "objective all_money_back_on less_is_better, band 7 day(s)" in output
 
@@ -866,8 +867,10 @@ def test_each_candidates_indistinguishable_neighbours_are_named() -> None:
     close = _answered().sections[0].dominance.indistinguishable  # type: ignore[union-attr]
     assert close, "nothing is indistinguishable here, so this asserts nothing"
     for item in close:
-        assert f"INDISTINGUISHABLE {item.key.instrument_id} from" in output
-    assert "not a group" in output, "a relation rendered as a partition"
+        assert f"INDISTINGUISHABLE {item.key.instrument_id} from salary_uah" in output
+        for neighbour in item.neighbours:
+            assert f"      from {neighbour.instrument_id} from salary_uah" in output
+    assert "never a group" in output, "a relation rendered as a partition"
 
 
 def test_a_tie_group_is_rendered_by_candidate() -> None:
@@ -885,10 +888,11 @@ def test_a_tie_group_is_rendered_by_candidate() -> None:
     ]
     planted = _with_ties(section, (tuple(shown[:2]),))
     lines = cli._tie_lines(section_ties(planted))
-    assert len(lines) == 1
+    assert lines[0].strip() == "TIED within the project tolerance, in no order:"
+    named = "\n".join(lines[1:])
+    assert len(lines) == 3
     for index in shown[:2]:
-        assert comparison.ranked[index].key.instrument_id in lines[0]
-    assert "TIED within the project tolerance" in lines[0]
+        assert cli._candidate(comparison.ranked[index].key) in named
 
 
 def test_an_incomparable_pair_and_a_not_placed_candidate_render_differently() -> None:
