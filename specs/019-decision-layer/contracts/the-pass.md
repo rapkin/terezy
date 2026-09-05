@@ -8,6 +8,7 @@
 ```python
 # terezy.core.decision.dominance
 
+
 def dominance(
     outcome: SectionOutcome,
     *,
@@ -63,6 +64,7 @@ once.
 
 ```python
 # terezy.core.primitives.tolerance
+
 
 def slack(left: float, right: float, *, tolerance: float = TOLERANCE) -> float: ...
 ```
