@@ -13,9 +13,8 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain — **four are open** (CL-1 to CL-4) and the status
-      is `drafted`. CL-1 and CL-2 decide what the output *is*, so planning may not start on
-      either; CL-3 is a standing position; CL-4 is one word in the owner's own question file.
+- [x] No [NEEDS CLARIFICATION] markers remain — all four were answered 2026-09-03 and are
+      recorded in `specs/decisions/2026-09-03-clarify-019.toml`; the status is `spec`.
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic
@@ -35,8 +34,11 @@
 
 - [x] No legal, tax or fee value originates here — comparing two computed figures needs none
 - [x] Every measurement is dated and reproducible by loading `data/` and answering the declared
-      question **in the two states *The measurement* names** — the tree as it stands, and the tree
-      after the owner's 2026-09-02 decision — and is stated **once**, in *The measurement*
+      question **in the states *The measurement* names** — the tree as it stands, the tree after
+      the owner's 2026-09-02 decision, and, for the tie-swap alone, that tree under a second
+      benchmark — and is stated **once**, in *The measurement*. The Pareto counts are the one
+      thing the engine cannot produce, and *The measurement* says so and names the reading of
+      FR-007 the hand-written pass implements
 - [x] Counts belonging to other features (instruments, streams, routes, pairs, candidates) are
       **cited** to 014 and 015 rather than copied
 - [x] Never a number more confident than its inputs: the indifference band is a requirement
@@ -52,9 +54,12 @@
 
 ## Notes
 
-- The spec is **drafted**, not ready for planning: `spec.md` exists and four
-  `[NEEDS CLARIFICATION]` markers are open, so planning may not start — guessing the answer is
-  what the marker exists to prevent. That word is `specs/features.toml`'s, and **this feature has
-  no row in that file yet**: the `[[feature]]` entry is proposed with the spec and added by the
-  change that lands it, so nothing here should be read as a claim about what the graph currently
-  says.
+- The spec is **`spec`** in `specs/features.toml` — clarified and ready to plan. It was
+  `drafted` from 2026-09-02 until the owner answered CL-1 to CL-4 on 2026-09-03; the answers,
+  the options and his own words are in `specs/decisions/2026-09-03-clarify-019.toml` and are
+  not restated here or in the spec's option tables, which the answers replaced.
+- **The measurements the answers touched were re-read** rather than left standing, and its *The
+  measurement* preamble names which, how, and the two readings that step outside the two states
+  it otherwise works in — a **third state**, that tree under a second declared benchmark, for the
+  tie-swap alone, and a hand-written Pareto pass for every non-dominated count, because the engine
+  has none.

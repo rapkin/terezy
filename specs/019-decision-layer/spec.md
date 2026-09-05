@@ -6,7 +6,8 @@
 
 **Created**: 2026-09-02
 
-**Status**: Drafted — four clarifications open (*Clarifications*). Planning may not start.
+**Status**: Ready for planning — all four clarifications answered 2026-09-03 and encoded
+(*Clarifications*; `specs/decisions/2026-09-03-clarify-019.toml`).
 
 **Input**: The owner's question is about to produce a ranked list of 24 real ОВДП issues at
 each of three horizons, ordered by one rate. A ranked list is not the honest output. This is
@@ -59,28 +60,61 @@ declared question `fifty-thousand-hryvnia` at `as_of` 2026-09-02, through
 `terezy.api.answer.answer_question` and `terezy.core.decision.answer.section_evaluated`. It is
 reproducible from the repository and from nothing else. Each item was read in **both** states —
 the tree as it stands today, and the tree after the owner's decision, reproduced by deleting the
-four fixture declarations with their access entries and naming a declared issue as the benchmark
-— and where the two differ the item says so. The registry's own counts — instruments,
-streams, routes, pairs, candidates — are 014's and 015's measurements and are **cited rather
-than copied**.
+four fixture declarations with their access entries and the seed lots that name them, and naming
+`UA4000231195` as the benchmark — and where the two differ the item says so. The registry's own
+counts — instruments, streams, routes, pairs, candidates — are 014's and 015's measurements and
+are **cited rather than copied**.
+
+**Items 2, 2a and 6 were re-read on 2026-09-03**, by the same route over the same reproduced
+tree, once the owner's answers made the first reading rest on choices that were not his: items 2
+and 2a now name the benchmark he chose (CL-4) rather than the one they were first measured under,
+and item 6 reports its first row at the bands he declared (CL-2) as well as at none. No figure
+below is carried over from a state an answer changed.
+
+**Two of those readings step outside the two states above, and say so here rather than nowhere.**
+Item 2's tie-swap is a **third** state — the same tree with `UA4000239016` named instead — because
+a claim about what naming an issue moves cannot be measured from one naming. And every Pareto
+count in item 6, at a band or at none, comes from a **hand-written pass over `section_evaluated`**
+and not from the engine: nothing in `src/` computes a non-dominated set, which is the whole of
+why this feature exists. That pass implements FR-007 — the band in the **strict** half only, the
+project comparison in the weak one. Measured 2026-09-03, **the definition FR-007 rejects produces
+every count in item 6 unchanged**, at a band and at none, so the table cannot be read as evidence
+for FR-007's choice: what separates the two definitions is FR-007's own 400 000-draw battery, and
+a registry of 24 candidates two objectives apart is exactly the case that battery found they
+agree on.
 
 **1. What the fixtures' departure costs.** Of the four ОВДП fixtures carrying the `ovdp` label,
 exactly **one** — `ovdp_enumerated_a` — ever produces an evaluated outcome for this question,
 and only at the twelve-month horizon. So the evaluated population goes from **24, 24, 25** to
 **24, 24, 24** across the three horizons, and at one and three months it does not move at all.
 
-**2. What the benchmark's departure costs: nothing, and that is the point.** Answering the same
-question with a declared issue named as the benchmark turns each section's `BenchmarkUnavailable`
-into a `Comparison` over **the same outcomes**: every candidate's amount and rate is unchanged,
-and the order by rate is unchanged at all three horizons. Which issue is named decides
-`beats_benchmark` and nothing else — with `UA4000238281` named, **7, 15 and 9** entries of
-`Comparison.ranked` beat the hurdle at one, three and twelve months.
+**2. What the benchmark's departure costs: almost nothing, and the exception is worth naming.**
+Answering the same question with a declared issue named as the benchmark turns each section's
+`BenchmarkUnavailable` into a `Comparison` over **the same outcomes**: every candidate's amount
+and rate is unchanged. Which issue is named decides `beats_benchmark` and, for one issue in this
+registry, the order of two rows: `compare` prepends the benchmark and the rate sort is stable, so
+naming a candidate whose rate is **bitwise equal** to another's moves it ahead of that other.
+Bitwise, not tied: `tied_groups` groups by `is_close`, so most tie-group members would not move,
+and this pair happens to carry the identical float. Measured 2026-09-03: with
+`UA4000239016` named, it and `UA4000238281` exchange the 0-based **positions** 7 and 8 of `ranked`
+at one month and 15 and 16 at three, and nothing moves at twelve, where nothing ties. Those are
+indices, not the counts above them. The owner's
+`UA4000231195` is in no tie group (item 4), so for his choice no figure and no order moves. **That
+an arbitrary naming decides an order is a defect in 010's ranking rule, which this feature carries
+unchanged and therefore does not fix**; it is recorded as the
+`naming-the-benchmark-reorders-a-bitwise-tie` future entry, with the remedy that is not this
+feature's to make.
+
+With `UA4000231195` named (CL-4), **14, 19 and 24** entries of `Comparison.ranked` beat the
+hurdle at one, three and twelve months — the last of which is **every other entry of `ranked`**,
+`ranked` holding 25. Of the section's own candidates it is 23, which is item 2a's whole point and
+is not the same number.
 
 **2a. And one of those entries is a candidate the section refuses to report.** `beats_benchmark`
 and `ties` are **indices into `Comparison.ranked`**, and `ranked` is the population 014 handed to
 `compare` — which 015 FR-030 then narrows, withholding a candidate whose money arrives after the
 window. Measured: `inzhur_miltech` is inside `beats_benchmark` at **all three** horizons, so of
-the candidates the section actually reports only **6, 14 and 8** beat the hurdle. An index into a
+the candidates the section actually reports, **13, 18 and 23** beat the hurdle. An index into a
 sequence somebody else narrowed is the defect FR-029a exists to stop reaching a reader.
 
 **3. Ordering by the rate is not ordering by the money, at any of the three horizons.** The
@@ -119,7 +153,8 @@ machine-computed one can agree (Principle IV). **Nothing anywhere says two figur
 to distinguish**, so any real difference separates two candidates: the closest pair by what
 reaches the endpoint is **6.39 UAH** apart at one month on an outlay of 50 000, and the closest
 non-tied pair by rate is **0.003 percentage points** apart at twelve months. Both differences are
-smaller than anything these inputs support, and both would decide a dominance verdict. In the
+smaller than anything these inputs look able to support, and both would decide a dominance
+verdict — CL-2 is where that judgement stops being this document's and becomes the owner's. In the
 other direction, at three and twelve months `UA4000236624` and `UA4000237416` reach **exactly**
 the same amount and are separated only by the date the money is back — 2026-10-17 against
 2026-11-21.
@@ -130,11 +165,12 @@ matures inside it. The section carries **69** stated exclusions, three per early
 (015 FR-033), and **none** for that one. `TupleOutcome.accounts_for` and `TupleOutcome.excludes`
 are identical across all 24, so the asymmetry is visible only in the section's exclusion
 records — and the one candidate carrying no early-exit exclusion is a member of every
-illustrative non-dominated set computed below.
+non-dominated set computed below.
 
-**6. What a Pareto pass over the record would produce today**, computed from
-`section_evaluated` over the shipped registry as an illustration rather than as a shipped
-behaviour, on the two pairs a reader is most likely to propose:
+**6. What a Pareto pass over the record would produce today**, computed from `section_evaluated`
+over the shipped registry — a measurement of the record, not a shipped behaviour, because nothing
+in `src/` computes this yet — on two objective pairs, of which the **first** is the one the owner
+went on to declare (CL-1) and the second is the alternative a reader is most likely to propose:
 
 | Objectives | 1 month | 3 months | 12 months |
 |---|---|---|---|
@@ -147,7 +183,14 @@ produces, at twelve months, a **single dominating candidate** — and it is `UA4
 from item 3 that comes back with the least money. A one-member
 non-dominated set is a winner by another name, arrived at without a weight and without anyone
 choosing one. **Which objectives the pass runs over is therefore not a detail of the
-implementation; it is the decision.** CL-1.
+implementation; it is the decision** — and CL-1 takes the **first** row, so those three counts are
+the owner's own sets rather than an illustration.
+
+The table is computed at **no** indifference band. Re-run at the ones he declared — 5.00 UAH on
+the money, 7 days on the date (CL-2) — the first row is **unchanged at 2, 3 and 10**, member for
+member. His bands move nothing on this registry, which is the honest thing to know about them:
+they are the floor under a *later* registry whose candidates sit closer together, not a
+correction to this one.
 
 **7. Every figure in every one of these sections is marked.** The answer reports the count of
 unverified sources behind its figures — **137** on the tree as it stands, **129** once the four
@@ -180,89 +223,67 @@ Three traps, each measured above rather than supposed:
 
 ## Clarifications
 
-Four questions only the owner can settle. Each is stated with its options and the consequence
-of each, and with a recommendation. **Planning may not start until they are answered** — that is
-what the `drafted` status means.
+### Session 2026-09-03
 
-### CL-1 — Which objectives is the non-dominated set taken over?
+Four questions only the owner could settle, put to him one at a time. **Each option and his own
+words are recorded in `specs/decisions/2026-09-03-clarify-019.toml`** and are deliberately not
+restated here; what each answer costs the requirements is below.
 
-[NEEDS CLARIFICATION: which criteria the dominance pass compares on, and in which direction]
+### CL-1 — Which objectives is the non-dominated set taken over? → **the money and the date**
 
-The measurement's item 6 shows the answer changes the output completely, and item 3 shows why
-the obvious choice is the wrong one.
+**Answered**: the money that reaches a spendable endpoint (more is better) and the date all of it
+is back there (sooner is better). Not the rate as a third objective, and not the money alone.
 
-| Option | What the owner gets | What it costs |
-|---|---|---|
-| **A. Two: the money that reaches a spendable endpoint (more is better), and the date all of it is back there (sooner is better).** | A set of 2, 3 and 10 members at his three horizons. The money figure is comparable across every candidate in a section because they share the window; the date is liquidity, which he asked about. | The rate stops being a criterion of the set. It is still reported per candidate and still ranks the list. |
-| **B. Three: A plus the rate.** | The set always contains the rate's leader as well. | At twelve months that leader is the candidate returning the least money (item 3), so the set will always contain an option nobody would take. |
-| **C. One: the money alone.** | A single answer per horizon: dominance degenerates to a total order and there is no set. | Throws away the liquidity dimension he stated himself, and produces exactly the winner this feature exists not to produce. |
-| **D. A plus a confidence dimension** — how much of a candidate's figure rests on unverified or stale declarations. | Model risk enters the partial order rather than a footnote, which is 014's own argument about step count. | Needs an ordering over marks nobody has declared: is one unverified input worse than two stale ones? That is a new declaration and a new judgement. |
+It is the **first** row of the measurement's item 6. Two consequences carried below rather than
+left to be re-derived: the rate stays reported per candidate and stays the list's order while
+deciding no verdict of this pass (FR-013), and the confidence dimension he did not take stays one
+requirement away, because FR-022 puts the merged marks on every verdict.
 
-**Recommendation: A.** It is the only option in which every criterion is comparable across the
-candidates being compared and answers something the owner actually said. D is the right *next*
-move and should be a separate decision once there is an ordering over marks to declare.
+### CL-2 — How close is "too close to call"? → **0.01 % of the question's amount, and 7 days**
 
-### CL-2 — How close is "too close to call"?
+**Answered**, and the money half arrived in a shape the question did not offer: it asked for an
+absolute hryvnia figure and he answered **0.01 %**. `specs/decisions/2026-09-03-clarify-019.toml`
+keeps his percent wording; the **declaration stores a fraction** (FR-011d), and the fraction for
+0.01 % is **0.0001** — not 0.01, which would be a 500 UAH band and a hundred times what he said.
+On his 50 000 UAH it resolves to **5.00 UAH** — narrower
+than the 6.39 UAH closest pair of item 4a, so his own band leaves that pair separated, and
+measured, it leaves the whole of item 6's first row where it was. This document called that gap
+smaller than the inputs look able to support and his band says otherwise, which is exactly the
+judgement Principle I puts with him rather than with the tool.
 
-[NEEDS CLARIFICATION: how wide the indifference band is, per objective, or whether there is one at all]
+**A relative band is relative to the question's amount, never to a candidate's own figure**: a
+fraction of each candidate's figure is a different width for *A* against *B* than for *B* against
+*A*, and FR-011's relation would stop being symmetric. That, and the pass being where a fraction
+resolves, is the whole of what the shape costs (FR-011d). The absolute hryvnia figure the question
+offered him stays legal beside the fraction — the answer **widened** the declaration rather than
+replacing it. The day half has no relative form — a percentage of a date means nothing, which is
+the same argument that closed *should the band be one number* below.
 
-Principle I requires that where a range of answers scores within noise, the output is the range.
-The engine has exactly one notion of closeness and it is not this one: the project tolerance is
-the width of float64 rounding, not a statement about how much precision the inputs support. So
-nothing says a 6.39 UAH difference on an outlay of 50 000 is too small to matter (item 4a) — on
-figures that rest on a seller's quotation nobody can verify.
+### CL-3 — Borrow a portfolio-optimisation library, or not? → **not now**
 
-| Option | What the owner gets | What it costs |
-|---|---|---|
-| **A. A declared indifference band, one per objective, no default** — e.g. so many hryvnia on the money and so many days on the date. | Two candidates inside the band on every objective are reported as indistinguishable and neither is put ahead of the other. He decides how much precision he believes his own inputs carry. | He has to name two numbers, and a forgotten line refuses at load rather than reading as a chosen policy. |
-| **B. Nothing beyond the float tolerance.** | Today's behaviour kept: candidates 6.39 UAH apart on 50 000 stay strictly ordered. | The tool asserts a difference its inputs cannot support, which is Principle I's named defect. |
-| **C. Derive the band from the provenance of the inputs.** | Nobody names a number; the band follows the data's own uncertainty. | Needs an error model for every declared value — the spreads, the quotations, the schedules — and nothing in the repository has one. It would be an invented number wearing a derivation. |
+**Answered**: no library in this feature, revisited the day *allocations* over candidates are
+scored (I4) — where the search space stops being 24 records and the library's subject finally
+arrives. So determinism stays structural rather than becoming a seeding discipline (FR-024,
+`docs/DIRECTION.md`), and nothing new enters the pure core. Recorded here so the question is not
+reopened by every later feature.
 
-**Recommendation: A**, declared per objective with no default, on the precedent of the segment
-bound (004 FR-006), the staleness threshold (002 FR-028) and the candidate ceiling (014 FR-019).
-C is the honest ideal and is unbuildable today; B is what happens if this question is not
-answered.
+### CL-4 — Which real issue is the benchmark? → **`UA4000231195`**
 
-### CL-3 — Borrow a portfolio-optimisation library, or not?
+**Answered**: the issue whose last coupon and principal both fall on **2027-08-25**, inside the
+twelve-month window, so at that horizon the hurdle is a hold-to-maturity figure rather than one
+resting on the observed-spread assumption. At one and three months it is sold before its own
+maturity, as all but one candidate is (item 5).
 
-[NEEDS CLARIFICATION: whether a portfolio-optimisation library is adopted, given that adopting one turns determinism from a structural guarantee into a seeding discipline]
+**That maturity falls seven days before the window closes, and it is the release date that
+decides**: 015 FR-030 withholds on `released_on > horizon.end` and never on the arrival —
+`core/decision/answer.py::_arrives_after_horizon` says why in its own words, that testing the
+arrival would withhold every figure there is. So a benchmark released inside the window is not
+withheld however long its corridor takes to settle, and FR-018a does not refuse the twelve-month
+section. Measured 2026-09-03: every section ranks. Item 3's `UA4000237556`, whose money is all
+back on 2027-09-04, is the same rule seen from the other side.
 
-`docs/DIRECTION.md` names one as a thing to borrow rather than build, and names the catch in the
-same breath: the core forbids nondeterminism and stochastic solvers bring it, so adopting one
-turns determinism from a structural guarantee into a seeding discipline — *the owner's decision,
-not an implementation detail*.
-
-| Option | What the owner gets | What it costs |
-|---|---|---|
-| **A. No library in this feature.** | A Pareto pass is a comparison of records: no solver, no seed, no floating-point search, no new dependency in the pure core. Determinism stays structural. | Nothing yet. The question returns unchanged the day an optimiser is genuinely needed. |
-| **B. Adopt one now.** | Risk metrics and optimisation routines written by people who got them right, which is worth something: the predecessor's list of hand-written metric mistakes is checked into this repository. | The catch above, plus a mismatch of subject — DIRECTION's own words are that the hard part here is the **constraint set**, not the objective, and a mean-variance optimiser solves the easy half. It also wants a return series, which no instrument in this registry has. |
-| **C. Adopt one later, behind the same seam this feature establishes.** | The decision stays cheap: an objective is declared data, and what reads it is a function. | A note, and the discipline not to let the partial order acquire a weight in the meantime. |
-
-**Recommendation: A now, C as the standing position.** State it once so the question is not
-reopened by every later feature. Note what makes B genuinely tempting and where it becomes
-right: the day an *allocation* over candidates is scored (I4), the search space stops being 24
-records and the library's subject arrives.
-
-### CL-4 — Which real issue is the benchmark?
-
-[NEEDS CLARIFICATION: which declared ОВДП issue replaces `ovdp_synthetic_a` as the question's benchmark]
-
-The owner has decided that a real issue replaces `ovdp_synthetic_a` in his question file. Which
-one is his judgement and not an implementer's: the benchmark is what everything else is measured
-against.
-
-Measured (item 2), the choice is cheap and reversible: it changes **no figure and no order**,
-only which candidates are reported as beating the hurdle. Options are any of the 24 declared
-issues. Two rules of thumb, either of which he may reject:
-
-- **The one he would actually buy if he did nothing clever** — that is what a naive baseline
-  means, and Principle I requires naive baselines to be always scored and always shown.
-- **The one whose own maturity is nearest the horizon he cares most about**, so the hurdle is a
-  hold-to-maturity figure rather than an early-exit figure resting on the spread assumption.
-
-**Recommendation: the second rule**, because a benchmark that itself rests on the observed-spread
-assumption makes every *comparison against it* rest on that assumption too — and the point of a
-hurdle is to be the thing you can trust while you doubt the rest.
+The field itself moves with the registry change and not with this document: one word in
+`data/questions/fifty-thousand.toml`.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -368,9 +389,9 @@ not share** — so a reader can see that the choice between two options is a cho
 beliefs rather than between two numbers.
 
 **Why this priority**: P2 because Stories 1–3 must exist first, and it is `DIRECTION.md`'s own
-formulation of what an honest output is. Measured under **both** illustrative objective pairs of
-the measurement's item 6, the one-month set contains a candidate that rests on the observed-spread
-assumption and one that does not; whether the owner's own set does is CL-1's to settle.
+formulation of what an honest output is. Measured under **both** objective pairs of the
+measurement's item 6 — the owner's declared pair being the first of them (CL-1) — the one-month
+set contains a candidate that rests on the observed-spread assumption and one that does not.
 
 **Independent Test**: a set whose two members rest on different stated assumptions reports the
 difference; a set whose members rest on identical assumptions says that plainly rather than
@@ -483,7 +504,7 @@ file it read with its digest.
   one place this feature is **not** data-only. A criterion is a *reader over a computed figure*,
   so a new criterion is a new figure or a new way of reading one, and both are code. What is
   data is **which** criteria the owner compares on and in which direction, which is the whole of
-  the choice CL-1 puts to him.
+  the choice CL-1 put to him.
 - **FR-004**: `data/objectives/` MUST NOT acquire a citation requirement: it is already named in
   `scripts/check_provenance.py`'s `EXEMPT_DIRS` with the reason that an objective set is a stated
   preference and not an observation. If a number describing the world is ever needed here, it
@@ -589,9 +610,35 @@ file it read with its digest.
   The slack is not a constant (FR-007): it depends on the magnitudes of the figures being
   compared, which a declaration file does not know. So the floor MUST be checked where those
   figures are — in the pass — and a band that fails it MUST produce a typed **refusal** naming the
-  objective, the declared band and the slack it did not clear (FR-026), never a set computed under
-  a relation whose acyclicity nobody established. A load-time check written against the bare
-  constant would pass a band five orders of magnitude too small and guarantee nothing.
+  objective, the declared band, the slack it did not clear and — where the band is a fraction —
+  the width it resolved to (FR-011d), never a set computed under a relation whose acyclicity
+  nobody established (FR-026). A load-time
+  check written against the bare constant would pass a band five orders of magnitude too small and
+  guarantee nothing.
+- **FR-011d**: A band on a **money** criterion MUST be declared either as an **absolute amount
+  with its currency** or as a **fraction of the question's amount**; a band on a **date** criterion
+  as a whole number of **days**, which has no relative form. Both money shapes, because CL-2 was
+  put to the owner asking for a band *"in hryvnia on the money"* — the `question` field of its
+  recorded answer — and he answered in **percent**: permitting only the shape he used would refuse
+  the one he was asked for. His stated bands are **0.01 % of the question's amount** and **7
+  days**.
+  A fraction MUST be resolved against the amount the question states **in the currency the pair is
+  compared in**, and **never against a candidate's own figure** — which would make the width for
+  *A* against *B* differ from the width for *B* against *A* and break FR-011's symmetry. The
+  resolution MUST happen **in the pass**, on FR-011c's precedent and for its reason: which currency
+  a money figure is in is the spendable endpoint's (`TupleOutcome.reaches`), a property of the
+  route a candidate takes and unknown to any declaration file. On a **date** criterion the slack is
+  exactly **zero** — FR-007's weak half is the project's float comparison and a date is not a
+  float — so FR-011c's floor reduces there to FR-011b's positivity.
+  **Two edge cases are left to the plan, and the second is the one that bites first.** What a
+  question stating no single amount in the currency compared in should do — a typed refusal, or an
+  incomparable pair — turns on records the plan will have in front of it and this document does
+  not. And a fraction resolved against a **token** amount is a band nobody chose: the owner's
+  question states 1.00 USD for `contract_usd` because 015 requires an amount per stream and that
+  file says the figure exists to make an empty stream visible, so his 0.01 % would resolve there
+  to 0.0001 USD — a width that would then have FR-011c's floor to clear. It does not bite today
+  only because **no candidate his question evaluates delivers USD**, which is a fact about the
+  registry and not a property of the rule.
 - **FR-012**: The declared band MUST be **distinguishable from the project tolerance** wherever
   either is reported, and MUST NOT be implemented by loosening it. The project tolerance is the
   width of float64 rounding and is defined in exactly one place (Principle IV); an indifference
@@ -604,8 +651,8 @@ file it read with its digest.
   the **declared bands**. Neither MUST be derived from, restated as, or rendered as the other.
   Where the two **disagree** — a candidate beats the hurdle on the rate and is indistinguishable
   from it on every declared objective — the disagreement MUST be reported as such and MUST NOT be
-  resolved, because resolving it needs a weight (FR-005). Under CL-1's recommended objectives the
-  rate is not among them, so the disagreement is not an edge case but the ordinary state.
+  resolved, because resolving it needs a weight (FR-005). The rate is **not** among the declared
+  objectives (CL-1), so the disagreement is not an edge case but the ordinary state.
 - **FR-014**: Where the reported set has one member, the record MUST say **why**, against
   FR-008's populations rather than in prose: the section evaluated one candidate; or every other
   evaluated candidate is dominated; or every other is *not placed*; or some mixture, in which case
@@ -663,10 +710,12 @@ file it read with its digest.
   staleness verdict of **both** candidates it relates, so a verdict never looks cleaner than the
   figures behind it. Principle I's propagation rule applies to a comparison exactly as it applies
   to a figure: *A dominates B* computed from two unverified figures is an unverified claim.
-- **FR-023**: The result MUST carry the whole declared objective set and the declared bands
-  beside every population it counts (014 FR-012's rule, one layer up). A dominance count read
-  without the objectives that produced it is meaningless, and the objectives are the one input a
-  reader is most likely to assume.
+- **FR-023**: The result MUST carry the whole declared objective set — **every band, of either
+  criterion, in the form it was declared** — and, where a band was declared as a fraction, **the
+  width it resolved to** (FR-011d), beside every population it counts (014 FR-012's rule, one
+  layer up). A dominance count read without the objectives that produced it is meaningless, and
+  the objectives are the one input a reader is most likely to assume; a fraction reported without
+  its width is a band nobody can check against a figure.
 - **FR-024**: The pass MUST be pure and deterministic: no clock, no I/O, no randomness, no
   solver, no seed. The same section and the same objective set MUST produce an equal result,
   field for field, and loading the declarations in a different file order MUST change nothing
@@ -678,7 +727,9 @@ file it read with its digest.
   set: no empty set standing for a failure, no partial set, no `None`. The refusals this feature
   needs are a section with no benchmark (FR-018), a section whose benchmark was withheld
   (FR-018a), and a declared band that does not clear its acyclicity floor against the figures
-  actually compared (FR-011c). **Two things a reader expects here are deliberately not refusals.** A missing or
+  actually compared (FR-011c). The last is a refusal rather than a load failure because it needs
+  figures a declaration file does not have.
+  **Two things a reader expects here are deliberately not refusals.** A missing or
   undeclared objective set is a **load failure** (FR-001, FR-001a), and a runtime refusal for it
   would be a second answer to a question the loader has already refused. A figure that cannot be
   compared is a property of a **pair** (FR-008a), and refusing the section for it would drop every
@@ -754,6 +805,12 @@ file it read with its digest.
   objective set produces, in every section, a reported non-dominated set and the accounting
   identity of FR-008 holding — every count derived from the registry and the objectives the test
   loads, never hard-coded.
+- **SC-001a**: The objective set the owner's question names **is the one he declared**: two
+  criteria in CL-1's directions, a band of **0.0001** as a fraction on the money and **7** days on
+  the date (CL-2, `specs/decisions/2026-09-03-clarify-019.toml`), asserted against the shipped
+  declaration by value. Its own criterion, because every other criterion here passes over *an*
+  objective set: an implementer can satisfy all of them with bands nobody chose, and the one thing
+  no other assertion notices is the owner's answers never reaching `data/objectives/`.
 - **SC-002**: **A** pair of questions differing only in the objective set they name (FR-001a),
   over one registry, produces **different** non-dominated sets, and each answer's manifest names
   its own objective file with its own digest. A chosen pair rather than any pair: two objective
@@ -762,10 +819,14 @@ file it read with its digest.
 - **SC-003**: A registry with no declared objective set fails at load naming the file and the
   field; an objective naming a criterion outside the closed set fails naming the field and the
   criteria that exist; an objective with no direction fails; a question naming no objective set,
-  or one the registry does not declare, fails (FR-001a); and a band that is negative, zero or
-  infinite fails at load (FR-011b). One assertion per case. **The acyclicity floor is not among
-  them** and its criterion is SC-004's: FR-011c states why it cannot be checked at load, and a
-  case here would be a check written against a constant that decides nothing.
+  or one the registry does not declare, fails (FR-001a); a band that is negative, zero or
+  infinite fails at load (FR-011b); and a band declared in a shape its criterion does not take
+  fails at load naming the criterion and the shapes it does — a fraction on a **date** criterion,
+  a day count that is not a whole number, a money band that is neither an absolute amount with a
+  currency nor a fraction (FR-011d). One assertion per case.
+  **The acyclicity floor is deliberately not among them** and its criterion is SC-004's: FR-011c
+  states why a declaration file lacks the figures to decide it, and a case here would be a check
+  written against a constant that decides nothing.
 - **SC-004**: Over generated candidate sets and bands drawn at or above FR-011c's floor, the
   dominance relation is **irreflexive, asymmetric and acyclic**, the non-dominated set is **never
   empty while the placed population is not**, and no candidate appears in two of FR-008's three
@@ -792,7 +853,11 @@ file it read with its digest.
   replaces that with a dominance verdict. The pair is the criterion: the first half alone passes
   for an implementation that calls everything indistinguishable. A third case pins FR-011a — three
   candidates whose closeness does not chain produce two pairs and **no** partition, asserted in
-  both candidate-key orders so a partition built by anchoring fails.
+  both candidate-key orders so a partition built by anchoring fails. A fourth pins FR-011d's
+  symmetry, and the pair it is asserted on is the criterion rather than a detail: the two figures
+  must differ by an amount lying **between** the two widths a per-candidate resolution would
+  produce, because only there do the two orders disagree. Asserted both ways round, such a pair
+  gives one verdict under the question's amount and two under a candidate's own.
 - **SC-007**: A scan asserts the two closeness rules are used only where they belong: the
   project's comparison in FR-007's weak half and in FR-011c's floor check — those two sites and no
   other — and the declared bands in FR-007's strict half and in the indifference relation, neither
@@ -821,9 +886,9 @@ file it read with its digest.
   rest on identical assumptions produces the typed *no stated assumption separates them*
   statement; and a set whose members carry **different section-level exclusions** names that
   difference too (FR-015, FR-019) — asserted on a fixture whose set has two such members, because
-  whether the owner's own one-month set has two depends on CL-1's answer and a criterion may not
-  rest on an open clarification. All three, because each is a different way for the same
-  requirement to be quietly unimplemented.
+  the owner's own one-month set has two only as long as the registry keeps them there (item 6,
+  CL-1), and a criterion that moves with the next declaration is not one. All three, because each
+  is a different way for the same requirement to be quietly unimplemented.
 - **SC-011**: A scan asserts this feature makes no claim about which assumption decides between
   two members: no record carries a deciding-assumption field, and no string it produces asserts
   one (FR-021).
@@ -893,7 +958,7 @@ file it read with its digest.
   one. If a requirement here ever seems to want one, the scope has slipped.
 - **A dominance pass is a comparison of records, not a search.** At 24 candidates a pairwise pass
   is 276 comparisons per section. Nothing here needs a solver, an approximation or a bound, which
-  is why CL-3's recommendation costs nothing today.
+  is why CL-3's answer costs nothing today.
 - **One owner, one regime per question, loopback only.** The authentication gate (Principle VII)
   is not reached.
 
@@ -957,7 +1022,8 @@ keeps finding — a claim whose warrant is somewhere else.
 **Should the indifference band be one number rather than one per objective?** Drafted as the
 simpler declaration and closed on units: the objectives are in hryvnia and in days, and one number
 cannot be both. A single relative band was the near miss — a percentage applies to money and is
-meaningless on a date.
+meaningless on a date — and the owner's answer is that split rather than either half of it: a
+percentage on the money, a count of days on the date (CL-2, FR-011d).
 
 ## Required tests this feature closes
 
@@ -1044,8 +1110,8 @@ per question stands; **any optimiser, solver or search**, and any dependency for
 rule**, all three of which are carried unchanged; **the recorded `horizon-as-a-latency-budget`,
 `one-amount-per-stream-in-compare`, `zero-hop-way-in`, `provenance-on-a-refusal`,
 `real-terms-for-a-tuple` and `secondary-market-rate-risk` gaps**, none of which this feature
-closes and several of which it makes more visible; **the display-currency switch**; and **the web
-UI**, whose framework stays unchosen.
+closes and several of which it makes more visible; **the display-currency switch**;
+and **every surface but the command line**, which 020 and 021 own.
 
 **Not out of scope, though a reader expects it to be**: the question schema's objective-set field
 (FR-001a), the slack-width function in the tolerance module (FR-011c), the `InputKind` member for
@@ -1073,20 +1139,18 @@ re-derive the argument.
 - **The deciding assumption (I5).** FR-019 names the assumptions the members do not share, which
   is the input to the question *which of them flips the order* — one re-evaluation per assumption
   over an already-computed set.
-- **A confidence dimension (CL-1 option D).** FR-022 puts the merged marks on every verdict, so
-  the day an ordering over marks is declared, the partial order gains a dimension without the
-  verdict record changing shape.
+- **A confidence dimension** — the option CL-1 did not take. FR-022 puts the merged marks on every
+  verdict, so the day an ordering over marks is declared, the partial order gains a dimension
+  without the verdict record changing shape.
 
 ## Owner verification tasks
 
-1. **Answer CL-1 to CL-4.** Nothing here can be planned until CL-1 and CL-2 are settled: they
-   decide what the output *is*. CL-3 is a standing position rather than a blocker. CL-4 is one
-   word in `data/questions/fifty-thousand.toml` and the feature cannot demonstrate itself without
-   it.
-2. **Name the indifference bands** once CL-2 is settled — one number per objective, in the
-   objective's own units. There is no citation and no source: how much precision he believes his
-   inputs support is a statement about him, which is why `data/objectives/` is exempt.
-3. **Confirm that a dominated candidate stays visible.** FR-009 reports every candidate and prunes
+1. **Confirm the declaration is his.** CL-1's two criteria and CL-2's two bands go into
+   `data/objectives/`, and the question's new objective-set field points at them (FR-001a) — the
+   same edit as CL-4's benchmark word, in his own files. There is no citation and no source:
+   how much precision he believes his inputs support is a statement about him, which is why
+   `data/objectives/` is exempt (FR-004). SC-001a is what stops the answers stopping at prose.
+2. **Confirm that a dominated candidate stays visible.** FR-009 reports every candidate and prunes
    none, on the reading that he may take a dominated option for a reason no objective carries. If
    he would rather the dominated population were withheld, that is his call and it changes what
    the answer shows — but it does not change what is computed.
