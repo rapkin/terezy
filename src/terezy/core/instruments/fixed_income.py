@@ -11,13 +11,14 @@ here is fixed in the engine: a second issue with a different frequency and a dif
 count is a data file and no code change (FR-021, SC-012), which is the property SC-003
 exists to prove.
 
-**Accrual is measured on unadjusted dates; only the payment date moves.** The declared
-business-day rule is applied to the date money changes hands, not to the period interest
-accrued over. Adjusting the accrual boundary as well would make every coupon depend on
-where weekends fell, and two economically identical bonds would pay different amounts --
-which is not what a fixed-coupon bond does. The consequence is visible in the D1 worked
-example, where the final coupon of a Saturday maturity is paid on the Monday and is
-nonetheless the ordinary 184-day amount.
+**A coupon's size is measured on unadjusted dates; only the payment date moves.** The
+declared business-day rule is applied to the date money changes hands, not to the period
+interest accrued over. Adjusting that period as well would make every coupon depend on where
+weekends fell, and two economically identical bonds would pay different amounts -- which is
+not what a fixed-coupon bond does. The consequence is visible in the D1 worked example, where
+the final coupon of a Saturday maturity is paid on the Monday and is nonetheless the ordinary
+184-day amount. **What 022 carries a quotation between is the *paid* dates**, so the intra-period
+accrual it computes is not on this footing (`docs/METHODOLOGY.md` §1.3).
 
 **Gross amounts only.** No tax is netted here (that is a ``ChargeFn``'s job downstream)
 and no route or access cost is applied (per Principle VI those belong to

@@ -165,8 +165,7 @@ so it receives that whole coupon.
 
 ### 1.3 The unadjusted accrual date and the adjusted payment date
 
-These are two different dates and conflating them is a real bug class, so the engine keeps
-them apart:
+These are two different dates and conflating them is a real bug class:
 
 - **Accrual** is measured between the **unadjusted** scheduled dates. The size of a coupon
   is a property of the paper.
@@ -176,6 +175,16 @@ them apart:
 If the accrual boundary moved as well, every coupon would depend on where weekends fell,
 and two economically identical bonds would pay different amounts. That is not what a
 fixed-coupon bond does.
+
+**The two are kept apart where a coupon is sized, and are not where a quotation is carried.**
+§31.5 bounds its accrual periods by the dates a coupon **leaves the price**, which are the
+*paid* dates — a coupon is in the price until it is paid, whichever day it accrued to. For an
+issue declared by its terms that puts an adjusted close against the unadjusted issue date this
+engine opens the first period at, so a first-period accrual is divided by a span its coupon was
+not earned over: at most two days on a 182-day period, since the only non-business days
+declared anywhere are weekends (§35 records that there is no holiday calendar). Unreachable on
+the shipped registry, where all 24 issues declare their payments and nothing adjusts a date,
+and recorded as `generative-accrual-boundaries` in `specs/features.toml`.
 
 The implemented rules are:
 

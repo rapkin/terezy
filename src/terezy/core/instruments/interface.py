@@ -88,8 +88,8 @@ class BondTerms:
 
     business_day_rule: str
     """A key of ``conventions.BUSINESS_DAY_FNS`` -- where a payment lands when its
-    scheduled date is not a business day. Applied to the payment date only; accrual is
-    measured on the unadjusted dates."""
+    scheduled date is not a business day. It does not move the period a coupon's **size** is
+    measured over (`docs/METHODOLOGY.md` §1.3)."""
 
     provenance: Provenance
     """The sources these terms rest on. Reaches every amount derived from them."""
