@@ -43,8 +43,10 @@ function RefusalDetail({ refusal }: { refusal: RefusalValue }) {
     case "envelopes.RequestMalformed":
       return (
         <ul className="mt-1 ml-4 list-disc text-xs">
-          {refusal.parameters.map((parameter) => (
-            <li key={parameter.location.join(".")} data-parameter={parameter.location.join(".")}>
+          {/* The index is in the key because one parameter can fail several ways at once: the
+              validator reports one fault per union member it tried, so the location repeats. */}
+          {refusal.parameters.map((parameter, at) => (
+            <li key={`${String(at)}:${parameter.location.join(".")}`} data-parameter={parameter.location.join(".")}>
               {parameter.location.join(" → ")} was{" "}
               {parameter.given === null ? "not given" : `given as ${parameter.given}`}:{" "}
               {parameter.problem}

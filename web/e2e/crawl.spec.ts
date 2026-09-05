@@ -3,9 +3,13 @@ import { AS_OF, offline } from "./offline";
 import { SERIES } from "../src/routes/series-map";
 
 /**
- * The regression net for the whole class of "several odd things": every screen the client can
- * reach over the shipped `data/`, driven once, failing on anything the reader would see as
- * broken rather than on one shape somebody thought to assert.
+ * The regression net for the whole class of "several odd things": the overview, every category,
+ * every record of a category small enough to open them all, three of a larger one, and both
+ * series -- driven once, failing on anything the reader would see as broken rather than on one
+ * shape somebody thought to assert. The sampling is why the name says *a screen of every kind*
+ * rather than *every screen*: on the shipped registry nothing is over the threshold, so it opens
+ * all of them today, and a category that grows past it is sampled rather than timing the suite
+ * out.
  *
  * What it watches for is exactly what a reader reports and no existing test catches together: a
  * console error, a request the page made that answered 4xx or 5xx, a main region with nothing in
@@ -21,7 +25,7 @@ const LARGE = 30;
 
 type Fault = { readonly where: string; readonly what: string };
 
-test("every screen the client reaches renders without an error, a 4xx, or an empty slot", async ({
+test("a screen of every kind renders without an error, a 4xx, or an empty slot", async ({
   page,
 }) => {
   await offline(page);

@@ -1,11 +1,15 @@
 """Where declarations are read from -- decided once at startup, never defaulted to the cwd.
 
 The default used to be ``Path("data")``, which is relative to whatever directory the process was
-started in. Started anywhere but the repository root the service came up healthy and answered
-500 on every endpoint, including the one serving the client's own index -- a degraded outcome
-reported once per request instead of once, at the only moment anything could act on it. An
-absent root is also not a malformed declaration, so 020 FR-016's permission to answer a
-malformed declaration with an error status never covered it.
+started in. Started anywhere but the repository root the service came up healthy and then
+answered 500 to every read -- a degraded outcome reported once per request instead of once, at
+the only moment anything could act on it. An absent root is also not a malformed declaration,
+so 020 FR-016's permission to answer a malformed declaration with an error status never
+covered it.
+
+:func:`terezy.api.http.service.client_root` is located from here for the same reason and had
+the same bug in its own half: the built client was looked for relative to the same wrong
+directory, so ``/`` answered a JSON 404 while every ``/api`` route answered 500.
 """
 
 from __future__ import annotations

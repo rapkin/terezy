@@ -111,18 +111,18 @@ def test_an_unrecognised_value_exits_non_zero_from_the_entry_point(
 def test_the_only_environment_key_the_guard_reads_is_the_context() -> None:
     """FR-030 forbids a second input that lets a refused address through. An environment key
     is the cheapest such input, so the modules are scanned rather than reviewed."""
-    read = {name: _environment_keys(_tree(name)) for name in GUARD_MODULES}
+    read = {name: set(_environment_keys(_tree(name))) for name in GUARD_MODULES}
 
-    assert read["serve.py"] == ["bind.CONTEXT_VARIABLE", "roots.DATA_ROOT_VARIABLE"]
-    assert read["bind.py"] == []
-    assert read["middleware.py"] == []
-    assert read["__main__.py"] == []
-    assert read["roots.py"] == []
-    assert read["service.py"] == [
+    assert read["serve.py"] == {"bind.CONTEXT_VARIABLE", "roots.DATA_ROOT_VARIABLE"}
+    assert read["bind.py"] == set()
+    assert read["middleware.py"] == set()
+    assert read["__main__.py"] == set()
+    assert read["roots.py"] == set()
+    assert read["service.py"] == {
         "CLIENT_VARIABLE",
         "roots.DATA_ROOT_VARIABLE",
         "bind.CONTEXT_VARIABLE",
-    ], "the served module reads a data root, a client directory and the context -- nothing else"
+    }, "the served module reads a data root, a client directory and the context -- nothing else"
 
 
 def test_the_entry_point_declares_no_flag_beyond_the_address_it_checks() -> None:

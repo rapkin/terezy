@@ -29,17 +29,19 @@ function Detail({ answered }: { answered: Answered }) {
       return (
         <p>
           the request never reached the API: {answered.detail}. Every request goes to{" "}
-          {API_PREFIX} on the origin that served this page, so there is no host to check — start
-          the service from the repository root with <code>{START_COMMAND}</code>.
+          {API_PREFIX} on the origin that served this page, so there is no host to check — if
+          nothing is listening, start it from the repository root with{" "}
+          <code>{START_COMMAND}</code>.
         </p>
       );
     case "not-answered":
       return (
         <p>
-          nothing answered for the API: status {answered.status} with content-type{" "}
-          {answered.contentType ?? "none"}, and every outcome this service has is a tagged JSON
-          body. In development that is the dev server reporting it could not reach the API — start
-          it from the repository root with <code>{START_COMMAND}</code>.
+          no route of the API produced this: status {answered.status} with content-type{" "}
+          {answered.contentType ?? "none"}, and every outcome a route has is a tagged JSON body.
+          So either nothing is listening and a development proxy is saying so — start the API
+          from the repository root with <code>{START_COMMAND}</code> — or the service is up and
+          this request failed inside it, which its own log records.
         </p>
       );
     case "not-json":

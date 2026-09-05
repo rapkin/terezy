@@ -1,5 +1,5 @@
 /**
- * Every request the client makes, and the three ways one can end.
+ * Every request the client makes, and the ways one can end.
  *
  * Same origin, always (FR-035): the paths carry the API's own `/api` prefix, so the browser
  * asks the origin that served the page in development behind a proxy and in production from one
@@ -9,10 +9,12 @@
  * the API does not serve is answered by the SPA fallback with an HTML document, and reporting
  * that as a transport failure would name a healthy API as down (FR-006).
  *
- * `not-answered` is the other half of that: a server error whose body is not this API's is
- * nothing this API produced -- every one of its own outcomes is a tagged JSON body, down to the
- * refusals that never reach a route. In development it is the dev server's proxy reporting that
- * it could not reach the API at all, which is a different thing to tell the reader than a 500.
+ * `not-answered` is the other half of that: a 5xx whose body is not JSON is one no route of
+ * this API produced, since every outcome a route has is a tagged body down to the refusals that
+ * never reach one. It does NOT say which of the two remaining things happened -- a dev server's
+ * proxy reporting it could not connect, or the service itself failing before it could write a
+ * body -- and the state deliberately does not claim to know: the two are indistinguishable from
+ * here, and naming one would send half the readers to the wrong process.
  */
 export type Answered =
   | { readonly tag: "body"; readonly status: number; readonly body: unknown }
@@ -25,8 +27,8 @@ export const API_PREFIX = "/api";
 /**
  * How the reader starts the service the page is a client of.
  *
- * Here rather than in the component, so the dev server's own banner and the two states that
- * name it cannot come to say different things.
+ * Here rather than in the component, so the two states that name it cannot come to say
+ * different things, and so the tests asserting each of them read the same string the screen does.
  */
 export const START_COMMAND = "uv run python -m terezy.api.http";
 

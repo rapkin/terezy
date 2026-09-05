@@ -3,8 +3,9 @@
 An absent root is not a malformed declaration, so 020 FR-016's permission to answer a malformed
 declaration with an error status does not reach it: before this, the root defaulted to ``data``
 relative to the process's own directory, so ``python -m terezy.api.http`` started from anywhere
-but the repository root answered 500 on *every* endpoint, the home page included, and said so
-once per request instead of once at boot.
+but the repository root answered 500 to *every* read, and said so once per request instead of
+once at boot. The client half is asserted below rather than described: located the same way, it
+left ``/`` answering a JSON 404 beside those 500s.
 """
 
 from __future__ import annotations

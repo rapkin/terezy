@@ -72,7 +72,7 @@ def data_root() -> Path:
 
     Raised rather than served, for the reason :func:`bind_context` is raised: a bare server
     command reaches this module and not the entry point, and a root with nothing in it answered
-    500 on every request rather than refusing once.
+    500 to every read rather than refusing once.
     """
     resolved = roots.data_root_in_force(
         os.environ.get(roots.DATA_ROOT_VARIABLE), packaged=roots.packaged_default()

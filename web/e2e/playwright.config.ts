@@ -37,8 +37,8 @@ export default defineConfig({
       // terezy's own entry point, never a bare server command: it is the one that applies the
       // bind guard before it binds (020 FR-026b).
       command: `uv run python -m terezy.api.http --host 127.0.0.1 --port ${String(API_PORT)}`,
-      // The repository root, because the API's data root defaults to `data/` relative to the
-      // process's directory and a server started elsewhere answers 500 rather than refusing.
+      // The repository root, because `uv run` resolves the project from the directory it is
+      // started in. Where declarations are read from no longer depends on it (`api/http/roots`).
       cwd: "../..",
       url: `http://127.0.0.1:${String(API_PORT)}/api/cpi?as_of=2026-01-01`,
       reuseExistingServer: process.env.CI === undefined,
