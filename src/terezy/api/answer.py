@@ -124,7 +124,12 @@ def answer_declared(
         base_currency=base_currency,
         scenario_id=_scenario_of(root, question.regime_id, base_currency=base_currency),
     )
-    resolver.check_question(question, declarations.tuples.registries.streams, path=declared_in)
+    resolver.check_question(
+        question,
+        declarations.tuples.registries.streams,
+        path=declared_in,
+        objective_sets=declarations.objective_sets,
+    )
     result = answer(question, inputs_of(declarations, regime_id=question.regime_id), as_of)
     return AnsweredQuestion(
         answer=result,

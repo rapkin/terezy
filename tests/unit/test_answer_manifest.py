@@ -90,6 +90,20 @@ def test_the_question_is_an_input_reference_like_any_other_declaration() -> None
     assert questions[0].file == "questions/fifty-thousand.toml"
 
 
+def test_the_objective_set_is_an_input_reference_with_its_own_version() -> None:
+    """019 FR-030, and required test I2's second half.
+
+    Two answers differing only in the criteria they were taken over are two results, and a
+    manifest that did not name the set could not tell them apart -- *a result without a manifest
+    is not a result* (Principle III).
+    """
+    run: Any = _answered()
+    sets = [ref for ref in run.manifest.inputs if ref.kind == "objective_set"]
+    assert [ref.id for ref in sets] == ["money-and-when"]
+    assert sets[0].file == "objectives/owner-001.toml"
+    assert sets[0].version
+
+
 def test_the_manifest_names_every_file_the_run_read() -> None:
     """SC-008, and the half of H3 that a sample cannot claim.
 

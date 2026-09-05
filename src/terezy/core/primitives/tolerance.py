@@ -60,6 +60,27 @@ def is_close(left: float, right: float, *, tolerance: float = TOLERANCE) -> bool
     return math.isclose(left, right, rel_tol=tolerance, abs_tol=tolerance)
 
 
+def slack(left: float, right: float, *, tolerance: float = TOLERANCE) -> float:
+    """How far apart two numbers may be and still be the same figure to :func:`is_close`.
+
+    The same rule as a **value** rather than a verdict, because 019 FR-011c has to name what a
+    declared indifference band failed to clear and FR-007's floor has to be measured against it.
+    Computing that width beside the pass would be a second copy of the closeness rule.
+
+    **Not a redefinition of :func:`is_close`, deliberately.** Rewriting the verdict as
+    ``abs(left - right) <= slack(left, right)`` is the tempting single-expression form and it
+    changes behaviour on non-finite inputs: ``math.isclose(inf, inf)`` is true while
+    ``abs(inf - inf)`` is ``nan``. The two therefore stand side by side and their agreement over
+    finite pairs is asserted rather than assumed
+    (``tests/invariants/test_the_slack_is_the_comparison.py``).
+
+    **The width is not the constant.** The tolerance is applied relatively *and* absolutely, so
+    on figures of the size a question of fifty thousand hryvnia deals in the width is orders of
+    magnitude above ``1e-9``. A floor written in units of the constant would guarantee nothing.
+    """
+    return max(tolerance * max(abs(left), abs(right)), tolerance)
+
+
 def assert_money_close(left: Money, right: Money, *, tolerance: float = TOLERANCE) -> None:
     """Assert two amounts are the same money, currency included.
 

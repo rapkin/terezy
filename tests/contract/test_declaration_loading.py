@@ -1321,6 +1321,12 @@ class TestNoFieldDefaultStandsInForAValue:
         # ignored. `exit_on` is deliberately NOT here: *hold to the fund's own end* is a choice
         # (014 FR-003), so it is required with a closed vocabulary.
         "QuestionTable": frozenset({"subjects", "every_declared_instrument"}),
+        # 019: a band is one of three shapes, and the absence of the other two IS the
+        # declaration. The loader refuses none, two, and a shape the criterion does not take,
+        # naming the criterion and the shapes it does -- the `subjects` /
+        # `every_declared_instrument` reading, for its reason: two shapes side by side would
+        # leave which one is in force to be settled by whichever the code read first.
+        "BandTable": frozenset({"amount", "currency", "fraction_of_the_question_amount", "days"}),
         "QuestionPlanTable": frozenset(
             {
                 "coupon_policy",
