@@ -155,7 +155,8 @@ because waiting is a cost. Testing the arrival would withhold every early exit t
 the certainty claim and the spread claim carry a direction, the rate-risk one carries `None`,
 and SC-026 asserts the absence rather than tolerating it. The fourth is what carrying a dirty
 quotation to a later date leaves behind; it carries a direction only where the quotation
-predates the sale, which is the case its warrant covers.
+predates the sale **and** no coupon detached before the purchase, which is the case its warrant
+covers.
 
 ### `core.results.answer.Refused`
 

@@ -3871,7 +3871,7 @@ the schedule generators already pay it.
 The subtraction opens at the **later of the quotation and the purchase**, and the purchase half
 is what keeps one morning's two prices coherent. The buy quotation sizes the purchase as
 declared, so a coupon detaching between the quotation and the purchase sits in both prices and
-is received by neither holder — two shipped issues pay one on 2026-08-26, eight days before the
+is received by neither holder — two shipped issues pay one on 2026-08-26, seven days before the
 owner's window buys. Taking it out of the sale alone would report a loss of a whole coupon that
 nobody took. What is double-counted, and all that is, is a coupon the holding both receives and
 is still credited with inside its sale price.
@@ -3899,7 +3899,7 @@ Four claims travel with such a figure, and **rate risk is the one that carries n
 | it is a point where the world is a distribution | **more certain than it is** | the optionality is the reason the option was chosen |
 | the spread is a seller's quote under today's conditions | **understated** | a seller's quote widens exactly when a forced sale is most likely |
 | it carries no rate risk | **none** | rate risk is symmetric: a bond sold after rates rise fetches less than its spread implies, and one sold after rates fall fetches more |
-| it ignores accrued interest | **the sale is struck too low** | a whole coupon comes out of the quotation where what was in it was that period's accrual, and an accrual within a period is smaller than the period's own coupon. Stated only where the quotation predates the sale, which is where that holds |
+| it ignores accrued interest | **the sale is struck too low** | a whole coupon comes out of the quotation where what was in it was that period's accrual, and an accrual within a period is smaller than the period's own coupon. Stated only where the quotation predates the sale **and** every coupon between them came out, which is where that holds — a coupon paid before the purchase is in neither price and resets the accrual it would have covered |
 
 The fourth is on every early exit a quotation was carried to, not only on the ones a coupon
 detached from: a quotation crossing any gap omits the accrual that gap builds. The two signed

@@ -203,7 +203,7 @@ def test_a_sale_price_below_the_coupons_still_in_it_refuses_rather_than_going_ne
     assert [
         reason
         for reason in _refusal_reasons(starved)
-        if "cannot hold less than the coupons it still contains" in reason
+        if "cannot be worth less than the coupons it still contains" in reason
         and "before the sale on" in reason
     ]
 

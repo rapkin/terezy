@@ -70,8 +70,13 @@ class SoldEarly:
     """What one unit fetched: the quotation less :attr:`detached_per_unit`."""
 
     detached_per_unit: Money
-    """What :func:`detached_since` took out of the quotation, per unit. Zero is a real answer
-    and not an absence: it says this sale carried no coupon adjustment at all."""
+    """What :func:`detached_since` took out of the quotation, per unit.
+
+    Reported rather than read back: the struck :attr:`price_per_unit` and the quotation on the
+    access record differ by exactly this, and a reader who has only the two prices cannot tell
+    an adjustment from a spread. Zero is a real answer -- this sale carried no coupon
+    adjustment at all -- and not an absence.
+    """
 
     quoted_on: date
     """The day the quotation described the market. Reported because the gap between it and
@@ -128,7 +133,7 @@ def detached_since(
     is what keeps the pair of quotations coherent. The *buy* quotation of the same morning
     sizes the purchase and is used as declared, so a coupon detaching between the quotation and
     the purchase is in both legs; subtracting it here alone would report a loss of a whole
-    coupon that nobody took. Two shipped issues pay one on 2026-08-26, eight days before the
+    coupon that nobody took. Two shipped issues pay one on 2026-08-26, seven days before the
     owner's window buys. What is double-counted, and all that is, is a coupon the holding both
     **receives** and is still credited with inside its sale price.
 

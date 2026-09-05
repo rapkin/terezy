@@ -512,6 +512,39 @@ def test_a_backdated_window_states_the_residual_without_a_direction() -> None:
     assert all(item.direction is None for item in accrued)
 
 
+def test_a_quotation_read_on_the_sale_day_states_no_residual_at_all() -> None:
+    """The third branch of the claim: no gap, so nothing to say about what crossed it.
+
+    A quotation carried nowhere has no unmodelled accrual -- the sale is struck at the price
+    somebody quoted for that very day. Stating the exclusion anyway would name an approximation
+    the figure did not make, which is the mirror of leaving a real one silent.
+    """
+    section = answers.answered().sections[0]
+    supplied = answers.with_resale_price(
+        answers.inputs(), "ovdp_synthetic_a", observed_on=section.horizon.end
+    )
+    quoted = answers.answered(supplied=supplied).sections[0]
+    sold = [
+        (item, item.sold_early)
+        for item in section_evaluated(quoted)
+        if item.sold_early is not None and item.key.instrument_id == "ovdp_synthetic_a"
+    ]
+    assert sold
+    assert all(sale.quoted_on == sale.on for _, sale in sold)
+    keys = {item.key for item, _ in sold}
+    assert not [
+        item
+        for item in quoted.excludes
+        if item.what is Exclusion.EARLY_EXIT_IGNORES_ACCRUED_INTEREST and item.applies_to in keys
+    ]
+    # The other three still travel: what is absent is the residual, not the figure's caveats.
+    assert {
+        item.what.value
+        for item in quoted.excludes
+        if item.applies_to in keys and item.what.value in EARLY_EXIT_CLAIMS
+    } == EARLY_EXIT_CLAIMS - {"early_exit_ignores_accrued_interest"}
+
+
 def test_the_carried_price_keeps_the_marks_of_both_the_quote_and_the_coupon() -> None:
     """Principle I: the struck price is an assumption derived from an unverified quotation less
     a declared coupon, and subtracting one from the other may not launder either source away."""

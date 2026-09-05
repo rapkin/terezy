@@ -124,9 +124,10 @@ def early_sale(
                 f"{declaration.id!r} quotes {exit_.price_per_unit.amount!r} "
                 f"{exit_.price_per_unit.currency.value} per unit as of "
                 f"{exit_.observed_on.isoformat()}, and {detached.amount!r} of coupon detaches "
-                f"from it before the sale on {on.isoformat()}. A quotation cannot hold less "
-                "than the coupons it still contains: the two declarations describe different "
-                "paper, and striking the sale would post a disposal of a negative amount."
+                f"from it before the sale on {on.isoformat()}, leaving nothing. A quotation "
+                "cannot be worth less than the coupons it still contains, nor exactly them: "
+                "the two declarations describe different paper, and striking the sale would "
+                "post a disposal of zero or of a negative amount."
             ),
         )
     return Event(

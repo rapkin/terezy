@@ -112,7 +112,10 @@ price is carried across the owner's windows exactly as a declared one is."""
 
 
 def with_resale_price(
-    supplied: AnswerInputs, instrument_id: str, per_unit: float = 995.0
+    supplied: AnswerInputs,
+    instrument_id: str,
+    per_unit: float = 995.0,
+    observed_on: date = QUOTED_ON,
 ) -> AnswerInputs:
     """The same registry with one instrument declaring what it sells for (015 FR-031).
 
@@ -124,7 +127,7 @@ def with_resale_price(
     access[instrument_id] = replace(
         access[instrument_id],
         resale_price=VenueQuote(
-            price=Money(per_unit, UAH, prov.EMPTY), kind="venue_terms", observed_on=QUOTED_ON
+            price=Money(per_unit, UAH, prov.EMPTY), kind="venue_terms", observed_on=observed_on
         ),
     )
     return replace(supplied, registries=replace(supplied.registries, access=access))

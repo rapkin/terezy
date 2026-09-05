@@ -257,12 +257,14 @@ class Exclusion(Enum):
 
     So the sale price is struck **below** what the same assumption implies, by the coupons
     detached less the accrual the quotation carried plus the accrual the sale date carries.
-    That quantity is positive **where the quotation predates the sale**: with no coupon between
-    them both dates sit in one accrual period and accrual only grows, and with one the accrual
-    the quotation had built is smaller than the coupon that ends its period. A quotation dated
-    *after* the sale is carried nowhere and the residual reverses, so the direction is stated
-    only in the forward case. It is **not** bounded by one coupon -- every further coupon inside
-    the window adds its whole amount to what came out."""
+    That quantity is positive **where the quotation predates the sale and every coupon between
+    them came out**: with none between them both dates sit in one accrual period and accrual
+    only grows, and with some the accrual the quotation had built is smaller than the coupon
+    that ends its period. Two things break it, and the direction is withheld for both -- a
+    quotation dated *after* the sale is carried nowhere and the residual reverses, and a coupon
+    that detached before the holding bought the paper comes out of neither price while having
+    reset the accrual it would have covered. It is **not** bounded by one coupon: every further
+    coupon inside the window adds its whole amount to what came out."""
 
 
 class Direction(Enum):

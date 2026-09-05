@@ -401,14 +401,13 @@ def _hold(
     registries: Registries,
 ) -> TupleOutcome | TupleRefused:
     """Buy with what arrived, live the declared lifecycle, and send every release home."""
-    purchased_on = horizon.start + timedelta(days=routed.latency_days)
     bought = _acquire(prepared, tuple_.route_in, routed.one_way.arrived)
     if not isinstance(bought, _Acquisition):
         return bought
     projected = _project(
         prepared,
         bought,
-        purchased_on=purchased_on,
+        purchased_on=horizon.start + timedelta(days=routed.latency_days),
         horizon=horizon,
         tax_classes=registries.tax_classes,
         registries=registries,
@@ -948,9 +947,14 @@ def _price_for(prepared: _Prepared) -> Money:
     **The quotation is used as declared, on whatever day the purchase lands**, and the resale
     leg is what keeps the pair coherent: it subtracts only the coupons that detached while the
     holding held the paper, so a coupon between the quotation and the purchase is in both
-    prices. Carrying this one as well would put the early-exit belief under every bond figure,
-    including the ones that hold to maturity and state no belief at all -- which is a change to
-    015 FR-032's scope and not a repair.
+    prices and cancels in the return. Carrying this one as well would put the early-exit belief
+    under every bond figure, including the ones that hold to maturity and state no belief at
+    all -- a change to 015 FR-032's scope rather than a repair.
+
+    **Where the window holds to maturity there is no second leg to cancel it**, and that is a
+    signed overstatement of the purchase price which nothing states: the
+    ``the-buy-quotation-is-not-carried`` entry in ``specs/features.toml`` records it with its
+    measurement and what would close it.
     """
     match prepared.declared, prepared.plan:
         case FundDeclaration(), FundAssumptions():

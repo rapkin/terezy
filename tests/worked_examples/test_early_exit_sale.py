@@ -395,32 +395,38 @@ def test_a_quotation_worth_less_than_its_own_coupons_refuses_by_name() -> None:
     assert isinstance(outcome, InconsistentTerms), outcome
     assert outcome.first_term == "access.resale_price.per_unit"
     assert outcome.second_term == "instrument.schedule.payment"
-    assert "cannot hold less than the coupons it still contains" in outcome.reason
+    assert "cannot be worth less than the coupons it still contains" in outcome.reason
 
 
 MOVED_ISSUE = date(2026, 1, 5)
 MOVED_ACCRUAL_END = date(2026, 7, 5)
 MOVED_PAID_ON = date(2026, 7, 6)
-"""A coupon whose accrual ends on a Saturday and is therefore paid on the Monday, bought on the
-Saturday itself. The only pair of dates on this fixture that can tell the two readings of
-*whose coupon is it* apart."""
+MOVED_PER_UNIT = 76.863013698630
+MOVED_STRUCK = 918.136986301370
+"""A coupon whose accrual ends on a Sunday and is therefore paid on the Monday, bought on the
+Sunday itself. The only pair of dates on this fixture that can tell the two readings of
+*whose coupon is it* apart.
+
+The amounts are written out rather than recomputed: a test that derives what it asserts from
+the same two dates the engine uses cannot tell a reader that the arithmetic beside it is
+right."""
 
 
 def test_a_coupon_the_business_day_rule_moves_past_the_purchase_is_bought_with_the_paper() -> None:
     """Ownership and detachment read the **same** date, and this is the day they could differ.
 
-    The accrual ends 2026-07-05, a Saturday, so ``following`` pays it on the Monday. Buy on the
-    Saturday and the two readings disagree: the unadjusted end is not after the purchase, the
-    paid date is. Reading the unadjusted one for ownership and the paid one for detachment
-    would take the coupon out of the sale price while crediting it to the seller -- the branch's
-    own defect, one leg over.
+    The accrual ends 2026-07-05, a Sunday, so ``following`` pays it on the Monday. Buy on the
+    Sunday and the two readings disagree: the unadjusted end is not after the purchase, the paid
+    date is. Reading the unadjusted one for ownership and the paid one for detachment would take
+    the coupon out of the sale price while crediting it to the seller -- the branch's own
+    defect, one leg over.
 
-        coupon paid 2026-07-06   1 000.00 x 15.5% x 171/365   =   72.616438356164 per unit
-        sale        2026-12-31   995.00 - 72.616438356164     =  922.383561643836 per unit
+        accrual     2026-01-05 -> 2026-07-05                   =      181 days
+        coupon paid 2026-07-06   1 000.00 x 15.5% x 181/365    =   76.863013698630 per unit
+        sale        2026-12-31   995.00 - 76.863013698630      =  918.136986301370 per unit
     """
     terms = synthetic.terms(issue_date=MOVED_ISSUE, maturity_date=date(2028, 1, 5))
-    accrued_days = (MOVED_ACCRUAL_END - MOVED_ISSUE).days
-    per_unit = 1_000.0 * 0.155 * accrued_days / 365
+    assert (MOVED_ACCRUAL_END - MOVED_ISSUE).days == 181
     outcome = project.project(
         synthetic.declaration(terms=terms),
         synthetic.holding(purchased_on=MOVED_ACCRUAL_END),
@@ -437,8 +443,8 @@ def test_a_coupon_the_business_day_rule_moves_past_the_purchase_is_bought_with_t
     paid = [event for event in outcome.ledger.applied if event.kind is EventKind.COUPON]
     assert [event.occurred_on for event in paid] == [MOVED_PAID_ON]
     assert outcome.sold_early is not None
-    assert is_close(outcome.sold_early.detached_per_unit.amount, per_unit)
-    assert is_close(outcome.sold_early.price_per_unit.amount, RESALE_PER_UNIT - per_unit)
+    assert is_close(outcome.sold_early.detached_per_unit.amount, MOVED_PER_UNIT)
+    assert is_close(outcome.sold_early.price_per_unit.amount, MOVED_STRUCK)
 
 
 def test_a_coupon_before_the_quotation_is_already_out_of_it() -> None:

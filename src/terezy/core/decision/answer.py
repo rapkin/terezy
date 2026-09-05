@@ -561,7 +561,7 @@ def _early_exit_exclusions(key: Tuple, sold: SoldEarly) -> tuple[StatedExclusion
     neither price -- the residual is ``a(sale) - a(quotation) + detached``, and what makes it
     positive is that ``detached`` covers the accrual the quotation had built, which a skipped
     coupon is exactly what it does not. Measured on the shipped registry: two issues pay on
-    2026-08-26, eight days before the owner's window buys, and their residual is negative.
+    2026-08-26, seven days before the owner's window buys, and their residual is negative.
     """
     stated = (
         StatedExclusion(
