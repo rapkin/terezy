@@ -13,8 +13,9 @@ and may not be skipped or deleted without an amendment.
 **How "zero lines of source code" is actually proved**, since a claim like that is easy to
 assert and easy to fake. Three checks, none of which is a matter of opinion:
 
-1. ``data/instruments/ovdp_synthetic_b.toml`` differs from issue A in periodicity, day
-   count, business-day rule, coupon rate, term and minimum ticket, and it produces a
+1. ``tests/fixtures/data/instruments/ovdp_synthetic_b.toml`` differs from issue A in
+   periodicity, day count, business-day rule, coupon rate, term and minimum ticket, and it
+   produces a
    complete result -- schedule, tax, both return figures.
 2. **No module in ``src/`` mentions either instrument's id.** A branch on an id is the
    Principle II violation this whole design exists to prevent, and it is greppable.
@@ -55,12 +56,12 @@ from terezy.core.results.project import Projection
 from terezy.core.tax.interface import TaxableEventKind
 from terezy.data.declarations import loader, resolver
 from terezy.data.declarations.errors import DeclarationError
-from tests import declared_terms, synthetic
+from tests import data_roots, declared_terms, synthetic
 
 pytestmark = pytest.mark.contract
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DATA_ROOT = REPO_ROOT / "data"
+DATA_ROOT = data_roots.with_fixtures()
 SOURCE_ROOT = REPO_ROOT / "src" / "terezy"
 
 # ⚙ Issue A's first *taxable* event is its 2026-07-15 coupon, fifteen days after the
@@ -467,8 +468,8 @@ class TestTheLoaderAndTheHandBuiltRecordsAgree:
     Everything else in this suite builds its inputs in code, so a loader that attached
     the wrong provenance, divided a percentage twice, or dropped a convention would be
     invisible to all of it. This closes that gap by projecting the *same* purchase twice
-    -- once from ``data/instruments/ovdp_synthetic_a.toml``, once from the declaration
-    ``tests/synthetic`` builds by hand -- and comparing the canonical form of the whole
+    -- once from ``tests/fixtures/data/instruments/ovdp_synthetic_a.toml``, once from the
+    declaration ``tests/synthetic`` builds by hand -- and comparing the canonical form of the whole
     result: every ledger event, every amount as ``float.hex()``, every charge, both return
     figures.
 

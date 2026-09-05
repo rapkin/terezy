@@ -3,9 +3,13 @@
 ``contracts/owner-declarations.md`` has a table of refusals and this module is the seed half
 of it executed. The construction is ``tests/contract/test_spendable_declaration_loading.py``'s
 and it is restated rather than imported so neither battery can break the other: **every broken
-variant is a mutation of the shipped file**, so each case also proves
-``data/seeds/owner-001.toml`` contains what the test thinks it contains. A battery written
-against an invented template keeps passing after the shipped format changes underneath it.
+variant is a mutation of a declared file**, so each case also proves that file contains what
+the test thinks it contains. A battery written against a template invented inline keeps
+passing after the declared format changes underneath it.
+
+The file mutated is ``tests/fixtures/data/seeds/owner-001.toml``, because it is the one that
+declares lots: what ships declares an owner and an empty list. That is a different thing to
+check and is checked at the foot of this module.
 
 **Two assertions apply to every case** (FR-023): the raised
 :class:`~terezy.data.declarations.errors.DeclarationError` names the *file* and its
@@ -36,18 +40,19 @@ from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.data.declarations import loader, resolver
 from terezy.data.declarations.errors import DeclarationError
+from tests import data_roots
 
 pytestmark = pytest.mark.contract
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DATA_ROOT = REPO_ROOT / "data"
+DATA_ROOT = data_roots.with_fixtures()
 SEEDS = DATA_ROOT / "seeds" / "owner-001.toml"
 
 
 def _is_comment(line: str) -> bool:
     """Whether a line is a TOML comment.
 
-    The shipped fixture explains itself in prose that quotes its own field names, so a naive
+    The overlay's file explains itself in prose that quotes its own field names, so a naive
     text search would edit the explanation of ``basis`` instead of the declaration of it --
     leaving the file valid and the test asserting an error that never came.
     """
@@ -61,7 +66,7 @@ def _replace(text: str, old: str, new: str) -> str:
         if old in line and not _is_comment(line):
             lines[index] = line.replace(old, new, 1)
             return "".join(lines)
-    pytest.fail(f"the shipped fixture no longer declares {old!r}; this test is stale")
+    pytest.fail(f"the fixture no longer declares {old!r}; this test is stale")
 
 
 def _drop_line(text: str, needle: str) -> str:
@@ -70,7 +75,7 @@ def _drop_line(text: str, needle: str) -> str:
     for index, line in enumerate(lines):
         if needle in line and not _is_comment(line):
             return "".join(lines[:index] + lines[index + 1 :])
-    pytest.fail(f"the shipped fixture no longer declares {needle!r}; this test is stale")
+    pytest.fail(f"the fixture no longer declares {needle!r}; this test is stale")
 
 
 def _broken(tmp_path: Path, old: str, new: str) -> Path:
@@ -374,9 +379,30 @@ def test_a_seed_naming_an_undeclared_instrument_is_refused_at_load(tmp_path: Pat
     assert "inzhur_reit" in caught.value.problem
 
 
-def test_the_shipped_data_root_resolves() -> None:
-    """The whole shipped tree, through the resolver a run would use."""
+def test_the_composed_data_root_resolves() -> None:
+    """The whole tree the battery above mutates, through the resolver a run would use."""
     declared = resolver.seeds_and_goals_from_data_root(DATA_ROOT, base_currency=Currency.UAH)
     assert declared.owner_id == "owner-001"
     assert len(declared.seeds) == 2
     assert declared.seed_file == SEEDS
+
+
+def test_what_ships_declares_an_owner_and_no_lot() -> None:
+    """The shipped file's own format check, which the battery above no longer covers.
+
+    An empty lot list is an ordinary state and not a missing declaration (FR-024). Asserted
+    rather than left to the battery above, which mutates the overlay's file and would stay
+    green if this one stopped parsing entirely -- as it did: emptying it left the required
+    ``seed`` key absent, and nothing in the suite loaded this root to notice.
+    """
+    shipped = data_roots.SHIPPED / "seeds" / "owner-001.toml"
+    owner_id, declared = loader.seeds_from_file(shipped, base_currency=Currency.UAH)
+    assert owner_id == "owner-001"
+    assert declared == ()
+
+    resolved = resolver.seeds_and_goals_from_data_root(
+        data_roots.SHIPPED, base_currency=Currency.UAH
+    )
+    assert resolved.seed_file == shipped
+    assert resolved.seeds == ()
+    assert resolved.owner_id == "owner-001", "the goals file still names him"

@@ -53,30 +53,30 @@ def _run(
     )
 
 
-def _shipped_count() -> int:
-    result = _run(fixtures.shipped())
+def _declared_count() -> int:
+    result = _run(fixtures.declared())
     assert isinstance(result, CandidateSet)
     return len(result.candidates)
 
 
 class TestTheCeilingRefusesAndNeverTruncates:
     def test_a_count_one_above_the_ceiling_refuses_naming_both_numbers(self) -> None:
-        reached = _shipped_count()
-        result = _run(fixtures.shipped(), ceiling=fixtures.ceiling(reached - 1))
+        reached = _declared_count()
+        result = _run(fixtures.declared(), ceiling=fixtures.ceiling(reached - 1))
         assert isinstance(result, CeilingExceeded), result
         assert (result.ceiling, result.reached) == (reached - 1, reached)
 
     def test_a_count_exactly_at_the_ceiling_is_admitted(self) -> None:
         """The boundary, because off-by-one here refuses a question the owner asked."""
-        reached = _shipped_count()
-        result = _run(fixtures.shipped(), ceiling=fixtures.ceiling(reached))
+        reached = _declared_count()
+        result = _run(fixtures.declared(), ceiling=fixtures.ceiling(reached))
         assert isinstance(result, CandidateSet), result
         assert len(result.candidates) == reached
 
     def test_a_ceiling_of_one_returns_no_set_rather_than_one_candidate(self) -> None:
         """The refusal *replaces* the set. A truncating implementation would return a
         ``CandidateSet`` of one here and satisfy every count on it."""
-        result = _run(fixtures.shipped(), ceiling=fixtures.ceiling(1))
+        result = _run(fixtures.declared(), ceiling=fixtures.ceiling(1))
         assert not isinstance(result, CandidateSet), result
         assert isinstance(result, CeilingExceeded), result
         assert result.reached > result.ceiling
@@ -84,7 +84,7 @@ class TestTheCeilingRefusesAndNeverTruncates:
 
 class TestARunPlanIsNeverInvented:
     def test_a_reachable_instrument_with_no_plan_refuses_the_whole_enumeration(self) -> None:
-        registries = fixtures.shipped()
+        registries = fixtures.declared()
         plans = {
             key: value for key, value in fixtures.one_plan_each(registries).items() if key != OVDP
         }
@@ -94,7 +94,7 @@ class TestARunPlanIsNeverInvented:
 
     def test_an_empty_sequence_is_the_same_omission_and_not_a_choice(self) -> None:
         """Supplying `()` reads as *run it no way at all*, which is not a way to run it."""
-        registries = fixtures.shipped()
+        registries = fixtures.declared()
         plans = dict(fixtures.one_plan_each(registries))
         plans[OVDP] = ()
         result = _run(registries, question=fixtures.question(registries, plans=plans))
@@ -105,7 +105,7 @@ class TestARunPlanIsNeverInvented:
         """The refusal is about *reachable* instruments. A plan for something the routes never
         connect would be a plan for a candidate that cannot exist, and demanding one would make
         a registry gap look like a caller's omission."""
-        registries = fixtures.with_access(fixtures.shipped(), OVDP, bought_at="binance")
+        registries = fixtures.with_access(fixtures.declared(), OVDP, bought_at="binance")
         plans = {
             key: value for key, value in fixtures.one_plan_each(registries).items() if key != OVDP
         }
@@ -116,7 +116,7 @@ class TestARunPlanIsNeverInvented:
     def test_two_equal_plans_for_one_instrument_refuse_naming_both_positions(self) -> None:
         """One key twice has no defined count, and de-duplicating would answer with fewer
         candidates than were asked for."""
-        registries = fixtures.shipped()
+        registries = fixtures.declared()
         plans = dict(fixtures.one_plan_each(registries))
         plans[OVDP] = (fixtures.HOLD_TO_MATURITY, fixtures.HOLD_TO_MATURITY)
         result = _run(registries, question=fixtures.question(registries, plans=plans))
@@ -135,7 +135,7 @@ class TestARouteTheRegistryDoesNotDeclare:
     """
 
     def test_composing_over_a_route_the_registry_lacks_refuses_as_a_whole(self) -> None:
-        registries = fixtures.shipped()
+        registries = fixtures.declared()
         extra = tuples.route(
             "test_route_the_registry_lacks",
             origin="monobank_uah",
@@ -155,7 +155,7 @@ class TestARouteTheRegistryDoesNotDeclare:
 
     def test_the_same_registry_and_route_set_produces_a_set(self) -> None:
         """The control: the refusal above is the *disagreement*, not the extra corridor."""
-        registries = fixtures.shipped()
+        registries = fixtures.declared()
         extra = tuples.route(
             "test_route_the_registry_lacks",
             origin="monobank_uah",
@@ -177,7 +177,7 @@ class TestARouteTheRegistryDoesNotDeclare:
 
 class TestAQuestionThatDoesNotStandUpRefusesRatherThanEmptying:
     def test_a_bound_admitting_nothing_refuses_the_whole_enumeration(self) -> None:
-        registries = fixtures.shipped()
+        registries = fixtures.declared()
         result = _run(
             registries,
             question=fixtures.question(registries, bound=SegmentBound(max_segments=0)),
@@ -188,7 +188,7 @@ class TestAQuestionThatDoesNotStandUpRefusesRatherThanEmptying:
     def test_no_declared_spendable_endpoint_refuses_the_whole_enumeration(self) -> None:
         """What is missing is the owner's statement of where money counts as spent, not a
         corridor -- so enumerating nothing would blame the registry for it."""
-        registries = replace(fixtures.shipped(), spendable=frozenset())
+        registries = replace(fixtures.declared(), spendable=frozenset())
         result = _run(registries)
         assert isinstance(result, QuestionDoesNotStandUp), result
         assert result.refusal.case is Unaskable.NO_SPENDABLE_ENDPOINT
@@ -196,6 +196,6 @@ class TestAQuestionThatDoesNotStandUpRefusesRatherThanEmptying:
     def test_money_already_where_it_was_wanted_does_not_refuse_the_enumeration(self) -> None:
         """The third case is about one pair and must stay in the no-candidate column: refusing
         the whole run for it would report a broken question where the registry is complete."""
-        registries = fixtures.with_access(fixtures.shipped(), OVDP, bought_at="monobank_uah")
+        registries = fixtures.with_access(fixtures.declared(), OVDP, bought_at="monobank_uah")
         result = _run(registries)
         assert isinstance(result, CandidateSet), result

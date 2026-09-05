@@ -7,7 +7,7 @@ field, and no such case results in a substituted default"*. The enforced-rules t
 below, and the rows are the reason the cases exist rather than the other way round.
 
 **Every case is a mutation of a file that is shipped and valid.** The broken variants are
-produced by editing the text of ``data/instruments/ovdp_synthetic_a.toml`` and
+produced by editing the text of ``tests/fixtures/data/instruments/ovdp_synthetic_a.toml`` and
 ``data/tax/ua.toml``, so each test also proves the real file contains what the test
 thinks it contains -- a battery written against an invented template would keep passing
 after the shipped format changed underneath it, which is the way a suite like this rots.
@@ -52,12 +52,12 @@ from terezy.core.tax.interface import TaxableEventKind
 from terezy.core.tax.schedule import RateUndeclaredBefore
 from terezy.data.declarations import loader, resolver, schema
 from terezy.data.declarations.errors import DeclarationError
-from tests import declared_terms
+from tests import data_roots, declared_terms
 from tests import observations as obs
 
 pytestmark = pytest.mark.contract
 
-DATA_ROOT = Path(__file__).resolve().parents[2] / "data"
+DATA_ROOT = data_roots.with_fixtures()
 
 REAL_OVDP_ISINS: Final = frozenset(obs.declared_isins())
 """Derived from the two observation files rather than listed, so an issue leaving the
@@ -71,7 +71,7 @@ TAX_UA = DATA_ROOT / "tax" / "ua.toml"
 def _is_comment(line: str) -> bool:
     """Whether a line is a TOML comment.
 
-    Both helpers below skip comments, and they have to: the shipped fixtures explain
+    Both helpers below skip comments, and they have to: the instrument fixtures explain
     themselves in prose that quotes their own field names, so a naive text search would
     edit the explanation of ``is_synthetic`` instead of the declaration of it -- leaving
     the file valid and the test asserting an error that never came.
@@ -120,7 +120,7 @@ def _replace(text: str, old: str, new: str) -> str:
         if old in line and not _is_comment(line):
             lines[index] = line.replace(old, new, 1)
             return "".join(lines)
-    pytest.fail(f"the shipped fixture no longer declares {old!r}; this test is stale")
+    pytest.fail(f"the fixture no longer declares {old!r}; this test is stale")
 
 
 def _drop_line(text: str, needle: str) -> str:
@@ -895,7 +895,7 @@ class TestDatedRateSchedules:
         """
         text = TAX_UA.read_text(encoding="utf-8")
         marker = "  [[jurisdiction.tax_class.rate]]"
-        assert marker in text, "the shipped fixture no longer declares a rate block"
+        assert marker in text, "the fixture no longer declares a rate block"
         return text[: text.index(marker)]
 
     def _schedule_block(self, effective_from: str) -> str:
@@ -1082,11 +1082,11 @@ class TestTheRegistryRefusesAnUncoveredEvent:
     because the Tax Code's own commencement had not been retrieved. Feature 009 retrieved it
     (пп. 165.1.2 and пп. 165.1.52 from 2017-01-01; the levy carve-out struck by № 466-IX from
     2020-05-23), so widening the date stopped being the invented legal fact D2 forbids and
-    became the fact. The shipped registry now covers that coupon, and the last test below is
+    became the fact. The tax pack now covers that coupon, and the last test below is
     what says so.
 
     **What must not be lost with it is the demonstration.** So the refusal is watched on a
-    copy of the shipped data root with exactly one field changed -- still the real loader,
+    copy of the data root with exactly one field changed -- still the real loader,
     the real resolver and the real projection, not a hand-built class. A refusal the wiring
     could swallow is worse than no refusal at all, and that is a property of the wiring
     rather than of any particular date.
@@ -1280,7 +1280,7 @@ class TestTheBatteryCoversTheContract:
             "TestAnImpossibleInstrumentIsNotALoadError",
             "TestTheBatteryCoversTheContract",
             "TestNoFieldDefaultStandsInForAValue",
-            "TestEveryShippedInstrumentSaysWhetherItIsAFixture",
+            "TestEveryDeclaredInstrumentSaysWhetherItIsAFixture",
         }
 
     def test_the_second_issue_is_a_file_and_not_a_special_case(self) -> None:
@@ -1407,8 +1407,8 @@ class TestNoFieldDefaultStandsInForAValue:
                 assert model.model_fields[field].default is None, f"{name}.{field}"
 
 
-class TestEveryShippedInstrumentSaysWhetherItIsAFixture:
-    """`docs/METHODOLOGY.md` §0's claim about `data/instruments/`, as a check.
+class TestEveryDeclaredInstrumentSaysWhetherItIsAFixture:
+    """`docs/METHODOLOGY.md` §0's claim about a declared instrument, as a check.
 
     Which declarations are invented is a fact about files, and §0 states it in prose. So the
     prose is held here: a fixture says so on its face — a bond through `is_synthetic`, a fund
@@ -1417,6 +1417,10 @@ class TestEveryShippedInstrumentSaysWhetherItIsAFixture:
 
     The property is stated rather than a file list, because a count of files goes stale on the
     next data change and this one already had, twice.
+
+    **Over the composed root**, which is where both populations exist at once — and the first
+    test below is what makes the pair meaningful. What SHIPS is the narrower claim, and it has
+    its own test at the foot of this class.
     """
 
     def test_a_bond_declares_itself_a_fixture_exactly_when_its_identity_is_not_an_isin(
@@ -1451,3 +1455,21 @@ class TestEveryShippedInstrumentSaysWhetherItIsAFixture:
         for identifier, instrument in sorted(declared.instruments.items()):
             assert prov.is_unverified(instrument.terms.provenance), identifier
             assert prov.is_unverified(instrument.constraints.provenance), identifier
+
+    def test_what_ships_declares_no_fixture_at_all(self) -> None:
+        """The owner's rule of 2026-09-02, which was stated in three READMEs and checked by
+        nothing.
+
+        `data/README.md` rule 5 no longer admits an invented instrument, so `data/instruments/`
+        is an inventory of what he can actually buy. Nothing else in the suite would notice a
+        `foo_synthetic.toml` landing there: every mechanism battery reads the composed root, and
+        the one artefact that would move is a golden, which is regenerated rather than refused.
+        """
+        declared = resolver.from_data_root(data_roots.SHIPPED)
+        invented = sorted(name for name, item in declared.instruments.items() if item.is_synthetic)
+        assert not invented, (
+            "an invented instrument may not ship (data/README.md rule 5, narrowed by the owner "
+            f"on 2026-09-02); these belong in tests/fixtures/data/instruments/: {invented}"
+        )
+        assert set(declared.instruments) == set(obs.declared_isins())
+        assert declared.funds, "the two real Inzhur funds still ship"

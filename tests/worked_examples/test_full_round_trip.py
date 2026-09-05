@@ -16,9 +16,10 @@ arrived" indistinguishable from "the purchase used what departed".
 
 ## The arithmetic, once, in full
 
-Terms (from ``data/instruments/ovdp_synthetic_a.toml`` and
-``data/access/instruments.toml``): face 1 000.00 UAH per unit, coupon 15.5% a year, issued
-2026-01-15, maturing 2028-01-15, semiannual, ``act/365``, ``following``, minimum ticket
+Terms (from ``tests/fixtures/data/instruments/ovdp_synthetic_a.toml`` and
+``tests/fixtures/data/access/fixtures.toml``): face 1 000.00 UAH per unit, coupon 15.5% a
+year, issued 2026-01-15, maturing 2028-01-15, semiannual, ``act/365``, ``following``, minimum
+ticket
 1 000.00, minimum increment 1 unit, quoted at par -- 1 000.00 per unit -- at ``inzhur``. Tax
 class ``ua_government_bond``: nil PIT, nil levy.
 
@@ -159,9 +160,9 @@ def _repatriated(released: float) -> float:
 
 
 def _registries() -> Registries:
-    """The shipped registry with one costed way in and one costed way out added."""
+    """The declared registry with one costed way in and one costed way out added."""
     registries = fixtures.with_new_route(
-        fixtures.shipped(),
+        fixtures.declared(),
         fixtures.route(
             IN_ROUTE,
             origin="monobank_uah",

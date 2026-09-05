@@ -26,11 +26,12 @@ from terezy.core.primitives.tolerance import TOLERANCE
 from terezy.core.results.tuple import BuysNoWholeUnit, TupleOutcome, TupleRefused
 from terezy.data.declarations import resolver
 from tests import answer_registries as answers
+from tests import data_roots
 from tests import observations as obs
 
 pytestmark = pytest.mark.contract
 
-DATA_ROOT: Final = Path(__file__).resolve().parents[2] / "data"
+DATA_ROOT: Final = data_roots.with_fixtures()
 INSTRUMENTS: Final = DATA_ROOT / "instruments"
 ACCESS: Final = DATA_ROOT / "access" / "instruments.toml"
 
@@ -217,7 +218,7 @@ def test_the_mark_would_still_rest_on_the_quotation_if_every_term_were_verified(
 
 
 def _with_verified_terms() -> Any:
-    """The shipped registry with every register-sourced citation given a verification date.
+    """The declared registry with every register-sourced citation given a verification date.
 
     Built in memory rather than as a scratch data root, because `scripts/check_provenance.py`
     refuses a verification date on an enumerated schedule and the point here is what the

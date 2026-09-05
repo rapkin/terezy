@@ -27,13 +27,12 @@ import pytest
 from terezy.core.primitives.currency import Currency
 from terezy.data.declarations import resolver
 from terezy.data.declarations.errors import DeclarationError
+from tests import data_roots
 from tests import observations as obs
 
 pytestmark = pytest.mark.contract
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-DATA_ROOT = REPO_ROOT / "data"
-ACCESS = DATA_ROOT / "access" / "instruments.toml"
+DATA_ROOT = data_roots.with_fixtures()
 
 BOND = "ovdp_synthetic_a"
 FUND = "inzhur_reit"
@@ -62,18 +61,19 @@ def _scratch_root(tmp_path: Path) -> Path:
 
 
 def _with_resale(root: Path, instrument_id: str, block: str = RESALE) -> Path:
-    """The shipped access file with one entry given a resale price, in place."""
-    target = root / "access" / "instruments.toml"
-    lines = target.read_text(encoding="utf-8").splitlines(keepends=True)
-    for index, line in enumerate(lines):
-        if line.startswith("[[access]]") and f'"{instrument_id}"' in lines[index + 1]:
+    """Whichever access file declares this instrument, with a resale price added in place."""
+    for target in sorted((root / "access").glob("*.toml")):
+        lines = target.read_text(encoding="utf-8").splitlines(keepends=True)
+        for index, line in enumerate(lines):
+            if not (line.startswith("[[access]]") and f'"{instrument_id}"' in lines[index + 1]):
+                continue
             end = index + 1
             while end < len(lines) and not (lines[end].startswith("[[access]]") and end != index):
                 end += 1
             lines.insert(end, block)
             target.write_text("".join(lines), encoding="utf-8")
             return target
-    pytest.fail(f"{target.name} no longer declares access for {instrument_id!r}")
+    pytest.fail(f"no access file under {root} declares {instrument_id!r}")
 
 
 def _resolve(root: Path) -> resolver.TupleDeclarations:

@@ -35,7 +35,7 @@ PRICED_OUT: Final = "test_priced_out"
 
 def _registries() -> fixtures.Registries:
     return fixtures.with_new_route(
-        fixtures.shipped(),
+        fixtures.declared(),
         fixtures.route(
             PRICED_OUT,
             origin="inzhur",

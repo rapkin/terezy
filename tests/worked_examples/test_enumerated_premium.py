@@ -117,8 +117,8 @@ def _holding(*, on: date, paid: float) -> Holding:
 
 
 LOT_A = _holding(on=date(2026, 1, 5), paid=10_300.00)
-"""The premium purchase: 10 units at 1 030.00, the quote `data/access/instruments.toml`
-declares for this fixture."""
+"""The premium purchase: 10 units at 1 030.00, the quote
+`tests/fixtures/data/access/fixtures.toml` declares for this fixture."""
 
 LOT_B = _holding(on=date(2026, 1, 6), paid=9_000.00)
 """The same instrument a day later at a discount, so the year has a same-category gain to
@@ -243,7 +243,7 @@ class TestAPurchaseMadeAfterARepaymentOfPrincipal:
     """FR-025 as amended (2026-08-30): the difference is measured against what **this
     holding** gets back, not against the nominal face.
 
-    The case the enumerated form exists for, and the one every shipped fixture hides: all
+    The case the enumerated form exists for, and the one every other fixture hides: all
     four repay their whole face once, so face and remaining principal coincide and the wrong
     rule reports the right number. An amortising issue parts them.
 
@@ -268,7 +268,7 @@ class TestAPurchaseMadeAfterARepaymentOfPrincipal:
 
     @staticmethod
     def _amortising() -> InstrumentDeclaration:
-        """The shipped fixture with its one repayment split into two, the first already
+        """The fixture with its one repayment split into two, the first already
         made by the time this buyer arrives. Nothing else moves."""
         terms = DECLARED.terms
         assert isinstance(terms, EnumeratedTerms)

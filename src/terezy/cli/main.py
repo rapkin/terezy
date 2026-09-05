@@ -55,7 +55,7 @@ from terezy.core.results.candidates import (
     NothingNeedsToConnect,
 )
 from terezy.core.results.fund import FundAssumptions
-from terezy.core.results.tuple import InstrumentPlan, TupleOutcome
+from terezy.core.results.tuple import Comparison, InstrumentPlan, TupleOutcome
 from terezy.core.routes.path import (
     ComposedExit,
     DeclaredExit,
@@ -262,14 +262,20 @@ def _ranking_lines(section: HorizonSection) -> list[str]:
     """
     ranked = section_ranking(section)
     scored = section_evaluated(section)
+    survey = section.outcome
+    comparison = survey.comparison if isinstance(survey, CandidateSurvey) else None
+    compared = comparison if isinstance(comparison, Comparison) and ranked else None
     lines = [
         f"  ranked: {len(ranked)}"
         if ranked
         else "  ranked: NOTHING. There is no benchmark to rank against, so the figures below "
         "are reported unranked rather than ordered."
     ]
+    hurdle = None if compared is None else compared.ranked[compared.benchmark].key
+    if compared is not None:
+        lines.append(_beats_line(compared, ranked))
     for outcome in ranked:
-        lines.extend(_figure_lines(outcome))
+        lines.extend(_figure_lines(outcome, hurdle=outcome.key == hurdle))
     for outcome in scored:
         if outcome not in ranked:
             lines.extend([*_figure_lines(outcome), "      NOT RANKED"])
@@ -289,8 +295,112 @@ def _ranking_lines(section: HorizonSection) -> list[str]:
     return lines
 
 
-def _figure_lines(outcome: TupleOutcome) -> list[str]:
+ONE_SPAN = 1
+"""How many distinct span lengths a ranking must have for its rates to be comparable."""
+
+
+def _beats_line(comparison: Comparison, ranked: tuple[TupleOutcome, ...]) -> str:
+    """How the ranking stands against its hurdle, in words, above the rows.
+
+    **``beats_benchmark`` is computed for this and was rendered nowhere.** Constitution
+    Principle I requires the naive baseline to be always scored *and always shown*, and an
+    empty tuple is the sentence the product exists to be able to say plainly -- *nothing beats
+    the hurdle*. Derived nowhere else either: `Comparison.beats_benchmark` applies the tie
+    tolerance, and a reader counting rows above the marked one would report a winner by a hair.
+
+    **Two index spaces meet here, and mixing them is silent.** Every index on ``comparison`` --
+    ``benchmark``, ``ties``, ``beats_benchmark`` -- addresses ``comparison.ranked``, while
+    ``ranked`` is what ``section_ranking`` reports: the same order with every withheld
+    candidate removed (010 FR-030). So each index is resolved to a *key* against
+    ``comparison.ranked`` and then matched by identity, and a candidate this section refuses to
+    show is not counted as having beaten anything.
+
+    ``ranked`` must hold the hurdle, which is the caller's to guarantee: ``section_ranking``
+    returns ``()`` when the benchmark is withheld, so a verdict is never asked for over a table
+    the hurdle is missing from. Violating it is a programmer error and raises, because every
+    sentence below asserts something about rows that would not be there.
+    """
+    hurdle = comparison.ranked[comparison.benchmark]
+    reported = frozenset(item.key for item in ranked)
+    if hurdle.key not in reported:
+        raise AssertionError(
+            f"a verdict was asked for over a ranking that does not show its own hurdle "
+            f"{hurdle.key.instrument_id!r}; section_ranking returns () in that case"
+        )
+    beaten = sum(
+        1 for index in comparison.beats_benchmark if comparison.ranked[index].key in reported
+    )
+    others = len(ranked) - 1
+    if not others:
+        verdict = (
+            f"THE BENCHMARK {hurdle.key.instrument_id} IS THE ONLY ROW HERE, so nothing was "
+            "measured against it"
+        )
+    elif not beaten:
+        verdict = f"NOTHING SHOWN HERE BEATS THE BENCHMARK {hurdle.key.instrument_id}"
+    else:
+        verdict = (
+            f"{beaten} of the {others} other row(s) beat the benchmark {hurdle.key.instrument_id}"
+        )
+    if any(
+        hurdle.key in {comparison.ranked[index].key for index in group}
+        and len({comparison.ranked[index].key for index in group} & reported) > 1
+        for group in comparison.ties
+    ):
+        verdict += ", and at least one candidate ties with it within the project tolerance"
+    return f"  {verdict}.{_span_caveat(comparison, hurdle, ranked)}"
+
+
+def _span_caveat(
+    comparison: Comparison, hurdle: TupleOutcome, ranked: tuple[TupleOutcome, ...]
+) -> str:
+    """What the verdict above is silent about when the ranked rows span different periods.
+
+    ``implied_rate`` is an IRR over the span the money was **at work**, and that span is not
+    the window: a row whose own terms end inside it is measured over less, and one sold at the
+    window's end is measured over the window plus the way out's latency, because waiting is
+    inside the span (010 FR-015). An ordering across spans of different length compares
+    different questions, and the verdict above is the most confident sentence this renderer
+    prints -- Principle I forbids emitting one more confident than its inputs.
+
+    **Keyed on whether the spans differ, and on nothing narrower.** Two earlier versions of
+    this guard keyed on the hurdle undershooting and then on any row undershooting; both went
+    quiet on tables that are just as incomparable -- a same-day corridor beside a three-day one
+    puts two span lengths in one ranking with nothing ending inside the window at all. The
+    comparable claim is that every row was measured over the same number of days, so that is
+    what is tested.
+
+    **``span.end`` is when the money is home, not when the paper's terms end.** It carries the
+    exit route's latency, so naming it as the issue's own last payment date puts the reader
+    three days out against the declaration they would check it against.
+
+    Stated rather than suppressed: the figures are real and the owner chose the hurdle, so
+    withholding the verdict would hide work he asked for. What he cannot be left to infer is
+    that the numbers span different periods. Recorded as
+    ``rates-in-one-ranking-span-different-periods`` in ``specs/features.toml``; the remedy -- a
+    different benchmark, or a declared rule for a candidate that undershoots -- is his.
+    """
+    lengths = {(item.span.end - item.span.start).days for item in ranked}
+    if len(lengths) == ONE_SPAN:
+        return ""
+    window = (comparison.horizon.end - comparison.horizon.start).days
+    hurdle_days = (hurdle.span.end - hurdle.span.start).days
+    return (
+        f" RATES HERE SPAN DIFFERENT PERIODS: these {len(ranked)} rows were measured over "
+        f"spans of {min(lengths)} to {max(lengths)} days against a window of {window}, and "
+        "each rate is annualised over its own span. Rates measured over periods of different "
+        "length are not comparable, and the ordering below is across them. The benchmark's "
+        f"span is {hurdle_days} days, its money home {hurdle.span.end.isoformat()}."
+    )
+
+
+def _figure_lines(outcome: TupleOutcome, *, hurdle: bool = False) -> list[str]:
     """One candidate's figures, with the currency, the rate and the terms that identify it.
+
+    ``hurdle`` marks the benchmark's own row. Unmarked, the head of the list reads as the
+    winner even when it is the thing everything else is measured against -- which is the trap
+    the empty-ranking branch above already names, and it does not stop being a trap because
+    the ranking is non-empty.
 
     All **five** terms of 010's key, because that is what makes two rows different rows: one
     instrument bought over two ways in, or run to maturity against sold at the window's end, is
@@ -304,7 +414,8 @@ def _figure_lines(outcome: TupleOutcome) -> list[str]:
     """
     rate = outcome.implied_rate
     return [
-        f"    {outcome.key.instrument_id} from {outcome.key.stream_id} "
+        f"    {'[BENCHMARK] ' if hurdle else ''}{outcome.key.instrument_id} "
+        f"from {outcome.key.stream_id} "
         f"via {candidate_id(outcome.key.route_in)} "
         f"out {_exit_choice(outcome.key.route_out)} "
         f"run as {_plan_terms(outcome.key.exit_terms)}",

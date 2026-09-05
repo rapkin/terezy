@@ -47,7 +47,7 @@ FLAT_FEE_ROUTE: Final = "test_flat_fee_in"
 
 def _registries(*, flat: float = 0.0) -> Registries:
     return fixtures.with_new_route(
-        fixtures.shipped(),
+        fixtures.declared(),
         fixtures.route(
             FLAT_FEE_ROUTE,
             origin="monobank_uah",
@@ -256,7 +256,7 @@ class TestADeclarationWithNoIncrementLeavesNoRemainderAtAll:
             horizon=fixtures.DateRange(start=fixtures.ISSUE_DATE, end=fixtures.HORIZON_END),
             as_of=fixtures.AS_OF,
             continuation=fixtures.HOLD_AS_CASH,
-            registries=fixtures.shipped(),
+            registries=fixtures.declared(),
         )
         assert isinstance(outcome, TupleOutcome), outcome
         return outcome
@@ -330,7 +330,7 @@ class TestTheDeclaredMonthlyCeilingAndThePerTransactionMaximum:
 
     def _limited(self, **limit: Money) -> object:
         return _evaluate(
-            fixtures.with_leg(fixtures.shipped(), fixtures.DOMESTIC_IN, **limit),
+            fixtures.with_leg(fixtures.declared(), fixtures.DOMESTIC_IN, **limit),
             fixtures.hurdle_tuple(),
             10_000.0,
         )
@@ -379,7 +379,7 @@ class TestTheDeclaredMonthlyCeilingAndThePerTransactionMaximum:
         # sending less would then reveal a seam the first refusal had concealed.
         registries = fixtures.with_access(
             fixtures.with_leg(
-                fixtures.shipped(),
+                fixtures.declared(),
                 fixtures.DOMESTIC_IN,
                 monthly_cap=Money(5_000.0, UAH, prov.EMPTY),
             ),
@@ -407,7 +407,7 @@ class TestTheSameTwoLimitsOnTheWayOut:
 
     def _limited(self, **limit: Money) -> object:
         return _evaluate(
-            fixtures.with_leg(fixtures.shipped(), fixtures.DOMESTIC_OUT, **limit),
+            fixtures.with_leg(fixtures.declared(), fixtures.DOMESTIC_OUT, **limit),
             fixtures.hurdle_tuple(),
             10_000.0,
         )

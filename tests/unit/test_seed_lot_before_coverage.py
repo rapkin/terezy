@@ -107,7 +107,7 @@ class TestTheQuestionIsOneQuestion:
     def test_a_seed_lot_needs_no_change_when_a_form_is_added(self) -> None:
         """The regression this whole file guards: `seeds._inconsistency` reads one date and
         one field path, and would read the same two for a form nobody has written."""
-        source = fixtures.DATA_ROOT.parent / "src" / "terezy" / "core" / "ledger" / "seeds.py"
+        source = fixtures.REPO_ROOT / "src" / "terezy" / "core" / "ledger" / "seeds.py"
         assert "issue_date" not in source.read_text(encoding="utf-8")
 
 

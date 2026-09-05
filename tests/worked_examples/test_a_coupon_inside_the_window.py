@@ -108,9 +108,14 @@ coupon out of the sell leg alone would report a loss of a whole coupon nobody to
 
 @functools.cache
 def _supplied() -> AnswerInputs:
-    """The shipped registry, read once. `answers.inputs()` re-resolves the whole data root, and
-    this module reads it once per candidate in every test below."""
-    return answers.inputs()
+    """What the tool ships, with no fixture overlaid, read once.
+
+    ``shipped_inputs`` rather than ``inputs``: this module measures the owner's own answer, and
+    an invented declaration joining the population would move every count in it. Cached because
+    resolving the root is the same work each time and this module asks for it once per
+    candidate in every test below.
+    """
+    return answers.shipped_inputs()
 
 
 def _latency(item: TupleOutcome) -> int:
@@ -129,7 +134,7 @@ def _bought_on(item: TupleOutcome, start: date) -> date:
 
 
 def _sold_early(horizon_index: int) -> list[TupleOutcome]:
-    section = answers.answered().sections[horizon_index]
+    section = answers.answered(supplied=_supplied()).sections[horizon_index]
     return [item for item in section_evaluated(section) if item.sold_early is not None]
 
 
@@ -149,7 +154,7 @@ def test_the_window_and_the_holding_cannot_disagree_about_what_is_inside() -> No
     declared = _supplied().registries.instruments
     gaps = []
     latencies = []
-    for index, section in enumerate(answers.answered().sections):
+    for index, section in enumerate(answers.answered(supplied=_supplied()).sections):
         for item in _sold_early(index):
             # Not `getattr(terms, "payments", ())`: a generative bond has no payment list, and
             # skipping one silently would drop it from a check whose subject IS which payments
@@ -198,7 +203,7 @@ def test_the_subtraction_is_reached_at_every_horizon_the_owner_asked_about() -> 
     declared = _supplied().registries.access
     measured = []
     untouched = []
-    for index, section in enumerate(answers.answered().sections):
+    for index, section in enumerate(answers.answered(supplied=_supplied()).sections):
         sold = _sold_early(index)
         assert sold
         expected = set()
@@ -237,7 +242,7 @@ def test_more_than_one_coupon_detaches_and_every_one_of_them_comes_out() -> None
     and why the residual is not bounded by a coupon.
     """
     name, count, per_coupon = MULTI_COUPON
-    twelve = answers.answered().sections[2]
+    twelve = answers.answered(supplied=_supplied()).sections[2]
     quote = _supplied().registries.access[name].resale_price
     assert quote is not None
     item = next(one for one in _sold_early(2) if one.key.instrument_id == name)
@@ -270,7 +275,7 @@ def test_a_coupon_paid_before_the_purchase_stays_in_both_prices() -> None:
     subtraction at the quotation instead would have taken 87.50 out of the sale while the buy
     quotation of the same morning still held it -- a loss of 45 x 87.50 that nobody took.
     """
-    assert answers.answered().sections[0].horizon.end == date(2026, 10, 1)
+    assert answers.answered(supplied=_supplied()).sections[0].horizon.end == date(2026, 10, 1)
     for name, (units, buy, sell, coupon) in BEFORE_THE_PURCHASE.items():
         item = next(one for one in _sold_early(0) if one.key.instrument_id == name)
         assert item.sold_early is not None
@@ -296,7 +301,7 @@ def test_no_early_exit_window_contains_a_repayment_of_principal() -> None:
     declared = _supplied().registries.instruments
     checked = 0
     inside = []
-    for index, section in enumerate(answers.answered().sections):
+    for index, section in enumerate(answers.answered(supplied=_supplied()).sections):
         for item in _sold_early(index):
             terms = declared[item.key.instrument_id].terms
             assert isinstance(terms, EnumeratedTerms), item.key.instrument_id
@@ -322,7 +327,7 @@ def test_no_declared_coupon_falls_on_the_quotation_day() -> None:
     declared = _supplied().registries
     checked = 0
     landed = []
-    for index in range(len(answers.answered().sections)):
+    for index in range(len(answers.answered(supplied=_supplied()).sections)):
         for item in _sold_early(index):
             quote = declared.access[item.key.instrument_id].resale_price
             assert quote is not None, item.key.instrument_id
@@ -343,7 +348,7 @@ def test_the_worked_arithmetic_is_what_the_declarations_say() -> None:
     declared = _supplied().registries
     terms = declared.instruments[WORKED].terms
     assert isinstance(terms, EnumeratedTerms)
-    section = answers.answered().sections[0]
+    section = answers.answered(supplied=_supplied()).sections[0]
     worked = next(item for item in section_evaluated(section) if item.key.instrument_id == WORKED)
     bought = _bought_on(worked, section.horizon.start)
     assert bought == date(2026, 9, 2)
@@ -423,7 +428,7 @@ def test_the_accrued_residual_is_stated_on_every_early_exit() -> None:
     of the approximation can be stated.
     """
     assert {item.value for item in Exclusion} & EARLY_EXIT_CLAIMS == EARLY_EXIT_CLAIMS
-    section = answers.answered().sections[0]
+    section = answers.answered(supplied=_supplied()).sections[0]
     accrued = [
         item
         for item in section.excludes
@@ -458,7 +463,7 @@ def test_the_residual_loses_its_sign_where_a_coupon_left_before_the_purchase() -
     declared = _supplied().registries
     unsigned = set()
     signed = set()
-    for index, section in enumerate(answers.answered().sections):
+    for index, section in enumerate(answers.answered(supplied=_supplied()).sections):
         for item in _sold_early(index):
             quote = declared.access[item.key.instrument_id].resale_price
             assert quote is not None, item.key.instrument_id
@@ -495,7 +500,7 @@ def test_a_backdated_window_states_the_residual_without_a_direction() -> None:
         answers.owners_question(),
         horizons=(DateRange(start=date(2026, 5, 1), end=date(2026, 8, 1)),),
     )
-    section = answers.answered(question=closed).sections[0]
+    section = answers.answered(question=closed, supplied=_supplied()).sections[0]
     sold = [
         (item, item.sold_early)
         for item in section_evaluated(section)
@@ -519,15 +524,13 @@ def test_a_quotation_read_on_the_sale_day_states_no_residual_at_all() -> None:
     somebody quoted for that very day. Stating the exclusion anyway would name an approximation
     the figure did not make, which is the mirror of leaving a real one silent.
     """
-    section = answers.answered().sections[0]
-    supplied = answers.with_resale_price(
-        answers.inputs(), "ovdp_synthetic_a", observed_on=section.horizon.end
-    )
+    section = answers.answered(supplied=_supplied()).sections[0]
+    supplied = answers.with_resale_price(_supplied(), WORKED, observed_on=section.horizon.end)
     quoted = answers.answered(supplied=supplied).sections[0]
     sold = [
         (item, item.sold_early)
         for item in section_evaluated(quoted)
-        if item.sold_early is not None and item.key.instrument_id == "ovdp_synthetic_a"
+        if item.sold_early is not None and item.key.instrument_id == WORKED
     ]
     assert sold
     assert all(sale.quoted_on == sale.on for _, sale in sold)
@@ -553,7 +556,7 @@ def test_the_carried_price_keeps_the_marks_of_both_the_quote_and_the_coupon() ->
     assert quote is not None
     terms = declared.instruments[WORKED].terms
     assert isinstance(terms, EnumeratedTerms)
-    section = answers.answered().sections[0]
+    section = answers.answered(supplied=_supplied()).sections[0]
     outcome = next(item for item in _sold_early(0) if item.key.instrument_id == WORKED)
     assert outcome.sold_early is not None
     inside = [
@@ -574,7 +577,7 @@ def test_the_latency_this_module_sums_is_the_one_the_engine_adds() -> None:
     actually uses -- `cost.cost_one`, whose `RampCost.latency_days` is what the join adds.
     """
     registries = _supplied().registries
-    section = answers.answered().sections[0]
+    section = answers.answered(supplied=_supplied()).sections[0]
     checked = 0
     for item in section_evaluated(section):
         priced = cost.cost_one(

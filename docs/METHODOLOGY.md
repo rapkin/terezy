@@ -60,13 +60,16 @@ and it says so on the face of every figure it touches.
 The `excludes` line above is unchanged and still true: the two **nominal** figures exclude
 inflation. The real figures are reported beside them, never instead of them.
 
-**Some shipped instruments are real now, and every one of them is still unverified.** Feature
+**Every shipped instrument is real now, and every one of them is still unverified.** Feature
 016 declared 24 ОВДП issues whose terms are the National Bank depository's record of what the
-Ministry of Finance issued; each carries `is_synthetic = false` and is named for its ISIN. Every
-other file under `data/instruments/` still declares `is_synthetic = true` — or, for a fund,
-`is_assumption_driven = true` — and its terms are **invented**, chosen so that a hand-checkable
-example exists. **No figure computed from a fixture describes something anyone can buy, and none
-may be quoted as if it did.**
+Ministry of Finance issued; each carries `is_synthetic = false` and is named for its ISIN.
+Since the owner narrowed `data/README.md` rule 5 on 2026-09-02, **an invented instrument may
+not ship at all**: `data/instruments/` holds those 24 and the two real Inzhur funds, which
+declare `is_assumption_driven = true` because a fund's yield is a range it states about itself.
+The invented declarations a test needs live in `tests/fixtures/data/instruments/`, each the only
+example of a mechanism, and their terms are **invented** so that a hand-checkable example
+exists. **No figure computed from a fixture describes something anyone can buy, and none may be
+quoted as if it did.**
 
 **Every `verified_on` in the whole directory is still empty**, and for the 24 the reason is now
 one thing rather than everything: the terms could be checked against the issuer's register, and
@@ -74,8 +77,10 @@ the price could not. A dated seller's quotation has no independent record and sh
 number tomorrow, so it stays unverified permanently — and because taint is asymmetric, every
 figure a real issue produces carries the mark through the price alone.
 
-Which files are which is a check rather than a sentence:
-`tests/contract/test_declaration_loading.py::TestEveryShippedInstrumentSaysWhetherItIsAFixture`.
+Which files are which is a check rather than a sentence, in both directions:
+`tests/contract/test_declaration_loading.py::TestEveryDeclaredInstrumentSaysWhetherItIsAFixture`
+pins that a declaration's `is_synthetic` agrees with whether its id is an ISIN, and that
+`data/instruments/` declares no fixture at all.
 
 **The tax exemption is cited but unverified.** `data/tax/ua.toml` declares the
 `ua_government_bond` class with a PIT rate of 0% and a military levy of 0%. The zeroes cite

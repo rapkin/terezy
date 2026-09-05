@@ -1,4 +1,4 @@
-"""What a horizon shorter than an instrument's own terms now reports, over the shipped registry.
+"""What a horizon shorter than an instrument's own terms now reports, over the composed registry.
 
 015 FR-029 and FR-031, at the tuple level. Before this feature such a candidate dropped as
 ``CannotSpanHorizon`` binding on ``instrument.maturity_date`` -- *shorten nothing, it is
@@ -26,7 +26,7 @@ from tests import candidate_registries as fixtures
 from tests import tuple_registries as tuple_fixtures
 
 SHORT = DateRange(start=fixtures.OUTLAY_ON, end=date(2027, 6, 30))
-"""A window that ends before several shipped instruments' own terms do, and after others'."""
+"""A window that ends before several declared instruments' own terms do, and after others'."""
 
 RESALE = Money(995.0, fixtures.UAH, prov.EMPTY)
 
@@ -60,7 +60,7 @@ def test_no_bond_binds_on_its_maturity_date_any_more() -> None:
     """The sentence FR-029 falsified is gone from the output, not merely from the docstring."""
     assert not [
         item
-        for item in dropped(_surveyed(fixtures.shipped()).comparison)
+        for item in dropped(_surveyed(fixtures.declared()).comparison)
         if isinstance(item.refusal, CannotSpanHorizon)
         and item.refusal.binding_term == "instrument.maturity_date"
     ]
@@ -68,9 +68,9 @@ def test_no_bond_binds_on_its_maturity_date_any_more() -> None:
 
 def test_the_instruments_that_outlive_the_window_want_a_declared_price() -> None:
     """Derived from the registry the test loads, never written out."""
-    wanting = _wanting_a_resale_price(_surveyed(fixtures.shipped()))
+    wanting = _wanting_a_resale_price(_surveyed(fixtures.declared()))
     assert wanting
-    assert all(name not in wanting for name in fixtures.shipped().funds)
+    assert all(name not in wanting for name in fixtures.declared().funds)
 
 
 def test_declaring_the_price_moves_exactly_that_instrument_and_no_other() -> None:
@@ -79,7 +79,7 @@ def test_declaring_the_price_moves_exactly_that_instrument_and_no_other() -> Non
     Asserted as a *difference* between two runs over one registry: an implementation that
     refused everything, or that refused nothing, passes neither half.
     """
-    registries = fixtures.shipped()
+    registries = fixtures.declared()
     before = _surveyed(registries)
     wanted = _wanting_a_resale_price(before)
     subject = wanted[0]
@@ -99,7 +99,7 @@ def test_declaring_the_price_moves_exactly_that_instrument_and_no_other() -> Non
 
 def test_the_figure_it_produces_names_the_declared_belief() -> None:
     """FR-032: every figure computed through the assumption carries it where it is reported."""
-    registries = fixtures.shipped()
+    registries = fixtures.declared()
     subject = _wanting_a_resale_price(_surveyed(registries))[0]
     after = _surveyed(
         fixtures.with_access(
@@ -120,7 +120,7 @@ def test_the_figure_it_produces_names_the_declared_belief() -> None:
 
 def test_a_holding_the_window_reaches_carries_no_such_claim() -> None:
     """The early-exit machinery is reachable only where an early exit actually happens."""
-    registries = fixtures.shipped()
+    registries = fixtures.declared()
     whole = _surveyed(registries, fixtures.HORIZON)
     for outcome in evaluated(whole.comparison):
         assert all(registries.quotation_holds.id not in claim for claim in outcome.rests_on)
@@ -128,7 +128,7 @@ def test_a_holding_the_window_reaches_carries_no_such_claim() -> None:
 
 def test_the_belief_is_read_from_the_registry_rather_than_written_here() -> None:
     """SC-032's rule applied to the assumption: change the declaration, change what is named."""
-    registries = fixtures.shipped()
+    registries = fixtures.declared()
     subject = _wanting_a_resale_price(_surveyed(registries))[0]
     renamed = replace(
         registries, quotation_holds=replace(registries.quotation_holds, id="a_different_belief")
@@ -157,7 +157,7 @@ def test_a_schedule_whose_last_payment_is_a_coupon_sells_nothing_at_the_window_e
     the ledger refuses by *raising* -- an uncaught exception where the honest answer is a coupon
     the holding simply never receives.
     """
-    registries = fixtures.shipped()
+    registries = fixtures.declared()
     subject = "enumerated_out_of_order"
     with_price = fixtures.with_access(
         registries,
@@ -191,7 +191,7 @@ def test_a_sale_price_below_the_coupons_still_in_it_refuses_rather_than_going_ne
     raising -- an uncaught exception out of the pure core on a condition two data files
     produced between them.
     """
-    registries = fixtures.shipped()
+    registries = fixtures.declared()
     subject = _wanting_a_resale_price(_surveyed(registries))[0]
     starved = fixtures.with_access(
         registries,
@@ -216,7 +216,7 @@ def test_a_reinvesting_holding_is_not_reported_as_a_missing_declaration() -> Non
     price it needs is already declared. Routing on the second term alone told the owner to
     supply a file he had, which is a guard whose message is false.
     """
-    registries = tuple_fixtures.shipped()
+    registries = tuple_fixtures.declared()
     subject = tuple_fixtures.OVDP
     priced = tuple_fixtures.with_access(
         registries,

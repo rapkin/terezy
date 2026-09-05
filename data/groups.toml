@@ -2,26 +2,18 @@
 #
 # **The owner asks in groups, and none of his words is an instrument id.** "Compare cash, OVDP,
 # Inzhur and BTC" names two families and two things nobody has declared. A subject that could
-# only be an id would put every issue in the question file — nine today, thirty-three once
-# feature 016 declares the real ОВДП issues — and every new issue would then be a hand edit that
-# is silently wrong until somebody makes it. Under a group, a new issue joins by carrying the
-# label and the question file does not change at all.
+# only be an id would put every issue in the question file, and every new issue would then be a
+# hand edit that is silently wrong until somebody makes it. Under a group, a new issue joins by
+# carrying the label and the question file does not change at all.
 #
 # **A group is a declared LABEL, never a rule** (015 FR-007a). An instrument says which groups
 # it is in; nothing here says which instruments are in it, and nothing anywhere computes
-# membership. Four inferences look right on today's registry and every one of them is wrong:
-#
-#   * the **class** — `enumerated_taxable_x` is fixed income and is not an ОВДП;
-#   * the **venue** — `inzhur` is also a venue id, and all nine access declarations read
-#     `bought_at = "inzhur"`, so inferring from it would call six bonds Inzhur funds;
-#   * the **tax class** — five of the six fixed-income fixtures carry `ua_government_bond` and
-#     the sixth does not, so it separates them today by luck; a tax class is a legal fact about
-#     an instrument and a group is what the owner calls it;
-#   * the **id prefix** — four of the six are named `ovdp_*`, and a prefix rule would silently
-#     exclude `enumerated_out_of_order`, which is modelled on a real government issue.
-#
-# `tests/contract/test_group_membership_is_declared.py` builds one instrument that trips all
-# four and asserts it is in no group.
+# membership. Four inferences would agree with the labels on some registry and none of them is
+# the label: the instrument **class** (fixed income is not the same set as ОВДП), the **venue**
+# (`inzhur` is a venue id too, and every access declaration names it), the **tax class** (a
+# legal fact about an instrument, where a group is what the owner calls it) and the **id
+# prefix**. `tests/contract/test_group_membership_is_declared.py` builds one instrument that
+# trips all four and asserts it is in no group.
 #
 # **Root-level and curated, beside `venues.toml`.** The label lives on the curated instrument
 # declaration, so a per-owner vocabulary would make an instrument file fail to load because

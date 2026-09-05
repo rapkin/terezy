@@ -30,11 +30,12 @@ from terezy.core.ledger import seeds
 from terezy.core.primitives.currency import Currency
 from terezy.data.declarations import loader, resolver
 from terezy.data.declarations.errors import DeclarationError
+from tests import data_roots
 
 pytestmark = pytest.mark.contract
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DATA_ROOT = REPO_ROOT / "data"
+DATA_ROOT = data_roots.with_fixtures()
 SEEDS = DATA_ROOT / "seeds" / "owner-001.toml"
 GOALS = DATA_ROOT / "goals" / "owner-001.toml"
 OWNER = "owner-001"
@@ -134,8 +135,13 @@ def test_deleting_the_per_owner_files_removes_every_record_and_no_curated_one(
 # ---------------------------------------------------------------------------
 
 
-def test_every_shipped_per_owner_record_is_labelled_synthetic() -> None:
+def test_every_declared_per_owner_record_is_labelled_synthetic() -> None:
     """FR-025, and `data/README.md` rule 5 -- the owner's own rule -- made checkable.
+
+    Over the COMPOSED root, because the label is only checkable where a labelled record
+    exists: `data/seeds/` declares no lot since the narrowing of 2026-09-02, and that its
+    list is empty rather than mislabelled is
+    `test_seed_declaration_loading.py::test_what_ships_declares_an_owner_and_no_lot`.
 
     What may be committed here is a public fact or a fixture that says it is one. The header
     comment says so to a human; ``is_synthetic`` says so to the tool, which is what makes "the

@@ -1768,8 +1768,12 @@ class SeedFile(BaseModel):
     seed: list[SeedTable]
     """May be **empty**, and this is the only declaration list in the project of which that is
     true (008 FR-024, research.md D9). An empty spendable list makes every exit fail a test it
-    should pass; an empty seed list means the owner holds nothing, which is an ordinary state
-    of affairs and not a mistyped path."""
+    should pass; an empty seed list is an ordinary state of affairs and not a mistyped path.
+
+    It says **no lot has been declared**, never *the owner holds none*: the second is a figure
+    describing his actual position, which `data/README.md` rule 5 forbids committing. The key
+    itself stays required, so the absence has to be written down rather than inferred from a
+    missing line."""
 
 
 class GoalTable(BaseModel):

@@ -1,8 +1,10 @@
-# SYNTHETIC FIXTURE. These are not the owner's holdings.
-#
-# His real figures are unstated (`SIMULATOR_SPEC.md` §11 item 3) and will replace this file
-# when they arrive. Nothing below describes a position anyone holds, and no figure computed
-# from it may be quoted as if it did (008 FR-025).
+# NOTHING IS DECLARED HERE YET, and that is not a claim that the owner holds nothing. His real
+# figures are unstated (`SIMULATOR_SPEC.md` §11 item 3) and will land here when they arrive;
+# until then this file says only that no lot has been declared, which is an ordinary state and
+# not a missing declaration (008 FR-024). Rule 5 of `data/README.md` is why it cannot say more:
+# a figure describing his actual position may never be committed, and a synthetic stand-in
+# would be a lot no test needs — the ones that are needed live in `tests/fixtures/data/seeds/`
+# beside the invented instruments they hold.
 #
 # **Per-owner data, not curated.** Beside `data/streams/`, `data/spendable/` and
 # `data/composition/`, on the boundary Principle VII draws: instruments, routes and tax packs
@@ -16,10 +18,10 @@
 # reason written out. If a *market value* ever has to live here it moves to a sourced
 # directory rather than the exemption widening to cover it.
 #
-# **`is_synthetic = true` is a claim the tool can read**, not decoration beside this header.
-# `data/README.md` rule 5 permits this file in the repository because what is in it is
-# invented; the day a lot here describes something the owner actually holds, the flag says so
-# and the file stops being committable.
+# **`is_synthetic = true` is a claim the tool can read**, not decoration beside a header.
+# `data/README.md` rule 5 is what permits an invented lot in the repository at all; the day
+# one describes something the owner actually holds, the flag says so and the file stops being
+# committable.
 #
 # **A seed is a cost, never a current value** (§4.8). "I hold 100 units worth X today" cannot
 # produce a disposal gain at all: the tax engine needs lots, and a lot is units acquired on a
@@ -32,27 +34,11 @@
 # which arrives with the FX features, and an assumed rate under a tax figure is exactly the
 # confident wrongness this project exists to remove.
 
+# Stated, not omitted, and ABOVE `[owner]` because a bare key after a table header joins that
+# table. The key is required and nothing is substituted for a missing one (008 FR-016), so an
+# absent `seed` is a file that does not load rather than a person who holds nothing -- and
+# those are different claims.
+seed = []
+
 [owner]
 id = "owner-001"
-
-# A lot whose cost the owner knows: he has the confirmation from the purchase.
-[[seed]]
-is_synthetic  = true
-instrument_id = "ovdp_synthetic_a"
-quantity      = 10.0
-acquired_on   = "2026-03-14"
-cost          = 9_800.0
-basis         = "known"
-
-# A lot whose cost he does not. The estimate is accepted and marked: a disposal of this lot
-# yields a gain that says it rests on a guess, and so does the tax charged on that gain.
-# `reason` is required here and forbidden above — a reason on a known basis means one of the
-# two fields is wrong, and guessing which would be the loader inventing a declaration.
-[[seed]]
-is_synthetic  = true
-instrument_id = "ovdp_synthetic_b"
-quantity      = 5.0
-acquired_on   = "2026-04-02"
-cost          = 5_400.0
-basis         = "estimated"
-reason        = "bought across several weeks; the cabinet shows units, not the prices paid"

@@ -49,7 +49,7 @@ def _enumerate(
 
 
 def test_the_same_question_twice_returns_an_equal_set_in_an_equal_order() -> None:
-    first, second = _enumerate(fixtures.shipped()), _enumerate(fixtures.shipped())
+    first, second = _enumerate(fixtures.declared()), _enumerate(fixtures.declared())
     assert first.candidates == second.candidates
     assert first.no_candidate == second.no_candidate
 
@@ -67,7 +67,7 @@ def test_a_registry_whose_files_sort_differently_returns_the_same_sequence(
         root, base_currency=Currency.UAH, scenario_id=None
     ).registries
     assert [item.key for item in _enumerate(shuffled).candidates] == [
-        item.key for item in _enumerate(fixtures.shipped()).candidates
+        item.key for item in _enumerate(fixtures.declared()).candidates
     ]
 
 
@@ -83,7 +83,7 @@ def test_the_sequence_is_the_one_fr016s_five_terms_imply() -> None:
     term and the position term something to order.
     """
     registries = tuples.with_new_route(
-        fixtures.shipped(),
+        fixtures.declared(),
         tuples.route(
             "test_second_way_in",
             origin="monobank_uah",
@@ -119,7 +119,7 @@ class TestARunPlansOrderIsItsPositionInTheCallersSequence:
 
     @staticmethod
     def _two_plans(first_exit: date, second_exit: date) -> dict[str, tuple[InstrumentPlan, ...]]:
-        registries = fixtures.shipped()
+        registries = fixtures.declared()
         plans = dict(fixtures.one_plan_each(registries))
         declared = registries.funds[REIT]
         plans[REIT] = (
@@ -135,7 +135,7 @@ class TestARunPlansOrderIsItsPositionInTheCallersSequence:
         produced = [
             item
             for item in _enumerate(
-                fixtures.shipped(), self._two_plans(self.EARLY, self.LATE)
+                fixtures.declared(), self._two_plans(self.EARLY, self.LATE)
             ).candidates
             if item.key.instrument_id == REIT
         ]
@@ -144,8 +144,8 @@ class TestARunPlansOrderIsItsPositionInTheCallersSequence:
         assert [item.plan_position for item in produced] == [0, 1]
 
     def test_supplying_them_the_other_way_round_permutes_those_two_and_nothing_else(self) -> None:
-        forwards = _enumerate(fixtures.shipped(), self._two_plans(self.EARLY, self.LATE))
-        backwards = _enumerate(fixtures.shipped(), self._two_plans(self.LATE, self.EARLY))
+        forwards = _enumerate(fixtures.declared(), self._two_plans(self.EARLY, self.LATE))
+        backwards = _enumerate(fixtures.declared(), self._two_plans(self.LATE, self.EARLY))
 
         def elsewhere(result: CandidateSet) -> list[object]:
             return [item.key for item in result.candidates if item.key.instrument_id != REIT]
@@ -163,7 +163,7 @@ class TestARunPlansOrderIsItsPositionInTheCallersSequence:
         """The claim FR-017 makes that the sequence alone cannot: the number on the record is
         the caller's index. Reading it off the sorted set would be reading the input off the
         output, and a sort that ignored the sequence would still satisfy that."""
-        backwards = _enumerate(fixtures.shipped(), self._two_plans(self.LATE, self.EARLY))
+        backwards = _enumerate(fixtures.declared(), self._two_plans(self.LATE, self.EARLY))
         by_exit = {
             item.key.exit_terms.exit_on: item.plan_position  # type: ignore[union-attr]
             for item in backwards.candidates

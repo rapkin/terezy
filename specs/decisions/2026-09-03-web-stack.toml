@@ -1,0 +1,78 @@
+# Owner decisions of 2026-09-03: the delivery surface, and what it is built out of.
+#
+# Not answers to a clarification round. These were volunteered, and the first of them
+# supersedes a founding decision recorded in the constitution's header (D-B), which is why
+# they are written down before the spec that rests on them rather than after. Feature
+# 021-web-declared-data cites this file for every "owner decision 2026-09-03" it makes.
+#
+# Relayed in English. The reasoning under `notes` is the owner's; the wording is not.
+exported_on = "2026-09-03"
+
+[[decision]]
+n       = 1
+feature = "021-web-declared-data"
+title   = "D-B is lifted: the delivery surface gains a web client"
+choice  = "web/ at the repository root, a TypeScript client over the HTTP API"
+notes   = """
+D-B deferred the web framework until the result schema had stabilised against real output.
+015 stabilised it and 016 put real instruments under it, so the condition the deferral was
+written against is met.
+
+The client is a client over the HTTP API and over nothing else. It lives outside
+src/terezy/ so that "the UI may not import the core" is a physical fact rather than a
+convention -- lint-imports governs a Python package and cannot see a TypeScript one, and a
+boundary a gate cannot see has to be a boundary a build cannot cross.
+
+Requires an amendment: the constitution's Architecture Constraints still carry the D-B
+deferral and a `ui/` line in the layer map. The amendment text is drafted in the Appendix of
+specs/021-web-declared-data/spec.md and is applied by the change that lands that spec.
+"""
+
+[[decision]]
+n       = 2
+feature = "021-web-declared-data"
+title   = "The stack"
+choice  = "pnpm, Vite, React, TypeScript strict, Tailwind + shadcn/ui, TanStack Router and Query, Recharts"
+notes   = """
+Every one of these is argued against its alternative in the decision table of
+specs/021-web-declared-data/spec.md, and that table is the one place the reasoning lives.
+
+What belongs here instead is the part that is not this feature's reasoning at all -- the
+owner's standing preference, which outlives the spec that first acted on it:
+
+  * MobX is the store to add if client state grows. Never Redux.
+
+Also decided: the typed contract is generated from the checked-in OpenAPI document of
+feature 020, committed, and re-generated in CI. The spec says why.
+"""
+
+[[decision]]
+n       = 3
+feature = "021-web-declared-data"
+title   = "Packaging: one production container, loopback only"
+choice  = "A pnpm build stage hands web/dist to the api image; the web compose service is development-only"
+notes   = """
+Three things decided, each argued in the spec rather than here:
+
+  * Production is one running container, serving the API and the client from one origin.
+  * Every published host port names 127.0.0.1 explicitly, in every compose profile.
+  * Playwright runs against the in-process API on loopback, not through compose.
+
+The one that is a preference rather than an argument: the owner does not want a reverse
+proxy in this stack at all, at any point, for any reason short of a second host.
+"""
+
+[[decision]]
+n       = 4
+feature = "021-web-declared-data"
+title   = "The bootstrap starts without waiting for the open questions"
+choice  = "Build the recommended option for each; an answer that overturns one is an additive change"
+notes   = """
+features.toml's `drafted` status says planning may not start while a [NEEDS CLARIFICATION]
+is open. This overrides that for feature 021 only. The ground is stated in the spec's
+Status header, where each of the three questions names what it blocks.
+
+What is recorded here and nowhere else: the override is granted for this feature and is
+not a precedent. A question whose blast radius is unstated still stops the work, which is
+the case the rule was written for.
+"""

@@ -30,7 +30,7 @@ DEARER_ROUTE: Final = "test_dearer_in"
 
 def _registries() -> Registries:
     """Two more ways in: one identical in cost to the shipped domestic route, one dearer."""
-    registries = fixtures.shipped()
+    registries = fixtures.declared()
     for route_id, fee in ((TWIN_ROUTE, 0.0), (DEARER_ROUTE, 0.02)):
         registries = fixtures.with_new_route(
             registries,

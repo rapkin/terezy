@@ -10,8 +10,8 @@ It is feature 003's FR-002 (owner decision, 2026-08-23), and `compose` cannot pr
 sentinel -- which is why FR-002 needs a carve-out here and why FR-004's prohibition is on the
 **default** rather than on a way out with no segments.
 
-The shipped registry reaches this nowhere, so the fixture moves one instrument's proceeds and
-the first test proves the move is what did it.
+No declared registry reaches this, so the fixture moves one instrument's proceeds and the
+first test proves the move is what did it.
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ SPENDABLE_VENUE = "monobank_uah"
 
 
 def _proceeds_land_where_the_owner_spends() -> Registries:
-    return fixtures.with_access(fixtures.shipped(), OVDP, proceeds_to=SPENDABLE_VENUE)
+    return fixtures.with_access(fixtures.declared(), OVDP, proceeds_to=SPENDABLE_VENUE)
 
 
 def _set(registries: Registries) -> CandidateSet:
@@ -40,10 +40,10 @@ def _set(registries: Registries) -> CandidateSet:
     return result
 
 
-def test_the_shipped_registry_reaches_this_nowhere() -> None:
-    """The control that makes the fixture mean something: on the shipped declarations every way
-    out is a declared chain, so a test that found the sentinel there would be finding a bug."""
-    ways_out = {item.key.route_out for item in _set(fixtures.shipped()).candidates}
+def test_the_declared_registry_reaches_this_nowhere() -> None:
+    """The control that makes the fixture mean something: on the declarations as they stand
+    every way out is a declared chain, so finding the sentinel there would be finding a bug."""
+    ways_out = {item.key.route_out for item in _set(fixtures.declared()).candidates}
     assert ways_out == {DeclaredExit(route_id="inzhur_to_monobank")}
 
 

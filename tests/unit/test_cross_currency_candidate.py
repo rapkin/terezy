@@ -43,7 +43,7 @@ def _with_the_corridor() -> object:
     )
 
 
-def test_the_shipped_registry_reaches_nothing_from_the_dollar_stream() -> None:
+def test_the_declared_registry_reaches_nothing_from_the_dollar_stream() -> None:
     """The baseline the fixture is a difference from, read off the sections themselves."""
     for section in fixtures.answered().sections:
         assert isinstance(section.outcome, CandidateSurvey)

@@ -4,7 +4,7 @@ Constitution Principle II: *adding an instrument must be a data-only change; if 
 an engine edit, the abstraction is wrong.* Feature 001 proved that for a bond declared by
 its terms, feature 006 for a fund. This proves it for the form 013 adds -- and the claim is
 made under the loosest conditions available: a file this repository has never seen, in a
-scratch data root, differing from the shipped fixture in its payments, its coverage claim,
+scratch data root, differing from the fixture it is modelled on in its payments, its coverage claim,
 its face value and its day count.
 
 The **duplicate identifier** half of SC-006 lives here rather than in the loading battery,
@@ -33,11 +33,12 @@ from terezy.core.results import project
 from terezy.core.results.project import Projection
 from terezy.data.declarations import resolver
 from terezy.data.declarations.errors import DeclarationError
+from tests import data_roots
 
 pytestmark = pytest.mark.contract
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DATA_ROOT = REPO_ROOT / "data"
+DATA_ROOT = data_roots.with_fixtures()
 SHIPPED = "ovdp_enumerated_a"
 THIRD = "ovdp_enumerated_c"
 

@@ -58,7 +58,7 @@ class TestOneMissingDeclarationPerPart:
 
     def test_an_instrument_nobody_declared(self) -> None:
         refusal = _evaluated(
-            fixtures.shipped(),
+            fixtures.declared(),
             replace(fixtures.hurdle_tuple(), instrument_id="nothing_declares_this"),
         )
         assert isinstance(refusal, DeclarationMissing), refusal
@@ -69,7 +69,7 @@ class TestOneMissingDeclarationPerPart:
         # The part this feature added, and the one that makes both venue seams anchorable.
         # Without
         # it the join could check only the currency -- which is feature 004's defect exactly.
-        refusal = _evaluated(fixtures.without_access(fixtures.shipped(), fixtures.OVDP))
+        refusal = _evaluated(fixtures.without_access(fixtures.declared(), fixtures.OVDP))
         assert isinstance(refusal, DeclarationMissing), refusal
         assert refusal.part == "access"
         assert fixtures.OVDP in refusal.what
@@ -77,14 +77,14 @@ class TestOneMissingDeclarationPerPart:
     def test_a_tax_class_the_instrument_names_and_no_jurisdiction_declares(self) -> None:
         # Refused rather than projected untaxed: "no rule was found" and "the rule charged
         # nothing" are opposite claims and only one of them is cited.
-        refusal = _evaluated(fixtures.without_tax_class(fixtures.shipped(), "ua_government_bond"))
+        refusal = _evaluated(fixtures.without_tax_class(fixtures.declared(), "ua_government_bond"))
         assert isinstance(refusal, DeclarationMissing), refusal
         assert refusal.part == "tax_class"
         assert "ua_government_bond" in refusal.what
 
     def test_an_income_stream_nobody_declared(self) -> None:
         refusal = _evaluated(
-            fixtures.shipped(), replace(fixtures.hurdle_tuple(), stream_id="no_such_income")
+            fixtures.declared(), replace(fixtures.hurdle_tuple(), stream_id="no_such_income")
         )
         assert isinstance(refusal, DeclarationMissing), refusal
         assert refusal.part == "route_in"
@@ -92,7 +92,7 @@ class TestOneMissingDeclarationPerPart:
 
     def test_a_way_in_naming_a_route_nobody_declared(self) -> None:
         refusal = _evaluated(
-            fixtures.shipped(),
+            fixtures.declared(),
             replace(
                 fixtures.hurdle_tuple(),
                 route_in=fixtures.FundingPath(
@@ -107,7 +107,7 @@ class TestOneMissingDeclarationPerPart:
 
     def test_a_way_out_naming_a_route_nobody_declared(self) -> None:
         refusal = _evaluated(
-            fixtures.shipped(),
+            fixtures.declared(),
             fixtures.hurdle_tuple(route_out=fixtures.DeclaredExit(route_id="no_such_exit")),
         )
         assert isinstance(refusal, DeclarationMissing), refusal
@@ -122,7 +122,7 @@ class TestTheTwoExitGapsAreDistinguishable:
         # promoted into the gap. `binance` is not a declared spendable endpoint, so no exit by
         # identity rescues it either.
         registries = fixtures.with_new_route(
-            fixtures.shipped(),
+            fixtures.declared(),
             fixtures.route(
                 DEAD_END,
                 origin="monobank_uah",
@@ -150,7 +150,7 @@ class TestTheTwoExitGapsAreDistinguishable:
         # there is no exit at all -- and the holding stays open rather than being liquidated
         # at a discount nobody granted.
         refusal = _evaluated(
-            fixtures.shipped(),
+            fixtures.declared(),
             fixtures.fund_tuple(
                 fixtures.REIT,
                 exit_on=date(2028, 1, 17),
@@ -185,7 +185,7 @@ class TestRunSettingsAndRangesRefuseRatherThanGuess:
         # Silently dropping the fields that do not apply would run the holding under settings
         # the caller believes are in force -- a fund projected with no liquidity mode at all.
         refusal = _evaluated(
-            fixtures.shipped(),
+            fixtures.declared(),
             replace(
                 fixtures.fund_tuple(fixtures.MILTECH, exit_on=fixtures.MILTECH_EXIT),
                 exit_terms=fixtures.HOLD_TO_MATURITY,
@@ -198,7 +198,7 @@ class TestRunSettingsAndRangesRefuseRatherThanGuess:
         # MilTech states 25-29% and a tuple has one outcome. Taking the midpoint, the low end
         # or the high end would be the false point a range exists to refuse.
         refusal = _evaluated(
-            fixtures.shipped(),
+            fixtures.declared(),
             fixtures.fund_tuple(fixtures.MILTECH, exit_on=fixtures.MILTECH_EXIT),
         )
         assert isinstance(refusal, TwoFiguresNotOne), refusal
@@ -212,32 +212,32 @@ class TestNoCaseInTheBatteryProducesAFigure:
         ("registries", "candidate"),
         [
             pytest.param(
-                fixtures.shipped(),
+                fixtures.declared(),
                 replace(fixtures.hurdle_tuple(), instrument_id="nothing_declares_this"),
                 id="instrument",
             ),
             pytest.param(
-                fixtures.without_access(fixtures.shipped(), fixtures.OVDP),
+                fixtures.without_access(fixtures.declared(), fixtures.OVDP),
                 fixtures.hurdle_tuple(),
                 id="access",
             ),
             pytest.param(
-                fixtures.without_tax_class(fixtures.shipped(), "ua_government_bond"),
+                fixtures.without_tax_class(fixtures.declared(), "ua_government_bond"),
                 fixtures.hurdle_tuple(),
                 id="tax class",
             ),
             pytest.param(
-                fixtures.shipped(),
+                fixtures.declared(),
                 replace(fixtures.hurdle_tuple(), stream_id="no_such_income"),
                 id="stream",
             ),
             pytest.param(
-                fixtures.shipped(),
+                fixtures.declared(),
                 fixtures.hurdle_tuple(route_out=fixtures.DeclaredExit(route_id="no_such_exit")),
                 id="way out",
             ),
             pytest.param(
-                fixtures.shipped(),
+                fixtures.declared(),
                 fixtures.fund_tuple(
                     fixtures.REIT,
                     exit_on=date(2028, 1, 17),
