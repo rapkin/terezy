@@ -173,13 +173,8 @@ def coupons_per_unit(declaration: InstrumentDeclaration) -> tuple[tuple[date, Mo
     at an unreduced per-unit quotation is what carries the reduction. Subtracting it here as
     well would take it out twice.
 
-    **The two mechanisms do not compose, and the gap is asserted rather than argued.** Declared
-    amounts are per unit as *declared*; retiring units rebases what a unit is, so a coupon
-    declared after a repayment is per original unit while the quotation it comes out of is per
-    remaining unit. Where both fall inside one window the subtraction is too small by the ratio.
-    No shipped early-exit window contains a repayment --
-    `tests/worked_examples/test_a_coupon_inside_the_window.py` asserts it -- and closing it
-    needs the sale priced per tranche, which is the same change a reinvesting holding wants.
+    The two mechanisms do not compose where both fall inside one window, which :func:`events`
+    refuses rather than pricing.
     """
     terms = terms_of.narrowed(declaration, EnumeratedTerms)
     return tuple(

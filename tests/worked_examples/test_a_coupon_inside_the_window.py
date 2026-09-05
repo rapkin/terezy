@@ -285,13 +285,13 @@ def test_a_coupon_paid_before_the_purchase_stays_in_both_prices() -> None:
 
 
 def test_no_early_exit_window_contains_a_repayment_of_principal() -> None:
-    """The one place the two per-unit conventions would disagree, asserted to be out of reach.
+    """Why every figure in this module is a figure and not a refusal.
 
-    A repayment retires units, so what *a unit* means changes at that date; a coupon declared
-    after one is per original unit while the quotation it is subtracted from is per remaining
-    unit. Both mechanisms are right on their own and they do not compose, so the subtraction
-    would be too small by the ratio. Nothing on the shipped registry pays principal inside an
-    early-exit window -- every real issue repays once, at maturity, past the owner's horizons.
+    A repayment retires units, so what *a unit* means changes at that date, and a coupon
+    declared after one is per original unit while the quotation it is subtracted from is per
+    remaining unit. `enumerated.events` refuses that combination rather than pricing it, so
+    this check is what says the owner's answer is on the other side of that refusal: every real
+    issue repays once, at maturity, past his horizons.
     """
     declared = _supplied().registries.instruments
     checked = 0
