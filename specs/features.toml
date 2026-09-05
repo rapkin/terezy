@@ -169,6 +169,18 @@ needs  = ["014-candidates", "015-the-question"]
 why    = "014 owns the no-candidate column this retires, the enumeration that must construct the identity way in instead of calling compose, and the total order the entry needs a position in; 015 owns the group vocabulary `cash` resolves through and the three-state subject population it moves between. Transitively covers 010 (Tuple.route_in widens) and 003 (EXIT_BY_IDENTITY, the precedent the way in mirrors)."
 note   = "Declares the do-nothing baseline the owner named first, and closes zero-hop-way-in in the same change that makes it live. Owner statement 2026-09-02; see specs/023-cash-instrument/spec.md."
 
+[[feature]]
+id     = "025-btc-holdings"
+status = "drafted"
+needs  = ["008-seed-and-goals", "011-official-rate", "015-the-question", "018-nbu-rate-series", "020-http-api"]
+why    = "008 declares the seed lots this position is made of and the estimated basis it carries; 011 strikes the dollar cost into hryvnia at the acquisition date and 018 is the series it strikes from -- both, because 011 shipped the machinery empty; 015 is where `btc` resolves to nothing and the verification task that says what would close it; 020 publishes the schema this feature edits, since a fifth subject standing regenerates the OpenAPI document. NOT parallel with 019 in practice: both regenerate tests/golden/the_answer.golden.txt and whichever lands second re-measures"
+note   = "Owner 2026-09-02/03 -- he holds BTC and wants it counted, not bought. `drafted` with plan.md and tasks.md written: two clarifications are open and tasks.md holds every artefact that turns on one in a phase that may not start. See specs/025-btc-holdings/spec.md."
+
+[[future]]
+id    = "the-graph-has-no-word-for-drafted-and-planned"
+after = ["025-btc-holdings"]
+note  = "`drafted` says planning may not start; `planned` says plan.md and tasks.md exist. 025 is both TODAY, so the graph asserts something false about it right now rather than later. Recorded 2026-09-06 by 025's review."
+
 [[future]]
 id      = "web-display-currency-switch"
 after   = ["021-web-declared-data"]
