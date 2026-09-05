@@ -49,6 +49,9 @@ dev = [
     "syrupy>=4.8",
     "httpx>=0.28",
     "httpx2>=2.12.0",
+    # tests/contract/test_the_shipped_compose_file.py parses docker-compose.yml; without this
+    # line yaml arrives only transitively through uvicorn[standard], an extra, not a dev dep.
+    "pyyaml>=6.0",
 ]
 
 [build-system]

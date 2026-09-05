@@ -74,8 +74,12 @@ jobs:
       - name: Tests, coverage gate enforced
         # The suite must pass with no network reachable (Principle V). The conftest
         # guard asserts this in-process; the runner has no fixtures that need egress.
+        # `uv run` re-syncs before running: without the same interpreter and extras it
+        # rebuilt the environment without the `api` extra and 18 modules failed to import.
+        env:
+          UV_PYTHON: ${{ matrix.python }}
         run: >-
-          uv run pytest
+          uv run --all-extras --dev pytest
           --cov
           --cov-report=term-missing
           --cov-report=xml
