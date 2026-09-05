@@ -45,8 +45,9 @@ def _generated(*arguments: str) -> subprocess.CompletedProcess[str]:
 
 @pytest.mark.contract
 def test_the_endpoint_serves_what_the_generator_writes(tmp_path: Path) -> None:
-    """The gate the checked-in file used to be. A client's types come from the generator and its
-    requests go to the endpoint, so the two emitting different bytes is drift with no diff."""
+    """Both sides render one document; what this pins is that they render it the same *way*. The
+    framework's JSON response writes compact separators and no trailing newline, so a client
+    generated from the generator's bytes and fetching the endpoint's would find they disagree."""
     written = tmp_path / "openapi.json"
     _generated("--out", str(written))
     assert written.read_text(encoding="utf-8") == _served_document()

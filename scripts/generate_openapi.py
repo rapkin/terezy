@@ -33,10 +33,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     arguments = parser.parse_args(argv)
     rendered = document.rendered(create_app(DATA_ROOT, client=None))
+    encoded = rendered.encode("utf-8")
     if arguments.out is None:
-        sys.stdout.write(rendered)
+        # Bytes both ways: the caller pipes this into a generator, and `sys.stdout` would encode
+        # with the locale's codec and translate newlines -- either of which makes the document a
+        # different file from the one the endpoint serves.
+        sys.stdout.buffer.write(encoded)
     else:
-        arguments.out.write_text(rendered, encoding="utf-8")
+        arguments.out.write_bytes(encoded)
     return 0
 
 

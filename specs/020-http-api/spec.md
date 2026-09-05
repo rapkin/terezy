@@ -189,9 +189,12 @@ two agree.
    byte-identical.
 2. **Given** two processes with different `PYTHONHASHSEED`, **When** each renders the document,
    **Then** the two are byte-identical — the property a build depends on with no file to diff.
-3. **Given** an added, removed or renamed field on any response record, **When** the suite runs,
-   **Then** the schema tests that walk the response types fail naming the union or the tag that
-   moved.
+3. **Given** a renamed or removed field on a response record, **When** the suite runs, **Then**
+   the body tests that read that field fail — measured 2026-09-05 by renaming
+   `ScenarioNotDeclared.wanted_id`, which turned 19 assertions red. **An *added* field is caught by
+   nothing**, and neither is the FR-041 bump it should provoke. That is what the committed
+   document's diff had been doing, and it is recorded as the `openapi-wire-change-is-unannounced`
+   future entry rather than replaced.
 
 ---
 
@@ -1022,6 +1025,11 @@ declare exactly the set the endpoint answers with.
   is also the wrong number on its own terms: the package version moves when the tax engine changes
   and a generated TypeScript client does not care, while this one moves when the wire shape does.
 
+  **Unenforced since 2026-09-05**, and stated here rather than left to be discovered: the diff of
+  the committed document was the only thing that told a reader a wire change had happened and the
+  bump was due. Nothing detects one now. `openapi-wire-change-is-unannounced` in
+  `specs/features.toml` records the gap.
+
 ### The answer endpoint
 
 - **FR-042**: The answer MUST be in this feature, read-only, over **declared questions only**:
@@ -1320,9 +1328,10 @@ to a feature about the answer's vocabulary rather than about serialising it.
 - **SC-006**: `OneWayCost` and `RoundTripCost` serialise to bodies that differ, on data where every
   one of their nine fields is equal. This is the Principle VI prohibition at the wire, and it fails
   on `main` today for the trivial reason that neither type is serialised at all. (FR-014)
-- **SC-007** — **SUPERSEDED 2026-09-05**, and what replaced it is SC-007a: with no committed file,
-  a changed response record has nothing to be compared against, and the schema tests that walk the
-  response types are what catch it. Regenerating the OpenAPI document produces bytes identical to
+- **SC-007** — **SUPERSEDED 2026-09-05**, and only partly replaced: with no committed file, a
+  changed response record has nothing to be compared against. A renamed or removed field is caught
+  by the body tests that read it; an added one is caught by nothing, which is the
+  `openapi-wire-change-is-unannounced` future entry. Regenerating the OpenAPI document produces bytes identical to
   `src/terezy/api/http/openapi.json`. Changing one field on one response record turns it red naming
   the path that moved; changing any of the three pinned versions turns it red if the output changed.
   (FR-037, FR-038, FR-039)
