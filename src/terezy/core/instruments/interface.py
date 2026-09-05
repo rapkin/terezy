@@ -49,7 +49,7 @@ from terezy.core.ledger.events import Event, EventKind
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance
-from terezy.core.scenarios.early_exit import QuotationHolds
+from terezy.core.scenarios.quotation import QuotationHolds
 from terezy.core.tax.interface import TaxableEventKind
 
 
@@ -442,11 +442,8 @@ class EarlyExit:
 
     price_per_unit: Money
     """The declared seller's quote **as observed**, carrying its own citation, in the
-    instrument's currency.
-
-    What a unit fetches on the sale date is this less
-    :func:`terezy.core.scenarios.early_exit.detached_since`, the only place that decides what
-    left the quotation in between.
+    instrument's currency. What a unit fetches on the sale date is this quotation carried
+    there by :func:`terezy.core.instruments.accrual.carried_to`.
     """
 
     observed_on: date
@@ -477,8 +474,8 @@ Obligations, all of them checkable by reading one implementation:
   empty tuple means "legitimately no events in this horizon" and nothing else.
 * **The horizon is when the money comes out** (015 FR-029). An instrument whose own terms
   run past ``horizon.end`` emits its flows up to that day and a sale on it, priced by
-  :func:`terezy.core.scenarios.early_exit.detached_since` from the :class:`EarlyExit`
-  quote and this instrument's own per-unit coupon schedule; handed ``None`` it returns an
+  :func:`terezy.core.instruments.accrual.carried_to` from the :class:`EarlyExit` quote and
+  this instrument's own per-unit coupon schedule; handed ``None`` it returns an
   ``InconsistentTerms`` naming ``access.resale_price``, which the join turns into a missing
   declaration.
 """
@@ -487,10 +484,10 @@ CouponsPerUnitFn = Callable[[InstrumentDeclaration], tuple[tuple[date, Money], .
 """Every coupon **one unit** pays over the whole life of the paper, by paid date, ascending.
 
 Not a holding's coupons and not a window's: the caller is
-:func:`terezy.core.scenarios.early_exit.detached_since`, which decides what has left a dated
-quotation against the *quotation's* day. An implementation that trimmed the list to a buyer
-would be a second opinion about that. Empty is a real answer -- a zero-coupon issue -- and
-never a stand-in for "this form cannot say".
+:func:`terezy.core.instruments.accrual.carried_to`, which reads the dates as the boundaries of
+the accrual periods a dated quotation is carried across. An implementation that trimmed the
+list to a buyer would leave the period containing the quotation's own day unbounded. Empty is
+a real answer -- a zero-coupon issue -- and never a stand-in for "this form cannot say".
 """
 
 TaxClassesFn = Callable[[InstrumentDeclaration], Mapping[TaxableEventKind, str]]

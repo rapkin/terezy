@@ -46,7 +46,6 @@ from terezy.core.instruments.interface import (
 from terezy.core.ledger.events import CausationKind, CausationRef, Event, LotRef
 from terezy.core.primitives import money
 from terezy.core.primitives.tolerance import is_close
-from terezy.core.scenarios import early_exit as early_exit_terms
 
 if TYPE_CHECKING:  # pragma: no cover -- import-time cycle avoidance
     from datetime import date
@@ -124,29 +123,23 @@ def events(
     # the ledger for units no lot holds.
     residual = holding.quantity - retired
     if early_exit is not None and not is_close(residual, 0.0) and residual > 0.0:
-        # **A repayment and a detachment in one window are refused, not priced.** Retiring units
-        # rebases what a unit is, so a coupon declared per unit is per ORIGINAL unit while the
-        # quotation it comes out of is per remaining one -- the subtraction is then too small by
-        # the ratio. Both mechanisms are right alone; what is missing is a sale priced per
-        # tranche, which is the same thing a reinvesting generative holding wants. Unreachable
-        # on the shipped registry, where every issue repays once at maturity.
-        detached = early_exit_terms.detached_since(
-            observed_on=early_exit.observed_on,
-            held_from=holding.purchased_on,
-            sold_on=horizon.end,
-            coupons=coupons_per_unit(declaration),
-            currency=early_exit.price_per_unit.currency,
-        )
-        if retired > 0.0 and detached.amount > 0.0:
+        # **A repayment and a CARRIED quotation in one window are refused, not priced.**
+        # Retiring units rebases what a unit is, so a coupon declared per unit is per ORIGINAL
+        # unit while the quotation whose accrual it sizes is per remaining one -- and the
+        # accrual is then wrong by the ratio. A quotation read on the sale day is carried
+        # nowhere: the accrual cancels out of the price entirely, so the mismatch never enters
+        # a figure and there is nothing to refuse. Unreachable on the shipped registry, where
+        # every issue repays once at maturity.
+        if retired > 0.0 and early_exit.observed_on != horizon.end:
             return InconsistentTerms(
                 first_term="instrument.schedule.payment",
                 second_term="access.resale_price.per_unit",
                 reason=(
-                    f"{declaration.id!r} repays principal and pays a coupon inside one window "
+                    f"{declaration.id!r} repays principal and is sold inside one window "
                     f"ending {horizon.end.isoformat()}: {retired!r} unit(s) are retired before "
-                    f"the sale and {detached.amount!r} per unit detaches from the quotation. "
-                    "A declared coupon is per unit as declared, and retiring units rebases "
-                    "what a unit is, so one quotation cannot price both. Hold to the schedule's "
+                    "the sale, and the quotation carried to that day is a price for one "
+                    "remaining unit while every declared coupon sizing its accrual is per "
+                    "original unit. One quotation cannot price both. Hold to the schedule's "
                     "own end, or price the sale per tranche."
                 ),
             )
@@ -168,13 +161,8 @@ def events(
 def coupons_per_unit(declaration: InstrumentDeclaration) -> tuple[tuple[date, Money], ...]:
     """:data:`CouponsPerUnitFn` for a listed schedule. Declared amounts are already per unit.
 
-    A repayment of principal is **not** here. It leaves the price too, and the schedule accounts
-    for it the other way: `_units_retired`'s share of it retires units, so pricing the remainder
-    at an unreduced per-unit quotation is what carries the reduction. Subtracting it here as
-    well would take it out twice.
-
-    The two mechanisms do not compose where both fall inside one window, which :func:`events`
-    refuses rather than pricing.
+    A repayment of principal is **not** here: it bounds no coupon period, and the schedule
+    accounts for it the other way -- `_units_retired`'s share of it retires units.
     """
     terms = terms_of.narrowed(declaration, EnumeratedTerms)
     return tuple(

@@ -416,3 +416,15 @@ categories, the answer, and a byte-gated OpenAPI document a second codebase is g
 | **E5** | Pressed at the surface where the mark has never had to survive, and not closed. Every money-valued field in every response type carries its provenance and the derived `is_unverified` verdict beside it, swept off the response types rather than sampled (`tests/contract/test_tags_and_unions.py`). The per-refusal half stays open: zero refusal-union members in the core carry provenance, which is the `provenance-on-a-refusal` future entry. |
 | **B10** | Exercised at the boundary where it is easiest to lose: an empty category is an empty list, a singleton the loader found nothing for is a **typed** refusal, and the registry summary reports *whether a document resolved* rather than a count of zero — which would be the same body for both (`tests/unit/test_the_registry_summary.py`). Still a whole-engine row. |
 | **K4** | Reinforced: the first HTTP surface in the repository and it still opens no socket in a test. Both halves are checked — the suite's guard covers outbound connections, and a scan covers the listening half, with the only server call in the entry point (`tests/contract/test_the_http_layer_computes_nothing.py`). |
+
+**022-accrued-interest** closes **no** row. No lettered behaviour names accrued interest, a
+clean price or a carried quotation (measured 2026-09-05), and the feature says so rather than
+stretching one: what it lands is the arithmetic that makes an early exit return a real holding
+period's interest instead of the round-trip spread.
+
+| Row | How, and why the box does not move |
+|---|---|
+| **D1** | The nearest row, and **unchanged by design.** D1 is a bond bought at a *stated* price and held to maturity reproducing a hand-computed schedule. Nothing about a generative schedule moved; what moved is the price a purchase is *sized* from, which D1 states rather than derives. The feature's own hand-computed example is `tests/worked_examples/test_accrued_interest.py` — three accruals, two clean prices, both carried prices and 49 758.37 reached on the owner's own 50 000 — and it answers a different question. |
+| **D3** | Untouched. A restructuring haircut is still nobody's declaration. |
+| **E5** | Pressed once more, and this time on a figure built by arithmetic across two files: a carried price is a quotation less one declared accrual plus another, and it carries the marks of the quotation **and** of every coupon that bounded a period it used (`tests/worked_examples/test_accrued_interest.py`, `tests/worked_examples/test_early_exit_sale.py`). A subtraction that laundered either would be the top-severity defect Principle I names. |
+| **K1** | Reinforced: both goldens moved and were regenerated deliberately, with one moved line hand-checked against the worked example. `the_answer.golden.txt` records three issues leaving as **named refusals** rather than as a shorter list, which is what keeps a shrinking population from reading as a disappearance. |

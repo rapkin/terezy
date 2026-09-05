@@ -20,9 +20,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from terezy.core.errors import InconsistentTerms
+from terezy.core.instruments import accrual
 from terezy.core.ledger.events import CausationKind, CausationRef, Event, EventKind, LotRef
 from terezy.core.primitives import money
-from terezy.core.scenarios import early_exit
 
 if TYPE_CHECKING:  # pragma: no cover -- the records live beside the interface
     from collections.abc import Iterable
@@ -81,17 +81,16 @@ def early_sale(
     coupons: Iterable[tuple[date, Money]],
     sequence: int,
 ) -> Event | InconsistentTerms:
-    """Cash in, units out, at the carried-forward resale price, on the horizon's last day.
+    """Cash in, units out, at the resale quotation carried to the horizon's last day.
 
     015 FR-029. A **disposal**, like a redemption at maturity and unlike a cash receipt: it
     consumes basis and realises a gain or a loss, and the loss is what a spread *is*. Reporting
     it as cash would make the cost of the early exit invisible in the ledger.
 
     ``coupons`` is this instrument's whole per-unit coupon schedule, dates and amounts, and it
-    is a **required** argument rather than an adjustment a caller may apply first: the sale
-    price is the quotation net of what detached from it while the holding held it
-    (:func:`early_exit.detached_since`), and a caller that forgot would credit a coupon and sell
-    at a price that still contained it.
+    is a **required** argument rather than an adjustment a caller may apply first: the quotation
+    is a dirty price and the sale is struck at what it is worth on the sale date
+    (:func:`accrual.carried_to`), which needs the periods the coupons bound.
 
     ``EventKind.REDEMPTION`` rather than ``PRINCIPAL_REPAYMENT``, on the reasoning that kind's
     own docstring already gives for a fund buyback: nothing is repaying principal here, the
@@ -104,18 +103,21 @@ def early_sale(
     ``quantity`` is passed rather than read off the holding, for the reason a redemption's is:
     under a reinvesting policy the units sold are the purchase plus every reinvestment.
 
-    **A quotation worth less than the coupons still inside it refuses**, in the words below.
-    Unreachable on the shipped registry, where the smallest quote is three figures against
-    coupons of tens, and reached deliberately in the worked examples rather than asserted here.
+    **A carried price at or below zero refuses**, in the words below. Unreachable on the shipped
+    registry, where the smallest quote is three figures against accruals of tens, and reached
+    deliberately in the worked examples rather than asserted here.
     """
-    detached = early_exit.detached_since(
+    carried = accrual.carried_to(
+        accrual.schedule_of(declaration, tuple(coupons)),
+        quote=exit_.price_per_unit,
         observed_on=exit_.observed_on,
-        held_from=holding.purchased_on,
-        sold_on=on,
-        coupons=coupons,
-        currency=exit_.price_per_unit.currency,
+        on=on,
+        quoted_term="access.resale_price.observed_on",
+        dated_term="horizon.end",
     )
-    price = money.sub(exit_.price_per_unit, detached)
+    if isinstance(carried, InconsistentTerms):
+        return carried
+    price = accrual.price(carried)
     if price.amount <= 0.0:
         return InconsistentTerms(
             first_term="access.resale_price.per_unit",
@@ -123,11 +125,12 @@ def early_sale(
             reason=(
                 f"{declaration.id!r} quotes {exit_.price_per_unit.amount!r} "
                 f"{exit_.price_per_unit.currency.value} per unit as of "
-                f"{exit_.observed_on.isoformat()}, and {detached.amount!r} of coupon detaches "
-                f"from it on or before the sale of {on.isoformat()}, leaving nothing. A quotation "
-                "cannot be worth less than the coupons it still contains, nor exactly them: "
-                "the two declarations describe different paper, and striking the sale would "
-                "post a disposal of zero or of a negative amount."
+                f"{exit_.observed_on.isoformat()}, which is a clean "
+                f"{carried.clean.amount!r} plus the accrual that day; carried to the sale of "
+                f"{on.isoformat()} that clean price plus {carried.accrued.amount!r} of accrual "
+                f"leaves {price.amount!r}. A sale cannot be struck at nothing or at less: the "
+                "quotation and the payment schedule describe different paper, and striking it "
+                "would post a disposal of zero or of a negative amount."
             ),
         )
     return Event(
@@ -142,8 +145,8 @@ def early_sale(
             detail=(
                 f"sale of {quantity!r} units at {price.amount!r} {price.currency.value} on "
                 f"{on.isoformat()}, the last day of the horizon: the resale quotation declared "
-                f"as of {exit_.observed_on.isoformat()}, less the {detached.amount!r} per "
-                f"unit that detached from it while the holding held it, under the assumption "
+                f"as of {exit_.observed_on.isoformat()}, clean {carried.clean.amount!r} plus "
+                f"{carried.accrued.amount!r} accrued by the sale date, under the assumption "
                 f"{exit_.assumption.id!r}"
             ),
         ),

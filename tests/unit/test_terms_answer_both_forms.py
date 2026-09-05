@@ -130,16 +130,17 @@ class TestWhatARowShouldSayAboutTheConventionsThatShapedIt:
 
 
 class TestWhatAFigureDerivedFromTheseTermsAdditionallyExcludes:
-    def test_a_generative_declaration_adds_nothing(self) -> None:
-        assert declared_terms.excludes_of(GENERATIVE) == frozenset()
+    """022 FR-013: neither form adds anything today, and the empty set is an answer.
 
-    def test_an_enumerated_declaration_states_the_dirty_price(self) -> None:
-        """FR-023, SC-015. Two facts are missing and neither may be inferred: the start of
-        the accrual period containing the purchase, and the basis interest accrues on
-        within it. So the price paid is a dirty price that has not been separated."""
-        stated = declared_terms.excludes_of(ENUMERATED)
-        assert len(stated) == 1
-        assert "dirty price" in next(iter(stated))
+    013 FR-023's dirty-price clause is gone because it stopped being true -- an enumerated
+    purchase price is separated into a clean price and an accrual like any other. The question
+    stays, and stays asked of the declaration, because FR-023 requires the exclusions to be
+    able to differ by declaration and a caller that stopped asking could not tell.
+    """
+
+    def test_neither_form_adds_anything(self) -> None:
+        assert declared_terms.excludes_of(GENERATIVE) == frozenset()
+        assert declared_terms.excludes_of(ENUMERATED) == frozenset()
 
 
 class TestNarrowingToTheFormAGeneratorReads:

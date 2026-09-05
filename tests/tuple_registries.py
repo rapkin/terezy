@@ -64,6 +64,7 @@ __all__ = [
     "MILTECH_POINT",
     "OUTLAY_ON",
     "OVDP",
+    "QUOTED_ON",
     "REIT",
     "SALARY",
     "UAH",
@@ -108,6 +109,15 @@ ISSUE_DATE: Final = date(2026, 1, 15)
 OUTLAY_ON: Final = date(2026, 1, 14)
 """When the money leaves the stream. One day before issue A's issue date, because the shipped
 domestic route declares a one-day latency and the purchase must land on or after the issue."""
+
+QUOTED_ON: Final = date(2026, 1, 15)
+"""When the fixture quotations were read: the day the money leaving on :data:`OUTLAY_ON`
+settles into units.
+
+A quotation is a dirty price carried to the date it is used, so a fixture quoted on some other
+day would put an accrual into every unit count in this suite for reasons that have nothing to
+do with what those examples are about. Reading it on the settlement date makes the carry a
+no-op and keeps the hand-computed arithmetic checkable."""
 
 HORIZON_END: Final = date(2028, 3, 31)
 """Comfortably past issue A's adjusted final payment (2028-01-17) and its three-day exit."""
@@ -278,6 +288,7 @@ def transfer_leg(
     fee_pct: float = 0.0,
     fee_fixed: float = 0.0,
     currency: Currency = UAH,
+    latency_days: int = 0,
 ) -> Leg:
     """One transfer leg in one currency, priced by whatever the caller states. A test fixture.
 
@@ -299,7 +310,7 @@ def transfer_leg(
         maximum=None,
         monthly_cap=None,
         capacity_pool=None,
-        latency_days=0,
+        latency_days=latency_days,
         available_from=None,
         available_until=None,
         disruption_probability=0.0,
@@ -319,8 +330,14 @@ def route(
     fee_fixed: float = 0.0,
     status: str = "open",
     currency: Currency = UAH,
+    latency_days: int = 0,
 ) -> Route:
-    """One declared route of one hryvnia leg. A test fixture, priced by the caller."""
+    """One declared route of one hryvnia leg. A test fixture, priced by the caller.
+
+    ``latency_days`` matters to a **price** and not only to a span since 022: money arriving a
+    day later buys a day dirtier quotation, so a route declared as a twin of another has to
+    take the same time as well as charge the same fee to be one.
+    """
     return Route(
         id=route_id,
         provider="TEST FIXTURE",
@@ -336,6 +353,7 @@ def route(
                 fee_pct=fee_pct,
                 fee_fixed=fee_fixed,
                 currency=currency,
+                latency_days=latency_days,
             ),
         ),
     )
@@ -390,10 +408,9 @@ def access(
     )
 
 
-def quote(price: float, *, kind: str = "venue_terms", observed_on: date = OUTLAY_ON) -> VenueQuote:
+def quote(price: float, *, kind: str = "venue_terms", observed_on: date = QUOTED_ON) -> VenueQuote:
     """One venue quote in hryvnia, ageing under a declared kind. A test fixture.
 
-    Observed no later than the day the money goes out by default, which is what makes a coupon
-    inside the window detach from a resale quote rather than stay in it.
+    Observed on :data:`QUOTED_ON` by default, which is the day the standard fixture tuple buys.
     """
     return VenueQuote(price=Money(price, UAH, prov.EMPTY), kind=kind, observed_on=observed_on)

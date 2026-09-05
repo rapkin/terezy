@@ -17,8 +17,6 @@ SC-002):
 
 * *identity* -- two declarations, two ids;
 * *provenance* -- two files, two citations;
-* *the stated exclusions* -- an enumerated purchase price is a dirty price that has not
-  been separated into a clean price and accrued interest, and the figure says so (FR-023);
 * *the schedule's statement of conventions* -- one row names three conventions, the other
   names the one that annualises and denies the other two (FR-016);
 * *the causation detail prose* -- a generative coupon's detail names the rate, the day count
@@ -43,7 +41,6 @@ import pytest
 
 from terezy.core.decision import tuple_outcome
 from terezy.core.decision.compare import compare
-from terezy.core.instruments import terms as instrument_terms
 from terezy.core.instruments.interface import DateRange, Holding
 from terezy.core.ledger.canonical import of_causation
 from terezy.core.primitives import provenance as prov
@@ -178,13 +175,13 @@ class TestTheOnlyDifferencesArePermittedOnes:
         assert _generative().key.instrument_id != _enumerated().key.instrument_id
         assert replace(_generative().key, instrument_id=MIRROR) == _enumerated().key
 
-    def test_the_exclusions_differ_by_exactly_the_dirty_price_clause(self) -> None:
-        """FR-023, SC-015. Two facts are missing and neither may be inferred: the start of
-        the accrual period containing the purchase, and the basis interest accrues on."""
-        assert _enumerated().excludes - _generative().excludes == frozenset(
-            {instrument_terms.DIRTY_PRICE}
-        )
-        assert _generative().excludes - _enumerated().excludes == frozenset()
+    def test_the_exclusions_no_longer_differ_at_all(self) -> None:
+        """022 FR-013 removed 013 FR-023's dirty-price clause, so this is now an equality.
+
+        What the clause said stopped being true: the declared payment dates bound the accrual
+        periods, so an enumerated purchase price **is** separated into a clean price and an
+        accrual, by the same function that separates a generated one."""
+        assert _enumerated().excludes == _generative().excludes
 
     def test_the_provenance_differs_because_the_files_do(self) -> None:
         """Different citations, and the same **mark**: both rest on unverified values, as

@@ -33,7 +33,7 @@ from terezy.core.primitives.rates import RealRate, RealTermsUnavailable
 from terezy.core.results import answer as records
 from terezy.core.results import question as question_records
 from terezy.core.results.answer import Answer, Direction, Exclusion
-from terezy.core.scenarios import early_exit
+from terezy.core.scenarios import quotation
 from tests import answer_registries as fixtures
 
 pytestmark = pytest.mark.contract
@@ -64,10 +64,10 @@ EARLY_EXIT_CLAIMS: Final = frozenset(
         Exclusion.EARLY_EXIT_IS_A_POINT_NOT_A_DISTRIBUTION,
         Exclusion.EARLY_EXIT_SPREAD_IS_A_SELLERS_QUOTE,
         Exclusion.EARLY_EXIT_CARRIES_NO_RATE_RISK,
-        Exclusion.EARLY_EXIT_IGNORES_ACCRUED_INTEREST,
+        Exclusion.QUOTED_CLEAN_PRICE_IS_ASSUMED_CONSTANT,
     }
 )
-"""015 FR-033's three, and the fourth that carrying a dated quotation added."""
+"""015 FR-033's three, and the fourth that carrying a dated quotation across a gap adds."""
 
 
 def _walk(value: object, seen: set[int] | None = None) -> list[object]:
@@ -135,7 +135,7 @@ def _vocabulary(result: Answer) -> set[str]:
         verb.REAL_TERMS_SUPPLIED_BY,
         verb.INCOME_TAX_SUPPLIED_BY,
         verb.RATE_RISK_SUPPLIED_BY,
-        verb.ACCRUED_INTEREST_SUPPLIED_BY,
+        verb.CLEAN_PRICE_SUPPLIED_BY,
         registries.quotation_holds.id,
     }
 
@@ -213,7 +213,7 @@ def test_every_early_exit_figure_names_the_assumption_it_rests_on() -> None:
         if outcome.sold_early is not None
     ]
     assert sold, "the fixture must actually reach an early exit"
-    expected = early_exit.rests_on(supplied.registries.quotation_holds)
+    expected = quotation.rests_on(supplied.registries.quotation_holds)
     for outcome in sold:
         assert expected in outcome.rests_on, outcome.rests_on
 
@@ -289,9 +289,9 @@ def test_an_early_exit_states_its_claims_and_leaves_rate_risk_unsigned() -> None
     ]
     assert specific
     assert not [item for item in fixture.excludes if item.applies_to is not None]
-    # Every direction each claim was given, not one per claim: a dict keyed by the claim keeps
-    # whichever candidate came last, and the accrued one is deliberately signed on some
-    # candidates and not on others.
+    # Every direction each claim was given, not one per claim: a dict keyed by the claim
+    # would keep whichever candidate came last, and the claim is that no candidate anywhere was
+    # given a direction the warrant does not cover.
     directions: dict[Exclusion, set[Direction | None]] = {}
     for item in specific:
         directions.setdefault(item.what, set()).add(item.direction)
@@ -301,16 +301,45 @@ def test_an_early_exit_states_its_claims_and_leaves_rate_risk_unsigned() -> None
     assert directions[Exclusion.EARLY_EXIT_CARRIES_NO_RATE_RISK] == {None}
     # Signed where the warrant holds and unsigned where it does not; which candidates fall
     # either side is pinned from the declared schedules in the worked example.
-    assert directions[Exclusion.EARLY_EXIT_IGNORES_ACCRUED_INTEREST] <= {
-        Direction.SALE_STRUCK_TOO_LOW,
-        None,
-    }
-    assert (
-        Direction.SALE_STRUCK_TOO_LOW in directions[Exclusion.EARLY_EXIT_IGNORES_ACCRUED_INTEREST]
-    )
+    # Unsigned, and asserted as such: the clean price moves with the curve and the curve moves
+    # both ways, so a sign here would be a number more confident than its inputs.
+    assert directions[Exclusion.QUOTED_CLEAN_PRICE_IS_ASSUMED_CONSTANT] == {None}
 
 
 def test_every_exclusion_names_what_would_supply_it() -> None:
     """FR-023a: a feature or a declaration, never a search."""
     for item in fixtures.answered().excludes:
         assert item.supplied_by.strip()
+
+
+RETIRED_FIELDS: Final = ("detached", "skipped_before")
+"""Field-name fragments of the two ``SoldEarly`` figures 022 removed, and of anything shaped
+like them. Both existed to explain a subtraction of whole detached coupons; the subtraction is
+gone, and a claim kept past its warrant is worse than one never made."""
+
+
+def test_no_result_record_carries_a_detached_coupon_figure() -> None:
+    """SC-004, by the same walk 013's own absence proof used: an absence is only proved by
+    looking everywhere. A stale field left behind would be reported and believed."""
+    found = sorted(
+        {
+            f"{type(record).__name__}.{field.name}"
+            for record in _walk(fixtures.answered())
+            if dataclasses.is_dataclass(record) and not isinstance(record, type)
+            for field in dataclasses.fields(record)
+            if any(word in field.name for word in RETIRED_FIELDS)
+        }
+    )
+    assert not found, found
+
+
+def test_the_walk_would_catch_such_a_figure_if_one_were_added() -> None:
+    """Falsifiability: the walk above passes forever over a shape it cannot reach."""
+    planted = dataclasses.make_dataclass("WithADetachedFigure", [("detached_per_unit", float)])(1.0)
+    assert [
+        field.name
+        for record in _walk(planted)
+        if dataclasses.is_dataclass(record) and not isinstance(record, type)
+        for field in dataclasses.fields(record)
+        if any(word in field.name for word in RETIRED_FIELDS)
+    ] == ["detached_per_unit"]

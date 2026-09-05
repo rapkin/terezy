@@ -91,7 +91,6 @@ from terezy.core.ledger.events import CausationKind, CausationRef, Event, EventK
 from terezy.core.primitives import conventions, money
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.tolerance import is_close
-from terezy.core.scenarios import early_exit as early_exit_terms
 
 if TYPE_CHECKING:  # pragma: no cover -- import-time cycle avoidance
     from terezy.core.instruments.interface import (
@@ -182,37 +181,6 @@ def events(
         ):
             stream.append(_reinvestment(declaration, holding, period, sequence=len(stream) + 1))
             units += period.reinvestment.units_bought
-    detached = (
-        early_exit_terms.detached_since(
-            observed_on=early_exit.observed_on,
-            held_from=holding.purchased_on,
-            sold_on=horizon.end,
-            coupons=coupons_per_unit(declaration),
-            currency=early_exit.price_per_unit.currency,
-        )
-        if sells_early and early_exit is not None
-        else None
-    )
-    if detached is not None and detached.amount > 0.0 and units != holding.quantity:
-        # **A reinvesting holding whose quotation actually moves is refused, not priced.**
-        # `early_sale` applies one per-unit adjustment to every unit, and a unit bought out of a
-        # coupon was not held when the earlier coupons detached -- so the reinvested tranche
-        # would be discounted for coupons it never contained. Pricing it needs a per-tranche
-        # sale, which is a change to the disposal and not to this line. Where nothing detached
-        # there is no adjustment to misapply and the sale stands; `enumerated` refuses
-        # reinvestment outright, so this is the only form that can reach either case.
-        return InconsistentTerms(
-            first_term="assumptions.coupon_policy",
-            second_term="access.resale_price",
-            reason=(
-                f"{declaration.id!r} reinvested its coupons into "
-                f"{units - holding.quantity!r} further unit(s) and the window sells the "
-                f"position on {horizon.end.isoformat()}, before its terms end. One resale "
-                "quotation cannot price units acquired on different dates: what detached from "
-                "it before a unit was bought was never in that unit's price. Hold the coupons "
-                "as cash, or extend the window to the instrument's own terms."
-            ),
-        )
     if sells_early and early_exit is not None:
         sale = acquire.early_sale(
             declaration,

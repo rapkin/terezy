@@ -59,6 +59,13 @@ def _registries(*, flat: float = 0.0) -> Registries:
     )
 
 
+AT_ISSUE = fixtures.DateRange(start=fixtures.ISSUE_DATE, end=fixtures.HORIZON_END)
+"""The flat-fee route declares no latency, so a window opened on :data:`OUTLAY_ON` would buy
+the day before issue A exists -- and a quotation cannot be carried to a date before the paper
+was issued. Opened on the issue date, the purchase lands on the day the fixture quotations
+were read and the carry is a no-op."""
+
+
 def _via_flat_fee() -> Tuple:
     return replace(
         fixtures.hurdle_tuple(),
@@ -78,7 +85,7 @@ def _evaluate(
     return evaluate(
         candidate if instrument_id is None else replace(candidate, instrument_id=instrument_id),
         amount=Money(amount, UAH, prov.EMPTY),
-        horizon=horizon or fixtures.DateRange(start=fixtures.ISSUE_DATE, end=fixtures.HORIZON_END),
+        horizon=horizon or fixtures.HORIZON,
         as_of=fixtures.AS_OF,
         continuation=fixtures.HOLD_AS_CASH,
         registries=registries,
@@ -162,7 +169,7 @@ class TestARemainderTheIncrementCannotDeploy:
         numbers -- which a free route does not, and which is what the two tests below turn on
         -- while leaving two amounts that buy the same units with the same money invested.
         """
-        outcome = _evaluate(_registries(flat=flat), _via_flat_fee(), sent)
+        outcome = _evaluate(_registries(flat=flat), _via_flat_fee(), sent, horizon=AT_ISSUE)
         assert isinstance(outcome, TupleOutcome), outcome
         rate = outcome.implied_rate
         assert isinstance(rate, NominalRate)
@@ -181,8 +188,8 @@ class TestARemainderTheIncrementCannotDeploy:
         # dates, and both invested 10 100.00: the 400.00 sitting at `inzhur` is netted off the
         # outlay rather than discounted as a loss. Charging it as one puts these two figures
         # percentage points apart and reports a 16% sovereign bond well below its coupon.
-        exact = _evaluate(_registries(flat=100.0), _via_flat_fee(), 10_100.0)
-        remainder = _evaluate(_registries(flat=100.0), _via_flat_fee(), 10_500.0)
+        exact = _evaluate(_registries(flat=100.0), _via_flat_fee(), 10_100.0, horizon=AT_ISSUE)
+        remainder = _evaluate(_registries(flat=100.0), _via_flat_fee(), 10_500.0, horizon=AT_ISSUE)
         assert isinstance(exact, TupleOutcome), exact
         assert isinstance(remainder, TupleOutcome), remainder
         assert exact.undeployed is None
@@ -253,7 +260,7 @@ class TestADeclarationWithNoIncrementLeavesNoRemainderAtAll:
                 yield_point=fixtures.MILTECH_POINT,
             ),
             amount=Money(amount, UAH, prov.EMPTY),
-            horizon=fixtures.DateRange(start=fixtures.ISSUE_DATE, end=fixtures.HORIZON_END),
+            horizon=fixtures.HORIZON,
             as_of=fixtures.AS_OF,
             continuation=fixtures.HOLD_AS_CASH,
             registries=fixtures.declared(),
@@ -300,7 +307,9 @@ class TestAnAmountThatWillNotBuyOneIncrement:
         # instrument that owns the constraint, with its own shortfall. Two refusals for two
         # genuinely different facts: what arrived, and what was spent.
         registries = fixtures.with_access(
-            _registries(), "ovdp_synthetic_b", quote=fixtures.quote(1_200.0)
+            _registries(),
+            "ovdp_synthetic_b",
+            quote=fixtures.quote(1_200.0, observed_on=date(2026, 7, 3)),
         )
         refusal = _evaluate(
             registries,

@@ -157,7 +157,7 @@ note   = "The first surface on which a mark and a refusal have to survive being 
 
 [[feature]]
 id     = "022-accrued-interest"
-status = "planned"
+status = "in-progress"
 needs  = ["013-enumerated-schedule", "016-real-ovdp"]
 why    = "013 declares the day count and is the FR-017 prohibition this lifts; 016 is what supplies every coupon date, which is the fact FR-017 said was missing"
 note   = "Owner decision 2026-09-05 -- an early exit must return a real holding period's interest, not the spread. Closes the enumerated-accrued-interest and the-buy-quotation-is-not-carried futures together; see specs/022-accrued-interest/spec.md."

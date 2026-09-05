@@ -65,14 +65,12 @@ class VenueQuote:
     """The quote, in the instrument's own currency (the resolver refuses any other)."""
 
     observed_on: date
-    """The day this price described the market. **Arithmetic, not only staleness.**
+    """The day this price described the market. **Arithmetic, not only staleness**: it is the
+    date the accrual inside the quotation is measured at (:func:`accrual.carried_to`).
 
-    A quotation carried to a later date is carried *net of what left the price in between*, so
-    a resale price struck at a horizon's end subtracts every coupon that detached after this
-    day (:func:`terezy.core.scenarios.early_exit.detached_since`). A field rather than a read of
-    ``price.provenance``, because a ``Provenance`` is a **set** with no distinguished member
-    and is legitimately ``EMPTY`` for a figure built in code -- so the date a term of the sale
-    price is computed from would be a lookup that can come back empty.
+    A field rather than a read of ``price.provenance``, because a ``Provenance`` is a **set**
+    with no distinguished member and is legitimately ``EMPTY`` for a figure built in code -- so
+    the date a price is carried from would be a lookup that can come back empty.
     """
 
     kind: str

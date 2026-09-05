@@ -80,7 +80,9 @@ from datetime import date, timedelta
 from typing import TYPE_CHECKING, Final, Literal, assert_never
 
 from terezy.core.errors import InconsistentTerms, LedgerInvariantError
+from terezy.core.instruments import accrual
 from terezy.core.instruments import fund as fund_terms
+from terezy.core.instruments import registry as instrument_registry
 from terezy.core.instruments import terms as instrument_terms
 from terezy.core.instruments.fund import FundDeclaration
 from terezy.core.instruments.interface import (
@@ -156,8 +158,8 @@ from terezy.core.routes.path import (
     exit_segments_of,
     segments_of,
 )
-from terezy.core.scenarios import early_exit
-from terezy.core.scenarios.early_exit import QuotationHolds
+from terezy.core.scenarios import quotation
+from terezy.core.scenarios.quotation import QuotationHolds
 from terezy.core.tax.interface import TaxClass
 
 if TYPE_CHECKING:  # pragma: no cover -- typing only
@@ -401,13 +403,14 @@ def _hold(
     registries: Registries,
 ) -> TupleOutcome | TupleRefused:
     """Buy with what arrived, live the declared lifecycle, and send every release home."""
-    bought = _acquire(prepared, tuple_.route_in, routed.one_way.arrived)
+    purchased_on = horizon.start + timedelta(days=routed.latency_days)
+    bought = _acquire(prepared, tuple_.route_in, routed.one_way.arrived, purchased_on=purchased_on)
     if not isinstance(bought, _Acquisition):
         return bought
     projected = _project(
         prepared,
         bought,
-        purchased_on=horizon.start + timedelta(days=routed.latency_days),
+        purchased_on=purchased_on,
         horizon=horizon,
         tax_classes=registries.tax_classes,
         registries=registries,
@@ -431,7 +434,9 @@ def _hold(
         undeployed=bought.undeployed,
         routed=routed,
         horizon=horizon,
+        purchased_on=purchased_on,
         continuation=continuation,
+        quotation_holds=registries.quotation_holds,
         kinds=registries.kinds,
         as_of=as_of,
     )
@@ -834,7 +839,9 @@ class _Acquisition:
     undeployed: UndeployedCash | None
 
 
-def _acquire(prepared: _Prepared, path: Candidate, arrived: Money) -> _Acquisition | TupleRefused:
+def _acquire(
+    prepared: _Prepared, path: Candidate, arrived: Money, *, purchased_on: date
+) -> _Acquisition | TupleRefused:
     """Turn what arrived into units, at the declared price and the declared increment.
 
     **Bought with what arrived, never with what departed** (FR-003). The two differ by the way
@@ -847,7 +854,6 @@ def _acquire(prepared: _Prepared, path: Candidate, arrived: Money) -> _Acquisiti
     a term its declaration does not state; the minimum *number* of units it does declare is
     its own projection's check, refused there with its own shortfall.
     """
-    price = _price_for(prepared)
     minimum = _minimum_ticket(prepared)
     if minimum is not None and money.compare(arrived, minimum) < 0:
         return BelowMinimumTicket(
@@ -871,6 +877,12 @@ def _acquire(prepared: _Prepared, path: Candidate, arrived: Money) -> _Acquisiti
                 + "."
             ),
         )
+    # **Priced after the ticket check, not before.** What a unit costs cannot decide whether
+    # the amount was large enough to trade at all, and a refusal that could not price the paper
+    # would otherwise mask the plainer one a reader needs first.
+    price = _price_for(prepared, purchased_on=purchased_on)
+    if isinstance(price, InstrumentRefused):
+        return price
     increment = _min_unit(prepared)
     quantity = _whole_increments(arrived, price, increment)
     if quantity <= 0.0:
@@ -934,7 +946,7 @@ def _undeployed(
     )
 
 
-def _price_for(prepared: _Prepared) -> Money:
+def _price_for(prepared: _Prepared, *, purchased_on: date) -> Money | InstrumentRefused:
     """What one unit costs, from whichever declaration states it.
 
     A fund prices itself -- its declared net asset value plus the entry markup the assumed
@@ -944,17 +956,11 @@ def _price_for(prepared: _Prepared) -> Money:
     resolver has already refused an access declaration that omits one for a bond or supplies
     one for a fund.
 
-    **The quotation is used as declared, on whatever day the purchase lands**, and the resale
-    leg is what keeps the pair coherent: it subtracts only the coupons that detached while the
-    holding held the paper, so a coupon between the quotation and the purchase is in both
-    prices and cancels in the return. Carrying this one as well would put the early-exit belief
-    under every bond figure, including the ones that hold to maturity and state no belief at
-    all -- a change to 015 FR-032's scope rather than a repair.
-
-    **Where the window holds to maturity there is no second leg to cancel it**, and that is a
-    signed overstatement of the purchase price which nothing states: the
-    ``specs/022-accrued-interest/spec.md`` measures it and carries the requirement that closes
-    it.
+    **A bond's quotation is a dirty price and is carried to the settlement date** (FR-005),
+    by the same function that carries the resale quotation to the sale date. It applies where
+    the window holds to maturity too, which is the half of the round trip no second leg
+    cancels: nothing else would state the difference between the price on the quotation's day
+    and the price on the day the money arrives.
     """
     match prepared.declared, prepared.plan:
         case FundDeclaration(), FundAssumptions():
@@ -968,12 +974,33 @@ def _price_for(prepared: _Prepared) -> Money:
                     "load, so reaching here means a Registries was built in code with a "
                     "declaration the data boundary would not have accepted."
                 )
-            return quoted.price
+            carried = accrual.carried_to(
+                _accrual_schedule(prepared.declared),
+                quote=quoted.price,
+                observed_on=quoted.observed_on,
+                on=purchased_on,
+                quoted_term="access.price.observed_on",
+                dated_term="holding.purchased_on",
+            )
+            if isinstance(carried, InconsistentTerms):
+                return InstrumentRefused(instrument_id=prepared.declared.id, reason=carried.reason)
+            return accrual.price(carried)
         case _:  # pragma: no cover -- `_plan_for` has already refused a mismatched pair
             raise ValueError(
                 f"{prepared.declared.id!r} reached pricing with run settings of type "
                 f"{type(prepared.plan).__name__}, which _plan_for refuses."
             )
+
+
+def _accrual_schedule(declared: InstrumentDeclaration) -> accrual.Schedule:
+    """This instrument's coupon dates and day count, through its own declared plugin.
+
+    ``ops_for`` rather than a match on the declaration form: which coupons one unit pays is a
+    question both forms answer, and asking it here is what keeps the decision layer from
+    learning that there are two of them (013 FR-011a).
+    """
+    ops = instrument_registry.ops_for(declared.instrument_class)
+    return accrual.schedule_of(declared, ops.coupons_per_unit(declared))
 
 
 def _minimum_ticket(prepared: _Prepared) -> Money | None:
@@ -1407,7 +1434,9 @@ def _assemble(
     undeployed: UndeployedCash | None,
     routed: _Routed,
     horizon: DateRange,
+    purchased_on: date,
     continuation: ContinuationAssumption,
+    quotation_holds: QuotationHolds,
     kinds: Mapping[str, ObservationKind],
     as_of: date,
 ) -> TupleOutcome:
@@ -1454,7 +1483,13 @@ def _assemble(
         risk_class=prepared.access.risk_class,
         sold_early=projected.sold_early if isinstance(projected, Projection) else None,
         rests_on=_rests_on(
-            prepared, projected, span=span, horizon=horizon, continuation=continuation
+            prepared,
+            projected,
+            span=span,
+            horizon=horizon,
+            purchased_on=purchased_on,
+            continuation=continuation,
+            quotation_holds=quotation_holds,
         ),
         accounts_for=ACCOUNTS_FOR,
         excludes=_excludes_of(prepared),
@@ -1811,7 +1846,9 @@ def _rests_on(
     *,
     span: DateRange,
     horizon: DateRange,
+    purchased_on: date,
     continuation: ContinuationAssumption,
+    quotation_holds: QuotationHolds,
 ) -> tuple[str, ...]:
     """The stated assumptions this outcome depends on, sorted and in words (FR-025).
 
@@ -1838,12 +1875,32 @@ def _rests_on(
                 f"disposals consume lots {prepared.plan.consumption_method!r}; both are the "
                 "owner's stated choices and both change the answer"
             )
-            if projected.sold_early is not None:
-                stated.append(early_exit.rests_on(projected.sold_early.assumption))
         case _:  # pragma: no cover -- `_plan_for` has already refused a mismatch
             raise ValueError(
                 f"{prepared.declared.id!r} reached the assumptions summary with a projection "
                 f"of type {type(projected).__name__} and run settings of type "
                 f"{type(prepared.plan).__name__}, a pairing _plan_for refuses."
             )
+    if _carried_a_quotation(prepared, projected, purchased_on=purchased_on):
+        stated.append(quotation.rests_on(quotation_holds))
     return tuple(sorted(stated))
+
+
+def _carried_a_quotation(
+    prepared: _Prepared,
+    projected: Projection | FundProjection,
+    *,
+    purchased_on: date,
+) -> bool:
+    """Whether either leg of this round trip was priced from a quotation of an earlier day.
+
+    FR-018, and either leg is enough. A hold-to-maturity candidate states no early exit and its
+    purchase price is still a quotation carried to the settlement date -- which is why the
+    belief is not the early exit's. A trade struck on the quotation's own day carried nothing,
+    and naming a belief there would claim a dependency the figure does not have.
+    """
+    quoted = prepared.access.quote
+    if quoted is not None and quoted.observed_on != purchased_on:
+        return True
+    sold = projected.sold_early if isinstance(projected, Projection) else None
+    return sold is not None and sold.quoted_on != sold.on

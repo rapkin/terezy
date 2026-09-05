@@ -53,7 +53,6 @@ import pytest
 
 from terezy.core.decision.compare import compare
 from terezy.core.decision.tuple_outcome import Registries
-from terezy.core.instruments.interface import DateRange
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
@@ -104,7 +103,7 @@ COUPON_LEVY: Final = 0.01
 DISPOSAL_PIT: Final = 0.08
 DISPOSAL_LEVY: Final = 0.02
 
-HORIZON: Final = DateRange(start=fixtures.ISSUE_DATE, end=fixtures.HORIZON_END)
+HORIZON: Final = fixtures.HORIZON
 
 _TAX = f"""
 # SYNTHETIC FIXTURE JURISDICTION, written by a contract test. Every rate is invented and
@@ -203,7 +202,7 @@ risk_class    = "{RISK_CLASS}"
   currency     = "UAH"
   kind         = "venue_terms"
   source       = "SYNTHETIC FIXTURE -- an invented quote for an invented note."
-  retrieved_on = "2026-08-23"
+  retrieved_on = "2026-01-16"
   verified_on  = ""
 """
 

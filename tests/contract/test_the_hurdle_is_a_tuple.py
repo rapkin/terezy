@@ -245,6 +245,11 @@ class TestTheHurdleReproducesFeatureOnesFigure:
         assert outcome.undeployed is None
 
 
+def _ramp_costs(outcome: TupleOutcome) -> list[float]:
+    """What the way in and the way out charged, read off the outcome's own attribution."""
+    return [part.amount.amount for part in outcome.parts if part.part in {"ramp_in", "ramp_out"}]
+
+
 class TestWaitingIsACostAndTheShippedRoutesCharge:
     """Why the shipped domestic pair does *not* reproduce 001's figure, stated as arithmetic."""
 
@@ -254,11 +259,21 @@ class TestWaitingIsACostAndTheShippedRoutesCharge:
         # waiting is a cost (owner decision, 2026-08-22), and a rate that ignored them would
         # report the same figure for a route that settles today and one that settles in a
         # month.
+        #
+        # **The whole outlay is accounted for on both**, which is what says neither route
+        # charged anything: a fee changes what *arrives*, so it would leave a purchase plus a
+        # remainder short of what was sent. The two do not reach the same amount, and since
+        # 022 they cannot: a day of latency buys a day dirtier quotation, so the slower route
+        # deploys into a different number of whole units. That is time showing up in the
+        # price as well as in the dates, not a cost either route levied.
         shipped = _outcome(fixtures.declared(), fixtures.hurdle_tuple(), AT_ISSUE)
         instant = _outcome(
             fixtures.without_latency(fixtures.declared()), fixtures.hurdle_tuple(), AT_ISSUE
         )
-        assert is_close(shipped.reaches.amount, instant.reaches.amount)
+        for outcome in (shipped, instant):
+            charged = _ramp_costs(outcome)
+            assert charged
+            assert all(is_close(amount, 0.0) for amount in charged), charged
         slow, quick = shipped.implied_rate, instant.implied_rate
         assert isinstance(slow, NominalRate)
         assert isinstance(quick, NominalRate)

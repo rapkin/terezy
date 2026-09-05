@@ -32,7 +32,7 @@ from terezy.core.results.question import Question
 from terezy.core.routes.channels import FxChannel
 from terezy.core.routes.legs import Route
 from terezy.core.routes.venues import Venue
-from terezy.core.scenarios.early_exit import QuotationHolds
+from terezy.core.scenarios.quotation import QuotationHolds
 from terezy.core.streams.streams import IncomeStream
 from terezy.core.tax.interface import TaxClass
 from terezy.core.tax.official_rate import OfficialRateSeries
@@ -238,11 +238,11 @@ def _access(ask: Ask) -> KeyedRecords:
     return KeyedRecords(records=tuples.access, files=tuples.access_files)
 
 
-def _early_exit(ask: Ask) -> SingleRecord:
+def _quotation_belief(ask: Ask) -> SingleRecord:
     tuples = _tuples(ask)
     return SingleRecord(
         record=tuples.registries.quotation_holds,
-        file=tuples.early_exit_file,
+        file=tuples.quotation_file,
     )
 
 
@@ -389,7 +389,9 @@ CATEGORIES: Final[tuple[Category, ...]] = (
     ),
     Category("tax-timing", "TAX_TIMING_DIR", False, Keyed(_tax_timing, AssessmentRules)),
     Category("tax-positions", "TAX_POSITIONS_DIR", False, Document(_tax_positions, TaxPositions)),
-    Category("early-exit-belief", "EARLY_EXIT_DIR", True, Document(_early_exit, QuotationHolds)),
+    Category(
+        "quotation-belief", "QUOTATION_DIR", True, Document(_quotation_belief, QuotationHolds)
+    ),
     Category("questions", "QUESTIONS_DIR", True, Keyed(_questions, Question)),
     Category("calendars", "CALENDARS_DIR", False, Keyed(_calendars, WorkingDayCalendar)),
 )

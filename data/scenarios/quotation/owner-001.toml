@@ -1,0 +1,39 @@
+# The owner's declared belief about what a dated quotation is worth on another day.
+#
+# **Everything in this file is an assumption, and that is what it carries instead of a
+# citation.** `data/scenarios/` is exempt from the provenance requirement by design (see
+# `data/README.md`), and this file is a stronger case than most: there is nothing a source
+# could vouch for. A platform that *committed* to its quoted price would have declared a TERM,
+# and the term would live on the access declaration beside the price. The assumption exists
+# precisely because none does.
+#
+# **A subdirectory, and the nesting is deliberate.** `data/scenarios/*.toml` is globbed and
+# validated as scenario documents (regimes and transitions); `glob` does not recurse, so this
+# file keeps the directory's citation exemption without pretending to be a scenario. The same
+# reading `data/scenarios/inflation/` already carries.
+#
+# **No default, and the absence of the file is the absence of the policy** (015 FR-032). A run
+# with no belief declared here refuses at load naming this directory rather than assuming a
+# quotation holds: a forgotten line must never read as a chosen policy, and the figure the
+# default would produce is exactly the invented number Principle I exists to prevent.
+#
+# **It is not named for the early exit, because it does not belong to it** (022 FR-017). Both
+# legs of a round trip are priced from a dated quotation — the buy quotation carried to the
+# settlement date and the sell quotation carried to the sale date — so a bond bought today and
+# held to its own maturity leans on this belief with no early exit anywhere in it.
+#
+# **What it is not.** It is not a claim that an early exit is free, and it does not decide
+# whether one is possible: an instrument whose access declaration quotes no resale price refuses
+# by name instead, and this belief is never reached for it.
+#
+# **How the figure errs reaches a reader as typed exclusions** on every figure computed through
+# it (015 FR-033, 022 FR-020), so they cannot be dropped by a renderer that did not know to
+# print them. None of them is signed for this belief: the clean price moves with the curve and
+# the curve moves both ways.
+
+[quotation]
+id            = "the_clean_price_holds"
+owner_id      = "owner-001"
+is_assumption = true
+
+rationale     = "OWNER'S BELIEF, not an observation. A quoted bond price is a DIRTY price: it contains the interest accrued since the last coupon, and it falls by the whole coupon on the day that coupon detaches. What is assumed to hold between the day a quotation is read and the day it is used is therefore the CLEAN price — the quotation net of the accrual it carried on its own observation date — with the accrual rebuilt on the date the price is wanted for. Inzhur publishes a buy and a sell price for every active issue on one morning and the gap between them is 0.000% to 0.637% of the buy price (median 0.237%, five issues quoting buy equal to sell, retrieved 2026-08-24); under this belief that gap, and nothing else, separates the two clean prices. TWO THINGS ARE ASSUMED AND NEITHER IS OBSERVABLE. First, that the clean price is constant: it is not, because it moves with market rates, and the direction is not claimed because rate risk is symmetric. Second, that interest accrues LINEARLY within each declared coupon period on the declared day count: the NBU depository register publishes pay_date, pay_val and pay_type and says nothing about how interest builds between them, so the issuer's own formula is not available and a straight line is a choice. Carrying the quotation forward unchanged instead is not the smaller assumption, it is a wrong number: a holding credited a coupon inside its window and sold at a price quoted before that coupon detached would be credited the same money twice. Taking the clean price to hold at all is the smallest assumption that makes a dated quotation usable on any other day — the alternative is refusing every purchase that does not settle on the morning the price was read, which answers a different question from the one asked. It is a belief about the future and nobody knows it: a seller's quote widens exactly when a forced sale is most likely, and eleven of the twenty-four active issues publish available_quantity = 0 without saying what that field constrains."

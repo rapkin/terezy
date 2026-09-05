@@ -250,36 +250,27 @@ class Exclusion(Enum):
     """A bond's resale price also moves with market rates, and this figure does not model it.
     Modelling it is a secondary-market model and is out of scope."""
 
-    EARLY_EXIT_IGNORES_ACCRUED_INTEREST = "early_exit_ignores_accrued_interest"
-    """A resale quotation is a **dirty** price -- clean plus the interest accrued by the day it
-    was observed -- and it is carried to the sale date net of whole coupons only, because
-    separating the accrual out needs a basis no declaration states.
+    QUOTED_CLEAN_PRICE_IS_ASSUMED_CONSTANT = "quoted_clean_price_is_assumed_constant"
+    """A quotation is carried across a gap at a **constant clean price**, with interest
+    accruing linearly inside each declared coupon period. Neither is observable, and neither
+    is a term of the paper.
 
-    So the sale price is struck **below** what the same assumption implies, by the coupons
-    detached less the accrual the quotation carried plus the accrual the sale date carries.
-    That quantity is positive **where the quotation predates the sale and every coupon between
-    them came out**: with none between them both dates sit in one accrual period and accrual
-    only grows, and with some the accrual the quotation had built is smaller than the coupon
-    that ends its period. Two things break it, and the direction is withheld for both -- a
-    quotation dated *after* the sale is carried nowhere and the residual reverses, and a coupon
-    that detached before the holding bought the paper comes out of neither price while having
-    reset the accrual it would have covered. It is **not** bounded by one coupon: every further
-    coupon inside the window adds its whole amount to what came out."""
+    **No direction.** The clean price moves with the curve and the curve moves both ways, so a
+    carried price may err either way -- 015 FR-033's own reasoning for rate risk, applied to
+    the assumption that shares its cause. A sign asserted without a warrant is a number more
+    confident than its inputs."""
 
 
 class Direction(Enum):
     """Which way an approximation errs, where it has a warranted direction.
 
-    Each member names what errs, not merely which way, because two claims on one candidate can
-    err in opposite directions: a seller's quote understates the **spread**, which flatters the
-    figure, while an unmodelled accrual strikes the **sale** below what the belief implies,
-    which does the reverse. Rendered side by side under one word a reader nets them as
+    Each member names what errs, not merely which way: two claims on one candidate can err in
+    opposite directions, and rendered side by side under one word a reader nets them as
     reinforcing.
     """
 
     MORE_CERTAIN_THAN_IT_IS = "more_certain_than_it_is"
     UNDERSTATED = "the_spread_is_understated"
-    SALE_STRUCK_TOO_LOW = "the_sale_is_struck_too_low"
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

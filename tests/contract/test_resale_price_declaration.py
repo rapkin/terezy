@@ -37,7 +37,7 @@ DATA_ROOT = data_roots.with_fixtures()
 BOND = "ovdp_synthetic_a"
 FUND = "inzhur_reit"
 
-QUOTED_ON = "2026-08-23"
+QUOTED_ON = "2026-01-15"
 """The day this bond's declared buy price was read. A resale price must carry the same one:
 the pair is one observation of one market, and each side is carried to the day it prices."""
 
