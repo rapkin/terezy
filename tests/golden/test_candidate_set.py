@@ -47,22 +47,35 @@ from terezy.core.results.candidates import (
 from terezy.core.results.tuple import Comparison
 from terezy.core.routes.path import ExitChain, candidate_id, exit_segments_of
 from tests import candidate_registries as fixtures
+from tests import data_roots
 
 pytestmark = pytest.mark.golden
 
 GOLDEN_FILE: Final = Path(__file__).with_name("candidate_set.golden.txt")
 UPDATE_VARIABLE: Final = "TEREZY_UPDATE_GOLDEN"
-BENCHMARK: Final = "ovdp_synthetic_a"
+BENCHMARK: Final = "UA4000231195"
+"""This artefact's own hurdle, and not a copy of the owner's choice.
+
+The question below is not his -- its horizon, its as-of and its amounts are this module's --
+so tracking whichever issue his question file names would be a coincidence maintained by hand.
+What it must be is an issue that survives the next observation refresh, which the one it
+replaced (`UA4000235865`, matured 2026-09-16) will not. Every shipped issue matures inside this
+horizon, so "outlives the window" is not available to any choice.
+"""
 
 
 def _surveyed() -> CandidateSurvey:
-    registries = fixtures.shipped()
-    question = fixtures.question(registries)
+    registries = fixtures.declared(data_roots.SHIPPED)
+    shipped = fixtures.declarations(data_roots.SHIPPED)
+    # Every term from the shipped root, the bound included: `question`'s default reads the
+    # composed one, and an artefact headed "what the shipped declarations offer" must not
+    # record a bound no shipped file declares.
+    question = fixtures.question(registries, bound=shipped.composition.bound)
     result = survey(
         registries=registries,
         routes=registries.routes,
         question=question,
-        ceiling=fixtures.declarations().ceiling,
+        ceiling=shipped.ceiling,
         benchmark=fixtures.benchmark_key(registries, BENCHMARK, question_=question),
     )
     assert isinstance(result, CandidateSurvey), result
@@ -214,7 +227,7 @@ class TestTheArtefactCannotBeGreenAndWrong:
     re-derived from the registry here rather than read out of the file."""
 
     def test_the_recorded_counts_are_the_counts_the_declarations_imply(self) -> None:
-        registries = fixtures.shipped()
+        registries = fixtures.declared(data_roots.SHIPPED)
         declared = [
             instrument_id
             for instrument_id in registries.access

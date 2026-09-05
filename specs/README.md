@@ -15,6 +15,9 @@ Update the `status` field **in the same commit** that changes the fact — the l
 commit flips it to `done`, the first implementation commit flips it to `in-progress`.
 A stale graph misdirects every agent that reads it.
 
+The permitted values, and what each means, are declared in `features.toml`'s own header
+beside the data they describe. That header is the one to change.
+
 ## The lifecycle of one feature
 
 Every feature goes through the same seven steps. None is optional.

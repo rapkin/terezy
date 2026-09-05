@@ -68,7 +68,7 @@ from terezy.core.results.coverage import IMPLICIT_REGIME_ID
 from terezy.core.results.project import Projection
 from terezy.data import manifest
 from terezy.data.declarations import resolver
-from tests import declared_terms, synthetic
+from tests import data_roots, declared_terms, synthetic
 
 pytestmark = pytest.mark.invariant
 
@@ -78,7 +78,7 @@ AS_OF = date(2026, 8, 30)
 UAH = Currency.UAH
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DATA_ROOT = REPO_ROOT / "data"
+DATA_ROOT = data_roots.with_fixtures()
 # ⚙ Issue A's first *taxable* event is its 2026-07-15 coupon, fifteen days after the
 # earliest entry the `ua_government_bond` exemption's citation reaches. The dependency
 # is asserted in tests/contract/test_declaration_loading.py, class

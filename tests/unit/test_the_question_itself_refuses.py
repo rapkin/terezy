@@ -155,7 +155,7 @@ def test_a_question_id_nothing_declares_is_refused_by_name(tmp_path: Path) -> No
 
 
 def _scratch_with_regime(tmp_path: Path, regime_id: str) -> Path:
-    """The shipped data root with the owner's question asked under a different world."""
+    """The composed data root with the owner's question asked under a different world."""
     root = tmp_path / "data"
     shutil.copytree(fixtures.DATA_ROOT, root)
     target = root / "questions" / "fifty-thousand.toml"

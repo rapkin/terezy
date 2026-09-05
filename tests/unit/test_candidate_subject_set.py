@@ -13,7 +13,7 @@ from tests import candidate_registries as fixtures
 
 
 def _set(subjects: frozenset[str]) -> CandidateSet:
-    registries = fixtures.shipped()
+    registries = fixtures.declared()
     result = fixtures.enumerated(
         registries, question_=fixtures.question(registries, subjects=subjects)
     )
@@ -23,7 +23,7 @@ def _set(subjects: frozenset[str]) -> CandidateSet:
 
 def test_only_the_named_ids_are_considered() -> None:
     """Two of the registry's instruments, and the other seven appear in no population."""
-    registries = fixtures.shipped()
+    registries = fixtures.declared()
     named = frozenset({"ovdp_synthetic_a", "inzhur_miltech"})
     narrowed = _set(named)
 
@@ -35,7 +35,7 @@ def test_only_the_named_ids_are_considered() -> None:
 
 def test_pairs_considered_counts_the_narrowed_set() -> None:
     """The identity FR-009 rests on is over the *considered* pairs, not the declared ones."""
-    registries = fixtures.shipped()
+    registries = fixtures.declared()
     named = frozenset({"ovdp_synthetic_a", "inzhur_miltech"})
     assert _set(named).pairs_considered == len(named) * len(registries.streams)
 
@@ -60,7 +60,7 @@ def test_an_id_the_registry_does_not_declare_is_not_a_candidate() -> None:
 
 def test_naming_every_declared_id_reproduces_the_unnarrowed_enumeration() -> None:
     """The narrowing is a filter and not a different walk."""
-    registries = fixtures.shipped()
+    registries = fixtures.declared()
     whole = _set(frozenset(registries.access))
     assert [candidate.key for candidate in whole.candidates] == [
         candidate.key

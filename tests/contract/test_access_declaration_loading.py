@@ -220,7 +220,7 @@ class TestWhatNeedsASecondFile:
         # Both, because knowing one leaves the reader to find the other by hand -- and neither
         # is preferred: whichever loaded last would win by accident of directory ordering.
         refusal = _resolved(tmp_path, WELL_FORMED)
-        assert refusal.file.name == "instruments.toml"
+        assert refusal.file.name == "fixtures.toml"
         assert "extra.toml" in refusal.problem
 
     def test_a_price_naming_an_undeclared_kind_is_refused_at_load(self, tmp_path: Path) -> None:
@@ -260,10 +260,11 @@ class TestEveryCitationInTheResolvedRegistriesCarriesAKind:
     **Resolution is not what this checks**, and an earlier version of this docstring said it
     was, on the reasoning that ``scripts/check_provenance.py`` "reads the repository's own
     data files and a runtime data root is not those". It reads the same files this does --
-    ``fixtures.shipped()`` resolves ``REPO_ROOT / "data"`` -- and it already resolves every
-    sourced table's kind against ``observation_kinds.toml``, with ``access`` added to its
-    ``SOURCED_DIRS`` by this feature. A second check of one fact over one set of files is a
-    second place for it to drift. Resolution is covered where a *wrong* kind can be planted:
+    ``tests/contract/test_provenance_gate.py`` runs it over the composed root -- and it
+    already resolves every sourced table's kind against ``observation_kinds.toml``, with
+    ``access`` added to its ``SOURCED_DIRS`` by this feature. A second check of one fact over
+    one set of files is a second place for it to drift. Resolution is covered where a *wrong*
+    kind can be planted:
     the load-time refusals above and in ``test_route_declaration_loading.py``, one per call
     site.
 
@@ -296,7 +297,7 @@ class TestEveryCitationInTheResolvedRegistriesCarriesAKind:
                 yield from self._sources(item, seen)
 
     def test_every_source_carries_a_kind(self) -> None:
-        registries = fixtures.shipped()
+        registries = fixtures.declared()
         found = list(self._sources(registries, set()))
         assert len(found) > 20, "the walk reached almost nothing, so it proves almost nothing"
         unstamped = sorted({source.id for source in found if not source.kind})

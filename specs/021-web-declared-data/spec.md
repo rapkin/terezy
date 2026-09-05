@@ -6,23 +6,29 @@
 
 **Created**: 2026-09-03
 
-**Status**: **Drafted** — three `[NEEDS CLARIFICATION]` markers are open, which is `drafted` in
-`specs/features.toml`'s vocabulary and normally means planning may not start. **Owner decision
-2026-09-03 overrides that for this feature**, and states the reason rather than working around
-it: the rule exists because guessing an unanswered question is what the process prevents, and
-each of these three questions says below exactly what it blocks — in order: nothing, one
-component, and one acceptance scenario. Each blast radius is stated with the question, and none
-reaches beyond the thing it names: the most expensive wrong guess makes a scenario unexercisable
-until a data decision re-enables it, and rebuilds nothing. The override is recorded here so it is visible as an
-override; it is not a reading of the vocabulary and does not generalise.
+**Status**: **Clarified** — the three clarification markers this spec shipped with are answered by
+the owner on 2026-09-03 and recorded in `specs/decisions/2026-09-03-clarify-021.toml`: **English only**; the
+display-currency selector is **moot**, because the switch itself is deferred; and the owner's own
+declarations **are shown**, each labelled as his statement rather than as an observation.
 
-**Two artefacts this spec depends on and does not apply.** The `[[feature]]` entry in
-`specs/features.toml` and the constitution amendment lifting D-B. Neither is in force anywhere;
-both are **drafted in the Appendix** and applied by the change that lands this spec, because this
-branch is spec-only by instruction. Until then the
-constitution as written is the document in force. The owner decisions this spec cites throughout
-are recorded in `specs/decisions/2026-09-03-web-stack.toml`, which does land with it, so that
-every appeal to "owner decision 2026-09-03" has one artefact to be checked against.
+The second is not an answer to the question as asked, and the difference is load-bearing. Q2 asked
+what a selector should list; the owner deferred the display switch as a **subject** the same day, on
+both sides of the wire, so there is no selector to list anything. Every requirement that rested on
+it is in *Deferred by owner decision* below — **moved, not deleted**, so that picking the switch up
+later reads a scope rather than reconstructs one.
+
+**One half of that decision is not yet done, and this spec does not pretend otherwise.**
+`specs/020-http-api/spec.md` still requires the `display` request parameter (its FR-021 to FR-025,
+and its clarification 1 keeps the parameter under either option). Withdrawing them is 020's change;
+until it is made, a generated client would carry a parameter this spec has no requirement about,
+which is the silent default FR-001 and FR-020 forbid arriving one level up.
+
+**Where the owner decisions this spec cites are recorded.** The stack and the packaging are
+`specs/decisions/2026-09-03-web-stack.toml`; the three clarification answers are
+`specs/decisions/2026-09-03-clarify-021.toml`. Every appeal to "owner decision 2026-09-03" is
+checked against one of those two. The `[[feature]]` entry and the constitution amendment lifting
+D-B were drafted in the Appendix and are now **applied** — the entry is in `specs/features.toml`
+and the constitution is at 1.4.0.
 
 **Input**: A read-only web client at `web/` for browsing what `data/` declares: categories, a
 record card carrying every field with its citation and its mark, and the two declared series as
@@ -56,10 +62,10 @@ which is the cheapest possible place to get that wrong and find out.
 
 Owner decision **D-B** kept the delivery surface at core + API + CLI *until the result schema
 had stabilised against real output*. Feature 015's note in `specs/features.toml` names that
-feature as the one that stabilises it, and the owner lifted the deferral on 2026-09-03. **The
-constitution still records the deferral** (`.specify/memory/constitution.md`, the D-B entry and
-the `ui/` line in the layer map): until the amendment drafted in the Appendix is applied, that
-document is the one in force, and this spec is a proposal against it rather than a fact about it.
+feature as the one that stabilises it, and the owner lifted the deferral on 2026-09-03. The
+constitution records the **discharge** (`.specify/memory/constitution.md` at 1.4.0, the D-B entry
+and the `web/` layer line): the amendment this spec was written against is applied, and the
+Appendix records what it changed and why.
 
 The first thing built on the new surface is deliberately the smallest: browsing declarations
 needs no answer, no ranking, no compare, and therefore cannot hide a UI defect behind an
@@ -75,7 +81,7 @@ against, and are not reopened by planning.
 | `web/` at the repository root, pnpm | a Python-templated server-rendered surface | The client is a client over the HTTP API and nothing else; putting it inside `src/terezy/` would put a build toolchain inside the package that `lint-imports` governs, and would make "the UI may not import the core" a convention rather than a physical fact. |
 | Vite + React + TypeScript strict | a no-build-step surface | Strict TypeScript over generated types is the mechanism for FR-004: an unhandled refusal member is a compile error rather than a blank cell. Without a typechecker there is no mechanical form of this feature's central requirement. |
 | Tailwind + shadcn/ui, components copied in | a component library as a runtime dependency | Copied components are owned code, reviewed in git, with no vendor's runtime and nothing to phone home. Principle VII's "no CDN calls, no telemetry" is satisfied structurally rather than by trusting a changelog. |
-| TanStack Router, with `as_of` and `display` as **typed** search params | React Router with string params, or client state | The two parameters that decide what a figure *means* are in the URL, validated, and shareable. A run is reproducible from a link, which is the same argument that made a question a declaration in 015. |
+| TanStack Router, with **typed** search params — `as_of` globally, a window on the two series routes | React Router with string params, or client state | A parameter that decides what a figure *means* is in the URL, validated, and shareable. A run is reproducible from a link, which is the same argument that made a question a declaration in 015. `display` was the third and is deferred; the argument is why the router was chosen and does not depend on the count. |
 | TanStack Query for all server state | `useEffect` + `fetch` | Caching, retry and staleness of a *request* belong in one place; hand-rolling them per screen is where a stale response silently outlives a parameter change. |
 | No client-side store initially — URL + React context | Redux, or MobX from the start | There is no client state yet: everything on screen is a function of the URL and a response, so a store would be a cache of the router and of TanStack Query. Which store to reach for when that stops being true is a standing preference of the owner's and is recorded in `specs/decisions/2026-09-03-web-stack.toml`, not here. |
 | Recharts | D3 by hand, or a canvas library | Two series, both simple, both needing an accessible DOM the a11y check can read. |
@@ -119,13 +125,10 @@ into a per-category branch — which would be Principle II broken in a new layer
   what exists would be a computation the client is forbidden (FR-001, FR-027).
 - **OB-8** — A default window per series, stated by the API. The client requests it and never
   invents one; see FR-027a.
-- **OB-9** — The base currency, and per currency whether a converted figure can be supplied and,
-  where it cannot, the reason. The first is what a first load writes into `display` (FR-024a) —
-  a currency the client chose would be the silent default FR-020 forbids, arriving as a parameter
-  instead of as a value. The second is what FR-026 renders as a refusal, and it is what **Q2**
-  decides the use of: under Q2-A the selector offers everything and the reason appears on the
-  figure; under Q2-B it offers only what can be supplied. The obligation is the same either way,
-  which is why OB-9 does not settle Q2.
+- **OB-9** — *Deferred with the display switch.* It asked for the base currency and, per currency,
+  whether a converted figure can be supplied; both existed to feed a redirect and a selector that
+  are no longer built. Every amount renders in the currency the API returned it in, which needs no
+  obligation. Scope: *Deferred by owner decision*.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -144,7 +147,8 @@ and read a citation off it that matches the file on disk.
 **Acceptance Scenarios**:
 
 1. **Given** the shipped registry, **When** the overview loads, **Then** every category the API
-   indexes is listed with its record count, and no category is listed that the API did not send.
+   indexes is listed with what the API reports for it — a count where it is keyed, a resolved
+   statement where it is a singleton — and no category is listed that the API did not send.
 2. **Given** a record whose `verified_on` is empty, **When** its card is opened, **Then** the
    unverified mark is present as **text**, and the field is not blank.
 3. **Given** a record in a directory exempt from the citation requirement, **When** its card is
@@ -214,11 +218,12 @@ unasserted claim.
 
 ### User Story 4 — Changing what the figure *means* changes only what it should (Priority: P1)
 
-He edits `as_of` in the URL, or switches the display currency, and what changes is what those
-two parameters are allowed to change.
+He edits `as_of` in the URL, and what changes is what that parameter is allowed to change.
 
-**Why this priority**: Principle VI's three currency roles and the staleness verdict are the two
-places where an interface can corrupt a correct engine without touching it.
+**Why this priority**: the staleness verdict is where an interface can corrupt a correct engine
+without touching it. Principle VI's three currency roles were the other such place; under the
+display deferral the client has no display role at all, which is the strongest form of not
+corrupting it.
 
 **Independent Test**: two loads of one record card differing in one search parameter, compared
 field by field.
@@ -229,13 +234,13 @@ field by field.
    the stale mark appears, and every figure the API returned unchanged renders unchanged. A
    figure the API resolved differently — a dated schedule crossing an `effective_from` — changes
    with it (FR-023a); the client neither suppresses that nor produces it.
-2. **Given** a record card, **When** `display` changes, **Then** every base-role and tax-role
-   figure is byte-identical to the previous load, and only the display-role slot changes state.
-3. **Given** `display` naming a currency the API cannot supply a converted figure in, **When**
-   the card loads, **Then** the figure stays in its declared currency and the unmet display
-   request is shown with its reason — the client converts nothing, and never at an official rate.
-4. **Given** an `as_of` or `display` value the router cannot validate, **When** the route loads,
-   **Then** the parameter is named in a visible error and no default is silently substituted.
+2. **Given** an `as_of` the router cannot validate, **When** the route loads, **Then** the
+   parameter is named in a visible error and no default is silently substituted.
+
+Two further scenarios named `display` — *"changing `display` leaves every base-role and tax-role
+figure byte-identical"* and *"an unmet `display` renders as a refusal"*. Both are in *Deferred by
+owner decision*, named there by those descriptions rather than by a number, because the two that
+survive have been renumbered and a stale ordinal would now point at a live scenario.
 
 ---
 
@@ -270,10 +275,10 @@ field by field.
   unit, mark and refusal reason on screen originates in a response body and is rendered as
   received. Locale formatting of a value the API already fixed is permitted; arithmetic,
   rounding, conversion, aggregation, interpolation and unit changes are not. A **request
-  parameter** the client puts in the URL is not a displayed figure. There are three of them —
-  `as_of`, `display` and a series window — and FR-021, FR-024a and FR-027a each say where its
-  value comes from, because a parameter with no stated origin is the silent default FR-020
-  forbids, arriving one level up.
+  parameter** the client puts in the URL is not a displayed figure. There are **two** of them —
+  `as_of` and a series window — and FR-021 and FR-027a each say where its value comes from,
+  because a parameter with no stated origin is the silent default FR-020 forbids, arriving one
+  level up. `display` was the third and is deferred.
 - **FR-002**: The client MAY order a list by a field the API returned, and MUST NOT derive a
   field to order by. An ordering the client computed is a ranking the engine did not make.
 - **FR-003**: Response types MUST be generated from the checked-in OpenAPI document of feature
@@ -316,8 +321,14 @@ field by field.
 
 ### Categories and records
 
-- **FR-014**: The overview MUST list the categories the API indexes, with each category's record
-  count and the dates the API characterises it by.
+- **FR-014**: The overview MUST list the categories the API indexes, each with **what the API
+  reports for it** — for a keyed category its record count, for a singleton **whether its document
+  resolved** — and the dates the API characterises it by. A singleton MUST NOT be rendered as a
+  count. 020 FR-009 keeps the two apart deliberately: a singleton shown as `0` is the same cell a
+  caller would get for a category the loader found nothing in, which is the `B10` distinction
+  between *empty* and *absent* collapsing at the one screen whose job is to say what the registry
+  holds. Measured 2026-09-03 this is **seven of the twenty-five** categories, so it is the ordinary
+  case and not an edge.
 - **FR-015**: The generic browser — everything under `/data/` — MUST NOT hard-code a category
   id, a category label, or a per-category rendering branch. A category added under `data/` and
   exposed by the API MUST appear there with no client change. Enforced mechanically: a test scans
@@ -325,10 +336,20 @@ field by field.
   inside the end-to-end job, where the API is already up, rather than as a lint over a hard-coded
   list, which would be the very second copy it exists to forbid — and fails on a match outside an
   **exception list checked in beside the scan**, each entry a path with a one-line reason — the same ratchet
-  shape as FR-036. The list is expected to hold the two series route modules, the routing map
-  that names their paths, and a generated route tree if the router produces one; what it may not
-  hold is a module under `/data/`. `cpi` is a category directory name **and** a route segment,
-  which is why the scan is scoped by path rather than by token.
+  shape as FR-036. The list is expected to hold the two series route modules and the routing map
+  that names their paths; what it may not hold is a module under `/data/`.
+
+  **The match rule is part of the requirement, because a substring grep would be useless.**
+  Thirteen of the twenty-five ids are ordinary English words — `routes`, `access`, `groups`,
+  `goals`, `seeds`, `streams`, `questions`, `venues`, `channels`, `calendars`, `scenarios`,
+  `composition`, `spendable` — and the client's own layout puts every route module under
+  `web/src/routes/`, so a grep for `routes` fires on an import path in a file that hard-codes
+  nothing. So the scan MUST match **string and template literals only**, parsed rather than
+  grepped, and MUST NOT count a literal that is a path segment of the file's own path or of an
+  import specifier. What it is looking for is a category id **written down as a value**; anything
+  else is a word that happens to collide, and a check that cannot tell the two apart gets silenced
+  by exceptions until it holds nothing. A generated route tree is excluded by being generated
+  rather than by being listed.
 - **FR-015a**: The two series routes are the deliberate exception, and there are exactly two,
   named in the routing map and in the exception list of FR-015.
   A chart is not a generic rendering: it needs to know it has a date axis and a numeric axis, and
@@ -343,10 +364,9 @@ field by field.
 - **FR-019**: A record's synthetic flag, where the API sends one, MUST be rendered on the record
   and MUST NOT be inferable only from a directory name.
 
-### `as_of` and `display`
+### `as_of`
 
-- **FR-020**: `as_of` and `display` MUST be typed search parameters validated by the router on
-  every route. An invalid value is a visible error naming the parameter; substituting a default
+- **FR-020**: `as_of` MUST be a typed search parameter validated by the router on every route. An invalid value is a visible error naming the parameter; substituting a default
   silently is a defect.
 - **FR-021**: There MUST be no implicit `as_of`. On a first load without one, the app MUST read
   today's date from the browser clock **once**, redirect to the same route with it written into
@@ -370,25 +390,10 @@ field by field.
   `effective_from` is a *correct* change and the screen shows it; the client neither suppresses
   it nor asserts it, because which figures are date-dependent is the engine's fact and not the
   client's. What may never change is a value the API returned identically twice.
-- **FR-024**: Changing `display` MUST NOT change a base-role figure, a tax-role figure, or any
-  ordering. Only a display-role slot may change.
-- **FR-024a**: There MUST be no implicit `display`. A first load without one MUST redirect with
-  the base currency the API states (OB-9) written into the URL — never a currency the client picked,
-  and never one inferred from the browser's locale. `display` is the parameter that decides what
-  a figure *means* (Principle VI's third role); a locale-derived one would make the same link
-  mean different things to two readers, which is the defect the whole three-roles rule exists
-  to prevent.
-- **FR-025**: The client MUST NOT convert a currency, and MUST NOT use an official rate for a
-  display conversion. The official rate is the **tax** role — *"the rate the law says a foreign
-  amount was worth, never a rate anybody transacts at"* (`data/README.md`) — and a display
-  conversion is a channel-rate question (`docs/REQUIRED_TESTS.md` F3).
-- **FR-026**: Where the API supplies no converted figure for the requested `display`, the figure
-  MUST render in its declared currency with the unmet display request shown as a refusal
-  carrying its reason. **Measured 2026-09-03**: no module under `src/terezy/` reads a display
-  currency at all — `tests/contract/test_the_rate_you_are_taxed_at.py::TestNoDisplayChoiceCanReachATaxFigure`
-  pins the tax half of that, and `docs/REQUIRED_TESTS.md` F2, F3 and F4 record the rest as open.
-  So on the day this feature lands, the honest state of the display slot is a refusal, and the
-  requirement is that the slot **has** that state rather than that it is never used.
+- **FR-024 to FR-026** governed the display switch and are **deferred**, in *Deferred by owner
+  decision*. What replaces them here is not a weaker rule but the absence of the thing they
+  constrained: the client has no display role, so *the client converts nothing* holds by
+  construction rather than by a prohibition.
 
 ### The two series
 
@@ -475,8 +480,7 @@ field by field.
   Python suite (`K4`).
 - **FR-046**: The end-to-end suite MUST cover, at minimum: opening a category and seeing its
   records; opening a record and reading its source, `retrieved_on`, `verified_on` and mark;
-  opening the official-rate chart; and switching `display` while asserting that a tax figure and
-  a declared amount did not change and the display slot's state did.
+  and opening the official-rate chart. A fourth item required switching `display` and asserting that a tax figure and a declared amount did not change while the display slot's state did; it is deferred.
 - **FR-047**: End-to-end assertions MUST be about states and relations — present, marked,
   refused, unchanged, changed — and MUST NOT hard-code a figure copied out of `data/`. Files
   under `data/cpi/` and `data/official_rates/` are regenerated by fetch scripts and are supposed
@@ -534,7 +538,8 @@ feature's part of it.
 - **Refusal** — a tagged member of a closed union carrying its reason.
 - **Series** — an identity, what its values are in (a quotation unit, or a base description), a
   coverage window, and observations in a requested window.
-- **View parameters** — `as_of` and `display`, typed, in the URL, on every route.
+- **View parameters** — `as_of`, typed, in the URL, on every route; and a window on the two
+  series routes.
 
 ## Success Criteria *(mandatory)*
 
@@ -548,8 +553,6 @@ feature's part of it.
   until every site handles it. Demonstrated by a test that adds one to a copy of the document.
 - **SC-004**: 100% of observed values on a record card display a citation, a `retrieved_on` and a
   `verified_on`, and every empty `verified_on` displays the unverified mark as text.
-- **SC-005**: Switching `display` on a record card changes zero base-role and zero tax-role
-  figures, compared field by field across the two loads.
 - **SC-006**: Moving `as_of` across a staleness threshold changes that source's staleness state;
   a move crossing none changes no staleness state. Neither is asserted over values, because
   FR-023a leaves the API free to resolve a dated schedule differently — what SC-006 pins is that
@@ -559,8 +562,7 @@ feature's part of it.
 - **SC-008**: The chart component handed a one-observation series renders exactly one plotted
   point and zero line segments, asserted in the unit suite (FR-031).
 - **SC-008a**: A first load of any route with a parameter missing ends at a URL carrying every
-  parameter **that route** takes — `as_of` and `display` everywhere, plus the window on the two
-  series routes. It asserts that the parameters arrive and that each is the one that route takes;
+  parameter **that route** takes — `as_of` everywhere, plus the window on the two series routes. It asserts that the parameters arrive and that each is the one that route takes;
   it asserts no parameter's **value**, which is the whole of FR-048's exception for it.
 - **SC-009**: The built output contains no absolute URL outside the allowlist, and the allowlist
   is empty of anything the running page would fetch.
@@ -648,7 +650,7 @@ closed. A closed row still has to keep holding.
 
 | Row | How, and why the box does not move |
 |---|---|
-| **F2** | *Switching display currency changes no realised amount, no tax figure, and no after-tax UAH ranking.* The switch now exists, and FR-024 and SC-005 assert the no-change half of it on a screen. The box stays open because a read-only browser has **no realised amount and no ranking** to leave unchanged: those come from an answer, and answers are out of scope here. What this feature does add is the surface the row's remaining halves will be tested on, and a refusal state so that the day a display conversion is declared, the slot it lands in already exists. |
+| **F2** | *Switching display currency changes no realised amount, no tax figure, and no after-tax UAH ranking.* **Not approached, and the reason is now simpler than the one this row was first given here: there is no switch.** The owner deferred it on 2026-09-03, so this feature builds neither the control nor the assertion (020's side of the withdrawal is still owed -- see the Status header). Two things stay true and are why the row is named at all: the figure slot this feature does build has a refusal state, so the day a display conversion is declared the slot it lands in already exists; and the row's remaining halves need a realised amount and a ranking, which come from an answer and are out of scope here regardless. |
 | **E5** | Closed since 2026-08-21 by `tests/contract/test_provenance_propagation.py`, and reinforced here on a third surface — after the tables and feature 005's diagrams. FR-009 and SC-004 carry the mark onto a rendered page with the same discipline of stripping every style declaration before asserting it. The box does not move because it has already moved; what this records is that the property still holds one surface further out, which is the only thing that keeps a closed row from quietly becoming false. |
 
 **E11** — *a zero tax figure distinguishes exempted from not applicable when rendered* — is the
@@ -656,83 +658,51 @@ presentation row nearest this feature and is untouched by it: no screen here ren
 waterfall. The refusal-and-mark component vocabulary this feature builds is where E11 will
 eventually be satisfied, and saying so is not a claim that this feature advances it.
 
-## Clarifications needed
+## Clarifications
 
-Three, and only the owner can settle them. **None of them blocks the bootstrap**, and each says
-below what it does block — because a marker whose blast radius is unstated stops work that did
-not need stopping. Owner decision 2026-09-03 pre-authorises the recommendation in each, so
-implementation builds the recommended option and an answer that overturns one is an additive
-change to the component named.
+Three were open when this spec was written. All three are answered by the owner on 2026-09-03 and
+recorded in `specs/decisions/2026-09-03-clarify-021.toml`, which is the artefact each appeal below
+is checked against. The options each was offered are in that file; what is here is the answer and
+what follows from it.
 
-### Q1 — What language is the interface written in?
+| | Question | Answer | What follows |
+|---|---|---|---|
+| **Q1** | What language is the interface written in? | **English only** | Nothing is translated and no key file exists. A label matches the field name in the TOML file, so a person reading a card and a person reading the file see the same word. The citation strings, refusal reasons and observation kinds arrive from the engine in English regardless, so a Ukrainian frame would have surrounded English content. |
+| **Q2** | Is the display-currency selector offered while nothing can convert? | **Moot** | Not *option A*, and the difference matters: the question assumed a selector, and the owner deferred the display switch as a subject the same day. There is no control and nothing for it to list. 020's matching withdrawal is still owed, which the Status header states rather than assumes. The question is live again, unchanged, the day the switch is picked up. |
+| **Q3** | Does the browser show the owner's own declarations? | **Yes, each labelled as his own statement** | Every category is shown. The label is the operative half and is not decoration: a per-owner figure must read as the owner's statement and never as an observation, and the mechanism already exists — FR-013 renders the citation exemption **with its reason** on every such record, and that reason *is* "this directory holds the owner's own statements" (OB-6). It changes who can reach the app not at all. |
 
-`[NEEDS CLARIFICATION: UI language — Ukrainian, English, or both?]`
+**Q3 also decides what is exercisable.** Every directory `scripts/check_provenance.py` exempts
+*and that ships records* is an owner-statement directory — its one other exemption is `user/`,
+which is gitignored and ships none. So under the answer given, US1 acceptance scenario 3 and
+FR-013 are exercisable on the shipped tree; under the alternative, no exempt record would have
+been reachable at all and the scenario could not have been run.
 
-The owner reads and writes Ukrainian; the code, the specs and every declaration in this
-repository are in English, and so is every citation string, refusal reason and observation kind
-the API sends.
+## Deferred by owner decision
 
-| Option | What it means in practice |
+**The display-currency switch, deferred entirely on 2026-09-03** together with 020's `display`
+request parameter. Moved here rather than deleted, so that picking it up later reads a scope
+instead of reconstructing one from a diff. Nothing below is withdrawn as wrong; each is a
+requirement about a thing that does not exist yet.
+
+| Deferred | What it said |
 |---|---|
-| **A — English only** *(recommended)* | Nothing is translated. Labels match the field names in the TOML files exactly, so a person reading a card and a person reading the file see the same word. No translation layer, no key files, no second copy of a term to go stale. Cost: the owner reads his own tool in his second language. |
-| **B — Ukrainian only** | The chrome is Ukrainian; the data is not, because a citation and a refusal reason come from the engine verbatim (FR-001) and translating one would be composing prose about a figure — which 015 forbids on the answer record for the same reason. Result: a Ukrainian frame around English content, and the field labels no longer match the files. |
-| **C — Both, switchable** | Everything in A plus a language switch and a translation file. Every new label needs two entries and the second is the one that drifts. Real cost, and it buys the same English data content as A. |
+| **OB-9** | The base currency, and per currency whether a converted figure can be supplied and, where it cannot, the reason. The first fed FR-024a's first-load redirect; the second fed FR-026's refusal. |
+| **FR-020**, the `display` half | `display` typed and validated by the router on every route. |
+| **FR-024** | Changing `display` MUST NOT change a base-role figure, a tax-role figure, or any ordering. Only a display-role slot may change. |
+| **FR-024a** | No implicit `display`: a first load redirects with the base currency the API states, never one the client picked and never one inferred from the browser's locale — a locale-derived one would make the same link mean different things to two readers. |
+| **FR-025** | The client MUST NOT convert a currency, and MUST NOT use an official rate for a display conversion: the official rate is the **tax** role, and a display conversion is a channel-rate question (`docs/REQUIRED_TESTS.md` F3). |
+| **FR-026** | Where the API supplies no converted figure, the figure renders in its declared currency with the unmet display request shown as a refusal carrying its reason. **Measured 2026-09-03**: no module under `src/terezy/` reads a display currency at all — `tests/contract/test_the_rate_you_are_taxed_at.py::TestNoDisplayChoiceCanReachATaxFigure` pins the tax half, and F2, F3 and F4 record the rest as open. |
+| The two `display` acceptance scenarios of US4 | Byte-identical base-role and tax-role figures across a `display` change; and an unmet `display` rendering as a refusal rather than as a conversion. Named rather than numbered: US4's surviving scenarios were renumbered, so the old ordinals now point at live ones. |
+| **SC-005** | Switching `display` changes zero base-role and zero tax-role figures, compared field by field. |
+| **FR-046's fourth item** | The end-to-end minimum's display clause. |
+| **Q2** | What the selector lists. |
 
-**Recommendation: A.** The screen's whole job is to show what the declaration says; a label that
-differs from the file's field name is one more thing that can quietly stop matching.
-
-**Blocks: nothing.** A is the zero-work option — no translation layer is built, so nothing has to
-be undone. B or C is a layer added later around labels that already exist.
-
-### Q2 — Is the display-currency selector offered while nothing can convert?
-
-`[NEEDS CLARIFICATION: does the currency selector list currencies nothing can be shown in yet?]`
-
-Nothing in the engine converts a currency for display today (FR-026 states the measurement and
-its date). The URL parameter exists either way — the owner fixed that. The question is what the
-selector on screen offers.
-
-| Option | What it means in practice |
-|---|---|
-| **A — The selector offers every currency, and an unconvertible figure shows a refusal saying so** *(recommended)* | Switching to dollars leaves every figure in its declared currency with a visible "no display conversion is declared, and here is what would supply one". Honest, and it exercises the refusal state on the most-used control in the app from day one. Cost: a control that today mostly produces refusals. |
-| **B — The selector offers only currencies something can actually be shown in** | The refusal stays reachable — `display` is a URL parameter and a link can carry any currency — but nothing on the *screen* leads to it. Cost: the path is exercised only by hand-edited URLs until the conversion feature ships, which is exactly the sequencing that lets a blank cell reach production; and the control silently gains options later with no visible reason. |
-
-**Recommendation: A**, on the project's own rule that a refusal with a reason beats an absence.
-
-**Blocks: one component** — the currency selector in the app shell, and only which options it
-lists. The URL parameter, the re-query on change, and the display slot's refusal state are
-required either way (FR-020, FR-022, FR-026), so every other screen proceeds.
-
-### Q3 — Does the browser show the owner's own declarations, or only the public ones?
-
-`[NEEDS CLARIFICATION: does the category index include the owner's own per-owner declarations?]`
-
-`data/` holds two kinds of thing: public facts about the world, and the owner's own statements —
-income, holdings, goals, where he spends from. **How each of them says it is not his real
-position varies, and two of them do not say it at all in a form the tool can read** — `seeds/`
-and `goals/` carry `is_synthetic`, `streams/` argues in a header comment that its zero amounts
-are the honest placeholder, and `spendable/` makes no such claim anywhere: it reads as a real
-declaration of the venues he spends from. So a label is not what makes this safe; what the screen always knows is that the directory is
-*exempt from the citation requirement because it holds the owner's own statements* (OB-6), which
-FR-013 already renders with its reason. When he replaces a fixture with his real figures, this
-screen shows them.
-
-| Option | What it means in practice |
-|---|---|
-| **A — Show every category, with each record marked as the owner's own statement** *(recommended)* | The screen shows what a run actually reads, which is the point of having it, and no per-owner figure can be read as an observation because FR-013 renders the exemption on every one of them. His real numbers appear on it once he enters them — on loopback, on his own machine, behind the authentication gate that must exist before anything else listens. That is what Principle VII already permits, so this adds no new exposure. |
-| **B — Show only the public categories** | His own figures never render, so nothing can leak from this screen even by a screenshot. Cost: the screen answers "what does the tool know about the world" and stops answering "what does the tool rest on", which is the question it was built for — half of a run's inputs would be invisible on the one surface that shows inputs. |
-
-**Recommendation: A.** It changes nothing about who can reach the app, and B makes the feature
-half a feature.
-
-**Blocks: no client code, and one acceptance scenario.** FR-015 forbids the client from knowing
-any category, so this is a decision about what the API's index returns and the screen renders
-whatever comes back — no client change either way. But every directory `check_provenance.py`
-exempts *and that ships records* is an owner-statement directory — its one other exemption is
-`user/`, which is gitignored and ships none — so under B **no exempt record is reachable**, and US1 acceptance scenario 3 and FR-013 — the exemption rendered with its
-reason rather than as a blank citation block — cannot be exercised on the shipped tree at all.
-That is the concrete cost of B, and it is the strongest argument for A after the one above.
-
+**What the deferral does not weaken.** FR-025's prohibition was the client converting nothing;
+with no display role at all, that holds by construction rather than by a rule, which is stronger.
+And FR-007's three states are untouched — the display slot was only ever going to be the least
+informative instance of the refusal state, since FR-026's own measurement said it would be a
+refusal on the day this feature landed. A refusal still arrives on a series window, on a keyed
+read of an id nothing declares, and on any figure the engine refused.
 ## Dependencies added, and what each one touches the network for
 
 Every entry states install / build / test / run. **Run** is the column FR-035 governs, and a
@@ -763,11 +733,10 @@ pulled when the image is built, pinned by digest, and reached by nothing at run 
 ## Assumptions
 
 - Feature 020-http-api ships the checked-in OpenAPI document this feature generates from, and
-  satisfies OB-1 to OB-9. **Its spec is being written in parallel with this one and neither it
-  nor the document exists yet**, which `specs/README.md` permits — spec-writing ignores `needs`
-  and disagreements between draft specs are resolved by clarification rather than by ordering.
-  Every requirement here that names the document is therefore unverifiable until 020 lands, and
-  that is the shape of the dependency rather than a gap in this spec. Where 020 does not satisfy
+  satisfies OB-1 to OB-8 (OB-9 is withdrawn with the display switch). **020's spec exists and the document does not**, so every
+  requirement here that names the document is unverifiable until 020 lands — the shape of the
+  dependency rather than a gap in this spec. Which of OB-1 to OB-8 that draft satisfies is audited
+  in `research.md`, and three of them it does not. Where 020 does not satisfy
   an obligation, that is 020's requirement to add or this feature's scope to cut — never a
   client-side workaround. Implementation may not start before 020 is `done` on `main`.
 - Feature 020 owns `docker-compose.yml` and the `api` service in it, including the image that
@@ -776,9 +745,10 @@ pulled when the image is built, pinned by digest, and reached by nothing at run 
 - The API and the client are served from one origin in production, so nothing here needs CORS,
   and a cross-origin request would be a defect rather than a configuration.
 - The routing map is the owner's: `/`, `/data/:category`, `/data/:category/:id`,
-  `/series/official-rate`, `/series/cpi`, with `?as_of=&display=` on every route. `/question/:id`
-  and `/compare` are later features and must fit under the same router and the same two search
-  parameters without restructuring — which is a constraint on this feature's routing, not a
+  `/series/official-rate`, `/series/cpi`, with `?as_of=` on every route (and a window on the two
+  series routes). `/question/:id`
+  and `/compare` are later features and must fit under the same router and the same search
+  parameters — `as_of` globally, a window where a route needs one — without restructuring — which is a constraint on this feature's routing, not a
   promise about theirs.
 - The API is the client's only source of truth. The client reads no TOML, ships no copy of
   `data/`, and derives nothing from a file path beyond displaying it (FR-018).
@@ -796,38 +766,41 @@ pulled when the image is built, pinned by digest, and reached by nothing at run 
   them and must not anticipate them.
 - **Authentication.** The constitution's release gate before the app listens on anything but
   loopback. Not this feature, and not weakened by it.
-- **Internationalisation** beyond whatever Q1 settles.
+- **Internationalisation.** Q1 is answered: English only. A translation layer is a later,
+  additive change around labels that already exist.
 - **Mobile-specific layouts.** The pages must be usable at a narrow width and no mobile-only
   surface is designed.
-- **Any display-currency conversion.** FR-025 and FR-026: the client never converts, and building
-  the conversion is a separate feature with a channel-rate question at its centre.
+- **The display-currency switch, entirely.** Deferred by owner decision 2026-09-03 together with
+  020's `display` request parameter — not merely the conversion, but the selector, the parameter
+  and the slot. *Deferred by owner decision* is its scope, and the `[[future]]` entry in the
+  Appendix is where it is tracked.
 
-## Appendix: the two artefacts this spec depends on, drafted
+## Appendix
 
-Neither is applied by this branch — it is spec-only — and both are applied by the change that
-lands the spec. They are drafted **here** so that "supplied by the landing change" is a claim
-with something behind it rather than an intention.
+### The two artefacts this spec depended on: both applied
 
-### The `[[feature]]` entry for `specs/features.toml`
+The `[[feature]]` entry in `specs/features.toml` and the constitution amendment lifting D-B were
+drafted here and are now **in force** — the entry is in the file (`020-http-api` beside it), and
+the constitution is at **1.4.0** with the `web/` layer line. Neither draft is reproduced here any
+longer: a copy of a live entry is a second place one fact lives, and the copy is where the drift
+goes. What the amendment changed is recorded below because it is the argument, not the text.
+
+### The `[[future]]` entry the display deferral needs, drafted
+
+**Not applied by this branch.** Applied by the change that lands the implementation, so that
+*Deferred by owner decision* above is tracked in the graph rather than only in prose.
 
 ```toml
-[[feature]]
-id     = "021-web-declared-data"
-status = "drafted"
-needs  = ["020-http-api"]
-why    = "the client generates its types from 020's checked-in OpenAPI document and reads nothing else; every figure, mark and refusal on screen is one of 020's responses, and OB-1 to OB-9 in the spec are the obligations it must satisfy"
-note   = "The first surface on which a mark and a refusal have to survive being looked at, built while the only thing on it is declared data -- which is the cheapest place to get that wrong and find out. Read-only by design: no editing, no fetchers, no answer or compare screens. Lifts owner decision D-B, which deferred the web framework until the result schema had stabilised; the constitution amendment lands with this feature. `drafted` is factual -- three [NEEDS CLARIFICATION] are open -- and owner decision 2026-09-03 (specs/decisions/2026-09-03-web-stack.toml) overrides the rule that planning may not start, on the ground that each of the three states its own blast radius in the spec's Status header. The radii are not restated here: this note and that header would be two copies of one fact, and the copy is where the drift goes."
+[[future]]
+id      = "web-display-currency-switch"
+after   = ["021-web-declared-data"]
+note    = "The display-currency selector, the `display` search parameter and the display slot's refusal state, deferred by owner decision 2026-09-03 (specs/decisions/2026-09-03-clarify-021.toml) together with 020's `display` request parameter. Its scope is the Deferred by owner decision table in 021's spec, which is why that table was moved rather than deleted. Additive to what 021 lands: a second global search parameter on a router that already validates one, and a fourth state on a figure slot that already has three. REQUIRED_TESTS F2's remaining halves need this AND an answer screen, so it does not close F2 on its own."
 ```
 
-**020 enters the graph first.** `needs` naming a feature the file does not declare is exactly the
-stale graph `specs/README.md` warns misdirects every agent that reads it. If 020's own entry has
-not landed by the time this one does, the landing change adds 020 as `status = "queued"` in the
-same commit — the mechanism that document provides for a feature accepted but not yet specified.
-
-### The constitution amendment
+### The constitution amendment, as applied
 
 **Three** edits in `.specify/memory/constitution.md`, all in *Architecture Constraints*, plus the
-header record of D-B and a version bump to **1.4.0**. MINOR under the stated policy — a section's
+header record of D-B and a version bump to **1.4.0** — all applied. MINOR under the stated policy — a section's
 guidance is expanded to cover a surface it deferred, and no principle is removed or redefined;
 superseding a founding decision is what *Governance* calls an amendment rather than what
 *Versioning policy* calls a MAJOR. **Artefacts invalidated: none.** No spec, plan, test or data
@@ -835,35 +808,18 @@ file rests on the deferral; feature 021's spec is written against the amended te
 reason for it, and every other feature's contract with the delivery surface is the API, which
 this does not touch.
 
-The layer-map line
+**The applied text is in the constitution and is not reproduced here.** A quote of a live document
+is a second copy of it, and this Appendix's whole subject is what happens when one drifts. What is
+recorded is the argument, which lives nowhere else:
 
-```
-ui/       deferred (see below) — a client over api/, never over core/
-```
-
-becomes
-
-```
-web/      a client over api/ over HTTP, never over core/ — outside the Python package
-```
-
-and the *Delivery surface* paragraph becomes:
-
-> **Delivery surface (owner decision D-B, superseded 2026-09-03).** The foundation shipped the
-> core, a typed API exposing the result schema, and a thin CLI, with the web UI framework
-> deliberately unchosen *until the result schema had stabilised against real output*. That
-> condition is met, and the deferral is lifted: the delivery surface is core, a typed API, an
-> HTTP API over it, a thin CLI, and a web client at `web/` — a TypeScript application outside the
-> Python package, reaching the system only through the HTTP API. It is outside `src/terezy/`
-> deliberately. `lint-imports` governs a Python package and cannot see a TypeScript one, so
-> *the UI may not import the core* is enforced there by the client having no way to name it:
-> its types are generated from the checked-in OpenAPI document and nothing else. The original
-> deferral was not an omission and this is not a reversal of its reasoning — the API was designed
-> as the UI's only contract precisely so that this choice would stay cheap, and it did.
-
-The third edit is the sentence immediately under the layer map, which today reads *"`core/` may
-not import from `data/`, `api/`, `cli/` or `ui/`."* `ui/` is dropped from that list rather than
-renamed: `web/` is a TypeScript tree, `lint-imports` cannot see it, and `core/` could not import
-from it if it tried. The sentence gains a clause saying so, because a layer named in the map and
-absent from the rule reads as an oversight, and a layer named in the rule that no gate can check
-reads as a gate that exists.
+1. **The layer-map line** stopped saying `ui/  deferred` and started naming `web/` as a client over
+   `api/` over HTTP and never over `core/`, outside the Python package.
+2. **The *Delivery surface* paragraph** records the deferral as **discharged, not deleted**: what it
+   bought — that the schema rather than a framework is the contract — survives the choice, and the
+   original deferral was not an omission being corrected. The API was designed as the UI's only
+   contract precisely so that this choice would stay cheap, and it did.
+3. **The sentence under the layer map** dropped `ui/` from `core/`'s forbidden-import list rather
+   than renaming it to `web/`. `lint-imports` governs a Python package and cannot see a TypeScript
+   tree, so `core/` could not import from `web/` if it tried. The sentence gains a clause saying so,
+   because a layer named in the map and absent from the rule reads as an oversight, and a layer
+   named in a rule that no gate can check reads as a gate that exists.

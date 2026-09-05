@@ -1,11 +1,11 @@
 """SC-010: a third fund, different in every term, projected with zero source lines changed.
 
-Constitution Principle II's executable claim, for funds. ``data/instruments/
+Constitution Principle II's executable claim, for funds. ``tests/fixtures/data/instruments/
 synthetic_fund_c.toml`` differs from both real funds in **every** axis the spec names — its
 liquidity terms, its spread, its peg and its tax schedule — plus a subscription cutoff the
 REIT does not have, a payout share below 100% so its NAV moves, and a two-entry dated
-schedule of its own in ``data/tax/synthetic_fixture.toml``. It produces a complete result,
-and nothing in ``src/`` knows it exists.
+schedule of its own in ``tests/fixtures/data/tax/synthetic_fixture.toml``. It produces a
+complete result, and nothing in ``src/`` knows it exists.
 
 **The "zero lines of source" half is asserted, not assumed.** A scan over the shipped
 source tree proves no module mentions any fund by id: a branch on ``id ==
@@ -43,11 +43,12 @@ from terezy.core.results import fund as fund_results
 from terezy.core.results.fund import FundAssumptions, FundProjection
 from terezy.core.tax.interface import TaxableEventKind
 from terezy.data.declarations import resolver
+from tests import data_roots
 
 pytestmark = pytest.mark.contract
 
 REPO_ROOT: Final = Path(__file__).resolve().parents[2]
-DATA_ROOT: Final = REPO_ROOT / "data"
+DATA_ROOT: Final = data_roots.with_fixtures()
 SOURCE_ROOT: Final = REPO_ROOT / "src" / "terezy"
 
 REIT: Final = "inzhur_reit"

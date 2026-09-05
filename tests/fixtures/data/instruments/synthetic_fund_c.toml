@@ -4,7 +4,7 @@
 # ceiling on a different date, a different spread, different settlement delays under both
 # liquidity modes, a subscription cutoff the real REIT does not have, a payout share below
 # 100% so its NAV moves, and its own tax classes on a **two-entry** dated schedule
-# (`data/tax/synthetic_fixture.toml`).
+# (`../tax/synthetic_fixture.toml`).
 #
 # SC-010 is the claim this file exists to prove: it produces a complete result, and **not
 # one line of source code** was written or changed to accept it. If adding a fourth fund

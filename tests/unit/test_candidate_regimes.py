@@ -6,7 +6,7 @@ two per-regime sets alignable at all: a candidate present in one and absent from
 **finding about that regime**, in its rawest form the deciding belief a later shortlist will
 have to name, rather than a missing row somebody reconciles by hand.
 
-What is asserted here is the property, not a shipped scenario: the shipped data root resolves no
+What is asserted here is the property, not a declared scenario: the composed data root resolves no
 regimes (`scenario_id=None`), so the two worlds below are two route sets stated by this module,
 which is the only way to reach the case.
 """
@@ -49,7 +49,7 @@ def _worlds() -> tuple[Registries, Mapping[str, Route], Mapping[str, Route]]:
     subsets of the registry's own declarations, which is what a regime is: a belief about which
     declared corridors are open, never a declaration of its own.
     """
-    registries = fixtures.shipped()
+    registries = fixtures.declared()
     second = tuples.route(
         SECOND_WAY_IN,
         origin="monobank_uah",

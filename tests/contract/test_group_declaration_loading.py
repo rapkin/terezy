@@ -21,12 +21,13 @@ import pytest
 from terezy.data.declarations import loader, resolver
 from terezy.data.declarations.errors import DeclarationError
 from tests import answer_registries as fixtures
+from tests import data_roots
 from tests import observations as obs
 
 pytestmark = pytest.mark.contract
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DATA_ROOT = REPO_ROOT / "data"
+DATA_ROOT = data_roots.with_fixtures()
 GROUPS = DATA_ROOT / "groups.toml"
 
 OVDP = "ovdp"
@@ -46,11 +47,11 @@ twice -- two candidates with two sets of cash flows, differing only in that one 
 ids for one security (016 FR-027a).
 """
 
-SHIPPED_MEMBERSHIP: dict[str, frozenset[str]] = {
+DECLARED_MEMBERSHIP: dict[str, frozenset[str]] = {
     OVDP: FIXTURES_IN_OVDP | frozenset(obs.declared_isins()),
     INZHUR: frozenset({"inzhur_reit", "inzhur_miltech"}),
 }
-"""What the owner's two words resolve to over the shipped registry.
+"""What the owner's two words resolve to over the composed registry.
 
 The real half is **derived** from the two observation files rather than listed, which is the
 whole argument for a group: an issue joins by carrying the label and nothing here changes.
@@ -90,22 +91,22 @@ def _assert_names_file_and_field(exc: DeclarationError, file: Path, contains: st
 
 
 # ---------------------------------------------------------------------------
-# The shipped vocabulary, and the shipped labels
+# The shipped vocabulary, and the labels declared against it
 # ---------------------------------------------------------------------------
 
 
-def test_the_shipped_groups_file_loads() -> None:
+def test_the_groups_file_loads() -> None:
     declared = loader.groups_from_file(GROUPS)
-    assert {group.id for group in declared} == set(SHIPPED_MEMBERSHIP)
+    assert {group.id for group in declared} == set(DECLARED_MEMBERSHIP)
     assert all(group.name for group in declared)
 
 
-def test_the_shipped_labels_are_what_the_owners_words_resolve_to() -> None:
-    labelled: dict[str, set[str]] = {group: set() for group in SHIPPED_MEMBERSHIP}
+def test_the_declared_labels_are_what_the_owners_words_resolve_to() -> None:
+    labelled: dict[str, set[str]] = {group: set() for group in DECLARED_MEMBERSHIP}
     for identifier, labels in fixtures.declared_labels().items():
         for group in labels:
             labelled[group].add(identifier)
-    assert {name: frozenset(ids) for name, ids in labelled.items()} == SHIPPED_MEMBERSHIP
+    assert {name: frozenset(ids) for name, ids in labelled.items()} == DECLARED_MEMBERSHIP
 
 
 def test_three_declared_instruments_are_in_no_group() -> None:

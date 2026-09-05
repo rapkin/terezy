@@ -1,9 +1,9 @@
-"""Fixtures for the full-tuple suites: the shipped registry, and small deliberate edits to it.
+"""Fixtures for the full-tuple suites: the declared registry, and small deliberate edits to it.
 
-Built from ``data/`` rather than by hand, and that is the point rather than a convenience. The
-join's whole claim is that it composes declarations, so a suite that hand-built every record
-would be testing a world the loader never validated -- and the seam tests below are only
-interesting if the thing whose seam is broken is otherwise exactly what ships.
+Built from a data root rather than by hand, and that is the point rather than a convenience.
+The join's whole claim is that it composes declarations, so a suite that hand-built every
+record would be testing a world the loader never validated -- and the seam tests below are only
+interesting if the thing whose seam is broken is otherwise exactly what a loader accepted.
 
 Each helper makes **one** deliberate change to that registry and says what it is breaking. A
 fixture that changed two things at once would let a test pass for the other reason.
@@ -35,9 +35,14 @@ from terezy.core.routes.path import (
 )
 from terezy.core.streams.streams import IncomeStream
 from terezy.data.declarations import resolver
+from tests import data_roots
 
-REPO_ROOT: Final = Path(__file__).resolve().parents[1]
-DATA_ROOT: Final = REPO_ROOT / "data"
+REPO_ROOT: Final = data_roots.REPO_ROOT
+DATA_ROOT: Final = data_roots.with_fixtures()
+"""The composed root, because every suite importing this module reaches for a fixture
+instrument somewhere -- the hurdle below is one. ``data_roots.SHIPPED`` is what a suite names
+when it is asserting about what ships.
+"""
 
 UAH: Final = Currency.UAH
 
@@ -72,6 +77,7 @@ __all__ = [
     "VenueQuote",
     "access",
     "date",
+    "declared",
     "fund_tuple",
     "fx_route",
     "hurdle_tuple",
@@ -79,7 +85,6 @@ __all__ = [
     "quote",
     "replace",
     "route",
-    "shipped",
     "transfer_leg",
     "with_access",
     "with_leg",
@@ -139,9 +144,9 @@ MILTECH_EXIT: Final = date(2028, 1, 17)
 tuples are compared over one span as well as over one horizon."""
 
 
-def shipped() -> Registries:
-    """Every declaration under ``data/``, resolved and cross-checked, as the join takes them."""
-    return resolver.tuple_from_data_root(DATA_ROOT, base_currency=UAH, scenario_id=None).registries
+def declared(root: Path = DATA_ROOT) -> Registries:
+    """Every declaration under a data root, resolved and cross-checked, as the join takes them."""
+    return resolver.tuple_from_data_root(root, base_currency=UAH, scenario_id=None).registries
 
 
 def hurdle_tuple(*, route_out: ExitChoice = FROM_THE_DECLARATION) -> Tuple:
@@ -372,8 +377,8 @@ def access(
 ) -> InstrumentAccess:
     """One access declaration, built in code. A test fixture.
 
-    ``resale_price`` defaults to absent because that is what every shipped declaration says, and
-    it is the state 015 FR-031 refuses by name. A battery about an early exit states its own.
+    ``resale_price`` defaults to absent because that is the state 015 FR-031 refuses by name.
+    A battery about an early exit states its own.
     """
     return InstrumentAccess(
         instrument_id=instrument_id,

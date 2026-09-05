@@ -180,7 +180,7 @@ def test_the_answers_digest_is_a_function_of_the_canonical_form_alone(tmp_path: 
 
 
 def test_the_roll_up_names_the_unverified_sources_behind_the_figures() -> None:
-    """The shipped registry is entirely unverified, so a clean roll-up would be a lie."""
+    """Every declaration is unverified, so a clean roll-up would be a lie."""
     run: Any = _answered()
     assert isinstance(run.answer, Answer)
     assert run.manifest.unverified_sources

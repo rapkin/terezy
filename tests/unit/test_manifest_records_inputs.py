@@ -50,7 +50,7 @@ from terezy.core.results.project import Projection
 from terezy.data import manifest
 from terezy.data.declarations import loader, resolver
 from terezy.data.declarations.errors import DeclarationError
-from tests import declared_terms, synthetic
+from tests import data_roots, declared_terms, synthetic
 
 UAH = Currency.UAH
 
@@ -59,7 +59,7 @@ AS_OF = date(2026, 8, 30)
 manifest rather than in the declaration it answers."""
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DATA_ROOT = REPO_ROOT / "data"
+DATA_ROOT = data_roots.with_fixtures()
 
 
 def _declared_files() -> dict[str, str]:

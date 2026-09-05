@@ -100,7 +100,7 @@ def _outcome(
     shipped domestic route they are one number, and a claim about which of them a figure rests
     on cannot be checked against a pair that agrees.
     """
-    resolved = registries or fixtures.shipped()
+    resolved = registries or fixtures.declared()
     candidate = fixtures.hurdle_tuple()
     if flat is not None:
         resolved = fixtures.with_new_route(
@@ -140,7 +140,7 @@ def _fund_outcome(candidate: Tuple, horizon: fixtures.DateRange) -> TupleOutcome
         horizon=horizon,
         as_of=fixtures.AS_OF,
         continuation=fixtures.HOLD_AS_CASH,
-        registries=fixtures.shipped(),
+        registries=fixtures.declared(),
     )
     assert isinstance(outcome, TupleOutcome), outcome
     return outcome
@@ -351,7 +351,7 @@ class TestAScopeStatementIsCheckedAgainstTheBehaviourItDescribes:
             (fixtures.DOMESTIC_OUT, "route_out"),
         ):
             outcome = _outcome(
-                registries=fixtures.with_route(fixtures.shipped(), route_id, status="constrained")
+                registries=fixtures.with_route(fixtures.declared(), route_id, status="constrained")
             )
             assert outcome.routes.status == "constrained", side
             assert outcome.routes.constrained == (side,), side
@@ -372,7 +372,7 @@ class TestAScopeStatementIsCheckedAgainstTheBehaviourItDescribes:
         for route_id in (fixtures.DOMESTIC_IN, fixtures.DOMESTIC_OUT):
             raised = _outcome(
                 registries=fixtures.with_leg(
-                    fixtures.shipped(), route_id, disruption_probability=0.05
+                    fixtures.declared(), route_id, disruption_probability=0.05
                 )
             )
             assert raised.routes.disruption_probability == 0.05, route_id
@@ -442,7 +442,7 @@ class TestNoFigureIsReportedWithoutItsScope:
             horizon=fixtures.DateRange(start=fixtures.ISSUE_DATE, end=fixtures.date(2028, 1, 20)),
             as_of=fixtures.AS_OF,
             continuation=fixtures.HOLD_AS_CASH,
-            registries=fixtures.shipped(),
+            registries=fixtures.declared(),
         )
         assert isinstance(outcome, TupleOutcome), outcome
         assert outcome.span.end == outcome.horizon.end

@@ -116,7 +116,7 @@ def test_the_shipped_ceiling_admits_the_shipped_registry() -> None:
     deliver, arriving at the owner rather than at a reader of the data file.
     """
     declarations = _resolve(DATA_ROOT)
-    registries = candidates.shipped()
+    registries = candidates.declared()
     enumerated = candidates.enumerated(
         registries, ceiling_=declarations.ceiling, question_=candidates.question(registries)
     )

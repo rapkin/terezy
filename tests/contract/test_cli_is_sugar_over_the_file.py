@@ -24,7 +24,7 @@ from typing import Any, cast
 
 import pytest
 
-from terezy.api.answer import answer_question
+from terezy.api.answer import AnsweredQuestion, answer_question
 from terezy.cli import main as cli
 from terezy.core.decision.answer import benchmark_unavailable, section_ranking
 from terezy.core.instruments.groups import InstrumentGroup
@@ -55,12 +55,35 @@ push them into the question file, which is the opposite of what FR-006 decided.
 
 def _run() -> tuple[list[str], int]:
     answered = answer_question(
-        fixtures.DATA_ROOT,
+        fixtures.SHIPPED_ROOT,
         fixtures.OWNERS_QUESTION,
         as_of=fixtures.AS_OF,
         base_currency=Currency.UAH,
     )
     return cli.render(answered), 0
+
+
+def _rebenchmarked(instrument_id: str) -> str:
+    """The owner's own question document, measured against a different issue."""
+    document = fixtures.QUESTION_FILE.read_text(encoding="utf-8")
+    replaced = document.replace(
+        f'benchmark    = "{fixtures.BENCHMARK}"', f'benchmark    = "{instrument_id}"', 1
+    )
+    assert replaced != document, "the question file no longer names the benchmark it did"
+    return replaced
+
+
+def _unranked() -> AnsweredQuestion:
+    """The same question measured against the fund that refuses on its own terms.
+
+    ``inzhur_reit`` produces no outcome at any horizon, so every section reaches
+    ``BenchmarkUnavailable`` -- 010 FR-011 will not offer a list whose head would read as a
+    winner. The two tests below are about how the CLI *renders* that, and over the shipped
+    registry every bond is priced both ways, so a refusing benchmark is where it comes from.
+    """
+    return cli._from_flags(
+        fixtures.SHIPPED_ROOT, [_rebenchmarked(fixtures.REIT)], as_of=fixtures.AS_OF
+    )
 
 
 def _declared_flags() -> set[str]:
@@ -102,9 +125,9 @@ def test_it_builds_a_question_through_the_same_loader_the_file_goes_through() ->
 def test_flags_produce_a_record_equal_to_the_one_the_file_produces(tmp_path: Path) -> None:
     """SC-019's first half, field for field."""
     document = fixtures.QUESTION_FILE.read_text(encoding="utf-8")
-    built = cli._from_flags(fixtures.DATA_ROOT, [document], as_of=fixtures.AS_OF)
+    built = cli._from_flags(fixtures.SHIPPED_ROOT, [document], as_of=fixtures.AS_OF)
     loaded = answer_question(
-        fixtures.DATA_ROOT,
+        fixtures.SHIPPED_ROOT,
         fixtures.OWNERS_QUESTION,
         as_of=fixtures.AS_OF,
         base_currency=Currency.UAH,
@@ -117,12 +140,7 @@ def test_flags_produce_a_record_equal_to_the_one_the_file_produces(tmp_path: Pat
 
 def test_every_sections_refusal_reaches_the_reader_with_its_own_reason() -> None:
     """SC-022. Asserted by finding each reason string in the output, byte for byte."""
-    answered = answer_question(
-        fixtures.DATA_ROOT,
-        fixtures.OWNERS_QUESTION,
-        as_of=fixtures.AS_OF,
-        base_currency=Currency.UAH,
-    )
+    answered = _unranked()
     assert isinstance(answered.answer, Answer)
     output = "\n".join(cli.render(answered))
     for section in answered.answer.sections:
@@ -147,8 +165,252 @@ def test_a_withheld_candidate_is_named_rather_than_omitted() -> None:
 
 def test_no_ranking_is_rendered_as_a_sentence_rather_than_as_an_empty_table() -> None:
     """A blank where a ranking would be is the failure this project exists to prevent."""
+    assert any("ranked: NOTHING" in line for line in cli.render(_unranked()))
+
+
+def test_a_ranking_marks_its_own_hurdle_and_says_what_beat_it() -> None:
+    """Principle I: the naive baseline is always scored **and always shown**.
+
+    The head of a ranked list reads as the winner whether or not it is one, and the hurdle is
+    somewhere in the list rather than beside it -- 14th of 24 at one month and last at twelve,
+    where every shown row beats it. Both halves are asserted: the row is marked, and
+    ``beats_benchmark`` -- computed for exactly this and rendered nowhere before -- reaches the
+    reader as a sentence rather than as rows to count off.
+    """
     lines, _ = _run()
-    assert any("ranked: NOTHING" in line for line in lines)
+    output = "\n".join(lines)
+    sections = [
+        section for section in _answered().sections if isinstance(section.outcome, CandidateSurvey)
+    ]
+    marked = [line for line in lines if "[BENCHMARK]" in line]
+    assert len(marked) == len(sections)
+    assert all(fixtures.BENCHMARK in line for line in marked)
+
+    for section in sections:
+        assert isinstance(section.outcome, CandidateSurvey)
+        comparison = section.outcome.comparison
+        assert isinstance(comparison, Comparison)
+        ranked = section_ranking(section)
+        shown = {item.key for item in ranked}
+        beaten = sum(1 for i in comparison.beats_benchmark if comparison.ranked[i].key in shown)
+        expected = (
+            f"NOTHING SHOWN HERE BEATS THE BENCHMARK {fixtures.BENCHMARK}."
+            if not beaten
+            else (
+                f"{beaten} of the {len(ranked) - 1} other row(s) beat the benchmark "
+                f"{fixtures.BENCHMARK}."
+            )
+        )
+        assert expected in output, expected
+
+
+def _answered() -> Answer:
+    """The owner's answer over what ships, asserted to be one."""
+    run = answer_question(
+        fixtures.SHIPPED_ROOT,
+        fixtures.OWNERS_QUESTION,
+        as_of=fixtures.AS_OF,
+        base_currency=Currency.UAH,
+    )
+    assert isinstance(run.answer, Answer), run.answer
+    return run.answer
+
+
+def test_a_section_whose_rows_span_different_periods_says_so() -> None:
+    """Principle I: the verdict is the most confident sentence this renderer prints.
+
+    ``implied_rate`` annualises over the span the money was at work, so an ordering across
+    rows measured over different numbers of days compares different questions. The caveat is
+    keyed on **the set of span lengths** and on nothing narrower: keying it on the hurdle, or
+    on any row ending inside the window, goes quiet on tables that are just as incomparable.
+    """
+    lines, _ = _run()
+    verdicts = [
+        line
+        for line in lines
+        if any(mark in line for mark in ("beat the benchmark", "NOTHING SHOWN HERE", "ONLY ROW"))
+    ]
+    sections = [
+        section for section in _answered().sections if isinstance(section.outcome, CandidateSurvey)
+    ]
+    assert len(verdicts) == len(sections)
+    for section, verdict in zip(sections, verdicts, strict=True):
+        assert isinstance(section.outcome, CandidateSurvey)
+        comparison = section.outcome.comparison
+        assert isinstance(comparison, Comparison)
+        ranked = section_ranking(section)
+        lengths = {(item.span.end - item.span.start).days for item in ranked}
+        assert len(lengths) > 1, "every one of his horizons ranks rows of differing spans"
+
+        window = (section.horizon.end - section.horizon.start).days
+        assert "RATES HERE SPAN DIFFERENT PERIODS" in verdict, verdict
+        assert f"spans of {min(lengths)} to {max(lengths)} days against a window of {window}" in (
+            verdict
+        ), verdict
+
+        # The hurdle's own span, named: a reader comparing it against the declaration checks
+        # the date the money is home, not the date the paper's terms end.
+        hurdle = comparison.ranked[comparison.benchmark]
+        assert f"The benchmark's span is {(hurdle.span.end - hurdle.span.start).days} days" in (
+            verdict
+        )
+        assert hurdle.span.end.isoformat() in verdict
+
+
+def test_a_ranking_holding_only_the_hurdle_says_so_rather_than_claiming_a_result() -> None:
+    """ "Nothing beats it" over a table of one is a finding-shaped sentence about no finding.
+
+    It is the `[BENCHMARK]` marker's own trap arriving from the other side: a lone row reads
+    as a result when the fact is that nothing was measured against it.
+    """
+    section = next(
+        section for section in _answered().sections if isinstance(section.outcome, CandidateSurvey)
+    )
+    assert isinstance(section.outcome, CandidateSurvey)
+    comparison = section.outcome.comparison
+    assert isinstance(comparison, Comparison)
+    hurdle = comparison.ranked[comparison.benchmark]
+
+    alone = replace(comparison, ranked=(hurdle,), benchmark=0, ties=(), beats_benchmark=())
+    line = cli._beats_line(alone, (hurdle,))
+    assert f"THE BENCHMARK {fixtures.BENCHMARK} IS THE ONLY ROW HERE" in line
+    assert "nothing was measured against it" in line
+    assert "BEATS" not in line, "a verdict about beating needs something to beat"
+
+
+def test_a_verdict_over_a_ranking_without_its_hurdle_is_refused() -> None:
+    """The precondition `section_ranking` upholds, asserted rather than assumed.
+
+    Every sentence the verdict prints is about rows relative to the hurdle, so a table the
+    hurdle is missing from would have it describing rows that are not there.
+    """
+    section = next(
+        section for section in _answered().sections if isinstance(section.outcome, CandidateSurvey)
+    )
+    assert isinstance(section.outcome, CandidateSurvey)
+    comparison = section.outcome.comparison
+    assert isinstance(comparison, Comparison)
+    hurdle = comparison.ranked[comparison.benchmark]
+    without = tuple(item for item in section_ranking(section) if item.key != hurdle.key)
+
+    with pytest.raises(AssertionError, match="does not show its own hurdle"):
+        cli._beats_line(comparison, without)
+
+
+def test_the_caveat_is_silent_when_every_row_runs_to_the_window() -> None:
+    """No caveat where there is nothing to caution about -- otherwise it is noise and unread.
+
+    The ``Comparison`` is rebuilt around the printed rows rather than edited in place: its
+    ``benchmark`` indexes ``comparison.ranked``, which carries the withheld candidate too, so
+    swapping in the filtered tuple and keeping the index resolves a different bond as the
+    hurdle -- the very mix-up the marker exists to prevent, committed by its own test.
+    """
+    section = next(
+        section for section in _answered().sections if isinstance(section.outcome, CandidateSurvey)
+    )
+    assert isinstance(section.outcome, CandidateSurvey)
+    comparison = section.outcome.comparison
+    assert isinstance(comparison, Comparison)
+    ranked = section_ranking(section)
+    hurdle = comparison.ranked[comparison.benchmark].key
+
+    to_the_end = tuple(
+        replace(item, span=replace(item.span, end=comparison.horizon.end)) for item in ranked
+    )
+    squared = replace(
+        comparison,
+        ranked=to_the_end,
+        benchmark=next(i for i, item in enumerate(to_the_end) if item.key == hurdle),
+        ties=(),
+        beats_benchmark=(),
+    )
+    assert squared.ranked[squared.benchmark].key == hurdle, "the rebuild must keep the hurdle"
+    assert len({(i.span.end - i.span.start).days for i in to_the_end}) == 1, (
+        "the fixture must actually square every span, or the silence proves nothing"
+    )
+    assert "RATES HERE SPAN DIFFERENT PERIODS" not in cli._beats_line(squared, to_the_end)
+
+
+def test_a_tie_with_the_hurdle_is_claimed_only_when_a_printed_row_ties() -> None:
+    """A tie group whose only other member is withheld is not a tie the reader can see.
+
+    The same two index spaces as the count beside it: ``ties`` addresses ``comparison.ranked``,
+    the rows come from ``section_ranking``. Asserted by construction rather than by the shipped
+    data, which has no such group today -- so the guard would be unreachable and untested.
+    """
+    section = next(
+        section for section in _answered().sections if isinstance(section.outcome, CandidateSurvey)
+    )
+    assert isinstance(section.outcome, CandidateSurvey)
+    comparison = section.outcome.comparison
+    assert isinstance(comparison, Comparison)
+    ranked = section_ranking(section)
+    withheld = next(
+        index
+        for index, item in enumerate(comparison.ranked)
+        if item.key not in {shown.key for shown in ranked}
+    )
+    tied_only_with_a_withheld_row = replace(comparison, ties=((comparison.benchmark, withheld),))
+    assert "ties with it" not in cli._beats_line(tied_only_with_a_withheld_row, ranked)
+
+    shown = next(
+        index
+        for index, item in enumerate(comparison.ranked)
+        if index != comparison.benchmark and item.key in {row.key for row in ranked}
+    )
+    tied_with_a_printed_row = replace(comparison, ties=((comparison.benchmark, shown),))
+    assert "ties with it" in cli._beats_line(tied_with_a_printed_row, ranked)
+
+
+BELOW_A_WITHHELD_CANDIDATE = "UA4000238281"
+"""A benchmark that `inzhur_miltech` outranks, so the two index spaces disagree about it.
+
+`Comparison.benchmark`, `ties` and `beats_benchmark` index `comparison.ranked`; the rows the
+CLI prints are `section_ranking`, which is that tuple with every withheld candidate removed
+(FR-030). The owner's own benchmark outranks the one withheld candidate at all three horizons,
+so under it the two spaces agree by luck and every mix-up passes. This one does not.
+"""
+
+
+def test_the_hurdle_is_marked_by_identity_and_not_by_position() -> None:
+    """A withheld candidate above the benchmark must not shift the marker or the count.
+
+    Reached through the CLI rather than asserted on the record, because the mix-up is a
+    rendering bug: the record is right and the printed hurdle was a different instrument.
+    """
+    document = _rebenchmarked(BELOW_A_WITHHELD_CANDIDATE)
+    answered = cli._from_flags(fixtures.SHIPPED_ROOT, [document], as_of=fixtures.AS_OF)
+    assert isinstance(answered.answer, Answer)
+    lines = cli.render(answered)
+
+    marked = [line for line in lines if "[BENCHMARK]" in line]
+    verdicts = [
+        line
+        for line in lines
+        if any(mark in line for mark in ("beat the benchmark", "NOTHING SHOWN HERE", "ONLY ROW"))
+    ]
+    assert marked, "the ranking prints no hurdle at all"
+    assert len(verdicts) == len(marked)
+    assert all(BELOW_A_WITHHELD_CANDIDATE in line for line in marked), marked
+    assert all(BELOW_A_WITHHELD_CANDIDATE in line for line in verdicts), verdicts
+
+    # And the count is over the rows the section actually prints: `inzhur_miltech` beats this
+    # benchmark on the record and is withheld, so counting it would give a total the reader
+    # cannot reconcile with the rows -- while two lines below, the same section says no figure
+    # for it is reported.
+    for section, verdict in zip(answered.answer.sections, verdicts, strict=True):
+        assert isinstance(section.outcome, CandidateSurvey)
+        comparison = section.outcome.comparison
+        assert isinstance(comparison, Comparison)
+        shown = {item.key for item in section_ranking(section)}
+        beaten = sum(1 for i in comparison.beats_benchmark if comparison.ranked[i].key in shown)
+        withheld = {item.key for item in section.arrives_after_horizon}
+        assert any(comparison.ranked[i].key in withheld for i in comparison.beats_benchmark), (
+            "the fixture must actually place a withheld candidate above the benchmark"
+        )
+        assert f"{beaten} of the {len(shown) - 1} other row(s) beat the benchmark" in verdict, (
+            verdict
+        )
 
 
 def test_the_undeclared_subjects_are_named_by_the_words_he_wrote() -> None:
@@ -166,7 +428,7 @@ def test_main_returns_zero_for_an_answer_and_one_for_a_refusal(
         cli.main(
             [
                 "--data-root",
-                str(fixtures.DATA_ROOT),
+                str(fixtures.SHIPPED_ROOT),
                 "--as-of",
                 fixtures.AS_OF.isoformat(),
                 "--question",
@@ -177,9 +439,11 @@ def test_main_returns_zero_for_an_answer_and_one_for_a_refusal(
     )
     assert capsys.readouterr().out
 
-    broken = fixtures.QUESTION_FILE.read_text(encoding="utf-8").replace(
-        'benchmark    = "ovdp_synthetic_a"', 'benchmark    = "enumerated_taxable_x"', 1
-    )
+    # Over the COMPOSED root, because the refusal under test is "declared, but not among the
+    # subjects" and the shipped root declares no instrument outside his two groups -- there,
+    # `enumerated_taxable_x` would reach the same refusal for the weaker reason that nobody
+    # declares it, and the case would pass without being exercised.
+    broken = _rebenchmarked("enumerated_taxable_x")
     assert (
         cli.main(
             [
@@ -204,7 +468,7 @@ def test_flags_search_the_same_world_the_file_does(tmp_path: Path) -> None:
     corridors the question's own world says do not exist.
     """
     root = tmp_path / "data"
-    shutil.copytree(fixtures.DATA_ROOT, root)
+    shutil.copytree(fixtures.SHIPPED_ROOT, root)
     wartime = fixtures.QUESTION_FILE.read_text(encoding="utf-8").replace(
         'regime       = "(no regime declared)"', 'regime       = "wartime"', 1
     )
@@ -226,7 +490,7 @@ def test_a_declaration_that_will_not_load_reaches_the_reader_as_words(
         cli.main(
             [
                 "--data-root",
-                str(fixtures.DATA_ROOT),
+                str(fixtures.SHIPPED_ROOT),
                 "--as-of",
                 fixtures.AS_OF.isoformat(),
                 "--set",
@@ -268,7 +532,7 @@ def test_a_declared_group_nobody_labelled_is_not_printed_as_undeclared() -> None
 def test_flags_answer_a_question_against_a_root_that_declares_none(tmp_path: Path) -> None:
     """The one place the file does not exist is the one place the flags path exists for."""
     root = tmp_path / "data"
-    shutil.copytree(fixtures.DATA_ROOT, root)
+    shutil.copytree(fixtures.SHIPPED_ROOT, root)
     (root / "questions" / "fifty-thousand.toml").unlink()
     run = cli._from_flags(
         root, [fixtures.QUESTION_FILE.read_text(encoding="utf-8")], as_of=fixtures.AS_OF
@@ -289,7 +553,7 @@ def test_a_malformed_as_of_is_not_blamed_on_a_declaration(
         cli.main(
             [
                 "--data-root",
-                str(fixtures.DATA_ROOT),
+                str(fixtures.SHIPPED_ROOT),
                 "--as-of",
                 "yesterday",
                 "--question",
@@ -323,7 +587,7 @@ def test_the_flags_path_runs_the_checks_that_only_the_file_path_used_to_run(
             cli.main(
                 [
                     "--data-root",
-                    str(fixtures.DATA_ROOT),
+                    str(fixtures.SHIPPED_ROOT),
                     "--as-of",
                     fixtures.AS_OF.isoformat(),
                     "--set",
@@ -366,15 +630,21 @@ def _ranked_section_with_an_unrankable_figure() -> tuple[HorizonSection, TupleOu
     comparison = section.outcome.comparison
     assert isinstance(comparison, Comparison)
     assert comparison.not_comparable == ()
-    moved = comparison.ranked[-1]
-    assert comparison.benchmark < len(comparison.ranked) - 1
+    # The LAST row that is not the hurdle. Taking the last unconditionally broke the moment a
+    # benchmark that ranks worst was declared: the hurdle would be the one moved out, and
+    # `section_ranking` then reports nothing at all rather than a ranking beside an unranked
+    # figure, which is the shape these two tests are about.
+    at = max(index for index in range(len(comparison.ranked)) if index != comparison.benchmark)
+    moved = comparison.ranked[at]
+    kept = comparison.ranked[:at] + comparison.ranked[at + 1 :]
     narrowed = replace(
         comparison,
-        ranked=comparison.ranked[:-1],
+        ranked=kept,
+        benchmark=comparison.benchmark - (1 if comparison.benchmark > at else 0),
         not_comparable=(moved,),
         ties=(),
         beats_benchmark=tuple(
-            index for index in comparison.beats_benchmark if index < len(comparison.ranked) - 1
+            index - (1 if index > at else 0) for index in comparison.beats_benchmark if index != at
         ),
     )
     return (
@@ -489,7 +759,7 @@ def test_a_question_naming_an_undeclared_stream_is_refused_before_the_verb_sees_
         cli.main(
             [
                 "--data-root",
-                str(fixtures.DATA_ROOT),
+                str(fixtures.SHIPPED_ROOT),
                 "--as-of",
                 fixtures.AS_OF.isoformat(),
                 "--set",
