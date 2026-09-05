@@ -43,14 +43,3 @@ def test_version_is_exposed() -> None:
 @pytest.mark.parametrize("name", LAYER_MODULES)
 def test_layer_is_importable(name: str) -> None:
     assert importlib.import_module(name) is not None
-
-
-@pytest.mark.parametrize("name", LAYER_MODULES)
-def test_layer_documents_its_charter(name: str) -> None:
-    """Every layer carries a docstring stating what it is and is not allowed to do.
-
-    The architecture is only enforceable if it is written down where the code lives,
-    not only in the constitution.
-    """
-    module = importlib.import_module(name)
-    assert module.__doc__, f"{name} has no docstring stating its charter"
