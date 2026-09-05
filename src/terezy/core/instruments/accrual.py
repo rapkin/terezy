@@ -62,8 +62,9 @@ class Schedule:
     """Named in every refusal, so a reader is sent to one file rather than to a registry."""
 
     coupons: tuple[tuple[date, Money], ...]
-    """Every coupon **one unit** pays over the life of the paper, by paid date, ascending --
-    ``CouponsPerUnitFn``'s own contract. Empty is a zero-coupon schedule and is a figure."""
+    """The accrual **boundaries**, ascending, each with the amount that ends the period opening
+    at it. Every coupon one unit pays is one, and :func:`schedule_of` may prepend one more that
+    ends nothing and carries a zero. Empty is a zero-coupon schedule and is a figure."""
 
     day_count: str
     """The declared convention. No fallback: ``conventions.day_count`` raises on an unknown
@@ -81,7 +82,8 @@ class Carried:
     """``quote - accrued(observed_on)``. The thing the owner's belief assumes constant."""
 
     accrued: Money
-    """``accrued(on)``, at the date the price is wanted for."""
+    """``accrued(on)``, at the date the price is wanted for -- or a zero standing for an
+    accrual that was never needed, where the quotation was used on the day it was read."""
 
 
 def schedule_of(

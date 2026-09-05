@@ -22,8 +22,8 @@ Two claims the schedule alone would not make, and both are asserted: the sale is
 that consumes basis, and the coupon the holding would have received in 2027 is **absent** rather
 than moved.
 
-**A fixture whose subject is the sale quotes the resale price on its own sale day**, so nothing
-detaches between the quotation and the sale and the arithmetic above is the whole of it. What a
+**A fixture whose subject is the sale quotes the resale price on its own sale day**, so the
+accrual cancels out of the price entirely and the arithmetic above is the whole of it. What a
 quotation taken *earlier* is worth on the sale day is a separate rule with its own tests below;
 separating the two is what lets each be checked on paper.
 """
@@ -464,12 +464,12 @@ def test_a_coupon_the_business_day_rule_moves_past_the_purchase_is_bought_with_t
     assert is_close(outcome.sold_early.price_per_unit.amount, MOVED_STRUCK)
 
 
-def test_a_coupon_before_the_quotation_is_already_out_of_it() -> None:
-    """The lower bound is the quotation's own day, and it is not the purchase date.
+def test_a_quotation_read_on_the_sale_day_is_the_price_on_it() -> None:
+    """``price(clean(q, d), d) == q``, on the projection rather than on the function.
 
     Quoted on the sale day, the same holding pays the same 2026-07-15 coupon and sells at the
-    full 995.00: a coupon that detached *before* the quotation was taken was never in it, so
-    subtracting it would report a loss the holder never took.
+    full 995.00: the accrual comes out of the quotation and goes straight back in, so the
+    identity holds whatever the schedule says.
     """
     sold = _sold_at_the_horizon().sold_early
     assert sold is not None

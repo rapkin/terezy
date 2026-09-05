@@ -25,7 +25,6 @@ from terezy.core.ledger.events import CausationKind, CausationRef, Event, EventK
 from terezy.core.primitives import money
 
 if TYPE_CHECKING:  # pragma: no cover -- the records live beside the interface
-    from collections.abc import Iterable
     from datetime import date
 
     from terezy.core.instruments.interface import EarlyExit, Holding, InstrumentDeclaration
@@ -78,7 +77,7 @@ def early_sale(
     *,
     on: date,
     exit_: EarlyExit,
-    coupons: Iterable[tuple[date, Money]],
+    coupons: tuple[tuple[date, Money], ...],
     sequence: int,
 ) -> Event | InconsistentTerms:
     """Cash in, units out, at the resale quotation carried to the horizon's last day.
@@ -108,7 +107,7 @@ def early_sale(
     deliberately in the worked examples rather than asserted here.
     """
     carried = accrual.carried_to(
-        accrual.schedule_of(declaration, tuple(coupons)),
+        accrual.schedule_of(declaration, coupons),
         quote=exit_.price_per_unit,
         observed_on=exit_.observed_on,
         on=on,

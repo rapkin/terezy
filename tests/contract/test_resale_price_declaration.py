@@ -156,10 +156,10 @@ def test_a_resale_price_read_on_another_day_than_the_purchase_quote_refuses(
 ) -> None:
     """One instrument, one market, one morning.
 
-    Each price is carried to the day it prices net of the coupons that detached since it was
-    read, so two retrieval dates would carry the pair by two different windows -- a coupon
-    could come out of the sale and stay in the purchase, charging the holder for one he never
-    received. Nothing downstream sees the pair, so the agreement is enforced at load or nowhere.
+    Each price is carried to the day it prices by the accrual measured from the day it was
+    read, so two retrieval dates would net two different accruals out of the pair -- and the
+    difference between the two clean prices, which is the spread, would then hold an accrual
+    as well. Nothing downstream sees the pair, so the agreement is enforced at load or nowhere.
     """
     root = _scratch_root(tmp_path)
     _with_resale(root, BOND, block=RESALE_READ_A_WEEK_LATER)

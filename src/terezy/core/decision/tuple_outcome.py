@@ -1123,8 +1123,8 @@ def _early_exit(prepared: _Prepared, registries: Registries) -> EarlyExit | None
     ``None`` where the access declaration quotes no resale price: the instrument then refuses
     naming ``access.resale_price`` and :func:`_bond_outcome` turns that into a missing
     declaration. Nothing is inferred from the purchase quote or the face value -- either would
-    report a spread of zero. The quotation's own date travels with it, because what the price
-    is worth on a later day depends on what detached from it in between.
+    report a spread of zero. The quotation's own date travels with it, because it is the date
+    the accrual inside the quotation is measured at.
     """
     quote = prepared.access.resale_price
     if quote is None:

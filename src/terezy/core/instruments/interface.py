@@ -484,8 +484,8 @@ CouponsPerUnitFn = Callable[[InstrumentDeclaration], tuple[tuple[date, Money], .
 """Every coupon **one unit** pays over the whole life of the paper, by paid date, ascending.
 
 Not a holding's coupons and not a window's: the caller is
-:func:`terezy.core.instruments.accrual.carried_to`, which reads the dates as the boundaries of
-the accrual periods a dated quotation is carried across. An implementation that trimmed the
+:func:`terezy.core.instruments.accrual.schedule_of`, which reads the dates as the boundaries
+of the accrual periods a dated quotation is carried across. An implementation that trimmed the
 list to a buyer would leave the period containing the quotation's own day unbounded. Empty is
 a real answer -- a zero-coupon issue -- and never a stand-in for "this form cannot say".
 """

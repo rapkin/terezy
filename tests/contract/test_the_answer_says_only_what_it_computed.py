@@ -269,10 +269,7 @@ def test_a_section_that_holds_to_maturity_inherits_no_early_exit_claim() -> None
 
 
 def test_an_early_exit_states_its_claims_and_leaves_rate_risk_unsigned() -> None:
-    """SC-026, **widened by one claim on 2026-09-03**: it was written for FR-033's three, and
-    carrying a dirty quotation net of detached coupons added a fourth. The criterion's shape is
-    unchanged -- state every claim, sign only the ones with a warrant -- and rate risk is still
-    the one that has none.
+    """SC-026: state every claim, sign only the ones with a warrant.
 
     Rate risk is symmetric -- a bond sold after rates rise fetches less than its spread implies
     and one sold after rates fall fetches more -- and an approximation whose sign is asserted
