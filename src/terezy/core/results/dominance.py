@@ -45,9 +45,7 @@ class MoneyFigure:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class DateFigure:
-    """A date. Compared exactly: FR-011d fixes a date's slack at zero, and a float comparison
-    applied to an ordinal near 740 000 would allow a slack of ~7.4e-4 days the contract does
-    not promise."""
+    """A date, compared exactly: FR-011d fixes a date's slack at zero."""
 
     on: date
 
@@ -57,7 +55,7 @@ class FigureUnavailable:
     """The criterion could read no figure off this candidate, naming what was not there."""
 
     what: str
-    """The record field that carried nothing -- an identifier, never a composed sentence."""
+    """The record field that carried nothing."""
 
 
 Figure = MoneyFigure | DateFigure | FigureUnavailable

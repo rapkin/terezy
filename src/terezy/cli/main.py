@@ -309,8 +309,8 @@ def _dominance_lines(section: HorizonSection) -> list[str]:
         for item in result.dominated
     )
     lines.extend(
-        f"    NOT PLACED {item.key.instrument_id}: every pair involving it is incomparable "
-        f"-- {_why_incomparable(item.every_pair[0])}"
+        f"    NOT PLACED {item.key.instrument_id}: every one of its "
+        f"{len(item.every_pair)} pair(s) is incomparable, each listed below"
         for item in result.not_placed
     )
     lines.extend(
@@ -324,7 +324,7 @@ def _dominance_lines(section: HorizonSection) -> list[str]:
         "pairs, not a group: closeness within a band does not chain"
         for item in result.indistinguishable
     )
-    lines.append(f"    {_standing_line(result.benchmark_standing)}")
+    lines.append(f"    {_hurdle_line(result.benchmark_standing)}")
     lines.extend(f"    {line}" for line in _separating_lines(result.separating))
     lines.append(f"    {_one_member_line(why_one_member(result))}")
     return lines
@@ -394,7 +394,7 @@ def _why_incomparable(pair: IncomparablePair) -> str:
             assert_never(pair.why)
 
 
-def _standing_line(standing: BenchmarkStanding) -> str:
+def _hurdle_line(standing: BenchmarkStanding) -> str:
     """Where the hurdle sits in the partial order.
 
     *Nothing dominates the hurdle* is never rendered as *the hurdle is best*: other members may

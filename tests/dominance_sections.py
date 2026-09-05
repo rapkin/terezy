@@ -175,10 +175,11 @@ def delivering_dollars(subject: HorizonSection, instrument_ids: Sequence[str]) -
 
 
 def question_amounts(*, uah: float | None = 50_000.0, usd: float | None = 1.0) -> dict[str, Money]:
-    """The question's stated amounts, with either stream droppable or repeated.
+    """The question's stated amounts, with either stream droppable.
 
     What a fraction band resolves against (FR-011d). ``None`` drops the stream, which is how
-    *no amount stated in the currency compared* is reached.
+    *no amount stated in the currency compared* is reached; a caller adds a second key of its
+    own to reach the ambiguous case.
     """
     stated: dict[str, Money] = {}
     if uah is not None:

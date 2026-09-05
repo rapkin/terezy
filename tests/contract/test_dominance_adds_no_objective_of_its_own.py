@@ -113,4 +113,4 @@ def test_the_pass_raises_only_where_a_caller_built_a_record_against_itself() -> 
         ast.unparse(node.exc.func)  # type: ignore[union-attr]
         for node in raised["core/decision/dominance.py"]
     )
-    assert kinds == ["AssertionError"] * 4 + ["TypeError"] * 2
+    assert kinds == ["AssertionError"] * 5 + ["TypeError"] * 2

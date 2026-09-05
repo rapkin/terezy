@@ -687,10 +687,8 @@ def section_ranking(section: HorizonSection) -> tuple[TupleOutcome, ...]:
     :func:`section_evaluated` is what carries the figures in those cases: they were computed and
     throwing them away would hide work the owner paid for.
     """
-    if not isinstance(section.outcome, CandidateSurvey):
-        return ()
-    comparison = section.outcome.comparison
-    if not isinstance(comparison, Comparison):
+    comparison = _comparison(section)
+    if comparison is None:
         return ()
     withheld = frozenset(item.key for item in section.arrives_after_horizon)
     if comparison.ranked[comparison.benchmark].key in withheld:

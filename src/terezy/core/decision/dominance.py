@@ -539,34 +539,30 @@ def _report(
     directions = tuple(objective.direction for objective in objectives.objectives)
     criteria = tuple(objective.criterion for objective in objectives.objectives)
     marks = {item.key: (item.provenance, item.staleness) for item in population}
-    verdicts: list[DominanceVerdict] = []
     incomparable: list[IncomparablePair] = []
     neighbours: dict[Tuple, list[Tuple]] = {item.key: [] for item in population}
+    against: dict[Tuple, list[DominanceVerdict]] = {item.key: [] for item in population}
+    pairs_of: dict[Tuple, list[IncomparablePair]] = {item.key: [] for item in population}
     for left, right in combinations(population, 2):
-        pair = _verdict_for(
+        match _verdict_for(
             left.key,
             right.key,
             figures=figures,
             widths=widths,
             directions=directions,
             criteria=criteria,
-        )
-        match pair:
-            case IncomparablePair():
+        ):
+            case IncomparablePair() as pair:
                 incomparable.append(pair)
-            case DominanceVerdict():
-                verdicts.append(_marked(pair, marks))
-            case _:
-                if pair:
-                    neighbours[left.key].append(right.key)
-                    neighbours[right.key].append(left.key)
-    against = {item.key: [] for item in population}  # type: dict[Tuple, list[DominanceVerdict]]
-    for verdict in verdicts:
-        against[verdict.over].append(verdict)
-    pairs_of = {item.key: [] for item in population}  # type: dict[Tuple, list[IncomparablePair]]
-    for item in incomparable:
-        pairs_of[item.left].append(item)
-        pairs_of[item.right].append(item)
+                pairs_of[pair.left].append(pair)
+                pairs_of[pair.right].append(pair)
+            case DominanceVerdict() as verdict:
+                against[verdict.over].append(_marked(verdict, marks))
+            case TooCloseToCall():
+                neighbours[left.key].append(right.key)
+                neighbours[right.key].append(left.key)
+            case Neither():
+                continue
     decided = len(population) - 1
     not_placed = tuple(
         NotPlaced(key=item.key, every_pair=tuple(pairs_of[item.key]))
@@ -598,7 +594,7 @@ def _report(
         ),
         benchmark_standing=(
             HurdleIsDominated(key=hurdle, by=tuple(against[hurdle]))
-            if against.get(hurdle)
+            if against[hurdle]
             else NothingDominatesTheHurdle(key=hurdle)
         ),
         separating=_separating(non_dominated, population, excludes),
@@ -613,13 +609,13 @@ def _verdict_for(
     widths: _Widths,
     directions: Sequence[ObjectiveDirection],
     criteria: Sequence[Criterion],
-) -> IncomparablePair | DominanceVerdict | bool:
-    """One pair, lifted from positions to criteria.
+) -> IncomparablePair | DominanceVerdict | TooCloseToCall | Neither:
+    """One pair, lifted from ``relates``' positions to the criteria that occupy them.
 
-    Returns ``True`` for a pair the bands cannot tell apart and ``False`` for one each is better
-    on something. Neither carries a record of its own: indistinguishability is reported per
-    candidate rather than per pair, and *each is better at something* is the ordinary state of a
-    partial order and has nothing to say.
+    The two verdicts that carry nothing are passed through as themselves rather than reduced to
+    a flag: indistinguishability is reported per candidate rather than per pair, and *each is
+    better at something* is the ordinary state of a partial order, so neither has a record of
+    its own on the result -- but the caller still has to tell them apart.
     """
     unreadable = first_unreadable(figures[left], figures[right])
     if unreadable is not None:
@@ -644,10 +640,10 @@ def _verdict_for(
             return _verdict(
                 right, left, verdict.at_least_as_good_at, verdict.strictly_better_at, criteria
             )
-        case TooCloseToCall():
-            return True
-        case _:
-            return False
+        case TooCloseToCall() | Neither() as decided:
+            return decided
+        case _:  # pragma: no cover -- the incomparable arm is taken above
+            raise AssertionError("relates returned a verdict its caller does not handle")
 
 
 def _widths_for(vector: Sequence[Figure], widths: _Widths) -> tuple[Width, ...]:

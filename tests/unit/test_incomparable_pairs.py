@@ -5,9 +5,7 @@ recorded as incomparable, naming the objective and what made it so. It refuses n
 removes neither candidate from any other pair's verdict -- a candidate is *not placed* only when
 **every** pair involving it is incomparable.
 
-Both cases are planted on a real section, because no declaration in this repository produces
-either: the money criterion reads a field that is always present, and the shipped registry has
-one spendable endpoint (research D5).
+Both cases are planted on a real section, for the reason ``tests/dominance_sections.py`` gives.
 """
 
 from __future__ import annotations

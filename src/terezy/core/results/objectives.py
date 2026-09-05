@@ -47,9 +47,8 @@ READS: Final[dict[Criterion, FigureKind]] = {
 }
 """Which kind of figure each criterion reads, in one place.
 
-The loader checks a band's shape against it and the pass reads the figure through it. Two copies
-of this mapping would let a fraction band reach a date criterion in the pass after the loader
-had refused it, which is the shape of disagreement one table exists to prevent.
+Two copies would let a fraction band reach a date criterion at one of them after the other had
+refused it, which is the shape of disagreement a shared table exists to prevent.
 """
 
 

@@ -891,7 +891,10 @@ def test_an_incomparable_pair_and_a_not_placed_candidate_render_differently() ->
     block = _dominance_block(rebuilt)
     assert "NOT PLACED UA4000239016" in block
     assert "INCOMPARABLE " in block
-    assert "no figure at TupleOutcome.arrivals" in block
+    assert "no figure at TupleOutcome.arrivals" in block, (
+        "the pair's own reason is where the missing figure is named, and the NOT PLACED line "
+        "points at those pairs rather than repeating one of them"
+    )
     assert block != _dominance_block(section)
 
 
