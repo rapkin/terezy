@@ -32,7 +32,8 @@ work is finished and the gates are green.
    - If `$ARGUMENTS` names files, stage exactly those.
    - Otherwise stage all modified and untracked files.
 
-3. **Run the pre-commit gates** (see below). They take a couple of seconds.
+3. **Run the pre-commit gates** (see below). Measured on 2026-09-05: about 40 s when the
+   suite runs, a few seconds otherwise.
    - All green → continue.
    - Anything red → **stop**, show the failure, and ask before committing. This repo's
      constitution requires that every change lands green, so a red commit needs an
@@ -57,16 +58,21 @@ work is finished and the gates are green.
 
 ## Pre-commit gates
 
-Every one of these is a blocking gate in CI (`.github/workflows/ci.yml`), so a red
+Each of these stands for a blocking gate in CI (`.github/workflows/ci.yml`), so a red
 one here means a red build. Run the cheap subset that matches what changed:
 
 ```bash
 uv run ruff check . && uv run ruff format --check .   # any Python change
 uv run mypy                                          # any Python change
-uv run pytest --cov -q                               # any src/ or tests/ change
 uv run lint-imports                                  # any src/ change
+uv run pytest -x -q -n auto                          # any src/ or tests/ change
 uv run python scripts/check_provenance.py            # any data/ change
 ```
+
+**The coverage floor is not a checkpoint gate.** `pytest --cov` runs single-process at
+landing and in CI: it costs an order of magnitude more than the parallel run above
+(`specs/README.md` step 3 carries the measurement) and answers a question about the branch
+rather than about one commit.
 
 For a docs- or spec-only change, skip straight to the guards.
 
@@ -150,7 +156,7 @@ Key Changes:
 commit a64e9f7
 feat(ledger): add tax lots and per-currency cash accounts (001-ledger-core)
 
-Gates: ruff ✓  mypy ✓  pytest 31 ✓ (cov 100%)  imports ✓
+Gates: ruff ✓  mypy ✓  imports ✓  pytest ✓ (no coverage — see above)
 
 Files changed: 3
 - src/terezy/core/ledger/lots.py

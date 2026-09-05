@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Fail when prose lists the members of a set and the set has more members than that.
 
-The constitution's rule is that a prose enumeration of things declared elsewhere is a
-check or it is not written. This is the check. It exists because two modules enumerated
-the observation kinds as five and as six while the data declared eleven, and disagreed
-with each other; nothing saw it.
+The constitution deletes a prose enumeration of things declared elsewhere unless a count
+catches a named defect nothing cheaper catches. This is that count: two modules enumerated
+the observation kinds as five and as six while the data declared eleven, and disagreed with
+each other; nothing saw it.
 
 Canonical sets come from the places that define them: `id` columns in `data/*.toml`,
 `Enum` members, and `Literal[...]` alternatives. A prose run of three or more

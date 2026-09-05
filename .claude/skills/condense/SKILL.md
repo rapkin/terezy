@@ -28,8 +28,9 @@ reads the branch, so the review spends its attention on what actually lands.
 ## When it runs
 
 **After the implementation is green, before `/code-review`.** In that order for two reasons:
-the review then reads the text that will land, and the review's own check on unverifiable
-claims applies to the condensed version rather than to prose about to be deleted.
+the review then reads the text that will land, and a comment the branch falsified is deleted
+here rather than reaching a review that is capped at two rounds and does not count prose as a
+finding.
 
 Never on a half-finished branch. Condensing is an edit like any other and ends at a green
 checkpoint.
@@ -115,7 +116,7 @@ uv run ruff check . && uv run ruff format --check .
 uv run mypy && uv run lint-imports
 uv run python scripts/check_provenance.py
 uv run python scripts/check_methodology_refs.py
-uv run pytest --cov
+uv run pytest -x -q -n auto
 ```
 
 A red gate after condensing means a cut removed something real. Restore it and say so —
