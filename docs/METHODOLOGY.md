@@ -4067,7 +4067,121 @@ of those and why the window ends where it does; it is not restated here.
 **Nothing consumes this calendar** (017 FR-015). It moves no coupon, no settlement and no
 deadline, so no figure in this document changes because it exists.
 
-## 36. Where to look next
+## 36. Dominance: the set with no head, and what an indifference band is not
+
+§34 produces a ranking. This section is what stops its head being read as a recommendation.
+
+The constitution's first principle fixes the order of preference for any answer — **dominance →
+range/distribution → break-even → point estimate** — and this is the first of them. It computes
+no weight, trades no criterion against another and calibrates nothing, which is exactly why it
+comes first.
+
+### 36.1 The definition, and why its two halves use different rules
+
+*A* **dominates** *B* when, on **every** declared objective, *A* is not worse than *B* by more
+than the project comparison allows, and on **at least one** it is better by more than that
+objective's declared indifference band.
+
+```
+A > B   iff   for every i:  advantage_i >= 0  or  is_close(a_i, b_i)
+        and   for some  i:  advantage_i >  band_i
+```
+
+where `advantage_i` is *A*'s lead over *B* on objective *i* after the objective's declared
+direction is applied, so a positive number always means *A* is the better of the two.
+
+The **weak** half goes through the project comparison rather than a bare
+`>=` so a last-bit difference on one objective cannot withdraw a verdict a five-thousand-hryvnia
+gap on another earned; it goes through *that* comparison rather than a fresh absolute one
+because a second rule for when two amounts are the same money would be a second tolerance
+policy. The **band** sits in the strict half only, and that split is what makes the acyclicity
+floor below possible at all: with the band in both halves the window in which a cycle is
+possible is *(p − 1)* **bands** wide and scales with the band, so no floor on the band ever
+closes it.
+
+The relation is **irreflexive**, and **asymmetric and acyclic** while the floor holds. It is
+**not transitive**, for any band, and the claim is not made: slack does not compose, so *A > B*
+and *B > C* leave *A > C* free to fail. Acyclicity is what the never-empty guarantee needs and
+transitivity is not, which is why only one of them is asserted.
+
+### 36.2 An indifference band is not the tolerance, and the two never meet
+
+The **project tolerance** is the width of float64 rounding. It exists so a hand-computed
+schedule and a machine-computed one can agree, and it is defined in exactly one place.
+
+An **indifference band** is a statement about what the *inputs* support: how much of a
+difference the owner believes his own figures can carry. Conflating the two would put a
+modelling judgement inside the constant that exists so hand arithmetic and machine arithmetic
+can agree. They are separate fields wherever either is reported, and the band is never
+implemented by loosening the tolerance.
+
+A band is declared per objective, as data, with no default, and in the shape its criterion
+takes: an **amount with its currency** or a **fraction of the question's amount** on money, and
+a **whole number of days** on a date, which has no relative form. A fraction resolves against
+the one amount the question states **in the currency the pair is compared in**, and never
+against a candidate's own figure — a fraction of each candidate's figure is a different width
+for *A* against *B* than for *B* against *A*, and indistinguishability would stop being
+symmetric.
+
+### 36.3 The acyclicity floor, and why it cannot live at load
+
+The slack the weak half allows is **not a constant**: the tolerance is applied relatively as
+well as absolutely, so on figures near 50 000 the width is `1e-9 × 50 000 = 5e-5` rather than
+`1e-9`. A band narrower than that slack lets two candidates dominate each other; a band wider
+than the slack but narrower than *(p − 1)* slacks lets three of them form a cycle. Either
+empties the non-dominated set over a population every member of which was placed.
+
+So a resolved band must clear:
+
+```
+band > slack        and        band >= (p - 1) x slack
+```
+
+where *p* is the number of declared objectives and `slack` is the widest the comparison allows
+over that objective's figures in the section. The second condition is implied by the first at
+two objectives and is the whole guarantee above them: at three, a band of one and a half slacks
+admits `(0, 0, 0)`, `(−1.6, 0.8, 0.8)` and `(−0.8, −0.8, 1.6)` as a three-cycle.
+
+Both conditions are checked **in the pass**, not at load: the slack depends on the magnitudes of
+the figures compared, which a declaration file does not carry, and a load-time check written
+against the bare constant would pass a band five orders of magnitude too small. A band that
+fails produces a typed refusal naming the objective, the band, the slack it did not clear and —
+where the band was a fraction — the width it resolved to. On a **date** objective the slack is
+exactly zero, so the floor reduces there to the band being positive, which the loader checks.
+
+### 36.4 Three populations, and nothing is pruned
+
+Every evaluated candidate lands in exactly one of:
+
+* **non-dominated** — nothing dominates it;
+* **dominated** — carrying at least one dominating candidate and the objectives that decided it;
+* **not placed** — a candidate with at least one pair, every one of which is incomparable.
+
+`evaluated = non-dominated + dominated + not placed` is an asserted check rather than a claim.
+**Incomparability is a property of a pair**, not of a candidate: one candidate carries no figure
+on some objective, or the two deliver money in different currencies and no exchange rate is
+consulted. Such a pair yields no verdict and removes neither candidate from any other pair's.
+
+Nothing is pruned. Dominance is a reported relation over the population, never a filter applied
+to it: a dominated candidate is one the owner may still take, for a reason no declared objective
+carries.
+
+### 36.5 What the set says beside itself
+
+* **Where the hurdle sits.** The benchmark is a member of the population, scored by the same
+  comparison as everything else. Where nothing dominates it the result says *nothing dominates
+  the hurdle* — never *the hurdle is best*, which is a different and stronger fact, and never a
+  restatement of §34's one-dimensional *beats the benchmark*, which is on the rate at the
+  project tolerance and answers a different question.
+* **What separates the members.** Where the set has more than one member, the stated assumptions
+  the members do not share are named by the ids and words the core records already carry. It
+  does **not** say which of them decides: that needs a re-evaluation under a changed assumption,
+  which this does not perform.
+* **Why the set has one member, where it does.** The section evaluated one candidate; or every
+  other is dominated; or every other is not placed; or a mixture, with the counts saying which.
+  Only *every other is dominated* is a finding.
+
+## 37. Where to look next
 
 | question | file |
 | --- | --- |
@@ -4154,6 +4268,12 @@ deadline, so no figure in this document changes because it exists.
 | Is the base really the credit date's? | `tests/worked_examples/test_base_versus_received.py` |
 | Can a switch ever hold a blend? | `tests/contract/test_readings_never_blend.py` |
 | Does the engine know any scheme by name? | `tests/contract/test_no_scheme_is_named_in_code.py` |
+| Is the dominance relation acyclic, and is the set ever empty? | `tests/invariants/test_dominance_relation.py` |
+| Is it transitive? (no, and here is the witness) | `tests/worked_examples/test_dominance_is_not_transitive.py` |
+| What does a band below the acyclicity floor do? | `tests/unit/test_the_acyclicity_floor.py` |
+| Are the two closeness rules ever confused? | `tests/contract/test_two_closeness_rules_stay_apart.py` |
+| What does the owner's own question produce? | `tests/worked_examples/test_the_owners_question.py` |
+| Do two objective sets give two answers? | `tests/worked_examples/test_two_objective_sets_disagree.py` |
 | What is still uncovered? | `docs/REQUIRED_TESTS.md` |
 
 ---

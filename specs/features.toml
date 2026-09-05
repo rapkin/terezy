@@ -190,6 +190,16 @@ note  = "Measured 2026-09-03 by flattening the refusal families this repository 
 # Named future work — seams already recorded inside landed specs, not yet features.
 
 [[future]]
+id    = "a-fraction-band-resolves-against-a-token-amount"
+after = ["019-decision-layer"]
+note  = "Recorded by 019's plan (research D6) and unchanged by landing it: a fraction band would resolve against the owner's TOKEN 1.00 USD to a width of 0.0001 USD, which CLEARS FR-011c's floor, so lazy resolution only defers it until a candidate delivers dollars. The remedy is one line in his own question file -- a USD amount he means, or the absolute USD band FR-011d already permits. Deliberately not guarded, because a guard would have to decide what a token amount is."
+
+[[future]]
+id    = "a-second-stream-in-one-currency-refuses-a-fraction-band"
+after = ["019-decision-layer"]
+note  = "The likelier cost of the FRACTION shape, recorded by 019's plan and not closed: 015 requires an amount for every declared stream, so a second UAH stream is a routine data edit and leaves a fraction band with no single width -- FR-011's relation must be symmetric, so one currency admits one width -- and every section refuses with SeveralQuestionAmountsInTheCurrencyCompared. An absolute money band is immune. Deliberately not built."
+
+[[future]]
 id    = "naming-the-benchmark-reorders-a-bitwise-tie"
 after = ["019-decision-layer"]
 note  = "MEASURED 2026-09-03 while clarifying 019, and registered here because 019 carries 010's ranking rule UNCHANGED and so closes nothing. `core/decision/compare.py` prepends the benchmark to the candidate list and sorts by rate with a STABLE sort, so where two candidates' rates are bitwise equal the one named benchmark comes out ahead of the other -- the order of two rows in `Comparison.ranked` turns on which issue the owner happened to name. Reproduced on the post-016 registry with the four fixtures gone: naming `UA4000239016` instead of `UA4000231195` swaps it with `UA4000238281` at 0-based positions 7/8 at one month and 15/16 at three, and nothing moves at twelve, where nothing ties. BITWISE, NOT TIED: `tolerance.tied_groups` groups by `is_close`, so most tie-group members would not move and this pair happens to carry the identical float. Harmless today because the owner's `UA4000231195` is in no tie group, and because `Comparison.ties` reports the pair as tied whichever is named, so nothing presents one as beating the other. It stops being harmless the day the ranking is rendered without its tie groups, which is exactly the regression 019 FR-029 exists to prevent. The honest remedy is a total order on the sort key -- rate then the candidate key 014 FR-016 already fixes -- which is a change to 010's ranking rule and therefore not 019's to make. Deliberately not built."
