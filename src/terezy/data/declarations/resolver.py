@@ -69,7 +69,7 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.routes.channels import FxChannel
     from terezy.core.routes.legs import Leg, Route
     from terezy.core.routes.venues import Venue
-    from terezy.core.scenarios.early_exit import SpreadHolds
+    from terezy.core.scenarios.early_exit import QuotationHolds
     from terezy.core.scenarios.regimes import Regime
     from terezy.core.streams.streams import IncomeStream
     from terezy.core.tax import year as tax_year
@@ -2612,6 +2612,34 @@ def _check_access(
     _check_resale_price(
         entry, currency=currency, self_priced=self_priced, path=path, field_prefix=prefix
     )
+    _check_one_observation(entry, path=path, field_prefix=prefix)
+
+
+def _check_one_observation(entry: InstrumentAccess, *, path: Path, field_prefix: str) -> None:
+    """A buy and a sell price for one instrument are **one** observation of one market.
+
+    A sale subtracts only the coupons that detached after the **purchase**
+    (``core.scenarios.early_exit.detached_since``), and what makes that right is that a coupon
+    detaching before the purchase is inside the buy price too, so the two errors cancel in the
+    return. That argument needs the pair to have been read on one day. Nothing downstream can
+    see the pair -- the sale reads only the resale price -- so the agreement is enforced here
+    or nowhere.
+    """
+    if entry.quote is None or entry.resale_price is None:
+        return
+    if entry.quote.observed_on == entry.resale_price.observed_on:
+        return
+    raise DeclarationError(
+        path,
+        f"{field_prefix}.resale_price.retrieved_on",
+        f"is {entry.resale_price.observed_on.isoformat()} while "
+        f"{field_prefix}.price.retrieved_on is {entry.quote.observed_on.isoformat()}. A buy and "
+        "a sell price for one instrument are one observation of one market: a sale subtracts "
+        "the coupons that detached after the purchase, and what makes that right is that an "
+        "earlier one is inside the buy price too. Two dates break that.",
+        "read both prices in one retrieval, or drop the resale price and let the early exit "
+        "refuse for want of one",
+    )
 
 
 def _check_resale_price(
@@ -2624,8 +2652,8 @@ def _check_resale_price(
 ) -> None:
     """A resale price is optional, is in the instrument's currency, and is not a fund's.
 
-    Optional because its absence is the shipped state and the thing 015 FR-031 refuses by name:
-    an early exit that cannot be struck reports a missing declaration rather than a figure. A
+    Optional because its absence is what 015 FR-031 refuses by name: an early exit that cannot
+    be struck reports a missing declaration rather than a figure. A
     **fund** may not declare one, on the purchase quote's reasoning: it prices its own exit from
     its declared NAV and its declared exit discount, and a second price in a second file is one
     fact in two places.
@@ -2745,12 +2773,12 @@ as scenario documents, and ``glob`` does not recurse.
 
 def _resolved_early_exit(
     root: Path, streams: Mapping[str, IncomeStream]
-) -> tuple[SpreadHolds, Path]:
+) -> tuple[QuotationHolds, Path]:
     """The one declared belief under a data root, checked against the streams' owner.
 
     An absent directory is an **error**, not an absent belief (015 FR-032): reading it as
-    *the spread holds* would put a figure in the model that no file declares, which is the one
-    thing the declaration exists to prevent.
+    *the quotation holds* would put a figure in the model that no file declares, which is the
+    one thing the declaration exists to prevent.
     """
     declared = sorted((root / EARLY_EXIT_DIR).glob("*.toml"))
     if not declared:
@@ -2758,8 +2786,8 @@ def _resolved_early_exit(
             root / EARLY_EXIT_DIR,
             "",
             f"contains no *.toml declarations. An empty {EARLY_EXIT_DIR} directory is reported "
-            "rather than read as 'the observed spread holds': a horizon means the money comes "
-            "out at its end, so every comparison can reach an early exit, and a run that "
+            "rather than read as 'the observed quotation holds': a horizon means the money "
+            "comes out at its end, so every comparison can reach an early exit, and a run that "
             "assumed the belief would report a figure no file declares.",
             "check the data root, or declare what an early exit is struck under",
         )
@@ -2840,7 +2868,7 @@ def tuple_from_data_root(
             streams=covered.ramp.streams,
             kinds=covered.ramp.kinds,
             spendable=covered.spendable,
-            spread_holds=early_exit,
+            quotation_holds=early_exit,
             base_currency=covered.ramp.base_currency,
         ),
     )

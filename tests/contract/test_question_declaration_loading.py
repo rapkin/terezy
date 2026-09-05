@@ -101,7 +101,7 @@ def test_the_shipped_data_root_resolves_for_the_answer() -> None:
     declarations = _resolve(DATA_ROOT)
     assert declarations.question_files["fifty-thousand-hryvnia"] == QUESTION
     assert declarations.candidates.ceiling.max_candidates >= 1
-    assert declarations.tuples.registries.spread_holds.rationale
+    assert declarations.tuples.registries.quotation_holds.rationale
 
 
 # ---------------------------------------------------------------------------

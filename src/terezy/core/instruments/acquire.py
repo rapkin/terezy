@@ -19,13 +19,17 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from terezy.core.errors import InconsistentTerms
 from terezy.core.ledger.events import CausationKind, CausationRef, Event, EventKind, LotRef
 from terezy.core.primitives import money
+from terezy.core.scenarios import early_exit
 
 if TYPE_CHECKING:  # pragma: no cover -- the records live beside the interface
+    from collections.abc import Iterable
     from datetime import date
 
     from terezy.core.instruments.interface import EarlyExit, Holding, InstrumentDeclaration
+    from terezy.core.primitives.money import Money
 
 
 def lot_id_for(holding: Holding) -> str:
@@ -74,13 +78,20 @@ def early_sale(
     *,
     on: date,
     exit_: EarlyExit,
+    coupons: Iterable[tuple[date, Money]],
     sequence: int,
-) -> Event:
-    """Cash in, units out, at the declared resale price, on the horizon's last day.
+) -> Event | InconsistentTerms:
+    """Cash in, units out, at the carried-forward resale price, on the horizon's last day.
 
     015 FR-029. A **disposal**, like a redemption at maturity and unlike a cash receipt: it
     consumes basis and realises a gain or a loss, and the loss is what a spread *is*. Reporting
     it as cash would make the cost of the early exit invisible in the ledger.
+
+    ``coupons`` is this instrument's whole per-unit coupon schedule, dates and amounts, and it
+    is a **required** argument rather than an adjustment a caller may apply first: the sale
+    price is the quotation net of what detached from it while the holding held it
+    (:func:`early_exit.detached_since`), and a caller that forgot would credit a coupon and sell
+    at a price that still contained it.
 
     ``EventKind.REDEMPTION`` rather than ``PRINCIPAL_REPAYMENT``, on the reasoning that kind's
     own docstring already gives for a fund buyback: nothing is repaying principal here, the
@@ -92,19 +103,47 @@ def early_sale(
 
     ``quantity`` is passed rather than read off the holding, for the reason a redemption's is:
     under a reinvesting policy the units sold are the purchase plus every reinvestment.
+
+    **A quotation worth less than the coupons still inside it refuses**, in the words below.
+    Unreachable on the shipped registry, where the smallest quote is three figures against
+    coupons of tens, and reached deliberately in the worked examples rather than asserted here.
     """
+    detached = early_exit.detached_since(
+        observed_on=exit_.observed_on,
+        held_from=holding.purchased_on,
+        sold_on=on,
+        coupons=coupons,
+        currency=exit_.price_per_unit.currency,
+    )
+    price = money.sub(exit_.price_per_unit, detached)
+    if price.amount <= 0.0:
+        return InconsistentTerms(
+            first_term="access.resale_price.per_unit",
+            second_term="instrument.schedule.payment",
+            reason=(
+                f"{declaration.id!r} quotes {exit_.price_per_unit.amount!r} "
+                f"{exit_.price_per_unit.currency.value} per unit as of "
+                f"{exit_.observed_on.isoformat()}, and {detached.amount!r} of coupon detaches "
+                f"from it on or before the sale of {on.isoformat()}, leaving nothing. A quotation "
+                "cannot be worth less than the coupons it still contains, nor exactly them: "
+                "the two declarations describe different paper, and striking the sale would "
+                "post a disposal of zero or of a negative amount."
+            ),
+        )
     return Event(
         sequence=sequence,
         occurred_on=on,
         kind=EventKind.REDEMPTION,
-        amount=money.scale_sourced(exit_.price_per_unit, quantity, exit_.price_per_unit.provenance),
+        amount=money.scale_sourced(price, quantity, price.provenance),
         owner_id=holding.owner_id,
         caused_by=CausationRef(
             kind=CausationKind.ACCESS_TERM,
             id=f"{declaration.id}:resale_price",
             detail=(
-                f"sale of {quantity!r} units at the declared resale price on "
-                f"{on.isoformat()}, the last day of the horizon, under the assumption "
+                f"sale of {quantity!r} units at {price.amount!r} {price.currency.value} on "
+                f"{on.isoformat()}, the last day of the horizon: the resale quotation declared "
+                f"as of {exit_.observed_on.isoformat()}, less the {detached.amount!r} per "
+                f"unit that detached from it while the holding held it, under the assumption "
                 f"{exit_.assumption.id!r}"
             ),
         ),

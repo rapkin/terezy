@@ -15,14 +15,15 @@ from dataclasses import replace
 from datetime import date
 
 from terezy.core.decision.candidates import dropped, evaluated, survey
-from terezy.core.decision.tuple_outcome import Registries
+from terezy.core.decision.tuple_outcome import Registries, evaluate
 from terezy.core.instruments.access import VenueQuote
-from terezy.core.instruments.interface import DateRange
+from terezy.core.instruments.interface import Assumptions, DateRange
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.money import Money
 from terezy.core.results.candidates import CandidateSet, CandidateSurvey
-from terezy.core.results.tuple import CannotSpanHorizon, DeclarationMissing
+from terezy.core.results.tuple import CannotSpanHorizon, DeclarationMissing, InstrumentRefused
 from tests import candidate_registries as fixtures
+from tests import tuple_registries as tuple_fixtures
 
 SHORT = DateRange(start=fixtures.OUTLAY_ON, end=date(2027, 6, 30))
 """A window that ends before several declared instruments' own terms do, and after others'."""
@@ -86,7 +87,7 @@ def test_declaring_the_price_moves_exactly_that_instrument_and_no_other() -> Non
     with_price = fixtures.with_access(
         registries,
         subject,
-        resale_price=VenueQuote(price=RESALE, kind="venue_terms"),
+        resale_price=VenueQuote(price=RESALE, kind="venue_terms", observed_on=fixtures.OUTLAY_ON),
     )
     after = _surveyed(with_price)
 
@@ -102,13 +103,19 @@ def test_the_figure_it_produces_names_the_declared_belief() -> None:
     subject = _wanting_a_resale_price(_surveyed(registries))[0]
     after = _surveyed(
         fixtures.with_access(
-            registries, subject, resale_price=VenueQuote(price=RESALE, kind="venue_terms")
+            registries,
+            subject,
+            resale_price=VenueQuote(
+                price=RESALE, kind="venue_terms", observed_on=fixtures.OUTLAY_ON
+            ),
         )
     )
     outcome = next(
         item for item in evaluated(after.comparison) if item.key.instrument_id == subject
     )
-    assert any(registries.spread_holds.id in claim for claim in outcome.rests_on), outcome.rests_on
+    assert any(registries.quotation_holds.id in claim for claim in outcome.rests_on), (
+        outcome.rests_on
+    )
 
 
 def test_a_holding_the_window_reaches_carries_no_such_claim() -> None:
@@ -116,7 +123,7 @@ def test_a_holding_the_window_reaches_carries_no_such_claim() -> None:
     registries = fixtures.declared()
     whole = _surveyed(registries, fixtures.HORIZON)
     for outcome in evaluated(whole.comparison):
-        assert all(registries.spread_holds.id not in claim for claim in outcome.rests_on)
+        assert all(registries.quotation_holds.id not in claim for claim in outcome.rests_on)
 
 
 def test_the_belief_is_read_from_the_registry_rather_than_written_here() -> None:
@@ -124,11 +131,15 @@ def test_the_belief_is_read_from_the_registry_rather_than_written_here() -> None
     registries = fixtures.declared()
     subject = _wanting_a_resale_price(_surveyed(registries))[0]
     renamed = replace(
-        registries, spread_holds=replace(registries.spread_holds, id="a_different_belief")
+        registries, quotation_holds=replace(registries.quotation_holds, id="a_different_belief")
     )
     after = _surveyed(
         fixtures.with_access(
-            renamed, subject, resale_price=VenueQuote(price=RESALE, kind="venue_terms")
+            renamed,
+            subject,
+            resale_price=VenueQuote(
+                price=RESALE, kind="venue_terms", observed_on=fixtures.OUTLAY_ON
+            ),
         )
     )
     outcome = next(
@@ -149,7 +160,9 @@ def test_a_schedule_whose_last_payment_is_a_coupon_sells_nothing_at_the_window_e
     registries = fixtures.declared()
     subject = "enumerated_out_of_order"
     with_price = fixtures.with_access(
-        registries, subject, resale_price=VenueQuote(price=RESALE, kind="venue_terms")
+        registries,
+        subject,
+        resale_price=VenueQuote(price=RESALE, kind="venue_terms", observed_on=fixtures.OUTLAY_ON),
     )
     result = _surveyed(with_price, DateRange(start=fixtures.OUTLAY_ON, end=date(2027, 3, 31)))
     outcome = next(
@@ -157,3 +170,74 @@ def test_a_schedule_whose_last_payment_is_a_coupon_sells_nothing_at_the_window_e
     )
     assert outcome.sold_early is None
     assert all(claim for claim in outcome.rests_on)
+
+
+NOT_ENOUGH = Money(10.0, fixtures.UAH, prov.EMPTY)
+"""A quotation worth less than one of the issue's own coupons. Unreachable on the shipped
+registry -- the smallest declared quote is three figures against coupons of tens -- and the
+whole point of the refusal below is that it is a **declaration** conflict rather than a number
+to be clamped."""
+
+
+def _refusal_reasons(registries: Registries) -> list[str]:
+    result = _surveyed(registries)
+    return [item.refusal.reason for item in dropped(result.comparison)]
+
+
+def test_a_sale_price_below_the_coupons_still_in_it_refuses_rather_than_going_negative() -> None:
+    """The sell leg's guard, reached on a listed schedule.
+
+    Striking the sale anyway posts a disposal of a negative amount, which the ledger answers by
+    raising -- an uncaught exception out of the pure core on a condition two data files
+    produced between them.
+    """
+    registries = fixtures.declared()
+    subject = _wanting_a_resale_price(_surveyed(registries))[0]
+    starved = fixtures.with_access(
+        registries,
+        subject,
+        resale_price=VenueQuote(
+            price=NOT_ENOUGH, kind="venue_terms", observed_on=fixtures.OUTLAY_ON
+        ),
+    )
+    assert [
+        reason
+        for reason in _refusal_reasons(starved)
+        if "cannot be worth less than the coupons it still contains" in reason
+        and "on or before the sale of" in reason
+    ]
+
+
+def test_a_reinvesting_holding_is_not_reported_as_a_missing_declaration() -> None:
+    """Two refusals share `access.resale_price` as their second term, and only one is a gap.
+
+    A window that outlives the paper with no quotation to sell at wants a **declaration**; a
+    reinvesting holding one quotation cannot price wants a different **coupon policy**, and the
+    price it needs is already declared. Routing on the second term alone told the owner to
+    supply a file he had, which is a guard whose message is false.
+    """
+    registries = tuple_fixtures.declared()
+    subject = tuple_fixtures.OVDP
+    priced = tuple_fixtures.with_access(
+        registries,
+        subject,
+        resale_price=VenueQuote(
+            price=RESALE, kind="venue_terms", observed_on=tuple_fixtures.OUTLAY_ON
+        ),
+    )
+    outcome = evaluate(
+        replace(
+            tuple_fixtures.hurdle_tuple(),
+            exit_terms=Assumptions(consumption_method="fifo", coupon_policy="reinvest"),
+        ),
+        # Enough that a coupon buys a whole unit at face: below that the policy buys nothing
+        # and there is no second acquisition date to refuse over.
+        amount=Money(200_000.0, fixtures.UAH, prov.EMPTY),
+        horizon=DateRange(start=tuple_fixtures.ISSUE_DATE, end=date(2027, 12, 31)),
+        as_of=tuple_fixtures.AS_OF,
+        continuation=tuple_fixtures.HOLD_AS_CASH,
+        registries=priced,
+    )
+    assert isinstance(outcome, InstrumentRefused), outcome
+    assert "units acquired on different dates" in outcome.reason
+    assert "access.resale_price" not in outcome.reason

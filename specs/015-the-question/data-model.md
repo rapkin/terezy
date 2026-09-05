@@ -30,10 +30,13 @@ class, venue, tax class or id prefix (FR-007a, SC-032).
 
 ### `[access.resale_price]` → `InstrumentAccess.resale_price: VenueQuote | None`
 
-The same `VenueQuote` an `[access.price]` builds — a `Money` per unit with its citation, and the
-`ObservationKind` it ages under. `None` is the shipped state and is what FR-031 refuses by name.
+The same `VenueQuote` an `[access.price]` builds — a `Money` per unit with its citation, the
+`ObservationKind` it ages under, and (added 2026-09-03) `observed_on`, the declaration's own
+`retrieved_on`: the day the quotation described the market, which is what a sale carried to a
+later date subtracts detached coupons from. `None` is what FR-031 refuses by name; the fixture
+instruments still make that statement and every real issue declares a quote.
 
-### `data/scenarios/early_exit/<owner>.toml` → `core.scenarios.early_exit.SpreadHolds`
+### `data/scenarios/early_exit/<owner>.toml` → `core.scenarios.early_exit.QuotationHolds`
 
 | Field | Type | Requirement |
 |---|---|---|
@@ -147,9 +150,13 @@ because waiting is a cost. Testing the arrival would withhold every early exit t
 
 `Exclusion` members: `NO_REAL_TERMS_FIGURE`, `NO_INCOME_TAX_ON_THE_STATED_AMOUNT`,
 `EARLY_EXIT_CARRIES_NO_RATE_RISK`, `EARLY_EXIT_IS_A_POINT_NOT_A_DISTRIBUTION`,
-`EARLY_EXIT_SPREAD_IS_A_SELLERS_QUOTE`. The last three are FR-033's split: the certainty claim
-and the spread claim carry a direction, the rate-risk one carries `None`, and SC-026 asserts the
-absence rather than tolerating it.
+`EARLY_EXIT_SPREAD_IS_A_SELLERS_QUOTE`, and (added 2026-09-03)
+`EARLY_EXIT_IGNORES_ACCRUED_INTEREST`. The first three early-exit members are FR-033's split:
+the certainty claim and the spread claim carry a direction, the rate-risk one carries `None`,
+and SC-026 asserts the absence rather than tolerating it. The fourth is what carrying a dirty
+quotation to a later date leaves behind; it carries a direction only where the quotation
+predates the sale **and** no coupon detached before the purchase, which is the case its warrant
+covers.
 
 ### `core.results.answer.Refused`
 

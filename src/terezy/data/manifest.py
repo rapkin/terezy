@@ -762,7 +762,7 @@ def answer_input_refs(declarations: resolver.AnswerDeclarations) -> tuple[InputR
         ),
         _ref(
             "early_exit_assumption",
-            declarations.tuples.registries.spread_holds.id,
+            declarations.tuples.registries.quotation_holds.id,
             declarations.tuples.early_exit_file,
             prov.EMPTY,
         ),

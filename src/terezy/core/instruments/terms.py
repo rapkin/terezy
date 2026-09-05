@@ -25,6 +25,7 @@ handle "no answer" is a caller that has learned there are two forms.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import date
 from typing import TYPE_CHECKING, Final, assert_never
@@ -35,7 +36,7 @@ from terezy.core.instruments.interface import (
     PaymentKind,
     ScheduledPayment,
 )
-from terezy.core.primitives import money
+from terezy.core.primitives import conventions, money
 from terezy.core.primitives.conventions import AmountsAsDeclared, ConventionsApplied
 from terezy.core.primitives.money import Money
 
@@ -148,6 +149,36 @@ def payments_after(
     buyer gets back. The answer to "what does this holding receive" has to be given once.
     """
     return tuple(payment for payment in payments if payment.on > bought_on)
+
+
+def accrual_periods(terms: BondTerms) -> Iterator[tuple[date, date]]:
+    """``(accrual_start, accrual_end)`` for every period a generated schedule describes.
+
+    One iterator rather than the same three lines in each of ``fixed_income``'s two schedule
+    walks: they must agree about the period boundaries, or a coupon subtracted from a resale
+    quotation would be dated differently from the coupon paid.
+    """
+    schedule = conventions.periodicity(terms.periodicity)(terms.issue_date, terms.maturity_date)
+    accrual_start = terms.issue_date
+    for accrual_end in schedule:
+        yield accrual_start, accrual_end
+        accrual_start = accrual_end
+
+
+def coupon_amount(terms: BondTerms, quantity: float, fraction: float) -> Money:
+    """``face x rate x fraction x units``, carrying the terms it was computed from.
+
+    Through ``money.scale_sourced`` rather than ``money.scale``, because the rate and the
+    day-count fraction are *declared* values: the factor has sources of its own, and ``scale``
+    would carry only the face value's. The two usually coincide -- a file declares face and
+    coupon in one table -- and relying on that coincidence is how a mark gets lost the day
+    they are separated.
+    """
+    return money.scale_sourced(
+        terms.face_value,
+        terms.coupon_rate * fraction * quantity,
+        terms.provenance,
+    )
 
 
 def face_value_of(terms: DeclaredTerms) -> Money:

@@ -46,8 +46,11 @@ from terezy.core.instruments.interface import (
 from terezy.core.ledger.events import CausationKind, CausationRef, Event, LotRef
 from terezy.core.primitives import money
 from terezy.core.primitives.tolerance import is_close
+from terezy.core.scenarios import early_exit as early_exit_terms
 
 if TYPE_CHECKING:  # pragma: no cover -- import-time cycle avoidance
+    from datetime import date
+
     from terezy.core.instruments.interface import (
         Assumptions,
         DateRange,
@@ -56,6 +59,7 @@ if TYPE_CHECKING:  # pragma: no cover -- import-time cycle avoidance
         InstrumentConstraints,
         InstrumentDeclaration,
     )
+    from terezy.core.primitives.money import Money
     from terezy.core.tax.interface import TaxableEventKind
 
 
@@ -120,17 +124,64 @@ def events(
     # the ledger for units no lot holds.
     residual = holding.quantity - retired
     if early_exit is not None and not is_close(residual, 0.0) and residual > 0.0:
-        stream.append(
-            acquire.early_sale(
-                declaration,
-                holding,
-                residual,
-                on=horizon.end,
-                exit_=early_exit,
-                sequence=len(stream) + 1,
-            )
+        # **A repayment and a detachment in one window are refused, not priced.** Retiring units
+        # rebases what a unit is, so a coupon declared per unit is per ORIGINAL unit while the
+        # quotation it comes out of is per remaining one -- the subtraction is then too small by
+        # the ratio. Both mechanisms are right alone; what is missing is a sale priced per
+        # tranche, which is the same thing a reinvesting generative holding wants. Unreachable
+        # on the shipped registry, where every issue repays once at maturity.
+        detached = early_exit_terms.detached_since(
+            observed_on=early_exit.observed_on,
+            held_from=holding.purchased_on,
+            sold_on=horizon.end,
+            coupons=coupons_per_unit(declaration),
+            currency=early_exit.price_per_unit.currency,
         )
+        if retired > 0.0 and detached.amount > 0.0:
+            return InconsistentTerms(
+                first_term="instrument.schedule.payment",
+                second_term="access.resale_price.per_unit",
+                reason=(
+                    f"{declaration.id!r} repays principal and pays a coupon inside one window "
+                    f"ending {horizon.end.isoformat()}: {retired!r} unit(s) are retired before "
+                    f"the sale and {detached.amount!r} per unit detaches from the quotation. "
+                    "A declared coupon is per unit as declared, and retiring units rebases "
+                    "what a unit is, so one quotation cannot price both. Hold to the schedule's "
+                    "own end, or price the sale per tranche."
+                ),
+            )
+        sale = acquire.early_sale(
+            declaration,
+            holding,
+            residual,
+            on=horizon.end,
+            exit_=early_exit,
+            coupons=coupons_per_unit(declaration),
+            sequence=len(stream) + 1,
+        )
+        if isinstance(sale, InconsistentTerms):
+            return sale
+        stream.append(sale)
     return tuple(stream)
+
+
+def coupons_per_unit(declaration: InstrumentDeclaration) -> tuple[tuple[date, Money], ...]:
+    """:data:`CouponsPerUnitFn` for a listed schedule. Declared amounts are already per unit.
+
+    A repayment of principal is **not** here. It leaves the price too, and the schedule accounts
+    for it the other way: `_units_retired`'s share of it retires units, so pricing the remainder
+    at an unreduced per-unit quotation is what carries the reduction. Subtracting it here as
+    well would take it out twice.
+
+    The two mechanisms do not compose where both fall inside one window, which :func:`events`
+    refuses rather than pricing.
+    """
+    terms = terms_of.narrowed(declaration, EnumeratedTerms)
+    return tuple(
+        (payment.on, payment.amount)
+        for payment in terms.payments
+        if payment.pays is PaymentKind.COUPON
+    )
 
 
 def tax_classes(declaration: InstrumentDeclaration) -> Mapping[TaxableEventKind, str]:

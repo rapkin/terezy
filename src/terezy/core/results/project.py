@@ -64,6 +64,7 @@ from terezy.core.instruments.interface import (
     EarlyExit,
     Holding,
     InstrumentDeclaration,
+    InstrumentOps,
 )
 from terezy.core.ledger import engine
 from terezy.core.ledger.engine import LedgerState
@@ -77,6 +78,7 @@ from terezy.core.results import hurdle as hurdle_figures
 from terezy.core.results import schedule as schedule_rows
 from terezy.core.results.hurdle import CashFlow, HurdleRate
 from terezy.core.results.schedule import CashFlowSchedule, ChargedOn
+from terezy.core.scenarios import early_exit as early_exit_scenario
 from terezy.core.scenarios.early_exit import SoldEarly
 from terezy.core.tax import registry as tax_registry
 from terezy.core.tax import year as tax_year
@@ -261,9 +263,9 @@ def project(
     :data:`~terezy.core.primitives.staleness.UNASSESSED` rather than as freshness.
 
     **``early_exit`` is what a window shorter than the instrument's own terms is closed with**
-    (015 FR-029). ``None`` is not a silence and is the shipped state: no access declaration
-    quotes a resale price, so such a window refuses naming ``access.resale_price`` rather than
-    striking a sale at a figure nobody declared.
+    (015 FR-029). ``None`` is not a silence: where the access declaration quotes no resale
+    price such a window refuses naming ``access.resale_price`` rather than striking a sale at a
+    figure nobody declared.
     """
     ops = instrument_registry.ops_for(declaration.instrument_class)
     produced = ops.events(declaration, holding, horizon, assumptions, early_exit)
@@ -302,7 +304,7 @@ def project(
     # would then move when the owner changed their mind about coupons -- a figure
     # labelled "contractual" that is not (FR-005). Policy-invariance is asserted by
     # tests/unit/test_contractual_yield_is_policy_invariant.py.
-    sold_early = _sold_early(gross_events, early_exit)
+    sold_early = _sold_early(declaration, ops, holding, gross_events, early_exit)
     contractual_events = _contractual_events(declaration, holding, horizon, assumptions, early_exit)
     if isinstance(contractual_events, InfeasiblePurchase | InconsistentTerms):
         return contractual_events  # pragma: no cover -- the policy run already succeeded
@@ -358,12 +360,19 @@ def _sale_excludes(sold: SoldEarly | None) -> frozenset[str]:
         {
             "the contractual figure closes at a declared resale price rather than at maturity "
             f"({sold.on.isoformat()}), under the stated belief {sold.assumption.id!r} that the "
-            "observed spread holds at that date -- neither is a term of the paper"
+            "observed quotation holds at that date less the coupons that detached while the "
+            "holding held the paper -- neither is a term of the paper"
         }
     )
 
 
-def _sold_early(events: Sequence[Event], early_exit: EarlyExit | None) -> SoldEarly | None:
+def _sold_early(
+    declaration: InstrumentDeclaration,
+    ops: InstrumentOps,
+    holding: Holding,
+    events: Sequence[Event],
+    early_exit: EarlyExit | None,
+) -> SoldEarly | None:
     """The sale that closed the position, read off the stream that closed it.
 
     A bond emits ``EventKind.REDEMPTION`` for one reason only -- an early sale; it repays
@@ -379,10 +388,31 @@ def _sold_early(events: Sequence[Event], early_exit: EarlyExit | None) -> SoldEa
         return None
     if sale.quantity is None:  # pragma: no cover -- `early_sale` always carries one
         return None
+    # Recomputed from the declaration rather than divided back out of the proceeds. The two
+    # agree to within a float or two, and that is the problem: whether anything detached is
+    # read off this figure, and a round-trip through a division makes that answer depend on the
+    # quantity. Both sides read the same schedule through the same function, so this cannot
+    # drift from what `early_sale` struck.
+    detached = early_exit_scenario.detached_since(
+        observed_on=early_exit.observed_on,
+        held_from=holding.purchased_on,
+        sold_on=sale.occurred_on,
+        coupons=ops.coupons_per_unit(declaration),
+        currency=early_exit.price_per_unit.currency,
+    )
     return SoldEarly(
         on=sale.occurred_on,
         units=sale.quantity,
-        price_per_unit=early_exit.price_per_unit,
+        price_per_unit=money.sub(early_exit.price_per_unit, detached),
+        detached_per_unit=detached,
+        quoted_on=early_exit.observed_on,
+        skipped_before_purchase=early_exit_scenario.detached_since(
+            observed_on=early_exit.observed_on,
+            held_from=early_exit.observed_on,
+            sold_on=holding.purchased_on,
+            coupons=ops.coupons_per_unit(declaration),
+            currency=early_exit.price_per_unit.currency,
+        ),
         proceeds=sale.amount,
         assumption=early_exit.assumption,
     )
@@ -445,12 +475,14 @@ def _at_purchase(
     The two cases cannot occur together, so the split is exact rather than an approximation:
     ``enumerated`` refuses ``reinvest`` outright, which is the only way units grow.
 
-    **Where a sale retired nothing, the figure carries the quote's sources and no others.** It
-    is the resale price times the holding's own quantity, and the terms had no part in it:
-    marking it with them as well would send a reader chasing its unverified mark to a file that
-    did not supply it. Where something retired, both sources are on the figure and belong
-    there: the units sold are what the declared repayments left, so the terms decided that
-    quantity too.
+    **Where a sale retired nothing, the figure adds no source of its own.** It is the struck
+    resale price times the holding's own quantity, and the *quantity* came from the holding:
+    marking the figure with the terms on that account would send a reader chasing its
+    unverified mark to a file that did not supply it. What the struck price already carries it
+    keeps -- since 2026-09-03 that is the quotation's sources **and**, where a coupon detached,
+    the schedule's, because the price is the quotation less those declared amounts. Where
+    something retired, the terms are on the figure for the second reason too: the units sold
+    are what the declared repayments left, so the terms decided that quantity.
     """
     per_unit = instrument_terms.principal_returned(
         declaration.terms, bought_on=holding.purchased_on

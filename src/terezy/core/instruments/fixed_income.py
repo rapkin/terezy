@@ -91,6 +91,7 @@ from terezy.core.ledger.events import CausationKind, CausationRef, Event, EventK
 from terezy.core.primitives import conventions, money
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.tolerance import is_close
+from terezy.core.scenarios import early_exit as early_exit_terms
 
 if TYPE_CHECKING:  # pragma: no cover -- import-time cycle avoidance
     from terezy.core.instruments.interface import (
@@ -181,18 +182,52 @@ def events(
         ):
             stream.append(_reinvestment(declaration, holding, period, sequence=len(stream) + 1))
             units += period.reinvestment.units_bought
-    stream.append(
-        acquire.early_sale(
+    detached = (
+        early_exit_terms.detached_since(
+            observed_on=early_exit.observed_on,
+            held_from=holding.purchased_on,
+            sold_on=horizon.end,
+            coupons=coupons_per_unit(declaration),
+            currency=early_exit.price_per_unit.currency,
+        )
+        if sells_early and early_exit is not None
+        else None
+    )
+    if detached is not None and detached.amount > 0.0 and units != holding.quantity:
+        # **A reinvesting holding whose quotation actually moves is refused, not priced.**
+        # `early_sale` applies one per-unit adjustment to every unit, and a unit bought out of a
+        # coupon was not held when the earlier coupons detached -- so the reinvested tranche
+        # would be discounted for coupons it never contained. Pricing it needs a per-tranche
+        # sale, which is a change to the disposal and not to this line. Where nothing detached
+        # there is no adjustment to misapply and the sale stands; `enumerated` refuses
+        # reinvestment outright, so this is the only form that can reach either case.
+        return InconsistentTerms(
+            first_term="assumptions.coupon_policy",
+            second_term="access.resale_price",
+            reason=(
+                f"{declaration.id!r} reinvested its coupons into "
+                f"{units - holding.quantity!r} further unit(s) and the window sells the "
+                f"position on {horizon.end.isoformat()}, before its terms end. One resale "
+                "quotation cannot price units acquired on different dates: what detached from "
+                "it before a unit was bought was never in that unit's price. Hold the coupons "
+                "as cash, or extend the window to the instrument's own terms."
+            ),
+        )
+    if sells_early and early_exit is not None:
+        sale = acquire.early_sale(
             declaration,
             holding,
             units,
             on=horizon.end,
             exit_=early_exit,
+            coupons=coupons_per_unit(declaration),
             sequence=len(stream) + 1,
         )
-        if sells_early and early_exit is not None
-        else _redemption(declaration, holding, units, sequence=len(stream) + 1)
-    )
+        if isinstance(sale, InconsistentTerms):
+            return sale
+        stream.append(sale)
+    else:
+        stream.append(_redemption(declaration, holding, units, sequence=len(stream) + 1))
     return tuple(stream)
 
 
@@ -559,16 +594,18 @@ def coupon_plan(
 
     year_fraction = conventions.day_count(terms.day_count)
     adjust = conventions.business_day_rule(terms.business_day_rule)
-    schedule = conventions.periodicity(terms.periodicity)(terms.issue_date, terms.maturity_date)
     buy = coupon_policy(assumptions.coupon_policy)
 
     periods: list[CouponPeriod] = []
     units = holding.quantity
-    accrual_start = terms.issue_date
-    for accrual_end in schedule:
-        if accrual_end > holding.purchased_on:
+    for accrual_start, accrual_end in terms_of.accrual_periods(terms):
+        # The ADJUSTED date decides ownership, because the adjusted date is when the money
+        # moves and is the date `coupons_per_unit` subtracts from a resale quotation. Testing
+        # the unadjusted end here instead let a rule that moves a payment across the purchase
+        # credit a coupon the sale price had already taken out, or the reverse.
+        if adjust(accrual_end) > holding.purchased_on:
             fraction = year_fraction(accrual_start, accrual_end)
-            coupon = _coupon_amount(terms, units, fraction)
+            coupon = terms_of.coupon_amount(terms, units, fraction)
             decision = _decide(declaration, coupon, buy, accrual_end=accrual_end)
             periods.append(
                 CouponPeriod(
@@ -582,8 +619,24 @@ def coupon_plan(
                 )
             )
             units += decision.units_bought
-        accrual_start = accrual_end
     return tuple(periods)
+
+
+def coupons_per_unit(declaration: InstrumentDeclaration) -> tuple[tuple[date, Money], ...]:
+    """:data:`CouponsPerUnitFn` for a generated schedule.
+
+    Dates are the **paid** dates, through the same declared business-day rule
+    :func:`coupon_plan` applies, because a coupon leaves the price on the day it is paid.
+    """
+    terms = terms_of.narrowed(declaration, BondTerms)
+    if terms.coupon_rate == 0.0:
+        return ()
+    year_fraction = conventions.day_count(terms.day_count)
+    adjust = conventions.business_day_rule(terms.business_day_rule)
+    return tuple(
+        (adjust(end), terms_of.coupon_amount(terms, 1.0, year_fraction(start, end)))
+        for start, end in terms_of.accrual_periods(terms)
+    )
 
 
 def _decide(
@@ -786,22 +839,6 @@ def _reinvestment(
         quantity=decision.units_bought,
         allocated_to=None,
         capacity_pool=None,
-    )
-
-
-def _coupon_amount(terms: BondTerms, quantity: float, fraction: float) -> Money:
-    """``face x rate x fraction x units``, carrying the terms it was computed from.
-
-    Through ``money.scale_sourced`` rather than ``money.scale``, because the rate and the
-    day-count fraction are *declared* values: the factor has sources of its own, and
-    ``scale`` would carry only the face value's. The two usually coincide -- a file
-    declares face and coupon in one table -- and relying on that coincidence is how a
-    mark gets lost the day they are separated.
-    """
-    return money.scale_sourced(
-        terms.face_value,
-        terms.coupon_rate * fraction * quantity,
-        terms.provenance,
     )
 
 

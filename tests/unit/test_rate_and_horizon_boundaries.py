@@ -423,7 +423,9 @@ class TestAForeignInstrumentIsClosedByTwoGuardsAndNotByTheShippedData:
             bought_at="binance",
             proceeds_to="binance",
             quote=fixtures.VenueQuote(
-                price=Money(1_000.0, Currency.USD, prov.EMPTY), kind="venue_terms"
+                price=Money(1_000.0, Currency.USD, prov.EMPTY),
+                kind="venue_terms",
+                observed_on=fixtures.OUTLAY_ON,
             ),
         )
         for route_id, origin, destination, sending, receiving, direction in (

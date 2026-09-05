@@ -157,7 +157,7 @@ from terezy.core.routes.path import (
     segments_of,
 )
 from terezy.core.scenarios import early_exit
-from terezy.core.scenarios.early_exit import SpreadHolds
+from terezy.core.scenarios.early_exit import QuotationHolds
 from terezy.core.tax.interface import TaxClass
 
 if TYPE_CHECKING:  # pragma: no cover -- typing only
@@ -202,8 +202,8 @@ class Registries:
     kinds: Mapping[str, ObservationKind]
     spendable: frozenset[SpendableEndpoint]
 
-    spread_holds: SpreadHolds
-    """The owner's declared belief that a quoted resale spread holds at a future exit date.
+    quotation_holds: QuotationHolds
+    """The owner's declared belief about what a future early exit is struck at.
 
     On the registries rather than on the question, because it is not a property of one question:
     two questions asked on one day must not be able to disagree about how a platform's quote
@@ -943,11 +943,23 @@ def _price_for(prepared: _Prepared) -> Money:
     face value is what it repays), so the venue's declared quote is the price, and the
     resolver has already refused an access declaration that omits one for a bond or supplies
     one for a fund.
+
+    **The quotation is used as declared, on whatever day the purchase lands**, and the resale
+    leg is what keeps the pair coherent: it subtracts only the coupons that detached while the
+    holding held the paper, so a coupon between the quotation and the purchase is in both
+    prices and cancels in the return. Carrying this one as well would put the early-exit belief
+    under every bond figure, including the ones that hold to maturity and state no belief at
+    all -- a change to 015 FR-032's scope rather than a repair.
+
+    **Where the window holds to maturity there is no second leg to cancel it**, and that is a
+    signed overstatement of the purchase price which nothing states: the
+    ``the-buy-quotation-is-not-carried`` entry in ``specs/features.toml`` records it with its
+    measurement and what would close it.
     """
     match prepared.declared, prepared.plan:
         case FundDeclaration(), FundAssumptions():
             return fund_terms.entry_price_for(prepared.declared, prepared.plan.liquidity_mode)
-        case _:
+        case InstrumentDeclaration(), _:
             quoted = prepared.access.quote
             if quoted is None:  # pragma: no cover -- the resolver refuses this at load
                 raise ValueError(
@@ -957,6 +969,11 @@ def _price_for(prepared: _Prepared) -> Money:
                     "declaration the data boundary would not have accepted."
                 )
             return quoted.price
+        case _:  # pragma: no cover -- `_plan_for` has already refused a mismatched pair
+            raise ValueError(
+                f"{prepared.declared.id!r} reached pricing with run settings of type "
+                f"{type(prepared.plan).__name__}, which _plan_for refuses."
+            )
 
 
 def _minimum_ticket(prepared: _Prepared) -> Money | None:
@@ -1076,15 +1093,20 @@ def _project(
 def _early_exit(prepared: _Prepared, registries: Registries) -> EarlyExit | None:
     """What this holding is sold for if the horizon ends before its own terms do (015 FR-029).
 
-    ``None`` where the access declaration quotes no resale price, which is every shipped
-    declaration: the instrument then refuses naming ``access.resale_price`` and
-    :func:`_bond_outcome` turns that into a missing declaration. Nothing is inferred from the
-    purchase quote or the face value -- either would report a spread of zero.
+    ``None`` where the access declaration quotes no resale price: the instrument then refuses
+    naming ``access.resale_price`` and :func:`_bond_outcome` turns that into a missing
+    declaration. Nothing is inferred from the purchase quote or the face value -- either would
+    report a spread of zero. The quotation's own date travels with it, because what the price
+    is worth on a later day depends on what detached from it in between.
     """
     quote = prepared.access.resale_price
     if quote is None:
         return None
-    return EarlyExit(price_per_unit=quote.price, assumption=registries.spread_holds)
+    return EarlyExit(
+        price_per_unit=quote.price,
+        observed_on=quote.observed_on,
+        assumption=registries.quotation_holds,
+    )
 
 
 def _bond_outcome(
@@ -1094,7 +1116,11 @@ def _bond_outcome(
     match outcome:
         case Projection():
             return outcome
-        case InconsistentTerms() if outcome.second_term == "access.resale_price":
+        # Both terms, not just the second. `access.resale_price` is the second term of two
+        # different refusals -- a window that outlives the paper with no price to sell at,
+        # whose remedy IS a declaration, and a holding one quotation cannot price, whose remedy
+        # is the run plan -- and only the first is a missing declaration.
+        case InconsistentTerms(first_term="horizon.end", second_term="access.resale_price"):
             return DeclarationMissing(
                 part="access",
                 what=f"{prepared.access.instrument_id}: access.resale_price",

@@ -46,6 +46,7 @@ where the file and the field can be named.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 
 from terezy.core.primitives.money import Money
 
@@ -62,6 +63,17 @@ class VenueQuote:
 
     price: Money
     """The quote, in the instrument's own currency (the resolver refuses any other)."""
+
+    observed_on: date
+    """The day this price described the market. **Arithmetic, not only staleness.**
+
+    A quotation carried to a later date is carried *net of what left the price in between*, so
+    a resale price struck at a horizon's end subtracts every coupon that detached after this
+    day (:func:`terezy.core.scenarios.early_exit.detached_since`). A field rather than a read of
+    ``price.provenance``, because a ``Provenance`` is a **set** with no distinguished member
+    and is legitimately ``EMPTY`` for a figure built in code -- so the date a term of the sale
+    price is computed from would be a lookup that can come back empty.
+    """
 
     kind: str
     """The ``ObservationKind`` this quote ages under. A price goes out of date faster than a
@@ -114,9 +126,9 @@ class InstrumentAccess:
 
     015 FR-031. A horizon means the money comes out at its end, so an instrument whose terms
     run past it is sold there -- and the price is a **declaration**, never a face value, a NAV
-    or the purchase price standing in for one. ``None`` is the shipped state and refuses by
-    name through ``DeclarationMissing(part="access")``: it is what makes the refusal the real
-    behaviour rather than a guard that reads as protection.
+    or the purchase price standing in for one. ``None`` refuses by name through
+    ``DeclarationMissing(part="access")`` rather than inferring a price -- the fixture
+    instruments still make that statement, while every real issue declares a quote.
 
     Distinct from :attr:`quote`, which is what a unit **costs**. The gap between the two is the
     loss an early exit takes, and one field holding both would make it zero by construction.

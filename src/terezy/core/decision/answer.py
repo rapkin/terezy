@@ -73,10 +73,15 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.results.question import Question, Reserve
     from terezy.core.results.tuple import Arrival, InstrumentPlan
     from terezy.core.routes.legs import Route
+    from terezy.core.scenarios.early_exit import SoldEarly
 
 REAL_TERMS_SUPPLIED_BY = "a real-terms rate on TupleOutcome, which feature 010 does not produce"
 INCOME_TAX_SUPPLIED_BY = "a deployable-capacity figure, which is a question about a stream"
 RATE_RISK_SUPPLIED_BY = "[[future]] secondary-market-rate-risk"
+ACCRUED_INTEREST_SUPPLIED_BY = (
+    "a declared accrual basis, and for a listed schedule the [[future]] "
+    "enumerated-accrued-interest entry"
+)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -377,7 +382,7 @@ def _section(
             stated
             for item in _outcomes(outcome)
             if item.sold_early is not None and item.key not in withheld
-            for stated in _early_exit_exclusions(item.key, item.sold_early.assumption.id)
+            for stated in _early_exit_exclusions(item.key, item.sold_early)
         ),
     )
 
@@ -535,26 +540,40 @@ def _answer_wide_excludes() -> tuple[StatedExclusion, ...]:
     )
 
 
-def _early_exit_exclusions(key: Tuple, assumption_id: str) -> tuple[StatedExclusion, ...]:
-    """FR-033's three claims, with a direction on exactly two of them.
+def _early_exit_exclusions(key: Tuple, sold: SoldEarly) -> tuple[StatedExclusion, ...]:
+    """What an early-exit figure does not account for, and which way each one errs.
 
     Rate risk is **symmetric** -- a bond sold after rates rise fetches less than its spread
     implies and one sold after rates fall fetches more -- so it carries no direction, and SC-026
-    asserts that absence rather than tolerating it. The other two are signed: the figure is a
-    point where the world is a distribution, and a seller's quote widens exactly when a forced
-    sale is most likely.
+    asserts that absence rather than tolerating it: a sign asserted without a warrant is a number
+    more confident than its inputs, which is worse than one left unstated.
+
+    **The accrued-interest claim is on every early exit a quotation was carried to, not only on
+    the ones a coupon detached from.** What it states is that a dirty quotation crossed a gap
+    without the accrual that gap builds, and the gap exists whenever the sale is not struck on
+    the quotation's own day. Gating it on a detachment would have left it unstated on the
+    majority of the owner's sales while the figure was understated all the same.
+
+    **Its direction is stated only where the warrant holds**, and two things break it. A
+    quotation dated *after* the sale is used unchanged (``early_exit.detached_since``) and the
+    residual runs the other way; struck on the quotation's own day there is no residual and no
+    claim to make. And a coupon that detached before the holding bought the paper comes out of
+    neither price -- the residual is ``a(sale) - a(quotation) + detached``, and what makes it
+    positive is that ``detached`` covers the accrual the quotation had built, which a skipped
+    coupon is exactly what it does not. Measured on the shipped registry: two issues pay on
+    2026-08-26, seven days before the owner's window buys, and their residual is negative.
     """
-    return (
+    stated = (
         StatedExclusion(
             what=Exclusion.EARLY_EXIT_IS_A_POINT_NOT_A_DISTRIBUTION,
             applies_to=key,
-            supplied_by=assumption_id,
+            supplied_by=sold.assumption.id,
             direction=Direction.MORE_CERTAIN_THAN_IT_IS,
         ),
         StatedExclusion(
             what=Exclusion.EARLY_EXIT_SPREAD_IS_A_SELLERS_QUOTE,
             applies_to=key,
-            supplied_by=assumption_id,
+            supplied_by=sold.assumption.id,
             direction=Direction.UNDERSTATED,
         ),
         StatedExclusion(
@@ -562,6 +581,21 @@ def _early_exit_exclusions(key: Tuple, assumption_id: str) -> tuple[StatedExclus
             applies_to=key,
             supplied_by=RATE_RISK_SUPPLIED_BY,
             direction=None,
+        ),
+    )
+    if sold.quoted_on == sold.on:
+        return stated
+    return (
+        *stated,
+        StatedExclusion(
+            what=Exclusion.EARLY_EXIT_IGNORES_ACCRUED_INTEREST,
+            applies_to=key,
+            supplied_by=ACCRUED_INTEREST_SUPPLIED_BY,
+            direction=(
+                Direction.SALE_STRUCK_TOO_LOW
+                if sold.quoted_on < sold.on and sold.skipped_before_purchase.amount == 0.0
+                else None
+            ),
         ),
     )
 

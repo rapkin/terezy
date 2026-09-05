@@ -56,8 +56,9 @@ OPS: Final[InstrumentOps] = InstrumentOps(
     events=fixed_income.events,
     tax_classes=fixed_income.tax_classes,
     constraints=fixed_income.constraints,
+    coupons_per_unit=fixed_income.coupons_per_unit,
 )
-"""``fixed_income``'s three functions, gathered into the interface's record.
+"""``fixed_income``'s functions, gathered into the interface's record.
 
 Built here rather than in ``fixed_income`` for the import reason in the module docstring.
 It is the implementation's declaration that it satisfies the interface, so it lives as
@@ -68,8 +69,9 @@ ENUMERATED_OPS: Final[InstrumentOps] = InstrumentOps(
     events=enumerated.events,
     tax_classes=enumerated.tax_classes,
     constraints=enumerated.constraints,
+    coupons_per_unit=enumerated.coupons_per_unit,
 )
-"""``enumerated``'s three functions, gathered into the same record, unchanged."""
+"""``enumerated``'s functions, gathered into the same record."""
 
 REGISTRY: Final[Mapping[str, InstrumentOps]] = {
     FIXED_INCOME: OPS,
