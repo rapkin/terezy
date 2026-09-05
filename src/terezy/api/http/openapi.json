@@ -46,10 +46,11 @@
         "type": "string"
       },
       "Direction": {
-        "description": "Which way an approximation errs, where it has a warranted direction.",
+        "description": "Which way an approximation errs, where it has a warranted direction.\n\nEach member names what errs, not merely which way, because two claims on one candidate can\nerr in opposite directions: a seller's quote understates the **spread**, which flatters the\nfigure, while an unmodelled accrual strikes the **sale** below what the belief implies,\nwhich does the reverse. Rendered side by side under one word a reader nets them as\nreinforcing.",
         "enum": [
           "more_certain_than_it_is",
-          "understated"
+          "the_spread_is_understated",
+          "the_sale_is_struck_too_low"
         ],
         "title": "Direction",
         "type": "string"
@@ -61,7 +62,8 @@
           "no_income_tax_on_the_stated_amount",
           "early_exit_is_a_point_not_a_distribution",
           "early_exit_spread_is_a_sellers_quote",
-          "early_exit_carries_no_rate_risk"
+          "early_exit_carries_no_rate_risk",
+          "early_exit_ignores_accrued_interest"
         ],
         "title": "Exclusion",
         "type": "string"
@@ -294,6 +296,11 @@
             "title": "Kind",
             "type": "string"
           },
+          "observed_on": {
+            "format": "date",
+            "title": "Observed On",
+            "type": "string"
+          },
           "price": {
             "$ref": "#/components/schemas/money_Money"
           },
@@ -306,6 +313,7 @@
         "required": [
           "tag",
           "price",
+          "observed_on",
           "kind"
         ],
         "title": "access_VenueQuote",
@@ -1815,11 +1823,45 @@
         "title": "coverage_SpendableEndpoint",
         "type": "object"
       },
+      "early_exit_QuotationHolds": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "is_assumption": {
+            "const": true,
+            "title": "Is Assumption",
+            "type": "boolean"
+          },
+          "rationale": {
+            "title": "Rationale",
+            "type": "string"
+          },
+          "tag": {
+            "const": "early_exit.QuotationHolds",
+            "title": "Tag",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tag",
+          "id",
+          "is_assumption",
+          "rationale"
+        ],
+        "title": "early_exit_QuotationHolds",
+        "type": "object"
+      },
       "early_exit_SoldEarly": {
         "additionalProperties": false,
         "properties": {
           "assumption": {
-            "$ref": "#/components/schemas/early_exit_SpreadHolds"
+            "$ref": "#/components/schemas/early_exit_QuotationHolds"
+          },
+          "detached_per_unit": {
+            "$ref": "#/components/schemas/money_Money"
           },
           "on": {
             "format": "date",
@@ -1830,6 +1872,14 @@
             "$ref": "#/components/schemas/money_Money"
           },
           "proceeds": {
+            "$ref": "#/components/schemas/money_Money"
+          },
+          "quoted_on": {
+            "format": "date",
+            "title": "Quoted On",
+            "type": "string"
+          },
+          "skipped_before_purchase": {
             "$ref": "#/components/schemas/money_Money"
           },
           "tag": {
@@ -1847,41 +1897,13 @@
           "on",
           "units",
           "price_per_unit",
+          "detached_per_unit",
+          "quoted_on",
+          "skipped_before_purchase",
           "proceeds",
           "assumption"
         ],
         "title": "early_exit_SoldEarly",
-        "type": "object"
-      },
-      "early_exit_SpreadHolds": {
-        "additionalProperties": false,
-        "properties": {
-          "id": {
-            "title": "Id",
-            "type": "string"
-          },
-          "is_assumption": {
-            "const": true,
-            "title": "Is Assumption",
-            "type": "boolean"
-          },
-          "rationale": {
-            "title": "Rationale",
-            "type": "string"
-          },
-          "tag": {
-            "const": "early_exit.SpreadHolds",
-            "title": "Tag",
-            "type": "string"
-          }
-        },
-        "required": [
-          "tag",
-          "id",
-          "is_assumption",
-          "rationale"
-        ],
-        "title": "early_exit_SpreadHolds",
         "type": "object"
       },
       "envelopes_CategoryHasNoSuchId": {
@@ -2206,14 +2228,14 @@
           "result": {
             "discriminator": {
               "mapping": {
-                "early_exit.SpreadHolds": "#/components/schemas/early_exit_SpreadHolds",
+                "early_exit.QuotationHolds": "#/components/schemas/early_exit_QuotationHolds",
                 "envelopes.NothingDeclared": "#/components/schemas/envelopes_NothingDeclared"
               },
               "propertyName": "tag"
             },
             "oneOf": [
               {
-                "$ref": "#/components/schemas/early_exit_SpreadHolds"
+                "$ref": "#/components/schemas/early_exit_QuotationHolds"
               },
               {
                 "$ref": "#/components/schemas/envelopes_NothingDeclared"

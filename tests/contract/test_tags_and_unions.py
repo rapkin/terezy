@@ -233,7 +233,7 @@ DECLARATIONS_WITHOUT_A_REASON = frozenset(
         "channels.FxChannel",
         "citation_policy.CitationsRequired",
         "composed.SegmentBound",
-        "early_exit.SpreadHolds",
+        "early_exit.QuotationHolds",
         "envelopes.DeclaredSeeds",
         "envelopes.DeclaredSpendable",
         "envelopes.TaxPositions",
