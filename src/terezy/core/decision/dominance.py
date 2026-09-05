@@ -795,7 +795,13 @@ def why_one_member(result: DominanceResult) -> WhyOneMember:
         return OnlyOneEvaluated()
     if dominated and not not_placed:
         return EveryOtherIsDominated()
-    if not_placed and not dominated:
+    if not_placed and not dominated:  # pragma: no cover -- see below
+        # **Unreachable through this pass**, measured 2026-09-06, and kept because FR-014
+        # enumerates it and because the `not placed` rule is where it would become reachable.
+        # It needs exactly one PLACED candidate beside a population of unplaced ones -- and a
+        # candidate is placed only by a pair some objective decided, which places the other
+        # member of that pair too. So one placed candidate implies a second, and the second is
+        # then either dominated (a mixture) or non-dominated (a set of two).
         return EveryOtherIsNotPlaced()
     return Mixed(dominated=dominated, not_placed=not_placed)
 

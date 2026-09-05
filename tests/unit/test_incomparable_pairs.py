@@ -12,10 +12,25 @@ one spendable endpoint (research D5).
 
 from __future__ import annotations
 
+from datetime import date
+
+import pytest
+
 from terezy.core.decision.answer import section_evaluated
+from terezy.core.decision.dominance import relates
+from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
-from terezy.core.results.dominance import DeliveredInTwoCurrencies, FigureMissing
-from terezy.core.results.objectives import Criterion
+from terezy.core.primitives.money import Money
+from terezy.core.results.dominance import (
+    DateFigure,
+    DeliveredInTwoCurrencies,
+    FigureMissing,
+    FigureUnavailable,
+    Incomparable,
+    MoneyFigure,
+    MoneyWidth,
+)
+from terezy.core.results.objectives import Criterion, ObjectiveDirection
 from tests import dominance_sections as sections
 from tests.data_roots import REPO_ROOT
 from tests.source_scan import executable_source
@@ -114,3 +129,56 @@ def test_no_exchange_rate_is_consulted_anywhere_in_the_pass() -> None:
         source = executable_source(REPO_ROOT / "src" / "terezy" / module)
         assert "convert" not in source, f"{module} converts a currency"
         assert "official_rate" not in source
+
+
+# ---------------------------------------------------------------------------
+# The relation's own contract, reached directly rather than through the pass
+# ---------------------------------------------------------------------------
+#
+# The pass asks `first_unreadable` before it looks up a width, so `relates`' own early exit is
+# never taken from there. It is part of the public contract either way, and a caller holding
+# figure vectors -- which is what the battery and the planted witness are -- reaches it.
+
+
+def _uah(amount: float) -> MoneyFigure:
+    return MoneyFigure(amount=Money(amount, Currency.UAH, prov.EMPTY))
+
+
+def _width() -> MoneyWidth:
+    return MoneyWidth(amount=Money(5.0, Currency.UAH, prov.EMPTY))
+
+
+def test_relates_returns_the_first_position_it_cannot_read() -> None:
+    verdict = relates(
+        (_uah(10.0), FigureUnavailable(what="TupleOutcome.arrivals")),
+        (_uah(20.0), _uah(30.0)),
+        directions=(ObjectiveDirection.MORE_IS_BETTER,) * 2,
+        widths=(_width(), _width()),
+    )
+    assert isinstance(verdict, Incomparable)
+    assert verdict.position == 1
+    assert verdict.why == FigureMissing(what="TupleOutcome.arrivals")
+
+
+def test_a_missing_figure_on_the_right_is_read_the_same_way_round() -> None:
+    verdict = relates(
+        (_uah(10.0),),
+        (FigureUnavailable(what="TupleOutcome.arrivals"),),
+        directions=(ObjectiveDirection.MORE_IS_BETTER,),
+        widths=(_width(),),
+    )
+    assert isinstance(verdict, Incomparable)
+    assert verdict.position == 0
+
+
+def test_two_kinds_of_figure_at_one_position_is_a_programmer_error() -> None:
+    """A criterion reads one kind of figure, so a money figure against a date at one position
+    means a criterion and its reader disagree about what the criterion reads. Principle IV's
+    split: ``raise`` for a violated invariant, a typed value for a business outcome."""
+    with pytest.raises(AssertionError, match="disagree about what it reads"):
+        relates(
+            (_uah(10.0),),
+            (DateFigure(on=date(2027, 1, 1)),),
+            directions=(ObjectiveDirection.MORE_IS_BETTER,),
+            widths=(_width(),),
+        )

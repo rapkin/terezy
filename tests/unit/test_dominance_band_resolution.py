@@ -13,14 +13,19 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
+from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
+from terezy.core.primitives.money import Money
 from terezy.core.results.dominance import (
+    BandInAnotherCurrency,
     NoQuestionAmountInTheCurrencyCompared,
     SeveralQuestionAmountsInTheCurrencyCompared,
 )
-from terezy.core.results.objectives import Criterion
+from terezy.core.results.objectives import AbsoluteBand, Criterion, DaysBand
 from tests import dominance_sections as sections
 
 
@@ -108,3 +113,70 @@ def test_the_two_refusals_differ_rather_than_sharing_one_record() -> None:
     assert type(sections.run(both, amounts=sections.question_amounts(usd=None))) is not type(
         sections.run(sections.section(), amounts=ambiguous)
     )
+
+
+def test_an_absolute_band_in_another_currency_refuses_rather_than_converting() -> None:
+    """The shape that does not resolve against the question at all, and its own refusal.
+
+    An absolute band **is** its width, and a width in hryvnia says nothing about how close two
+    dollar figures are. Refused rather than converted, because no exchange rate is consulted
+    anywhere in this pass -- and refused rather than ignored, because a band silently dropped is
+    the silent default this repository refuses everywhere.
+    """
+    declared = sections.objectives()
+    absolute = replace(
+        declared,
+        objectives=(
+            replace(
+                declared.objectives[0],
+                band=AbsoluteBand(amount=Money(5.0, Currency.UAH, prov.EMPTY)),
+            ),
+            declared.objectives[1],
+        ),
+    )
+    planted = sections.delivering_dollars(sections.section(), ["UA4000239016", "UA4000238281"])
+    refusal = sections.run(planted, declared=absolute)
+    assert isinstance(refusal, BandInAnotherCurrency)
+    assert refusal.declared_in is Currency.UAH
+    assert refusal.compared_in is Currency.USD
+    assert refusal.criterion is Criterion.MONEY_AT_THE_ENDPOINT
+
+
+def test_an_absolute_band_in_the_currency_compared_is_the_width_itself() -> None:
+    """The other half of the pair: an absolute band resolves to itself and is reported in its
+    declared form, so ``resolved_bands`` -- which reports fractions -- stays empty."""
+    declared = sections.objectives()
+    absolute = replace(
+        declared,
+        objectives=(
+            replace(
+                declared.objectives[0],
+                band=AbsoluteBand(amount=Money(5.0, Currency.UAH, prov.EMPTY)),
+            ),
+            declared.objectives[1],
+        ),
+    )
+    result = sections.result(sections.section(), declared=absolute)
+    assert result.resolved_bands == ()
+    assert result.non_dominated
+
+
+@pytest.mark.parametrize(
+    ("position", "band"),
+    [
+        (0, DaysBand(days=7)),
+        (1, AbsoluteBand(amount=Money(5.0, Currency.UAH, prov.EMPTY))),
+    ],
+)
+def test_a_band_of_the_wrong_shape_for_its_criterion_is_a_programmer_error(
+    position: int, band: object
+) -> None:
+    """The loader refuses both shapes, so a record reaching the pass with one was built by hand
+    against its own criterion -- which is a mistake about the code rather than about the money,
+    and Principle IV puts ``raise`` there."""
+    declared = sections.objectives()
+    objectives = list(declared.objectives)
+    objectives[position] = replace(objectives[position], band=band)  # type: ignore[arg-type]
+    mismatched = replace(declared, objectives=tuple(objectives))
+    with pytest.raises(TypeError, match="the loader refuses that shape"):
+        sections.run(sections.section(), declared=mismatched)

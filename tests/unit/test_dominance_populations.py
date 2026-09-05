@@ -14,6 +14,7 @@ from terezy.core.decision.answer import section_evaluated
 from terezy.core.decision.dominance import why_one_member
 from terezy.core.results.dominance import (
     EveryOtherIsDominated,
+    Mixed,
     OnlyOneEvaluated,
     TheSetHasSeveralMembers,
 )
@@ -103,3 +104,52 @@ def test_the_populations_are_in_the_candidate_order_and_in_no_objectives_order()
         [item.key for item in result.not_placed],
     ):
         assert population == [key for key in order if key in set(population)]
+
+
+def test_a_section_every_pair_of_which_is_incomparable_has_an_empty_set_honestly() -> None:
+    """SC-004's own scoping, reached rather than argued.
+
+    Two candidates whose only pair cannot be decided are **both** *not placed*, so the set is
+    empty over a population **neither** member of which is placed -- which is why the never-empty
+    guarantee is scoped to the placed population and not to the evaluated one.
+    """
+    pair = sections.only(sections.section(), ["UA4000239016"])
+    planted = sections.with_no_arrivals(pair, "UA4000239016")
+    result = sections.result(planted)
+    assert len(result.not_placed) == 2
+    assert not result.non_dominated
+    assert not result.dominated
+
+
+def test_a_set_of_one_beside_both_kinds_reports_the_counts() -> None:
+    """FR-014's fourth case: *some mixture, in which case the counts say which*."""
+    three = sections.only(sections.section(), ["UA4000239016", "UA4000238281"])
+    planted = sections.with_no_arrivals(three, "UA4000238281")
+    result = sections.result(planted)
+    reading = why_one_member(result)
+    assert isinstance(reading, Mixed)
+    assert reading.dominated == len(result.dominated)
+    assert reading.not_placed == len(result.not_placed)
+    assert reading.dominated
+    assert reading.not_placed
+
+
+def test_the_readings_this_pass_can_produce_are_distinguishable_without_prose() -> None:
+    """FR-014's own requirement, over the four the pass reaches.
+
+    ``EveryOtherIsNotPlaced`` is the fifth and is **not** among them, for the reason
+    ``why_one_member`` states at its own site: it would need exactly one placed candidate, and a
+    candidate is placed only by a decided pair with another -- which places that one too.
+    """
+    lone = why_one_member(sections.result(sections.only(sections.section(), [])))
+    beaten = why_one_member(sections.result(sections.only(sections.section(), ["UA4000239016"])))
+    mixed = why_one_member(
+        sections.result(
+            sections.with_no_arrivals(
+                sections.only(sections.section(), ["UA4000239016", "UA4000238281"]),
+                "UA4000238281",
+            )
+        )
+    )
+    several = why_one_member(sections.result(sections.section()))
+    assert len({type(reading) for reading in (lone, beaten, mixed, several)}) == 4
