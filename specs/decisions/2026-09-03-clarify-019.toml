@@ -1,0 +1,106 @@
+# Owner answers — the four clarifications of 019's specification.
+#
+# Взято 2026-09-03, по одному питанню за раз. Перші два вирішують, ЧИМ Є відповідь, а не як
+# вона побудована: CL-1 називає критерії, CL-2 — ширину, за якої дві цифри перестають
+# відрізнятися. CL-3 — стала позиція, а не блокер. CL-4 — одне слово у власному файлі питання.
+#
+# `choice` несе САМУ ВІДПОВІДЬ, а не лише літеру варіанта — літера сама по собі не відтворює
+# рішення (числа CL-2 у жодному варіанті не стояли, CL-3 — це «A сьогодні, C як позиція», а
+# CL-4 узагалі не мав літер). Де варіант є, він названий на початку рядка. Зіставляти `choice`
+# з `options` рядок у рядок не можна.
+exported_on = "2026-09-03"
+
+[[answer]]
+q        = 1
+feature  = "019-decision-layer"
+title    = "За якими критеріями береться недомінована множина"
+question = "Which objectives is the non-dominated set taken over, and in which direction?"
+options  = [
+  "A. Two: the money that reaches a spendable endpoint (more is better), and the date all of it is back there (sooner is better)",
+  "B. Three: A plus the rate",
+  "C. One: the money alone",
+  "D. A plus a confidence dimension — how much of a candidate's figure rests on unverified or stale declarations",
+]
+choice   = "A — two objectives: the money that reaches a spendable endpoint (more is better), and the date all of it is back there (sooner is better). Not the rate, not the money alone."
+notes    = """
+Дві цілі: скільки грошей повернулося до кінця горизонту і як швидко повернулося все.
+
+Чому не B. Ставка — це грошозважена дохідність за той проміжок, коли гроші справді були
+вкладені, і на дванадцяти місяцях її лідер `UA4000235865` повертає НАЙМЕНШЕ грошей з усіх
+(вимірювання, пункт 3). Множина, яка завжди містить лідера за ставкою, завжди містить варіант,
+якого ніхто не візьме. Ставка лишається на кожному кандидаті й далі впорядковує список — вона
+просто не є критерієм множини.
+
+Чому не C. Одні гроші — це повний порядок, тобто рівно той переможець, проти якого існує ця
+фіча; і це викидає ліквідність, про яку власник спитав сам («можуть знадобитися 20 000 у межах
+шести місяців»).
+
+Чому не D. Потрібен порядок над марками провенансу, якого ніхто не оголошував: чи одна
+неперевірена цифра гірша за дві застарілі — це нова декларація і нове судження. FR-022 кладе
+злиті марки на кожен вердикт, тож D лишається дешевим наступним кроком, а не відкинутим.
+"""
+
+[[answer]]
+q        = 2
+feature  = "019-decision-layer"
+title    = "Наскільки близько — це «надто близько, щоб розрізняти»"
+question = "How wide is the indifference band, per objective — in hryvnia on the money and in days on the date — or is there none at all?"
+options  = [
+  "A. A declared indifference band, one per objective, no default",
+  "B. Nothing beyond the float tolerance",
+  "C. Derive the band from the provenance of the inputs",
+]
+choice   = "A — 0.01 % of the question's amount on the money (a RELATIVE band, where the question asked for an absolute hryvnia figure), and 7 days on the date."
+notes    = """
+Гроші: **0,01 % суми питання**. Дні: **7**.
+
+Питання просило абсолютну гривневу цифру; власник написав відсоток — це його форма, і вона
+записана як його форма, а не переведена в гривні. На 50 000 UAH це 5,00 UAH, тож виміряний
+розрив у 6,39 UAH між найближчою парою за грошима все ще РОЗДІЛЯЄ їх.
+
+Наслідок, який мусить бути в специфікації: відносна смуга береться від суми питання, а не від
+цифри кандидата. Смуга, взята від власної цифри кожного кандидата, різна для A→B і для B→A, і
+тоді «нерозрізненність» перестає бути симетричним відношенням, якого вимагає FR-011. Тобто
+відносна форма розв'язується в одну ширину на питання і далі поводиться як абсолютна.
+
+Днів це не стосується: відсоток від дати не означає нічого, тому там абсолютна величина.
+"""
+
+[[answer]]
+q        = 3
+feature  = "019-decision-layer"
+title    = "Брати бібліотеку портфельної оптимізації чи ні"
+question = "Is a portfolio-optimisation library adopted, given that adopting one turns determinism from a structural guarantee into a seeding discipline?"
+options  = [
+  "A. No library in this feature",
+  "B. Adopt one now",
+  "C. Adopt one later, behind the same seam this feature establishes",
+]
+choice   = "A now, C as the standing position — no library in this feature; revisit when allocations over candidates are scored (I4)."
+notes    = """
+Не зараз. Повернутися до питання тоді, коли оцінюватимуться РОЗПОДІЛИ між кандидатами (I4) —
+саме там простір пошуку перестає бути 24 записами і предмет бібліотеки нарешті настає.
+
+Тобто це A сьогодні і C як стала позиція, щоб питання не відкривала кожна наступна фіча.
+"""
+
+[[answer]]
+q        = 4
+feature  = "019-decision-layer"
+title    = "Який реальний випуск є еталоном"
+question = "Which declared OVDP issue replaces `ovdp_synthetic_a` as the benchmark of data/questions/fifty-thousand.toml?"
+options  = [
+  "Any of the 24 declared issues; two rules of thumb offered — the one he would buy doing nothing clever, or the one whose own maturity is nearest the horizon he cares most about",
+]
+choice   = "UA4000231195 — the issue maturing 2027-08-25, inside the twelve-month window."
+notes    = """
+Погашення 2027-08-25 — усередині дванадцятимісячного вікна (2026-09-01 → 2027-09-01), тож на
+цьому горизонті бар'єр є цифрою утримання до погашення, а не раннього виходу. На одному й
+трьох місяцях він продається достроково, як і решта.
+
+Зміна — одне поле в data/questions/fifty-thousand.toml. Для ЦЬОГО випуску вона лишає без змін
+кожну цифру та кожен порядок і вирішує лише, хто «перевершує бар'єр»; для випуску всередині
+групи рівних вона ще й міняє місцями двох у `ranked` (вимірювання, пункт 2 — перевірено
+2026-09-03, після відповіді). UA4000231195 у жодній групі рівних не стоїть. Зміна приходить
+із реєстром, а не з цією специфікацією.
+"""
