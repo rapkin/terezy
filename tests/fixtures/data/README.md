@@ -22,6 +22,8 @@ asserts the table and the tree hold the same set of files, in both directions.
 | `access/fixtures.toml` | How each of the above is reached, priced and labelled. Beside `data/access/instruments.toml` rather than replacing it: `access/` is globbed and the two merge. |
 | `seeds/owner-001.toml` | Two opening lots, one with a known basis and one estimated, so an estimated basis has a lot to propagate from. **Replaces** the shipped seeds file: a data root resolves at most one. |
 | `tax/synthetic_fixture.toml` | A second jurisdiction whose rates differ per income kind, so a payment's declared label is provably load-bearing (013 FR-010). |
+| `objectives/money-alone.toml` | A second declared objective set — the money and nothing else, which is the option the owner declined. Required test **I2** needs two sets that DISAGREE, and the money alone is a total order, so its non-dominated set has one member where his own has several. |
+| `questions/fifty-thousand-by-the-money.toml` | The owner's question differing in exactly one field, the objective set it names (019 FR-001a). Two questions alike but for that name are what make I2's *two objectives over the same candidate set* demonstrable at all. |
 | `tax/timing/synthetic_fixture.toml` | Its assessment rules, whose category **nets** — the case 013 FR-026 requires exercised rather than warned about, and which Ukraine's own `exempt_securities` cannot show. |
 
 `scripts/check_provenance.py` scans this tree through the composed root, in

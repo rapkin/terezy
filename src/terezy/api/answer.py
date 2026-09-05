@@ -30,6 +30,7 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from pathlib import Path
 
     from terezy.core.primitives.currency import Currency
+    from terezy.core.results.objectives import ObjectiveSet
     from terezy.core.results.question import Question
     from terezy.core.routes.legs import Route
     from terezy.data.manifest import RunManifest
@@ -47,7 +48,9 @@ class AnsweredQuestion:
     manifest: RunManifest
 
 
-def inputs_of(declarations: resolver.AnswerDeclarations, *, regime_id: str) -> AnswerInputs:
+def inputs_of(
+    declarations: resolver.AnswerDeclarations, *, regime_id: str, objective_set_id: str
+) -> AnswerInputs:
     """The verb's second parameter, built from a resolved data root.
 
     **The route set is the one the question's regime declares**, never the one a transition
@@ -58,10 +61,11 @@ def inputs_of(declarations: resolver.AnswerDeclarations, *, regime_id: str) -> A
     question naming ``normalized`` with horizons starting 2026-09-01 was answered over
     ``wartime``'s eight routes, two corridors short, under the label ``normalized``.
     """
+    objectives = declarations.objective_sets[objective_set_id]
     coverage = declarations.candidates.composition.coverage
     routes = coverage.ramp.routes
     if not coverage.regimes:
-        return _inputs(declarations, routes)
+        return _inputs(declarations, routes, objectives)
     named = coverage.regimes.get(regime_id)
     if named is None:
         raise DeclarationError(
@@ -73,10 +77,15 @@ def inputs_of(declarations: resolver.AnswerDeclarations, *, regime_id: str) -> A
             "question's own world says do not exist.",
             f"name one of {sorted(coverage.regimes)}",
         )
-    return _inputs(declarations, {name: routes[name] for name in sorted(named.route_ids)})
+    narrowed = {name: routes[name] for name in sorted(named.route_ids)}
+    return _inputs(declarations, narrowed, objectives)
 
 
-def _inputs(declarations: resolver.AnswerDeclarations, routes: Mapping[str, Route]) -> AnswerInputs:
+def _inputs(
+    declarations: resolver.AnswerDeclarations,
+    routes: Mapping[str, Route],
+    objectives: ObjectiveSet,
+) -> AnswerInputs:
     """The bundle, over whichever route set the regime settled on."""
     return AnswerInputs(
         registries=declarations.tuples.registries,
@@ -84,6 +93,7 @@ def _inputs(declarations: resolver.AnswerDeclarations, routes: Mapping[str, Rout
         groups=declarations.tuples.instruments.groups,
         bound=declarations.candidates.composition.bound,
         ceiling=declarations.candidates.ceiling,
+        objectives=objectives,
     )
 
 
@@ -130,7 +140,15 @@ def answer_declared(
         path=declared_in,
         objective_sets=declarations.objective_sets,
     )
-    result = answer(question, inputs_of(declarations, regime_id=question.regime_id), as_of)
+    result = answer(
+        question,
+        inputs_of(
+            declarations,
+            regime_id=question.regime_id,
+            objective_set_id=question.objective_set_id,
+        ),
+        as_of,
+    )
     return AnsweredQuestion(
         answer=result,
         manifest=run_manifest.of_answer(

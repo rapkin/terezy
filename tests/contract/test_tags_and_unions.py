@@ -203,9 +203,20 @@ WITHOUT_A_REASON = frozenset(
         "answer.TwoIdenticalHorizons",
         "answer.PlanForNothing",
         "answer.BenchmarkYieldsNoCandidate",
+        # 019: six of the seven arms of `DominanceRefused`. The seventh,
+        # `NoBenchmarkToStandAgainst`, carries 010's own reason verbatim and is therefore not
+        # here. Each of these names the fact instead: the band and the slack it did not clear,
+        # the streams whose two amounts left a fraction with no single width, the record that
+        # replaced the survey. The `a-reason-on-every-refusal` gap covers them with the nine.
+        "dominance.BandBelowTheAcyclicityFloor",
+        "dominance.BandInAnotherCurrency",
+        "dominance.BenchmarkWasWithheld",
+        "dominance.NoQuestionAmountInTheCurrencyCompared",
+        "dominance.NoSurveyToRunOver",
+        "dominance.SeveralQuestionAmountsInTheCurrencyCompared",
     }
 )
-"""The nine refusals that carry no `reason`.
+"""The refusals that carry no `reason`.
 
 Eight are the whole of `Answer`'s own `Refused` union; the ninth is a refusal arm of
 `SectionOutcome` reached through `Answer.sections`, so it belongs to no union whose name ends in
@@ -247,6 +258,13 @@ DECLARATIONS_WITHOUT_A_REASON = frozenset(
         "interface.InstrumentDeclaration",
         "interface.TaxClass",
         "legs.Route",
+        "dominance.DeliveredInTwoCurrencies",
+        "dominance.DominanceResult",
+        "dominance.FigureMissing",
+        "dominance.HurdleIsDominated",
+        "dominance.NoStatedAssumptionSeparatesThem",
+        "dominance.NothingDominatesTheHurdle",
+        "dominance.SeparatingAssumptions",
         "loader.ScenarioDeclaration",
         "objectives.AbsoluteBand",
         "objectives.DaysBand",

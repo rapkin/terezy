@@ -24,6 +24,7 @@ from datetime import date
 from typing import TYPE_CHECKING
 
 from terezy.core.decision import candidates as enumeration
+from terezy.core.decision.dominance import dominance
 from terezy.core.decision.tuple_outcome import Registries
 from terezy.core.primitives import money, staleness
 from terezy.core.primitives import provenance as prov
@@ -70,6 +71,7 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.instruments.groups import InstrumentGroup
     from terezy.core.instruments.interface import DateRange
     from terezy.core.results.composed import SegmentBound
+    from terezy.core.results.objectives import ObjectiveSet
     from terezy.core.results.question import Question, Reserve
     from terezy.core.results.tuple import Arrival, InstrumentPlan
     from terezy.core.routes.legs import Route
@@ -100,6 +102,11 @@ class AnswerInputs:
     bound: SegmentBound
     ceiling: candidate_results.CandidateCeiling
 
+    objectives: ObjectiveSet
+    """The declared set the question names (019 FR-001a). Here rather than on the question
+    because the question names an **id** and resolving it is the data layer's, exactly as the
+    ceiling and the bound are."""
+
 
 def answer(question: Question, inputs: AnswerInputs, as_of: date) -> Answer | Refused:
     """Answer one declared question over one registry, at one as-of date.
@@ -126,7 +133,7 @@ def answer(question: Question, inputs: AnswerInputs, as_of: date) -> Answer | Re
         )
         if isinstance(outcome, BenchmarkYieldsSeveralCandidates):
             return outcome
-        sections.append(_section(question, subjects, horizon, outcome))
+        sections.append(_section(question, subjects, horizon, outcome, inputs.objectives))
     return Answer(
         question=question,
         as_of=as_of,
@@ -361,10 +368,24 @@ def _section(
     subjects: Sequence[ResolvedSubject],
     horizon: DateRange,
     outcome: SectionOutcome,
+    objectives: ObjectiveSet,
 ) -> HorizonSection:
-    """One section: the survey whole, plus what this feature withholds and what it verdicts."""
+    """One section: the survey whole, plus what this feature withholds and what it verdicts.
+
+    **The dominance pass is handed the parts rather than the section** (019 research D9a):
+    ``HorizonSection`` is frozen and carries the pass's own result, so a pass taking the finished
+    record could not be called before the record exists, and the two escapes -- a default on the
+    field, or a ``replace`` over a section whose ``dominance`` is momentarily wrong -- are both
+    the silent default this repository refuses everywhere else.
+    """
     late = _arrives_after_horizon(outcome, horizon)
     withheld = frozenset(item.key for item in late)
+    excludes = tuple(
+        stated
+        for item in _outcomes(outcome)
+        if item.key not in withheld
+        for stated in _stated_exclusions(item)
+    )
     return HorizonSection(
         horizon=horizon,
         outcome=outcome,
@@ -375,12 +396,14 @@ def _section(
             for reserve in question.reserves
             for verdict in _verdicts(outcome, reserve, withheld)
         ),
-        excludes=tuple(
-            stated
-            for item in _outcomes(outcome)
-            if item.key not in withheld
-            for stated in _stated_exclusions(item)
+        dominance=dominance(
+            outcome,
+            withheld=late,
+            excludes=excludes,
+            objectives=objectives,
+            amounts=question.amounts,
         ),
+        excludes=excludes,
     )
 
 

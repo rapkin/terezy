@@ -85,9 +85,9 @@ def test_the_manifest_records_the_run_and_not_a_holding_it_did_not_have() -> Non
 def test_the_question_is_an_input_reference_like_any_other_declaration() -> None:
     """FR-025. An answer traces to the sentence that asked for it."""
     run: Any = _answered()
-    questions = [ref for ref in run.manifest.inputs if ref.kind == "question"]
-    assert [ref.id for ref in questions] == [fixtures.OWNERS_QUESTION]
-    assert questions[0].file == "questions/fifty-thousand.toml"
+    questions = {ref.id: ref for ref in run.manifest.inputs if ref.kind == "question"}
+    assert fixtures.OWNERS_QUESTION in questions
+    assert questions[fixtures.OWNERS_QUESTION].file == "questions/fifty-thousand.toml"
 
 
 def test_the_objective_set_is_an_input_reference_with_its_own_version() -> None:
@@ -98,10 +98,12 @@ def test_the_objective_set_is_an_input_reference_with_its_own_version() -> None:
     is not a result* (Principle III).
     """
     run: Any = _answered()
-    sets = [ref for ref in run.manifest.inputs if ref.kind == "objective_set"]
-    assert [ref.id for ref in sets] == ["money-and-when"]
-    assert sets[0].file == "objectives/owner-001.toml"
-    assert sets[0].version
+    sets = {ref.id: ref for ref in run.manifest.inputs if ref.kind == "objective_set"}
+    assert sets[fixtures.OBJECTIVE_SET].file == "objectives/owner-001.toml"
+    assert sets[fixtures.OBJECTIVE_SET].version
+    assert sets[fixtures.OBJECTIVE_SET].version != sets[fixtures.MONEY_ALONE].version, (
+        "two objective sets share a version, so the manifest could not tell two answers apart"
+    )
 
 
 def test_the_manifest_names_every_file_the_run_read() -> None:

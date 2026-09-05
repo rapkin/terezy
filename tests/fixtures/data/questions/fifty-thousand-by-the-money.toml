@@ -1,0 +1,124 @@
+# The owner's question again, differing in ONE field: the objective set it is answered under.
+#
+# It exists for required test I2 and for nothing else (019 SC-002). Two questions alike but for
+# that name, over one registry, must produce different non-dominated sets, and each answer's
+# manifest must name its own objective file with its own digest -- which is not demonstrable
+# from one question, however many objective sets are declared beside it.
+#
+# Everything else is a copy of `data/questions/fifty-thousand.toml`, deliberately: a fixture
+# that also changed the amount, the horizons or the benchmark would leave which difference
+# produced the different answer unsettled, which is the whole of what the criterion asserts.
+
+[owner]
+id = "owner-001"
+
+[question]
+id           = "fifty-thousand-hryvnia-by-the-money"
+asked_on     = "2026-08-30"
+
+# The shipped registry declares no scenario in force, and the answer says so in the regime's
+# own words rather than by leaving the field out.
+regime       = "(no regime declared)"
+
+# Proceeds arriving before a horizon's end sit as cash and earn nothing. Reinvestment would
+# need a rate, an instrument, an entry cost and a tax treatment, none of them declared.
+continuation = "hold_as_cash"
+
+# Everything is ranked against one issue. Named by instrument id: more than one candidate for
+# it refuses rather than settling by file order which figure the rest are measured against.
+#
+# OWNER'S CHOICE, 2026-09-03, and chosen for its DATE: its final coupon and its principal both
+# fall on 2027-08-25, a week short of the twelve-month horizon, so the hurdle is a bond held
+# very nearly to its own maturity over the longest window he asked about. At one and three
+# months it is sold at the window's end like any other candidate, so its rate spans the window
+# plus the three days the way out declares — waiting is inside the span (010 FR-015).
+#
+# It supersedes `UA4000235865`, which matured 2026-09-16 — inside every horizon — and was
+# therefore annualised over 18 days at all three while the rest of the list was annualised over
+# one, three and twelve months. That comparability break is recorded as
+# `rates-in-one-ranking-span-different-periods` in `specs/features.toml` and is NOT closed by this
+# choice: it is a property of any candidate whose terms end inside the window, and the renderer
+# says so per section. This benchmark simply does not trip it except by seven days.
+benchmark    = "UA4000231195"
+
+# Which criteria the dominance pass is taken over, named rather than defaulted (019 FR-001a):
+# there is no default set, and a question that named none would be answered under criteria
+# nobody chose. It is a field of this file rather than a flag on the verb because the file's own
+# digest is what makes the answer reproducible.
+objectives   = "money-alone"
+
+# The four words he said, in the order he said them. `subjects` and `every_declared_instrument`
+# are mutually exclusive and one of them is required: omission must never read as *everything*.
+subjects     = ["cash", "ovdp", "inzhur", "btc"]
+
+# He states no other need; an empty list says so rather than leaving the section out.
+reserve      = []
+
+  [[question.amount]]
+  stream   = "salary_uah"
+  amount   = 50000.0
+  currency = "UAH"
+
+  # A token dollar amount, and it is required rather than decorative: an amount is stated for
+  # EVERY declared stream, because a stream with no stated amount is the case that fails
+  # silently — its pairs yield no candidate, nothing raises, and the answer is simply missing a
+  # stream nobody mentioned. The stream really is enumerated: the answer carries one
+  # `contract_usd` pair per instrument per section, each saying no declared corridor reaches the
+  # buying venue. That absence is the finding, and stating an amount is what makes it visible.
+  [[question.amount]]
+  stream   = "contract_usd"
+  amount   = 1.0
+  currency = "USD"
+
+  # One, three and twelve months from 2026-09-01.
+  [[question.horizon]]
+  start = "2026-09-01"
+  end   = "2026-10-01"
+
+  [[question.horizon]]
+  start = "2026-09-01"
+  end   = "2026-12-01"
+
+  [[question.horizon]]
+  start = "2026-09-01"
+  end   = "2027-09-01"
+
+  # A plan per SUBJECT, not per instrument. That is what stops this file growing an entry per
+  # issue when feature 016 declares 24 real ОВДП: a new issue joins the group by carrying the
+  # label, and nothing here changes.
+  [[question.plan]]
+  subject            = "ovdp"
+  kind               = "bond"
+  consumption_method = "fifo"
+  coupon_policy      = "hold_cash"
+
+  # The two Inzhur funds are planned SEPARATELY, and it is not a stylistic choice. Each states
+  # its own yield RANGE and a chosen point has to lie inside the fund's own range, so one plan
+  # for the group could not be a point inside both — their ranges do not overlap. A plan keyed
+  # by an instrument id wins over its subject's, which is what lets the group keep the plan a
+  # new member would inherit while an instrument whose own terms differ states its own.
+  [[question.plan]]
+  subject            = "inzhur_reit"
+  kind               = "fund"
+  consumption_method = "fifo"
+  liquidity_mode     = "practice"
+  buyback            = "available"
+  exit_on            = "2028-01-17"
+
+    [question.plan.yield_point]
+    rate_pct      = 9.5
+    is_assumption = true
+    rationale     = "OWNER'S CHOICE inside the range this fund itself states — the low end, so the figure is the least flattering one the range admits rather than a midpoint nobody stated. Not observed and not a forecast."
+
+  [[question.plan]]
+  subject            = "inzhur_miltech"
+  kind               = "fund"
+  consumption_method = "fifo"
+  liquidity_mode     = "practice"
+  buyback            = "available"
+  exit_on            = "2028-01-17"
+
+    [question.plan.yield_point]
+    rate_pct      = 25.0
+    is_assumption = true
+    rationale     = "OWNER'S CHOICE inside the range this fund itself states — the low end, so the figure is the least flattering one the range admits rather than a midpoint nobody stated. Not observed and not a forecast."
