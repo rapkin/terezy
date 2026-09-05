@@ -6,16 +6,12 @@
 
 **Created**: 2026-09-03
 
-**Status**: **Drafted** — three open `[NEEDS CLARIFICATION]`, all listed under "What only the owner
-can decide". None of them blocks the other requirements: each names what the feature does while it
-stands open, and each of those standing behaviours is a refusal rather than a guess.
-
-**This branch deliberately does not carry the `[[feature]]` entry** that `specs/README.md` requires
-in a spec's landing commit, and the omission is an instruction rather than an oversight: the entry
-and the constitution amendment for D-B were both to be *proposed* for review rather than written
-here, because 021 is being specified in parallel and the two entries land together or the graph is
-briefly wrong. **Whoever lands this adds the entry in the landing commit**; until it exists, 020 is
-invisible to the dependency graph that `CLAUDE.md` names as the source of feature order.
+**Status**: **Spec** — the three clarifications are **answered** (owner, 2026-09-03,
+`specs/decisions/2026-09-03-clarify-020.toml`), and each answer is written into the requirement it
+governs rather than left in the question. The first of them **defers the display switch entirely**,
+which is a narrower feature than either of the standing behaviours the draft shipped: what was
+offered is kept under "Display currency — deferred by owner decision", because the record of what
+was declined is what stops it being re-proposed as new.
 
 **Input**: Owner decision of 2026-09-03 lifting the D-B deferral of the delivery surface. The stack
 is decided and this specification does not reopen it: FastAPI over Pydantic v2, an OpenAPI document
@@ -194,7 +190,10 @@ one field on one response record and confirm the comparison fails.
 
 ---
 
-### User Story 4 - Switching the display currency changes only what it is allowed to (Priority: P2)
+### User Story 4 - Switching the display currency changes only what it is allowed to (DEFERRED)
+
+**Deferred by owner decision 2026-09-03** together with FR-021 to FR-025; kept as the record of what
+was offered. Nothing below is built in this feature.
 
 The owner switches the display to dollars. Every realised amount, every tax figure and the ranking
 of every candidate are the same bytes they were.
@@ -312,8 +311,9 @@ of addresses it may bind to.
 - **FR-003**: `terezy.api.http` MUST NOT compute a financial figure. It selects, serialises and
   refuses. A scan MUST assert that no module under it imports `terezy.core.primitives.money`'s
   combining functions or constructs a `Money`, on the pattern
-  `tests/contract/test_money_construction_guard.py` already uses — with the single exception of the
-  display conversion, which is the subject of FR-021 to FR-025 and is confined to one named module.
+  `tests/contract/test_money_construction_guard.py` already uses. There is **no exception**: the
+  draft carved one out for the display conversion, and the owner's deferral of the switch closes it,
+  so no module under `terezy.api.http` constructs money at all.
 
 - **FR-004**: The CLI MUST be unchanged by this feature. It is a client over `api/` and remains one;
   a second client does not make the first one route through it.
@@ -355,8 +355,9 @@ of addresses it may bind to.
   direction were deleted — `.importlinter`'s FR-012/FR-013 pair states this reasoning at its own
   site and it applies unchanged.
 
-- **FR-007a**: Every category's path MUST be a **single flat segment**, and every **route group**
-  the application serves MUST own a distinct first segment. A route group is a category together
+- **FR-007a**: Every category's path MUST be a **single flat segment beneath the `/api` prefix**
+  (FR-056), and every **route group** the application serves MUST own a distinct first segment
+  within it. A route group is a category together
   with everything nested under its own segment, or a fixed endpoint that is not inside a category's
   subtree.
 
@@ -560,24 +561,36 @@ of addresses it may bind to.
   FR-017 nowhere. A response MAY report the canonical digest as a field; it may not be built from
   the canonical encoding.
 
-### Display currency
+### Display currency — deferred by owner decision 2026-09-03
 
-- **FR-021**: The display currency MUST be a **request parameter**, resolved on the server. The
+**FR-021 to FR-025 are NOT in this feature.** The owner deferred the switch («відкладемо перемикач
+курсів поки», `specs/decisions/2026-09-03-clarify-020.toml`, answer 1), and the deferral is wider
+than the draft's own standing behaviour: there is **no `display` parameter, no display block, and no
+call to `money.convert` anywhere in this feature**. Every amount is served in the currency it was
+computed in, which is what `Money` already carries.
+
+They are kept below, unedited, as the record of what was offered — deleting them would leave a
+future reader to re-derive the three options and re-propose the one that was declined. The
+`[[future]]` entry `display-currency-switch` in `specs/features.toml` is what carries them forward,
+and `docs/REQUIRED_TESTS.md` rows F2, F3 and F4 stay open with their notes unchanged: a switch that
+does not exist closes none of them.
+
+- **FR-021** *(deferred, not in this feature)*: The display currency MUST be a **request parameter**, resolved on the server. The
   client computes nothing. Constitution Principle VI gives currency three roles, and a client that
   converted for display would be a fourth place a rate lives.
 
-- **FR-022**: A display switch MUST change **only** an explicitly declared display block attached
+- **FR-022** *(deferred, not in this feature)*: A display switch MUST change **only** an explicitly declared display block attached
   beside each amount. It MUST NOT change the amount, its currency, its provenance, any tax figure,
   any ranking, any ordering, or any field a ranking is computed from. A test MUST request the same
   resource under each declared display currency and assert that every field outside the display
   block is **byte-identical** across the responses.
 
-- **FR-023**: The display block MUST be **additive**. The originally-computed amount and its own
+- **FR-023** *(deferred, not in this feature)*: The display block MUST be **additive**. The originally-computed amount and its own
   currency stay in the body under the same field names regardless of the display choice. A display
   that replaced the amount would make FR-022's byte-identity claim untestable, because the field it
   is about would be the field that moved.
 
-- **FR-024**: Every converted display figure MUST carry the **rate as its source declares it, the
+- **FR-024** *(deferred, not in this feature)*: Every converted display figure MUST carry the **rate as its source declares it, the
   direction that declaration is in, the factor actually applied, the source of the rate, and the
   merged provenance of the amount and the rate**. The display path MUST go through
   `terezy.core.primitives.money.convert`, which already demands the rate's provenance in its
@@ -594,7 +607,7 @@ of addresses it may bind to.
   cannot check it against the declaration. Both, with the direction named, and a worked example
   (SC-011a) is what proves the pair agrees.
 
-- **FR-024a**: Where the requested display currency **is already the amount's own currency**, the
+- **FR-024a** *(deferred, not in this feature)*: Where the requested display currency **is already the amount's own currency**, the
   amount MUST carry **no display block at all**, and `convert` MUST NOT be called for it. It is not a
   conversion and the core says so by raising: *"a conversion from UAH to UAH is not a conversion.
   Same-currency arithmetic goes through scale, add or sub; reaching here means a currency was lost
@@ -607,13 +620,15 @@ of addresses it may bind to.
   own terms: an amount shown in its own currency has nothing to add beside it, and a display block
   echoing the same number at a rate of 1 would be a rate nobody quoted.
 
-- **FR-025**: Where no declared rate is available for a requested display currency, the response
+- **FR-025** *(deferred, not in this feature)*: Where no declared rate is available for a requested display currency, the response
   MUST **refuse the display block by name**, with the figure and its own currency left intact. Not a
   missing block, not a null, not the amount shown unconverted as though it had been converted.
 
   This is a different absence from FR-024a's and MUST be distinguishable from it: *nothing to
   convert* and *nothing to convert with* are not the same fact, and a client showing a mark for one
   of them must not show it for the other.
+
+*(End of the deferred requirements.)*
 
 ### The bind, and the gate that stays
 
@@ -751,6 +766,57 @@ of addresses it may bind to.
   opposite of what it claims: a citation the client never fetches is the provenance mark working,
   and a script tag is the defect.
 
+### What a generic client needs, and this feature owes
+
+These four are obligations feature 021 rests on (its OB-2, OB-3 and OB-6, and its FR-049). They
+are requirements here rather than assumptions there, because a client that has to know each
+category's schema turns a generic screen into a per-category branch — Principle II broken in a new
+layer.
+
+- **FR-052**: A record read MUST be **self-describing**: beside the record, the response MUST carry
+  the ordered **field descriptors** of the record it returned — each field's name and its kind, and
+  for a field whose kind names another record or an enum, which one. Derived from the same shape the
+  body is encoded from, never written out per category.
+
+  Names and kinds, and deliberately **no label**: a human label is presentation, and a serialiser
+  that invented one would be adding a fact the record does not carry (FR-015). Title-casing a field
+  name is the client's to do and is reversible; a label chosen here would be a second vocabulary
+  nobody could correct.
+
+- **FR-053**: Every record read MUST state **which file declared it**, as a path relative to the
+  data root. Where the resolver exposes no file for a category, the response MUST say so as a
+  **typed absence carrying the reason**, never as a null or a missing key — and a test MUST pin the
+  set of categories in that state, so it is a measured gap rather than a silent one. Measured
+  2026-09-03 the set has one member, `tax-timing`, whose entry point returns rules by jurisdiction
+  and no file map.
+
+- **FR-054**: Every category MUST state whether its directory is **sourced or exempt from the
+  citation requirement**, and for an exempt one **the recorded reason**. `scripts/check_provenance.py`
+  holds both lists by name and fail-closed, and it is the single definition: a test MUST assert the
+  API's verdict for every category equals that script's, so the reason is served rather than
+  restated. An exemption served as an absent citation is indistinguishable from a citation nobody
+  wrote, which is the distinction the whole provenance mechanism exists to keep.
+
+- **FR-056**: Every endpoint MUST be served beneath a single **`/api` prefix**, declared in one
+  place and carried by the OpenAPI document, so a client generated from that document is correct
+  by construction. The alternative — the client's dev server rewriting paths — is this feature's
+  route table copied into a proxy configuration, which is the second copy the whole gated-document
+  arrangement exists to avoid.
+
+- **FR-055**: Where a built client is present at `web/dist`, the API MUST serve it from its own
+  origin with an SPA fallback, and where that directory is **absent the mount MUST be inert** —
+  no route, no error, and nothing the Python suite has to build.
+
+  **A path beneath `/api` that the API does not serve MUST return a typed JSON refusal**, never
+  the fallback document. An SPA page served with status 200 for an unknown API path reaches a
+  generated client as a parse error rather than as the missing route it is, and a healthy service
+  then looks broken in the one place a reader would not think to look. 021 FR-049 makes production one
+  container serving both, which is what removes the cross-origin question in FR-032a; the inert
+  case is what keeps `uv run pytest` free of a Node build (FR-035).
+
+  The served bytes stay inside FR-031's scan: a built asset referencing an external host is the
+  defect that scan exists to catch, and 021 FR-036 checks the same property over its own build.
+
 ### Packaging
 
 - **FR-032**: A `docker-compose.yml` at the repository root MUST declare an `api` service running
@@ -762,28 +828,24 @@ of addresses it may bind to.
   origin arrangement FR-032a settles. Everything the web client shows comes through those. This
   specification declares no web service; 021 does, and adds its own service to the same file.
 
-- **FR-032a**: The API MUST declare a **cross-origin allowance** naming exact loopback origins. The
-  decision is taken here rather than left to 021 because a browser takes it either way and a
-  requirement neither specification owns is a requirement neither tests.
+- **FR-032a**: The API MUST declare **no cross-origin allowance at all**, and a test MUST assert
+  the absence: no CORS middleware is installed and no `access-control-allow-origin` header is ever
+  emitted.
 
-  Two services on `127.0.0.1` at different ports are different origins, so the alternative was for
-  the API to serve the built client from its own origin — which would give a read-only API a
-  static-file responsibility, and would break 021's development loop, where the client runs on its
-  own port against this service. A declared allowance is the smaller thing.
+  **The premise the first draft argued from was false.** It said the alternative — the API serving
+  the built client from its own origin — *"would break 021's development loop, where the client runs
+  on its own port against this service"*. It does not: 021 FR-033 proxies `/api` through its dev
+  server, so the browser sees one origin in development, and 021 FR-049 makes production **one
+  container** whose API serves `web/dist`. There is no supported arrangement in which the two are
+  different origins, so an allowance would be a widening declared for a case that does not arise —
+  and the one thing it would then do is admit a page the owner merely visited, on a service holding
+  his whole position.
 
-  It MUST name **exact origins**, every one of them a loopback origin, with **no wildcard, no
-  pattern and no credentials allowance**. A wildcard origin on a service holding one person's
-  finances is a non-loopback exposure reached by a different route: any page the owner's browser
-  loads, from any site, could then read the whole registry. A test MUST assert that every configured
-  origin is a loopback origin and that no wildcard or pattern appears.
-
-  **What the allowance does MUST NOT be overstated: a CORS allowance withholds, it does not refuse.**
-  Starlette's `CORSMiddleware` serves a simple `GET` carrying a disallowed `Origin` in full and merely
-  omits the `access-control-allow-origin` header, leaving the **browser** to block the read. So the
-  allowance protects a browser-mediated caller and nothing else, and a criterion asserting that such a
-  request is refused would be red against the very mechanism this requirement names. Refusal is
-  FR-032b's job, on the `Host` header, which is also the only one of the two that survives DNS
-  rebinding.
+  What the draft's last paragraph established stands and is the reason the allowance would not have
+  been worth much anyway: **a CORS allowance withholds, it does not refuse.** Starlette's
+  `CORSMiddleware` serves a simple `GET` carrying a disallowed `Origin` in full and merely omits the
+  header, leaving the *browser* to block the read. Refusal is FR-032b's job, on the `Host` header,
+  which is also the only one of the two that survives DNS rebinding.
 
 - **FR-032b**: The service MUST also refuse any request whose **`Host` header** is not one it
   declares, from a closed list of loopback hosts.
@@ -977,6 +1039,12 @@ of addresses it may bind to.
   indistinguishable from a correct one"*, and quietly returning fewer rows than were asked for is a
   fifth.
 
+  **Silently is the operative word, and 021 depends on it.** A response carrying the observations
+  that *are* covered **beside** a typed refusal naming the part that is not is the required shape,
+  not a violation of this requirement: the refusal is what makes the body non-silent, and refusing
+  the whole window would force the client to trim the window itself, which is a computation 021
+  FR-001 forbids it (021 OB-7). What is forbidden is a short body with nothing saying it is short.
+
 - **FR-047**: Every observation returned MUST carry its own provenance, not the series'. Both record
   types already hold one per observation; collapsing them to a series-level mark would lose which
   date was verified, and 018 FR-006 establishes that per-row is the only reading under which
@@ -1007,11 +1075,10 @@ of addresses it may bind to.
   it can close and what it cannot is stated under "Required tests this feature relates to" below,
   and no row is claimed on the strength of a surface existing.
 
-  **F2 MUST NOT be flipped unless clarification 1 resolves to option A.** Under option B nothing is
-  ever converted, so byte-identity across display choices is true because there is no display — and
-  the row's own note records that its tax half was established early *"so the row cannot be closed
-  later by a feature that never checked it"*. Flipping it on a vacuous assertion would be that exact
-  failure, performed by the feature the note was written for.
+  **F2 MUST NOT be flipped.** The owner deferred the display switch, so this feature has no switch
+  to check the row against, and the row's own note records that its tax half was established early
+  *"so the row cannot be closed later by a feature that never checked it"*. Flipping it here would be
+  that exact failure, performed by the feature the note was written for.
 
 ---
 
@@ -1065,9 +1132,13 @@ the segments are named for what a category *holds* rather than for where its fil
 
 ---
 
-## What only the owner can decide
+## What only the owner decided
 
-### [NEEDS CLARIFICATION 1] — Which rate may a display conversion use?
+All three are **answered** — owner, 2026-09-03, `specs/decisions/2026-09-03-clarify-020.toml`.
+The questions and their options stay as they were asked; each closes with what was chosen, so a
+reader can see the alternative that was declined rather than only the rule that survived.
+
+### Answered 1 — Which rate may a display conversion use? → **none: the switch is deferred**
 
 There is no display-currency machinery in this repository today, and the reason is not neglect.
 `money.convert` is the only function that produces an amount in another currency and it demands the
@@ -1090,17 +1161,13 @@ channel-rate question about presentation"*. This question is whether to act on i
 | **B** | No conversion at all: `display` names no rate this feature can honour, and the block refuses by name wherever a conversion would be needed (never where the amount is already in the requested currency — FR-024a). | Nothing is ever wrong, and nothing is ever converted — so **`REQUIRED_TESTS` F2 stays open**, by FR-051: a byte-identity test over a switch that converts nothing is green for the wrong reason, and F2's own note exists to stop exactly that flip. F3 and F4 stay where they are too. |
 | **C** | Declare a **fourth** rate role for presentation, in its own data directory with its own citations. | The cleanest long-run answer and the largest change: a new declaration kind, a new provenance surface, and a new argument about what a presentation rate even is. Not a serialisation feature. |
 
-**Recommendation: A.** It is the position already written down in F3, it is honest about what it
-rests on, and the alarming mark is the correct output rather than a defect — the same reasoning
-`data/channels/uah_usd.toml`'s own header already carries.
+**Recommendation was A. The owner chose none of the three and deferred the switch**, which is
+wider than B: B kept the parameter and a block that refuses, and the deferral removes both. FR-021 to
+FR-025, SC-010, SC-010a, SC-011 and SC-011a are marked deferred at their own sites, `REQUIRED_TESTS`
+F2 stays open by FR-051, and `display-currency-switch` in `specs/features.toml` carries the three
+options above forward unchanged.
 
-**While this stands open** the feature ships option B's behaviour: the display block refuses by name
-**wherever a conversion would be needed**. An amount already in the requested currency still carries
-no block at all, per FR-024a — "always refuses" would contradict that MUST on the ordinary request,
-`display=UAH` over hryvnia figures. Nothing is converted, nothing is wrong, and FR-022's
-byte-identity assertion and SC-010a both still run.
-
-### [NEEDS CLARIFICATION 2] — Does `as_of` get a default?
+### Answered 2 — Does `as_of` get a default? → **no**
 
 015 FR-006 put `as_of` on the verb rather than in the question file, because *"a question whose
 horizons or amounts moved with the calendar would be a different question each day while its digest
@@ -1112,14 +1179,11 @@ is not an artefact under review, and a person opening a browser has no obvious p
 | **A** *(recommended)* | `as_of` is **required**. A request without it refuses naming the parameter. | Two requests a week apart with the same URL give the same answer forever. The web client must supply a date, which means it has to decide what date it means and say so on screen. No clock is read anywhere in this feature. |
 | **B** | `as_of` defaults to the server's current date when omitted, and the date used is echoed in the response. | The browser case is one click. The cost is that the HTTP layer reads the clock, so an identical URL is a different question tomorrow — and the staleness verdict, which is the only thing `as_of` decides, would then change under a reader who did not ask it to. |
 
-**Recommendation: A.** The honest default is "required, no default". If B is chosen, the clock read
-must be confined to one function that nothing in `core/` or `data/` can reach, and the resolved date
-must appear in the response and in the manifest — an echoed default is defensible, an invisible one
-is not.
+**Chosen: A.** `as_of` is required, there is no default, and no code path in this feature reads the
+clock. B's conditions — one confined clock read, echoed into the response and the manifest — are the
+terms it would have to be built under if it is ever revisited, and are recorded here for that.
 
-**While this stands open** `as_of` is required.
-
-### [NEEDS CLARIFICATION 3] — What does the schema do about the nine refusals that carry no reason?
+### Answered 3 — The nine refusals that carry no reason → **optional in the schema, core untouched**
 
 The decision of 2026-09-03 says each union member carries "its tag and its `reason`". Measured on
 2026-09-03 by flattening the refusal families this repository names — `Refused`, `SectionOutcome`'s
@@ -1147,11 +1211,10 @@ all three of `LotRefusal`.
 | **B** | Add `reason` to the nine members first, as a small core change inside this feature. | The schema is uniform and every refusal explains itself in one field. It is a core edit in a feature whose whole point is that the core is untouched, it needs nine sentences nobody has written, and it moves what the CLI prints. |
 | **C** | The HTTP layer synthesises a reason for the nine. | **Rejected, not offered as a live option.** It would make the API a second place the tool decides what happened, against FR-015 and against the CLI's own rule that it adds no fact to the record. Recorded here so the option is visibly closed rather than never considered. |
 
-**Recommendation: A**, with the `[[future]]` entry. B is a real improvement and belongs in a feature
-about the answer's vocabulary, not in one about serialising it.
-
-**While this stands open** the schema marks `reason` optional and the test pins the nine absences by
-walking the response types rather than by holding a list of union names.
+**Chosen: A**, with the `[[future]]` entry. The schema marks `reason` optional; the test **discovers**
+the reason-less records by walking the response types and compares the discovered set against a list
+checked in beside it, so a tenth is a deliberate edit. B stays the better long-run answer and belongs
+to a feature about the answer's vocabulary rather than about serialising it.
 
 ---
 
@@ -1161,7 +1224,6 @@ walking the response types rather than by holding a list of union names.
   records serialise to. The unit FR-005's mapping is keyed by.
 - **Tag** — `<module leaf>.<ClassName>`, derived, never stored on a core record, injective over all
   314 core records as measured. The field a client switches on.
-- **Display block** — the only part of a response a display switch may change (FR-022, FR-023).
 - **Bind context** — a two-valued statement of where the process is running (FR-027). Not a
   permission level and not extensible.
 - **The OpenAPI document** — a published contract, checked in, byte-gated, and deliberately not a
@@ -1263,19 +1325,19 @@ walking the response types rather than by holding a list of union names.
   including every set-derived list. Asserted **across processes with differing `PYTHONHASHSEED`**,
   not twice within one, because within one process a `frozenset` iterates stably and the criterion
   would pass while the property fails. (FR-019)
-- **SC-010**: The same resource requested under each declared display currency differs **only**
+- **SC-010** *(deferred with FR-021 to FR-025)*: The same resource requested under each declared display currency differs **only**
   inside the display block; every other byte is identical, including every ranking position and
   every figure a ranking is computed from. Asserted by comparing the two bodies field by field, not
   by comparing a chosen subset. (FR-022, FR-023)
-- **SC-010a**: A body containing both hryvnia and dollar amounts, requested under each declared
+- **SC-010a** *(deferred with FR-021 to FR-025)*: A body containing both hryvnia and dollar amounts, requested under each declared
   display currency, raises nothing: the amounts already in the requested currency carry no display
   block, the others carry one, and the two absences — *already in it* and *no rate for it* — are
   distinguishable in the body. (FR-024a, FR-025)
-- **SC-011**: A display currency with no declared rate returns a named refusal in the display block
+- **SC-011** *(deferred with FR-021 to FR-025)*: A display currency with no declared rate returns a named refusal in the display block
   and an intact, unconverted figure beside it. No response contains a converted figure without the
   declared rate, its direction, the applied factor, the rate's source and the merged provenance.
   (FR-024, FR-025)
-- **SC-011a** *(conditional on clarification 1 resolving to option A)*: One hand-computed worked
+- **SC-011a** *(deferred with FR-021 to FR-025)*: One hand-computed worked
   example, arithmetic checked in beside the assertion, shows a UAH amount displayed in USD against
   a declared `reference_rate` of 42 UAH per USD — the applied factor is the reciprocal, the response
   carries both numbers, and multiplying the reported figure by the reported declared rate returns
@@ -1315,11 +1377,10 @@ walking the response types rather than by holding a list of union names.
   external host, and both documentation routes serve nothing. Asserted by scanning the served
   bytes, not by reading the configuration. Serialised citations are outside the scan by
   construction — they are data in a JSON body, never a fetch. (FR-031)
-- **SC-016a**: Every origin the service admits is a loopback origin; no wildcard, no pattern and no
-  credentials allowance appears in the configuration; and a response to a request carrying a
-  non-loopback origin carries **no** `access-control-allow-origin` header. Stated as the header
-  withheld rather than the request refused, because that is what a CORS allowance does — the refusal
-  is SC-016c's, on the `Host` header. (FR-032a)
+- **SC-016a**: The service installs no CORS middleware and emits no `access-control-allow-origin`
+  header on any response, including one carrying an `Origin` of its own loopback. Asserted as an
+  absence, because the arrangement 021 declares is same-origin in both development and production.
+  (FR-032a)
 - **SC-016b**: The runtime closure of the `api` extra in the lock file equals the reviewed list.
   Adding a dependency turns the suite red until a line describing its network behaviour is written.
   (FR-036)
@@ -1339,7 +1400,8 @@ walking the response types rather than by holding a list of union names.
 - **SC-019**: Every answer response carries a manifest, and no code path returns one without.
   (FR-044)
 - **SC-020**: A given window reaching outside a series' declared coverage refuses by name in 100% of
-  cases and returns zero observations; no window ever returns a truncated result. An omitted window
+  cases, in a body that also carries whatever part of the window the series does cover; no window
+  ever returns a short body with nothing saying it is short. An omitted window
   returns every declared observation, and the coverage a client would need to construct a window is
   on the list read of the same category. (FR-045, FR-045a, FR-046)
 - **SC-021**: Every observation in a series response carries its own provenance, and a series in
@@ -1361,17 +1423,34 @@ walking the response types rather than by holding a list of union names.
 - **SC-023b**: `uv run pytest` passes with no container built and no Docker daemon running; the
   compose-file and Dockerfile checks parse those files as text. (FR-035)
 - **SC-024**: No module under `terezy.api.http` constructs a `Money` or calls a combining function,
-  outside the single display module FR-021 to FR-025 name. Asserted by a scan. (FR-003)
+  anywhere: the display module the draft carved out is not in this feature. Asserted by a scan.
+  (FR-003)
 - **SC-025**: `docs/METHODOLOGY.md` gains nothing from this feature, and that is checked rather than
-  assumed: this feature introduces no formula. If the display conversion lands under clarification 1
-  option A, it introduces exactly one, and it is documented in the same change.
+  assumed: this feature introduces no formula. The one it would have introduced was the display
+  conversion, which the owner deferred.
 - **SC-026**: `docs/REQUIRED_TESTS.md` rows are flipped only for what this feature closes — see
-  below. F1, F3 and F4 stay open, and F2 is flipped only if clarification 1 resolved to option A.
+  below. F1, F2, F3 and F4 all stay open: the switch F2 needs is deferred.
   (FR-051)
 - **SC-026a**: No endpoint accepts a question built from request parameters; the only answer route
   names a declared question id. Asserted as an absence over the route table, so that FR-043's
   deferral is measured rather than merely stated — an out-of-scope requirement that nothing checks is
   the shape by which scope creeps back in. (FR-043)
+- **SC-027**: Every record read carries the ordered field descriptors of the record it returned,
+  and the descriptor set equals the record's own fields — swept in both directions, so a descriptor
+  can neither omit a field nor name one the body does not carry. No descriptor carries a label.
+  (FR-052)
+- **SC-028**: Every record read states its declaring file relative to the data root, and the
+  categories that cannot are exactly the set the test pins, each carrying a typed absence with its
+  reason. (FR-053)
+- **SC-029**: Every category's citation verdict equals `scripts/check_provenance.py`'s own lists,
+  and every exempt one is served with that script's recorded reason. Moving a directory between the
+  two lists turns the suite red. (FR-054)
+- **SC-030**: With no `web/dist` present the application registers no static route and every test
+  passes; with a directory present, a request for an unknown path under it returns the fallback
+  document and a request for a known asset returns it. **With the fallback mounted, an unknown
+  path beneath `/api` still returns a JSON refusal and never `200 text/html`.** (FR-055)
+- **SC-031**: Every path in the committed OpenAPI document begins with `/api`, and the prefix is
+  one constant in the module rather than a string repeated per route. (FR-056)
 
 ---
 
@@ -1380,9 +1459,9 @@ walking the response types rather than by holding a list of union names.
 | Row | What this feature does to it |
 |---|---|
 | **F1** | *A position flat in USD across a devaluation produces a positive taxable gain in UAH.* **Unmoved, and not approached.** The row's own note records that what is still missing is the *position* — a per-lot basis carried in both currencies with each leg struck at its own date's rate — which is a core capability, tracked as `fx-tax-asymmetry-f1`. A serialisation layer cannot supply it and this feature does not try; naming the row here is what stops a reader inferring that a display switch and an FX tax asymmetry are the same subject. |
-| **F2** | *Switching display currency changes no realised amount, no tax figure, and no after-tax UAH ranking.* The row's own note records that the tax half was established **before** the switch existed, deliberately, *"so the row cannot be closed later by a feature that never checked it"*, and that the realised-amount and ranking halves *"need the switch"*. This is the switch. **Closable under clarification 1 option A only**, and FR-051 forbids the flip otherwise: under option B the byte-identity assertion holds because nothing is converted, and a green test over a switch that does nothing is what the row's note was written to prevent. |
-| **F3** | *Historical series convert at per-date rates, never at today's rate.* Untouched under option B. Under option A it is **pressed and not closed**: a channel's `reference_rate` is a single declared value, not a per-date series, so a display conversion of a dated chart would still be one rate applied across dates — which is precisely what F3 forbids. Option A therefore does not license converting a series. |
-| **F4** | *The real-terms view uses UA CPI in the UAH display and US CPI in the USD display.* Unmoved. The row needs a US CPI series and none is declared. 007's own obligation to it is discharged structurally; this feature adds a display switch and no second deflator. |
+| **F2** | *Switching display currency changes no realised amount, no tax figure, and no after-tax UAH ranking.* The row's own note records that the tax half was established **before** the switch existed, deliberately, *"so the row cannot be closed later by a feature that never checked it"*, and that the realised-amount and ranking halves *"need the switch"*. This is the switch. This is the switch — and it is **deferred** (owner, 2026-09-03), so the row **stays open** and FR-051 forbids the flip. |
+| **F3** | *Historical series convert at per-date rates, never at today's rate.* **Untouched.** Nothing in this feature converts anything. The observation about a channel's `reference_rate` being a single declared value rather than a per-date series is what the deferred switch would have had to answer, and it travels with the `display-currency-switch` future entry. |
+| **F4** | *The real-terms view uses UA CPI in the UAH display and US CPI in the USD display.* Unmoved. The row needs a US CPI series and none is declared. 007's own obligation to it is discharged structurally; this feature adds no display switch and no second deflator. |
 | **H2** | Reinforced, not re-derived: a malformed declaration reaches an HTTP caller naming the file and the field, on the existing loader path. The row's own test stays `tests/contract/test_declaration_loading.py`. |
 | **H3** | Untouched, and worth naming for the same reason 010 named it: this feature widens what a run *reads* only in the sense of reading it aloud. It adds no input the manifest does not already record. |
 | **H4** | Reinforced: a new layer arrives and the boundary contract grows rather than bends. FR-002 adds a contract; it loosens none. |
@@ -1420,10 +1499,16 @@ walking the response types rather than by holding a list of union names.
   approach it. What it does is keep the gate's condition from being reached by any supported path —
   FR-026 to FR-030, whose reach FR-029 tables exactly and whose limits FR-027b states rather than
   dressing up as impossibility.
-- **The web client.** Feature 021. What passes between them is FR-032's contract and nothing else.
+- **The web client.** Feature 021. What passes between them is FR-032's contract, the four
+  obligations under "What a generic client needs", and nothing else. Serving its *built output* is
+  not the same thing as building it: FR-055 is a mount that is inert until 021's image puts a
+  directory there.
 - **Ad-hoc questions over HTTP.** FR-043, recorded as a future entry.
 - **Triggering a fetcher.** The scripts under `scripts/` stay commands a person runs and reads the
   diff of. An HTTP endpoint that fetched would be a network call from a service whose dependency
   list says it makes none.
 - **Serving `data/observations/`.** FR-048.
+- **The display-currency switch.** Deferred by the owner on 2026-09-03; FR-021 to FR-025 are kept
+  above under their own heading as the record, and `display-currency-switch` in `specs/features.toml`
+  is what carries them.
 - **A second display deflator.** `REQUIRED_TESTS` F4.

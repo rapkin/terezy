@@ -143,10 +143,10 @@ note   = "ALL FOUR CLARIFICATIONS ANSWERED 2026-09-03, so planning may start; th
 
 [[feature]]
 id     = "020-http-api"
-status = "drafted"
+status = "in-progress"
 needs  = ["007-cpi-real-terms", "008-seed-and-goals", "009-tax-depth", "011-official-rate", "012-fop-group-3", "015-the-question", "017-working-day-calendar", "018-nbu-rate-series"]
 why    = "one endpoint per declaration category, so every feature that OWNS a category must exist before there is a response type to write: 007 CPI, 008 seeds and goals, 009 tax timing, 011 official rates, 012 schemes and destinations, 017 calendars. 015 brings the answer endpoint; 018 makes a windowed series read testable against data rather than an empty file. All eight are done, so this blocks nothing -- the list is long because the surface is wide."
-note   = "Lifts D-B (owner decision 2026-09-03, specs/decisions/2026-09-03-web-stack.toml lands with 021). THREE CLARIFICATIONS OPEN, each shipping a stated default until answered, so the stack bootstrap may start (owner instruction 2026-09-03). The load-bearing measurement: 314 frozen core records carry no kind tag and ten groups share an identical field set -- OneWayCost and RoundTripCost among them, whose separation Principle VI requires and mypy currently supplies. Serialisation is where that guard is lost."
+note   = "Lifts D-B (owner decision 2026-09-03, specs/decisions/2026-09-03-web-stack.toml lands with 021). ALL THREE CLARIFICATIONS ANSWERED 2026-09-03 (specs/decisions/2026-09-03-clarify-020.toml) and written into the requirements they govern; do not restate them here. The first defers the display switch ENTIRELY -- no parameter, no block, no conversion -- which is wider than the standing behaviour the draft shipped, so REQUIRED_TESTS F2 stays open and the three options travel on the display-currency-switch future entry below. The load-bearing measurement: 314 frozen core records carry no kind tag and ten groups share an identical field set -- OneWayCost and RoundTripCost among them, whose separation Principle VI requires and mypy currently supplies. Serialisation is where that guard is lost."
 
 [[feature]]
 id     = "021-web-declared-data"
@@ -154,6 +154,21 @@ status = "planned"
 needs  = ["020-http-api"]
 why    = "the client generates its types from 020's checked-in OpenAPI document and reads nothing else; every figure, mark and refusal on screen is one of 020's responses, and OB-1 to OB-8 in the spec are the obligations it must satisfy -- OB-9 was withdrawn with the display switch"
 note   = "The first surface on which a mark and a refusal have to survive being looked at, built while the only thing on it is declared data -- which is the cheapest place to get that wrong and find out. Read-only by design: no editing, no fetchers, no answer or compare screens. Lifts owner decision D-B together with 020; the constitution amendment (1.4.0) landed with this spec. Owner decision 2026-09-03 (specs/decisions/2026-09-03-web-stack.toml) let planning start while the three clarifications were open, on the ground that each stated its own blast radius; they then closed the same day. CLARIFIED 2026-09-03 (specs/decisions/2026-09-03-clarify-021.toml): English only; the owner's own declarations are shown, each labelled as his statement rather than as an observation; and the display-currency selector question is MOOT rather than answered -- the owner deferred the display switch entirely, so 021 builds no selector, no `display` search parameter and no display scenario. 020's matching withdrawal of its own `display` request parameter (its FR-021 to FR-025) is OWED AND NOT YET MADE, and is the first thing to settle before 021's implementation starts. Those requirements are MOVED, not deleted, to the spec's Deferred by owner decision section, and the [[future]] entry tracking them is drafted in the Appendix and lands with the implementation."
+
+[[future]]
+id    = "display-currency-switch"
+after = ["020-http-api"]
+note  = "The display role of constitution Principle VI has no machinery, and 020 was where it was offered and declined («відкладемо перемикач курсів поки», owner 2026-09-03, specs/decisions/2026-09-03-clarify-020.toml). **The three options and their consequences are in specs/020-http-api/spec.md under 'Display currency — deferred by owner decision' and under 'Answered 1'; do not restate them here.** What the deferral costs is one row: REQUIRED_TESTS F2 stays open, and its own note says why it cannot be closed by a feature that never checked it -- so the row is now waiting on this entry rather than on 020. What the deferral buys is that no invented rate reaches a rendered figure: all three declared channels carry `reference_rate = 42.0` sourced *SYNTHETIC FIXTURE -- invented reference rate*, so the first display this repository ever shows would have shown every converted amount marked unverified. FR-021 to FR-025 are written and reviewed; the work is building them, not deciding them."
+
+[[future]]
+id    = "http-question-from-request-parameters"
+after = ["020-http-api"]
+note  = "020 FR-043 keeps the HTTP equivalent of the CLI's `--set` out of the API: the answer endpoint names a DECLARED question id and nothing else. The reason is 015 FR-004's -- in an artefact under review an unknown stream is a typo -- and `answer_declared`'s own docstring records that two of the four cross-file checks are UNREACHABLE through the record-taking entry point. An ad-hoc HTTP question needs those two refusals to be reachable, which is a change to the verb's contract rather than a serialisation concern. 020 SC-026a asserts the absence over the route table, so the deferral is measured rather than merely stated."
+
+[[future]]
+id    = "a-reason-on-every-refusal"
+after = ["020-http-api"]
+note  = "Measured 2026-09-03 by flattening the refusal families this repository names and reading `dataclasses.fields`: 51 refusal records, 42 carry `reason: str`, 9 do not. Eight are the whole of `Answer`'s own `Refused` union and the ninth is `BenchmarkYieldsNoCandidate`, a refusal arm of `SectionOutcome` -- which is why 020's test DISCOVERS them by walking the response types rather than enumerating the unions, an audit that enumerates unions finds eight. 020 ships the schema marking `reason` optional (owner, 2026-09-03, answer 3), so a client narrows on the tag. Closing it is nine sentences nobody has written plus what the CLI prints, and it belongs to a feature about the answer's vocabulary rather than to one about serialising it."
 
 # Named future work — seams already recorded inside landed specs, not yet features.
 

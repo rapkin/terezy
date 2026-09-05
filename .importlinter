@@ -116,3 +116,29 @@ source_modules =
 forbidden_modules =
     terezy.core.routes.channels
 allow_indirect_imports = True
+
+; --- feature 020: the delivery framework lives in exactly one module tree ------------------
+;
+; `core-independent-of-frameworks` above keeps the framework out of the core. This keeps it out
+; of everything else that is not the HTTP surface -- including `terezy.api.answer`, which is
+; orchestration the CLI shares and which a below-only contract says nothing about. `pydantic` is
+; deliberately absent: the data layer already imports it at the load boundary, which is where the
+; constitution says validation belongs.
+;
+; Two modules this cannot reach -- `src/terezy/__init__.py` and `src/terezy/api/__init__.py` --
+; are covered by a source scan, and a completeness check asserts the union reaches every module
+; under `src/terezy/`: tests/contract/test_the_framework_stays_in_one_module.py.
+
+[importlinter:contract:frameworks-only-in-the-http-module]
+name = FR-002 — fastapi, starlette and uvicorn appear only under terezy.api.http
+type = forbidden
+source_modules =
+    terezy.data
+    terezy.cli
+    terezy.api.answer
+    terezy.api.diagrams
+forbidden_modules =
+    fastapi
+    starlette
+    uvicorn
+allow_indirect_imports = False

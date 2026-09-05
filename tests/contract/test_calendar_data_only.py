@@ -194,7 +194,16 @@ def test_nothing_outside_the_declaration_layer_imports_the_calendar() -> None:
     allowed = {
         "data/declarations/loader.py",
         "data/declarations/resolver.py",
+        # 020 serves the declared calendars as a read-only category: it names the record type
+        # and calls nothing. Serialising a declaration is not consuming it, and the assertion
+        # below is what keeps the two apart.
+        "api/http/categories.py",
     }
+    assert not [
+        name
+        for name in ("classify", "is_working_day")
+        if name in (SRC / "api" / "http" / "categories.py").read_text(encoding="utf-8")
+    ], "the HTTP layer names a calendar function, which is consuming rather than serving"
     importing = {
         path.relative_to(SRC).as_posix()
         for path in sorted(SRC.rglob("*.py"))

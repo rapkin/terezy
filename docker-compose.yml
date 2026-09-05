@@ -1,0 +1,28 @@
+# The shipped way to run terezy (020 FR-032). One service today; feature 021 adds a `web`
+# service under a dev profile to this same `services:` mapping without touching this one.
+#
+# The published port is the guarantee that holds here. Inside a container every client address
+# is the bridge, so the per-request loopback check is relaxed (FR-027) and what keeps the
+# service off the network is `127.0.0.1:` on the publication below -- a bare `8000:8000` would
+# publish on every interface, and tests/contract/test_the_shipped_compose_file.py turns red on
+# the edit that writes one (FR-028, FR-029 row 4).
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: terezy-api
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      # Read-only by mount rather than by intention: a read-only API whose data directory is
+      # writable is only as read-only as its code (FR-033).
+      - ./data:/data:ro
+    environment:
+      TEREZY_DATA_ROOT: /data
+      # A claim the process verifies before honouring: with no container marker present the
+      # entry point refuses rather than binding (FR-027a).
+      TEREZY_BIND_CONTEXT: container-published-to-loopback
+    command: ["--host", "0.0.0.0", "--port", "8000"]
+    restart: unless-stopped
