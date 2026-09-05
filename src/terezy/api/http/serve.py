@@ -7,8 +7,7 @@ this, which is why :func:`terezy.api.http.middleware.loopback_guard` exists.
 
 ``--host`` and ``--port`` are the only options. FR-030 forbids a second input that lets a
 refused address through, and ``tests/unit/test_the_bind_context_is_closed.py`` scans this module
-for one rather than trusting a sentence -- which is also what holds the second variable read
-here, the data root, to a question about *what is served* rather than about *where*.
+for one rather than trusting a sentence.
 """
 
 from __future__ import annotations

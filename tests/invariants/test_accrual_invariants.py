@@ -10,9 +10,10 @@ everywhere between them:
 * **Accrual grows inside a period and resets at each coupon date.** ``accrued(c_i) == 0``, and
   ``accrued`` is non-decreasing on ``[c_i, c_i+1)``. A period boundary is where a coupon
   detaches, so the drop is the reset rather than a subtraction standing beside it.
-* **It is bounded by the coupon that ends the period**: ``0 <= accrued(t) < C``. The bound is
-  strict at the top because the interval is half-open -- the day the coupon is worth its whole
-  amount is the day it detaches, and that day opens the next period at zero.
+* **It is bounded by the coupon that ends the period**: ``0 <= accrued(t) <= C``, strict at the
+  top for the actual-day conventions because the interval is half-open -- the day the coupon is
+  worth its whole amount is the day it detaches, and that day opens the next period at zero.
+  Not strict under 30/360; :func:`_within_its_coupon` carries the counterexample.
 
 Nothing here invents a tolerance; ``is_close`` from ``primitives.tolerance`` is imported.
 """
@@ -21,6 +22,7 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 from itertools import pairwise
+from typing import Final
 
 import pytest
 from hypothesis import assume, given
@@ -52,6 +54,10 @@ DECLARED = prov.of(
 """A generated schedule is not a citation of anything, but it must carry *some* mark: an
 amount built with empty provenance would let this suite pass while the propagation it is
 checking had been dropped."""
+
+THIRTY_360: Final = "30/360"
+"""The one convention whose upper bound is not strict. Asserted to be a declared name, so a
+rename of the convention leaves this module red rather than quietly exempting nothing."""
 
 day_counts = st.sampled_from(sorted(DAY_COUNT_FNS))
 amounts = st.floats(min_value=0.01, max_value=500.0, allow_nan=False, allow_infinity=False)
@@ -159,10 +165,35 @@ def test_the_accrual_is_non_decreasing_inside_a_period_and_bounded_by_its_coupon
     at_earlier = _accrued(earlier, coupons, day_count).amount
     at_later = _accrued(later, coupons, day_count).amount
     coupon = coupons[0][1].amount
-    assert 0.0 <= at_earlier < coupon
-    assert 0.0 <= at_later < coupon
+    assert _within_its_coupon(at_earlier, coupon, day_count), (earlier, at_earlier, coupon)
+    assert _within_its_coupon(at_later, coupon, day_count), (later, at_later, coupon)
     if _period_of(earlier, coupons) == _period_of(later, coupons):
         assert at_later >= at_earlier - TOLERANCE
+
+
+def _within_its_coupon(accrued: float, coupon: float, day_count: str) -> bool:
+    """Whether an accrual is inside the coupon that ends its period, on this convention.
+
+    Strict for the actual-day conventions. **Not strict for 30/360**, where the last day of a
+    long month is only pulled back to the 30th when the period *started* on a 30th or 31st
+    (ISDA 2006 Definitions section 4.16(f), "30/360" / Bond Basis: D1 = 30 if D1 = 31; D2 = 30
+    only if D2 = 31 and D1 is 30 or 31). So 2020-07-01 -> 2021-01-31 and 2020-07-01 ->
+    2021-02-01 both count 360 - 180 + 30 = 210 days, and the accrual on the 31st is the whole
+    coupon a day before it detaches. `tests/worked_examples/test_day_count.py` works that pair
+    out on the calendar; widening the bound for the other two conventions would let a real
+    off-by-one period through.
+    """
+    if accrued < 0.0:
+        return False
+    if day_count == THIRTY_360:
+        return accrued <= coupon + TOLERANCE
+    return accrued < coupon
+
+
+def test_the_convention_exempted_from_the_strict_bound_is_one_the_engine_declares() -> None:
+    """The bound is widened for one name; a rename that left it matching nothing would make the
+    widening vacuous rather than red."""
+    assert THIRTY_360 in DAY_COUNT_FNS
 
 
 def _period_of(on: date, coupons: tuple[tuple[date, Money], ...]) -> int:

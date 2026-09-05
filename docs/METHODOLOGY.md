@@ -332,6 +332,14 @@ start while August's 31st is counted in full at the end.
 *Worked, leap year invisible:* 2024-01-15 → 2025-01-15 is `360 × 1 = 360`, so exactly 1.0
 despite 2024 having 366 days.
 
+**A consequence worth stating, because it looks like an off-by-one.** When the rule does not
+fire, a period ending on a 31st counts the same as one ending the next day: 2020-07-01 →
+2021-01-31 and 2020-07-01 → 2021-02-01 are both `360 − 180 + 30 = 210` and `360 − 150 + 0 =
+210`. A coupon period ending 2021-02-01 is therefore **fully accrued on 2021-01-31**, a day
+before it detaches. That is the convention, not a boundary error, and it is why the accrual's
+upper bound is `≤ C` on this basis and `< C` on the other two
+(`tests/invariants/test_accrual_invariants.py`).
+
 ### 2.4 Why the difference matters
 
 Issue A (`act/365`, semiannual) pays **four different-sized coupons** — 768.63, 781.37,

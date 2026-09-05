@@ -1,9 +1,5 @@
 """Where declarations are read from -- decided once at startup, never defaulted to the cwd.
 
-A sibling of :mod:`terezy.api.http.bind` in shape and for the same reason: the decision is a
-typed result taken over arguments, so the entry point can refuse in one line before it binds and
-the per-request path can rely on a root that was already checked.
-
 The default used to be ``Path("data")``, which is relative to whatever directory the process was
 started in. Started anywhere but the repository root the service came up healthy and answered
 500 on every endpoint, including the one serving the client's own index -- a degraded outcome
@@ -24,11 +20,7 @@ from terezy.data.declarations import resolver
 DATA_ROOT_VARIABLE: Final[str] = "TEREZY_DATA_ROOT"
 
 SOURCE_DIRECTORY: Final[str] = "src"
-"""The layout marker that says this package was imported from a checkout rather than installed.
-
-``terezy`` sits at ``<checkout>/src/terezy``, so a parent named this is what distinguishes the
-two -- and only in the first case is there a ``data/`` to fall back on.
-"""
+"""The layout marker that says this package was imported from a checkout rather than installed."""
 
 
 @dataclass(frozen=True)
@@ -36,14 +28,12 @@ class DataRootFound:
     """A directory declaring the venues every other declaration is checked against."""
 
     path: Path
-    reason: str
 
 
 @dataclass(frozen=True)
 class DataRootMissing:
     """No root to read, named with the path that was tried and the variable that overrides it."""
 
-    path: Path | None
     reason: str
 
 
@@ -72,12 +62,11 @@ def data_root_in_force(
         return _checked(Path(declared), named_by=f"{DATA_ROOT_VARIABLE}={declared}")
     if packaged is None:
         return DataRootMissing(
-            path=None,
             reason=(
                 f"no data root: {DATA_ROOT_VARIABLE} is unset and terezy is installed outside a "
                 f"checkout, so there is no {resolver.VENUES_FILE} to fall back on. Set "
                 f"{DATA_ROOT_VARIABLE} to the directory holding it."
-            ),
+            )
         )
     return _checked(packaged, named_by="the checkout this package was imported from")
 
@@ -89,13 +78,11 @@ def _checked(path: Path, *, named_by: str) -> DataRootFound | DataRootMissing:
     something else both pass an existence check, and every route resolves through the venues, so
     a root without one answers nothing.
     """
-    marker = path / resolver.VENUES_FILE
-    if not marker.is_file():
+    if not (path / resolver.VENUES_FILE).is_file():
         return DataRootMissing(
-            path=path,
             reason=(
                 f"the data root {path} ({named_by}) holds no {resolver.VENUES_FILE}, so nothing "
                 f"is declared to read. Point {DATA_ROOT_VARIABLE} at the directory that holds it."
-            ),
+            )
         )
-    return DataRootFound(path=path, reason=f"declarations are read from {path} ({named_by})")
+    return DataRootFound(path=path)
