@@ -20,6 +20,7 @@ import pytest
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
+from terezy.core.primitives.tolerance import assert_money_close
 from terezy.core.results.dominance import (
     BandInAnotherCurrency,
     NoQuestionAmountInTheCurrencyCompared,
@@ -36,8 +37,8 @@ def test_the_width_is_the_fraction_of_the_amount_the_question_states() -> None:
     band = result.resolved_bands[0]
     assert band.criterion is Criterion.MONEY_AT_THE_ENDPOINT
     assert band.currency is Currency.UAH
-    assert band.from_amount.amount == pytest.approx(50_000.0)
-    assert band.width.amount == pytest.approx(5.0)
+    assert_money_close(band.from_amount, Money(50_000.0, Currency.UAH, prov.EMPTY))
+    assert_money_close(band.width, Money(5.0, Currency.UAH, prov.EMPTY))
 
 
 def test_the_token_dollar_amount_resolves_to_nothing_because_no_pair_is_in_dollars() -> None:
@@ -70,7 +71,7 @@ def test_a_currency_two_candidates_deliver_resolves_a_width_of_its_own() -> None
     result = sections.result(planted, amounts=sections.question_amounts(usd=200.0))
     by_currency = {band.currency: band for band in result.resolved_bands}
     assert set(by_currency) == {Currency.UAH, Currency.USD}
-    assert by_currency[Currency.USD].width.amount == pytest.approx(0.02)
+    assert_money_close(by_currency[Currency.USD].width, Money(0.02, Currency.USD, prov.EMPTY))
 
 
 def test_no_amount_in_the_currency_compared_is_a_refusal_naming_the_criterion() -> None:

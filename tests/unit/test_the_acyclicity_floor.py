@@ -21,11 +21,12 @@ from typing import Final
 
 import pytest
 
+from terezy.core.decision.answer import section_evaluated
 from terezy.core.decision.dominance import relates
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
-from terezy.core.primitives.tolerance import TOLERANCE, slack
+from terezy.core.primitives.tolerance import TOLERANCE, assert_money_close, slack
 from terezy.core.results.dominance import (
     BandBelowTheAcyclicityFloor,
     DominanceResult,
@@ -106,9 +107,9 @@ def test_the_shipped_band_clears_the_floor_by_orders_of_magnitude() -> None:
     section = sections.section()
     result = sections.result(section)
     assert isinstance(result, DominanceResult)
-    width = result.resolved_bands[0].width.amount
-    assert width == pytest.approx(5.0)
-    assert width > slack(50_000.0, 50_000.0) * (len(result.objectives.objectives) - 1)
+    width = result.resolved_bands[0].width
+    assert_money_close(width, _uah(5.0))
+    assert width.amount > slack(50_000.0, 50_000.0) * (len(result.objectives.objectives) - 1)
 
 
 def test_a_band_below_the_floor_produces_the_refusal_and_no_set() -> None:
@@ -129,7 +130,8 @@ def test_a_band_below_the_floor_produces_the_refusal_and_no_set() -> None:
     assert isinstance(refusal, BandBelowTheAcyclicityFloor)
     assert refusal.criterion is Criterion.MONEY_AT_THE_ENDPOINT
     assert refusal.objective_count == 2
-    assert refusal.slack == pytest.approx(slack(50_529.0, 50_529.0), rel=1e-3)
+    largest = max(item.reaches.amount for item in section_evaluated(sections.section()))
+    assert refusal.slack == slack(largest, -largest)
     assert refusal.resolved == _uah(1e-8)
 
 
@@ -153,8 +155,7 @@ def test_the_refusal_names_the_width_a_fraction_resolved_to() -> None:
     refusal = sections.run(sections.section(), declared=tiny)
     assert isinstance(refusal, BandBelowTheAcyclicityFloor)
     assert isinstance(refusal.declared, FractionOfTheQuestionAmount)
-    assert refusal.resolved is not None
-    assert refusal.resolved.amount == pytest.approx(1e-13 * 50_000.0)
+    assert_money_close(refusal.resolved, _uah(1e-13 * 50_000.0))
 
 
 def test_no_floor_is_checked_on_a_date_objective() -> None:

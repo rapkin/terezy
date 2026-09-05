@@ -21,7 +21,11 @@ from pathlib import Path
 
 import pytest
 
+from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
+from terezy.core.primitives.money import Money
+from terezy.core.primitives.tolerance import assert_money_close
+from terezy.core.results.objectives import AbsoluteBand
 from terezy.data.declarations import loader, resolver
 from terezy.data.declarations.errors import DeclarationError
 
@@ -242,7 +246,8 @@ class TestTheBandIsOneShapeAndAWidth:
             )
         )
         band = declared.objectives[0].band
-        assert getattr(band, "amount").amount == pytest.approx(5.0)  # noqa: B009
+        assert isinstance(band, AbsoluteBand)
+        assert_money_close(band.amount, Money(5.0, Currency.UAH, prov.EMPTY))
 
 
 class TestTheFileShapeItself:

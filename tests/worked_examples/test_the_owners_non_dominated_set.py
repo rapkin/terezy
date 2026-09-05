@@ -19,7 +19,9 @@ from __future__ import annotations
 import pytest
 
 from terezy.core.decision.answer import section_evaluated, section_ranking
+from terezy.core.primitives.tolerance import is_close
 from terezy.core.results.dominance import DominanceResult
+from terezy.core.results.objectives import FractionOfTheQuestionAmount
 from tests import answer_registries as fixtures
 from tests import dominance_sections as sections
 
@@ -111,6 +113,6 @@ def test_the_band_he_declared_is_what_the_section_resolved(index: int) -> None:
     result = _shipped(index)
     assert len(result.resolved_bands) == 1
     band = result.resolved_bands[0]
-    assert band.width.amount == pytest.approx(
-        band.from_amount.amount * result.objectives.objectives[0].band.proportion  # type: ignore[union-attr]
-    )
+    declared = result.objectives.objectives[0].band
+    assert isinstance(declared, FractionOfTheQuestionAmount)
+    assert is_close(band.width.amount, band.from_amount.amount * declared.proportion)

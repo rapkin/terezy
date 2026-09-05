@@ -18,6 +18,7 @@ from pathlib import Path
 
 import pytest
 
+from terezy.core.primitives.tolerance import is_close
 from terezy.core.results.objectives import (
     Criterion,
     DaysBand,
@@ -58,9 +59,9 @@ def test_the_shipped_set_holds_his_two_criteria_in_his_two_directions() -> None:
 def test_the_money_band_is_the_fraction_he_answered_and_not_the_percent_figure() -> None:
     band = loader.objectives_from_file(SHIPPED).objectives[0].band
     assert isinstance(band, FractionOfTheQuestionAmount)
-    assert band.proportion == pytest.approx(AS_A_FRACTION)
-    assert band.proportion == pytest.approx(0.0001)
-    assert band.proportion * HIS_AMOUNT == pytest.approx(RESOLVES_TO)
+    assert is_close(band.proportion, AS_A_FRACTION)
+    assert is_close(band.proportion, 0.0001)
+    assert is_close(band.proportion * HIS_AMOUNT, RESOLVES_TO)
 
 
 def test_the_date_band_is_seven_days() -> None:

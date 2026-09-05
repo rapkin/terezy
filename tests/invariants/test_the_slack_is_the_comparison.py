@@ -10,8 +10,6 @@ and ``abs(left - right)`` part company on non-finite inputs (research D3).
 
 from __future__ import annotations
 
-import math
-
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
@@ -50,5 +48,5 @@ def test_the_width_is_the_relative_bound_where_the_figures_are_large() -> None:
     On 50 000 UAH the width is ``1e-9 * 50000 = 5e-5`` -- five hundredths of a kopiyka, and
     five orders of magnitude above the constant an implementer would otherwise write.
     """
-    assert slack(50_000.0, 49_999.0) == pytest.approx(5e-5, rel=1e-12)
-    assert math.isclose(slack(0.5, -0.25), TOLERANCE)
+    assert slack(50_000.0, 49_999.0) == TOLERANCE * 50_000.0
+    assert slack(0.5, -0.25) == TOLERANCE
