@@ -17,8 +17,12 @@ import dataclasses
 from dataclasses import dataclass
 from datetime import date
 from enum import Enum
+from typing import TYPE_CHECKING, Final
 
 from terezy.api.http import shapes
+
+if TYPE_CHECKING:  # pragma: no cover -- typing only
+    from collections.abc import Iterable, Mapping
 
 _MODULE = __name__
 
@@ -114,6 +118,64 @@ class FileNotRecorded:
 
     category: str
     reason: str
+
+
+@dataclass(frozen=True, slots=True)
+class ParameterMalformed:
+    """One request parameter the route could not read, as the validator reported it.
+
+    ``location`` verbatim rather than a name lifted out of it: which parameter and where it was
+    looked for are one fact, and splitting them would let a query parameter and a path parameter
+    of the same name arrive indistinguishable.
+    """
+
+    location: tuple[str, ...]
+    given: str | None
+    problem: str
+
+
+@dataclass(frozen=True, slots=True)
+class RequestMalformed:
+    """A well-formed request whose parameters could not be read, as a tagged body.
+
+    The framework's own validation body carries no tag, so a client generated from the document
+    has nothing to narrow on and 021 FR-004's exhaustive switch cannot reach it -- the same
+    prohibition 020 FR-016 puts on a refusal expressed by a status code alone. Every reported
+    parameter is carried: one alone would send a caller round the loop once per fault.
+    """
+
+    parameters: tuple[ParameterMalformed, ...]
+    reason: str
+
+
+MALFORMED_REASON: Final[str] = (
+    "a parameter of this request could not be read. No default is substituted for one that is "
+    "missing or malformed: a read as of a date nobody asked for answers a question nobody asked."
+)
+
+
+def malformed_from(reported: Iterable[Mapping[str, object]]) -> RequestMalformed:
+    """The validator's own findings as a refusal record, with nothing added and nothing dropped.
+
+    ``input`` is absent from the request rather than the string ``"None"`` when it is ``None``: a
+    query parameter is either a string or not there, and the two are what a caller has to tell
+    apart to fix the URL.
+    """
+    return RequestMalformed(
+        parameters=tuple(
+            ParameterMalformed(
+                location=tuple(str(part) for part in _sequence(fault.get("loc"))),
+                given=None if (given := fault.get("input")) is None else str(given),
+                problem=str(fault.get("msg", "")),
+            )
+            for fault in reported
+        ),
+        reason=MALFORMED_REASON,
+    )
+
+
+def _sequence(location: object) -> tuple[object, ...]:
+    return tuple(location) if isinstance(location, tuple | list) else ()
 
 
 class FieldKind(Enum):

@@ -8,13 +8,27 @@
  * `not-json` is a state of its own rather than a parse failure folded into `unreachable`: a path
  * the API does not serve is answered by the SPA fallback with an HTML document, and reporting
  * that as a transport failure would name a healthy API as down (FR-006).
+ *
+ * `not-answered` is the other half of that: a server error whose body is not this API's is
+ * nothing this API produced -- every one of its own outcomes is a tagged JSON body, down to the
+ * refusals that never reach a route. In development it is the dev server's proxy reporting that
+ * it could not reach the API at all, which is a different thing to tell the reader than a 500.
  */
 export type Answered =
   | { readonly tag: "body"; readonly status: number; readonly body: unknown }
   | { readonly tag: "unreachable"; readonly detail: string }
-  | { readonly tag: "not-json"; readonly status: number; readonly contentType: string | null };
+  | { readonly tag: "not-json"; readonly status: number; readonly contentType: string | null }
+  | { readonly tag: "not-answered"; readonly status: number; readonly contentType: string | null };
 
 export const API_PREFIX = "/api";
+
+/**
+ * How the reader starts the service the page is a client of.
+ *
+ * Here rather than in the component, so the dev server's own banner and the two states that
+ * name it cannot come to say different things.
+ */
+export const START_COMMAND = "uv run python -m terezy.api.http";
 
 export function url(path: string, search: Readonly<Record<string, string>>): string {
   const query = new URLSearchParams(search).toString();
@@ -33,7 +47,8 @@ export async function request(
   }
   const contentType = answer.headers.get("content-type");
   if (contentType === null || !contentType.includes("json")) {
-    return { tag: "not-json", status: answer.status, contentType };
+    const tag = answer.status >= 500 ? "not-answered" : "not-json";
+    return { tag, status: answer.status, contentType };
   }
   try {
     return { tag: "body", status: answer.status, body: await answer.json() };

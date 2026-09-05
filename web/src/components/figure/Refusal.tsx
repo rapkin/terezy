@@ -40,6 +40,18 @@ function RefusalDetail({ refusal }: { refusal: RefusalValue }) {
           {refusal.declared_ids.join(", ")}
         </Detail>
       );
+    case "envelopes.RequestMalformed":
+      return (
+        <ul className="mt-1 ml-4 list-disc text-xs">
+          {refusal.parameters.map((parameter) => (
+            <li key={parameter.location.join(".")} data-parameter={parameter.location.join(".")}>
+              {parameter.location.join(" → ")} was{" "}
+              {parameter.given === null ? "not given" : `given as ${parameter.given}`}:{" "}
+              {parameter.problem}
+            </li>
+          ))}
+        </ul>
+      );
     case "envelopes.NothingDeclared":
       return <Detail>nothing under {refusal.category} declares a document</Detail>;
     case "envelopes.FileNotRecorded":

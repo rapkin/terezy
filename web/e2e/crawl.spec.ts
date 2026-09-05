@@ -1,0 +1,84 @@
+import { expect, test } from "@playwright/test";
+import { AS_OF, offline } from "./offline";
+import { SERIES } from "../src/routes/series-map";
+
+/**
+ * The regression net for the whole class of "several odd things": every screen the client can
+ * reach over the shipped `data/`, driven once, failing on anything the reader would see as
+ * broken rather than on one shape somebody thought to assert.
+ *
+ * What it watches for is exactly what a reader reports and no existing test catches together: a
+ * console error, a request the page made that answered 4xx or 5xx, a main region with nothing in
+ * it, a spinner still spinning when the network went quiet, and a figure slot rendered empty
+ * where the API sent a value, a mark or a refusal (FR-006, FR-007, FR-008).
+ */
+
+/** The whole crawl is one test because the browser and the API are the expensive part. */
+test.describe.configure({ timeout: 900_000 });
+
+const RECORDS_PER_LARGE_CATEGORY = 3;
+const LARGE = 30;
+
+type Fault = { readonly where: string; readonly what: string };
+
+test("every screen the client reaches renders without an error, a 4xx, or an empty slot", async ({
+  page,
+}) => {
+  await offline(page);
+  const faults: Fault[] = [];
+  let where = "before the first page";
+
+  page.on("console", (message) => {
+    if (message.type() === "error") faults.push({ where, what: `console: ${message.text()}` });
+  });
+  page.on("pageerror", (error) => {
+    faults.push({ where, what: `uncaught: ${error.message}` });
+  });
+  page.on("response", (answer) => {
+    if (answer.status() >= 400) {
+      faults.push({ where, what: `${String(answer.status())} from ${answer.url()}` });
+    }
+  });
+
+  async function visit(path: string): Promise<void> {
+    where = path;
+    await page.goto(path, { waitUntil: "networkidle" });
+    const main = page.locator("main");
+    await expect(main, `${path} rendered a main region with nothing in it`).not.toBeEmpty();
+    await expect(
+      page.locator("[data-awaiting]"),
+      `${path} was still reading when the network went quiet`,
+    ).toHaveCount(0);
+    await expect(
+      page.locator("[data-api-error]"),
+      `${path} could not read what it asked the API for`,
+    ).toHaveCount(0);
+    const blank = await page.evaluate(() =>
+      [...document.querySelectorAll("[data-figure]")]
+        .filter((slot) => (slot.textContent ?? "").trim() === "")
+        .map((slot) => slot.getAttribute("data-figure") ?? "?"),
+    );
+    expect(blank, `${path} rendered a figure slot with nothing in it`).toEqual([]);
+  }
+
+  await visit(`/?as_of=${AS_OF}`);
+  // Asked of the API rather than read off the page, so a category the overview failed to render
+  // is a screen this crawl still opens.
+  const categories: string[] = await page.evaluate(async (asOf: string) => {
+    const answer = await fetch(`/api/registry?as_of=${asOf}`);
+    const body: { categories: { category: string }[] } = await answer.json();
+    return body.categories.map((held) => held.category);
+  }, AS_OF);
+  expect(categories.length).toBeGreaterThan(0);
+  for (const category of categories) {
+    await visit(`/data/${category}?as_of=${AS_OF}`);
+    const links = await page
+      .locator(`[data-records] li a`)
+      .evaluateAll((anchors) => anchors.map((anchor) => anchor.getAttribute("href") ?? ""));
+    const reachable = links.length <= LARGE ? links : links.slice(0, RECORDS_PER_LARGE_CATEGORY);
+    for (const href of reachable) await visit(href);
+  }
+  for (const series of SERIES) await visit(`${series.to}?as_of=${AS_OF}`);
+
+  expect(faults, "the crawl saw these").toEqual([]);
+});

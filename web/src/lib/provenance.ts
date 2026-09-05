@@ -34,6 +34,7 @@ const REFUSAL_TAGS: { readonly [Tag in Refusal["tag"]]: true } = {
   "envelopes.CategoryHasNoSuchId": true,
   "envelopes.FileNotRecorded": true,
   "envelopes.NothingDeclared": true,
+  "envelopes.RequestMalformed": true,
   "envelopes.ScenarioNotDeclared": true,
   "envelopes.WindowMalformed": true,
   "envelopes.WindowOutsideCoverage": true,

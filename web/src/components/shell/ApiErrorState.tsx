@@ -1,4 +1,4 @@
-import type { Answered } from "@/api/client";
+import { API_PREFIX, START_COMMAND, type Answered } from "@/api/client";
 import { assertNever } from "@/lib/exhaustive";
 import { isRecord } from "@/lib/narrow";
 import { isRefusal } from "@/lib/provenance";
@@ -28,8 +28,18 @@ function Detail({ answered }: { answered: Answered }) {
     case "unreachable":
       return (
         <p>
-          the API was unreachable: {answered.detail}. The client is served from the same origin as
-          the API, so this is the service being down rather than a connectivity story.
+          the request never reached the API: {answered.detail}. Every request goes to{" "}
+          {API_PREFIX} on the origin that served this page, so there is no host to check — start
+          the service from the repository root with <code>{START_COMMAND}</code>.
+        </p>
+      );
+    case "not-answered":
+      return (
+        <p>
+          nothing answered for the API: status {answered.status} with content-type{" "}
+          {answered.contentType ?? "none"}, and every outcome this service has is a tagged JSON
+          body. In development that is the dev server reporting it could not reach the API — start
+          it from the repository root with <code>{START_COMMAND}</code>.
         </p>
       );
     case "not-json":
