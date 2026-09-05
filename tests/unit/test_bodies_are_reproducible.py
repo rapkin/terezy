@@ -30,17 +30,18 @@ from terezy.api.http import document
 client = served(Path("data"))
 for path in ("/venues", "/tax-classes", "/calendars", "/registry", "/openapi.json"):
     response = client.get(f"{document.PREFIX}{path}", params={"as_of": "2026-09-03"})
-    sys.stdout.write(response.text)
+    sys.stdout.buffer.write(response.content)
 """
+"""Bytes, not text: the document carries a non-ASCII character, and `sys.stdout` would encode it
+with the locale's codec -- so under `LANG=C` the child raises rather than answering."""
 
 
-def _body_under(seed: str) -> str:
+def _body_under(seed: str) -> bytes:
     return subprocess.run(
         [sys.executable, "-c", PROGRAM],
         cwd=REPO_ROOT,
         env={**os.environ, "PYTHONHASHSEED": seed},
         capture_output=True,
-        text=True,
         check=True,
     ).stdout
 

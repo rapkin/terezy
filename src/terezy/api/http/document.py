@@ -37,9 +37,9 @@ feature's route table copied into a proxy configuration (021 FR-033).
 
 
 def rendered(app: FastAPI) -> str:
-    """The document's bytes: sorted keys, two-space indent, trailing newline.
+    """The document in its canonical form: sorted keys, two-space indent, trailing newline.
 
     The one renderer, so the endpoint and the generator that feeds the client build cannot
-    produce the same *document* as different *bytes*.
+    produce the same *document* as different *bytes*. Both encode it as UTF-8; it is not ASCII.
     """
     return json.dumps(app.openapi(), indent=2, sort_keys=True, ensure_ascii=False) + "\n"

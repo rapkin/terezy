@@ -27,18 +27,21 @@ GENERATOR = REPO_ROOT / "scripts" / "generate_openapi.py"
 DATA_ROOT = SHIPPED
 
 
-def _served_document() -> str:
+def _served_document() -> bytes:
+    """Bytes throughout, for two reasons. The document carries a non-ASCII character, so a text
+    hop would encode it with the locale's codec; and text mode translates newlines, which would
+    leave a generator writing CRLF against an endpoint serving LF and both assertions below
+    green."""
     response = served(DATA_ROOT).get(f"{document.PREFIX}/openapi.json")
     assert response.status_code == 200
-    return response.text
+    return response.content
 
 
-def _generated(*arguments: str) -> subprocess.CompletedProcess[str]:
+def _generated(*arguments: str) -> subprocess.CompletedProcess[bytes]:
     return subprocess.run(
         [sys.executable, str(GENERATOR), *arguments],
         cwd=REPO_ROOT,
         capture_output=True,
-        text=True,
         check=True,
     )
 
@@ -50,7 +53,7 @@ def test_the_endpoint_serves_what_the_generator_writes(tmp_path: Path) -> None:
     generated from the generator's bytes and fetching the endpoint's would find they disagree."""
     written = tmp_path / "openapi.json"
     _generated("--out", str(written))
-    assert written.read_text(encoding="utf-8") == _served_document()
+    assert written.read_bytes() == _served_document()
 
 
 @pytest.mark.contract
@@ -62,7 +65,7 @@ def test_the_generator_writes_to_stdout_by_default() -> None:
 @pytest.mark.contract
 def test_the_document_is_canonical() -> None:
     """Sorted keys, two-space indent, a trailing newline -- reproducible bytes, per FR-039."""
-    body = _served_document()
+    body = _served_document().decode("utf-8")
     assert body.endswith("\n")
     parsed = json.loads(body)
     assert body == json.dumps(parsed, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
