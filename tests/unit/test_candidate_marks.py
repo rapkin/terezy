@@ -51,7 +51,7 @@ def test_every_source_behind_every_route_and_quote_the_walk_read_is_on_the_set()
     assert expected <= set(enumerated.provenance.sources)
 
 
-def test_the_shipped_registry_marks_its_set_unverified() -> None:
+def test_the_declared_registry_marks_its_set_unverified() -> None:
     """A set that came back clean would claim a verification nobody performed."""
     assert prov.is_unverified(_set().provenance)
 

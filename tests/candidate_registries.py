@@ -57,7 +57,7 @@ CONTRACT: Final = "contract_usd"
 OUTLAY_ON: Final = date(2026, 4, 1)
 """When the money leaves.
 
-On or after every shipped instrument's issue date and schedule start, so a bond bought here is
+On or after every declared instrument's issue date and schedule start, so a bond bought here is
 bought into terms that are already complete. An earlier outlay refuses most of the registry as
 ``InstrumentRefused`` before anything else can be exercised, which would leave a battery
 measuring the date rather than what it planted.

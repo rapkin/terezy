@@ -226,7 +226,9 @@ def test_a_section_whose_rows_span_different_periods_says_so() -> None:
     """
     lines, _ = _run()
     verdicts = [
-        line for line in lines if "beat the benchmark" in line or "NOTHING SHOWN HERE" in line
+        line
+        for line in lines
+        if any(mark in line for mark in ("beat the benchmark", "NOTHING SHOWN HERE", "ONLY ROW"))
     ]
     sections = [
         section for section in _answered().sections if isinstance(section.outcome, CandidateSurvey)
@@ -253,6 +255,46 @@ def test_a_section_whose_rows_span_different_periods_says_so() -> None:
             verdict
         )
         assert hurdle.span.end.isoformat() in verdict
+
+
+def test_a_ranking_holding_only_the_hurdle_says_so_rather_than_claiming_a_result() -> None:
+    """ "Nothing beats it" over a table of one is a finding-shaped sentence about no finding.
+
+    It is the `[BENCHMARK]` marker's own trap arriving from the other side: a lone row reads
+    as a result when the fact is that nothing was measured against it.
+    """
+    section = next(
+        section for section in _answered().sections if isinstance(section.outcome, CandidateSurvey)
+    )
+    assert isinstance(section.outcome, CandidateSurvey)
+    comparison = section.outcome.comparison
+    assert isinstance(comparison, Comparison)
+    hurdle = comparison.ranked[comparison.benchmark]
+
+    alone = replace(comparison, ranked=(hurdle,), benchmark=0, ties=(), beats_benchmark=())
+    line = cli._beats_line(alone, (hurdle,))
+    assert f"THE BENCHMARK {fixtures.BENCHMARK} IS THE ONLY ROW HERE" in line
+    assert "nothing was measured against it" in line
+    assert "BEATS" not in line, "a verdict about beating needs something to beat"
+
+
+def test_a_verdict_over_a_ranking_without_its_hurdle_is_refused() -> None:
+    """The precondition `section_ranking` upholds, asserted rather than assumed.
+
+    Every sentence the verdict prints is about rows relative to the hurdle, so a table the
+    hurdle is missing from would have it describing rows that are not there.
+    """
+    section = next(
+        section for section in _answered().sections if isinstance(section.outcome, CandidateSurvey)
+    )
+    assert isinstance(section.outcome, CandidateSurvey)
+    comparison = section.outcome.comparison
+    assert isinstance(comparison, Comparison)
+    hurdle = comparison.ranked[comparison.benchmark]
+    without = tuple(item for item in section_ranking(section) if item.key != hurdle.key)
+
+    with pytest.raises(AssertionError, match="does not show its own hurdle"):
+        cli._beats_line(comparison, without)
 
 
 def test_the_caveat_is_silent_when_every_row_runs_to_the_window() -> None:
@@ -343,7 +385,9 @@ def test_the_hurdle_is_marked_by_identity_and_not_by_position() -> None:
 
     marked = [line for line in lines if "[BENCHMARK]" in line]
     verdicts = [
-        line for line in lines if "beat the benchmark" in line or "NOTHING SHOWN HERE" in line
+        line
+        for line in lines
+        if any(mark in line for mark in ("beat the benchmark", "NOTHING SHOWN HERE", "ONLY ROW"))
     ]
     assert marked, "the ranking prints no hurdle at all"
     assert len(verdicts) == len(marked)

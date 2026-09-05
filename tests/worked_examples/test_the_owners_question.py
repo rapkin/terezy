@@ -14,7 +14,8 @@ What the choice does **not** settle is that a comparable rate is an IRR over the
 was at work: 1, 3 and 12 of the 24 ranked rows end inside his three windows and are annualised
 over their own spans while the rest are annualised over the window, so the ordering is across
 periods of different length whatever the hurdle is. `specs/features.toml` records it as
-`rates-in-one-ranking-span-different-periods`; the renderer states the count per section.
+`rates-in-one-ranking-span-different-periods`; the renderer states the range of span
+lengths against the window, per section.
 
 **Every count below is derived from the labels and declarations the test loads.** A criterion
 pinning 24 would be pinning the whole ОВДП group, and the cheapest way to satisfy it would be

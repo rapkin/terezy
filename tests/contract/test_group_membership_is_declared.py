@@ -60,7 +60,7 @@ risk_class    = "sovereign_debt"
 def _root_with_lookalike(tmp_path: Path, *, labelled: bool) -> Path:
     """A whole data root plus one instrument that looks like an OVDP and may or may not say so.
 
-    Built by copying and editing the **shipped** declarations rather than by writing a template,
+    Built by copying and editing a **declared** instrument rather than by writing a template,
     so the fixture cannot drift into a shape the loader would reject for an unrelated reason.
     """
     root = tmp_path / "data"

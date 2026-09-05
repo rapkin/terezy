@@ -314,9 +314,19 @@ def _beats_line(comparison: Comparison, ranked: tuple[TupleOutcome, ...]) -> str
     candidate removed (010 FR-030). So each index is resolved to a *key* against
     ``comparison.ranked`` and then matched by identity, and a candidate this section refuses to
     show is not counted as having beaten anything.
+
+    ``ranked`` must hold the hurdle, which is the caller's to guarantee: ``section_ranking``
+    returns ``()`` when the benchmark is withheld, so a verdict is never asked for over a table
+    the hurdle is missing from. Violating it is a programmer error and raises, because every
+    sentence below asserts something about rows that would not be there.
     """
     hurdle = comparison.ranked[comparison.benchmark]
     reported = frozenset(item.key for item in ranked)
+    if hurdle.key not in reported:
+        raise AssertionError(
+            f"a verdict was asked for over a ranking that does not show its own hurdle "
+            f"{hurdle.key.instrument_id!r}; section_ranking returns () in that case"
+        )
     beaten = sum(
         1 for index in comparison.beats_benchmark if comparison.ranked[index].key in reported
     )

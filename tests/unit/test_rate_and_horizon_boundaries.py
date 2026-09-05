@@ -391,7 +391,7 @@ class TestAForeignInstrumentIsClosedByTwoGuardsAndNotByTheShippedData:
     """
 
     def _foreign(self, *, declares_tax: bool) -> Registries:
-        """The shipped bond redeclared in dollars, bought and sold at a dollar venue."""
+        """The fixture bond redeclared in dollars, bought and sold at a dollar venue."""
         registries = fixtures.declared()
         declared = registries.instruments[fixtures.OVDP]
         registries = fixtures.replace(
