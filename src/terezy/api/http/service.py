@@ -7,7 +7,7 @@ Principle VII forbids a CDN call outright in a repository holding one person's f
 """
 
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -159,7 +159,7 @@ def _register_keyed(
                 category=category.id,
                 as_of=asked.as_of,
                 scenario_id=asked.ask.scenario_id,
-                declared_in=_declared_in(category, resolved.files, record_id),
+                declared_in=_declared_in(category, resolved.files, record_id, asked.ask.root),
                 fields=envelopes.describe(type(result)),
                 result=result,
             ),
@@ -184,7 +184,7 @@ def _register_singleton(
     def read_document(asked: Annotated[Read, Depends(reader)]) -> encode.Json:
         resolved = shape.resolve(asked.ask)
         result = _document(category, resolved, held_in)
-        declared_in = None if resolved.file is None else _relative(category, resolved.file)
+        declared_in = None if resolved.file is None else _relative(resolved.file, asked.ask.root)
         return _body(
             envelope,
             envelope(
@@ -267,14 +267,18 @@ def _register_fixed(router: APIRouter, root: Path) -> None:
         return Response(content=document.committed(), media_type="application/json")
 
 
-def _coverage(records: object) -> envelopes.SeriesCoverage | None:
-    """A listing's coverage: one series' window, or none where the category holds several.
+def _coverage(records: Mapping[str, object]) -> dict[str, envelopes.SeriesCoverage]:
+    """Each declared series' window, by its id.
 
-    Stated as the coverage of the single declared series because both shipped series categories
-    declare one, and a window spanning two series would be a window belonging to neither.
+    Per series rather than one window for the category: a category declaring two series has no
+    single coverage, and a field that quietly went empty when a second one was declared would
+    leave a client guessing exactly where FR-045a exists to stop it.
     """
-    held = list(records.values()) if isinstance(records, dict) else list(records)  # type: ignore[call-overload]
-    return series.coverage_of(held[0]) if len(held) == 1 else None
+    return {
+        series_id: window
+        for series_id, held in sorted(records.items())
+        if (window := series.coverage_of(held)) is not None
+    }
 
 
 def _window(first: str | None, last: str | None) -> tuple[str, str] | None:
@@ -329,26 +333,23 @@ def _document(
 
 def _declared_in(
     category: categories.Category,
-    files: object,
+    files: Mapping[str, Path] | categories.NoFileMap,
     record_id: str,
+    root: Path,
 ) -> str | envelopes.FileNotRecorded | None:
     if isinstance(files, categories.NoFileMap):
         return envelopes.FileNotRecorded(category=category.id, reason=files.reason)
-    path = files.get(record_id) if isinstance(files, dict) else None
-    return None if path is None else _relative(category, path)
+    path = files.get(record_id)
+    return None if path is None else _relative(path, root)
 
 
-def _relative(category: categories.Category, path: Path) -> str:
+def _relative(path: Path, root: Path) -> str:
     """The declaring file as a path under the data root, never an absolute one.
 
-    An absolute path is a fact about the machine that served the request, and the client shows
-    it to a reader who is looking for the file in the repository.
+    An absolute path is a fact about the machine that served the request, and a reader is shown
+    it to go and find the file in the repository.
     """
-    parts = path.parts
-    directory = categories.directory_of(category).split("/", 1)[0]
-    if directory in parts:
-        return "/".join(parts[len(parts) - 1 - parts[::-1].index(directory) :])
-    return path.name
+    return path.relative_to(root).as_posix()
 
 
 def _serve_client(app: FastAPI, client: Path | None) -> None:

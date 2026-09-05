@@ -39,8 +39,10 @@ def _observations(client: Any, category: str, series_id: str, **window: str) -> 
 def test_a_listing_publishes_the_coverage_a_window_needs(client: Any) -> None:
     """Without this the pair is a trap: a mandatory window and nowhere to read the extent from."""
     listing = client.get(f"{document.PREFIX}/cpi", params=AS_OF).json()
-    assert listing["coverage"]["first"] < listing["coverage"]["last"]
-    assert listing["coverage"]["tag"] == "envelopes.SeriesCoverage"
+    assert set(listing["coverage"]) == set(listing["ids"])
+    coverage = listing["coverage"][CPI]
+    assert coverage["tag"] == "envelopes.SeriesCoverage"
+    assert coverage["first"] < coverage["last"]
 
 
 def test_an_omitted_window_returns_the_whole_declared_coverage(client: Any) -> None:

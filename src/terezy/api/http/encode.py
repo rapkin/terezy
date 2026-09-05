@@ -24,8 +24,12 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
 Json = None | bool | int | float | str | list["Json"] | dict[str, "Json"]
 
 TAG_FIELD = "tag"
-"""The injected field's name. `tag` collides with no field of any core record; `kind` collides
-with eleven, `SourceRef.kind` among them."""
+"""The injected field's name.
+
+`tag` collides with no field of any core record, and the obvious alternative does:
+`SourceRef.kind` is one of several a `kind` tag would have shadowed. The absence is asserted
+over every reachable record rather than stated here.
+"""
 
 
 class UnencodableValueError(ValueError):

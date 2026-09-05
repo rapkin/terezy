@@ -151,7 +151,7 @@ def listing_of(category_id: str, *, series: bool) -> type:
     from (020 FR-045a).
     """
     coverage: tuple[tuple[str, object], ...] = (
-        (("coverage", SeriesCoverage | None),) if series else ()
+        (("coverage", dict[str, SeriesCoverage]),) if series else ()
     )
     return container(
         f"ListingOf{_titled(category_id)}",

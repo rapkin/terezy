@@ -177,9 +177,9 @@ _FALLBACK: Final[Mapping[str, object]] = {
 """Names that appear in annotations under ``TYPE_CHECKING`` and so are absent at run time.
 
 Layered *under* each record's own module globals, never over them, so a module's own name always
-wins and this cannot shadow a ``date`` or a ``Mapping`` with something else's. Fifteen records in
-the core need it; ``tests/contract/test_every_record_resolves.py`` fails if a sixteenth appears
-and this list has not grown.
+wins and this cannot shadow a ``date`` or a ``Mapping`` with something else's. The first attempt
+supplied one flat namespace built from every core module instead, and it was worse than useless:
+it shadowed those two and failed on records that resolve perfectly well on their own.
 """
 
 _MEMO: Final[dict[type, RecordShape]] = {}

@@ -2745,14 +2745,11 @@
             "type": "string"
           },
           "coverage": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/envelopes_SeriesCoverage"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "additionalProperties": {
+              "$ref": "#/components/schemas/envelopes_SeriesCoverage"
+            },
+            "title": "Coverage",
+            "type": "object"
           },
           "ids": {
             "items": {
@@ -3032,14 +3029,11 @@
             "type": "string"
           },
           "coverage": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/envelopes_SeriesCoverage"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "additionalProperties": {
+              "$ref": "#/components/schemas/envelopes_SeriesCoverage"
+            },
+            "title": "Coverage",
+            "type": "object"
           },
           "ids": {
             "items": {

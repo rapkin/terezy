@@ -45,7 +45,7 @@ core record and carry `envelopes.<Name>` tags.
 
 | Envelope | Fields | Where the refusal comes from |
 |---|---|---|
-| **listing** — `GET /api/{category}` | `tag`, `category`, `as_of`, `scenario_id`, `ids`, and `coverage` on the two series | none: an empty category is an empty list (B10) |
+| **listing** — `GET /api/{category}` | `tag`, `category`, `as_of`, `scenario_id`, `ids`, and on the two series a `coverage` **per series id** | none: an empty category is an empty list (B10) |
 | **read** — `GET /api/{category}/{id}` | `tag`, `category`, `as_of`, `scenario_id`, `declared_in`, `fields`, `result` | `CategoryHasNoSuchId(category, wanted_id, declared_ids, reason)` |
 | **singleton** — `GET /api/{category}` for the seven | the same, with `result` the document or its refusal | `NothingDeclared(category, reason)` |
 | **observations** — `GET /api/{series}/{id}/observations` | `tag`, `category`, `as_of`, `result` — and inside it `series_id`, `window`, `covers`, `observations` **and** `outside` | `CategoryHasNoSuchId`; `WindowOutsideCoverage(series_id, asked, covers, missing, reason)` **beside** the covered observations, never instead of them |

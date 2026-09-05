@@ -1,11 +1,10 @@
 """What is exposed: one row per declared category, and the entry point behind each.
 
 A mapping from category to a resolver entry point and a response type, never a hand-written
-route function per category doing its own loading. The set is fail-closed against `data/` in
-both directions -- every directory at any depth is covered by a row or named in
+route function per category doing its own loading. It is fail-closed against `data/` in both
+directions: every directory at any depth is covered by a row or named in
 :data:`EXEMPT_DIRECTORIES` with its reason, and every `*_DIR`/`*_FILE` constant in the resolver
-is named by a row -- and both directions are asserted, separately, so either can go red alone
-(020 FR-005 to FR-007).
+is named by a row (020 FR-005 to FR-007).
 
 Each row resolves **records and their declaring files in one call**, because a read has to say
 which file declared what it returned and two calls would load the same root twice.
