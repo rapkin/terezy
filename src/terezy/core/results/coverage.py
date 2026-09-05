@@ -109,7 +109,7 @@ class SpendableEndpoint:
 class Destination:
     """A currency balance at a venue -- feature 002's shape, and the report's unit of audit.
 
-    **Derived, never declared** (FR-001 ⚙, research.md D5): the universe is every declared
+    **Derived, never declared** (FR-001, research.md D5): the universe is every declared
     venue times every currency that venue declares it can hold. That is what makes a venue with
     zero routes visible as a hole *the moment it is declared*, rather than invisible until
     somebody tries to cost it. Building the universe from the routes instead is the way to lose
@@ -203,7 +203,7 @@ means nothing declared gets the money out from here, which is deficit 2 or defic
 class AnySpendableEndpoint(Enum):
     """The target of a missing **exit**: any one of the declared spendable endpoints.
 
-    FR-007's ⚙ note. For a missing *inbound* both endpoints are determined -- the stream
+    FR-007's note. For a missing *inbound* both endpoints are determined -- the stream
     fixes one, the destination the other. For a missing
     *exit* only the origin is: any declared spendable endpoint would satisfy the owner's rule,
     and picking one would be the report inventing a preference it has no basis for.
@@ -277,7 +277,7 @@ class MissingDeclaration:
     inbound route's shape written backwards."""
 
     target: MissingTarget
-    """The destination for an inbound; :data:`ANY_SPENDABLE` for an exit (FR-007 ⚙)."""
+    """The destination for an inbound; :data:`ANY_SPENDABLE` for an exit (FR-007)."""
 
     candidates: tuple[SpendableEndpoint, ...]
     """For an exit: the declared spendable endpoints, **any one** of which satisfies it, sorted.
@@ -348,7 +348,7 @@ class Ready:
 
     Derived rather than declared, and beside the statuses it was derived from. Coverage measures
     *declaration*, because the hole it exists to surface is an unobserved corridor and the fix
-    for a closed route is not an observation (FR-022 ⚙). But a ready verdict resting only on
+    for a closed route is not an observation (FR-022). But a ready verdict resting only on
     closed routes must be visibly different from one resting on open ones, or the report would
     quietly overstate what can be compared today. A three-value field is the smallest thing that
     carries the distinction without duplicating feature 002's feasibility reporting -- a bare

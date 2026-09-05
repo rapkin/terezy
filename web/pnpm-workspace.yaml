@@ -1,0 +1,6 @@
+# esbuild's install script unpacks the platform binary vite builds with; without it there is no
+# build at all. msw is refused deliberately: its script writes a browser service worker into
+# public/, and only msw/node is used here (FR-044).
+allowBuilds:
+  esbuild: true
+  msw: false

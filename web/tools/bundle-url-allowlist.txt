@@ -1,0 +1,25 @@
+# Absolute URLs permitted in the built output (FR-036). One per line, each with a reason.
+#
+# A ratchet in the same shape as scripts/check_prose_budget.py: adding one is a visible edit, and
+# an unlisted URL fails the build. What may never be listed is a URL the running page fetches --
+# FR-035 is the rule and this file is not a way round it. Every line below is text the browser
+# never resolves: an XML namespace, a diagnostic link inside a thrown message, or a parsing base.
+
+# XML namespaces, written into elements the renderer creates. A namespace is an identifier, not
+# an address: the browser matches it and never resolves it, and an SVG chart cannot be drawn
+# without naming the first of them.
+http://www.w3.org/2000/svg
+http://www.w3.org/1999/xlink
+http://www.w3.org/1998/Math/MathML
+http://www.w3.org/XML/1998/namespace
+
+# Diagnostic links inside error messages a library throws. Text in a string; nothing fetches one,
+# and a person who sees one has already stopped.
+https://react.dev/errors/
+https://redux.js.org/Errors?code=$
+https://redux-toolkit.js.org/Errors?code=$
+https://bit.ly/3cXEKWf
+
+# The router's base for parsing a relative href where the document has no origin -- a test
+# environment, or a sandboxed frame. It is the second argument to `new URL`, never a request.
+http://localhost

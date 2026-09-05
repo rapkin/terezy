@@ -405,7 +405,7 @@ their price from Inzhur's quotation, with the two sources never sharing a citati
 | **J3** | Untouched. An early exit is now struck at a declared resale price for every real issue, which is a *price*, not a redemption window or a haircut. |
 
 **020-http-api** closes **no** row and puts the whole schema on a socket: twenty-five declared
-categories, the answer, and a byte-gated OpenAPI document a second codebase is generated from.
+categories, the answer, and an OpenAPI document a second codebase is generated from.
 
 | Row | How, and why the box does not move |
 |---|---|
@@ -416,6 +416,15 @@ categories, the answer, and a byte-gated OpenAPI document a second codebase is g
 | **E5** | Pressed at the surface where the mark has never had to survive, and not closed. Every money-valued field in every response type carries its provenance and the derived `is_unverified` verdict beside it, swept off the response types rather than sampled (`tests/contract/test_tags_and_unions.py`). The per-refusal half stays open: zero refusal-union members in the core carry provenance, which is the `provenance-on-a-refusal` future entry. |
 | **B10** | Exercised at the boundary where it is easiest to lose: an empty category is an empty list, a singleton the loader found nothing for is a **typed** refusal, and the registry summary reports *whether a document resolved* rather than a count of zero — which would be the same body for both (`tests/unit/test_the_registry_summary.py`). Still a whole-engine row. |
 | **K4** | Reinforced: the first HTTP surface in the repository and it still opens no socket in a test. Both halves are checked — the suite's guard covers outbound connections, and a scan covers the listening half, with the only server call in the entry point (`tests/contract/test_the_http_layer_computes_nothing.py`). |
+
+**021-web-declared-data** closes **no** row and adds none: no lettered behaviour names a browsing
+surface, and stretching one to fit would be the inverse of what this file is for. Two rows it
+reinforces:
+
+| Row | How, and why the box does not move |
+|---|---|
+| **F2** | *Switching display currency changes no realised amount, no tax figure, and no after-tax UAH ranking.* **Not approached, and the reason is the simplest one available: there is no switch.** The owner deferred it on 2026-09-03, so this feature builds neither the control nor the assertion, and `web-display-currency-switch` in `specs/features.toml` is what the row now waits on. What is true and worth recording is that the figure slot this feature does build has a refusal state (`web/tests/unit/figure-slot.test.tsx`), so the day a display conversion is declared, the slot it lands in already exists. |
+| **E5** | Closed since 2026-08-21 and reinforced here on a third surface, after the tables and feature 005's diagrams. The mark survives from a TOML file to a pixel: a citation, `retrieved_on` and `verified_on` read off a rendered card are found in the file that card itself names (`web/e2e/us1-citation.spec.ts`), and every mark assertion strips each element's style and class attributes before reading it (`web/tests/unit/mark.test.tsx`) — the reading `tests/contract/test_diagram_marks.py` already applies to diagrams. The box does not move because it has already moved; what this records is that the property still holds one surface further out. |
 
 **022-accrued-interest** closes **no** row. No lettered behaviour names accrued interest, a
 clean price or a carried quotation (measured 2026-09-05), and the feature says so rather than

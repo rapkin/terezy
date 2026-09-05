@@ -1,6 +1,11 @@
 <!--
 Sync Impact Report
 ==================
+Version change: 1.5.0 → 1.5.1 (2026-09-05)
+Rationale: PATCH — wording. The OpenAPI document is generated from the API's types and
+never stored (owner decision, specs/decisions/2026-09-05-openapi-on-the-fly.toml); two
+sentences that called it a checked-in artefact now say what it is. No rule changes.
+
 Version change: 1.4.0 → 1.5.0 (2026-09-05)
 Rationale: MINOR — guidance on review and on making a claim checkable materially changed.
 Review is capped at two rounds, a finding is one of three named classes, prose the change
@@ -280,8 +285,8 @@ web/      a client over api/ over HTTP, never over core/ — a TypeScript tree o
 `api/` upward. A violation fails the build. `web/` is absent from that rule deliberately:
 `lint-imports` governs a Python package and cannot see a TypeScript one, and `core/` could
 not import from it if it tried — so *the UI may not import the core* is enforced by the
-client having no way to name it: its types are generated from the checked-in OpenAPI
-document and from nothing else.
+client having no way to name it: its types are generated from the OpenAPI document the
+API publishes and from nothing else.
 
 **Delivery surface (owner decision D-B, discharged 2026-09-03).** The foundation shipped
 the core, a typed API exposing the result schema, and a thin CLI, with the web UI
@@ -291,8 +296,8 @@ published rate series — and the owner has chosen: an HTTP layer inside `api/`,
 client at `web/` that is a client of its published schema and of nothing else
 (`specs/decisions/2026-09-03-web-stack.toml`). **The deferral is discharged, not
 deleted.** What it bought was that the schema, rather than a framework, is the contract,
-and that survives the choice: the schema is a checked-in artefact regenerated under a
-gate, so a client is generated from it and cannot drift from it; the client reads the
+and that survives the choice: the schema is generated from the API's own types and never
+stored, so a client is generated from it and cannot drift from it; the client reads the
 schema and never `core/`; and the UI computes no figure the schema does not carry,
 because a figure computed in a client is a figure with no provenance. Principle VII's
 release gate is unchanged — authentication before the application listens on anything
@@ -445,4 +450,4 @@ skipped, marked expected-to-fail, or deleted without an amendment.
 **Runtime guidance.** Day-to-day development guidance for coding agents lives in
 `CLAUDE.md`, which is subordinate to this document and may not contradict it.
 
-**Version**: 1.5.0 | **Ratified**: 2026-08-21 | **Last Amended**: 2026-09-05
+**Version**: 1.5.1 | **Ratified**: 2026-08-21 | **Last Amended**: 2026-09-05

@@ -88,7 +88,7 @@ def create_app(root: Path, *, client: Path | None = None) -> FastAPI:
     router = APIRouter(prefix=document.PREFIX, responses=_refusals())
     for category in categories.CATEGORIES:
         _register(router, category, root)
-    _register_fixed(router, root)
+    _register_fixed(router, root, app)
     app.include_router(router)
     app.add_exception_handler(DeclarationError, _declaration_failed(root))
     app.add_exception_handler(ScenarioRefused, _scenario_refused)
@@ -337,7 +337,7 @@ def _register_observations(
         )
 
 
-def _register_fixed(router: APIRouter, root: Path) -> None:
+def _register_fixed(router: APIRouter, root: Path, app: FastAPI) -> None:
     under_scenario = _reader(root, scenario=True)
     # The answer resolves its own scenario from the question's declared regime, so a scenario
     # parameter here would be one a caller could set and believe in.
@@ -370,7 +370,12 @@ def _register_fixed(router: APIRouter, root: Path) -> None:
 
     @router.get("/openapi.json", name="openapi")
     def openapi() -> Response:
-        return Response(content=document.committed(), media_type="application/json")
+        """The document this application publishes, rendered from the routes just registered.
+
+        The application closed over is the one being built: the framework caches the assembled
+        schema on it, so the first request pays for the walk and no later one does.
+        """
+        return Response(content=document.rendered(app), media_type="application/json")
 
 
 def _coverage(records: Mapping[str, object]) -> dict[str, envelopes.SeriesCoverage]:

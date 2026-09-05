@@ -15,7 +15,7 @@ was declined is what stops it being re-proposed as new.
 
 **Input**: Owner decision of 2026-09-03 lifting the D-B deferral of the delivery surface. The stack
 is decided and this specification does not reopen it: FastAPI over Pydantic v2, an OpenAPI document
-generated from the types and checked in, uvicorn on loopback, packaged with `docker-compose`. What
+generated from the types, uvicorn on loopback, packaged with `docker-compose`. What
 the specification decides is what the surface *says* — which is where every honesty rule in this
 repository either survives serialisation or is lost at it.
 
@@ -168,25 +168,33 @@ returned. Discovered by walking the response types, never from a hand-written li
 
 ### User Story 3 - The document the web client is generated from cannot drift (Priority: P1)
 
-Feature 021 generates its TypeScript types from a checked-in OpenAPI document. A change to a
-response record that nobody regenerated is a build failure here, not a runtime surprise there.
+Feature 021 generates its TypeScript types from the OpenAPI document — from a checked-in file as
+first written, and from the generator's output since the owner decision of 2026-09-05. A change to a
+response record that nobody regenerated is a build failure there, not a runtime surprise.
 
 **Why this priority**: equal-highest because it is the whole reason the boundary is worth drawing.
-An OpenAPI file that is *published* rather than *gated* is a second copy of the schema going
-quietly out of step with the first — the exact failure the constitution's prose rules name, in a
-machine-readable file.
+An OpenAPI file *stored* rather than *generated* is a second copy of the types going quietly out
+of step with them — the exact failure the constitution's prose rules name, in a machine-readable
+file. It was to be a checked-in file under a byte gate until the owner decision of 2026-09-05, which
+read the same rule the other way: the gate keeps the copy in step, and having no copy is cheaper
+than keeping one in step.
 
-**Independent Test**: regenerate the document and compare bytes with the committed one; then change
-one field on one response record and confirm the comparison fails.
+**Independent Test**: generate the document to a temporary path and compare it byte for byte with
+what `/api/openapi.json` serves; then generate it twice under different hash seeds and confirm the
+two agree.
 
 **Acceptance Scenarios**:
 
-1. **Given** the committed document, **When** it is regenerated from the running application,
-   **Then** the two are byte-identical.
-2. **Given** an added, removed or renamed field on any response record, **When** the suite runs,
-   **Then** the comparison fails naming the path that moved.
-3. **Given** a change to the pinned HTTP framework version, **When** the suite runs, **Then** the
-   comparison fails if the generated document changed — the pin exists so that this is visible.
+1. **Given** the generator's output, **When** `/api/openapi.json` is fetched, **Then** the two are
+   byte-identical.
+2. **Given** two processes with different `PYTHONHASHSEED`, **When** each renders the document,
+   **Then** the two are byte-identical — the property a build depends on with no file to diff.
+3. **Given** a renamed or removed field on a response record, **When** the suite runs, **Then**
+   the body tests that read that field fail — measured 2026-09-05 by renaming
+   `ScenarioNotDeclared.wanted_id`, which turned 19 assertions red. **An *added* field is caught by
+   nothing**, and neither is the FR-041 bump it should provoke. That is what the committed
+   document's diff had been doing, and it is recorded as the `openapi-wire-change-is-unannounced`
+   future entry rather than replaced.
 
 ---
 
@@ -755,7 +763,7 @@ does not exist closes none of them.
 - **FR-031**: The interactive documentation UI MUST be **disabled** — both the Swagger UI route and
   the ReDoc route. Principle VII forbids CDN calls outright and the framework's default pages reach
   three external hosts across five asset URLs, measured above. The OpenAPI *document* is still served: it is JSON
-  read from the committed artefact (FR-038a) and reaches no network.
+  rendered from the running application (FR-038a) and reaches no network.
 
   The assertion MUST be scoped to **what the browser would fetch**: the markup, scripts,
   stylesheets and other assets this application serves must reference no external host, and the two
@@ -824,7 +832,8 @@ layer.
 
   **This is the whole contract with feature 021**, stated once and referred to from everywhere else
   in this document: the service name `api`; the port `8000`, published at `127.0.0.1:8000:8000`;
-  `src/terezy/api/http/openapi.json` as the file its TypeScript types are generated from; and the
+  `scripts/generate_openapi.py` as what its TypeScript types are generated from at build time
+  (owner decision 2026-09-05; it named `src/terezy/api/http/openapi.json` until then); and the
   origin arrangement FR-032a settles. Everything the web client shows comes through those. This
   specification declares no web service; 021 does, and adds its own service to the same file.
 
@@ -939,7 +948,8 @@ layer.
 
 - **FR-037**: `fastapi`, `pydantic` **and** `starlette` MUST be **pinned to exact versions** in
   `pyproject.toml`, replacing the present `>=0.115` and `>=2.9` and adding the third. The generated
-  OpenAPI document is a gated artefact (FR-038) and its content is a function of all three:
+  OpenAPI document is the contract a second codebase is generated from and its content is a
+  function of all three:
   Starlette owns the routes, FastAPI assembles the document, and Pydantic emits every JSON Schema
   inside it. Pinning only FastAPI would leave the larger half of the bytes floating; leaving
   Starlette out would leave the paths floating, and it is the widest range of the three —
@@ -950,8 +960,25 @@ layer.
 
 ### The OpenAPI document
 
-- **FR-038**: The OpenAPI document MUST be checked in at **`src/terezy/api/http/openapi.json`**, and
-  regenerating it MUST produce a byte-identical file or the build fails.
+**Owner decision 2026-09-05 (`specs/decisions/2026-09-05-openapi-on-the-fly.toml`): the document is
+generated on the fly and stored nowhere.** `/api/openapi.json` renders it from the running
+application; `scripts/generate_openapi.py` renders the same bytes to a path the caller names, or to
+standard output, for a build that generates a client from it. The reason is one line — a generated
+artefact in the repository is a second copy of the types. FR-039 and FR-041 stand unchanged and now
+carry the whole weight: with no committed file whose diff names a change, byte-reproducibility is
+the only thing that keeps a regenerated client from moving for a reason nobody can read. The
+requirements superseded by this are marked in place below and keep their numbers.
+
+**One gate the committed bytes carried has to be replaced explicitly.** A route's declared refusal
+union is written by hand beside the route, and the walk over the response envelopes that SC-005 is
+measured by starts at the envelope and never reaches it — so dropping a member left the endpoint
+answering a body no generated client had a type for, and only the byte comparison was red. The
+suite now provokes both members of the one such union over HTTP and requires the document to
+declare exactly the set the endpoint answers with.
+
+- **FR-038** — **SUPERSEDED 2026-09-05.** The OpenAPI document MUST be checked in at
+  **`src/terezy/api/http/openapi.json`**, and regenerating it MUST produce a byte-identical file or
+  the build fails.
 
   Inside the package rather than at the repository root or under `docs/`, for two reasons. It is an
   artefact *of* that module — it changes when and only when that module's response types change, and
@@ -964,8 +991,10 @@ layer.
   Filing it as evidence would invite the reading Principle V spends a paragraph rejecting — that the
   artefact constrains the input — in the one place where it is nearly true.
 
-- **FR-038a**: The `/openapi.json` route MUST serve **the committed file, verbatim**, rather than
-  re-serialising the generated document. Otherwise the endpoint and the file are the same *document*
+- **FR-038a** — **SUPERSEDED 2026-09-05**; what survives is that the endpoint and the generator
+  share one renderer, so the bytes a client is generated from and the bytes it fetches are the same
+  bytes and not merely the same document. The `/openapi.json` route MUST serve **the committed
+  file, verbatim**, rather than re-serialising the generated document. Otherwise the endpoint and the file are the same *document*
   and different *bytes*: FR-039 gives the file a fixed indentation and a trailing newline, and the
   framework's JSON response writes compact separators and no trailing newline. A client told by
   FR-032 that the file is its source of truth would fetch the endpoint, get something that does not
@@ -976,15 +1005,17 @@ layer.
   trailing newline, and no value read from the clock, the environment or the filesystem. A document
   whose bytes depend on where it was generated cannot be gated.
 
-- **FR-040**: The generation MUST be available as a script **under `scripts/`**, beside
-  `check_provenance.py` and `fetch_cpi.py`, so that the response to a red gate is *regenerate and read
-  the diff*, not *edit JSON by hand*. The location is stated rather than left open because it is the
+- **FR-040** — **AMENDED 2026-09-05**: the script stays where it is and stops writing one fixed
+  path. It writes to a path the caller names, and to standard output by default, because its caller
+  is now a build step rather than a person answering a red gate. The generation MUST be available as
+  a script **under `scripts/`**, beside `check_provenance.py` and `fetch_cpi.py`, so that the
+  response to a red gate is *regenerate and read the diff*, not *edit JSON by hand*. The location is stated rather than left open because it is the
   one file this feature adds outside `src/terezy/api/http/`, and SC-023a's claim about where the
   feature's modules live has to know about it.
 
 - **FR-041**: The document's `info.version` MUST be a **literal constant in the HTTP module**, named
   as the version of *this contract*, and MUST be bumped in the same commit as any change to the
-  committed document that a generated client would have to react to.
+  served document that a generated client would have to react to.
 
   Deliberately **not** the package version, which was the obvious choice and breaks FR-039. A package
   version is read at runtime from installed distribution metadata — the filesystem — and an editable
@@ -993,6 +1024,11 @@ layer.
   precisely the document-whose-bytes-depend-on-where-it-was-generated FR-039 exists to rule out. It
   is also the wrong number on its own terms: the package version moves when the tax engine changes
   and a generated TypeScript client does not care, while this one moves when the wire shape does.
+
+  **Unenforced since 2026-09-05**, and stated here rather than left to be discovered: the diff of
+  the committed document was the only thing that told a reader a wire change had happened and the
+  bump was due. Nothing detects one now. `openapi-wire-change-is-unannounced` in
+  `specs/features.toml` records the gap.
 
 ### The answer endpoint
 
@@ -1122,7 +1158,7 @@ Beside the categories:
 |---|---|---|
 | registry summary | `/registry` | FR-009: per-category counts, file digests, merged provenance, unverified counts |
 | the answer | `/questions/{id}/answer` | FR-042: `Answer` or `Refused`, and the run manifest |
-| the OpenAPI document | `/openapi.json` | FR-038a: the committed file, served verbatim |
+| the OpenAPI document | `/openapi.json` | rendered from the running application (owner decision 2026-09-05) |
 
 `scenarios/` reaches four categories because four resolver constants read it — `SCENARIOS_DIR`,
 `INFLATION_ASSUMPTION_DIR`, `TAX_POSITIONS_DIR`, `EARLY_EXIT_DIR` — for the reason `data/README.md`
@@ -1226,8 +1262,9 @@ to a feature about the answer's vocabulary rather than about serialising it.
   314 core records as measured. The field a client switches on.
 - **Bind context** — a two-valued statement of where the process is running (FR-027). Not a
   permission level and not extensible.
-- **The OpenAPI document** — a published contract, checked in, byte-gated, and deliberately not a
-  golden file (FR-038).
+- **The OpenAPI document** — a published contract, generated on the fly at serve time and at build
+  time, stored nowhere, and byte-reproducible so a client generated from it does not move without a
+  cause (owner decision 2026-09-05).
 
 ---
 
@@ -1270,7 +1307,7 @@ to a feature about the answer's vocabulary rather than about serialising it.
 - **SC-004**: 100% of records reachable from a response type carry a tag, and the tags are distinct.
   Asserted over the walk, and demonstrated by introducing a colliding record name and watching the
   build go red. (FR-011, FR-012, FR-014)
-- **SC-005**: Every member of every union reachable from a response type appears in the committed
+- **SC-005**: Every member of every union reachable from a response type appears in the served
   OpenAPI document as a named member of a `discriminator` mapping. Discovered by walking the types;
   the test contains no list of member names. Adding a member to any union in the core turns it red.
   (FR-013)
@@ -1291,22 +1328,25 @@ to a feature about the answer's vocabulary rather than about serialising it.
 - **SC-006**: `OneWayCost` and `RoundTripCost` serialise to bodies that differ, on data where every
   one of their nine fields is equal. This is the Principle VI prohibition at the wire, and it fails
   on `main` today for the trivial reason that neither type is serialised at all. (FR-014)
-- **SC-007**: Regenerating the OpenAPI document produces bytes identical to
+- **SC-007** — **SUPERSEDED 2026-09-05**, and only partly replaced: with no committed file, a
+  changed response record has nothing to be compared against. A renamed or removed field is caught
+  by the body tests that read it; an added one is caught by nothing, which is the
+  `openapi-wire-change-is-unannounced` future entry. Regenerating the OpenAPI document produces bytes identical to
   `src/terezy/api/http/openapi.json`. Changing one field on one response record turns it red naming
   the path that moved; changing any of the three pinned versions turns it red if the output changed.
   (FR-037, FR-038, FR-039)
-- **SC-007a**: The body served at `/openapi.json` is **byte-identical** to
-  `src/terezy/api/http/openapi.json`. Asserted directly, because it is the whole of what FR-038a is
-  for and SC-007 does not reach it: SC-007 compares a regeneration against the file, and this compares
-  the endpoint against the file. Re-serialising the generated document instead of serving the artefact
-  turns it red on the separator and the trailing newline. (FR-038a)
-- **SC-007b**: The regeneration script exists, and running it over an unmodified tree leaves
-  `src/terezy/api/http/openapi.json` byte-identical — so the response to a red gate is to run it and
-  read the diff. (FR-040)
+- **SC-007a** — **AMENDED 2026-09-05**: the body served at `/api/openapi.json` is
+  **byte-identical** to what `scripts/generate_openapi.py` writes. A client's types come from the
+  generator and its requests go to the endpoint, so the two emitting different bytes is drift with
+  no diff to read — and the two rendering the same document through different serialisers turns it
+  red on the separator and the trailing newline. (FR-038a, FR-040)
+- **SC-007b** — **AMENDED 2026-09-05**: the generator writes the document to standard output with
+  no arguments and to a named path with `--out`, and both carry the same bytes the endpoint serves.
+  (FR-040)
 - **SC-007c**: `info.version` is a literal in the HTTP module, and no code path behind the document
   reads distribution metadata — asserted by a scan, not by building a wheel, so the criterion stays
   inside a test suite that must run without a build step (FR-035). Changing the package version
-  leaves the committed document byte-identical. (FR-041)
+  leaves the served document byte-identical. (FR-041)
 - **SC-008**: 100% of money-valued fields in every response type carry provenance, swept off the
   dataclasses rather than sampled, so a field added later is inside the claim. A response type that
   drops the mark fails the suite. (FR-017)
@@ -1449,7 +1489,7 @@ to a feature about the answer's vocabulary rather than about serialising it.
   passes; with a directory present, a request for an unknown path under it returns the fallback
   document and a request for a known asset returns it. **With the fallback mounted, an unknown
   path beneath `/api` still returns a JSON refusal and never `200 text/html`.** (FR-055)
-- **SC-031**: Every path in the committed OpenAPI document begins with `/api`, and the prefix is
+- **SC-031**: Every path in the served OpenAPI document begins with `/api`, and the prefix is
   one constant in the module rather than a string repeated per route. (FR-056)
 
 ---
