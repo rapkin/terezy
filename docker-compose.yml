@@ -1,5 +1,6 @@
-# The shipped way to run terezy (020 FR-032). One service today; feature 021 adds a `web`
-# service under a dev profile to this same `services:` mapping without touching this one.
+# The shipped way to run terezy (020 FR-032, 021 FR-051). Two services: `api` always, and `web`
+# only under the `dev` profile -- in production there is nothing for it to do, because the api
+# image serves the built client from the same origin (021 FR-049).
 #
 # The published port is the guarantee that holds here. Inside a container every client address
 # is the bridge, so the per-request loopback check is relaxed (FR-027) and what keeps the
@@ -26,3 +27,41 @@ services:
       TEREZY_BIND_CONTEXT: container-published-to-loopback
     command: ["--host", "0.0.0.0", "--port", "8000"]
     restart: unless-stopped
+
+  # Development only (021 FR-051). `docker compose up` with no profile starts no web service.
+  web:
+    profiles: ["dev"]
+    image: node:22-slim
+    working_dir: /web
+    entrypoint: ["/bin/sh", "-c"]
+    # The dev server proxies /api to the api service over the compose network, so the browser is
+    # same-origin here exactly as it is in production and no CORS allowance exists in either.
+    # A list of one string, because compose splits a scalar `command` on whitespace and `sh -c`
+    # would then be handed the first word alone.
+    command:
+      - >-
+        corepack enable &&
+        pnpm install --frozen-lockfile --store-dir /pnpm-store &&
+        pnpm exec vite --host 0.0.0.0 --port 5173
+    # The generated types are deliberately absent here: the dev server erases type imports rather
+    # than checking them, and the gates that do check them run on the host, where Python is. This
+    # image has none, and the api service would refuse a request whose `Host` is `api:8000`
+    # anyway -- the host allowlist that closes DNS rebinding (020 FR-032b).
+    environment:
+      TEREZY_API_ORIGIN: http://api:8000
+    volumes:
+      - ./web:/web
+      # The container keeps its own install: sharing the host's would put Linux binaries in a
+      # tree the host's own gates run out of. The package store goes to a volume of its own for
+      # the same reason and one more -- left at its default it lands inside the bind-mounted
+      # tree, where it is 250 MB of build cache in a checkout.
+      - /web/node_modules
+      - pnpm-store:/pnpm-store
+    ports:
+      - "127.0.0.1:5173:5173"
+    depends_on:
+      - api
+
+volumes:
+  # The dev service's package store, so it survives a restart and stays out of the checkout.
+  pnpm-store:

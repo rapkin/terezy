@@ -112,3 +112,143 @@ jobs:
         # Principle I: no tax or legal value may originate from an implementer's or
         # an agent's memory. Every rate in data/tax/ needs source + retrieved_on.
         run: uv run python scripts/check_provenance.py
+
+  # ---------------------------------------------------------------------------
+  # The web client (021-web-declared-data). Every job below is **unconditional**, not filtered on
+  # a `web/` path: each regenerates the typed contract from the Python source, so each exists to
+  # turn red when a *Python* change moves the OpenAPI document -- and a path filter would disable
+  # them on the only change they were built for.
+
+  web-typecheck:
+    name: Client typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: corepack enable
+      - run: uv sync --all-extras --dev
+      - run: pnpm -C web install --frozen-lockfile
+      # This is the type-sync gate as well as the typecheck: the document is generated on the fly
+      # (owner decision 2026-09-05) and nothing derived from it is committed, so the gate is that
+      # generation succeeds and `tsc` then passes over what came out.
+      - run: pnpm -C web typecheck
+
+  web-lint:
+    name: Client lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: corepack enable
+      - run: uv sync --all-extras --dev
+      - run: pnpm -C web install --frozen-lockfile
+      # Carries FR-004's no-`default`-arm rule and FR-021a's one-clock rule.
+      - run: pnpm -C web lint
+
+  web-unit:
+    name: Client unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: corepack enable
+      - run: uv sync --all-extras --dev
+      - run: pnpm -C web install --frozen-lockfile
+      - run: pnpm -C web test
+
+  web-bundle-urls:
+    name: Client bundle URLs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: corepack enable
+      - run: uv sync --all-extras --dev
+      - run: pnpm -C web install --frozen-lockfile
+      - run: pnpm -C web build
+      # FR-035 checked over the built output: an absolute URL outside the allowlist fails here.
+      - run: pnpm -C web check-bundle-urls
+
+  web-e2e:
+    name: Client end-to-end
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: corepack enable
+      - run: uv sync --all-extras --dev
+      - run: pnpm -C web install --frozen-lockfile
+      - run: pnpm -C web exec playwright install --with-deps chromium
+      # The config starts the API through terezy's own entry point -- never a bare server command,
+      # because the entry point is the one that refuses early (020 FR-026b). The accessibility
+      # pass (FR-043) and the category-id scan (FR-015) run inside this job, because both need
+      # the browser or the running API it already has.
+      - run: pnpm -C web e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: web/playwright-report
+          if-no-files-found: ignore
+
+  compose-smoke:
+    name: Compose smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --all-extras --dev
+      # The static half -- every published port on every service and profile names 127.0.0.1 --
+      # is `tests/contract/test_the_shipped_compose_file.py` and runs in the test job. It is
+      # static rather than runtime-only because this job brings up the production stack and the
+      # `web` service is dev-profile-only, so a runtime check alone never looks at the stanza
+      # most likely to carry a blank host.
+      - name: Build and bring the production stack up
+        run: |
+          docker compose build
+          docker compose up -d
+          for attempt in $(seq 1 60); do
+            curl -fsS "http://127.0.0.1:8000/api/cpi?as_of=2026-01-01" >/dev/null && break
+            sleep 2
+          done
+      - name: One container, one origin, no Node toolchain
+        run: |
+          test "$(docker compose ps -q | wc -l)" -eq 1
+          curl -fsS "http://127.0.0.1:8000/api/cpi?as_of=2026-01-01" >/dev/null
+          curl -fsS "http://127.0.0.1:8000/" | grep -q '<div id="root">'
+          ! docker compose exec -T api sh -c 'command -v node || command -v pnpm || command -v npm'
+          ! docker compose exec -T api sh -c 'test -e /app/web/src'
+      - name: The shipped assets carry no unlisted absolute URL
+        run: |
+          mkdir -p extracted
+          docker compose cp api:/app/web/dist extracted/dist
+          node web/tools/check-bundle-urls.mjs extracted/dist
+      - if: always()
+        run: docker compose down -v

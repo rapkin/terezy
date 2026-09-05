@@ -24,6 +24,8 @@ PUBLICATION = re.compile(r"^127\.0\.0\.1:(?P<published>\d+):(?P<container>\d+)(?
 
 OFFICIAL_PYTHON = re.compile(r"^python:[\w.-]+$")
 
+OFFICIAL_NODE = re.compile(r"^node:[\w.-]+$")
+
 CONTEXT_VARIABLE = "TEREZY_BIND_CONTEXT"
 DATA_ROOT_VARIABLE = "TEREZY_DATA_ROOT"
 CONTAINER_CONTEXT = "container-published-to-loopback"
@@ -165,9 +167,10 @@ def test_the_api_service_builds_here_and_names_no_foreign_image() -> None:
 
 
 @pytest.mark.contract
-def test_every_base_image_in_the_dockerfile_is_the_official_python_one() -> None:
-    """FR-034 is scoped to this service: 021's web client is a Node image, and a file-wide
-    assertion would go red on the commit that fulfils this feature's own contract."""
+def test_every_base_image_in_the_dockerfile_is_an_official_one() -> None:
+    """FR-034 in the form it takes now that 021 builds the client here: the service runs on the
+    official ``python`` image and the client is built on the official ``node`` one, and no other
+    registry is read from."""
     stages: set[str] = set()
     bases: list[str] = []
     for line in DOCKERFILE.read_text(encoding="utf-8").splitlines():
@@ -181,7 +184,7 @@ def test_every_base_image_in_the_dockerfile_is_the_official_python_one() -> None
 
     assert bases
     for base in bases:
-        assert base in stages or OFFICIAL_PYTHON.match(base), base
+        assert base in stages or OFFICIAL_PYTHON.match(base) or OFFICIAL_NODE.match(base), base
 
 
 @pytest.mark.contract
@@ -206,16 +209,74 @@ def test_the_build_copies_from_no_second_image() -> None:
 @pytest.mark.contract
 def test_the_dockerfile_check_would_actually_catch_a_foreign_image() -> None:
     assert OFFICIAL_PYTHON.match("python:3.13-slim")
-    assert not OFFICIAL_PYTHON.match("node:22-slim")
+    assert OFFICIAL_NODE.match("node:22-slim")
     assert not OFFICIAL_PYTHON.match("ghcr.io/someone/python:3.13")
     assert not OFFICIAL_PYTHON.match("docker.io/library/python:3.13-slim")
+    assert not OFFICIAL_NODE.match("ghcr.io/someone/node:22")
 
 
 @pytest.mark.contract
-def test_the_file_leaves_room_for_the_web_service_without_restructuring() -> None:
-    """Feature 021 adds its own service to this file (FR-032). What it must not have to do is
-    move the ``api`` service to make room, so the top-level mapping is asserted here."""
+def test_the_file_declares_the_api_service_and_the_development_only_web_one() -> None:
+    """Feature 021 added its own service to this file (FR-032) without moving ``api``. The set is
+    closed so a third service is a decision rather than a file somebody adds."""
     compose = _compose()
 
     assert set(compose) <= {"services", "name", "volumes", "networks", "configs", "secrets"}
-    assert set(_services()) == {"api"}
+    assert set(_services()) == {"api", "web"}
+
+
+@pytest.mark.contract
+def test_the_web_service_starts_only_under_a_profile_and_the_api_service_always() -> None:
+    """021 FR-051: bringing the stack up without a profile starts no ``web`` service, because in
+    production the api image serves the built client from the same origin (021 FR-049)."""
+    services = _services()
+
+    assert services["web"]["profiles"] == ["dev"]
+    assert "profiles" not in services["api"]
+
+
+@pytest.mark.contract
+def test_the_web_service_command_reaches_the_shell_as_one_string() -> None:
+    """A scalar `command` beside a `sh -c` entry point is split on whitespace, so the shell is
+    handed the first word alone and the service starts nothing. It fails at run time and looks
+    like a slow start, which is why it is asserted here rather than found by bringing it up."""
+    web = _services()["web"]
+
+    assert _words(web["entrypoint"]) == ["/bin/sh", "-c"]
+    assert isinstance(web["command"], list)
+    assert len(web["command"]) == 1
+    assert "vite" in str(web["command"][0])
+
+
+@pytest.mark.contract
+def test_the_web_service_keeps_its_own_installed_packages() -> None:
+    """The source tree is bind-mounted, so an install inside the container writes into the
+    checkout: Linux binaries into the tree the host's own gates run out of, and a 250 MB package
+    store beside them. Measured 2026-09-05: the store's default put 19,182 files under `web/`."""
+    web = _services()["web"]
+    mounts = [str(entry) for entry in web["volumes"]]
+
+    assert "./web:/web" in mounts
+    assert any(entry.endswith("/web/node_modules") and ":" not in entry for entry in mounts)
+
+    # And the package store, which is 250 MB and lands in the checkout when left at its default.
+    store = [entry for entry in mounts if entry.endswith(":/pnpm-store")]
+    assert len(store) == 1
+    assert store[0].split(":")[0] in _compose()["volumes"]
+    assert "--store-dir /pnpm-store" in str(web["command"][0])
+
+
+@pytest.mark.contract
+def test_the_final_image_carries_no_node_toolchain() -> None:
+    """021 FR-053, SC-015: the stage that ships carries the built assets, the Python application
+    and its runtime, and nothing that produced the assets."""
+    stages = DOCKERFILE.read_text(encoding="utf-8").split("\nFROM ")
+    final = stages[-1]
+
+    assert final.startswith("python:"), final.splitlines()[0]
+    assert "corepack" not in final
+    assert "pnpm" not in final
+    assert "npm" not in final
+    for line in final.splitlines():
+        if line.upper().startswith("COPY --FROM=CLIENT"):
+            assert line.split()[2].endswith("/dist"), line

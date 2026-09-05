@@ -11,11 +11,10 @@ Written for the day after the feature lands. Nothing here works before `020-http
 uv sync --all-extras --dev
 pnpm -C web install --frozen-lockfile
 
-# terminal 1 — the API, on loopback, through terezy's OWN entry point. 020 FR-026b
-# requires that entry point and this feature does not name the command; take it from
-# 020's own quickstart. Never a bare server command: `uvicorn terezy.api.http:app
-# --host 0.0.0.0` never reaches the bind guard, which is the case 020 FR-026a exists for.
-<the entry point 020 FR-026b declares> --host 127.0.0.1 --port 8000
+# terminal 1 — the API, on loopback, through terezy's OWN entry point (020 FR-026b).
+# Never a bare server command: `uvicorn terezy.api.http:app --host 0.0.0.0` never
+# reaches the bind guard, which is the case 020 FR-026a exists for.
+uv run python -m terezy.api.http --host 127.0.0.1 --port 8000
 
 # terminal 2 — the client. Its dev server proxies /api to the above (FR-033),
 # so the browser is same-origin here exactly as it is in production.
@@ -58,19 +57,18 @@ filing a defect.
 ## The gates, as CI runs them
 
 ```bash
-pnpm -C web exec tsc --noEmit          # typecheck — FR-004, FR-005
+# Each script below regenerates the types first, which is why each needs `uv` on the path:
+# `gen:types` runs 020's scripts/generate_openapi.py into openapi-typescript. The output is
+# gitignored, so what proves the types are current is that tsc then passes over them —
+# FR-003 and SC-013 in the form the owner's decision of 2026-09-05 gives them.
+pnpm -C web typecheck                  # FR-004, FR-005, and the type-sync gate
 pnpm -C web lint                       # the no-default-arm rule and the one-clock rule
 pnpm -C web test                       # Vitest + RTL over MSW handlers typed from the document
-pnpm -C web build                      # and then:
-node web/tools/check-bundle-urls.mjs web/dist    # FR-036 — every absolute URL against the allowlist
+pnpm -C web build && pnpm -C web check-bundle-urls   # FR-036 — absolute URLs against the allowlist
 
-# types generate — FR-003, SC-013. `gen:types` is 021's own web script (T043); it runs 020's
-# scripts/generate_openapi.py (its FR-040) and pipes the document into openapi-typescript. The
-# output is gitignored, so what proves the types are current is that tsc passes over them.
-pnpm -C web gen:types && pnpm -C web exec tsc --noEmit
-
-# end-to-end — FR-045 to FR-048, plus the a11y pass and the category-id scan inside it
-pnpm -C web exec playwright test
+# end-to-end — FR-045 to FR-048, plus the a11y pass and the category-id scan inside it. The
+# config starts both halves itself, on loopback, over the shipped data/.
+pnpm -C web e2e
 ```
 
 The Python gates are unchanged and must stay green on a tree that has grown a `web/` directory:

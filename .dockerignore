@@ -16,4 +16,7 @@ data
 docs
 specs
 scripts
+# The OpenAPI generator is the exception: the document is generated on the fly (owner decision
+# 2026-09-05) and the client's types come out of it, so the build needs it.
+!scripts/generate_openapi.py
 tests

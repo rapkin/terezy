@@ -1,0 +1,53 @@
+{
+  "name": "terezy-web",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.25.0",
+  "scripts": {
+    "gen:types": "node tools/gen-types.mjs",
+    "dev": "pnpm gen:types && vite",
+    "build": "pnpm gen:types && tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "pnpm gen:types && tsc --noEmit",
+    "lint": "pnpm gen:types && eslint .",
+    "test": "pnpm gen:types && vitest run",
+    "check-bundle-urls": "node tools/check-bundle-urls.mjs dist",
+    "e2e": "pnpm gen:types && pnpm build && playwright test -c e2e/playwright.config.ts"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.90.2",
+    "@tanstack/react-router": "^1.132.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "openapi-fetch": "^0.14.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "recharts": "^3.2.1",
+    "tailwind-merge": "^3.3.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.36.0",
+    "@axe-core/playwright": "^4.10.2",
+    "@playwright/test": "^1.55.0",
+    "@tailwindcss/vite": "^4.1.13",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.8.0",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^24.5.2",
+    "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.9",
+    "@vitejs/plugin-react": "^5.0.2",
+    "eslint": "^9.36.0",
+    "eslint-plugin-react-hooks": "^6.1.0",
+    "globals": "^16.4.0",
+    "jsdom": "^27.0.0",
+    "msw": "^2.11.2",
+    "openapi-typescript": "^7.9.1",
+    "tailwindcss": "^4.1.13",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.44.0",
+    "vite": "^7.1.5",
+    "vitest": "^3.2.4"
+  }
+}

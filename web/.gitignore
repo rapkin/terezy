@@ -1,0 +1,12 @@
+node_modules/
+# The dev container installs into the bind-mounted tree; its store belongs to no checkout.
+.pnpm-store/
+dist/
+playwright-report/
+test-results/
+.vite/
+
+# Generated from the API's own OpenAPI document at every gate (owner decision 2026-09-05: the
+# document is generated on the fly and neither it nor anything derived from it is committed).
+src/api/schema.d.ts
+.union-widening/

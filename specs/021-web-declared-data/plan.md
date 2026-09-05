@@ -158,6 +158,12 @@ web/
 to feature 020 (its FR-032, and this spec's *Assumptions*). This feature contributes the `web`
 service stanza and the pnpm build stage; the tasks that add them say so and are last.
 
+**The pnpm stage's input is `web/` and one generated file.** The document is generated, not stored
+(owner decision 2026-09-05), so a Python stage runs
+`uv run python scripts/generate_openapi.py --out /schema/openapi.json` and the pnpm stage reads it
+through `TEREZY_OPENAPI_JSON` — which is why FR-049's "whose only input is `web/`" is one file wider
+than written, and why the final image still carries neither stage (FR-053).
+
 ## The seven CI jobs, and how each is wired
 
 The **spec's table is the requirement** — what each job fails on — and is not copied here. What

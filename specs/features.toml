@@ -150,7 +150,7 @@ note   = "Lifts D-B (owner decision 2026-09-03, specs/decisions/2026-09-03-web-s
 
 [[feature]]
 id     = "021-web-declared-data"
-status = "planned"
+status = "done"
 needs  = ["020-http-api"]
 why    = "the client generates its types at build time from 020's OpenAPI document generator (owner decision 2026-09-05) and reads nothing else; every figure, mark and refusal on screen is one of 020's responses, and OB-1 to OB-8 in the spec are the obligations it must satisfy -- OB-9 was withdrawn with the display switch"
 note   = "The first surface on which a mark and a refusal have to survive being looked at, built while the only thing on it is declared data -- which is the cheapest place to get that wrong and find out. Read-only by design: no editing, no fetchers, no answer or compare screens. Lifts owner decision D-B together with 020; the constitution amendment (1.4.0) landed with this spec. Owner decision 2026-09-03 (specs/decisions/2026-09-03-web-stack.toml) let planning start while the three clarifications were open, on the ground that each stated its own blast radius; they then closed the same day. CLARIFIED 2026-09-03 (specs/decisions/2026-09-03-clarify-021.toml): English only; the owner's own declarations are shown, each labelled as his statement rather than as an observation; and the display-currency selector question is MOOT rather than answered -- the owner deferred the display switch entirely, so 021 builds no selector, no `display` search parameter and no display scenario. 020's matching withdrawal of its own `display` request parameter (its FR-021 to FR-025) is made in 020 on 2026-09-05, and is the first thing to settle before 021's implementation starts. Those requirements are MOVED, not deleted, to the spec's Deferred by owner decision section, and the [[future]] entry tracking them is drafted in the Appendix and lands with the implementation."
@@ -161,6 +161,11 @@ status = "planned"
 needs  = ["013-enumerated-schedule", "016-real-ovdp"]
 why    = "013 declares the day count and is the FR-017 prohibition this lifts; 016 is what supplies every coupon date, which is the fact FR-017 said was missing"
 note   = "Owner decision 2026-09-05 -- an early exit must return a real holding period's interest, not the spread. Closes the enumerated-accrued-interest and the-buy-quotation-is-not-carried futures together; see specs/022-accrued-interest/spec.md."
+
+[[future]]
+id      = "web-display-currency-switch"
+after   = ["021-web-declared-data"]
+note    = "The display-currency selector, the `display` search parameter and the display slot's refusal state, deferred by owner decision 2026-09-03 (specs/decisions/2026-09-03-clarify-021.toml) together with 020's `display` request parameter. Its scope is the Deferred by owner decision table in 021's spec, which is why that table was moved rather than deleted. Additive to what 021 lands: a second global search parameter on a router that already validates one, and a fourth state on a figure slot that already has three. REQUIRED_TESTS F2's remaining halves need this AND an answer screen, so it does not close F2 on its own."
 
 [[future]]
 id    = "display-currency-switch"

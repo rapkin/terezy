@@ -1,0 +1,9 @@
+# Paths under web/src permitted to name a category id (FR-015, SC-012). One per line, with a
+# reason. What may never be listed is a module under /data/: that is the generic browser, and an
+# exception there is the per-category branch this check exists to forbid.
+
+src/routes/series-map.ts
+# FR-015a's two named series routes. A chart is not a generic rendering -- it needs to know it
+# has a date axis and a numeric axis, and which series it is drawing -- so the two ids are
+# written down here, in one file, and a third per-category screen is a decision taken in review
+# rather than a file somebody adds.
