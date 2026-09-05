@@ -42,7 +42,12 @@ from terezy.core.results.answer import Answer, HorizonSection
 from terezy.core.results.candidates import CandidateSurvey
 from terezy.core.results.dominance import DominanceRefused, DominanceResult
 from terezy.core.results.fund import FundAssumptions
-from terezy.core.results.objectives import Criterion, FractionOfTheQuestionAmount
+from terezy.core.results.objectives import (
+    AbsoluteBand,
+    Criterion,
+    DaysBand,
+    FractionOfTheQuestionAmount,
+)
 from terezy.core.results.tuple import Comparison, InstrumentPlan, Tuple, TupleOutcome
 from terezy.data.declarations import loader
 from tests import answer_registries as fixtures
@@ -902,6 +907,11 @@ def test_an_incomparable_pair_and_a_not_placed_candidate_render_differently() ->
     )
     assert block != _dominance_block(section)
 
+    crossing = dominance_sections.delivering_dollars(section, ["UA4000239016"])
+    printed = _dominance_block(replace(crossing, dominance=dominance_sections.run(crossing)))
+    assert "delivered in UAH against USD" in printed
+    assert "no exchange rate is consulted" in printed
+
 
 def test_a_refused_pass_says_so_instead_of_printing_an_empty_set() -> None:
     """FR-026 at the surface: an empty set standing for a failure is what a reader would take
@@ -975,3 +985,44 @@ def _every_dominance_refusal() -> list[DominanceRefused]:
             compared_in=Currency.USD,
         ),
     ]
+
+
+def test_each_reading_of_why_the_set_holds_what_it_holds_reads_differently() -> None:
+    """FR-014 requires the cases distinguishable **without reading prose** on the record, and
+    FR-029 requires the surface not to collapse them again. Every arm is rendered here because
+    each is a sentence the owner will actually read, and one of them -- ``EveryOtherIsNotPlaced``
+    -- names a state the pass cannot reach and would otherwise never be rendered at all.
+    """
+    sentences = {
+        cli._one_member_line(reading)
+        for reading in (
+            dominance_records.TheSetDoesNotHaveOneMember(members=0),
+            dominance_records.TheSetDoesNotHaveOneMember(members=3),
+            dominance_records.OnlyOneEvaluated(),
+            dominance_records.EveryOtherIsDominated(),
+            dominance_records.EveryOtherIsNotPlaced(),
+            dominance_records.Mixed(dominated=2, not_placed=1),
+        )
+    }
+    assert len(sentences) == 6
+    assert any("THE SET IS EMPTY" in line for line in sentences)
+    assert not any(
+        "best" in line or "winner" in line.replace("not a win", "") for line in sentences
+    )
+
+
+def test_a_set_whose_members_share_every_assumption_says_so_rather_than_listing_nothing() -> None:
+    """FR-020: an empty list is what a reader takes as *nothing separates them*."""
+    printed = cli._separating_lines(dominance_records.NoStatedAssumptionSeparatesThem())
+    assert printed == ["the members rest on the same stated assumptions; none separates them"]
+
+
+def test_a_band_is_rendered_in_the_shape_it_was_declared_in() -> None:
+    """FR-023: *every band, of either criterion, in the form it was declared*. A fraction
+    printed as its resolved width, or an absolute band as a fraction, would be a number the
+    owner did not write."""
+    assert cli._band_words(FractionOfTheQuestionAmount(proportion=0.0001)) == (
+        "0.0001 of the question's amount"
+    )
+    assert cli._band_words(AbsoluteBand(amount=Money(5.0, Currency.UAH, prov.EMPTY))) == "5.0 UAH"
+    assert cli._band_words(DaysBand(days=7)) == "7 day(s)"
