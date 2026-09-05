@@ -20,10 +20,11 @@ from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.data import citation_policy, manifest
 from terezy.data.declarations import resolver
+from tests.data_roots import SHIPPED
 from tests.http_client import served
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DATA_ROOT = REPO_ROOT / "data"
+DATA_ROOT = SHIPPED
 AS_OF = {"as_of": "2026-09-03"}
 
 

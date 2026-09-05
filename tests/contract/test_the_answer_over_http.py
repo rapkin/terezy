@@ -7,7 +7,6 @@ formatting of it (020 FR-042, FR-044, SC-018, SC-019).
 from __future__ import annotations
 
 from datetime import date
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -15,9 +14,10 @@ import pytest
 from terezy.api import answer as verb
 from terezy.api.http import document, service
 from terezy.core.primitives.currency import Currency
+from tests.data_roots import SHIPPED
 from tests.http_client import served
 
-DATA_ROOT = Path(__file__).resolve().parents[2] / "data"
+DATA_ROOT = SHIPPED
 AS_OF = "2026-09-03"
 QUESTION = "fifty-thousand-hryvnia"
 

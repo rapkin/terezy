@@ -7,15 +7,15 @@ FR-001 forbids it; returning the short list alone is the silent truncation 020 F
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 import pytest
 
 from terezy.api.http import document
+from tests.data_roots import SHIPPED
 from tests.http_client import served
 
-DATA_ROOT = Path(__file__).resolve().parents[2] / "data"
+DATA_ROOT = SHIPPED
 AS_OF = {"as_of": "2026-09-03"}
 CPI = "ua_cpi_monthly"
 RATES = "ua_nbu_usd"

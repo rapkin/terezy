@@ -8,14 +8,14 @@ would put `/scenarios/inflation` beside `/scenarios/{id}` and a scenario declare
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 import pytest
 
 from terezy.api.http import categories, document, service
+from tests.data_roots import SHIPPED
 
-DATA_ROOT = Path(__file__).resolve().parents[2] / "data"
+DATA_ROOT = SHIPPED
 
 
 def _published() -> dict[str, dict[str, Any]]:

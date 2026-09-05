@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import dataclasses
 from collections import Counter
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -20,8 +19,9 @@ from terezy.api.http import categories, encode, envelopes, service, shapes, tags
 from terezy.api.http.summary import RegistrySummary
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance, SourceRef
+from tests.data_roots import SHIPPED
 
-DATA_ROOT = Path(__file__).resolve().parents[2] / "data"
+DATA_ROOT = SHIPPED
 
 
 def _reachable() -> list[shapes.RecordShape]:

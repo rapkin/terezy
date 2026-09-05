@@ -13,8 +13,9 @@ import pytest
 
 from terezy.api.http import categories
 from terezy.data.declarations import resolver
+from tests.data_roots import SHIPPED
 
-DATA_ROOT = Path(__file__).resolve().parents[2] / "data"
+DATA_ROOT = SHIPPED
 
 
 def _covered() -> frozenset[str]:

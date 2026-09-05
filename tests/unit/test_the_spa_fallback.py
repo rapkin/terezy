@@ -9,9 +9,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from terezy.api.http import document
+from tests.data_roots import SHIPPED
 from tests.http_client import served
 
-DATA_ROOT = Path(__file__).resolve().parents[2] / "data"
+DATA_ROOT = SHIPPED
 AS_OF = {"as_of": "2026-09-03"}
 
 

@@ -18,10 +18,11 @@ import pytest
 
 from terezy.api.http import document
 from terezy.api.http.service import create_app
+from tests.data_roots import SHIPPED
 from tests.http_client import served
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DATA_ROOT = REPO_ROOT / "data"
+DATA_ROOT = SHIPPED
 
 
 @pytest.mark.golden
