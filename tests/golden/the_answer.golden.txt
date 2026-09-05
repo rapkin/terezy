@@ -37,7 +37,7 @@
   evaluated UA4000207518             reaches 0x1.8568087087087p+15
   ranked 21
   dropped InstrumentRefused            4  UA4000239040,UA4000239081,UA4000239107,inzhur_reit
-  dominance money-and-when  non_dominated=2 dominated=19 not_placed=0 incomparable=0  TheSetHasSeveralMembers
+  dominance money-and-when  non_dominated=2 dominated=19 not_placed=0 incomparable=0  TheSetDoesNotHaveOneMember
     band money_at_the_endpoint    UAH 0x1.4000000000000p+2 of 0x1.86a0000000000p+15
     non-dominated UA4000235865
     non-dominated UA4000239016
@@ -174,7 +174,7 @@
   evaluated UA4000207518             reaches 0x1.8bd0aa32a32a3p+15
   ranked 21
   dropped InstrumentRefused            4  UA4000239040,UA4000239081,UA4000239107,inzhur_reit
-  dominance money-and-when  non_dominated=3 dominated=18 not_placed=0 incomparable=0  TheSetHasSeveralMembers
+  dominance money-and-when  non_dominated=3 dominated=18 not_placed=0 incomparable=0  TheSetDoesNotHaveOneMember
     band money_at_the_endpoint    UAH 0x1.4000000000000p+2 of 0x1.86a0000000000p+15
     non-dominated UA4000235865
     non-dominated UA4000237416
@@ -301,7 +301,7 @@
   evaluated UA4000235865             reaches 0x1.84c1000000000p+15
   ranked 21
   dropped InstrumentRefused            4  UA4000239040,UA4000239081,UA4000239107,inzhur_reit
-  dominance money-and-when  non_dominated=10 dominated=11 not_placed=0 incomparable=0  TheSetHasSeveralMembers
+  dominance money-and-when  non_dominated=10 dominated=11 not_placed=0 incomparable=0  TheSetDoesNotHaveOneMember
     band money_at_the_endpoint    UAH 0x1.4000000000000p+2 of 0x1.86a0000000000p+15
     non-dominated UA4000207518
     non-dominated UA4000230270

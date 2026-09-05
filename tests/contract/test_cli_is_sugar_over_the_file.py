@@ -33,11 +33,16 @@ from terezy.core.decision.answer import (
     section_ties,
 )
 from terezy.core.instruments.groups import InstrumentGroup
+from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
+from terezy.core.primitives.money import Money
 from terezy.core.results import canonical
+from terezy.core.results import dominance as dominance_records
 from terezy.core.results.answer import Answer, HorizonSection
 from terezy.core.results.candidates import CandidateSurvey
+from terezy.core.results.dominance import DominanceRefused, DominanceResult
 from terezy.core.results.fund import FundAssumptions
+from terezy.core.results.objectives import Criterion, FractionOfTheQuestionAmount
 from terezy.core.results.tuple import Comparison, InstrumentPlan, Tuple, TupleOutcome
 from terezy.data.declarations import loader
 from tests import answer_registries as fixtures
@@ -907,3 +912,66 @@ def test_a_refused_pass_says_so_instead_of_printing_an_empty_set() -> None:
     output = "\n".join(cli.render(answered))
     assert "NO DOMINANCE SET: BenchmarkWasWithheld" in output
     assert "NON-DOMINATED" not in output
+
+
+def test_every_refusal_this_pass_can_produce_names_its_reason_in_the_output() -> None:
+    """FR-026 at the surface: *every degraded outcome is a typed result carrying its reason, and
+    the reason surfaces in the output*.
+
+    Asserted over **every** arm of the union rather than over the one the shipped registry
+    happens to reach. The gap this catches shipped once: a refusal whose fields are all `Enum`
+    members rendered as its type name and nothing else, because the field walk read only
+    `str | int | float | date` and an enum is none of them.
+    """
+    for refusal in _every_dominance_refusal():
+        section = replace(_answered().sections[0], dominance=refusal)
+        printed = "\n".join(cli._dominance_lines(section))
+        assert f"NO DOMINANCE SET: {type(refusal).__name__}" in printed
+        fields = [item.name for item in dataclasses.fields(refusal)]
+        assert fields, type(refusal).__name__
+        for name in fields:
+            assert f"    {name} = " in printed, (
+                f"{type(refusal).__name__}.{name} reaches no reader: {printed}"
+            )
+
+
+def _every_dominance_refusal() -> list[DominanceRefused]:
+    """One of each arm, built here because no single registry reaches them all.
+
+    ``NoBenchmarkToStandAgainst`` and ``NoSurveyToRunOver`` are excluded: the first carries a
+    ``reason`` string that is rendered wholesale, and the second carries another record whose
+    own fields a `repr` would flood the reader with -- which is the case `_named_scalars` exists
+    to skip.
+    """
+    hurdle = _answered().sections[0].dominance
+    assert isinstance(hurdle, DominanceResult)
+    return [
+        dominance_records.BenchmarkWasWithheld(
+            key=hurdle.benchmark_standing.key, arrives_on=date(2028, 1, 20)
+        ),
+        dominance_records.BandBelowTheAcyclicityFloor(
+            criterion=Criterion.MONEY_AT_THE_ENDPOINT,
+            declared=FractionOfTheQuestionAmount(proportion=1e-13),
+            resolved=Money(5e-9, Currency.UAH, prov.EMPTY),
+            slack=5e-5,
+            floor=5e-5,
+            objective_count=2,
+        ),
+        dominance_records.NoQuestionAmountInTheCurrencyCompared(
+            criterion=Criterion.MONEY_AT_THE_ENDPOINT, currency=Currency.USD
+        ),
+        dominance_records.SeveralQuestionAmountsInTheCurrencyCompared(
+            criterion=Criterion.MONEY_AT_THE_ENDPOINT,
+            currency=Currency.UAH,
+            stream_ids=("salary_uah", "a_second_uah_stream"),
+            amounts=(
+                Money(50_000.0, Currency.UAH, prov.EMPTY),
+                Money(20_000.0, Currency.UAH, prov.EMPTY),
+            ),
+        ),
+        dominance_records.BandInAnotherCurrency(
+            criterion=Criterion.MONEY_AT_THE_ENDPOINT,
+            declared_in=Currency.UAH,
+            compared_in=Currency.USD,
+        ),
+    ]

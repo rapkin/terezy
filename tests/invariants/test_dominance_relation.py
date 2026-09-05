@@ -74,8 +74,12 @@ def _uah(value: float) -> MoneyFigure:
 
 
 def _floor(count: int) -> float:
-    """FR-011c's floor: strictly above one slack, and at least *(p - 1)* of them."""
-    return max(ONE_SLACK * (count - 1), ONE_SLACK * 2.0)
+    """FR-011c's floor: strictly above one slack, and at least *(p - 1)* of them.
+
+    The second term is what binds here, because the battery never draws fewer than three
+    objectives and *(p - 1)* is then at least two slacks -- which already exceeds one.
+    """
+    return ONE_SLACK * (count - 1)
 
 
 Battery = tuple[list[list[MoneyFigure]], list[MoneyWidth], list[ObjectiveDirection]]

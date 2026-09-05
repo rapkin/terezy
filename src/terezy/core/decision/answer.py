@@ -702,7 +702,15 @@ def section_ties(section: HorizonSection) -> tuple[tuple[Tuple, ...], ...]:
     019 FR-029a. ``Comparison.ties`` holds **indices into ``ranked``**, which FR-030 narrows
     afterwards, so rendering them as they stand would put a withheld figure in front of a
     reader. A group left with fewer than two members after narrowing is not a tie and is not
-    reported -- ``tolerance.tied_groups``' own rule, applied to what the section shows.
+    reported: a group of one is not a tie under any rule.
+
+    **What narrowing costs, stated rather than papered over.** ``tolerance.tied_groups``
+    anchors each group on its **first** member, which is what bounds a reported tie at one
+    tolerance wide. Where FR-030 withholds that anchor, the survivors were each within one
+    tolerance of a row that is no longer shown and may be up to two apart from each other -- so
+    a narrowed group is *at most two tolerances* wide rather than one. It is not recomputed
+    here: 010 owns the tie rule and FR-013 says this feature reads it rather than running a
+    second copy, which would report a strict winner in one comparison and a tie in the other.
 
     Here rather than in the renderer so the command line computes nothing.
     """

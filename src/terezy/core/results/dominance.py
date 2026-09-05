@@ -364,8 +364,13 @@ class Mixed:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
-class TheSetHasSeveralMembers:
-    """The question does not arise. A typed value rather than ``None``, so a caller matches."""
+class TheSetDoesNotHaveOneMember:
+    """The question does not arise, and the count says which way.
+
+    **Zero is one of the ways**, and it is the one a reader most needs named: a section every
+    pair of which is incomparable places nobody, so nothing is non-dominated and the set is
+    empty honestly. A record naming this *several members* would be false there.
+    """
 
     members: int
 
@@ -375,7 +380,7 @@ WhyOneMember = (
     | EveryOtherIsDominated
     | EveryOtherIsNotPlaced
     | Mixed
-    | TheSetHasSeveralMembers
+    | TheSetDoesNotHaveOneMember
 )
 """Why the reported set holds what it holds, against FR-008's populations rather than in prose.
 *Dominates every other* is deliberately not among them: dominance is reported per pair, and a
@@ -423,8 +428,10 @@ class BandBelowTheAcyclicityFloor:
 
     criterion: Criterion
     declared: Band
-    resolved: Money | None
-    """The width a fraction band resolved to, or ``None`` where the band was already absolute."""
+    resolved: Money
+    """The width the band was actually measured at, which for an absolute band is its own
+    amount. Not optional: the floor is reached only on a money objective, whose width is money
+    either way, and a ``None`` here would be a state nothing can produce."""
 
     slack: float
     floor: float
@@ -546,7 +553,7 @@ __all__ = [
     "RightDominates",
     "SeparatingAssumptions",
     "SeveralQuestionAmountsInTheCurrencyCompared",
-    "TheSetHasSeveralMembers",
+    "TheSetDoesNotHaveOneMember",
     "TooCloseToCall",
     "WhyOneMember",
     "Width",

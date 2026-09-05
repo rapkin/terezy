@@ -16,7 +16,7 @@ from terezy.core.results.dominance import (
     EveryOtherIsDominated,
     Mixed,
     OnlyOneEvaluated,
-    TheSetHasSeveralMembers,
+    TheSetDoesNotHaveOneMember,
 )
 from tests import dominance_sections as sections
 
@@ -84,7 +84,7 @@ def test_a_set_of_one_over_several_candidates_says_every_other_is_dominated() ->
 def test_a_set_of_several_says_the_question_does_not_arise() -> None:
     result = sections.result(sections.section())
     reading = why_one_member(result)
-    assert isinstance(reading, TheSetHasSeveralMembers)
+    assert isinstance(reading, TheSetDoesNotHaveOneMember)
     assert reading.members == len(result.non_dominated)
 
 
@@ -104,6 +104,15 @@ def test_the_populations_are_in_the_candidate_order_and_in_no_objectives_order()
         [item.key for item in result.not_placed],
     ):
         assert population == [key for key in order if key in set(population)]
+
+
+def test_an_empty_set_is_reported_as_empty_rather_than_as_several_members() -> None:
+    """The count is what says which way the question does not arise, and zero is one of them."""
+    pair = sections.only(sections.section(), ["UA4000239016"])
+    result = sections.result(sections.with_no_arrivals(pair, "UA4000239016"))
+    reading = why_one_member(result)
+    assert isinstance(reading, TheSetDoesNotHaveOneMember)
+    assert reading.members == 0
 
 
 def test_a_section_every_pair_of_which_is_incomparable_has_an_empty_set_honestly() -> None:

@@ -22,6 +22,7 @@ import argparse
 import sys
 import tomllib
 from datetime import date
+from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, assert_never
 
@@ -38,6 +39,7 @@ from terezy.core.decision.answer import (
 from terezy.core.decision.dominance import why_one_member
 from terezy.core.instruments.interface import Assumptions
 from terezy.core.primitives.currency import Currency
+from terezy.core.primitives.money import Money
 from terezy.core.primitives.rates import NominalRate
 from terezy.core.results.answer import (
     Answer,
@@ -72,7 +74,7 @@ from terezy.core.results.dominance import (
     NothingDominatesTheHurdle,
     OnlyOneEvaluated,
     SeparatingAssumptions,
-    TheSetHasSeveralMembers,
+    TheSetDoesNotHaveOneMember,
     WhyOneMember,
 )
 from terezy.core.results.fund import FundAssumptions
@@ -224,12 +226,51 @@ def _named_scalars(record: object) -> list[str]:
     A record field is skipped rather than printed: ``BenchmarkYieldsNoCandidate`` carries the
     whole enumerated set, and a bare ``repr`` of it is thousands of characters where a sentence
     was intended. What the reader needs from a refusal is its ids, its counts and its reason.
+
+    **An ``Enum`` and a ``Money`` are readable and were not read.** 019's refusals name a
+    criterion and a currency and nothing else -- ``BandInAnotherCurrency`` carries three enum
+    members -- so under the narrower test they rendered as their type name and no reason at
+    all, which is the silent degradation Principle IV forbids. A tuple of them is rendered the
+    same way, because ``SeveralQuestionAmountsInTheCurrencyCompared`` names the streams whose
+    two amounts left a band with no single width, and *which two* is the whole of the remedy.
+
+    **A candidate key and a declared band are rendered rather than skipped.** Both are records,
+    so the narrower test dropped them: ``BenchmarkWasWithheld`` exists to name *which* hurdle
+    was withheld, and FR-011c's refusal has to name the band that failed beside the slack it
+    did not clear. A refusal missing either sends a reader to the wrong file.
     """
     return [
-        f"    {name} = {value}"
+        f"    {name} = {_readable(getattr(record, name))}"
         for name in getattr(type(record), "__slots__", ())
-        if isinstance(value := getattr(record, name), str | int | float | date)
+        if _is_readable(getattr(record, name))
     ]
+
+
+def _is_readable(value: object) -> bool:
+    """Whether a field is a figure a reader can take in, or a structure that would flood them."""
+    if isinstance(value, Tuple | AbsoluteBand | FractionOfTheQuestionAmount | DaysBand):
+        return True
+    if isinstance(value, tuple):
+        return all(_is_readable(item) for item in value)
+    return isinstance(value, str | int | float | date | Enum | Money)
+
+
+def _readable(value: object) -> str:
+    """One such field, in the words its own type carries."""
+    if isinstance(value, Tuple):
+        return (
+            f"{value.instrument_id} from {value.stream_id} "
+            f"via {candidate_id(value.route_in)} out {_exit_choice(value.route_out)}"
+        )
+    if isinstance(value, AbsoluteBand | FractionOfTheQuestionAmount | DaysBand):
+        return _band_words(value)
+    if isinstance(value, tuple):
+        return ", ".join(_readable(item) for item in value)
+    if isinstance(value, Enum):
+        return str(value.value)
+    if isinstance(value, Money):
+        return f"{value.amount} {value.currency.value}"
+    return str(value)
 
 
 def _subject_lines(result: Answer) -> list[str]:
@@ -325,7 +366,11 @@ def _dominance_lines(section: HorizonSection) -> list[str]:
         for item in result.indistinguishable
     )
     lines.append(f"    {_hurdle_line(result.benchmark_standing)}")
-    lines.extend(f"    {line}" for line in _separating_lines(result.separating))
+    if result.non_dominated:
+        # An empty set has no members to be separated by anything, and the record's
+        # *they rest on the same stated assumptions* is a claim about a population that is not
+        # there. The line below says the set is empty instead.
+        lines.extend(f"    {line}" for line in _separating_lines(result.separating))
     lines.append(f"    {_one_member_line(why_one_member(result))}")
     return lines
 
@@ -433,7 +478,12 @@ def _separating_lines(
 def _one_member_line(reading: WhyOneMember) -> str:
     """FR-014: where the set has one member, why -- and only one of the cases is a finding."""
     match reading:
-        case TheSetHasSeveralMembers():
+        case TheSetDoesNotHaveOneMember() if not reading.members:
+            return (
+                "THE SET IS EMPTY: no candidate is non-dominated, because none of them could "
+                "be placed at all -- see the NOT PLACED rows above"
+            )
+        case TheSetDoesNotHaveOneMember():
             return f"{reading.members} candidate(s) in the set; none is presented ahead of another"
         case OnlyOneEvaluated():
             return "one member because this section evaluated ONE candidate, which is not a win"

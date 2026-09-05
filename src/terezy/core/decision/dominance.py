@@ -78,7 +78,7 @@ from terezy.core.results.dominance import (
     RightDominates,
     SeparatingAssumptions,
     SeveralQuestionAmountsInTheCurrencyCompared,
-    TheSetHasSeveralMembers,
+    TheSetDoesNotHaveOneMember,
     TooCloseToCall,
     WhyOneMember,
     Width,
@@ -512,10 +512,15 @@ def _below_the_floor(
     floor = allowed * (len(objectives.objectives) - 1)
     if declared > allowed and declared >= floor:
         return None
+    if not isinstance(width, MoneyWidth):
+        raise TypeError(
+            f"the acyclicity floor was measured on {objective.criterion.value!r} with a "
+            f"{type(width).__name__}; a date objective's slack is zero and no floor runs there"
+        )
     return BandBelowTheAcyclicityFloor(
         criterion=objective.criterion,
         declared=objective.band,
-        resolved=width.amount if isinstance(width, MoneyWidth) else None,
+        resolved=width.amount,
         slack=allowed,
         floor=floor,
         objective_count=len(objectives.objectives),
@@ -785,7 +790,7 @@ def why_one_member(result: DominanceResult) -> WhyOneMember:
     the four cases are distinguishable without reading prose.
     """
     if len(result.non_dominated) != 1:
-        return TheSetHasSeveralMembers(members=len(result.non_dominated))
+        return TheSetDoesNotHaveOneMember(members=len(result.non_dominated))
     dominated, not_placed = len(result.dominated), len(result.not_placed)
     if not dominated and not not_placed:
         return OnlyOneEvaluated()
