@@ -38,15 +38,21 @@ ACCESS = DATA_ROOT / "access" / "instruments.toml"
 BOND = "ovdp_synthetic_a"
 FUND = "inzhur_reit"
 
-RESALE = """
+QUOTED_ON = "2026-08-23"
+"""The day this bond's declared buy price was read. A resale price must carry the same one:
+the pair is one observation of one market, and each side is carried to the day it prices."""
+
+RESALE = f"""
   [access.resale_price]
   per_unit     = 995.0
   currency     = "UAH"
   kind         = "venue_terms"
   source       = "TEST FIXTURE -- invented seller's quote, not observed at any venue."
-  retrieved_on = "2026-08-31"
+  retrieved_on = "{QUOTED_ON}"
   verified_on  = ""
 """
+
+RESALE_READ_A_WEEK_LATER = RESALE.replace(QUOTED_ON, "2026-08-31")
 
 
 def _scratch_root(tmp_path: Path) -> Path:
@@ -143,3 +149,21 @@ def test_a_fund_may_not_declare_a_resale_price(tmp_path: Path) -> None:
     assert caught.value.file == target
     assert caught.value.field_path.endswith(".resale_price")
     assert "net asset value" in caught.value.problem
+
+
+def test_a_resale_price_read_on_another_day_than_the_purchase_quote_refuses(
+    tmp_path: Path,
+) -> None:
+    """One instrument, one market, one morning.
+
+    Each price is carried to the day it prices net of the coupons that detached since it was
+    read, so two retrieval dates would carry the pair by two different windows -- a coupon
+    could come out of the sale and stay in the purchase, charging the holder for one he never
+    received. Nothing downstream sees the pair, so the agreement is enforced at load or nowhere.
+    """
+    root = _scratch_root(tmp_path)
+    _with_resale(root, BOND, block=RESALE_READ_A_WEEK_LATER)
+    with pytest.raises(DeclarationError) as raised:
+        _resolve(root)
+    assert "resale_price.retrieved_on" in str(raised.value)
+    assert "one observation of one market" in str(raised.value)

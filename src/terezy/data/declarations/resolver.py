@@ -2612,6 +2612,33 @@ def _check_access(
     _check_resale_price(
         entry, currency=currency, self_priced=self_priced, path=path, field_prefix=prefix
     )
+    _check_one_observation(entry, path=path, field_prefix=prefix)
+
+
+def _check_one_observation(entry: InstrumentAccess, *, path: Path, field_prefix: str) -> None:
+    """A buy and a sell price for one instrument are **one** observation of one market.
+
+    Each is carried to the day it prices net of the coupons that detached in between
+    (``core.scenarios.early_exit.detached_since``), so two different observation dates would
+    carry the pair by two different windows: a coupon could come out of the sale and stay in
+    the purchase, charging the holder for one he never received. Nothing downstream can see
+    the pair -- the sale reads only the resale price -- so the agreement is enforced here or
+    nowhere.
+    """
+    if entry.quote is None or entry.resale_price is None:
+        return
+    if entry.quote.observed_on == entry.resale_price.observed_on:
+        return
+    raise DeclarationError(
+        path,
+        f"{field_prefix}.resale_price.retrieved_on",
+        f"is {entry.resale_price.observed_on.isoformat()} while "
+        f"{field_prefix}.price.retrieved_on is {entry.quote.observed_on.isoformat()}. A buy "
+        "and a sell price for one instrument are one observation of one market, and each is "
+        "carried to the day it prices net of the coupons that detached since it was read -- so "
+        "two dates would take a coupon out of one leg and leave it in the other.",
+        "read both prices in one retrieval, or declare only the one that was read",
+    )
 
 
 def _check_resale_price(

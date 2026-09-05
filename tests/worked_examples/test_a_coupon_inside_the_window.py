@@ -417,13 +417,10 @@ def test_the_accrued_residual_is_stated_on_every_early_exit() -> None:
     or not a coupon interrupts it -- so 18 of this section's 23 sales would have stated nothing
     while being understated all the same.
 
-    Signed, and the sign is warranted rather than assumed. With no coupon detaching, both dates
-    sit inside one accrual period and accrual only grows, so the carried price is below the true
-    one. With a coupon detaching, what came out is the whole coupon where what was in the
-    quotation was the part of it that had accrued -- smaller, by definition. Both arguments
-    need the quotation to **predate** the sale, which every one of the owner's does; a backdated
-    window states the claim without a direction, and that split is asserted where a backdated
-    window exists rather than here.
+    **Stated on every one; signed on most.** Which of them may carry a direction is a separate
+    question with its own warrant and its own test below -- this one is about the claim being
+    made at all, because the figure is approximate on every sale whether or not the direction
+    of the approximation can be stated.
     """
     assert {item.value for item in Exclusion} & EARLY_EXIT_CLAIMS == EARLY_EXIT_CLAIMS
     section = answers.answered().sections[0]
@@ -432,7 +429,6 @@ def test_the_accrued_residual_is_stated_on_every_early_exit() -> None:
         for item in section.excludes
         if item.what is Exclusion.EARLY_EXIT_IGNORES_ACCRUED_INTEREST
     ]
-    assert all(item.direction is Direction.SALE_STRUCK_TOO_LOW for item in accrued)
     sold = _sold_early(0)
     assert {item.applies_to for item in accrued} == {item.key for item in sold}
     # Non-vacuous in the direction that matters: most of this population detached nothing, so a
@@ -440,6 +436,51 @@ def test_the_accrued_residual_is_stated_on_every_early_exit() -> None:
     assert [item for item in sold if _detached(item) == 0.0]
     stated = {item.what.value for item in section.excludes if item.what.value in EARLY_EXIT_CLAIMS}
     assert stated == EARLY_EXIT_CLAIMS
+
+
+def test_the_residual_loses_its_sign_where_a_coupon_left_before_the_purchase() -> None:
+    """The warrant, and the exact population it does not cover, from the declared schedules.
+
+    The residual is ``a(sale) - a(quotation) + detached``, and what makes it positive is that
+    ``detached`` covers the accrual the quotation had built -- an accrual within a period being
+    smaller than the coupon that ends it. A coupon that detached before the holding bought the
+    paper comes out of neither price, so it is missing from ``detached`` while having reset the
+    accrual, and the residual goes the other way. Measured on UA4000231195, whose coupon of
+    87.50 fell on 2026-08-26::
+
+        a(2026-08-24)   87.50 x 180/182 = 86.54   -- two days short of the coupon
+        a(2026-10-01)   87.50 x  36/182 = 17.31   -- 36 days into the next period
+        residual        17.31 - 86.54 + 0.00 = **-69.23**, struck too HIGH
+
+    The population is computed from the payment lists rather than from
+    ``skipped_before_purchase``, so the engine and the check reach it by different routes.
+    """
+    declared = _supplied().registries
+    unsigned = set()
+    signed = set()
+    for index, section in enumerate(answers.answered().sections):
+        for item in _sold_early(index):
+            quote = declared.access[item.key.instrument_id].resale_price
+            assert quote is not None, item.key.instrument_id
+            skipped = _coupons_declared_between(
+                item.key.instrument_id,
+                quote.observed_on,
+                _bought_on(item, section.horizon.start),
+            )
+            stated = next(
+                one
+                for one in section.excludes
+                if one.what is Exclusion.EARLY_EXIT_IGNORES_ACCRUED_INTEREST
+                and one.applies_to == item.key
+            )
+            if skipped:
+                unsigned.add(item.key.instrument_id)
+                assert stated.direction is None, item.key.instrument_id
+            else:
+                signed.add(item.key.instrument_id)
+                assert stated.direction is Direction.SALE_STRUCK_TOO_LOW, item.key.instrument_id
+    assert unsigned == set(BEFORE_THE_PURCHASE)
+    assert len(signed) > len(unsigned)
 
 
 def test_a_backdated_window_states_the_residual_without_a_direction() -> None:

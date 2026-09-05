@@ -1112,7 +1112,13 @@ def _bond_outcome(
     match outcome:
         case Projection():
             return outcome
-        case InconsistentTerms() if outcome.second_term == "access.resale_price":
+        # Both terms, not just the second. `access.resale_price` is the second term of two
+        # different refusals: the window that outlives the paper and has no price to sell at,
+        # whose remedy IS a declaration, and a reinvesting holding a single quotation cannot
+        # price, whose remedy is the coupon policy. Matching the second alone routed the
+        # latter into a missing declaration and told the owner to declare a price he already
+        # has.
+        case InconsistentTerms(first_term="horizon.end", second_term="access.resale_price"):
             return DeclarationMissing(
                 part="access",
                 what=f"{prepared.access.instrument_id}: access.resale_price",

@@ -52,7 +52,7 @@
   excludes early_exit_is_a_point_not_a_distribution UA4000231195             more_certain_than_it_is
   excludes early_exit_spread_is_a_sellers_quote   UA4000231195             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000231195             
-  excludes early_exit_ignores_accrued_interest    UA4000231195             the_sale_is_struck_too_low
+  excludes early_exit_ignores_accrued_interest    UA4000231195             
   excludes early_exit_is_a_point_not_a_distribution UA4000233712             more_certain_than_it_is
   excludes early_exit_spread_is_a_sellers_quote   UA4000233712             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000233712             
@@ -128,7 +128,7 @@
   excludes early_exit_is_a_point_not_a_distribution UA4000239081             more_certain_than_it_is
   excludes early_exit_spread_is_a_sellers_quote   UA4000239081             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000239081             
-  excludes early_exit_ignores_accrued_interest    UA4000239081             the_sale_is_struck_too_low
+  excludes early_exit_ignores_accrued_interest    UA4000239081             
   excludes early_exit_is_a_point_not_a_distribution UA4000239107             more_certain_than_it_is
   excludes early_exit_spread_is_a_sellers_quote   UA4000239107             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000239107             
@@ -175,7 +175,7 @@
   excludes early_exit_is_a_point_not_a_distribution UA4000231195             more_certain_than_it_is
   excludes early_exit_spread_is_a_sellers_quote   UA4000231195             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000231195             
-  excludes early_exit_ignores_accrued_interest    UA4000231195             the_sale_is_struck_too_low
+  excludes early_exit_ignores_accrued_interest    UA4000231195             
   excludes early_exit_is_a_point_not_a_distribution UA4000233712             more_certain_than_it_is
   excludes early_exit_spread_is_a_sellers_quote   UA4000233712             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000233712             
@@ -243,7 +243,7 @@
   excludes early_exit_is_a_point_not_a_distribution UA4000239081             more_certain_than_it_is
   excludes early_exit_spread_is_a_sellers_quote   UA4000239081             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000239081             
-  excludes early_exit_ignores_accrued_interest    UA4000239081             the_sale_is_struck_too_low
+  excludes early_exit_ignores_accrued_interest    UA4000239081             
   excludes early_exit_is_a_point_not_a_distribution UA4000239107             more_certain_than_it_is
   excludes early_exit_spread_is_a_sellers_quote   UA4000239107             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000239107             
@@ -323,7 +323,7 @@
   excludes early_exit_is_a_point_not_a_distribution UA4000239081             more_certain_than_it_is
   excludes early_exit_spread_is_a_sellers_quote   UA4000239081             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000239081             
-  excludes early_exit_ignores_accrued_interest    UA4000239081             the_sale_is_struck_too_low
+  excludes early_exit_ignores_accrued_interest    UA4000239081             
   excludes early_exit_is_a_point_not_a_distribution UA4000239107             more_certain_than_it_is
   excludes early_exit_spread_is_a_sellers_quote   UA4000239107             the_spread_is_understated
   excludes early_exit_carries_no_rate_risk        UA4000239107             
@@ -334,4 +334,4 @@
 [excludes] no_income_tax_on_the_stated_amount
 
 [keys] SectionsAgreeByKey
-[digest] sha256:15060b522cdd60099e6de9cc1008e38f0d2c522a306f487c5ef54a038aff806b
+[digest] sha256:8c6c8833a73798ef5a1324e68c85a1c11fce022d74275335ff03d67ffe0ebaa6

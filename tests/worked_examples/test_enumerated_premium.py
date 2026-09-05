@@ -54,6 +54,7 @@ from typing import Final
 
 import pytest
 
+from terezy.core.errors import InconsistentTerms
 from terezy.core.instruments.interface import (
     Assumptions,
     DateRange,
@@ -376,6 +377,40 @@ class TestAPurchaseMadeAfterARepaymentOfPrincipal:
         assert outcome.sold_early.units == 5.0
         assert is_close(outcome.at_purchase.principal_returned.amount, 5_000.00 + 4_975.00)
         assert is_close(outcome.at_purchase.difference.amount, 25.00)
+
+    def test_a_repayment_and_a_detachment_in_one_window_refuse_rather_than_mis_price(
+        self,
+    ) -> None:
+        """The two per-unit conventions meeting, which is the case one quotation cannot serve.
+
+        Buy 2026-01-05, and by the sale on 2026-08-01 the schedule has repaid 500.00 per unit
+        (retiring five of the ten units) and paid a coupon of 50.00 (detaching from the
+        quotation). The 50.00 is declared per unit **as declared**, while the 995.00 it would
+        come out of now prices a unit that is half of what it was -- the subtraction would be
+        too small by that ratio. Both mechanisms are right on their own; what is missing is a
+        sale priced per tranche.
+        """
+        outcome = project.project(
+            self._amortising(),
+            _holding(on=HORIZON.start, paid=1_000.00 * 10.0),
+            replace(HORIZON, end=date(2026, 8, 1)),
+            HOLD_CASH,
+            tax_classes=DECLARATIONS.tax_classes,
+            assessment_rules=RULES["synthetic_fixture"],
+            early_exit=EarlyExit(
+                price_per_unit=Money(self.RESALE, UAH, prov.EMPTY),
+                observed_on=HORIZON.start,
+                assumption=QuotationHolds(
+                    id="test_quotation_holds",
+                    is_assumption=True,
+                    rationale="TEST FIXTURE -- the quoted resale price still holds at the exit.",
+                ),
+            ),
+        )
+        assert isinstance(outcome, InconsistentTerms), outcome
+        assert outcome.first_term == "instrument.schedule.payment"
+        assert outcome.second_term == "access.resale_price.per_unit"
+        assert "one quotation cannot price both" in outcome.reason
 
     def test_a_bond_that_repays_its_face_once_is_unaffected(self) -> None:
         """Why this was latent. For every declaration this repository ships, the amended

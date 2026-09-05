@@ -78,6 +78,18 @@ class SoldEarly:
     :attr:`on` is what the accrued-interest exclusion is about, and its **sign** is what decides
     whether that exclusion may state a direction at all."""
 
+    skipped_before_purchase: Money
+    """What left the quotation before this holding bought the paper, per unit, and was therefore
+    subtracted from neither leg.
+
+    Zero for all but two shipped issues, and it is what decides whether the accrued-interest
+    residual has a warranted sign. The residual is ``a(sale) - a(quotation) + detached``: with
+    nothing skipped, ``detached`` covers ``a(quotation)`` -- an accrual within a period is
+    smaller than the coupon that ends it -- and the residual is positive. What is skipped is
+    exactly what breaks that, because the coupon that reset the accrual comes out of neither
+    price.
+    """
+
     proceeds: Money
     """``units x price_per_unit``. Gross: the disposal's tax is charged like any other."""
 

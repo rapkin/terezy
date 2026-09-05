@@ -554,10 +554,14 @@ def _early_exit_exclusions(key: Tuple, sold: SoldEarly) -> tuple[StatedExclusion
     the quotation's own day. Gating it on a detachment would have left it unstated on the
     majority of the owner's sales while the figure was understated all the same.
 
-    **Its direction is stated only where the quotation predates the sale**, which is where the
-    warrant holds. A quotation dated *after* the sale is used unchanged
-    (``early_exit.detached_since``), and the residual then runs the other way; struck on the
-    quotation's own day there is no residual and no claim to make.
+    **Its direction is stated only where the warrant holds**, and two things break it. A
+    quotation dated *after* the sale is used unchanged (``early_exit.detached_since``) and the
+    residual runs the other way; struck on the quotation's own day there is no residual and no
+    claim to make. And a coupon that detached before the holding bought the paper comes out of
+    neither price -- the residual is ``a(sale) - a(quotation) + detached``, and what makes it
+    positive is that ``detached`` covers the accrual the quotation had built, which a skipped
+    coupon is exactly what it does not. Measured on the shipped registry: two issues pay on
+    2026-08-26, eight days before the owner's window buys, and their residual is negative.
     """
     stated = (
         StatedExclusion(
@@ -587,7 +591,11 @@ def _early_exit_exclusions(key: Tuple, sold: SoldEarly) -> tuple[StatedExclusion
             what=Exclusion.EARLY_EXIT_IGNORES_ACCRUED_INTEREST,
             applies_to=key,
             supplied_by=ACCRUED_INTEREST_SUPPLIED_BY,
-            direction=(Direction.SALE_STRUCK_TOO_LOW if sold.quoted_on < sold.on else None),
+            direction=(
+                Direction.SALE_STRUCK_TOO_LOW
+                if sold.quoted_on < sold.on and sold.skipped_before_purchase.amount == 0.0
+                else None
+            ),
         ),
     )
 

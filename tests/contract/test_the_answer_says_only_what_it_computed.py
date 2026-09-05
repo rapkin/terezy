@@ -288,13 +288,25 @@ def test_an_early_exit_states_its_claims_and_leaves_rate_risk_unsigned() -> None
     ]
     assert specific
     assert not [item for item in fixture.excludes if item.applies_to is not None]
-    by_claim = {item.what: item for item in specific}
-    assert set(by_claim) == EARLY_EXIT_CLAIMS
-    assert by_claim[Exclusion.EARLY_EXIT_IS_A_POINT_NOT_A_DISTRIBUTION].direction is not None
-    assert by_claim[Exclusion.EARLY_EXIT_SPREAD_IS_A_SELLERS_QUOTE].direction is not None
-    assert by_claim[Exclusion.EARLY_EXIT_CARRIES_NO_RATE_RISK].direction is None
-    accrued = by_claim[Exclusion.EARLY_EXIT_IGNORES_ACCRUED_INTEREST]
-    assert accrued.direction is Direction.SALE_STRUCK_TOO_LOW
+    # Every direction each claim was given, not one per claim: a dict keyed by the claim keeps
+    # whichever candidate came last, and the accrued one is deliberately signed on some
+    # candidates and not on others.
+    directions: dict[Exclusion, set[Direction | None]] = {}
+    for item in specific:
+        directions.setdefault(item.what, set()).add(item.direction)
+    assert set(directions) == EARLY_EXIT_CLAIMS
+    assert None not in directions[Exclusion.EARLY_EXIT_IS_A_POINT_NOT_A_DISTRIBUTION]
+    assert None not in directions[Exclusion.EARLY_EXIT_SPREAD_IS_A_SELLERS_QUOTE]
+    assert directions[Exclusion.EARLY_EXIT_CARRIES_NO_RATE_RISK] == {None}
+    # Signed where the warrant holds and unsigned where it does not; which candidates fall
+    # either side is pinned from the declared schedules in the worked example.
+    assert directions[Exclusion.EARLY_EXIT_IGNORES_ACCRUED_INTEREST] <= {
+        Direction.SALE_STRUCK_TOO_LOW,
+        None,
+    }
+    assert (
+        Direction.SALE_STRUCK_TOO_LOW in directions[Exclusion.EARLY_EXIT_IGNORES_ACCRUED_INTEREST]
+    )
 
 
 def test_every_exclusion_names_what_would_supply_it() -> None:

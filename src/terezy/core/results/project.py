@@ -406,6 +406,13 @@ def _sold_early(
         price_per_unit=money.sub(early_exit.price_per_unit, detached),
         detached_per_unit=detached,
         quoted_on=early_exit.observed_on,
+        skipped_before_purchase=early_exit_scenario.detached_since(
+            observed_on=early_exit.observed_on,
+            held_from=early_exit.observed_on,
+            sold_on=holding.purchased_on,
+            coupons=ops.coupons_per_unit(declaration),
+            currency=early_exit.price_per_unit.currency,
+        ),
         proceeds=sale.amount,
         assumption=early_exit.assumption,
     )
