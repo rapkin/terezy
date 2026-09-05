@@ -425,3 +425,15 @@ reinforces:
 |---|---|
 | **F2** | *Switching display currency changes no realised amount, no tax figure, and no after-tax UAH ranking.* **Not approached, and the reason is the simplest one available: there is no switch.** The owner deferred it on 2026-09-03, so this feature builds neither the control nor the assertion, and `web-display-currency-switch` in `specs/features.toml` is what the row now waits on. What is true and worth recording is that the figure slot this feature does build has a refusal state (`web/tests/unit/figure-slot.test.tsx`), so the day a display conversion is declared, the slot it lands in already exists. |
 | **E5** | Closed since 2026-08-21 and reinforced here on a third surface, after the tables and feature 005's diagrams. The mark survives from a TOML file to a pixel: a citation, `retrieved_on` and `verified_on` read off a rendered card are found in the file that card itself names (`web/e2e/us1-citation.spec.ts`), and every mark assertion strips each element's style and class attributes before reading it (`web/tests/unit/mark.test.tsx`) — the reading `tests/contract/test_diagram_marks.py` already applies to diagrams. The box does not move because it has already moved; what this records is that the property still holds one surface further out. |
+
+**022-accrued-interest** closes **no** row. No lettered behaviour names accrued interest, a
+clean price or a carried quotation (measured 2026-09-05), and the feature says so rather than
+stretching one: what it lands is the arithmetic that makes an early exit return a real holding
+period's interest instead of the round-trip spread.
+
+| Row | How, and why the box does not move |
+|---|---|
+| **D1** | The nearest row, and **unchanged by design.** D1 is a bond bought at a *stated* price and held to maturity reproducing a hand-computed schedule. Nothing about a generative schedule moved; what moved is the price a purchase is *sized* from, which D1 states rather than derives. The feature's own hand-computed example is `tests/worked_examples/test_accrued_interest.py` — three accruals, two clean prices, both carried prices and 49 758.37 reached on the owner's own 50 000 — and it answers a different question. |
+| **D3** | Untouched. A restructuring haircut is still nobody's declaration. |
+| **E5** | Pressed once more, and this time on a figure built by arithmetic across two files: a carried price is a quotation less one declared accrual plus another, and it carries the marks of the quotation **and** of every coupon that bounded a period it used (`tests/worked_examples/test_accrued_interest.py`, `tests/worked_examples/test_early_exit_sale.py`). A subtraction that laundered either would be the top-severity defect Principle I names. |
+| **K1** | Reinforced: both goldens moved and were regenerated deliberately, with one moved line hand-checked against the worked example. `the_answer.golden.txt` records three issues leaving as **named refusals** rather than as a shorter list, which is what keeps a shrinking population from reading as a disappearance. |

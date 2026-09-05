@@ -187,9 +187,15 @@ PLANTED: dict[str, tuple[Registries, dict[str, object]]] = {
         {},
     ),
     "BelowMinimumTicket": (fixtures.declared(), {"amounts": _tiny()}),
+    # The window opens on `enumerated_taxable_x`'s first declared coupon: it is the one
+    # instrument here that declares a small enough ticket to reach this arm, and a purchase
+    # before its first coupon has no accrual period to be priced in (022 FR-001).
     "BuysNoWholeUnit": (
         fixtures.declared(),
-        {"amounts": {fixtures.SALARY: Money(500.0, fixtures.UAH, prov.EMPTY)}},
+        {
+            "amounts": {fixtures.SALARY: Money(500.0, fixtures.UAH, prov.EMPTY)},
+            "horizon": DateRange(start=date(2026, 7, 5), end=fixtures.HORIZON.end),
+        },
     ),
     # 015 FR-029 narrowed this arm to the fund. A bond outliving its horizon is now **sold**
     # at the end of it, so a short horizon plants a missing resale price rather than this; what

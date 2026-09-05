@@ -45,6 +45,7 @@ from terezy.core.results.ramp import ExitCostUnknown, RouteUnusable
 from terezy.core.routes.legs import RouteStatus
 from terezy.core.routes.path import Candidate, ExitChoice
 from terezy.core.scenarios.early_exit import SoldEarly
+from terezy.core.scenarios.quotation import QuotationHolds
 
 InstrumentPlan = Assumptions | FundAssumptions
 """How the holding is run, and therefore **which declared way out this tuple takes**.
@@ -379,6 +380,17 @@ class TupleOutcome:
     Typed rather than left to be read out of :attr:`rests_on`: an early-exit figure carries
     stated exclusions of its own (FR-033), and deciding whether to attach them by searching a
     sentence is the string-matching 014 FR-014a already refuses for a refusal's case.
+    """
+
+    carried_quotation: QuotationHolds | None
+    """The belief a price this outcome rests on leaned on, or ``None`` where none did.
+
+    A quotation is a dated observation, so a price struck on any other day rests on it holding
+    (022 FR-018) -- **either leg**, which is why this is not a field of :attr:`sold_early`: a
+    holding bought from a quotation and held to its own maturity leans on the belief with no
+    early exit anywhere in it. Typed rather than read out of :attr:`rests_on` for the reason
+    that field gives: deciding whether to attach a stated exclusion by searching a sentence is
+    the string matching 014 FR-014a refuses.
     """
 
     rests_on: tuple[str, ...]

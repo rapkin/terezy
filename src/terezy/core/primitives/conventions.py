@@ -328,8 +328,8 @@ class ConventionsApplied:
     """
 
     business_day_rule: str
-    """The declared rule that moved a payment off a non-business day. Applied to the
-    payment date only; the accrual was measured on the unadjusted dates."""
+    """The declared rule that moved a payment off a non-business day. It did not move the
+    period each coupon's **size** was measured over (`docs/METHODOLOGY.md` §1.3)."""
 
 
 _DECLARED_REASON: Final = (

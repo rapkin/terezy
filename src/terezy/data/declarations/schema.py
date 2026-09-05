@@ -2020,7 +2020,7 @@ class InflationAssumptionTable(BaseModel):
 # no source that could vouch for the belief rather than replace it.
 
 
-class EarlyExitTable(BaseModel):
+class QuotationBeliefTable(BaseModel):
     """``[early_exit]`` -- what an observed resale quotation is worth at a future exit date."""
 
     model_config = STRICT
@@ -2034,12 +2034,12 @@ class EarlyExitTable(BaseModel):
     """Why the owner is willing to assume it. Required and non-empty."""
 
 
-class EarlyExitFile(BaseModel):
-    """A whole ``data/scenarios/early_exit/<owner>.toml``: one owner's belief."""
+class QuotationBeliefFile(BaseModel):
+    """A whole ``data/scenarios/quotation/<owner>.toml``: one owner's belief."""
 
     model_config = STRICT
 
-    early_exit: EarlyExitTable
+    quotation: QuotationBeliefTable
 
 
 class InflationAssumptionFile(BaseModel):

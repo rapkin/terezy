@@ -208,7 +208,14 @@ class TestASeriesWithNoRateToFind:
         # exit fee is charged on a movement that did not happen. The principal is not taxable
         # income and still comes back, which is why this leaves a rate rather than no series
         # at all.
-        outcome = _evaluated(_taxed_at(fixtures.declared(), pit=0.5, levy=0.5))
+        # `fixtures.HORIZON` rather than the module's default: it opens on the day the money
+        # leaves, so the purchase settles on the day the fixture quotation was read and buys
+        # ten whole units at par. Opened on the issue date the money lands a day later, at a
+        # day of accrual more, and nine units come back instead -- which would make the round
+        # 10 000.00 below an arithmetic point rather than a stated one.
+        outcome = _evaluated(
+            _taxed_at(fixtures.declared(), pit=0.5, levy=0.5), horizon=fixtures.HORIZON
+        )
         assert isinstance(outcome, TupleOutcome), outcome
         assert [arrival.released_on for arrival in outcome.arrivals] == [date(2028, 1, 17)]
         assert outcome.reaches.amount == 10_000.0
@@ -425,7 +432,7 @@ class TestAForeignInstrumentIsClosedByTwoGuardsAndNotByTheShippedData:
             quote=fixtures.VenueQuote(
                 price=Money(1_000.0, Currency.USD, prov.EMPTY),
                 kind="venue_terms",
-                observed_on=fixtures.OUTLAY_ON,
+                observed_on=fixtures.QUOTED_ON,
             ),
         )
         for route_id, origin, destination, sending, receiving, direction in (

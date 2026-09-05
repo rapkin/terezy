@@ -11,18 +11,21 @@ this module's own question (an outlay on 2026-04-01, a horizon ending 2030-06-30
 instrument):
 
     66 pairs considered  =  33 pairs enumerated  + 33 pairs yielding no candidate
-    33 candidates        =  27 evaluated         +  6 dropped
+    33 candidates        =  20 evaluated         + 13 dropped
 
 The **second** line is the one that moves with the question. Refusals across 010's union turn on
-the amount, on the horizon and on `as_of`, so 27 and 6 are facts about *this* question rather
+the amount, on the horizon and on `as_of`, so 20 and 13 are facts about *this* question rather
 than about the registry -- which is why FR-012 puts the whole question on the record beside
 every count, and why the identities are asserted against the set rather than against the
 numbers above. Both are derived here; the literals are the reader's check on the derivation.
 
-Four of the six drops are what a real registry looks like: `UA4000239016`, `UA4000239040`,
-`UA4000239081` and `UA4000239107` were placed after this question's outlay date, so buying them
-on it is buying paper that did not exist. The other two are the funds that size their payouts
-in USD with no declared rate, and they are the two that dropped before 016 declared anything.
+Eleven of the thirteen drops are the same fact in two forms: this question buys on 2026-04-02,
+and an instrument has no price on a date no declared accrual period contains (022 FR-001).
+`UA4000239016`, `UA4000239040`, `UA4000239081` and `UA4000239107` were placed after the outlay
+date, so buying them on it is buying paper that did not exist; `UA4000238992`, `UA4000239008`
+and the five enumerated fixtures declare their first coupon later than the purchase, so the
+quotation cannot be carried to it. The other two are the funds that size their payouts in USD
+with no declared rate, and they are the two that dropped before 016 declared anything.
 """
 
 from __future__ import annotations
@@ -69,8 +72,8 @@ class TestTheThreePopulationsPartitionEverythingConsidered:
 
     def test_candidates_enumerated_equals_evaluated_plus_dropped(self) -> None:
         result = _survey()
-        assert len(evaluated(result.comparison)) == 27
-        assert len(dropped(result.comparison)) == 6
+        assert len(evaluated(result.comparison)) == 20
+        assert len(dropped(result.comparison)) == 13
         assert len(evaluated(result.comparison)) + len(dropped(result.comparison)) == len(
             result.enumerated.candidates
         )

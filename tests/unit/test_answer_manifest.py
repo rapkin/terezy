@@ -132,7 +132,7 @@ def test_the_inputs_are_ordered_by_kind_and_id_rather_than_by_the_filesystem() -
         "groups.toml",
         "candidates/owner-001.toml",
         "composition/owner-001.toml",
-        "scenarios/early_exit/owner-001.toml",
+        "scenarios/quotation/owner-001.toml",
     ],
 )
 def test_editing_one_file_moves_exactly_one_digest(tmp_path: Path, relative: str) -> None:

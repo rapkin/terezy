@@ -55,7 +55,7 @@ from terezy.core.errors import (
     UnresolvedTaxClass,
 )
 from terezy.core.inflation.series import CpiSeries, InflationAssumption
-from terezy.core.instruments import fixed_income
+from terezy.core.instruments import accrual, fixed_income
 from terezy.core.instruments import registry as instrument_registry
 from terezy.core.instruments import terms as instrument_terms
 from terezy.core.instruments.interface import (
@@ -78,7 +78,6 @@ from terezy.core.results import hurdle as hurdle_figures
 from terezy.core.results import schedule as schedule_rows
 from terezy.core.results.hurdle import CashFlow, HurdleRate
 from terezy.core.results.schedule import CashFlowSchedule, ChargedOn
-from terezy.core.scenarios import early_exit as early_exit_scenario
 from terezy.core.scenarios.early_exit import SoldEarly
 from terezy.core.tax import registry as tax_registry
 from terezy.core.tax import year as tax_year
@@ -304,7 +303,7 @@ def project(
     # would then move when the owner changed their mind about coupons -- a figure
     # labelled "contractual" that is not (FR-005). Policy-invariance is asserted by
     # tests/unit/test_contractual_yield_is_policy_invariant.py.
-    sold_early = _sold_early(declaration, ops, holding, gross_events, early_exit)
+    sold_early = _sold_early(declaration, ops, gross_events, early_exit)
     contractual_events = _contractual_events(declaration, holding, horizon, assumptions, early_exit)
     if isinstance(contractual_events, InfeasiblePurchase | InconsistentTerms):
         return contractual_events  # pragma: no cover -- the policy run already succeeded
@@ -360,8 +359,8 @@ def _sale_excludes(sold: SoldEarly | None) -> frozenset[str]:
         {
             "the contractual figure closes at a declared resale price rather than at maturity "
             f"({sold.on.isoformat()}), under the stated belief {sold.assumption.id!r} that the "
-            "observed quotation holds at that date less the coupons that detached while the "
-            "holding held the paper -- neither is a term of the paper"
+            "clean price implied by the observed quotation still holds on that date -- neither "
+            "is a term of the paper"
         }
     )
 
@@ -369,7 +368,6 @@ def _sale_excludes(sold: SoldEarly | None) -> frozenset[str]:
 def _sold_early(
     declaration: InstrumentDeclaration,
     ops: InstrumentOps,
-    holding: Holding,
     events: Sequence[Event],
     early_exit: EarlyExit | None,
 ) -> SoldEarly | None:
@@ -389,30 +387,27 @@ def _sold_early(
     if sale.quantity is None:  # pragma: no cover -- `early_sale` always carries one
         return None
     # Recomputed from the declaration rather than divided back out of the proceeds. The two
-    # agree to within a float or two, and that is the problem: whether anything detached is
-    # read off this figure, and a round-trip through a division makes that answer depend on the
-    # quantity. Both sides read the same schedule through the same function, so this cannot
+    # agree to within a float or two, and that is the problem: the clean price and the accrual
+    # are read off this figure, and a round trip through a division would make them depend on
+    # the quantity. Both sides read the same schedule through the same function, so this cannot
     # drift from what `early_sale` struck.
-    detached = early_exit_scenario.detached_since(
+    carried = accrual.carried_to(
+        accrual.schedule_of(declaration, ops.coupons_per_unit(declaration)),
+        quote=early_exit.price_per_unit,
         observed_on=early_exit.observed_on,
-        held_from=holding.purchased_on,
-        sold_on=sale.occurred_on,
-        coupons=ops.coupons_per_unit(declaration),
-        currency=early_exit.price_per_unit.currency,
+        on=sale.occurred_on,
+        quoted_term="access.resale_price.observed_on",
+        dated_term="horizon.end",
     )
+    if isinstance(carried, InconsistentTerms):  # pragma: no cover -- `early_sale` refused first
+        return None
     return SoldEarly(
         on=sale.occurred_on,
         units=sale.quantity,
-        price_per_unit=money.sub(early_exit.price_per_unit, detached),
-        detached_per_unit=detached,
+        price_per_unit=accrual.price(carried),
+        clean_per_unit=carried.clean,
+        accrued_per_unit=carried.accrued,
         quoted_on=early_exit.observed_on,
-        skipped_before_purchase=early_exit_scenario.detached_since(
-            observed_on=early_exit.observed_on,
-            held_from=early_exit.observed_on,
-            sold_on=holding.purchased_on,
-            coupons=ops.coupons_per_unit(declaration),
-            currency=early_exit.price_per_unit.currency,
-        ),
         proceeds=sale.amount,
         assumption=early_exit.assumption,
     )
@@ -479,8 +474,8 @@ def _at_purchase(
     resale price times the holding's own quantity, and the *quantity* came from the holding:
     marking the figure with the terms on that account would send a reader chasing its
     unverified mark to a file that did not supply it. What the struck price already carries it
-    keeps -- since 2026-09-03 that is the quotation's sources **and**, where a coupon detached,
-    the schedule's, because the price is the quotation less those declared amounts. Where
+    keeps -- the quotation's sources **and** the schedule's, because the price is the quotation
+    net of one declared accrual and plus another. Where
     something retired, the terms are on the figure for the second reason too: the units sold
     are what the declared repayments left, so the terms decided that quantity.
     """

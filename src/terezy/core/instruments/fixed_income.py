@@ -11,13 +11,14 @@ here is fixed in the engine: a second issue with a different frequency and a dif
 count is a data file and no code change (FR-021, SC-012), which is the property SC-003
 exists to prove.
 
-**Accrual is measured on unadjusted dates; only the payment date moves.** The declared
-business-day rule is applied to the date money changes hands, not to the period interest
-accrued over. Adjusting the accrual boundary as well would make every coupon depend on
-where weekends fell, and two economically identical bonds would pay different amounts --
-which is not what a fixed-coupon bond does. The consequence is visible in the D1 worked
-example, where the final coupon of a Saturday maturity is paid on the Monday and is
-nonetheless the ordinary 184-day amount.
+**A coupon's size is measured on unadjusted dates; only the payment date moves.** The
+declared business-day rule is applied to the date money changes hands, not to the period
+interest accrued over. Adjusting that period as well would make every coupon depend on where
+weekends fell, and two economically identical bonds would pay different amounts -- which is
+not what a fixed-coupon bond does. The consequence is visible in the D1 worked example, where
+the final coupon of a Saturday maturity is paid on the Monday and is nonetheless the ordinary
+184-day amount. **What 022 carries a quotation between is the *paid* dates**, so the intra-period
+accrual it computes is not on this footing (`docs/METHODOLOGY.md` §1.3).
 
 **Gross amounts only.** No tax is netted here (that is a ``ChargeFn``'s job downstream)
 and no route or access cost is applied (per Principle VI those belong to
@@ -91,7 +92,6 @@ from terezy.core.ledger.events import CausationKind, CausationRef, Event, EventK
 from terezy.core.primitives import conventions, money
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.tolerance import is_close
-from terezy.core.scenarios import early_exit as early_exit_terms
 
 if TYPE_CHECKING:  # pragma: no cover -- import-time cycle avoidance
     from terezy.core.instruments.interface import (
@@ -182,37 +182,6 @@ def events(
         ):
             stream.append(_reinvestment(declaration, holding, period, sequence=len(stream) + 1))
             units += period.reinvestment.units_bought
-    detached = (
-        early_exit_terms.detached_since(
-            observed_on=early_exit.observed_on,
-            held_from=holding.purchased_on,
-            sold_on=horizon.end,
-            coupons=coupons_per_unit(declaration),
-            currency=early_exit.price_per_unit.currency,
-        )
-        if sells_early and early_exit is not None
-        else None
-    )
-    if detached is not None and detached.amount > 0.0 and units != holding.quantity:
-        # **A reinvesting holding whose quotation actually moves is refused, not priced.**
-        # `early_sale` applies one per-unit adjustment to every unit, and a unit bought out of a
-        # coupon was not held when the earlier coupons detached -- so the reinvested tranche
-        # would be discounted for coupons it never contained. Pricing it needs a per-tranche
-        # sale, which is a change to the disposal and not to this line. Where nothing detached
-        # there is no adjustment to misapply and the sale stands; `enumerated` refuses
-        # reinvestment outright, so this is the only form that can reach either case.
-        return InconsistentTerms(
-            first_term="assumptions.coupon_policy",
-            second_term="access.resale_price",
-            reason=(
-                f"{declaration.id!r} reinvested its coupons into "
-                f"{units - holding.quantity!r} further unit(s) and the window sells the "
-                f"position on {horizon.end.isoformat()}, before its terms end. One resale "
-                "quotation cannot price units acquired on different dates: what detached from "
-                "it before a unit was bought was never in that unit's price. Hold the coupons "
-                "as cash, or extend the window to the instrument's own terms."
-            ),
-        )
     if sells_early and early_exit is not None:
         sale = acquire.early_sale(
             declaration,

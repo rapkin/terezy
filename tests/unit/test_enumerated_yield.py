@@ -158,26 +158,18 @@ class TestTheContractualYieldIsProducedRatherThanRefused:
         assert abs(hurdle.net_present_value(flows, projected.hurdle.nominal_ytm.value)) < TOLERANCE
 
 
-class TestTheYieldStatesTheDirtyPriceExclusion:
-    """SC-015, FR-023."""
+class TestNeitherFormExcludesTheAccruedCleanSplit:
+    """022 FR-013: 013 FR-023's dirty-price clause is removed, because it is no longer true.
 
-    def test_the_declared_schedule_states_it(self) -> None:
-        assert instrument_terms.DIRTY_PRICE in _projected(MIRROR).hurdle.excludes
+    The declared payment dates bound the accrual periods and the declaration carries a day
+    count, so an enumerated purchase price **is** separated into a clean price and an accrual
+    (`core.instruments.accrual`). What is left is the boundaries every figure already states,
+    identical for both forms -- which is what makes them comparable at all.
+    """
 
-    def test_the_generative_equivalent_does_not(self) -> None:
-        assert instrument_terms.DIRTY_PRICE not in _projected(GENERATIVE).hurdle.excludes
-
-    def test_it_is_added_to_the_standing_boundaries_and_replaces_none_of_them(self) -> None:
-        """The module constant is the floor. A declaration widens it; nothing narrows it."""
-        assert _projected(MIRROR).hurdle.excludes > hurdle.EXCLUDES
+    def test_neither_form_widens_the_standing_boundaries(self) -> None:
+        assert _projected(MIRROR).hurdle.excludes == hurdle.EXCLUDES
         assert _projected(GENERATIVE).hurdle.excludes == hurdle.EXCLUDES
-
-    def test_the_clause_names_both_missing_facts(self) -> None:
-        """FR-017: the start of the accrual period containing the purchase, and the basis
-        interest accrues on within it. Neither may be inferred, so the figure says so
-        rather than quietly assuming the price was clean."""
-        assert "accrual period" in instrument_terms.DIRTY_PRICE
-        assert "basis" in instrument_terms.DIRTY_PRICE
 
 
 def test_the_yield_needs_no_issue_date_and_the_declaration_has_none() -> None:

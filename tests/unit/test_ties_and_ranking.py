@@ -41,6 +41,7 @@ def _registries() -> Registries:
                 direction="inbound",
                 partner=fixtures.DOMESTIC_OUT,
                 fee_pct=fee,
+                latency_days=1,
             ),
         )
     return registries
@@ -58,7 +59,7 @@ def _ranked(others: tuple[Tuple, ...]) -> Comparison:
         others,
         benchmark=fixtures.hurdle_tuple(),
         amount=fixtures.AMOUNT,
-        horizon=fixtures.DateRange(start=fixtures.ISSUE_DATE, end=fixtures.HORIZON_END),
+        horizon=fixtures.HORIZON,
         as_of=fixtures.AS_OF,
         continuation=fixtures.HOLD_AS_CASH,
         registries=_registries(),

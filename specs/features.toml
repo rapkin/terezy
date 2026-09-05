@@ -157,7 +157,7 @@ note   = "The first surface on which a mark and a refusal have to survive being 
 
 [[feature]]
 id     = "022-accrued-interest"
-status = "planned"
+status = "in-progress"
 needs  = ["013-enumerated-schedule", "016-real-ovdp"]
 why    = "013 declares the day count and is the FR-017 prohibition this lifts; 016 is what supplies every coupon date, which is the fact FR-017 said was missing"
 note   = "Owner decision 2026-09-05 -- an early exit must return a real holding period's interest, not the spread. Closes the enumerated-accrued-interest and the-buy-quotation-is-not-carried futures together; see specs/022-accrued-interest/spec.md."
@@ -318,3 +318,8 @@ note  = "A bond sold before maturity fetches what the market pays that day, and 
 id    = "cli-renders-raw-floats"
 after = ["015-the-question"]
 note  = "The CLI prints unrounded floats -- an amount as 49834.350000000006, a rate as 3.7e-16 -- so a correct figure reads as a broken one. Formatting only; see specs/015-the-question/spec.md for what the answer output carries."
+
+[[future]]
+id    = "generative-accrual-boundaries"
+after = ["022-accrued-interest"]
+note  = "022 carries a quotation between the dates a coupon leaves the price, which for a bond declared by its TERMS are the business-day-adjusted PAID dates -- while the opening boundary `terms.accrual_opens_at` supplies before the first coupon is the unadjusted issue date. The two conventions part company by at most two days -- weekends are the only non-business days declared anywhere (CL-1: no holiday calendar), so `following` moves a Saturday +2 and a Sunday +1, and `modified_following` moves a month-end Sunday -2. Measured on the `ovdp_synthetic_b` fixture, a period whose coupon was earned over 92 days is divided by 94, so the accrual reads about 2% low and `accrued(2028-09-02)` returns 29.97 instead of resetting. UNREACHABLE ON THE SHIPPED REGISTRY -- all 24 declared issues state their payments, where a declared date is a date and nothing adjusts it -- which is why it is recorded rather than closed. Both available fixes cost more than the defect today: adjusting the opening makes `core/instruments/terms.py` a FOURTH module reaching 017's uncited weekend notion, which `tests/contract/test_no_calendar_free_working_day.py` exists to refuse; using unadjusted accrual ends instead means pairing boundaries with amounts by position, which is the drift shape the whole schedule interface avoids. What would close it is a coupon record carrying its accrual period and its paid date together, so neither has to be re-derived. Found by review of 022, 2026-09-05."

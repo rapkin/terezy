@@ -118,7 +118,7 @@ from terezy.core.routes import capacity, legs
 from terezy.core.routes.channels import ChannelSide, FxChannel, Side, effective_rate
 from terezy.core.routes.legs import Leg, Route
 from terezy.core.routes.venues import Venue
-from terezy.core.scenarios.early_exit import QuotationHolds
+from terezy.core.scenarios.quotation import QuotationHolds
 from terezy.core.scenarios.regimes import Regime, RegimeTransition
 from terezy.core.streams import streams
 from terezy.core.streams.streams import IncomeStream, Indexation
@@ -3914,23 +3914,23 @@ def inflation_assumption_from_file(path: Path) -> tuple[str, InflationAssumption
 # 015-the-question: the belief an early exit is struck under
 # ---------------------------------------------------------------------------
 
-EARLY_EXIT_TABLE: Final = "early_exit"
-"""Root table of an early-exit belief file, and the prefix of every field path in one."""
+QUOTATION_TABLE: Final = "quotation"
+"""Root table of a quotation-belief file, and the prefix of every field path in one."""
 
 
-def early_exit_from_file(path: Path) -> tuple[str, QuotationHolds]:
-    """One ``data/scenarios/early_exit/<owner>.toml`` as its owner id and the declared belief.
+def quotation_belief_from_file(path: Path) -> tuple[str, QuotationHolds]:
+    """One ``data/scenarios/quotation/<owner>.toml`` as its owner id and the declared belief.
 
     ``inflation_assumption_from_file``'s shape, with **no citation read and none expected**: a
     platform that committed to its quoted buyback price would have declared a term on the
     access record, so a source here would replace the belief rather than vouch for it.
     """
     document = read_document(path)
-    table = _validate(schema.EarlyExitFile, document, path).early_exit
+    table = _validate(schema.QuotationBeliefFile, document, path).quotation
     if not table.is_assumption:
         raise DeclarationError(
             path,
-            f"{EARLY_EXIT_TABLE}.is_assumption",
+            f"{QUOTATION_TABLE}.is_assumption",
             "is declared false. Whether a quotation still holds on a future date is nobody's "
             "observation: a platform that committed to its price would have declared a term, "
             "and the term would live on the access declaration beside the price. The field "
@@ -3941,7 +3941,7 @@ def early_exit_from_file(path: Path) -> tuple[str, QuotationHolds]:
     return (
         _require_text(
             path,
-            f"{EARLY_EXIT_TABLE}.owner_id",
+            f"{QUOTATION_TABLE}.owner_id",
             table.owner_id,
             "a belief about the future is one person's, and every declaration carries its "
             "owner from the first commit (Principle VII)",
@@ -3949,7 +3949,7 @@ def early_exit_from_file(path: Path) -> tuple[str, QuotationHolds]:
         QuotationHolds(
             id=_require_text(
                 path,
-                f"{EARLY_EXIT_TABLE}.id",
+                f"{QUOTATION_TABLE}.id",
                 table.id,
                 "every outcome computed through the belief names it, so a reader can find the "
                 "file the assumption is stated in",
@@ -3957,7 +3957,7 @@ def early_exit_from_file(path: Path) -> tuple[str, QuotationHolds]:
             is_assumption=True,
             rationale=_require_text(
                 path,
-                f"{EARLY_EXIT_TABLE}.rationale",
+                f"{QUOTATION_TABLE}.rationale",
                 table.rationale,
                 "the rationale is what an assumption carries where an observation carries a "
                 "source: a figure conditional on an unexplained guess cannot be argued with",

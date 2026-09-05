@@ -69,7 +69,7 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.routes.channels import FxChannel
     from terezy.core.routes.legs import Leg, Route
     from terezy.core.routes.venues import Venue
-    from terezy.core.scenarios.early_exit import QuotationHolds
+    from terezy.core.scenarios.quotation import QuotationHolds
     from terezy.core.scenarios.regimes import Regime
     from terezy.core.streams.streams import IncomeStream
     from terezy.core.tax import year as tax_year
@@ -2539,7 +2539,7 @@ class TupleDeclarations:
     access_files: Mapping[str, Path]
     """Which file declared each entry, so a later failure can still name it."""
 
-    early_exit_file: Path
+    quotation_file: Path
     """Which file declared the spread-holds belief every early-exit figure rests on."""
 
     registries: Registries
@@ -2618,12 +2618,10 @@ def _check_access(
 def _check_one_observation(entry: InstrumentAccess, *, path: Path, field_prefix: str) -> None:
     """A buy and a sell price for one instrument are **one** observation of one market.
 
-    A sale subtracts only the coupons that detached after the **purchase**
-    (``core.scenarios.early_exit.detached_since``), and what makes that right is that a coupon
-    detaching before the purchase is inside the buy price too, so the two errors cancel in the
-    return. That argument needs the pair to have been read on one day. Nothing downstream can
-    see the pair -- the sale reads only the resale price -- so the agreement is enforced here
-    or nowhere.
+    Both are carried by one accrual from their own observation day, so the difference between
+    the two clean prices is the spread and nothing else -- which is only true if the pair was
+    read on one day. Nothing downstream can see the pair, so the agreement is enforced here or
+    nowhere.
     """
     if entry.quote is None or entry.resale_price is None:
         return
@@ -2634,9 +2632,9 @@ def _check_one_observation(entry: InstrumentAccess, *, path: Path, field_prefix:
         f"{field_prefix}.resale_price.retrieved_on",
         f"is {entry.resale_price.observed_on.isoformat()} while "
         f"{field_prefix}.price.retrieved_on is {entry.quote.observed_on.isoformat()}. A buy and "
-        "a sell price for one instrument are one observation of one market: a sale subtracts "
-        "the coupons that detached after the purchase, and what makes that right is that an "
-        "earlier one is inside the buy price too. Two dates break that.",
+        "a sell price for one instrument are one observation of one market: each is carried "
+        "to its own date by the accrual from the day it was read, so the two clean prices "
+        "differ by the spread only when that day is the same. Two dates break that.",
         "read both prices in one retrieval, or drop the resale price and let the early exit "
         "refuse for want of one",
     )
@@ -2763,15 +2761,15 @@ def _resolved_access(
     return access, declaring
 
 
-EARLY_EXIT_DIR = "scenarios/early_exit"
-"""Where the owner's early-exit belief lives, as a subdirectory of the scenarios directory.
+QUOTATION_DIR = "scenarios/quotation"
+"""Where the owner's belief about a dated quotation lives, under the scenarios directory.
 
 Nested for ``INFLATION_ASSUMPTION_DIR``'s reason: ``scenarios/*.toml`` is globbed and validated
 as scenario documents, and ``glob`` does not recurse.
 """
 
 
-def _resolved_early_exit(
+def _resolved_quotation_belief(
     root: Path, streams: Mapping[str, IncomeStream]
 ) -> tuple[QuotationHolds, Path]:
     """The one declared belief under a data root, checked against the streams' owner.
@@ -2780,12 +2778,12 @@ def _resolved_early_exit(
     *the quotation holds* would put a figure in the model that no file declares, which is the
     one thing the declaration exists to prevent.
     """
-    declared = sorted((root / EARLY_EXIT_DIR).glob("*.toml"))
+    declared = sorted((root / QUOTATION_DIR).glob("*.toml"))
     if not declared:
         raise DeclarationError(
-            root / EARLY_EXIT_DIR,
+            root / QUOTATION_DIR,
             "",
-            f"contains no *.toml declarations. An empty {EARLY_EXIT_DIR} directory is reported "
+            f"contains no *.toml declarations. An empty {QUOTATION_DIR} directory is reported "
             "rather than read as 'the observed quotation holds': a horizon means the money "
             "comes out at its end, so every comparison can reach an early exit, and a run that "
             "assumed the belief would report a figure no file declares.",
@@ -2793,20 +2791,20 @@ def _resolved_early_exit(
         )
     if len(declared) > 1:
         raise DeclarationError(
-            root / EARLY_EXIT_DIR,
+            root / QUOTATION_DIR,
             "",
-            f"holds {len(declared)} early-exit beliefs "
+            f"holds {len(declared)} quotation beliefs "
             f"({', '.join(path.name for path in declared)}), and this engine resolves one. Two "
             "beliefs cannot both be in force, and taking either would be choosing one by file "
             "order.",
             "keep one file per data root until multi-owner support lands",
         )
-    owner_id, assumption = loader.early_exit_from_file(declared[0])
+    owner_id, assumption = loader.quotation_belief_from_file(declared[0])
     owners = sorted({stream.owner_id for stream in streams.values()})
     if owner_id not in owners:
         raise DeclarationError(
             declared[0],
-            f"{loader.EARLY_EXIT_TABLE}.owner_id",
+            f"{loader.QUOTATION_TABLE}.owner_id",
             f"declares owner {owner_id!r}, but the income streams this belief is resolved with "
             f"belong to {owners}. What a person is willing to assume about a future price is "
             "his own statement, and one owner's belief marking another's figures would put two "
@@ -2844,7 +2842,7 @@ def tuple_from_data_root(
             "a mistyped path is indistinguishable from one emptied by a real gap.",
             "check the data root, or declare how each instrument is reached",
         )
-    early_exit, early_exit_file = _resolved_early_exit(root, covered.ramp.streams)
+    early_exit, quotation_file = _resolved_quotation_belief(root, covered.ramp.streams)
     access, declaring = _resolved_access(
         files,
         instruments=instruments.instruments,
@@ -2857,7 +2855,7 @@ def tuple_from_data_root(
         coverage=covered,
         access=access,
         access_files=declaring,
-        early_exit_file=early_exit_file,
+        quotation_file=quotation_file,
         registries=Registries(
             instruments=instruments.instruments,
             funds=instruments.funds,

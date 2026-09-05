@@ -28,7 +28,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import date
-from typing import TYPE_CHECKING, Final, assert_never
+from typing import TYPE_CHECKING, assert_never
 
 from terezy.core.instruments.interface import (
     BondTerms,
@@ -69,16 +69,6 @@ class TermsKnownFrom:
     which one it is making."""
 
 
-DIRTY_PRICE: Final = (
-    "the accrued/clean split: the purchase price is a dirty price and has not been "
-    "separated into a clean price and accrued interest, because two facts are missing and "
-    "neither may be inferred -- the start of the accrual period containing the purchase, "
-    "and the basis interest accrues on within it"
-)
-"""What a figure derived from a schedule of declared payments additionally does not
-account for (FR-017, FR-023). Phrased for a reader, because it is meant to be shown."""
-
-
 def known_from(terms: DeclaredTerms) -> TermsKnownFrom:
     """From what date are this instrument's terms known?"""
     match terms:
@@ -110,6 +100,50 @@ def day_count_of(terms: DeclaredTerms) -> str:
         case BondTerms() | EnumeratedTerms():
             return terms.day_count
         case _:  # pragma: no cover -- mypy proves this unreachable
+            assert_never(terms)
+
+
+def coupon_term_of(terms: DeclaredTerms) -> str:
+    """Which declared term states this instrument's coupon dates?
+
+    A refusal that could not price a date names the schedule it fell outside, and the two forms
+    declare that schedule under different keys. Naming one of them everywhere would send half
+    the readers to a table their file does not contain.
+    """
+    match terms:
+        case BondTerms():
+            return "instrument.terms.periodicity"
+        case EnumeratedTerms():
+            return "instrument.schedule.payment"
+        case _:  # pragma: no cover -- mypy proves this unreachable
+            assert_never(terms)
+
+
+def accrual_opens_at(terms: DeclaredTerms) -> date | None:
+    """The date these terms declare interest starts accruing from, where they declare one.
+
+    A period is bounded by two consecutive **declared** accrual boundaries, and the two forms
+    declare a different number of them. A bond declared by its terms states an issue date, and
+    its own schedule generator already opens the first accrual period there
+    (:func:`accrual_periods`) -- so the period before the first coupon is declared, not
+    inferred. A bond declared by its payments states no issue date at all: ``covers_from`` is a
+    claim about where the published **list** begins, and opening the first period there would
+    accrue a whole coupon over a stub whose true length nobody published (013 FR-021). Hence
+    ``None``, which the accrual reads as *this form bounds no period before its first coupon*.
+
+    **Unadjusted, while the boundary that closes the period is a paid date and has been through
+    the declared business-day rule** (``fixed_income.coupons_per_unit``), so a generative issue's
+    first accrual is divided by a span its coupon was not earned over. Unreachable on the shipped
+    registry -- every declared issue states its payments, where a date is a date -- and recorded
+    as `generative-accrual-boundaries` in `specs/features.toml`, which carries the measurement
+    and why neither available fix is cheaper than the defect.
+    """
+    match terms:
+        case BondTerms():
+            return terms.issue_date
+        case EnumeratedTerms():
+            return None
+        case _:  # pragma: no cover
             assert_never(terms)
 
 
@@ -235,14 +269,14 @@ def principal_returned(terms: DeclaredTerms, *, bought_on: date) -> Money:
 def excludes_of(terms: DeclaredTerms) -> frozenset[str]:
     """What does a figure derived from these terms fail to account for, beyond the usual?
 
-    Added to the boundaries every figure already states, never replacing them. FR-023 asks
-    for the exclusions to be able to **differ by declaration**; today exactly one does.
+    Added to the boundaries every figure already states, never replacing them. FR-023 asks for
+    the exclusions to be able to **differ by declaration**; today none does, and the empty set
+    is the answer rather than the absence of one -- 022 separated the accrued/clean split that
+    an enumerated projection used to exclude.
     """
     match terms:
-        case BondTerms():
+        case BondTerms() | EnumeratedTerms():
             return frozenset()
-        case EnumeratedTerms():
-            return frozenset({DIRTY_PRICE})
         case _:  # pragma: no cover -- mypy proves this unreachable
             assert_never(terms)
 

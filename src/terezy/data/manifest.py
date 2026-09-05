@@ -143,7 +143,7 @@ InputKind = Literal[
     "channel",
     "composition",
     "cpi_series",
-    "early_exit_assumption",
+    "quotation_assumption",
     "fund",
     "group_vocabulary",
     "inflation_assumption",
@@ -761,9 +761,9 @@ def answer_input_refs(declarations: resolver.AnswerDeclarations) -> tuple[InputR
             prov.EMPTY,
         ),
         _ref(
-            "early_exit_assumption",
+            "quotation_assumption",
             declarations.tuples.registries.quotation_holds.id,
-            declarations.tuples.early_exit_file,
+            declarations.tuples.quotation_file,
             prov.EMPTY,
         ),
     ]

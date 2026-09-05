@@ -78,7 +78,7 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
 REAL_TERMS_SUPPLIED_BY = "a real-terms rate on TupleOutcome, which feature 010 does not produce"
 INCOME_TAX_SUPPLIED_BY = "a deployable-capacity figure, which is a question about a stream"
 RATE_RISK_SUPPLIED_BY = "[[future]] secondary-market-rate-risk"
-ACCRUED_INTEREST_SUPPLIED_BY = "a declared accrual basis, which is feature 022-accrued-interest"
+CLEAN_PRICE_SUPPLIED_BY = "[[future]] secondary-market-rate-risk"
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -378,8 +378,8 @@ def _section(
         excludes=tuple(
             stated
             for item in _outcomes(outcome)
-            if item.sold_early is not None and item.key not in withheld
-            for stated in _early_exit_exclusions(item.key, item.sold_early)
+            if item.key not in withheld
+            for stated in _stated_exclusions(item)
         ),
     )
 
@@ -537,30 +537,39 @@ def _answer_wide_excludes() -> tuple[StatedExclusion, ...]:
     )
 
 
+def _stated_exclusions(item: TupleOutcome) -> tuple[StatedExclusion, ...]:
+    """What this candidate's figure does not account for, in the two groups it falls into.
+
+    **They are not the same population, and that is the whole of 022 FR-018.** Three claims
+    belong to the *early exit*: the figure is a point, the spread is a seller's quote, and no
+    rate risk is modelled. The fourth belongs to any price a **dated quotation was carried to**
+    -- and the buy leg is carried for every bond, including one held to its own maturity, which
+    strikes no sale and would otherwise rest on the belief while stating nothing.
+    """
+    stated: tuple[StatedExclusion, ...] = ()
+    if item.sold_early is not None:
+        stated += _early_exit_exclusions(item.key, item.sold_early)
+    if item.carried_quotation is not None:
+        stated += (
+            StatedExclusion(
+                what=Exclusion.QUOTED_CLEAN_PRICE_IS_ASSUMED_CONSTANT,
+                applies_to=item.key,
+                supplied_by=CLEAN_PRICE_SUPPLIED_BY,
+                direction=None,
+            ),
+        )
+    return stated
+
+
 def _early_exit_exclusions(key: Tuple, sold: SoldEarly) -> tuple[StatedExclusion, ...]:
     """What an early-exit figure does not account for, and which way each one errs.
 
     Rate risk is **symmetric** -- a bond sold after rates rise fetches less than its spread
-    implies and one sold after rates fall fetches more -- so it carries no direction, and SC-026
-    asserts that absence rather than tolerating it: a sign asserted without a warrant is a number
-    more confident than its inputs, which is worse than one left unstated.
-
-    **The accrued-interest claim is on every early exit a quotation was carried to, not only on
-    the ones a coupon detached from.** What it states is that a dirty quotation crossed a gap
-    without the accrual that gap builds, and the gap exists whenever the sale is not struck on
-    the quotation's own day. Gating it on a detachment would have left it unstated on the
-    majority of the owner's sales while the figure was understated all the same.
-
-    **Its direction is stated only where the warrant holds**, and two things break it. A
-    quotation dated *after* the sale is used unchanged (``early_exit.detached_since``) and the
-    residual runs the other way; struck on the quotation's own day there is no residual and no
-    claim to make. And a coupon that detached before the holding bought the paper comes out of
-    neither price -- the residual is ``a(sale) - a(quotation) + detached``, and what makes it
-    positive is that ``detached`` covers the accrual the quotation had built, which a skipped
-    coupon is exactly what it does not. Measured on the shipped registry: two issues pay on
-    2026-08-26, seven days before the owner's window buys, and their residual is negative.
+    implies and one sold after rates fall fetches more -- so it carries no direction, and
+    SC-026 asserts that absence rather than tolerating it: a sign asserted without a warrant is
+    a number more confident than its inputs, which is worse than one left unstated.
     """
-    stated = (
+    return (
         StatedExclusion(
             what=Exclusion.EARLY_EXIT_IS_A_POINT_NOT_A_DISTRIBUTION,
             applies_to=key,
@@ -578,21 +587,6 @@ def _early_exit_exclusions(key: Tuple, sold: SoldEarly) -> tuple[StatedExclusion
             applies_to=key,
             supplied_by=RATE_RISK_SUPPLIED_BY,
             direction=None,
-        ),
-    )
-    if sold.quoted_on == sold.on:
-        return stated
-    return (
-        *stated,
-        StatedExclusion(
-            what=Exclusion.EARLY_EXIT_IGNORES_ACCRUED_INTEREST,
-            applies_to=key,
-            supplied_by=ACCRUED_INTEREST_SUPPLIED_BY,
-            direction=(
-                Direction.SALE_STRUCK_TOO_LOW
-                if sold.quoted_on < sold.on and sold.skipped_before_purchase.amount == 0.0
-                else None
-            ),
         ),
     )
 

@@ -42,9 +42,10 @@ they are printed with the figure.
 ⚙ The count used to be written out as *three* and the fourth line was added without it,
 which is the exact staleness shape a count over its own list has. Corrected in 013, in the
 same change as the identical count in `core/results/hurdle.py`. A **declaration** can add to
-this set — the enumerated form adds one clause about the price it was bought at
-([§31.5](#315-what-the-figure-additionally-excludes)) — so the set is a floor rather than a
-closed list, and the figure prints whatever it actually carries.
+this set, so it is a floor rather than a closed list and the figure prints whatever it
+actually carries. No declaration adds one today: the clause the enumerated form used to add —
+that its purchase price was a dirty price nobody had separated — went with the separation
+arriving (§31.5).
 
 **Both return figures are still nominal, and beside them the real-terms slot now holds two
 real figures.** A nominal 16% against double-digit inflation is a materially different
@@ -164,8 +165,7 @@ so it receives that whole coupon.
 
 ### 1.3 The unadjusted accrual date and the adjusted payment date
 
-These are two different dates and conflating them is a real bug class, so the engine keeps
-them apart:
+These are two different dates and conflating them is a real bug class:
 
 - **Accrual** is measured between the **unadjusted** scheduled dates. The size of a coupon
   is a property of the paper.
@@ -175,6 +175,16 @@ them apart:
 If the accrual boundary moved as well, every coupon would depend on where weekends fell,
 and two economically identical bonds would pay different amounts. That is not what a
 fixed-coupon bond does.
+
+**The two are kept apart where a coupon is sized, and are not where a quotation is carried.**
+§31.5 bounds its accrual periods by the dates a coupon **leaves the price**, which are the
+*paid* dates — a coupon is in the price until it is paid, whichever day it accrued to. For an
+issue declared by its terms that puts an adjusted close against the unadjusted issue date this
+engine opens the first period at, so a first-period accrual is divided by a span its coupon was
+not earned over: at most two days on a 182-day period, since the only non-business days
+declared anywhere are weekends (§35 records that there is no holiday calendar). Unreachable on
+the shipped registry, where all 24 issues declare their payments and nothing adjusts a date,
+and recorded as `generative-accrual-boundaries` in `specs/features.toml`.
 
 The implemented rules are:
 
@@ -3473,19 +3483,64 @@ slot 0**: both renderings are three entries long, and no key of `PERIODICITY_FNS
 spelled `declared`, which is asserted rather than assumed. The three-name rendering is byte-for-byte what it has
 always been, so no existing row's digest moved for this.
 
-### 31.5 What the figure additionally excludes
+### 31.5 The accrual: what a dated quotation is worth on another day
 
-A secondary-market price is a **dirty price**: it includes interest that has accrued since the
-last coupon, and the buyer receives that interest back in the next coupon. Separating it would
-need two facts, and neither may be inferred — the start of the accrual period containing the
-purchase, and the basis interest accrues on within it. Neither is the issue date; what accrual
-actually needs is the **previous coupon date**.
+A secondary-market price is a **dirty price**: it contains the interest accrued since the last
+coupon, and it falls by the whole coupon on the day that coupon detaches. So a quotation read
+on one morning is not the price on any other day, and both legs of a round trip are carried:
 
-So no accrued-interest figure and no clean price is emitted, and the yield says so: an
-enumerated projection's `HurdleRate.excludes` carries the dirty-price clause that a generative
-one's does not. This is a prohibition rather than a refusal — nothing in the engine computes
-accrued interest today, so a typed refusal for it would be dead code — and the absence is
-proved by a walk over every field of every result record rather than assumed.
+```text
+period(t)   the declared accrual period containing t: [c_i, c_i+1)
+accrued(t)  = C_i+1  x  yf(c_i, t) / yf(c_i, c_i+1)   under the declared day count
+clean       = quote - accrued(observed_on)
+price(t)    = clean + accrued(t)
+```
+
+**A period is bounded by two consecutive declared accrual boundaries**, and the two forms
+declare a different number of them. §1's form states an issue date and its schedule generator
+already opens the first accrual period there, so the period before the first coupon is
+declared. A schedule of listed payments states no issue date at all: `covers_from` says where
+the published **list** begins, not when interest began, and three shipped issues show the
+difference is not academic — UA4000239081 declares 29 days from `covers_from` to a first
+coupon of 82.20 that its own next period pays over 182. Opening the first period there would
+accrue a whole coupon over a stub, and deriving the true start from the amounts is §31.7's
+forbidden step. So a date in no declared period **refuses by name**, and the three leave every
+answer as named refusals rather than as a shorter list.
+
+**Worked, on UA4000236228** — coupon 85.50, declared dates 2026-03-11, 2026-09-09 and
+2027-03-10 (182 days apart), `act/365`, quoted 2026-08-24 at 1089.32 to buy and 1087.89 to
+sell, bought 2026-09-02 and sold 2026-10-01:
+
+```text
+accrued(2026-08-24) = 85.50 x 166/182 =   77.98      166 days into [03-11, 09-09)
+accrued(2026-09-02) = 85.50 x 175/182 =   82.21      175 days into the same period
+accrued(2026-10-01) = 85.50 x  22/182 =   10.34       22 days into [09-09, 03-10)
+
+clean (buy)   = 1089.32 - 77.98 = 1011.34
+clean (sell)  = 1087.89 - 77.98 = 1009.91   the two clean prices differ by the whole
+                                            1.43 spread, and by nothing else
+purchase 2026-09-02 = 1011.34 + 82.21 = 1093.55
+sale     2026-10-01 = 1009.91 + 10.34 = 1020.24
+```
+
+The identity the whole model reduces to needs no decimals: the clean price cancels between the
+legs, so per unit `sale + coupon - purchase = 85.50 x 29/182 - 1.43` — 29 days held at the
+issue's own rate, less the round-trip spread.
+
+**One assumption, stated once: the accrual is linear within a period.** The NBU depository
+register publishes `pay_date`, `pay_val` and `pay_type` and nothing about how interest builds
+between them, so the issuer's own formula is not available and a straight line is a choice. It
+is declared with the owner's belief in `data/scenarios/quotation/` and reaches every figure
+that leans on it (§34.2).
+
+**The day count enters only as a ratio of two year fractions inside one period**, so §31.3
+stands: a ratio yields no coupon rate, and no issue date can be extrapolated from one. It is
+still computed with the declared convention rather than as a ratio of day counts, because the
+two part company across a year boundary.
+
+**A schedule declaring no coupon accrues nothing on every date**, and that is a figure rather
+than a refusal: a zero-coupon bond earns its return in the price, and the formula reproduces
+that with no special case.
 
 ### 31.6 The premium at purchase, and what governs it
 
@@ -3524,8 +3579,9 @@ of its own. What becomes of the difference is the declared category treatment's 
 - `per_event` — nothing nets; the difference is realised on its own disposal and nowhere else.
 
 The full cost stays the lot's basis. Nothing is amortised, nothing is imputed, and no part of
-it is reclassified as accrued interest — which is the only honest treatment while the two
-facts §31.5 names are missing.
+it is reclassified as accrued interest — even though §31.5 now separates the accrual out of the
+price. What the buyer paid is what he paid; how the law treats the accrued interest inside it
+is this section's premium figure and its declared category treatment, and nothing else.
 
 ### 31.7 What is inferred is declared, and the gate checks it
 
@@ -3854,8 +3910,8 @@ window is therefore **sold** on the window's last day rather than reported as im
 hold. The figure is:
 
 ```
-price per unit = the declared resale quotation
-               - every coupon per unit detaching in (max(quotation, purchase), sale]
+price per unit = the declared resale quotation, carried to the sale date (§31.5)
+               = clean + accrued(sale date), where clean = quote - accrued(observed_on)
 proceeds       = units still held x price per unit
 ```
 
@@ -3866,20 +3922,17 @@ a loss under the instrument's declared disposal-gain class, exactly as a redempt
 does. A sale below basis is what a spread *is*, and reporting it as a cash receipt would make
 the cost of the early exit invisible in the ledger.
 
-**The second line is not a refinement; without it the same money is counted twice.** A
-quotation is a **dated observation**, and a quoted bond price is a *dirty* price that falls by
-its coupon on the day the coupon detaches. Carrying it to the sale date unchanged credits the
-holding a coupon it collects inside the window *and* sells it at a price that still contains
-that coupon. A coupon dated **on** the sale day counts as detached: the holder receives it, and
-the schedule generators already pay it.
+**Carrying is not a refinement of the quotation; without it the same money is counted twice.**
+A quoted bond price falls by its coupon on the day the coupon detaches, so a quotation carried
+forward unchanged credits the holding a coupon it collects inside the window *and* sells it at
+a price that still contains that coupon. Under §31.5 that drop needs no rule of its own: a
+coupon between two dates puts them in different periods, the accrual resets, and the drop falls
+out of `price(t)`.
 
-The subtraction opens at the **later of the quotation and the purchase**, and the purchase half
-is what keeps one morning's two prices coherent. The buy quotation sizes the purchase as
-declared, so a coupon detaching between the quotation and the purchase sits in both prices and
-is received by neither holder — two shipped issues pay one on 2026-08-26, seven days before the
-owner's window buys. Taking it out of the sale alone would report a loss of a whole coupon that
-nobody took. What is double-counted, and all that is, is a coupon the holding both receives and
-is still credited with inside its sale price.
+**Both legs are carried, and the purchase leg has no second leg to cancel its error.** The buy
+quotation is carried to the settlement date for every bond purchase, including one held to its
+own maturity, which is where nothing else would state the difference between the price on the
+quotation's day and the price on the day the money arrives.
 
 Payments falling after the window are **absent** from the stream rather than moved. Nothing is
 paid early and nothing is folded into the sale.
@@ -3887,35 +3940,33 @@ paid early and nothing is folded into the sale.
 Where an access declaration carries **no** resale price the early exit refuses by name —
 `DeclarationMissing(part="access")`, naming `access.resale_price` — and the
 remedy is a file rather than a longer window. The price is not inferred from the face value or
-from the purchase quote: either would report a spread of **zero** that nobody observed.
+from the purchase quote: either would report a spread of **zero** that nobody observed. Where a
+quotation cannot be carried to the date a price is wanted for, the candidate refuses by name
+instead, and the remedy is a window rather than a file.
 
 ### 34.2 What the figure rests on, and how it errs
 
-That a quote taken today still holds on a future date is nobody's observation. If a platform
-committed to its buyback price that would be a *term*, and there would be no assumption; the
-assumption exists because none does. It is declared under `data/scenarios/early_exit/`, with no
-default — an absent belief refuses at load — and every figure computed through it names it in
-`TupleOutcome.rests_on`.
+That the clean price a quote implies today still holds on another date is nobody's observation.
+If a platform committed to its price that would be a *term*, and there would be no assumption;
+the assumption exists because none does. It is declared under `data/scenarios/quotation/`, with
+no default — an absent belief refuses at load — and every figure computed through it names it
+in `TupleOutcome.rests_on`. It is **not the early exit's belief**: both legs of a round trip are
+priced from a dated quotation, so a bond bought today and held to its own maturity leans on it
+with no early exit anywhere in it.
 
-Four claims travel with such a figure, and **rate risk is the one that carries no direction**:
+Four claims travel with an early-exit figure, and **two of them carry no direction**:
 
 | claim | direction | why |
 | --- | --- | --- |
 | it is a point where the world is a distribution | **more certain than it is** | the optionality is the reason the option was chosen |
 | the spread is a seller's quote under today's conditions | **understated** | a seller's quote widens exactly when a forced sale is most likely |
 | it carries no rate risk | **none** | rate risk is symmetric: a bond sold after rates rise fetches less than its spread implies, and one sold after rates fall fetches more |
-| it ignores accrued interest | **the sale is struck too low** | a whole coupon comes out of the quotation where what was in it was that period's accrual, and an accrual within a period is smaller than the period's own coupon. Stated only where the quotation predates the sale **and** every coupon between them came out, which is where that holds — a coupon paid before the purchase is in neither price and resets the accrual it would have covered |
+| the clean price is assumed constant, and interest linear within each period | **none** | the clean price moves with the curve, and the curve moves both ways — the same cause as the row above, so it inherits the same silence about direction |
 
-The fourth is on every early exit a quotation was carried to, not only on the ones a coupon
-detached from: a quotation crossing any gap omits the accrual that gap builds. The two signed
-claims err in **opposite** directions — a seller's quote understates the spread, which flatters
-the figure, while the unmodelled accrual strikes the sale below what the belief implies — so
-each names what errs rather than only which way. Closing the fourth needs a declared accrual
-basis, which §31.5 deliberately does not carry, so what ships is the direction and not the
-size.
-
-An approximation whose sign is unstated is incomplete; one whose sign is asserted without a
-warrant is a number more confident than its inputs, which is worse.
+The fourth is on every sale a quotation was carried to, and on no sale struck on the
+quotation's own day: nothing was carried there, so there is no claim to make. An approximation
+whose sign is unstated is incomplete; one whose sign is asserted without a warrant is a number
+more confident than its inputs, which is worse.
 
 ### 34.3 What the answer says, and what it refuses to say
 

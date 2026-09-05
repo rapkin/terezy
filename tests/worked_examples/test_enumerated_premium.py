@@ -73,7 +73,7 @@ from terezy.core.primitives.money import Money
 from terezy.core.primitives.tolerance import is_close
 from terezy.core.results import project
 from terezy.core.results.project import GovernedBy, Projection, PurchasePremium
-from terezy.core.scenarios.early_exit import QuotationHolds
+from terezy.core.scenarios.quotation import QuotationHolds
 from terezy.core.tax import flat_rate
 from terezy.core.tax import year as tax_year
 from terezy.core.tax.interface import TaxableEventKind, TaxCharge, TaxContext
@@ -410,7 +410,7 @@ class TestAPurchaseMadeAfterARepaymentOfPrincipal:
         assert isinstance(outcome, InconsistentTerms), outcome
         assert outcome.first_term == "instrument.schedule.payment"
         assert outcome.second_term == "access.resale_price.per_unit"
-        assert "one quotation cannot price both" in outcome.reason
+        assert "One quotation cannot price both" in outcome.reason
 
     def test_a_bond_that_repays_its_face_once_is_unaffected(self) -> None:
         """Why this was latent. For every declaration this repository ships, the amended

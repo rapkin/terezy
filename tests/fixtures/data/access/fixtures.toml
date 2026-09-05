@@ -18,7 +18,7 @@ risk_class    = "sovereign_debt"
   currency     = "UAH"
   kind         = "venue_terms"
   source       = "SYNTHETIC FIXTURE — the price implied by this fixture's own header, which states that issue A is 'bought at par'. Par is its declared face value of 1000.0 UAH. Not a quote observed at any venue, and not a claim about any real issue."
-  retrieved_on = "2026-08-23"
+  retrieved_on = "2026-01-15"
   verified_on  = ""
 
 [[access]]
@@ -32,7 +32,7 @@ risk_class    = "sovereign_debt"
   currency     = "UAH"
   kind         = "venue_terms"
   source       = "SYNTHETIC FIXTURE — par, on issue A's reading, so that the two fixtures differ in their conventions and their minimum ticket rather than in their price. Not observed anywhere."
-  retrieved_on = "2026-08-23"
+  retrieved_on = "2026-01-15"
   verified_on  = ""
 
 # --- the enumerated fixture ---------------------------------------------------------------
@@ -66,7 +66,7 @@ risk_class    = "sovereign_debt"
   currency     = "UAH"
   kind         = "venue_terms"
   source       = "SYNTHETIC FIXTURE — par, copied from ovdp_synthetic_a's entry so that the pair differs in its declaration form and in nothing else. Not observed anywhere."
-  retrieved_on = "2026-08-29"
+  retrieved_on = "2026-01-15"
   verified_on  = ""
 
 [[access]]
@@ -94,7 +94,7 @@ risk_class    = "sovereign_debt"
   currency     = "UAH"
   kind         = "venue_terms"
   source       = "SYNTHETIC FIXTURE — par. This fixture exists for what its transcription records rather than for any figure, so it is priced at face and nothing turns on the number."
-  retrieved_on = "2026-08-29"
+  retrieved_on = "2026-10-02"
   verified_on  = ""
 
 

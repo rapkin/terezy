@@ -117,12 +117,23 @@ def test_there_are_three_sections_and_each_enumerates_the_same_ids() -> None:
         assert enumerated == _expected_ids()
 
 
-def test_every_horizon_ranks_the_bonds_and_only_the_bonds() -> None:
-    """SC-001's second half. The ranked population is the ОВДП group, derived from the labels."""
+NEWLY_PLACED = frozenset({"UA4000239040", "UA4000239081", "UA4000239107"})
+"""Labelled ОВДП and refused all the same: their depository lists open at a first coupon later
+than the 2026-08-24 quotation, so no declared accrual period contains the day the quotation was
+read and it cannot be carried anywhere (022 FR-001, FR-008). They leave every section as named
+refusals -- `tests/worked_examples/test_a_newly_placed_issue_refuses.py` is what says so, and
+this is where the population that dropped is reported rather than inferred from a shorter
+list."""
+
+
+def test_every_horizon_ranks_the_bonds_it_can_price_and_only_those() -> None:
+    """SC-001's second half. The ranked population is the ОВДП group, derived from the labels,
+    less the three the quotation cannot be carried for."""
     bonds = frozenset(name for name, groups in _labels().items() if fixtures.OVDP in groups)
+    assert bonds > NEWLY_PLACED
     for section in _answer().sections:
         ranked = {item.key.instrument_id for item in section_ranking(section)}
-        assert ranked == bonds
+        assert ranked == bonds - NEWLY_PLACED
 
 
 def test_the_benchmark_spans_each_window_within_the_exit_latency() -> None:
