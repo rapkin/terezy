@@ -375,8 +375,8 @@ def test_a_quotation_worth_less_than_its_own_coupons_refuses_by_name() -> None:
     """Two declarations that cannot both describe the same paper, refused rather than struck.
 
     Unreachable on the shipped registry -- at most three coupons of ~85 leave a quotation of
-    ~1 000 -- and reached here by quoting one unit at 100.00 while 76.86 of coupon detaches
-    twice over a window that spans two of them. Without the guard the sale is struck at a
+    ~1 000 -- and reached here by quoting one unit at 100.00 while 231.863013698630 of coupon
+    detaches over a window spanning three of them. Without the guard the sale is struck at a
     negative price and the ledger posts a disposal of a negative amount, which is a raise from
     the pure core on a condition two data files produced.
     """

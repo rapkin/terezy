@@ -2618,12 +2618,12 @@ def _check_access(
 def _check_one_observation(entry: InstrumentAccess, *, path: Path, field_prefix: str) -> None:
     """A buy and a sell price for one instrument are **one** observation of one market.
 
-    Each is carried to the day it prices net of the coupons that detached in between
-    (``core.scenarios.early_exit.detached_since``), so two different observation dates would
-    carry the pair by two different windows: a coupon could come out of the sale and stay in
-    the purchase, charging the holder for one he never received. Nothing downstream can see
-    the pair -- the sale reads only the resale price -- so the agreement is enforced here or
-    nowhere.
+    A sale subtracts only the coupons that detached after the **purchase**
+    (``core.scenarios.early_exit.detached_since``), and what makes that right is that a coupon
+    detaching before the purchase is inside the buy price too, so the two errors cancel in the
+    return. That argument needs the pair to have been read on one day. Nothing downstream can
+    see the pair -- the sale reads only the resale price -- so the agreement is enforced here
+    or nowhere.
     """
     if entry.quote is None or entry.resale_price is None:
         return
@@ -2633,11 +2633,12 @@ def _check_one_observation(entry: InstrumentAccess, *, path: Path, field_prefix:
         path,
         f"{field_prefix}.resale_price.retrieved_on",
         f"is {entry.resale_price.observed_on.isoformat()} while "
-        f"{field_prefix}.price.retrieved_on is {entry.quote.observed_on.isoformat()}. A buy "
-        "and a sell price for one instrument are one observation of one market, and each is "
-        "carried to the day it prices net of the coupons that detached since it was read -- so "
-        "two dates would take a coupon out of one leg and leave it in the other.",
-        "read both prices in one retrieval, or declare only the one that was read",
+        f"{field_prefix}.price.retrieved_on is {entry.quote.observed_on.isoformat()}. A buy and "
+        "a sell price for one instrument are one observation of one market: a sale subtracts "
+        "the coupons that detached after the purchase, and what makes that right is that an "
+        "earlier one is inside the buy price too. Two dates break that.",
+        "read both prices in one retrieval, or drop the resale price and let the early exit "
+        "refuse for want of one",
     )
 
 
