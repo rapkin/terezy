@@ -181,6 +181,13 @@ id    = "the-graph-has-no-word-for-drafted-and-planned"
 after = ["025-btc-holdings"]
 note  = "`drafted` says planning may not start; `planned` says plan.md and tasks.md exist. 025 is both TODAY, so the graph asserts something false about it right now rather than later. Recorded 2026-09-06 by 025's review."
 
+[[feature]]
+id     = "024-real-terms-tuple"
+status = "planned"
+needs  = ["007-cpi-real-terms", "015-the-question", "022-accrued-interest"]
+why    = "007 owns the relation, the coverage refusal and the function that fills a real slot; 015 states the absence this fills as a typed exclusion and is where that exclusion is deleted; 022 is what the deflated figure is, since it changed how `implied_rate` is computed and the spec's worked example is a post-022 number"
+note   = "Closes the real-terms-for-a-tuple future: the owner asked for inflation on 2026-09-03, and every candidate's rate was nominal while the benchmark's could be real. No clarification is open -- the future-span question is 007's owner decision of 2026-08-22 applied rather than re-asked; see specs/024-real-terms-tuple/spec.md."
+
 [[future]]
 id      = "web-display-currency-switch"
 after   = ["021-web-declared-data"]
@@ -317,11 +324,6 @@ note  = "010's seventeen refusal records carry a `reason` string and NO provenan
 id    = "one-amount-per-stream-in-compare"
 after = ["014-candidates"]
 note  = "`core/decision/compare.py::compare` takes ONE `amount: Money` and scores every tuple in the set with it, while 014 FR-001 and FR-005 take an amount PER INCOME STREAM and forbid converting one into the other. The two agree only while a candidate set is single-stream, which is what the shipped registry yields (`contract_usd` connects to nothing inbound), so 014 SC-015 is constructible today and a two-stream set cannot be handed to `compare` at all. The fix is 010's to make -- one amount per stream on the call, struck against each tuple's own `stream_id` -- and it is a change to 010, made and reviewed there on the rule 014 FR-014a states, rather than a per-stream loop in the caller, which would produce one ranking per stream and no ranking of the set. Recorded 2026-08-30 while repairing 014's specification; deliberately not built. 014 SHIPPED THE REFUSAL RATHER THAN THE FIX: `survey` returns `MoreThanOneStreamInTheSet` naming both streams, so the disagreement is a typed output rather than a single amount silently scoring a set it does not describe. Unreachable from the shipped registry, and reached in `tests/unit/test_candidate_survey.py` by declaring the inbound USD-to-UAH corridor the registry lacks -- which is also the smallest change that makes the gap live."
-
-[[future]]
-id    = "real-terms-for-a-tuple"
-after = ["007-cpi-real-terms", "010-full-tuple"]
-note  = "A tuple has NO real-terms rate. Read in the code on 2026-08-30 rather than supposed: `TupleOutcome.implied_rate` is typed `NominalRate | RateNotComparable`, and the `RealRate | RealTermsUnavailable` slot 007 built lives on feature 001's hurdle record (`core/results/hurdle.py`) and on nothing the join produces. So a comparison of instruments answers in nominal terms only, while the benchmark it is ranked against can state a real one -- and the owner's question names inflation explicitly. Deflating the nominal rate is not a presentation choice: it is a new figure needing a formula, a `docs/METHODOLOGY.md` entry and a worked example, it must refuse by name where no CPI series covers the span (007's existing behaviour), and it is a change to 010's outcome record that moves figures 010's and 014's goldens pin. 015 states it as an EXCLUSION rather than filling it (015 FR-023a), which is why this is a recorded gap and not a silent absence. Recorded 2026-08-30 while specifying 015; deliberately not built."
 
 [[future]]
 id    = "secondary-market-rate-risk"
