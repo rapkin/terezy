@@ -82,6 +82,7 @@ def create_app(root: Path, *, client: Path | None = None) -> FastAPI:
     _register_fixed(router, root)
     app.include_router(router)
     app.add_exception_handler(DeclarationError, _declaration_failed(root))
+    app.add_exception_handler(ScenarioRefused, _scenario_refused)
     _serve_client(app, client)
     return app
 
@@ -107,6 +108,15 @@ def _reader(root: Path, *, scenario: bool) -> Callable[..., Read]:
     return without_scenario
 
 
+class ScenarioRefused(HTTPException):
+    """Carried as an exception because it is raised inside a dependency, where a return value
+    cannot become the response. The handler below turns it into the tagged body."""
+
+    def __init__(self, refusal: envelopes.ScenarioNotDeclared) -> None:
+        super().__init__(status_code=400, detail=refusal.reason)
+        self.refusal = refusal
+
+
 def _declared_scenario(root: Path, scenario_id: str | None) -> str | None:
     """The scenario the request named, checked against the ones `data/scenarios/` declares.
 
@@ -119,15 +129,28 @@ def _declared_scenario(root: Path, scenario_id: str | None) -> str | None:
         return None
     declared = sorted(resolver.ramp_from_data_root(root, base_currency=BASE_CURRENCY).scenarios)
     if scenario_id not in declared:
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                f"no scenario with the id {scenario_id!r} is declared. The declared ids are "
-                f"{declared}. A read under a scenario nobody declared would answer under a world "
-                "nobody asked for."
-            ),
+        raise ScenarioRefused(
+            envelopes.ScenarioNotDeclared(
+                wanted_id=scenario_id,
+                declared_ids=tuple(declared),
+                reason=(
+                    f"no scenario with the id {scenario_id!r} is declared. A read under a "
+                    "scenario nobody declared would answer under a world nobody asked for."
+                ),
+            )
         )
     return scenario_id
+
+
+def _scenario_refusal(scenario: bool) -> dict[int | str, dict[str, object]]:
+    """What a route that takes a scenario may answer besides its own body, in the document.
+
+    Declared rather than left to the framework's validation shape: a client generated from the
+    document parses what the document says, and an undeclared body is one it cannot read.
+    """
+    if not scenario:
+        return {}
+    return {400: {"model": _model(envelopes.ScenarioNotDeclared)}}
 
 
 def _model(built: type) -> type[BaseModel]:
@@ -156,7 +179,14 @@ def _register_keyed(
     listing = envelopes.listing_of(category.id, series=is_series)
     read = envelopes.read_of(category.id, shape.record)
 
-    @router.get(f"/{category.id}", response_model=_model(listing), name=f"{category.id}.list")
+    refusals = _scenario_refusal(category.scenario)
+
+    @router.get(
+        f"/{category.id}",
+        response_model=_model(listing),
+        name=f"{category.id}.list",
+        responses=refusals,
+    )
     def list_ids(asked: Annotated[Read, Depends(reader)]) -> encode.Json:
         resolved = shape.resolve(asked.ask)
         coverage = {"coverage": _coverage(resolved.records)} if is_series else {}
@@ -172,7 +202,10 @@ def _register_keyed(
         )
 
     @router.get(
-        f"/{category.id}/{{record_id}}", response_model=_model(read), name=f"{category.id}.read"
+        f"/{category.id}/{{record_id}}",
+        response_model=_model(read),
+        name=f"{category.id}.read",
+        responses=refusals,
     )
     def read_one(record_id: str, asked: Annotated[Read, Depends(reader)]) -> encode.Json:
         resolved = shape.resolve(asked.ask)
@@ -205,7 +238,12 @@ def _register_singleton(
         assert isinstance(shape, categories.Collection)
         held_in, envelope = envelopes.collection_of(category.id, shape.record)
 
-    @router.get(f"/{category.id}", response_model=_model(envelope), name=f"{category.id}.read")
+    @router.get(
+        f"/{category.id}",
+        response_model=_model(envelope),
+        name=f"{category.id}.read",
+        responses=_scenario_refusal(category.scenario),
+    )
     def read_document(asked: Annotated[Read, Depends(reader)]) -> encode.Json:
         resolved = shape.resolve(asked.ask)
         result = _document(category, resolved, held_in)
@@ -237,6 +275,7 @@ def _register_observations(
         f"/{category.id}/{{record_id}}/observations",
         response_model=_model(envelope),
         name=f"{category.id}.observations",
+        responses=_scenario_refusal(category.scenario),
     )
     def observations(
         record_id: str,
@@ -249,18 +288,19 @@ def _register_observations(
         if held is None:
             result: object = _no_such_id(category.id, record_id, resolved)
         else:
-            window = series.window_of(held, window_from, window_to)
-            if isinstance(window, series.WindowMalformed):
-                raise HTTPException(status_code=422, detail=window.reason)
-            read = series.read(held, window)
-            result = held_in(
-                series_id=record_id,
-                window=window,
-                covers=series.coverage_of(held),
-                checked=read.checked,
-                observations=read.observations,
-                outside=read.outside,
-            )
+            window = series.window_of(held, record_id, window_from, window_to)
+            if isinstance(window, envelopes.WindowMalformed):
+                result = window
+            else:
+                read = series.read(held, window)
+                result = held_in(
+                    series_id=record_id,
+                    window=window,
+                    covers=series.coverage_of(held),
+                    checked=read.checked,
+                    observations=read.observations,
+                    outside=read.outside,
+                )
         return _body(
             envelope,
             envelope(category=category.id, as_of=asked.as_of, result=result),
@@ -274,7 +314,12 @@ def _register_fixed(router: APIRouter, root: Path) -> None:
     plain = _reader(root, scenario=False)
     answer_envelope = envelopes.answer_of(AnsweredQuestion)
 
-    @router.get("/registry", response_model=_model(summary.RegistrySummary), name="registry")
+    @router.get(
+        "/registry",
+        response_model=_model(summary.RegistrySummary),
+        name="registry",
+        responses=_scenario_refusal(scenario=True),
+    )
     def registry(asked: Annotated[Read, Depends(under_scenario)]) -> encode.Json:
         return _body(summary.RegistrySummary, summary.of(asked.ask, as_of=asked.as_of))
 
@@ -359,6 +404,22 @@ def _declared_in(
     return None if path is None else _relative(path, root)
 
 
+def _under_the_api(path: str) -> bool:
+    """Whether a path is one the API owns, by segment and not by prefix.
+
+    `/api-docs` is a client route that merely begins with the same letters; served a JSON 404
+    it would be a deep link the SPA fallback should have answered.
+    """
+    return path == document.PREFIX or path.startswith(f"{document.PREFIX}/")
+
+
+async def _scenario_refused(_: Request, exc: Exception) -> Response:
+    if not isinstance(exc, ScenarioRefused):
+        raise exc
+    body = _body(envelopes.ScenarioNotDeclared, exc.refusal)
+    return JSONResponse(status_code=exc.status_code, content=body)
+
+
 def _relative(path: Path, root: Path) -> str:
     """The declaring file as a path under the data root, never an absolute one.
 
@@ -381,11 +442,7 @@ def _serve_client(app: FastAPI, client: Path | None) -> None:
 
     @app.exception_handler(404)
     async def not_found(request: Request, _: Exception) -> Response:
-        if (
-            index is not None
-            and index.is_file()
-            and not request.url.path.startswith(document.PREFIX)
-        ):
+        if index is not None and index.is_file() and not _under_the_api(request.url.path):
             return FileResponse(index)
         return JSONResponse(
             status_code=404,

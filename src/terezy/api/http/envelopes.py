@@ -68,6 +68,32 @@ class WindowOutsideCoverage:
 
 
 @dataclass(frozen=True, slots=True)
+class WindowMalformed:
+    """A window that is not a window: an end in the wrong shape, or one that ends before it
+    begins. A fault in the request rather than a fact about the series, so it never reaches the
+    coverage question -- an inverted window covers no period, and reporting that as *the series
+    declares none of it* would name the series for the caller's typo."""
+
+    series_id: str
+    asked: tuple[str | None, str | None]
+    reason: str
+
+
+@dataclass(frozen=True, slots=True)
+class ScenarioNotDeclared:
+    """A request naming a scenario nobody declares.
+
+    A typed refusal rather than the loader's error, which means *this data root is broken* and
+    would send the reader to `data/` to look for a fault that is not there -- the trap FR-008
+    names for a record id, arriving through a query parameter.
+    """
+
+    wanted_id: str
+    declared_ids: tuple[str, ...]
+    reason: str
+
+
+@dataclass(frozen=True, slots=True)
 class DeclarationFailed:
     """A malformed declaration, carrying the loader's own four fields and nothing added."""
 
@@ -113,9 +139,10 @@ class FieldDescription:
 
     name: str
     kind: FieldKind
-    of: str | None
-    """The tag of the record, or the name of the enum, this field's values are -- at whatever
-    depth the shape names one. ``None`` where the kind names nothing further."""
+    of: tuple[str, ...]
+    """Every record tag or enum name this field's values may be, at whatever depth the shape
+    names one. A tuple because a union has several: naming only the first told a client that
+    every instrument's `terms` were `BondTerms`, which is false for every enumerated one."""
 
     optional: bool
 
@@ -263,7 +290,7 @@ def observations_of(category_id: str, observation: object) -> tuple[type, type]:
         (
             ("category", str),
             ("as_of", date),
-            ("result", declared | CategoryHasNoSuchId),
+            ("result", declared | CategoryHasNoSuchId | WindowMalformed),
         ),
     )
 
@@ -290,7 +317,7 @@ def _described(name: str, field: shapes.Shape) -> FieldDescription:
     inner, optional = (
         (field.inner, True) if isinstance(field, shapes.OptionalShape) else (field, False)
     )
-    return FieldDescription(name=name, kind=_kind(inner), of=_names(inner), optional=optional)
+    return FieldDescription(name=name, kind=_kind(inner), of=_named(inner), optional=optional)
 
 
 def _kind(shape: shapes.Shape) -> FieldKind:  # noqa: PLR0911 -- exhaustive match
@@ -313,27 +340,20 @@ def _kind(shape: shapes.Shape) -> FieldKind:  # noqa: PLR0911 -- exhaustive matc
             return _kind(inner)
 
 
-def _names(shape: shapes.Shape) -> str | None:
-    """The record tag or enum name this field's **values** are, at whatever depth the shape
-    names one -- so a list of records says which record, not merely that it is a list.
+def _named(shape: shapes.Shape) -> tuple[str, ...]:
+    """Every record tag or enum name this field's **values** may be.
 
-    A mapping is descended by its value alone. The generic walk visits the key first, so an
-    enum-keyed mapping to a record used to be described by the type of its keys -- which is a
-    label a client would put on the wrong half of the field.
+    A mapping is descended by its value alone: the generic walk visits the key first, so an
+    enum-keyed mapping to a record would otherwise be described by the type of its keys.
     """
     match shape:
         case shapes.RecordShape(tag=tag):
-            return tag
+            return (tag,)
         case shapes.EnumShape(enum=enum):
-            return enum.__name__
+            return (enum.__name__,)
         case shapes.MappingShape(value=value):
-            return _names(value)
+            return _named(value)
         case _:
-            return next(
-                (
-                    found
-                    for child in shapes.children_of(shape)
-                    if (found := _names(child)) is not None
-                ),
-                None,
+            return tuple(
+                dict.fromkeys(name for child in shapes.children_of(shape) for name in _named(child))
             )

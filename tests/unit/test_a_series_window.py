@@ -71,11 +71,9 @@ def test_a_window_reaching_outside_coverage_names_what_is_missing(client: Any) -
 
 
 def test_a_one_ended_window_is_refused(client: Any) -> None:
-    response = client.get(
-        f"{document.PREFIX}/cpi/{CPI}/observations", params={**AS_OF, "from": "2026-01"}
-    )
-    assert response.status_code == 422
-    assert "two-ended" in response.text
+    result = _observations(client, "cpi", CPI, **{"from": "2026-01"})
+    assert result["tag"] == "envelopes.WindowMalformed"
+    assert "two-ended" in result["reason"]
 
 
 def test_an_undeclared_series_is_a_typed_refusal(client: Any) -> None:
@@ -124,11 +122,9 @@ def test_an_inverted_window_is_refused_rather_than_named_a_coverage_gap(client: 
         ("cpi", CPI, {"from": "2025-06", "to": "2024-01"}),
         ("official-rates", RATES, {"from": "2025-06-01", "to": "2024-01-01"}),
     ):
-        response = client.get(
-            f"{document.PREFIX}/{category}/{series_id}/observations", params={**AS_OF, **window}
-        )
-        assert response.status_code == 422, category
-        assert "ends before it begins" in response.text
+        result = _observations(client, category, series_id, **window)
+        assert result["tag"] == "envelopes.WindowMalformed", category
+        assert "ends before it begins" in result["reason"]
 
 
 def test_a_window_end_in_the_wrong_shape_is_refused(client: Any) -> None:
@@ -136,12 +132,10 @@ def test_a_window_end_in_the_wrong_shape_is_refused(client: Any) -> None:
         ("cpi", CPI, "YYYY-MM"),
         ("official-rates", RATES, "YYYY-MM-DD"),
     ):
-        response = client.get(
-            f"{document.PREFIX}/{category}/{series_id}/observations",
-            params={**AS_OF, "from": "banana", "to": "zzz"},
-        )
-        assert response.status_code == 422, category
-        assert expected in response.text
+        result = _observations(client, category, series_id, **{"from": "banana", "to": "zzz"})
+        assert result["tag"] == "envelopes.WindowMalformed", category
+        assert expected in result["reason"]
+        assert result["series_id"] == series_id
 
 
 def test_a_body_says_what_it_actually_checked(client: Any) -> None:

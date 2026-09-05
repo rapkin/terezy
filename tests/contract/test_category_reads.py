@@ -171,8 +171,21 @@ def test_a_scenario_nobody_declares_is_refused_as_a_parameter(client: Any) -> No
     response = client.get(
         f"{document.PREFIX}/spendable", params={**AS_OF, "scenario_id": "nothing-declares-this"}
     )
-    assert response.status_code == 422
-    assert "war_end" in response.text
+    assert response.status_code == 400
+    body = response.json()
+    assert body["tag"] == "envelopes.ScenarioNotDeclared"
+    assert body["declared_ids"] == ["war_end"]
+
+
+@pytest.mark.contract
+def test_a_union_field_names_every_member_it_may_hold(client: Any) -> None:
+    """Naming only the first told a client that every instrument's terms were `BondTerms`,
+    which is false for every enumerated one."""
+    body = _get(client, "/instruments/UA4000207518")
+    described = {held["name"]: held for held in body["fields"]}
+    assert described["terms"]["kind"] == "union"
+    assert set(described["terms"]["of"]) == {"interface.BondTerms", "interface.EnumeratedTerms"}
+    assert body["result"]["terms"]["tag"] in described["terms"]["of"]
 
 
 @pytest.mark.contract
@@ -181,4 +194,4 @@ def test_a_mapping_field_is_described_by_what_its_values_are(client: Any) -> Non
     was labelled with the type of its keys."""
     described = {held["name"]: held for held in _get(client, "/tax-timing/ua")["fields"]}
     assert described["methods"]["kind"] == "mapping"
-    assert described["methods"]["of"] == "year.MethodStanding"
+    assert described["methods"]["of"] == ["year.MethodStanding"]

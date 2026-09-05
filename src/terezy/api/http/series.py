@@ -27,16 +27,6 @@ from collections.abc import Callable
 
 
 @dataclass(frozen=True, slots=True)
-class WindowMalformed:
-    """A window that is not a window: an end in the wrong shape, or one that ends before it
-    begins. A request-shape fault rather than a fact about the series, so it never reaches the
-    coverage question -- an inverted window covers no period, and reporting that as *the series
-    declares none of it* would name the series for the caller's typo."""
-
-    reason: str
-
-
-@dataclass(frozen=True, slots=True)
 class Read:
     """What a windowed read produced: the covered observations, and what fell outside."""
 
@@ -63,31 +53,42 @@ def coverage_of(series: object) -> envelopes.SeriesCoverage | None:
 
 
 def window_of(
-    series: object, first: str | None, last: str | None
-) -> tuple[str, str] | WindowMalformed | None:
+    series: object, series_id: str, first: str | None, last: str | None
+) -> tuple[str, str] | envelopes.WindowMalformed | None:
     """The window a request asked for, checked against the shape the series is keyed by.
 
     Omitted is a window of its own (the whole declared coverage); one end alone is not, because
     the other would have to be inferred and the inference is what a coverage refusal exists to
     prevent.
     """
+    asked = (first, last)
     if first is None and last is None:
         return None
     if first is None or last is None:
-        return WindowMalformed(
+        return envelopes.WindowMalformed(
+            series_id=series_id,
+            asked=asked,
             reason=(
                 "a window is two-ended: give both `from` and `to`, or neither. One end alone "
                 "would leave the other to be inferred."
-            )
+            ),
         )
     shape = _shape_of(series)
     malformed = [end for end in (first, last) if not shape.matches(end)]
     if malformed:
-        return WindowMalformed(
-            reason=f"{malformed} is not {shape.description}, which is what this series is keyed by."
+        return envelopes.WindowMalformed(
+            series_id=series_id,
+            asked=asked,
+            reason=(
+                f"{malformed} is not {shape.description}, which is what this series is keyed by."
+            ),
         )
     if first > last:
-        return WindowMalformed(reason=f"the window {(first, last)} ends before it begins.")
+        return envelopes.WindowMalformed(
+            series_id=series_id,
+            asked=asked,
+            reason=f"the window {(first, last)} ends before it begins.",
+        )
     return (first, last)
 
 
@@ -144,7 +145,12 @@ def _cpi(series: CpiSeries, window: tuple[str, str] | None) -> Read:
         case cpi.NotCovered(missing=missing):
             return Read(
                 observations=inside,
-                outside=_outside(series, window, missing),
+                outside=_outside(
+                    series,
+                    window,
+                    missing,
+                    f"declares no observation for {len(missing)} of the periods asked for",
+                ),
                 checked=envelopes.EveryPeriodChecked(),
             )
 
@@ -172,7 +178,15 @@ def _rates(series: OfficialRateSeries, window: tuple[str, str] | None) -> Read:
     missing = _beyond(window, declared)
     return Read(
         observations=inside,
-        outside=None if not missing else _outside(series, window, missing),
+        outside=None
+        if not missing
+        else _outside(
+            series,
+            window,
+            missing,
+            f"does not reach {len(missing)} of the asked window's two ends; what lies between "
+            "them was not checked, because this series declares no periodicity",
+        ),
         checked=ONLY_THE_ENDS,
     )
 
@@ -197,7 +211,7 @@ def _beyond(window: tuple[str, str], declared: tuple[date, date] | None) -> tupl
 
 
 def _outside(
-    series: object, window: tuple[str, str], missing: tuple[str, ...]
+    series: object, window: tuple[str, str], missing: tuple[str, ...], what: str
 ) -> envelopes.WindowOutsideCoverage:
     coverage = coverage_of(series)
     series_id = getattr(series, "id", "")
@@ -207,9 +221,9 @@ def _outside(
         covers=None if coverage is None else (coverage.first, coverage.last),
         missing=missing,
         reason=(
-            f"the series {series_id!r} declares no observation for {len(missing)} of the "
-            f"periods asked for. The covered part is returned beside this refusal; nothing is "
-            "interpolated, carried forward or snapped to a neighbouring period."
+            f"the series {series_id!r} {what}. The covered part is returned beside this "
+            "refusal; nothing is interpolated, carried forward or snapped to a neighbouring "
+            "period."
         ),
     )
 

@@ -2554,15 +2554,11 @@
             "type": "string"
           },
           "of": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Of"
+            "items": {
+              "type": "string"
+            },
+            "title": "Of",
+            "type": "array"
           },
           "optional": {
             "title": "Optional",
@@ -5124,6 +5120,39 @@
         "title": "envelopes_ReadOfVenues",
         "type": "object"
       },
+      "envelopes_ScenarioNotDeclared": {
+        "additionalProperties": false,
+        "properties": {
+          "declared_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Declared Ids",
+            "type": "array"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "tag": {
+            "const": "envelopes.ScenarioNotDeclared",
+            "title": "Tag",
+            "type": "string"
+          },
+          "wanted_id": {
+            "title": "Wanted Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tag",
+          "wanted_id",
+          "declared_ids",
+          "reason"
+        ],
+        "title": "envelopes_ScenarioNotDeclared",
+        "type": "object"
+      },
       "envelopes_SeriesCoverage": {
         "additionalProperties": false,
         "properties": {
@@ -5217,6 +5246,60 @@
         "title": "envelopes_TheAnswer",
         "type": "object"
       },
+      "envelopes_WindowMalformed": {
+        "additionalProperties": false,
+        "properties": {
+          "asked": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            ],
+            "title": "Asked",
+            "type": "array"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "series_id": {
+            "title": "Series Id",
+            "type": "string"
+          },
+          "tag": {
+            "const": "envelopes.WindowMalformed",
+            "title": "Tag",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tag",
+          "series_id",
+          "asked",
+          "reason"
+        ],
+        "title": "envelopes_WindowMalformed",
+        "type": "object"
+      },
       "envelopes_WindowOfCpi": {
         "additionalProperties": false,
         "properties": {
@@ -5233,7 +5316,8 @@
             "discriminator": {
               "mapping": {
                 "envelopes.CategoryHasNoSuchId": "#/components/schemas/envelopes_CategoryHasNoSuchId",
-                "envelopes.ObservationsCpi": "#/components/schemas/envelopes_ObservationsCpi"
+                "envelopes.ObservationsCpi": "#/components/schemas/envelopes_ObservationsCpi",
+                "envelopes.WindowMalformed": "#/components/schemas/envelopes_WindowMalformed"
               },
               "propertyName": "tag"
             },
@@ -5243,6 +5327,9 @@
               },
               {
                 "$ref": "#/components/schemas/envelopes_CategoryHasNoSuchId"
+              },
+              {
+                "$ref": "#/components/schemas/envelopes_WindowMalformed"
               }
             ],
             "title": "Result"
@@ -5278,7 +5365,8 @@
             "discriminator": {
               "mapping": {
                 "envelopes.CategoryHasNoSuchId": "#/components/schemas/envelopes_CategoryHasNoSuchId",
-                "envelopes.ObservationsOfficialRates": "#/components/schemas/envelopes_ObservationsOfficialRates"
+                "envelopes.ObservationsOfficialRates": "#/components/schemas/envelopes_ObservationsOfficialRates",
+                "envelopes.WindowMalformed": "#/components/schemas/envelopes_WindowMalformed"
               },
               "propertyName": "tag"
             },
@@ -5288,6 +5376,9 @@
               },
               {
                 "$ref": "#/components/schemas/envelopes_CategoryHasNoSuchId"
+              },
+              {
+                "$ref": "#/components/schemas/envelopes_WindowMalformed"
               }
             ],
             "title": "Result"
@@ -10672,6 +10763,16 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_ScenarioNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -10740,6 +10841,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_ScenarioNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
           },
           "422": {
             "content": {
@@ -10894,6 +11005,16 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_ScenarioNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -11046,6 +11167,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_ScenarioNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
           },
           "422": {
             "content": {
@@ -11375,6 +11506,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_ScenarioNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
           },
           "422": {
             "content": {
@@ -12042,6 +12183,16 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_ScenarioNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -12162,6 +12313,16 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_ScenarioNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -12221,6 +12382,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_ScenarioNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
           },
           "422": {
             "content": {
@@ -12509,6 +12680,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_ScenarioNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
           },
           "422": {
             "content": {

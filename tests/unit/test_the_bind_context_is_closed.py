@@ -17,7 +17,11 @@ from terezy.api.http.bind import CONTEXT_VARIABLE, BindContext, ContextNotRecogn
 
 MODULE_ROOT = Path(__file__).resolve().parents[2] / "src" / "terezy" / "api" / "http"
 
-GUARD_MODULES = ("bind.py", "middleware.py", "serve.py", "__main__.py")
+GUARD_MODULES = ("bind.py", "middleware.py", "serve.py", "__main__.py", "service.py")
+"""`service.py` is in the list because it is the guard on the path `serve.py` cannot cover:
+`uvicorn terezy.api.http:app` builds the application there, and `bind_context()` reads the
+context variable there. A scan that stopped at the entry point would stay green on a second
+key added in the module that actually installs both refusals."""
 
 DECLARED_FLAGS = frozenset({"--host", "--port"})
 
@@ -113,6 +117,11 @@ def test_the_only_environment_key_the_guard_reads_is_the_context() -> None:
     assert read["bind.py"] == []
     assert read["middleware.py"] == []
     assert read["__main__.py"] == []
+    assert read["service.py"] == [
+        "DATA_ROOT_VARIABLE",
+        "CLIENT_VARIABLE",
+        "bind.CONTEXT_VARIABLE",
+    ], "the served module reads a data root, a client directory and the context -- nothing else"
 
 
 def test_the_entry_point_declares_no_flag_beyond_the_address_it_checks() -> None:
