@@ -264,9 +264,13 @@ def records_in(shape: Shape, value: object) -> Iterator[object]:  # noqa: PLR091
             if value is not None:
                 yield from records_in(inner, value)
         case UnionShape(members=members):
-            for member in members:
-                if isinstance(member, RecordShape) and type(value) is member.record:
-                    yield from records_in(member, value)
+            chosen = member_for(members, value)
+            if chosen is None:
+                raise UnserialisableAnnotationError(
+                    f"{type(value).__name__} is not a member of the union its shape names, so "
+                    "nothing can be said about what it rests on."
+                )
+            yield from records_in(chosen, value)
         case SequenceShape(element=element) | SetShape(element=element):
             for item in typing.cast("Iterable[object]", value):
                 yield from records_in(element, item)
@@ -278,6 +282,28 @@ def records_in(shape: Shape, value: object) -> Iterator[object]:  # noqa: PLR091
                 yield from records_in(inner, item)
         case _:
             return
+
+
+def member_for(members: Sequence[Shape], value: object) -> Shape | None:
+    """Which arm of a union this value is, by identity of type and never by duck typing.
+
+    Shared by both folds: the encoder refuses a value no member names, and the value walk used
+    to yield nothing for it -- so a record outside its own union's arms produced an *unmarked*
+    provenance rather than a failure, which is the top-severity direction to be wrong in.
+    """
+    for member in members:
+        match member:
+            case RecordShape(record=record) if type(value) is record:
+                return member
+            case EnumShape(enum=enum) if isinstance(value, enum):
+                return member
+            case ScalarShape(python_type=python_type) if type(value) is python_type:
+                return member
+            case LiteralShape(values=values) if value in values:
+                return member
+            case _:
+                continue
+    return None
 
 
 def record_of(record: type) -> RecordShape:

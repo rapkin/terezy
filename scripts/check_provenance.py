@@ -43,7 +43,7 @@ REQUIRED_WITH_SOURCE = ("source", "retrieved_on")
 # mechanical half of "no permissive default". The script still cannot evaluate staleness --
 # it has no as-of date and must not invent one -- so it checks that the *declaration* is
 # complete and leaves the verdict to the engine.
-KINDS_FILE = "observation_kinds.toml"
+KINDS_FILE = citation_policy.KINDS_FILE
 
 # The key naming a table's observation kind. A route leg declares `kind_of_observation`,
 # because `kind` on a leg is already the *leg* kind (`transfer`, `fx`); every other sourced

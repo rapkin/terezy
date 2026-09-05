@@ -2528,6 +2528,21 @@
         "title": "envelopes_DocumentOfTaxPositions",
         "type": "object"
       },
+      "envelopes_EveryPeriodChecked": {
+        "additionalProperties": false,
+        "properties": {
+          "tag": {
+            "const": "envelopes.EveryPeriodChecked",
+            "title": "Tag",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tag"
+        ],
+        "title": "envelopes_EveryPeriodChecked",
+        "type": "object"
+      },
       "envelopes_FieldDescription": {
         "additionalProperties": false,
         "properties": {
@@ -3466,6 +3481,24 @@
       "envelopes_ObservationsCpi": {
         "additionalProperties": false,
         "properties": {
+          "checked": {
+            "discriminator": {
+              "mapping": {
+                "envelopes.EveryPeriodChecked": "#/components/schemas/envelopes_EveryPeriodChecked",
+                "envelopes.OnlyTheEndsChecked": "#/components/schemas/envelopes_OnlyTheEndsChecked"
+              },
+              "propertyName": "tag"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/envelopes_EveryPeriodChecked"
+              },
+              {
+                "$ref": "#/components/schemas/envelopes_OnlyTheEndsChecked"
+              }
+            ],
+            "title": "Checked"
+          },
           "covers": {
             "anyOf": [
               {
@@ -3529,6 +3562,7 @@
           "series_id",
           "window",
           "covers",
+          "checked",
           "observations",
           "outside"
         ],
@@ -3538,6 +3572,24 @@
       "envelopes_ObservationsOfficialRates": {
         "additionalProperties": false,
         "properties": {
+          "checked": {
+            "discriminator": {
+              "mapping": {
+                "envelopes.EveryPeriodChecked": "#/components/schemas/envelopes_EveryPeriodChecked",
+                "envelopes.OnlyTheEndsChecked": "#/components/schemas/envelopes_OnlyTheEndsChecked"
+              },
+              "propertyName": "tag"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/envelopes_EveryPeriodChecked"
+              },
+              {
+                "$ref": "#/components/schemas/envelopes_OnlyTheEndsChecked"
+              }
+            ],
+            "title": "Checked"
+          },
           "covers": {
             "anyOf": [
               {
@@ -3601,10 +3653,31 @@
           "series_id",
           "window",
           "covers",
+          "checked",
           "observations",
           "outside"
         ],
         "title": "envelopes_ObservationsOfficialRates",
+        "type": "object"
+      },
+      "envelopes_OnlyTheEndsChecked": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "tag": {
+            "const": "envelopes.OnlyTheEndsChecked",
+            "title": "Tag",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tag",
+          "reason"
+        ],
+        "title": "envelopes_OnlyTheEndsChecked",
         "type": "object"
       },
       "envelopes_ReadOfAccess": {
@@ -12006,24 +12079,6 @@
               "format": "date",
               "title": "As Of",
               "type": "string"
-            }
-          },
-          {
-            "description": "A declared scenario id, or none.",
-            "in": "query",
-            "name": "scenario_id",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "A declared scenario id, or none.",
-              "title": "Scenario Id"
             }
           }
         ],

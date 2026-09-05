@@ -42,6 +42,7 @@ class Read:
 
     observations: tuple[object, ...]
     outside: envelopes.WindowOutsideCoverage | None
+    checked: envelopes.EveryPeriodChecked | envelopes.OnlyTheEndsChecked
 
 
 def coverage_of(series: object) -> envelopes.SeriesCoverage | None:
@@ -125,29 +126,54 @@ def read(series: object, window: tuple[str, str] | None) -> Read:
 
 def _cpi(series: CpiSeries, window: tuple[str, str] | None) -> Read:
     if window is None:
-        return Read(observations=series.observations, outside=None)
+        return Read(
+            observations=series.observations,
+            outside=None,
+            checked=envelopes.EveryPeriodChecked(),
+        )
     asked = Window(first=window[0], last=window[1])
     covered = cpi.coverage(series, asked)
     inside = _inside(series.observations, window, key=lambda held: held.period)
     match covered:
         case cpi.Covered():
-            return Read(observations=covered.observations, outside=None)
+            return Read(
+                observations=covered.observations,
+                outside=None,
+                checked=envelopes.EveryPeriodChecked(),
+            )
         case cpi.NotCovered(missing=missing):
             return Read(
                 observations=inside,
                 outside=_outside(series, window, missing),
+                checked=envelopes.EveryPeriodChecked(),
             )
+
+
+ONLY_THE_ENDS = envelopes.OnlyTheEndsChecked(
+    reason=(
+        "an official-rate series declares no periodicity, so which dates between its first and "
+        "its last were expected is not a fact this layer has. The window's ends were compared "
+        "against the declared bounds; a date missing strictly inside them is not detected here."
+    )
+)
+"""What a rate window read actually checked. Enumerating calendar days would infer a
+periodicity the declaration does not carry."""
 
 
 def _rates(series: OfficialRateSeries, window: tuple[str, str] | None) -> Read:
     if window is None:
-        return Read(observations=series.observations, outside=None)
+        return Read(
+            observations=series.observations,
+            outside=None,
+            checked=envelopes.EveryPeriodChecked(),
+        )
     inside = _inside(series.observations, window, key=lambda held: held.on_date.isoformat())
     declared = official_rate.covered_window(series)
     missing = _beyond(window, declared)
     return Read(
         observations=inside,
         outside=None if not missing else _outside(series, window, missing),
+        checked=ONLY_THE_ENDS,
     )
 
 
@@ -161,12 +187,8 @@ def _inside[T](
 def _beyond(window: tuple[str, str], declared: tuple[date, date] | None) -> tuple[str, ...]:
     """The ends of the asked window the series does not reach, as the two dates themselves.
 
-    Named ends rather than every uncovered day, because an official-rate series **declares no
-    periodicity** -- so which days between its first and its last were expected is not a fact
-    this layer has, and enumerating calendar days would be inferring one. A gap strictly inside
-    the declared bounds is therefore not detectable here; the CPI series has a declared
-    periodicity and its own coverage function, which is why that arm can name every missing
-    month.
+    Named ends rather than every uncovered day: see :data:`ONLY_THE_ENDS`, which is what the
+    body says about it.
     """
     if declared is None:
         return window

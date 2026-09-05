@@ -13,7 +13,7 @@ from typing import Any
 import pytest
 
 from terezy.api import answer as verb
-from terezy.api.http import document
+from terezy.api.http import document, service
 from terezy.core.primitives.currency import Currency
 from tests.http_client import served
 
@@ -74,3 +74,14 @@ def test_as_of_is_required_on_the_answer() -> None:
     response = served(DATA_ROOT).get(f"{document.PREFIX}/questions/{QUESTION}/answer")
     assert response.status_code == 422
     assert "as_of" in response.text
+
+
+@pytest.mark.contract
+def test_the_answer_takes_no_scenario_parameter() -> None:
+    """It resolves its own scenario from the question's declared regime, so a parameter here
+    would be one a caller could set, and believe in, while it decided nothing."""
+    published = service.create_app(DATA_ROOT, client=None).openapi()["paths"]
+    parameters = published[f"{document.PREFIX}/questions/{{question_id}}/answer"]["get"][
+        "parameters"
+    ]
+    assert [held["name"] for held in parameters] == ["question_id", "as_of"]

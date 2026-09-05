@@ -7,7 +7,7 @@ Principle VII forbids a CDN call outright in a repository holding one person's f
 """
 
 import os
-from collections.abc import Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -81,7 +81,7 @@ def create_app(root: Path, *, client: Path | None = None) -> FastAPI:
         _register(router, category, root)
     _register_fixed(router, root)
     app.include_router(router)
-    app.add_exception_handler(DeclarationError, _declaration_failed)
+    app.add_exception_handler(DeclarationError, _declaration_failed(root))
     _serve_client(app, client)
     return app
 
@@ -257,6 +257,7 @@ def _register_observations(
                 series_id=record_id,
                 window=window,
                 covers=series.coverage_of(held),
+                checked=read.checked,
                 observations=read.observations,
                 outside=read.outside,
             )
@@ -267,11 +268,14 @@ def _register_observations(
 
 
 def _register_fixed(router: APIRouter, root: Path) -> None:
-    reader = _reader(root, scenario=True)
+    under_scenario = _reader(root, scenario=True)
+    # The answer resolves its own scenario from the question's declared regime, so a scenario
+    # parameter here would be one a caller could set and believe in.
+    plain = _reader(root, scenario=False)
     answer_envelope = envelopes.answer_of(AnsweredQuestion)
 
     @router.get("/registry", response_model=_model(summary.RegistrySummary), name="registry")
-    def registry(asked: Annotated[Read, Depends(reader)]) -> encode.Json:
+    def registry(asked: Annotated[Read, Depends(under_scenario)]) -> encode.Json:
         return _body(summary.RegistrySummary, summary.of(asked.ask, as_of=asked.as_of))
 
     @router.get(
@@ -279,7 +283,7 @@ def _register_fixed(router: APIRouter, root: Path) -> None:
         response_model=_model(answer_envelope),
         name="questions.answer",
     )
-    def answer(question_id: str, asked: Annotated[Read, Depends(reader)]) -> encode.Json:
+    def answer(question_id: str, asked: Annotated[Read, Depends(plain)]) -> encode.Json:
         return _body(
             answer_envelope,
             answer_envelope(
@@ -361,6 +365,8 @@ def _relative(path: Path, root: Path) -> str:
     An absolute path is a fact about the machine that served the request, and a reader is shown
     it to go and find the file in the repository.
     """
+    if not path.is_relative_to(root):
+        return path.name
     return path.relative_to(root).as_posix()
 
 
@@ -397,22 +403,26 @@ def _serve_client(app: FastAPI, client: Path | None) -> None:
         app.mount("/", StaticFiles(directory=client, html=True), name="client")
 
 
-async def _declaration_failed(_: Request, exc: Exception) -> Response:
+def _declaration_failed(root: Path) -> Callable[[Request, Exception], Awaitable[Response]]:
     """A malformed declaration, carrying the loader's own four fields and nothing added.
 
     An error status rather than a typed refusal in a 200 body: nothing was answered and no
     partial result exists, which is the distinction the CLI keeps between `LOAD_FAILED` and
     `REFUSED`.
     """
-    assert isinstance(exc, DeclarationError)
-    failure = envelopes.DeclarationFailed(
-        file=str(exc.file),
-        field_path=exc.field_path,
-        problem=exc.problem,
-        remedy=exc.remedy,
-    )
-    body = _body(envelopes.DeclarationFailed, failure)
-    return JSONResponse(status_code=500, content=body)
+
+    async def handler(_: Request, exc: Exception) -> Response:
+        if not isinstance(exc, DeclarationError):
+            raise exc
+        failure = envelopes.DeclarationFailed(
+            file=_relative(exc.file, root),
+            field_path=exc.field_path,
+            problem=exc.problem,
+            remedy=exc.remedy,
+        )
+        return JSONResponse(status_code=500, content=_body(envelopes.DeclarationFailed, failure))
+
+    return handler
 
 
 FILESYSTEM_ROOT: Final[Path] = Path("/")
@@ -444,9 +454,21 @@ def guarded(served: FastAPI, *, context: bind.BindContext) -> ASGIApp:
     return middleware.host_allowlist(middleware.loopback_guard(served, context=context))
 
 
-application: Final[FastAPI] = create_app(data_root(), client=client_root())
-"""The routed application. One data root, fixed at import, and the object the document is
-generated from."""
+_SERVED: list[ASGIApp] = []
 
-app = guarded(application, context=bind_context())
-"""What a server command addresses: the application behind both per-request guards."""
+
+def __getattr__(name: str) -> object:
+    """``app`` is built on first access rather than at import.
+
+    Built at import, a malformed ``TEREZY_BIND_CONTEXT`` raised three modules deep before
+    ``python -m terezy.api.http`` could reach its own one-line refusal -- so the entry point's
+    refusal was unreachable in the real process and green only in tests that had already
+    imported this module under a clean environment.
+    """
+    if name != "app":
+        raise AttributeError(name)
+    if not _SERVED:
+        _SERVED.append(
+            guarded(create_app(data_root(), client=client_root()), context=bind_context())
+        )
+    return _SERVED[0]

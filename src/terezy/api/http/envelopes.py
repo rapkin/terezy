@@ -121,6 +121,23 @@ class FieldDescription:
 
 
 @dataclass(frozen=True, slots=True)
+class EveryPeriodChecked:
+    """Every period of the asked window was looked for, so an empty `outside` means complete."""
+
+
+@dataclass(frozen=True, slots=True)
+class OnlyTheEndsChecked:
+    """Only the window's ends were compared against the series' declared bounds.
+
+    An empty `outside` then means *the window lies inside the declared bounds*, which is a
+    weaker statement than *every period asked for is declared*. Stated rather than left for a
+    client to assume, because an absent refusal reads as full coverage.
+    """
+
+    reason: str
+
+
+@dataclass(frozen=True, slots=True)
 class SeriesCoverage:
     """The first and last period a series declares, so a client never has to guess a window."""
 
@@ -236,6 +253,7 @@ def observations_of(category_id: str, observation: object) -> tuple[type, type]:
             ("series_id", str),
             ("window", tuple[str, str] | None),
             ("covers", SeriesCoverage | None),
+            ("checked", EveryPeriodChecked | OnlyTheEndsChecked),
             ("observations", tuple[observation, ...]),  # type: ignore[valid-type]
             ("outside", WindowOutsideCoverage | None),
         ),

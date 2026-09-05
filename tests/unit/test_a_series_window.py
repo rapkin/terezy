@@ -142,3 +142,16 @@ def test_a_window_end_in_the_wrong_shape_is_refused(client: Any) -> None:
         )
         assert response.status_code == 422, category
         assert expected in response.text
+
+
+def test_a_body_says_what_it_actually_checked(client: Any) -> None:
+    """An absent refusal reads as full coverage, and for a series declaring no periodicity that
+    is more than was checked."""
+    cpi = _observations(client, "cpi", CPI, **{"from": "2025-08", "to": "2025-10"})
+    assert cpi["checked"]["tag"] == "envelopes.EveryPeriodChecked"
+
+    rates = _observations(
+        client, "official-rates", RATES, **{"from": "2026-08-01", "to": "2026-08-05"}
+    )
+    assert rates["checked"]["tag"] == "envelopes.OnlyTheEndsChecked"
+    assert "periodicity" in rates["checked"]["reason"]

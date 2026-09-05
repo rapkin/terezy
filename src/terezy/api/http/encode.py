@@ -116,16 +116,9 @@ def _as_iterable(value: object) -> Iterable[object]:
 
 
 def _member_for(members: Sequence[shapes.Shape], value: object) -> shapes.Shape:
-    """Which arm of a union this value is, decided by identity of type and never by duck typing."""
-    for member in members:
-        if isinstance(member, shapes.RecordShape) and type(value) is member.record:
-            return member
-        if isinstance(member, shapes.EnumShape) and isinstance(value, member.enum):
-            return member
-        if isinstance(member, shapes.ScalarShape) and type(value) is member.python_type:
-            return member
-        if isinstance(member, shapes.LiteralShape) and value in member.values:
-            return member
+    chosen = shapes.member_for(members, value)
+    if chosen is not None:
+        return chosen
     raise UnencodableValueError(
         f"{type(value).__name__} is not a member of the union its shape names. A body cannot "
         "carry a value the schema does not describe, and guessing the nearest member is how a "
