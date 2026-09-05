@@ -49,6 +49,15 @@ ScenarioId = Annotated[str | None, Query(description="A declared scenario id, or
 
 
 @dataclass(frozen=True, slots=True)
+class PathNotServed:
+    """No route serves that path. A record rather than a literal dict, so its tag is derived by
+    the same scheme as every other body and cannot go stale on a rename."""
+
+    path: str
+    reason: str
+
+
+@dataclass(frozen=True, slots=True)
 class Read:
     """One request's parameters: what to resolve under, and the date it was asked as of."""
 
@@ -76,7 +85,7 @@ def create_app(root: Path, *, client: Path | None = None) -> FastAPI:
         docs_url=None,
         redoc_url=None,
     )
-    router = APIRouter(prefix=document.PREFIX)
+    router = APIRouter(prefix=document.PREFIX, responses=_refusals())
     for category in categories.CATEGORIES:
         _register(router, category, root)
     _register_fixed(router, root)
@@ -142,15 +151,36 @@ def _declared_scenario(root: Path, scenario_id: str | None) -> str | None:
     return scenario_id
 
 
-def _scenario_refusal(scenario: bool) -> dict[int | str, dict[str, object]]:
-    """What a route that takes a scenario may answer besides its own body, in the document.
+def _refusals() -> dict[int | str, dict[str, object]]:
+    """Every refusal a request may receive besides the route's own body, in the document.
 
     Declared rather than left to the framework's validation shape: a client generated from the
-    document parses what the document says, and an undeclared body is one it cannot read.
+    document parses what the document says, and an undeclared body is one it cannot read. The
+    two guards refuse before any route is reached, so they are declared on the router rather
+    than per route.
+    """
+    return {
+        403: {"model": _model(middleware.NotOnLoopback)},
+        404: {"model": _model(PathNotServed)},
+        500: {"model": _model(envelopes.DeclarationFailed)},
+    }
+
+
+def _scenario_refusal(scenario: bool) -> dict[int | str, dict[str, object]]:
+    """The 400 a scenario-taking route may answer with.
+
+    Two records share that status -- the `Host` refusal reaches every request and the scenario
+    refusal only these -- so it is declared as the union of the two rather than as whichever
+    one a reader happened to think of.
     """
     if not scenario:
-        return {}
-    return {400: {"model": _model(envelopes.ScenarioNotDeclared)}}
+        return {400: {"model": _model(middleware.HostNotDeclared)}}
+    return {400: {"model": _either(middleware.HostNotDeclared, envelopes.ScenarioNotDeclared)}}
+
+
+def _either(left: type, right: type) -> object:
+    """A discriminated union of two refusal records, as a response model."""
+    return models.annotation_of(shapes.plan_of(left | right))
 
 
 def _model(built: type) -> type[BaseModel]:
@@ -318,7 +348,7 @@ def _register_fixed(router: APIRouter, root: Path) -> None:
         "/registry",
         response_model=_model(summary.RegistrySummary),
         name="registry",
-        responses=_scenario_refusal(scenario=True),
+        responses=_scenario_refusal(True),
     )
     def registry(asked: Annotated[Read, Depends(under_scenario)]) -> encode.Json:
         return _body(summary.RegistrySummary, summary.of(asked.ask, as_of=asked.as_of))
@@ -446,14 +476,16 @@ def _serve_client(app: FastAPI, client: Path | None) -> None:
             return FileResponse(index)
         return JSONResponse(
             status_code=404,
-            content={
-                "tag": "service.PathNotServed",
-                "path": request.url.path,
-                "reason": (
-                    "this application serves no route at that path. Every endpoint is under "
-                    f"{document.PREFIX!r}."
+            content=_body(
+                PathNotServed,
+                PathNotServed(
+                    path=request.url.path,
+                    reason=(
+                        "this application serves no route at that path. Every endpoint is under "
+                        f"{document.PREFIX!r}."
+                    ),
                 ),
-            },
+            ),
         )
 
     if client is not None and client.is_dir():

@@ -15,12 +15,13 @@ from __future__ import annotations
 import asyncio
 import ipaddress
 import json
+from dataclasses import fields
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from terezy.api.http import middleware
+from terezy.api.http import encode, middleware, tags
 from terezy.api.http.bind import BindContext
 
 if TYPE_CHECKING:
@@ -167,3 +168,12 @@ def test_the_port_is_stripped_and_a_bracketed_literal_survives(header: str, expe
     """A bare IPv6 literal has colons of its own, so splitting on the first one would turn
     ``[::1]:8000`` into ``[``."""
     assert middleware.host_of(header) == expected
+
+
+@pytest.mark.contract
+def test_the_middleware_refusals_carry_the_derived_tag() -> None:
+    """These two are serialised without the shape machinery, so their tags are literals. The
+    claim that they follow the same scheme is asserted here rather than left as prose."""
+    for record in (middleware.NotOnLoopback, middleware.HostNotDeclared):
+        declared = next(field.default for field in fields(record) if field.name == encode.TAG_FIELD)
+        assert declared == tags.tag_of(record)

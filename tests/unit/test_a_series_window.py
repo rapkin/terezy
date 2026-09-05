@@ -149,3 +149,13 @@ def test_a_body_says_what_it_actually_checked(client: Any) -> None:
     )
     assert rates["checked"]["tag"] == "envelopes.OnlyTheEndsChecked"
     assert "periodicity" in rates["checked"]["reason"]
+
+
+def test_a_read_with_no_window_claims_nothing_about_absence(client: Any) -> None:
+    """Found by review: a whole-series read said every period was checked, which is the claim
+    the module argues cannot be made for a series declaring no periodicity -- and which a
+    declaration with a gap in it would make false for the other one too."""
+    for category, series_id in (("cpi", CPI), ("official-rates", RATES)):
+        result = _observations(client, category, series_id)
+        assert result["checked"]["tag"] == "envelopes.NoWindowAsked", category
+        assert result["outside"] is None

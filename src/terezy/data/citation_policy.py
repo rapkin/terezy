@@ -144,21 +144,22 @@ class CitationsExempt:
 def verdict_for(path: str) -> CitationsRequired | CitationsExempt:
     """The gate's verdict for one path under ``data/``, directory or root file.
 
-    A root ``.toml`` is scanned like a sourced file -- ``venues.toml`` and ``groups.toml`` both
-    are -- with :data:`KINDS_FILE` the single exclusion.
+    The exempt top segment is consulted **before** the file-suffix rule: a ``.toml`` nested
+    under an exempt directory is exempt like everything else there, and answering *required*
+    for it would make this module disagree with the gate that imports it -- which is the one
+    thing it exists to prevent. A root ``.toml`` is scanned like a sourced file, with
+    :data:`KINDS_FILE` the single exclusion.
     """
     if path == KINDS_FILE:
         return CitationsExempt(path=path, reason=KINDS_FILE_EXEMPTION)
-    if path.endswith(".toml"):
-        return CitationsRequired(path=path)
     top = path.split("/", 1)[0]
-    if top in SOURCED_DIRS:
-        return CitationsRequired(path=path)
     exemption = EXEMPT_DIRS.get(top)
-    if exemption is None:
-        raise ValueError(
-            f"{path!r} is in neither SOURCED_DIRS nor EXEMPT_DIRS. Answering `required` for an "
-            "unlisted directory would be the silent default that makes a fail-closed gate "
-            "fail-open; name it in one of the two lists, with its reason if it is exempt."
-        )
-    return CitationsExempt(path=path, reason=exemption)
+    if exemption is not None:
+        return CitationsExempt(path=path, reason=exemption)
+    if path.endswith(".toml") or top in SOURCED_DIRS:
+        return CitationsRequired(path=path)
+    raise ValueError(
+        f"{path!r} is in neither SOURCED_DIRS nor EXEMPT_DIRS. Answering `required` for an "
+        "unlisted directory would be the silent default that makes a fail-closed gate "
+        "fail-open; name it in one of the two lists, with its reason if it is exempt."
+    )

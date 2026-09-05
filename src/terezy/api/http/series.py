@@ -32,7 +32,7 @@ class Read:
 
     observations: tuple[object, ...]
     outside: envelopes.WindowOutsideCoverage | None
-    checked: envelopes.EveryPeriodChecked | envelopes.OnlyTheEndsChecked
+    checked: envelopes.NoWindowAsked | envelopes.EveryPeriodChecked | envelopes.OnlyTheEndsChecked
 
 
 def coverage_of(series: object) -> envelopes.SeriesCoverage | None:
@@ -127,11 +127,7 @@ def read(series: object, window: tuple[str, str] | None) -> Read:
 
 def _cpi(series: CpiSeries, window: tuple[str, str] | None) -> Read:
     if window is None:
-        return Read(
-            observations=series.observations,
-            outside=None,
-            checked=envelopes.EveryPeriodChecked(),
-        )
+        return _whole(series.observations)
     asked = Window(first=window[0], last=window[1])
     covered = cpi.coverage(series, asked)
     inside = _inside(series.observations, window, key=lambda held: held.period)
@@ -166,13 +162,14 @@ ONLY_THE_ENDS = envelopes.OnlyTheEndsChecked(
 periodicity the declaration does not carry."""
 
 
+def _whole(observations: tuple[object, ...]) -> Read:
+    """The whole declared series, with no claim about what it does or does not contain."""
+    return Read(observations=observations, outside=None, checked=envelopes.NoWindowAsked())
+
+
 def _rates(series: OfficialRateSeries, window: tuple[str, str] | None) -> Read:
     if window is None:
-        return Read(
-            observations=series.observations,
-            outside=None,
-            checked=envelopes.EveryPeriodChecked(),
-        )
+        return _whole(series.observations)
     inside = _inside(series.observations, window, key=lambda held: held.on_date.isoformat())
     declared = official_rate.covered_window(series)
     missing = _beyond(window, declared)
@@ -211,10 +208,13 @@ def _beyond(window: tuple[str, str], declared: tuple[date, date] | None) -> tupl
 
 
 def _outside(
-    series: object, window: tuple[str, str], missing: tuple[str, ...], what: str
+    series: CpiSeries | OfficialRateSeries,
+    window: tuple[str, str],
+    missing: tuple[str, ...],
+    what: str,
 ) -> envelopes.WindowOutsideCoverage:
     coverage = coverage_of(series)
-    series_id = getattr(series, "id", "")
+    series_id = series.id
     return envelopes.WindowOutsideCoverage(
         series_id=series_id,
         asked=window,

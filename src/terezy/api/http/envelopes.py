@@ -148,6 +148,16 @@ class FieldDescription:
 
 
 @dataclass(frozen=True, slots=True)
+class NoWindowAsked:
+    """Every declared observation is returned, and nothing was checked for absence.
+
+    A read with no window asks about no period, so there is nothing a refusal could name -- and
+    saying every period was checked would be the stronger claim, false for a series whose
+    declaration is allowed to have a gap in it.
+    """
+
+
+@dataclass(frozen=True, slots=True)
 class EveryPeriodChecked:
     """Every period of the asked window was looked for, so an empty `outside` means complete."""
 
@@ -280,7 +290,7 @@ def observations_of(category_id: str, observation: object) -> tuple[type, type]:
             ("series_id", str),
             ("window", tuple[str, str] | None),
             ("covers", SeriesCoverage | None),
-            ("checked", EveryPeriodChecked | OnlyTheEndsChecked),
+            ("checked", NoWindowAsked | EveryPeriodChecked | OnlyTheEndsChecked),
             ("observations", tuple[observation, ...]),  # type: ignore[valid-type]
             ("outside", WindowOutsideCoverage | None),
         ),

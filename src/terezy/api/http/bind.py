@@ -17,6 +17,7 @@ than the one it is tempting to make, and 020 FR-027b requires the smaller one.
 from __future__ import annotations
 
 import ipaddress
+import re
 from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Final
@@ -160,10 +161,19 @@ def container_marker(root: Path) -> str | None:
     cgroup = root.joinpath(*CGROUP_PATH.strip("/").split("/"))
     if not cgroup.is_file():
         return None
-    text = cgroup.read_text(encoding="utf-8", errors="replace")
-    for runtime in CGROUP_RUNTIMES:
-        if runtime in text:
-            return f"{CGROUP_PATH} names {runtime}"
+    for line in cgroup.read_text(encoding="utf-8", errors="replace").splitlines():
+        # A cgroup line is `hierarchy:controllers:path`; the runtime names a path segment, and
+        # matching the whole line would honour the claim on a machine whose unrelated scope
+        # merely contains the word -- fail-open on the guard standing in for authentication.
+        words = {
+            word
+            for field in line.split(":")[2:]
+            for segment in field.split("/")
+            for word in re.split(r"[^a-z0-9]+", segment.lower())
+        }
+        named = sorted(words & set(CGROUP_RUNTIMES))
+        if named:
+            return f"{CGROUP_PATH} names {named[0]}"
     return None
 
 

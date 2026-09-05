@@ -1922,6 +1922,48 @@
         "title": "envelopes_CategoryHasNoSuchId",
         "type": "object"
       },
+      "envelopes_DeclarationFailed": {
+        "additionalProperties": false,
+        "properties": {
+          "field_path": {
+            "title": "Field Path",
+            "type": "string"
+          },
+          "file": {
+            "title": "File",
+            "type": "string"
+          },
+          "problem": {
+            "title": "Problem",
+            "type": "string"
+          },
+          "remedy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remedy"
+          },
+          "tag": {
+            "const": "envelopes.DeclarationFailed",
+            "title": "Tag",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tag",
+          "file",
+          "field_path",
+          "problem",
+          "remedy"
+        ],
+        "title": "envelopes_DeclarationFailed",
+        "type": "object"
+      },
       "envelopes_DeclaredSeeds": {
         "additionalProperties": false,
         "properties": {
@@ -3449,6 +3491,21 @@
         "title": "envelopes_ListingOfVenues",
         "type": "object"
       },
+      "envelopes_NoWindowAsked": {
+        "additionalProperties": false,
+        "properties": {
+          "tag": {
+            "const": "envelopes.NoWindowAsked",
+            "title": "Tag",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tag"
+        ],
+        "title": "envelopes_NoWindowAsked",
+        "type": "object"
+      },
       "envelopes_NothingDeclared": {
         "additionalProperties": false,
         "properties": {
@@ -3481,11 +3538,15 @@
             "discriminator": {
               "mapping": {
                 "envelopes.EveryPeriodChecked": "#/components/schemas/envelopes_EveryPeriodChecked",
+                "envelopes.NoWindowAsked": "#/components/schemas/envelopes_NoWindowAsked",
                 "envelopes.OnlyTheEndsChecked": "#/components/schemas/envelopes_OnlyTheEndsChecked"
               },
               "propertyName": "tag"
             },
             "oneOf": [
+              {
+                "$ref": "#/components/schemas/envelopes_NoWindowAsked"
+              },
               {
                 "$ref": "#/components/schemas/envelopes_EveryPeriodChecked"
               },
@@ -3572,11 +3633,15 @@
             "discriminator": {
               "mapping": {
                 "envelopes.EveryPeriodChecked": "#/components/schemas/envelopes_EveryPeriodChecked",
+                "envelopes.NoWindowAsked": "#/components/schemas/envelopes_NoWindowAsked",
                 "envelopes.OnlyTheEndsChecked": "#/components/schemas/envelopes_OnlyTheEndsChecked"
               },
               "propertyName": "tag"
             },
             "oneOf": [
+              {
+                "$ref": "#/components/schemas/envelopes_NoWindowAsked"
+              },
               {
                 "$ref": "#/components/schemas/envelopes_EveryPeriodChecked"
               },
@@ -7017,6 +7082,78 @@
         "title": "manifest_RunManifest",
         "type": "object"
       },
+      "middleware_HostNotDeclared": {
+        "additionalProperties": false,
+        "properties": {
+          "declared": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Declared",
+            "type": "array"
+          },
+          "host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Host"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "tag": {
+            "const": "middleware.HostNotDeclared",
+            "title": "Tag",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tag",
+          "host",
+          "declared",
+          "reason"
+        ],
+        "title": "middleware_HostNotDeclared",
+        "type": "object"
+      },
+      "middleware_NotOnLoopback": {
+        "additionalProperties": false,
+        "properties": {
+          "client_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Address"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "tag": {
+            "const": "middleware.NotOnLoopback",
+            "title": "Tag",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tag",
+          "client_address",
+          "reason"
+        ],
+        "title": "middleware_NotOnLoopback",
+        "type": "object"
+      },
       "money_Money": {
         "additionalProperties": false,
         "properties": {
@@ -8407,6 +8544,31 @@
           "kind"
         ],
         "title": "series_InflationAssumption",
+        "type": "object"
+      },
+      "service_PathNotServed": {
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "tag": {
+            "const": "service.PathNotServed",
+            "title": "Tag",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tag",
+          "path",
+          "reason"
+        ],
+        "title": "service_PathNotServed",
         "type": "object"
       },
       "staleness_ObservationKind": {
@@ -10767,11 +10929,46 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/envelopes_ScenarioNotDeclared"
+                  "discriminator": {
+                    "mapping": {
+                      "envelopes.ScenarioNotDeclared": "#/components/schemas/envelopes_ScenarioNotDeclared",
+                      "middleware.HostNotDeclared": "#/components/schemas/middleware_HostNotDeclared"
+                    },
+                    "propertyName": "tag"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                    },
+                    {
+                      "$ref": "#/components/schemas/envelopes_ScenarioNotDeclared"
+                    }
+                  ],
+                  "title": "Response 400 Access List Api Access Get"
                 }
               }
             },
             "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
           },
           "422": {
             "content": {
@@ -10782,6 +10979,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Access.List"
@@ -10846,11 +11053,46 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/envelopes_ScenarioNotDeclared"
+                  "discriminator": {
+                    "mapping": {
+                      "envelopes.ScenarioNotDeclared": "#/components/schemas/envelopes_ScenarioNotDeclared",
+                      "middleware.HostNotDeclared": "#/components/schemas/middleware_HostNotDeclared"
+                    },
+                    "propertyName": "tag"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                    },
+                    {
+                      "$ref": "#/components/schemas/envelopes_ScenarioNotDeclared"
+                    }
+                  ],
+                  "title": "Response 400 Access Read Api Access  Record Id  Get"
                 }
               }
             },
             "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
           },
           "422": {
             "content": {
@@ -10861,6 +11103,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Access.Read"
@@ -10894,6 +11146,36 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -10903,6 +11185,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Calendars.List"
@@ -10945,6 +11237,36 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -10954,6 +11276,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Calendars.Read"
@@ -11009,11 +11341,46 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/envelopes_ScenarioNotDeclared"
+                  "discriminator": {
+                    "mapping": {
+                      "envelopes.ScenarioNotDeclared": "#/components/schemas/envelopes_ScenarioNotDeclared",
+                      "middleware.HostNotDeclared": "#/components/schemas/middleware_HostNotDeclared"
+                    },
+                    "propertyName": "tag"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                    },
+                    {
+                      "$ref": "#/components/schemas/envelopes_ScenarioNotDeclared"
+                    }
+                  ],
+                  "title": "Response 400 Candidate Ceiling Read Api Candidate Ceiling Get"
                 }
               }
             },
             "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
           },
           "422": {
             "content": {
@@ -11024,6 +11391,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Candidate-Ceiling.Read"
@@ -11057,6 +11434,36 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -11066,6 +11473,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Channels.List"
@@ -11108,6 +11525,36 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -11117,6 +11564,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Channels.Read"
@@ -11172,11 +11629,46 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/envelopes_ScenarioNotDeclared"
+                  "discriminator": {
+                    "mapping": {
+                      "envelopes.ScenarioNotDeclared": "#/components/schemas/envelopes_ScenarioNotDeclared",
+                      "middleware.HostNotDeclared": "#/components/schemas/middleware_HostNotDeclared"
+                    },
+                    "propertyName": "tag"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                    },
+                    {
+                      "$ref": "#/components/schemas/envelopes_ScenarioNotDeclared"
+                    }
+                  ],
+                  "title": "Response 400 Composition Read Api Composition Get"
                 }
               }
             },
             "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
           },
           "422": {
             "content": {
@@ -11187,6 +11679,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Composition.Read"
@@ -11220,6 +11722,36 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -11229,6 +11761,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Cpi.List"
@@ -11271,6 +11813,36 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -11280,6 +11852,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Cpi.Read"
@@ -11354,6 +11936,36 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -11363,6 +11975,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Cpi.Observations"
@@ -11396,6 +12018,36 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -11405,6 +12057,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Crediting-Destinations.List"
@@ -11447,6 +12109,36 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -11456,6 +12148,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Crediting-Destinations.Read"
@@ -11511,11 +12213,46 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/envelopes_ScenarioNotDeclared"
+                  "discriminator": {
+                    "mapping": {
+                      "envelopes.ScenarioNotDeclared": "#/components/schemas/envelopes_ScenarioNotDeclared",
+                      "middleware.HostNotDeclared": "#/components/schemas/middleware_HostNotDeclared"
+                    },
+                    "propertyName": "tag"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                    },
+                    {
+                      "$ref": "#/components/schemas/envelopes_ScenarioNotDeclared"
+                    }
+                  ],
+                  "title": "Response 400 Early Exit Belief Read Api Early Exit Belief Get"
                 }
               }
             },
             "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
           },
           "422": {
             "content": {
@@ -11526,6 +12263,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Early-Exit-Belief.Read"
@@ -11559,6 +12306,36 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -11568,6 +12345,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Goals.List"
@@ -11610,6 +12397,36 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -11619,6 +12436,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Goals.Read"
@@ -11652,6 +12479,36 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -11661,6 +12518,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Groups.List"
@@ -11703,6 +12570,36 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -11712,6 +12609,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Groups.Read"
@@ -11745,6 +12652,36 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -11754,6 +12691,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Inflation-Assumption.Read"
@@ -11787,6 +12734,36 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -11796,6 +12773,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Instruments.List"
@@ -11838,6 +12825,36 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -11847,6 +12864,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Instruments.Read"
@@ -11880,6 +12907,36 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -11889,6 +12946,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Observation-Kinds.List"
@@ -11931,6 +12998,36 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -11940,6 +13037,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Observation-Kinds.Read"
@@ -11973,6 +13080,36 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -11982,6 +13119,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Official-Rates.List"
@@ -12024,6 +13171,36 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -12033,6 +13210,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Official-Rates.Read"
@@ -12107,6 +13294,36 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -12116,6 +13333,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Official-Rates.Observations"
@@ -12132,6 +13359,36 @@
               }
             },
             "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Openapi"
@@ -12187,11 +13444,46 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/envelopes_ScenarioNotDeclared"
+                  "discriminator": {
+                    "mapping": {
+                      "envelopes.ScenarioNotDeclared": "#/components/schemas/envelopes_ScenarioNotDeclared",
+                      "middleware.HostNotDeclared": "#/components/schemas/middleware_HostNotDeclared"
+                    },
+                    "propertyName": "tag"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                    },
+                    {
+                      "$ref": "#/components/schemas/envelopes_ScenarioNotDeclared"
+                    }
+                  ],
+                  "title": "Response 400 Questions List Api Questions Get"
                 }
               }
             },
             "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
           },
           "422": {
             "content": {
@@ -12202,6 +13494,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Questions.List"
@@ -12244,6 +13546,26 @@
             },
             "description": "Successful Response"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -12253,6 +13575,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Questions.Answer"
@@ -12317,11 +13649,46 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/envelopes_ScenarioNotDeclared"
+                  "discriminator": {
+                    "mapping": {
+                      "envelopes.ScenarioNotDeclared": "#/components/schemas/envelopes_ScenarioNotDeclared",
+                      "middleware.HostNotDeclared": "#/components/schemas/middleware_HostNotDeclared"
+                    },
+                    "propertyName": "tag"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                    },
+                    {
+                      "$ref": "#/components/schemas/envelopes_ScenarioNotDeclared"
+                    }
+                  ],
+                  "title": "Response 400 Questions Read Api Questions  Record Id  Get"
                 }
               }
             },
             "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
           },
           "422": {
             "content": {
@@ -12332,6 +13699,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Questions.Read"
@@ -12387,11 +13764,46 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/envelopes_ScenarioNotDeclared"
+                  "discriminator": {
+                    "mapping": {
+                      "envelopes.ScenarioNotDeclared": "#/components/schemas/envelopes_ScenarioNotDeclared",
+                      "middleware.HostNotDeclared": "#/components/schemas/middleware_HostNotDeclared"
+                    },
+                    "propertyName": "tag"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                    },
+                    {
+                      "$ref": "#/components/schemas/envelopes_ScenarioNotDeclared"
+                    }
+                  ],
+                  "title": "Response 400 Registry Api Registry Get"
                 }
               }
             },
             "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
           },
           "422": {
             "content": {
@@ -12402,6 +13814,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Registry"
@@ -12435,6 +13857,36 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -12444,6 +13896,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Routes.List"
@@ -12486,6 +13948,36 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -12495,6 +13987,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Routes.Read"
@@ -12528,6 +14030,36 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -12537,6 +14069,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Scenarios.List"
@@ -12579,6 +14121,36 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -12588,6 +14160,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Scenarios.Read"
@@ -12621,6 +14203,36 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -12630,6 +14242,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Seeds.Read"
@@ -12685,11 +14307,46 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/envelopes_ScenarioNotDeclared"
+                  "discriminator": {
+                    "mapping": {
+                      "envelopes.ScenarioNotDeclared": "#/components/schemas/envelopes_ScenarioNotDeclared",
+                      "middleware.HostNotDeclared": "#/components/schemas/middleware_HostNotDeclared"
+                    },
+                    "propertyName": "tag"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                    },
+                    {
+                      "$ref": "#/components/schemas/envelopes_ScenarioNotDeclared"
+                    }
+                  ],
+                  "title": "Response 400 Spendable Read Api Spendable Get"
                 }
               }
             },
             "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
           },
           "422": {
             "content": {
@@ -12700,6 +14357,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Spendable.Read"
@@ -12733,6 +14400,36 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -12742,6 +14439,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Streams.List"
@@ -12784,6 +14491,36 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -12793,6 +14530,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Streams.Read"
@@ -12826,6 +14573,36 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -12835,6 +14612,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Tax-Classes.List"
@@ -12877,6 +14664,36 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -12886,6 +14703,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Tax-Classes.Read"
@@ -12919,6 +14746,36 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -12928,6 +14785,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Tax-Positions.Read"
@@ -12961,6 +14828,36 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -12970,6 +14867,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Tax-Schemes.List"
@@ -13012,6 +14919,36 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -13021,6 +14958,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Tax-Schemes.Read"
@@ -13054,6 +15001,36 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -13063,6 +15040,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Tax-Timing.List"
@@ -13105,6 +15092,36 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -13114,6 +15131,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Tax-Timing.Read"
@@ -13147,6 +15174,36 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -13156,6 +15213,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Venues.List"
@@ -13198,6 +15265,36 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_HostNotDeclared"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/middleware_NotOnLoopback"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/service_PathNotServed"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -13207,6 +15304,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/envelopes_DeclarationFailed"
+                }
+              }
+            },
+            "description": "Internal Server Error"
           }
         },
         "summary": "Venues.Read"

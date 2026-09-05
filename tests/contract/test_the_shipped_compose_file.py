@@ -96,6 +96,16 @@ def test_every_published_port_on_every_service_names_loopback() -> None:
 
 
 @pytest.mark.contract
+def test_no_service_takes_the_host_network() -> None:
+    """`network_mode: host` publishes every port on every interface while declaring none, so a
+    check that reads `ports` alone would go green on the one edit that needs it most."""
+    on_the_host = sorted(
+        name for name, service in _services().items() if service.get("network_mode") == "host"
+    )
+    assert not on_the_host, f"these services bypass port publication entirely: {on_the_host}"
+
+
+@pytest.mark.contract
 def test_the_port_check_would_actually_catch_a_publication() -> None:
     assert PUBLICATION.match("127.0.0.1:8000:8000")
     assert not PUBLICATION.match("8000:8000")
