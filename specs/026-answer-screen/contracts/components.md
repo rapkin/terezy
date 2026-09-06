@@ -39,7 +39,7 @@ somewhere to go (FR-015). Components that *are* a state — a badge, a refusal g
 | `SharedAssumptions` | | FR-020, FR-018 — what every member rests on, and that a rate is measured on the money invested | unit: no shared sentence appears on a card |
 | `HorizonColumn` | | FR-012 — every count the section reports, its `benchmark_standing`, `standings` and `reserves`; FR-014's banner at its head; every member of `outcome`'s nine-member union and `comparison`'s two rendered as its own reason | unit: a survey refusal, a dominance refusal and a missing benchmark each render their reason and no card; each population the API sent has a count; e2e reads the standing off each column |
 | `ComparabilityBanner` | | FR-014 — condition and consequence, no derived figure | unit: shown for mixed spans, absent for equal ones; e2e asserts it is above the fold |
-| `MoneyBack` | ✱ | FR-016/FR-017 — the figures a card's money slot carries, each labelled by where it is; `null` `undeployed` is *nothing left over* | unit: both Q2 shapes, a cross-currency pair shown apart, and a `null` remainder |
+| `MoneyBack` | ✱ | FR-016 — one served figure, `reaches`, neither added to nor subtracted from; FR-017 — the served `undeployed` record behind a disclosure, and a named state where it says the remainder did not come home; `null` `undeployed` is *nothing left over* | unit: the figure is the served one, the disclosure expands, a remainder that did not come home is named, and a `null` remainder reads *nothing left over* |
 | `CandidateCard` | ✱ | FR-015's field order; FR-016/FR-017's money back; FR-019's single badge; the *indistinguishable from* line | unit: each of the three figure states, each badge variant, each kind tile, and a member with neighbours naming them |
 | `FullRanking` | ✱ | FR-012 — every ranked row with all five terms, the benchmark row marked in **text**, tie groups as groups | unit: a tie group of two renders as one group |
 | `RefusalGroup` | | FR-022, FR-023 — one line with its typed reason, expandable to each member | unit: never a count alone, never a blank |
@@ -50,5 +50,5 @@ somewhere to go (FR-015). Components that *are* a state — a badge, a refusal g
 | Thing | Carries | Test |
 |---|---|---|
 | `routes/overview.tsx` → the answer, browser under secondary nav | FR-028 | e2e: 021's whole-UI crawl extended to `/` |
-| the venue `kind` declaration | FR-007 — closed vocabulary in `core/`, refused at load naming file and field | `tests/contract/`: a malformed kind fails at load; **tasks Phase 5, turns on Q1** |
+| the venue `kind` declaration | FR-007 — the five-member closed vocabulary in `core/`, refused at load naming file and field | `tests/contract/`: a malformed kind fails at load; **tasks Phase 5** |
 | `missing.ts` — the named state for an absent field | FR-010 | unit: names the field, renders no blank |

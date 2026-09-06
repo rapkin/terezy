@@ -178,10 +178,12 @@ note   = "Owner 2026-09-02/03 -- he holds BTC and wants it counted, not bought. 
 
 [[feature]]
 id     = "026-answer-screen"
-status = "drafted"
+status = "planned"
 needs  = ["019-decision-layer", "021-web-declared-data"]
 why    = "019 produces the non-dominated set, the separating assumptions and the benchmark standing this screen renders, and nothing else reports them to a reader; 021 owns the client, its router, its figure/mark/refusal components and the `as_of` search parameter this page reuses unchanged"
-note   = "The home page becomes the answer, drawn in the visual language the owner chose 2026-09-06. ZERO ENGINE CHANGES is his constraint, with one declared exception (FR-007's venue kind): the screen renders what the API serves today and every gap is a listed obligation, not a blocker."
+note   = """
+The home page becomes the answer; both clarifications answered 2026-09-06 in specs/decisions/2026-09-06-clarify-026.toml -- five venue kinds, and `money back` as one served figure.
+Implementation additionally waits on the fix/undeployed-remainder branch, which `needs` cannot name because it is a fix and not a feature: until it lands, `reaches` is the deployed part alone."""
 
 [[future]]
 id    = "the-graph-has-no-word-for-drafted-and-planned"

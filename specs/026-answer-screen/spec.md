@@ -6,10 +6,12 @@
 
 **Created**: 2026-09-06
 
-**Status**: **Drafted** — two `[NEEDS CLARIFICATION]` markers are open (*Clarifications*). Each states
-its own blast radius, so planning may start on 021's precedent. Q1 gates the last phase of
-`tasks.md` and nothing above it; Q2 gates one rendering choice inside it, with both shapes built and
-tested either way.
+**Status**: **Planned** — both clarifications answered by the owner on 2026-09-06
+(`specs/decisions/2026-09-06-clarify-026.toml`). Q1 named the venue vocabulary, so `tasks.md`'s last
+phase is unconditional. Q2 rejected all three offered options with a fact about the owner's broker
+account, which moved the question into the engine: **implementation may not start until
+`fix/undeployed-remainder` is on `main`**, because until then `reaches` does not yet carry the
+remainder that FR-016 renders as one figure.
 
 **Input**: `/` becomes the answer to the owner's declared question, drawn in the visual language he
 chose on 2026-09-06: one muted hue per entity kind, tinted icon tiles, one badge system, three
@@ -23,6 +25,12 @@ the shape to settle would invert that. It renders from what `/api/questions/{id}
 against 020 — never a blocker here and never a blank. **One exception, and it is a declaration rather
 than a branch**: FR-007's venue `kind`, which is data plus the closed vocabulary that refuses an
 unknown one.
+
+The constraint survives Q2's answer, which is an engine change this feature does not make. The
+undeployed remainder rides the declared exit route home and arrives inside `reaches` — branch
+`fix/undeployed-remainder`, whose own decision file
+`specs/decisions/2026-09-06-undeployed-remainder-returns.toml` is written there and does not exist
+yet. 026 renders that served figure and still edits no engine file beyond FR-007.
 
 ---
 
@@ -68,9 +76,9 @@ document — `GET /api/questions/fifty-thousand-hryvnia/answer?as_of=2026-09-06`
 | **OB-10** | an answer sized for a screen | unmet: **8.0 MB on the wire**, 4.6 MB of it `dominance.dominated`, because every verdict carries both candidates' merged provenance and staleness | fetches it whole and names the wait (FR-013) |
 | **OB-11** | a member's figures beside the member | unmet: `non_dominated` carries five-term keys, the outcomes are in `outcome.comparison.ranked` | joins by key equality (FR-009) |
 | **OB-12** | a typed separating assumption per member | unmet: `separating.per_member[].rests_on` is prose the core composed | derives the badge from typed outcome fields (FR-019) |
-| **OB-13** | the whole stated amount as one figure | unmet: `reaches` and `undeployed` are two fields; nothing sums them or refuses the sum across currencies | FR-016, FR-017 |
+| **OB-13** | the whole stated amount as one figure, and a verdict saying whether the remainder made it | unmet today, and **the one obligation that blocks implementation**: `fix/undeployed-remainder` is what meets it — served `reaches` then includes the remainder, and the record says whether it came home or could not | renders `reaches` as received (FR-016); renders FR-010's named state where the verdict says it did not (FR-017) |
 | **OB-14** | the declared class on every instrument read, **as a closed enumeration** | unmet three ways: absent from the answer, dropped for a fund, and `str` rather than a `Literal` where it survives — so no client can be made red by widening it | keys exhaustiveness on the read's tag and renders an unnamed class raw (FR-006) |
-| **OB-15** | a venue's declared kind | unmet, blocked on a data change (Q1) | nothing here draws a venue; it binds the language, not the screen |
+| **OB-15** | a venue's declared kind | unmet; **this feature declares it** — the vocabulary is the owner's, answered 2026-09-06 | nothing here draws a venue; it binds the language, not the screen (FR-007) |
 | **OB-16** | a section's span range, and that each rate is annualised over its own span | unmet: `cli/main.py` composes it from each row's `span` | states the condition and no derived figure (FR-014) |
 | **OB-17** | a remedy on an undeclared subject | unmet: `answer.UndeclaredSubject` carries only the word the owner wrote | composes the remedy from a checked map (FR-021) |
 | **OB-18** | the three populations, tie groups, `beats_benchmark`, the benchmark index, every refused and withheld candidate with its typed reason | **met**, all of it, per section | renders it |
@@ -170,8 +178,9 @@ Everything 021 built stays reachable under a secondary navigation entry.
   as the API's own member count, never as a column that failed to load.
 - **A member whose rate is `RateNotComparable`.** The amount is real and the rate is not: the rate
   slot renders the typed refusal and the card stays.
-- **`undeployed` in a currency `reaches` is not in.** Shown apart with the reason, never added: no
-  exchange rate is consulted anywhere here.
+- **A remainder in a currency `reaches` is not in.** It cannot join the headline — no exchange rate is
+  consulted anywhere here — so the served record says it did not come home and the card says so beside
+  the figure (FR-017), never by leaving the headline to stand for the whole amount.
 - **A section with more members than fit.** Measured: 2, 3 and 10. A count and a disclosure, never a
   client-chosen truncation.
 - **`NoStatedAssumptionSeparatesThem`.** Rendered as what it is — *the same beliefs are behind all of
@@ -217,7 +226,10 @@ Everything 021 built stays reachable under a secondary navigation entry.
   declares `id`, `name`, `currencies` and nothing else, while `core/routes/venues.py`'s docstring
   names the taxonomy in prose. So this feature adds a declared `kind` — a closed vocabulary in
   `core/`, refused at load by the `_known` mechanism every other closed field uses, naming file and
-  field — rather than a client-side guess. Vocabulary: Q1.
+  field — rather than a client-side guess. The vocabulary is exactly five, owner 2026-09-06: `bank`,
+  `exchange`, `broker`, `platform`, `payroll`. **Every shipped venue carries one**; the three the
+  owner did not name himself are assigned in the decisions file so a wrong one is corrected there
+  rather than found in a diff.
 
 ### The answer over HTTP
 
@@ -264,19 +276,24 @@ Everything 021 built stays reachable under a secondary navigation entry.
   noise*, without which a set of cards reads as an ordering. Every figure slot MUST be 021's
   `FigureSlot` in one of its three states, so a refused rate and a marked amount already have
   somewhere to go.
-- **FR-016**: *Money back* MUST account for the whole amount stated for **the stream the candidate
-  was funded from** — `key.stream_id`, never the sum of a two-currency map. Measured 2026-09-06 a one-month
-  member reaches **49 760.50 ₴** against 50 000 ₴ asked while reporting **+10.99 %**: `reaches` is
-  measured on what was deployed (whole units × price) and the remainder — 494.68 ₴, at the purchase
-  venue — is a separate field, so the first beside the second reads as a loss with a positive rate.
-  All three figures belong to `salary_uah`, which is that candidate's stream.
-  [NEEDS CLARIFICATION: Q2 — one figure or two.]
-- **FR-017**: Whichever Q2 settles, both figures MUST come from the API's typed fields, and each MUST
-  be labelled by **where** it is: `reaches` is at a spendable endpoint net of the way out's cost and
-  tax, `undeployed` at the purchase venue having paid neither. Any addition is permitted only within
-  one currency, belongs in the API (OB-13), and MUST NOT present money at a venue as money that can
-  be spent. `undeployed` is `null` for a purchase that deployed everything — the ordinary whole-unit
-  case, rendered as *nothing left over* and never as FR-010's missing field.
+- **FR-016**: *Money back* MUST be **one** figure — the served `reaches` for the candidate, rendered
+  as received — and the client MUST neither add to it nor subtract from it. Measured 2026-09-06, before
+  the fix, a one-month member reached **49 760.50 ₴** against 50 000 ₴ asked while reporting
+  **+10.99 %**, because `reaches` was measured on what was deployed (whole units × price) and the
+  remainder — 494.68 ₴ — was a separate field nothing brought home. The owner's answer was that his
+  remainder *can* come home, so the engine brings it: it rides the declared exit route to a spendable
+  endpoint, arrives inside `reaches`, and its arrival is what *all of it by* counts. **What that route
+  charges it is the fix's to declare and cite** — the owner's statement that his own withdrawal costs
+  neither fee nor tax is his account, not a fee value this spec may settle by inference.
+- **FR-017**: The card MAY show, **on expansion**, the served `UndeployedCash` record beside
+  `reaches` — its amount, the venue it was at, and the constraint that left it over — each figure as
+  served. It MUST NOT compute the deployed part: `reaches` less the remainder is a figure the API does
+  not send, which is FR-008 and not an exception to it. Where the served record says the remainder
+  **could not** come home — the cross-currency case the *Edge Cases* name, since no rate is consulted
+  anywhere here — the card MUST render FR-010's named state saying so, because a headline that quietly
+  omits it is FR-016's measured defect back again. `undeployed` is `null` for a purchase that deployed
+  everything — the ordinary whole-unit case, rendered as *nothing left over* and never as FR-010's
+  missing field.
 - **FR-018**: The screen MUST state **once** that a rate is measured on the money actually invested.
   Without it the rate is non-monotonic against *money back* across rows of equal span, and a reader
   takes the disagreement for an error.
@@ -361,26 +378,23 @@ Everything 021 built stays reachable under a secondary navigation entry.
 
 ## Clarifications
 
-Two are open; each states what turns on it, so the rest is plannable.
+Both answered by the owner on 2026-09-06; the questions as asked, the options offered and his words
+are in `specs/decisions/2026-09-06-clarify-026.toml`. What is here is what each answer changed.
 
-**Q1 — Is the venue `kind` vocabulary the owner's to name?** FR-007 adds a declared `kind` to
-`data/venues.toml`. The mockup's five are bank, exchange, broker, platform, payroll; the nine shipped
-venues mostly fit (`monobank_uah` bank; `binance`, `coinbase` exchange; `ibkr_usd` broker; `inzhur`
-platform; `deel` payroll; `fop`, `payoneer`, `foreign_bank_usd` arguable).
+**Q1 — Is the venue `kind` vocabulary the owner's to name?** Yes, and it is the mockup's five:
+`bank`, `exchange`, `broker`, `platform`, `payroll` — closed, in `core/`, an unknown one refused at
+load. Every shipped venue carries one, six of them named by the owner and three assigned in the
+decisions file for his correction. FR-007 and `tasks.md`'s last phase are unconditional.
 
-| Option | Answer | What follows |
-|---|---|---|
-| **A** *(recommended)* | The five, and he assigns each shipped venue its kind | Nine data lines, one closed vocabulary in `core/`. An unknown kind refuses at load naming file and field, like every other closed field. |
-| B | A different set he names | Same change, different members. Costs nothing now and everything later if revised after venues carry one. |
-| C | No venue kind; one neutral hue for every venue | No data change, and the language loses a third of its vocabulary. The answer screen is unaffected either way — it draws no venue. |
-
-**Q2 — What does a card call *money back*?** FR-016's measurement is the context.
-
-| Option | Answer | What follows |
-|---|---|---|
-| A | One figure: what arrives **plus** the undeployed remainder, with the split on expansion | The headline stops reading as a loss, and buys that by adding two amounts **in two places**: `reaches` is at a spendable endpoint net of the way out's cost and tax, `undeployed` sits at the purchase venue having paid neither. 49 760.50 + 494.68 is 50 255.18, not 50 000 — so the sum is not *the stated amount returned*, and presenting it as spendable is Principle VI's *an asset that cannot be liquidated at a reasonable cost is not worth its NAV*. |
-| **B** *(recommended)* | Two figures, each labelled by where it is: what came back to a spendable endpoint, and what is still at the purchase venue | Nothing is summed, nothing that has not paid its way out is presented as spendable, and the positive rate stops contradicting the headline because both halves are visible. The cost is a fourth number on the card. |
-| C | What arrives alone, remainder on expansion | Today's shape, and the reading that produced the defect. |
+**Q2 — What does a card call *money back*?** None of the three options, because all three assumed the
+remainder stays where it was bought. It does not: the owner's account of his own broker account is
+that he can withdraw it back to his bank without fee or tax, so the defect was in the engine rather
+than in the rendering. The remainder rides the declared exit route home and arrives inside `reaches`
+— branch `fix/undeployed-remainder`, which writes
+`specs/decisions/2026-09-06-undeployed-remainder-returns.toml` and prices what that route charges.
+*Money back* is therefore **one served figure**, with the served remainder record on expansion —
+FR-016 and FR-017 — and the client neither adds nor subtracts. **That fix must land on `main` before
+this feature's implementation starts**, because until it does `reaches` is the deployed part alone.
 
 ## Out of scope
 
@@ -398,8 +412,9 @@ platform; `deel` payroll; `fop`, `payoneer`, `foreign_bank_usd` arguable).
 
 ## Assumptions
 
-- 019 and 021 are `done` on `main`; 020 publishes the document this client generates from. No
-  obligation OB-10 to OB-19 blocks implementation.
+- 019 and 021 are `done` on `main`; 020 publishes the document this client generates from. **OB-13 is
+  the one obligation that blocks implementation**, and `fix/undeployed-remainder` is what meets it;
+  every other obligation OB-10 to OB-19 is a named state on the screen rather than a blocker.
 - The routing constraint 021's *Assumptions* stated — `/question/:id` and `/compare` fit under the
   same router and the same search parameters without restructuring — is what this feature spends.
 - `as_of` is 021's, unchanged: typed, validated, in the URL on every route, one clock read.

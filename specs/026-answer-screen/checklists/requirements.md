@@ -13,9 +13,8 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain — **two are open by design** (Q1, Q2). Each states its
-      blast radius; the feature is `drafted` and the tasks turning on one sit in a phase that may not
-      start.
+- [x] No [NEEDS CLARIFICATION] markers remain — both answered by the owner 2026-09-06,
+      `specs/decisions/2026-09-06-clarify-026.toml`.
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic
@@ -39,8 +38,9 @@
 
 ## Notes
 
-The two open markers are the owner's to answer. Everything else was settled against a measurement
-rather than a guess; the measurements are in the spec beside the requirement they warrant.
+Everything was settled against a measurement rather than a guess; the measurements are in the spec
+beside the requirement they warrant. The two markers were the owner's, and he answered both on
+2026-09-06 — Q2 by rejecting every option offered, which is why the figure moved into the engine.
 
 ## Review, round one (2026-09-06, `main...spec/026-answer-screen`)
 
@@ -63,7 +63,8 @@ vocabulary Phase 5 creates.
 
 ## Review, round two (2026-09-06, same diff, five commits)
 
-Ten findings; **nine fixed, one rejected with evidence**. The three that changed a decision:
+Ten findings; **nine fixed, one rejected with evidence**. The two that changed a decision and still
+stand — a third, on Q2's recommendation, was superseded by the owner's own answer:
 
 - `instrument_class` is `str` on the core record and `string` in the generated document, so it can
   carry no exhaustiveness guard. FR-006 now runs FR-004 over the instrument read's **tag**, which is a
@@ -72,10 +73,6 @@ Ten findings; **nine fixed, one rejected with evidence**. The three that changed
   `horizon.end` inverted them: `span` is first outlay to last arrival, so a member that ran to the
   window's end would have been badged *matures inside the window*. It is now `sold_early` present or
   absent, plus the raw-tag fallback.
-- **Q2's recommendation moved from A to B.** `reaches` is at a spendable endpoint net of the way out's
-  cost and tax; `undeployed` sits at the purchase venue having paid neither, and the two sum to
-  50 255.18 rather than 50 000. Adding them presents money at a venue as money that can be spent,
-  which is Principle VI's *not worth its NAV*.
 
 Also fixed: `/` had a redirect requirement no path could satisfy; `outcome`'s nine-member and
 `comparison`'s two-member refusal unions had no named state; `MoneyBack` was missing from the
@@ -86,5 +83,23 @@ discriminant on a variant that does not carry it.
 21 of them carry `carried_quotation`; `the_answer.golden.txt` prints `ranked 21` because the CLI
 renders the benchmark row separately. The plan now says so, so the next reader does not reopen it.
 
-**Nothing is left open.** The cap is spent; the two `[NEEDS CLARIFICATION]` markers are the owner's,
-not the review's.
+**Nothing is left open.** The cap is spent; the two `[NEEDS CLARIFICATION]` markers were the owner's,
+not the review's, and both are answered.
+
+## Review of the clarification diff (2026-09-06, `main...spec/clarify-026`)
+
+One round, six findings, all fixed; nothing left open. Three changed a requirement:
+
+- FR-017 asked for the **deployed/remainder split**, and the API serves `reaches` and the remainder
+  but not the deployed part — so the card would have had to subtract, which is FR-008. It now shows
+  the served `UndeployedCash` record beside the figure and composes nothing.
+- Nothing served said whether a remainder **came home**, so a cross-currency one would have left the
+  headline understating money back — FR-016's own measured defect. That verdict is now OB-13's second
+  half and a named state on the card.
+- OB-13's row was flipped to *met* against a branch carrying no commits and a decision file that does
+  not exist. It reads *unmet*, and is named as the one obligation that blocks implementation.
+
+Also fixed: what the exit route charges the remainder was being settled by inference from the owner's
+account of his own bank, and is now the fix's to declare and cite; `UndeployedCash` carries no date,
+so FR-017 no longer asks a card to label one; and *Assumptions* claimed no obligation blocks
+implementation while OB-13 does.

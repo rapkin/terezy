@@ -22,7 +22,8 @@ but this one (021 FR-035, checked over the built output).
 | `ranked.length`, `refused.length`, `no_candidate.length`, `beats_benchmark.length` | count of served members | permitted (FR-009), and each count's members are reachable in one interaction (FR-012) |
 | `no_candidate` → groups | grouping by typed fields | permitted (FR-009): narrow on `why.tag` **first**, then on the fields that member carries — `NothingConnects` has a `side`, `NothingNeedsToConnect` has none, and reading `side` before narrowing merges the two into one group. Never the reason text (FR-022) |
 | `refused` → groups | grouping by typed fields | same rule; the discriminant is `refusal.tag` |
-| `reaches` and `undeployed.amount` | two figures in two places | FR-017: each labelled by where it is, never summed into one spendable figure; `undeployed` is `null` for a whole-unit purchase, which is *nothing left over* rather than a missing field |
+| `reaches` | one served figure | FR-016: *money back*, rendered as received. After `fix/undeployed-remainder` the served `reaches` **includes the remainder**, which rides the declared exit route home, so the client sums nothing |
+| `undeployed` | a disclosure, not an operand | FR-017: on expansion, its `amount`, `venue_id` and `reason` as served, plus the record's verdict on whether it came home. The deployed part is **not** composed — `reaches` less the remainder is FR-008's forbidden figure. `null` for a whole-unit purchase, which is *nothing left over* rather than a missing field |
 | span lengths all equal? | comparison | yields a **boolean** for FR-014's banner. No span range is composed — that is OB-16 |
 | `outcome.rests_on` less `separating.per_member[].rests_on` | set difference over served strings | the shared assumptions, once per screen (FR-020) |
 | `sold_early`, `span.end` vs `horizon.end`, `carried_quotation` | typed match | the separating badge (FR-019). Never a match over `rests_on` text |
