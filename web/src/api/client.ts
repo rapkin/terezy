@@ -1,20 +1,40 @@
 /**
- * Every request the client makes, and the three ways one can end.
+ * Every request the client makes, and the ways one can end.
  *
  * Same origin, always (FR-035): the paths carry the API's own `/api` prefix, so the browser
  * asks the origin that served the page in development behind a proxy and in production from one
  * container. Nothing here names a host.
  *
- * `not-json` is a state of its own rather than a parse failure folded into `unreachable`: a path
- * the API does not serve is answered by the SPA fallback with an HTML document, and reporting
- * that as a transport failure would name a healthy API as down (FR-006).
+ * `not-json` is a state of its own rather than a parse failure folded into `unreachable`: an
+ * answer that is not this API's document is not the API being down, and reporting it as one
+ * would name a healthy service as unreachable (FR-006). It covers something other than terezy
+ * answering the prefix, and a body that says JSON and is not.
+ *
+ * `not-answered` is the other half of that: a 5xx whose body is not JSON is one no route of
+ * this API produced, since every outcome a route has is a tagged body down to the refusals that
+ * never reach one. It does NOT say which of the two remaining things happened -- a dev server's
+ * proxy reporting it could not connect, or the service itself failing before it could write a
+ * body -- and the state deliberately does not claim to know: the two are indistinguishable from
+ * here, and naming one would send half the readers to the wrong process.
  */
 export type Answered =
   | { readonly tag: "body"; readonly status: number; readonly body: unknown }
   | { readonly tag: "unreachable"; readonly detail: string }
-  | { readonly tag: "not-json"; readonly status: number; readonly contentType: string | null };
+  | { readonly tag: "not-json"; readonly status: number; readonly contentType: string | null }
+  | { readonly tag: "not-answered"; readonly status: number; readonly contentType: string | null };
 
 export const API_PREFIX = "/api";
+
+/**
+ * How the reader starts the API **in the development shape**, where the page is served by a dev
+ * server and the API is a second process.
+ *
+ * Scoped, because the production shape has no checkout and no `uv`: there the page is served by
+ * the API itself, so a screen the reader is looking at is a service that is already running and
+ * the states below say so beside this. Here rather than in the components, so the states that
+ * name it cannot come to say different things, and so their tests read the string the screen does.
+ */
+export const START_COMMAND = "uv run python -m terezy.api.http";
 
 export function url(path: string, search: Readonly<Record<string, string>>): string {
   const query = new URLSearchParams(search).toString();
@@ -33,7 +53,8 @@ export async function request(
   }
   const contentType = answer.headers.get("content-type");
   if (contentType === null || !contentType.includes("json")) {
-    return { tag: "not-json", status: answer.status, contentType };
+    const tag = answer.status >= 500 ? "not-answered" : "not-json";
+    return { tag, status: answer.status, contentType };
   }
   try {
     return { tag: "body", status: answer.status, body: await answer.json() };

@@ -167,6 +167,28 @@ class TestThirty360:
         fraction = conventions.day_count("30/360")(date(2025, 1, 30), date(2025, 3, 31))
         assert is_close(fraction, 60 / 360)
 
+    def test_a_period_ending_on_a_31st_can_be_as_long_as_one_ending_the_next_day(self) -> None:
+        # 2020-07-01 -> 2021-01-31 against 2020-07-01 -> 2021-02-01.
+        #   d1 = 1 (below 30, untouched), so the end-of-month rule does NOT fire and the
+        #   31st is counted in full:
+        #     360 * (2021 - 2020) = 360
+        #      30 * (1 - 7)       = -180
+        #          (31 - 1)       =  30
+        #     total = 210 days
+        #   and to 2021-02-01:
+        #     360 * (2021 - 2020) = 360
+        #      30 * (2 - 7)       = -150
+        #          (1 - 1)        =   0
+        #     total = 210 days
+        # The same 210 days. A coupon period ending 2021-02-01 is therefore fully accrued on
+        # 2021-01-31, a day before it detaches -- which is why the accrual's upper bound is
+        # not strict on this convention (tests/invariants/test_accrual_invariants.py).
+        thirty_360 = conventions.day_count("30/360")
+        to_the_31st = thirty_360(date(2020, 7, 1), date(2021, 1, 31))
+        to_the_1st = thirty_360(date(2020, 7, 1), date(2021, 2, 1))
+        assert is_close(to_the_31st, 210 / 360)
+        assert to_the_31st == to_the_1st
+
 
 class TestTheConventionsDisagree:
     """The three are genuinely different algorithms, not three names for one.

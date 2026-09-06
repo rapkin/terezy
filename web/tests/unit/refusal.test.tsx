@@ -39,6 +39,35 @@ describe("Refusal", () => {
     expect(text).toContain("1991-08 .. 2025-10");
   });
 
+  it("names every parameter a malformed request was refused for, and which were absent", () => {
+    render(
+      <Refusal
+        refusal={{
+          tag: "envelopes.RequestMalformed",
+          parameters: [
+            {
+              tag: "envelopes.ParameterMalformed",
+              location: ["query", "as_of"],
+              given: null,
+              problem: "Field required",
+            },
+            {
+              tag: "envelopes.ParameterMalformed",
+              location: ["query", "from"],
+              given: "yesterday",
+              problem: "Input should be a valid date",
+            },
+          ],
+          reason: "a parameter of this request could not be read.",
+        }}
+      />,
+    );
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("query → as_of was not given");
+    expect(text).toContain("query → from was given as yesterday");
+    expect(document.querySelectorAll("[data-parameter]")).toHaveLength(2);
+  });
+
   it("names its tag, so a refusal without a distinguishing reason is still identified", () => {
     render(
       <Refusal

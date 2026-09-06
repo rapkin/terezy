@@ -5,10 +5,9 @@ refuses early -- a message at boot beats a service that starts and then refuses 
 It is the *early and legible* half and not the guarantee: a bare server command never calls
 this, which is why :func:`terezy.api.http.middleware.loopback_guard` exists.
 
-``--host`` and ``--port`` are the only options, and ``TEREZY_BIND_CONTEXT`` the only variable
-read. FR-030 forbids a second input that lets a refused address through, and
-``tests/unit/test_the_bind_context_is_closed.py`` scans this module for one rather than
-trusting the sentence.
+``--host`` and ``--port`` are the only options. FR-030 forbids a second input that lets a
+refused address through, and ``tests/unit/test_the_bind_context_is_closed.py`` scans this module
+for one rather than trusting a sentence.
 """
 
 from __future__ import annotations
@@ -19,7 +18,7 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
-from terezy.api.http import bind
+from terezy.api.http import bind, roots
 
 if TYPE_CHECKING:  # pragma: no cover -- typing only
     from collections.abc import Callable, Sequence
@@ -73,6 +72,11 @@ def main(
         case bind.BindRefused(reason=reason):
             return _refuse(reason)
         case bind.BindPermitted(address=address):
+            declarations = roots.data_root_in_force(
+                os.environ.get(roots.DATA_ROOT_VARIABLE), packaged=roots.packaged_default()
+            )
+            if isinstance(declarations, roots.DataRootMissing):
+                return _refuse(declarations.reason)
             (start or _start)(address, int(arguments.port))
             return 0
 

@@ -79,6 +79,21 @@ def test_every_resolver_constant_is_served() -> None:
 
 
 @pytest.mark.contract
+def test_no_directory_is_both_served_and_exempt() -> None:
+    """An exemption standing beside a category row answers the closure check twice.
+
+    Deleting the row then leaves the check green and the API silent about a directory the loader
+    reads -- the one outcome the check exists to catch. Found in `objectives`, which 019 gave a
+    row and a loader while its exemption still said it had neither.
+    """
+    both = sorted(_covered() & frozenset(categories.EXEMPT_DIRECTORIES))
+    assert not both, (
+        "these directories are served by a category AND named in an exemption, so removing the "
+        f"category would leave the closure check green: {both}"
+    )
+
+
+@pytest.mark.contract
 def test_every_exemption_names_a_directory_that_exists() -> None:
     """An exemption for a directory nobody has is an exemption nobody can review."""
     missing = sorted(

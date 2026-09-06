@@ -67,7 +67,6 @@ EXEMPT_DIRECTORIES: Final[Mapping[str, str]] = {
         "subdirectory holds a different shape of file. Empty today, and a category for it would "
         "be a second instrument shape this feature has no response type for"
     ),
-    "objectives": "empty but for .gitkeep, and no loader exists",
     "strategies": "empty but for .gitkeep, and no loader exists",
 }
 """Directories under `data/` no category serves, each with the reason it does not.

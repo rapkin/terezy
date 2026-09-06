@@ -46,6 +46,23 @@ describe("the request", () => {
     expect(answered.contentType).toContain("text/html");
   });
 
+  it("names an API that did not answer, rather than reporting it as having answered", async () => {
+    // What the dev server's proxy sends when nothing is listening on the API's port. Reported as
+    // an answer, it read as *the API is up and sent something odd*, which is the opposite of true.
+    server.use(
+      answersWithText(
+        "/api/registry",
+        "Error: connect ECONNREFUSED 127.0.0.1:8000",
+        "text/plain",
+        500,
+      ),
+    );
+    const answered = await request(`${ORIGIN}/api/registry`, { as_of: "2026-09-05" });
+    expect(answered.tag).toBe("not-answered");
+    if (answered.tag !== "not-answered") throw new Error("expected an unanswered request");
+    expect(answered.status).toBe(500);
+  });
+
   it("names a body that says it is JSON and is not, rather than calling the API down", async () => {
     server.use(answersWithText("/api/registry", "{not json", "application/json"));
     const answered = await request(`${ORIGIN}/api/registry`, { as_of: "2026-09-05" });

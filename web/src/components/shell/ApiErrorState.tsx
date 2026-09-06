@@ -1,4 +1,4 @@
-import type { Answered } from "@/api/client";
+import { API_PREFIX, START_COMMAND, type Answered } from "@/api/client";
 import { assertNever } from "@/lib/exhaustive";
 import { isRecord } from "@/lib/narrow";
 import { isRefusal } from "@/lib/provenance";
@@ -28,16 +28,28 @@ function Detail({ answered }: { answered: Answered }) {
     case "unreachable":
       return (
         <p>
-          the API was unreachable: {answered.detail}. The client is served from the same origin as
-          the API, so this is the service being down rather than a connectivity story.
+          the request never reached the API: {answered.detail}. Every request goes to{" "}
+          {API_PREFIX} on the origin that served this page, so there is no host to check: the
+          service is not answering. In development, start it with <code>{START_COMMAND}</code>.
+        </p>
+      );
+    case "not-answered":
+      return (
+        <p>
+          no route of the API produced this: status {answered.status} with content-type{" "}
+          {answered.contentType ?? "none"}, and every outcome a route has is a tagged JSON body.
+          So either the service is up and this request failed inside it, which its own log
+          records, or nothing is listening at all — in development, start it with{" "}
+          <code>{START_COMMAND}</code>.
         </p>
       );
     case "not-json":
       return (
         <p>
-          the API answered status {answered.status} with content-type{" "}
-          {answered.contentType ?? "none"}, which is not a body generated from its document. A
-          path the API does not serve is answered by the client's own fallback document.
+          the answer was status {answered.status} with content-type{" "}
+          {answered.contentType ?? "none"}, which is not a body generated from the API's
+          document — either something other than this service is answering {API_PREFIX}, or it
+          said JSON and sent something else.
         </p>
       );
     case "body":

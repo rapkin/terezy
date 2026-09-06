@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Annotated, Final
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -29,6 +30,7 @@ from terezy.api.http import (
     envelopes,
     middleware,
     models,
+    roots,
     series,
     shapes,
     summary,
@@ -37,7 +39,6 @@ from terezy.core.primitives.currency import Currency
 from terezy.data.declarations import resolver
 from terezy.data.declarations.errors import DeclarationError
 
-DATA_ROOT_VARIABLE: Final[str] = "TEREZY_DATA_ROOT"
 CLIENT_VARIABLE: Final[str] = "TEREZY_WEB_DIST"
 
 BASE_CURRENCY: Final[Currency] = Currency.UAH
@@ -67,13 +68,34 @@ class Read:
 
 def data_root() -> Path:
     """Where declarations are read from. Fixed per process and never a request parameter: a
-    caller choosing a data root is a caller choosing a path into the filesystem."""
-    return Path(os.environ.get(DATA_ROOT_VARIABLE, "data"))
+    caller choosing a data root is a caller choosing a path into the filesystem.
+
+    Raised rather than served, for the reason :func:`bind_context` is raised: a bare server
+    command reaches this module and not the entry point, and a root with nothing in it answered
+    500 to every read rather than refusing once.
+    """
+    resolved = roots.data_root_in_force(
+        os.environ.get(roots.DATA_ROOT_VARIABLE), packaged=roots.packaged_default()
+    )
+    match resolved:
+        case roots.DataRootMissing(reason=reason):
+            raise ValueError(reason)
+        case roots.DataRootFound(path=path):
+            return path
 
 
-def client_root() -> Path:
-    """Where a built client would be, if one has been built into this image."""
-    return Path(os.environ.get(CLIENT_VARIABLE, "web/dist"))
+def client_root() -> Path | None:
+    """Where a built client would be, if one has been built beside or into this application.
+
+    Located the way the data root is: read relative to the process's own directory, a service
+    started outside the checkout answered a JSON refusal at ``/``, which reads as the page being
+    gone rather than as the client never having been looked for.
+    """
+    named = os.environ.get(CLIENT_VARIABLE)
+    if named is not None:
+        return Path(named)
+    checkout = roots.checkout_root()
+    return None if checkout is None else checkout / "web" / "dist"
 
 
 def create_app(root: Path, *, client: Path | None = None) -> FastAPI:
@@ -92,6 +114,7 @@ def create_app(root: Path, *, client: Path | None = None) -> FastAPI:
     app.include_router(router)
     app.add_exception_handler(DeclarationError, _declaration_failed(root))
     app.add_exception_handler(ScenarioRefused, _scenario_refused)
+    app.add_exception_handler(RequestValidationError, _request_malformed)
     _serve_client(app, client)
     return app
 
@@ -155,26 +178,28 @@ def _refusals() -> dict[int | str, dict[str, object]]:
     """Every refusal a request may receive besides the route's own body, in the document.
 
     Declared rather than left to the framework's validation shape: a client generated from the
-    document parses what the document says, and an undeclared body is one it cannot read. The
-    two guards refuse before any route is reached, so they are declared on the router rather
-    than per route.
+    document parses what the document says, and an undeclared body is one it cannot read. Each of
+    them refuses before the route's own body is reached, so they are declared on the router --
+    where a route added later inherits them rather than remembering them.
     """
     return {
+        400: {"model": _model(middleware.HostNotDeclared)},
         403: {"model": _model(middleware.NotOnLoopback)},
         404: {"model": _model(PathNotServed)},
+        422: {"model": _model(envelopes.RequestMalformed)},
         500: {"model": _model(envelopes.DeclarationFailed)},
     }
 
 
 def _scenario_refusal(scenario: bool) -> dict[int | str, dict[str, object]]:
-    """The 400 a scenario-taking route may answer with.
+    """What a scenario-taking route adds to the router's own 400.
 
     Two records share that status -- the `Host` refusal reaches every request and the scenario
     refusal only these -- so it is declared as the union of the two rather than as whichever
     one a reader happened to think of.
     """
     if not scenario:
-        return {400: {"model": _model(middleware.HostNotDeclared)}}
+        return {}
     return {400: {"model": _either(middleware.HostNotDeclared, envelopes.ScenarioNotDeclared)}}
 
 
@@ -446,6 +471,18 @@ def _under_the_api(path: str) -> bool:
     it would be a deep link the SPA fallback should have answered.
     """
     return path == document.PREFIX or path.startswith(f"{document.PREFIX}/")
+
+
+async def _request_malformed(_: Request, exc: Exception) -> Response:
+    """The framework's validation failure as a tagged body, replacing its own untagged one.
+
+    Its default answers ``{"detail": [...]}``, which the document does not publish as a refusal
+    and a generated client therefore cannot narrow on.
+    """
+    if not isinstance(exc, RequestValidationError):
+        raise exc
+    body = _body(envelopes.RequestMalformed, envelopes.malformed_from(exc.errors()))
+    return JSONResponse(status_code=422, content=body)
 
 
 async def _scenario_refused(_: Request, exc: Exception) -> Response:
