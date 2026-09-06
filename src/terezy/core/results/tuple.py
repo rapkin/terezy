@@ -209,10 +209,6 @@ class UndeployedCash:
     it bears **no tax** -- nothing was disposed of and there is no gain. So it is part of
     :attr:`TupleOutcome.reaches` and its arrival is inside the span the rate is measured over.
 
-    Where the way out will not carry it -- it is at the purchase venue and the chain departs
-    from wherever the instrument releases its **proceeds**, which are two declarations --
-    :attr:`journey` says so and the amount stays out of both figures.
-
     Reported as its own record either way, rather than folded in with what the instrument
     released: money the purchase could not deploy and money a holding paid out are different
     facts, and rounding the remainder into the purchase would spend money the owner did not
@@ -328,8 +324,7 @@ class TupleOutcome:
     The whole amount, and the whole amount is what :attr:`implied_rate` is measured against:
     since 2026-09-06 the part of it :attr:`undeployed` says bought nothing comes home along
     the declared way out, so it is a receipt in the series rather than a deduction from the
-    denominator. A remainder the way out will not carry is a receipt that never arrives, which
-    is the loss it actually is.
+    denominator.
     """
 
     parts: tuple[PartContribution, ...]

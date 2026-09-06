@@ -1378,26 +1378,18 @@ def _send_the_remainder_home(
 ) -> tuple[UndeployedCash | None, WayOutCost | None]:
     """Send what the purchase could not deploy back out along the tuple's declared way out.
 
-    Owner decision of 2026-09-06
-    (``specs/decisions/2026-09-06-undeployed-remainder-returns.toml``): the remainder is
-    withdrawable from the purchase venue, so it comes home the same way everything else this
-    tuple sends home does -- charged what that chain declares, delayed by the latency it
-    declares, and **taxed nothing**, because nothing was disposed of and there is no gain. It
-    leaves on the purchase date: it never became a position, so there is nothing for it to
-    wait for.
+    The terms of that journey are :class:`~terezy.core.results.tuple.UndeployedCash`'s, and
+    the two things this function decides are here.
 
-    **A way out that will not carry it leaves it where it is** rather than refusing the tuple,
-    which is the one place this parts company with a release that cannot come home. A release
-    that is stuck means the holding cannot be liquidated; a remainder that is stuck is the
-    change from the purchase, and the position beside it is unaffected. It stays out of
-    ``reaches`` and out of the rate, with the reason on its own record.
+    **The fourth seam.** The remainder is at the venue the purchase was made at while the
+    chain departs from wherever the instrument releases its **proceeds**, and those are two
+    declarations -- reachable in the shipped shapes rather than theoretical. Where they
+    differ, walking the chain with this money would be the free transfer between venues
+    feature 004 shipped.
 
-    Three ways that happens, and the first is reachable in the shipped shapes rather than
-    theoretical: the remainder is at the venue the purchase was made at while the chain
-    departs from wherever the instrument releases its **proceeds**, and those are two
-    declarations. Where they differ, walking the chain with this money would be the free
-    transfer between venues feature 004 shipped. The other two are the chain refusing this
-    amount and the chain's declared monthly ceiling.
+    **A way out that will not carry it leaves it where it is** rather than refusing the
+    tuple, which is where this parts company with :func:`_repatriate`. See
+    :class:`~terezy.core.results.tuple.RemainderStayed`.
     """
     if remainder is None:
         return None, None
@@ -1426,8 +1418,8 @@ def _send_the_remainder_home(
     )
     if isinstance(way_out, RouteUnusable):
         return _stayed(prepared, remainder, way_out.reason), None
-    # The ceiling rule is read here rather than restated: `_over_the_way_out_cap` is where it
-    # lives, and what differs is only what a caller does with its answer.
+    # The refusal is read for its reason rather than returned: the ceiling rule lives in one
+    # place and only what a caller does with its answer differs.
     capped = _over_the_way_out_cap(way_out, remainder.amount, purchased_on)
     if capped is not None:
         return _stayed(prepared, remainder, capped.reason), None
@@ -1666,8 +1658,6 @@ def _arriving(
     match undeployed:
         case UndeployedCash(journey=RemainderCameHome(arrived_on=on, reached=reached)):
             coming.append((on, reached))
-        case _:
-            pass
     return tuple(sorted(coming, key=lambda item: item[0]))
 
 
@@ -1905,10 +1895,9 @@ def _rate(
 
     **The payment out at ``t=0`` is the whole outlay**, and every dated amount that reached the
     endpoint is a receipt against it -- including the remainder the purchase could not deploy,
-    which since the owner's decision of 2026-09-06 comes home along the declared way out with
-    its own cost and its own arrival date. Netting it off the denominator instead assumed it
-    was recoverable at par and free, which is the assumption that decision replaced with a
-    priced journey.
+    which comes home along the declared way out with its own cost and its own arrival date.
+    Netting it off the denominator instead would assume it recoverable at par and free, and it
+    is neither: it is a costed movement like any other.
 
     Time is measured with the **instrument's declared day-count convention**, from the first
     outlay -- the same convention that sized the instrument's own flows, so this rate and

@@ -51,9 +51,8 @@ accrual::
     sale + coupon - purchase  =  87.40 x 29/182  =  13.9263...
 
 On 44 units that is 612.76, and 50 000.00 + 612.76 is exactly the 50 612.76 above. **That
-identity is the change**: before the remainder came home, ``reaches`` was 49 776.69 and the
-gain could only be read against the 49 163.93 deployed rather than against the amount the owner
-actually asked about.
+identity is the point**: the gain is readable against the amount he asked about, with no
+intermediate figure between the two.
 """
 
 from __future__ import annotations
