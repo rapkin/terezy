@@ -174,10 +174,15 @@ def forecast_assumption(
     )
 
 
+def declaring(*series: CpiSeries) -> dict[str, CpiSeries]:
+    """The declared-series mapping a run brings, keyed by declared id. Empty for no argument."""
+    return {declared.id: declared for declared in series}
+
+
 def deflation(
     *,
     window: Window,
-    series: CpiSeries | None = None,
+    series: Mapping[str, CpiSeries] | None = None,
     assumption: InflationAssumption | None = None,
     ageing: Ageing | None = None,
 ) -> Deflation:
@@ -188,7 +193,12 @@ def deflation(
     tests keep saying what they mean. The defaults are all-absent because that is the state
     every refusal test is a departure from.
     """
-    return Deflation(window=window, series=series, assumption=assumption, ageing=ageing)
+    return Deflation(
+        window=window,
+        series={} if series is None else series,
+        assumption=assumption,
+        ageing=ageing,
+    )
 
 
 def ageing_at(as_of: date, kinds: Mapping[str, ObservationKind]) -> Ageing:

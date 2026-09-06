@@ -767,7 +767,7 @@ def _deflated(
         nominal_staleness=staleness.UNASSESSED,
         deflation=cpi_fixtures.deflation(
             window=Window(first="2026-01", last=series.observations[-1].period),
-            series=series,
+            series=cpi_fixtures.declaring(series),
         ),
     ).realized
     assert isinstance(figure, RealRate), figure

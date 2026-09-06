@@ -222,7 +222,7 @@ def project(
     assumptions: Assumptions,
     *,
     tax_classes: Mapping[str, TaxClass],
-    cpi_series: CpiSeries | None = None,
+    cpi_series: Mapping[str, CpiSeries] | None = None,
     inflation_assumption: InflationAssumption | None = None,
     ageing: Ageing | None = None,
     assessment_rules: AssessmentRules | None = None,
@@ -236,8 +236,10 @@ def project(
     instrument references and this mapping does not contain is reported, never treated as
     untaxed: those are opposite claims and only one of them is cited.
 
-    **``cpi_series`` and ``inflation_assumption`` fill the real-terms slot.** Both
-    default to ``None``, and the default is not a silence: the resulting figures are
+    **``cpi_series`` and ``inflation_assumption`` fill the real-terms slot.** ``cpi_series``
+    is every series this run declares, keyed by declared id, because which one deflates a
+    figure is decided inside the slot rather than here (024 FR-013a). Both default to ``None``,
+    and the default is not a silence: the resulting figures are
     :data:`~terezy.core.results.hurdle.NOT_DEFLATED`, whose two reasons say *no CPI series was
     declared* and *no future-inflation assumption was declared* -- which is exactly what
     happened, and is what a reader is shown. 007's FR-006 and US1 scenario 5 require *a
@@ -337,7 +339,7 @@ def project(
             ),
             deflate_with=hurdle_figures.Deflation(
                 window=_deflation_window(holding, contractual_events),
-                series=cpi_series,
+                series={} if cpi_series is None else cpi_series,
                 assumption=inflation_assumption,
                 ageing=ageing,
             ),

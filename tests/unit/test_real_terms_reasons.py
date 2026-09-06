@@ -42,7 +42,7 @@ FULL_WINDOW = cpi_fixtures.window("2026-01", "2026-12")
 def _real_terms(
     *,
     nominal: NominalRate | None = NOMINAL,
-    series: object = COVERED_SERIES,
+    series: object = None,
     window: object = FULL_WINDOW,
     assumption: object = None,
 ) -> hurdle.RealTerms:
@@ -53,7 +53,7 @@ def _real_terms(
         nominal_staleness=staleness.UNASSESSED,
         deflation=cpi_fixtures.deflation(
             window=window,  # type: ignore[arg-type]
-            series=series,  # type: ignore[arg-type]
+            series=cpi_fixtures.declaring(COVERED_SERIES) if series is None else series,  # type: ignore[arg-type]
             assumption=assumption,  # type: ignore[arg-type]
         ),
     )
@@ -61,7 +61,7 @@ def _real_terms(
 
 def test_the_slot_always_holds_a_real_terms_record_never_a_bare_unavailable() -> None:
     """Both halves missing is still two answers, not one (research.md D2)."""
-    result = _real_terms(series=None, assumption=None)
+    result = _real_terms(series={}, assumption=None)
 
     assert isinstance(result, hurdle.RealTerms)
     assert isinstance(result.realized, RealTermsUnavailable)
@@ -70,7 +70,7 @@ def test_the_slot_always_holds_a_real_terms_record_never_a_bare_unavailable() ->
 
 
 def test_an_absent_series_is_named_as_an_absent_series() -> None:
-    result = _real_terms(series=None)
+    result = _real_terms(series={})
 
     assert isinstance(result.realized, RealTermsUnavailable)
     assert "no CPI series" in result.realized.reason
@@ -81,7 +81,9 @@ def test_an_uncovered_window_lists_the_months_that_are_missing() -> None:
     gapped = cpi_fixtures.series(
         [("2026-01", 101.0), ("2026-02", 101.0), ("2026-05", 101.0), ("2026-06", 101.0)]
     )
-    result = _real_terms(series=gapped, window=cpi_fixtures.window("2026-01", "2026-06"))
+    result = _real_terms(
+        series=cpi_fixtures.declaring(gapped), window=cpi_fixtures.window("2026-01", "2026-06")
+    )
 
     assert isinstance(result.realized, RealTermsUnavailable)
     assert "2026-03" in result.realized.reason
@@ -92,7 +94,9 @@ def test_an_uncovered_window_lists_the_months_that_are_missing() -> None:
 def test_the_uncovered_reason_says_the_window_was_not_shortened() -> None:
     """The reader has to be told the tempting repair was refused, not merely that it failed."""
     short = cpi_fixtures.series(cpi_fixtures.run_of("2026-01", 4, 101.0))
-    result = _real_terms(series=short, window=cpi_fixtures.window("2026-01", "2026-06"))
+    result = _real_terms(
+        series=cpi_fixtures.declaring(short), window=cpi_fixtures.window("2026-01", "2026-06")
+    )
 
     assert isinstance(result.realized, RealTermsUnavailable)
     assert "shorten" in result.realized.reason.lower()
@@ -135,8 +139,11 @@ def test_the_five_reasons_are_all_different_from_one_another() -> None:
     """A reason that is specific in wording but identical in content is not specific."""
     gapped = cpi_fixtures.series([("2026-01", 101.0)])
     reasons = {
-        _real_terms(series=None).realized,
-        _real_terms(series=gapped, window=cpi_fixtures.window("2026-01", "2026-03")).realized,
+        _real_terms(series={}).realized,
+        _real_terms(
+            series=cpi_fixtures.declaring(gapped),
+            window=cpi_fixtures.window("2026-01", "2026-03"),
+        ).realized,
         _real_terms(nominal=None).realized,
         _real_terms(assumption=None).assumed,
         _real_terms(window=cpi_fixtures.window("2026-05", "2026-04")).realized,

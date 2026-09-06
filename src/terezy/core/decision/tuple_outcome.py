@@ -80,6 +80,7 @@ from datetime import date, timedelta
 from typing import TYPE_CHECKING, Final, Literal, assert_never
 
 from terezy.core.errors import InconsistentTerms, LedgerInvariantError
+from terezy.core.inflation.series import CpiSeries, InflationAssumption
 from terezy.core.instruments import accrual
 from terezy.core.instruments import fund as fund_terms
 from terezy.core.instruments import registry as instrument_registry
@@ -203,6 +204,22 @@ class Registries:
     streams: Mapping[str, IncomeStream]
     kinds: Mapping[str, ObservationKind]
     spendable: frozenset[SpendableEndpoint]
+
+    cpi: Mapping[str, CpiSeries]
+    """Every CPI series this run declares, by declared id. Empty when it declares none.
+
+    The whole mapping and not one series, and no default: an absent deflator is a *reported
+    reason* (024 FR-013), and which series a figure is real against is decided inside the slot
+    that fills it rather than by whoever assembled this record (024 FR-013a).
+    """
+
+    inflation: InflationAssumption | None
+    """The declared future-inflation belief, or ``None`` when this run was given none.
+
+    Required with no default, on ``quotation_holds``' reasoning: a caller that could omit it
+    would produce an answer whose assumed real figures are all unavailable and no record of
+    whether that was the data or the call.
+    """
 
     quotation_holds: QuotationHolds
     """The owner's declared belief about what a future early exit is struck at.

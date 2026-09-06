@@ -53,7 +53,7 @@ requirement here, not a preference.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Final, assert_never
 
@@ -242,6 +242,32 @@ def window_has_no_elapsed_month(window: Window) -> RealTermsUnavailable:
     )
 
 
+def deflating_series(series: Mapping[str, CpiSeries]) -> CpiSeries | RealTermsUnavailable:
+    """Which declared series deflates this figure, or the reason none can be chosen (024 FR-013a).
+
+    Exactly one declared series is that one. **Never by load order, by file name, or by there
+    happening to be only one and a rule that would have picked differently with two**: 007
+    FR-002 makes a second series a data-only addition, so a rule that silently picked a
+    deflator would make adding one move a figure with nothing in the output to see.
+
+    None reuses :func:`no_series_declared`, because *given no series* is the same fact whether
+    the mapping is empty or was never passed.
+    """
+    if not series:
+        return no_series_declared()
+    if len(series) > 1:
+        return RealTermsUnavailable(
+            reason=(
+                f"this run declares {len(series)} CPI series ({', '.join(sorted(series))}) and "
+                "names none, so there is no deciding which index this figure is real against. "
+                "Neither is preferred and neither is merged: picking one by load order would "
+                "make a figure rest on whichever file was read second, with nothing in the "
+                "output to say which. Name the series this run deflates by."
+            )
+        )
+    return next(iter(series.values()))
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Deflation:
     """What one run brings to the deflation: the span, and the two possible deflators.
@@ -251,16 +277,25 @@ class Deflation:
     window without either deflator, or a deflator without a window, is half a statement. The
     caller assembles it once from the run's inputs.
 
-    Both deflators are ``None``-able and neither has a default: their absence is a *reported
+    Both deflators may be absent and neither has a default: their absence is a *reported
     reason* rather than an error (FR-012), and which one is absent decides which half of
     :class:`RealTerms` says so.
     """
 
     window: Window
-    """The span the figures are deflated over, inclusive. See ``project._deflation_window``."""
+    """The span the figures are deflated over, inclusive.
 
-    series: CpiSeries | None
-    """The declared CPI series, or ``None`` when the run was given none."""
+    See :func:`terezy.core.inflation.series.deflation_window`.
+    """
+
+    series: Mapping[str, CpiSeries]
+    """Every CPI series this run declares, by declared id. Empty when it was given none.
+
+    The whole mapping rather than one series, because which one deflates a figure is decided by
+    :func:`deflating_series` **inside** the slot rather than by a caller resolving it first: a
+    call site that chose a series before calling would report *"could not choose a series"*
+    where a tuple with no comparable rate must report *"there is nothing to deflate"*.
+    """
 
     assumption: InflationAssumption | None
     """The declared future-inflation assumption, or ``None`` when the run was given none."""
@@ -357,11 +392,11 @@ def _realized(
 
     **Coverage is checked before any arithmetic.** The two guards that could equally apply to
     the assumed figure were hoisted into :func:`real_terms`, so this function refuses only what
-    is genuinely its own: no series, and a series that does not cover the window.
+    is genuinely its own: which series deflates, and a series that does not cover the window.
     """
-    series = deflation.series
-    if series is None:
-        return no_series_declared()
+    series = deflating_series(deflation.series)
+    if isinstance(series, RealTermsUnavailable):
+        return series
 
     covered = cpi.coverage(series, deflation.window)
     match covered:
