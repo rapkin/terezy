@@ -2016,11 +2016,11 @@ def _rate(
             ),
             missing="a conventional series -- one payment out at the start, receipts after it",
         )
-    # Unreachable on today's declarations -- every shipped and fixture way out declares a
-    # latency, and a holding that releases nothing still sells at the window's end. Written
-    # because the remainder made a same-day receipt possible for the first time, and the
-    # alternative to a typed refusal here is `internal_rate_of_return` raising out of the
-    # pure core.
+    # The remainder is the first receipt that can land on the day the money left, so this is
+    # written rather than argued away. It is unreached today for a reason outside this module:
+    # every arrival on that day needs a horizon one day long, and such a horizon raises out of
+    # `results.project` before anything here runs -- `a-one-day-horizon-raises` in
+    # specs/features.toml. Without the guard the same series raises out of the pure core here.
     if span.end == span.start:
         return RateNotComparable(
             reason=(

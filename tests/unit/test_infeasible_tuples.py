@@ -349,6 +349,54 @@ class TestARemainderTheDeclaredWayOutWillNotCarry:
         assert isinstance(self._outcome(1_000.0).implied_rate, NominalRate)
 
 
+class TestTheWayOutRefusesTheRemainderAndCarriesEveryRelease:
+    """The other two ways a remainder stays put, and both need the way out to refuse **it**
+    while carrying everything the holding released -- which is what makes them different
+    findings from the refusals `_repatriate` raises one step earlier.
+    """
+
+    def test_a_leg_minimum_above_the_remainder_and_below_every_release(self) -> None:
+        # 100.00 flat, 10 500.00 sent -> 10 400.00 arrives -> 10 units, 400.00 over. A 500.00
+        # minimum on the way out carries the 775.00 coupons and the 10 775.00 redemption and
+        # will not carry the 400.00 -- the "a fixed minimum makes small movements
+        # unrepatriable" case `WayOutUnusable` names, arriving at the remainder instead.
+        registries = fixtures.with_leg(
+            _registries(flat=100.0), fixtures.DOMESTIC_OUT, minimum=Money(500.0, UAH, prov.EMPTY)
+        )
+        outcome = _evaluate(registries, _via_flat_fee(), 10_500.0, horizon=AT_ISSUE)
+        assert isinstance(outcome, TupleOutcome), outcome
+        undeployed = outcome.undeployed
+        assert undeployed is not None
+        assert isinstance(undeployed.journey, RemainderStayed), undeployed.journey
+        assert_money_close(undeployed.amount, Money(400.0, UAH, prov.EMPTY))
+        assert "leg" in undeployed.journey.reason
+        assert outcome.arrivals, "every release still came home"
+        assert isinstance(outcome.implied_rate, RateNotComparable)
+
+    def test_a_monthly_ceiling_the_remainder_alone_is_over(self) -> None:
+        # A remainder is smaller than every release on a bond quoted at par, so reaching this
+        # needs a unit dearer than what it repays: quoted at 1 500.00 against a 1 000.00 face,
+        # 2 900.00 buys one unit and strands 1 400.00 while the redemption is 1 000.00. A
+        # 1 200.00 ceiling then carries every release and refuses the change.
+        registries = fixtures.with_leg(
+            fixtures.with_access(_registries(), fixtures.OVDP, quote=fixtures.quote(1_500.0)),
+            fixtures.DOMESTIC_OUT,
+            monthly_cap=Money(1_200.0, UAH, prov.EMPTY),
+        )
+        outcome = _evaluate(registries, fixtures.hurdle_tuple(), 2_900.0)
+        assert isinstance(outcome, TupleOutcome), outcome
+        undeployed = outcome.undeployed
+        assert undeployed is not None
+        assert isinstance(undeployed.journey, RemainderStayed), undeployed.journey
+        assert_money_close(undeployed.amount, Money(1_400.0, UAH, prov.EMPTY))
+        assert "monthly ceiling of 1200.0" in undeployed.journey.reason
+        assert "200.0 of the remainder is over it" in undeployed.journey.reason
+        assert "The tuple is refused" not in undeployed.journey.reason, (
+            "the tuple was not refused; the ceiling rule's own reason says it was, which is "
+            "why that reason is not the one carried here"
+        )
+
+
 class TestADeclarationWithNoIncrementLeavesNoRemainderAtAll:
     """A fund's arriving amount buys exactly what it buys, so there is nothing left over.
 
