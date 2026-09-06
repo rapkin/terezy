@@ -2801,10 +2801,10 @@ could not choose between. Never by load order, by file name, or by there happeni
 one — a second CPI series is a data-only addition (§27.4), and a rule that silently picked
 would make adding one move a figure with nothing in the output to see.
 
-**Nothing ranks on it.** Ordering stays on the money and the days it was already on (§33), and
-the figure is written at the construction site and read by renderers and the canonical form
-only. That is Principle VI's display rule in another shape: a figure added for the reader never
-reorders the answer.
+**Nothing ranks on it.** The ranking (§34) and the dominance pass over it (§36) read the money
+and the days they already read; the figure is written at the construction site and read by
+renderers and the canonical form only. That is Principle VI's display rule in another shape: a
+figure added for the reader never reorders the answer.
 
 **Today every realized half refuses.** The declared series ends 2025-10 and the horizons start
 2026-09, so no tuple span this feature sees is covered, and each refusal names the months of
