@@ -24,6 +24,8 @@ from dataclasses import replace
 from datetime import date
 from typing import Final
 
+import pytest
+
 from terezy.core.decision.answer import section_evaluated
 from terezy.core.decision.tuple_outcome import Registries, evaluate
 from terezy.core.instruments.interface import DateRange
@@ -72,17 +74,30 @@ def test_a_run_with_no_declared_series_reports_that_there_is_nothing_to_deflate_
     assert "no CPI series" in figure.reason
 
 
-def test_two_declared_series_and_neither_named_refuses_naming_both_ids() -> None:
+@pytest.mark.parametrize("extra", [1, 2])
+def test_declared_series_and_none_named_refuses_naming_every_id(extra: int) -> None:
     """FR-013a. Adding a second series stays a data-only change that loads; what it stops
-    doing is silently deciding which index a figure is real against."""
+    doing is silently deciding which index a figure is real against.
+
+    Two counts, because the guard fires for **any** number above one and its sentence has to
+    describe what it did at each: a message written for a collision between two files says
+    something false the day a third is declared.
+    """
     declared = fixtures.declared()
     one = next(iter(declared.cpi.values()))
-    both = {**declared.cpi, SECOND_SERIES: replace(one, id=SECOND_SERIES, country="PL")}
+    every = {
+        **declared.cpi,
+        **{
+            f"{SECOND_SERIES}_{index}": replace(one, id=f"{SECOND_SERIES}_{index}")
+            for index in range(extra)
+        },
+    }
 
-    figure = _evaluated(replace(declared, cpi=both)).real.realized
+    figure = _evaluated(replace(declared, cpi=every)).real.realized
 
     assert isinstance(figure, RealTermsUnavailable), figure
-    for series_id in sorted(both):
+    assert str(len(every)) in figure.reason
+    for series_id in sorted(every):
         assert series_id in figure.reason
 
 

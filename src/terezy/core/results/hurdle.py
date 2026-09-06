@@ -260,9 +260,9 @@ def deflating_series(series: Mapping[str, CpiSeries]) -> CpiSeries | RealTermsUn
             reason=(
                 f"this run declares {len(series)} CPI series ({', '.join(sorted(series))}) and "
                 "names none, so there is no deciding which index this figure is real against. "
-                "Neither is preferred and neither is merged: picking one by load order would "
-                "make a figure rest on whichever file was read second, with nothing in the "
-                "output to say which. Name the series this run deflates by."
+                "None is preferred and none is merged: picking one would make a figure rest on "
+                "whichever the load order happened to reach, with nothing in the output to say "
+                "which. Name the series this run deflates by."
             )
         )
     return next(iter(series.values()))

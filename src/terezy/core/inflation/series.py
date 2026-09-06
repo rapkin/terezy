@@ -237,9 +237,10 @@ def deflation_window(money_left_on: date, last_flow_on: date) -> Window:
       thing; a horizon running past the last flow would deflate by months in which the money
       was already back.
 
-    ``money_left_on`` rather than a purchase date, and the difference is a month on a tuple:
-    an outlay precedes its purchase by the way in's declared latency, so an outlay made on the
-    last day of a month would start the window a month early if the purchase named it.
+    ``money_left_on`` rather than a purchase date, and the difference is a month on a tuple: an
+    outlay on 2026-09-30 through a way in declaring three days is purchased on 2026-10-03, and
+    a window named from the purchase would begin 2026-11 against this rule's 2026-10 -- a month
+    of inflation the money did live through, dropped.
 
     The count of months between the two is the number of price changes the money lived
     through, which is what the annualisation divides by. A span inside one month yields a
