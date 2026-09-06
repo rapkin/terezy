@@ -279,14 +279,14 @@ class TestARemainderTheIncrementCannotDeploy:
         assert not is_close(cheap, dear)
         assert dear < cheap
 
-    def test_the_recovery_is_something_the_outcome_accounts_for_rather_than_excludes(
-        self,
-    ) -> None:
+    def test_the_outcome_no_longer_excludes_the_cost_of_recovering_the_remainder(self) -> None:
         # The scope statements are what a reader meets, so they move with the behaviour: this
         # remainder's journey home is priced, so `excludes` may no longer say it is not costed.
         outcome = _evaluate(_registries(), fixtures.hurdle_tuple(), 1_500.0)
         assert isinstance(outcome, TupleOutcome)
-        assert isinstance(_came_home(outcome), RemainderCameHome)
+        undeployed = outcome.undeployed
+        assert undeployed is not None
+        assert isinstance(undeployed.journey, RemainderCameHome), undeployed.journey
         assert not [item for item in outcome.excludes if "undeployed" in item]
 
     def test_an_exact_multiple_leaves_no_remainder_at_all(self) -> None:
