@@ -76,7 +76,11 @@ def test_dating_it_one_day_earlier_flips_the_verdict() -> None:
     )
     assert isinstance(earlier, PartialExitWouldBeNeeded), earlier
     assert isinstance(later, CoveredByThePlan), later
-    assert earlier.arrivals_read == ()
+    # The one arrival the day moves. The undeployed remainder is home well before either date
+    # and is read at both, which is why this is stated about the arrival rather than about an
+    # empty tuple.
+    assert arrival not in earlier.arrivals_read
+    assert arrival in later.arrivals_read
 
 
 def test_a_stated_need_never_removes_an_option() -> None:

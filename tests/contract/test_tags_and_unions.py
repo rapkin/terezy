@@ -287,6 +287,7 @@ DECLARATIONS_WITHOUT_A_REASON = frozenset(
         "streams.IncomeStream",
         "summary.KeyedSummary",
         "summary.SingletonSummary",
+        "tuple.Arrival",
         "tuple.Comparison",
         "tuple.RemainderCameHome",
         "venues.Venue",

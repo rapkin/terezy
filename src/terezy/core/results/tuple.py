@@ -231,6 +231,25 @@ class UndeployedCash:
     and the unit price -- in the output's own words."""
 
 
+def money_home(
+    arrivals: tuple[Arrival, ...], undeployed: UndeployedCash | None
+) -> tuple[tuple[date, Money, Arrival | RemainderCameHome], ...]:
+    """Every dated amount that reached a spendable endpoint, in date order, with its record.
+
+    The releases and the remainder that came home, in **one** series, because
+    :attr:`TupleOutcome.reaches`, the span's end, :attr:`TupleOutcome.implied_rate` and 019's
+    reserve verdicts are four readings of one fact -- and building each from its own addition
+    is how two of them came to leave the remainder out.
+    """
+    coming: list[tuple[date, Money, Arrival | RemainderCameHome]] = [
+        (arrival.arrived_on, arrival.amount, arrival) for arrival in arrivals
+    ]
+    match undeployed:
+        case UndeployedCash(journey=RemainderCameHome() as came):
+            coming.append((came.arrived_on, came.reached, came))
+    return tuple(sorted(coming, key=lambda item: item[0]))
+
+
 ACCOUNTS_FOR: Final[frozenset[str]] = frozenset(
     {
         "funding route costs (in), for this stream and this route",

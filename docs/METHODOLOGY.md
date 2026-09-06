@@ -3151,8 +3151,8 @@ and settlement latency sit **inside** the span, because waiting is a cost (owner
 and still returns a little less than 001's contractual yield, because it declares one day in
 and three days out.
 
-The rate is a **typed absence** rather than a figure in three cases, and the amount is
-unaffected in all three:
+The rate is a **typed absence** rather than a figure wherever the series it needs does not
+exist, and the amount is unaffected every time:
 
 * the two amounts the series is built from — what left and what came back — are **not in one
   currency**. A dollar outflow against hryvnia inflows is not a
@@ -3164,7 +3164,8 @@ unaffected in all three:
 * the round trip returned nothing;
 * an arrival is negative, because the repatriation charges exceeded what was released. A
   series that is not one payment out followed by receipts has no single internal rate of
-  return, and extrapolating past the bracket would invent one.
+  return, and extrapolating past the bracket would invent one;
+* everything came back on the day it left, so there is no period for a return to be over.
 
 Such a tuple is **not comparison-ready**: it is reported, and kept out of the ranking, exactly
 as 002 keeps a candidate with no round-trip figure out of one.

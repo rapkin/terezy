@@ -152,6 +152,7 @@ from terezy.core.results.tuple import (
     UndeployedCash,
     WayOutCapExceeded,
     WayOutUnusable,
+    money_home,
 )
 from terezy.core.routes import cost
 from terezy.core.routes.cost import Junction
@@ -974,11 +975,14 @@ def _undeployed(
     along a declared exit under a sentence reading "bought in increments of 0.0 unit(s)".
 
     Where an increment **is** declared the same arithmetic can land a hair either side of
-    zero, so the comparison is the imported tolerance rather than ``== 0.0`` -- the same
-    tolerance :func:`_whole_increments` uses two lines earlier, for the same reason and now in
-    both directions.
+    zero, so the comparison is the imported tolerance rather than ``== 0.0``. **Anything at or
+    below zero is refused outright as well**, and not only what the tolerance absorbs: the two
+    tolerances are applied to different quantities -- :func:`_whole_increments` rounds a
+    *ratio* at the relative one, this tests the *money* at the absolute one -- so a residue can
+    be negative by more than this guard admits, and a negative one now reaches ``cost_exit``,
+    which raises rather than costing a movement that runs backwards.
     """
-    if increment == 0.0 or is_close(remainder.amount, 0.0):
+    if increment == 0.0 or remainder.amount <= 0.0 or is_close(remainder.amount, 0.0):
         return None
     return _Remainder(
         amount=remainder,
@@ -1442,6 +1446,15 @@ def _send_the_remainder_home(
         return _stayed(prepared, remainder, way_out.reason), None
     # The ceiling rule lives in `_over_the_way_out_cap` and is read here rather than restated;
     # its own reason is not, because that one says the tuple was refused and this one is not.
+    if way_out.arrived.amount <= 0.0:
+        return _stayed(
+            prepared,
+            remainder,
+            f"the way out charges {money.sub(remainder.amount, way_out.arrived).amount!r} "
+            f"{remainder.amount.currency.value} to carry it, which is the whole of it or more. "
+            "A release has to come home and is reported arriving at a loss; a remainder does "
+            "not, and moving it would leave the owner with less than leaving it there.",
+        ), None
     capped = _over_the_way_out_cap(way_out, remainder.amount, purchased_on)
     if capped is not None:
         return _stayed(
@@ -1625,8 +1638,8 @@ def _assemble(
     carried = _carried_quotation(
         prepared, projected, purchased_on=purchased_on, quotation_holds=quotation_holds
     )
-    home = _arriving(arrivals, undeployed)
-    reaches = money.total([amount for _, amount in home], endpoint_currency)
+    home = money_home(arrivals, undeployed)
+    reaches = money.total([amount for _, amount, _ in home], endpoint_currency)
     provenance = prov.merge_all(
         [
             one_way.provenance,
@@ -1635,11 +1648,11 @@ def _assemble(
             _declaration_provenance(prepared),
         ]
     )
-    span = DateRange(start=horizon.start, end=max((on for on, _ in home), default=horizon.start))
+    span = DateRange(start=horizon.start, end=max((on for on, _, _ in home), default=horizon.start))
     rate = _rate(
         prepared,
         outlay=outlay,
-        arriving=home,
+        arriving=tuple((on, amount) for on, amount, _ in home),
         stranded=_stranded(undeployed),
         endpoint_currency=endpoint_currency,
         span=span,
@@ -1693,23 +1706,6 @@ def _assemble(
     )
 
 
-def _arriving(
-    arrivals: tuple[Arrival, ...], undeployed: UndeployedCash | None
-) -> tuple[tuple[date, Money], ...]:
-    """Every dated amount that reached the endpoint: the releases, and the remainder that
-    came home.
-
-    In one series because :attr:`~terezy.core.results.tuple.TupleOutcome.reaches`, the span's
-    end and the rate are three readings of the same fact, and building each from its own
-    addition is how one of them came to leave the remainder out.
-    """
-    coming = [(arrival.arrived_on, arrival.amount) for arrival in arrivals]
-    match undeployed:
-        case UndeployedCash(journey=RemainderCameHome(arrived_on=on, reached=reached)):
-            coming.append((on, reached))
-    return tuple(sorted(coming, key=lambda item: item[0]))
-
-
 def _standing(routed: _Routed, way_out_costs: tuple[WayOutCost, ...]) -> RouteStanding:
     """How usable both declared ways are, from the figures the costing already returned.
 
@@ -1717,8 +1713,8 @@ def _standing(routed: _Routed, way_out_costs: tuple[WayOutCost, ...]) -> RouteSt
     number is a round trip is the half-truth ``RampCost.status`` records about itself.
 
     A holding that released nothing has no way-out cost to read, and then the way out's
-    standing is genuinely unknown rather than open -- but such a tuple has no rate either and
-    is reported as not comparable, so there is no figure here for a reader to over-trust.
+    standing is genuinely unknown rather than open. Unreachable today: a position is closed at
+    the window's end if its own terms have not closed it, so every tuple releases something.
     """
     out_status = {charged.status for charged in way_out_costs}
     constrained: list[Literal["route_in", "route_out"]] = []
@@ -1976,8 +1972,9 @@ def _rate(
     if stranded is not None:
         return RateNotComparable(
             reason=(
-                f"{stranded.amount!r} {stranded.currency.value} of the {outlay.amount!r} that "
-                "left the stream never came home: the declared way out will not carry the "
+                f"{stranded.amount!r} {stranded.currency.value} of the {outlay.amount!r} "
+                f"{outlay.currency.value} that left the stream never came home: the declared "
+                "way out will not carry the "
                 "remainder the purchase could not deploy. Measuring the return on the whole "
                 "outlay prices that amount at zero and netting it off prices it at par, "
                 "nothing declares which it is worth, and both produce a figure that looks "
