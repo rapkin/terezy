@@ -176,6 +176,15 @@ needs  = ["008-seed-and-goals", "011-official-rate", "015-the-question", "018-nb
 why    = "008 declares the seed lots this position is made of and the estimated basis it carries; 011 strikes the dollar cost into hryvnia at the acquisition date and 018 is the series it strikes from -- both, because 011 shipped the machinery empty; 015 is where `btc` resolves to nothing and the verification task that says what would close it; 020 publishes the schema this feature edits, since a fifth subject standing regenerates the OpenAPI document. NOT parallel with 019 in practice: both regenerate tests/golden/the_answer.golden.txt and whichever lands second re-measures"
 note   = "Owner 2026-09-02/03 -- he holds BTC and wants it counted, not bought. `drafted` with plan.md and tasks.md written: two clarifications are open and tasks.md holds every artefact that turns on one in a phase that may not start. See specs/025-btc-holdings/spec.md."
 
+[[feature]]
+id     = "026-answer-screen"
+status = "planned"
+needs  = ["019-decision-layer", "021-web-declared-data"]
+why    = "019 produces the non-dominated set, the separating assumptions and the benchmark standing this screen renders, and nothing else reports them to a reader; 021 owns the client, its router, its figure/mark/refusal components and the `as_of` search parameter this page reuses unchanged"
+note   = """
+The home page becomes the answer; both clarifications answered 2026-09-06 in specs/decisions/2026-09-06-clarify-026.toml -- five venue kinds, and `money back` as one served figure.
+Implementation additionally waits on the fix/undeployed-remainder branch, which `needs` cannot name because it is a fix and not a feature: until it lands, `reaches` is the deployed part alone."""
+
 [[future]]
 id    = "the-graph-has-no-word-for-drafted-and-planned"
 after = ["025-btc-holdings"]
@@ -183,7 +192,7 @@ note  = "`drafted` says planning may not start; `planned` says plan.md and tasks
 
 [[feature]]
 id     = "024-real-terms-tuple"
-status = "planned"
+status = "done"
 needs  = ["007-cpi-real-terms", "015-the-question", "022-accrued-interest"]
 why    = "007 owns the relation, the coverage refusal and the function that fills a real slot; 015 states the absence this fills as a typed exclusion and is where that exclusion is deleted; 022 is what the deflated figure is, since it changed how `implied_rate` is computed and the spec's worked example is a post-022 number"
 note   = "Closes the real-terms-for-a-tuple future: the owner asked for inflation on 2026-09-03, and every candidate's rate was nominal while the benchmark's could be real. No clarification is open -- the future-span question is 007's owner decision of 2026-08-22 applied rather than re-asked; see specs/024-real-terms-tuple/spec.md."
@@ -239,6 +248,16 @@ note  = "`scripts/check_provenance.py::_uncited_inferences` requires EVERY enume
 id    = "rates-in-one-ranking-span-different-periods"
 after = ["015-the-question", "016-real-ovdp"]
 note  = "A COMPARABILITY BREAK, visible from 2026-09-02 -- the first day the owner's question ranked anything. NAMED FOR THE SET, not for the hurdle: an earlier id said `the-hurdle-undershoots-every-horizon`, which was true of one benchmark and of no rule. `implied_rate` is an IRR over the SPAN the money was at work, so a candidate whose own terms end inside the window is annualised over that shorter span while the rest are annualised over the window, and the ordering puts both in one list. It is a property of the SET of spans and not of any one row: on the owner's own question 1, 3 and 12 of 24 ranked rows undershoot at his three horizons, whichever issue is the benchmark. THE WORKED INSTANCE that made it visible was `UA4000235865`, benchmark until 2026-09-03: it matured 2026-09-16, so its span was the same 18 days at all three horizons and at twelve months `beats_benchmark` was EMPTY -- which reads as `nothing beats it` and meant `nothing was measured against it`. It was NOT a loss, though 49 760.50 against a 50 000 outlay looks like one: 680.64 stayed at `inzhur` as `UndeployedCash` (the minimum increment) and the rate is measured on what was actually invested, so conflating outlay with `reaches` is the reading the outcome's own reason exists to refuse. The owner replaced it with `UA4000231195` on 2026-09-03, whose terms end 2027-08-25 -- which moves the worked instance and closes nothing. `src/terezy/cli/main.py::_span_caveat` now states, per section, the range of span lengths against the window, and that is a caveat rather than a fix: the ordering is still across periods of different length. It is the mirror of `horizon-as-a-latency-budget`'s second half, which records the OVERSHOOT (an outcome running past the horizon says nothing on its face); this is the undershoot, and the undershoot at least fires `_rests_on`. THE REMEDY IS THE OWNER'S: a different benchmark, or a declared rule about a candidate that undershoots its horizon -- reinvestment needs a rate, an instrument, an entry cost and a tax treatment, none of them declared, so an implementer choosing one would be inventing the largest term in his comparison. Recorded 2026-09-02 while landing the real-only registry; deliberately not built."
+
+[[future]]
+id    = "the-real-rate-reaches-no-reader"
+after = ["024-real-terms-tuple"]
+note  = "The owner asked for inflation on 2026-09-03 and 024 answered it in the record: every evaluated candidate carries `TupleOutcome.real`, it is in the published schema, in `Answer.provenance` and in `digest_of_answer`. NOTHING PRINTS IT. `cli/main.py::_candidate_lines` renders `reaches` and `implied_rate` and stops (measured 2026-09-06), and there is no answer screen at all -- 021 built a browser over DECLARED DATA, not over an answer, which is 026's. So the figure the owner asked for is reachable over HTTP and invisible at the surface he actually uses. NOT AN OVERSIGHT IN 024: rendering is named by no FR in its spec, its plan says in as many words that the rendering is unchanged, and the answer golden's `_render` prints the amount and not the rate -- which is what let the golden move by exactly two lines. It is recorded rather than done because a rendered real rate needs two decisions this feature had no mandate to take: whether the CLI prints BOTH halves on every row (24 candidates x 3 sections x 2 figures, where every realized half today is a paragraph naming six months) or a per-section summary of the refusal with the assumed rate per row; and whether the assumed figure carries its assumption marker inline or leans on the section's stated assumptions. Both are presentation questions for the owner. Cheapest honest interim, if he wants one before 026: one line per section stating that every realized half refuses for the window it names, and `; real <rate> (assumed)` appended to the rate line. Deliberately not built."
+
+[[future]]
+id    = "a-refusals-wording-moves-the-answer-digest"
+after = ["024-real-terms-tuple"]
+note  = "MEASURED 2026-09-06 by 024's review round one. `core/results/canonical.py::of_real_figure` renders an unavailable real figure as `(\"unavailable\", value.reason)` — the whole generated sentence — and 024 put that inside `of_outcome`, so every evaluated candidate's refusal prose is now in `digest_of_answer`. On the shipped root every realized half refuses through `window_not_covered`, whose reason enumerates each missing month, so the exposure is every candidate in every section. Reproduced: changing `does not cover every month of` to `has no observation for every month of` and changing nothing else moves the answer digest from `sha256:c46f3684…78cf43d9279d` to `sha256:23e2f325…7bd765a3`, and `tests/golden/the_answer.golden.txt` must be regenerated with no computed figure having moved. THAT IS THE FAILURE THE RULE THREE LINES AWAY EXISTS TO PREVENT: `canonical.py::_of_section_outcome` reduces a comparison refusal to `type(item.refusal).__name__` precisely so a digest does not move on a wording edit. NOT FIXED HERE, and the reason is scope rather than difficulty: `of_real_figure` is 007's and is what `of_hurdle_rate` also calls, so reducing it moves every projection digest too; and it cannot simply drop the reason, because `RealTermsUnavailable` is ONE type for six refusals and `tests/contract/test_two_figures_never_blend.py` asserts that two slots differing only in which half is missing do not digest alike — so the honest fix needs a stable discriminator on the record, which is a new field, which is a wire-visible schema change 024 FR-020 puts out of scope. Same shape as `the-answer-digest-is-blind-to-the-hurdle` from the other side: that one is a digest that does not move when it should, this one moves when it should not. Deliberately not built."
 
 [[future]]
 id    = "the-answer-digest-is-blind-to-the-hurdle"
@@ -343,7 +362,7 @@ note  = "A bond sold before maturity fetches what the market pays that day, and 
 [[future]]
 id    = "cli-renders-raw-floats"
 after = ["015-the-question"]
-note  = "The CLI prints unrounded floats -- an amount as 49834.350000000006, a rate as 3.7e-16 -- so a correct figure reads as a broken one. Formatting only; see specs/015-the-question/spec.md for what the answer output carries."
+note  = "The CLI prints unrounded floats -- an amount as 49834.350000000006, a rate as 3.7e-16 -- so a correct figure reads as a broken one. Formatting only; see specs/015-the-question/spec.md for what the answer output carries. THE WEB HALF IS CLOSED BY 026-answer-screen (its FR-026, one formatting module); the CLI stays as it is, so this entry stays open."
 
 [[future]]
 id    = "generative-accrual-boundaries"
@@ -359,3 +378,13 @@ note  = "A series route loaded without a window redirects to the API's declared 
 id    = "one-invariant-module-depends-on-worker-assignment"
 after = ["003-route-coverage"]
 note  = "`tests/invariants/test_coverage_costing_agreement.py::test_the_battery_produced_both_ready_and_not_ready_verdicts` reads a module-level `_SEEN` the property above it fills, so it passes only when both run in the same process. Under `pytest -n auto` xdist may put them on different workers and it fails with `the battery only produced nothing` -- reproduced three times in ten runs on 2026-09-06, and green in ten of ten under `-n auto --dist loadfile`. So the vacuity guard is real but its verdict depends on scheduling, which is the shape a false guard has. What would close it is pinning the module to one worker (`xdist_group`) or making the battery a fixture the guard reads directly rather than a module global. Found while running the gates on an unrelated branch, 2026-09-06."
+
+[[future]]
+id    = "the-interactive-graph"
+after = ["026-answer-screen"]
+note  = "Entities as nodes, routes as edges, a candidate's path lit on selection -- the owner asked for it 2026-09-06 and 026 draws no edges. It needs the edge vocabulary settled first: the visual language names transfer/FX/purchase/redemption while `core/routes/legs.py` declares transfer|fx|trade|withdrawal, and purchase and redemption are stages of a tuple rather than legs."
+
+[[future]]
+id    = "the-answer-document-is-too-big-for-a-screen"
+after = ["026-answer-screen"]
+note  = "MEASURED 2026-09-06: /api/questions/fifty-thousand-hryvnia/answer is 8.0 MB on the wire, 4.6 MB of it dominance.dominated, because every verdict carries both candidates' merged provenance and staleness. 026 fetches it whole behind a named loading state; the remedy is OB-10 in its spec and never a client-side trim, which would be the truncation its FR-008 forbids."

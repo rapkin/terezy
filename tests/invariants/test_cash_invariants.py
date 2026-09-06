@@ -110,6 +110,11 @@ def _registries() -> Registries:
             )
         },
         kinds={KIND: ObservationKind(id=KIND, staleness_days=365, note="a fixture")},
+        # No series and no belief: a balance is nominal by construction, and 024 reports an
+        # absent deflator as a reason rather than an error. The real slot is not what this
+        # property is about, and supplying one would let it move under a change to the CPI.
+        cpi={},
+        inflation=None,
         spendable=frozenset({SpendableEndpoint(venue_id=VENUE, currency=UAH)}),
         quotation_holds=QuotationHolds(
             id="a_belief", is_assumption=True, rationale="a fixture, unread by a balance"

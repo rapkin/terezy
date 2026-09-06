@@ -230,11 +230,6 @@ class Exclusion(Enum):
     severity class regardless of how small the omission looks.
     """
 
-    NO_REAL_TERMS_FIGURE = "no_real_terms_figure"
-    """Every rate reported is nominal. The real slot exists on feature 001's hurdle and on
-    nothing a tuple produces, so deflating one is a new figure with a formula rather than a
-    presentation choice."""
-
     NO_INCOME_TAX_ON_THE_STATED_AMOUNT = "no_income_tax_on_the_stated_amount"
     """Income tax is a question about a **stream**. Charging it on money already held would
     charge the owner twice for the same hryvnia."""

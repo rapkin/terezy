@@ -176,9 +176,11 @@ ADJUSTED_MATURITY: Final = date(2028, 1, 17)
 UAH: Final = Currency.UAH
 
 CPI_SERIES_ID: Final = "ua_cpi_monthly"
-"""The declared series this run deflates by. Named here because it is a *choice about the
-run* -- which economy's prices this owner's purchasing power is measured against -- and not a
-constant of the engine, which holds no CPI of its own (FR-002)."""
+"""The one series the shipped root declares, and so the one this run deflates by.
+
+Named here rather than passed in: the run hands over every declared series and the choice is
+made inside the slot (024 FR-013a), so this constant is what the refusal below is *checked*
+against -- if a second series were declared, that refusal would name both ids instead."""
 
 
 # --- the run under test ---------------------------------------------------------------
@@ -242,7 +244,7 @@ def _project(declarations: resolver.Declarations) -> Projection:
         _horizon(),
         _assumptions(),
         tax_classes=declarations.tax_classes,
-        cpi_series=inflation.series[CPI_SERIES_ID],
+        cpi_series=inflation.series,
         inflation_assumption=inflation.assumption,
         assessment_rules=resolver.tax_rules_from_data_root(DATA_ROOT, declarations)[JURISDICTION],
     )

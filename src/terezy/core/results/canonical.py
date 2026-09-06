@@ -325,12 +325,14 @@ def of_tuple_key(value: Tuple) -> tuple[Canonical, ...]:
 
 
 def of_outcome(value: TupleOutcome) -> tuple[Canonical, ...]:
-    """One evaluated candidate: its key, what reaches, and the rate it is ranked by."""
+    """One evaluated candidate: its key, what reaches, the rate it is ranked by, and its real
+    counterpart."""
     rate = value.implied_rate
     return (
         of_tuple_key(value.key),
         ledger_canonical.of_money(value.reaches),
         ledger_canonical.of_number(rate.value) if isinstance(rate, NominalRate) else None,
+        of_real_terms(value.real),
         ledger_canonical.of_date(value.span.start),
         ledger_canonical.of_date(value.span.end),
         None if value.sold_early is None else ledger_canonical.of_date(value.sold_early.on),

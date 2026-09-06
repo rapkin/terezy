@@ -453,6 +453,16 @@ period's interest instead of the round-trip spread.
 | **E5** | Pressed once more, and this time on a figure built by arithmetic across two files: a carried price is a quotation less one declared accrual plus another, and it carries the marks of the quotation **and** of every coupon that bounded a period it used (`tests/worked_examples/test_accrued_interest.py`, `tests/worked_examples/test_early_exit_sale.py`). A subtraction that laundered either would be the top-severity defect Principle I names. |
 | **K1** | Reinforced: both goldens moved and were regenerated deliberately, with one moved line hand-checked against the worked example. `the_answer.golden.txt` records three issues leaving as **named refusals** rather than as a shorter list, which is what keeps a shrinking population from reading as a disappearance. |
 
+**024-real-terms-tuple** closes **no** row, and that is stated rather than inferred: the one
+lettered behaviour it touches is **F4**, whose second half is the display switch. This feature
+adds a second consumer of F4's UA half — every evaluated candidate now carries the record the
+hurdle carries — and consumes no second series, so nothing about the switch moves.
+
+| Row | How, and why the box does not move |
+|---|---|
+| **F4** | Reinforced on a second figure. `TupleOutcome.real` is filled by 007's own `real_terms` over the outcome's `implied_rate`, deflated by the exact Fisher relation over the window derived from its `span`; the realized half names the months of that window the declared series does not cover and the assumed half carries the declared belief, labelled. `tests/worked_examples/test_real_terms_on_a_tuple.py`, `tests/unit/test_real_terms_refusals.py`, `tests/unit/test_deflation_window.py`. What F4 asks — that the **display** selects the deflator — still has no display switch and no second series consumed, so the box is unchanged. |
+| **K1** | Reinforced: `the_answer.golden.txt` moved by exactly two kinds of line, its `[digest]` and the retired `no_real_terms_figure` exclusion, and `candidate_set.golden.txt` is asserted byte-identical by `tests/contract/test_the_real_figure_moves_no_order.py` — the ranking inputs are the key, the amount and the nominal rate, and none of the three moved. |
+
 **023-cash-instrument** closes **no** row and moves **I4** closer than any feature before it.
 What it lands is the row's own subject: a `cash_balance` declared at the venue the owner's
 salary already arrives at, reached by an identity entry and left by an identity exit, ranked in

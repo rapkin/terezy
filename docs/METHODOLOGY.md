@@ -2775,6 +2775,43 @@ today the nominal side of that merge is `UNASSESSED` and only the CPI side is ge
 assessed. The merge point exists so that when those records gain their kind, one caller
 changes and every real figure inherits the verdict.
 
+### 27.7 A tuple's real rate
+
+The same slot, the same function, on a second nominal figure. `TupleOutcome.real` is the
+record `HurdleRate.real` is — a realized figure and an assumed one — so a candidate's real
+rate is comparable with the benchmark's field for field, which is the point: the answer ranks
+candidates against the hurdle.
+
+**What is deflated is `implied_rate` and nothing else.** Not the outlay, not what reaches a
+spendable endpoint. Those stay nominal and the outcome's `excludes` says so; a second figure
+is reported beside the rate rather than replacing it, and `accounts_for` gains no line —
+adding one would make the nominal rate read as deflated.
+
+**Over the span, never the horizon.** The window runs from the month after the month the money
+left to the month the last flow landed in, inclusive, derived from the outcome's own `span` by
+the one function §27.4's boundaries live in. A candidate that redeems before the horizon's end
+has a shorter span, and deflating it over the horizon would charge it for months in which the
+money was already back. A span inside one month contains no elapsed month and **both** halves
+refuse for that reason — decided before either deflator is consulted, so a tuple with no
+comparable rate says *there is nothing to deflate* rather than *no series was named*.
+
+**Which series deflates is decided inside the slot.** Exactly one declared series is that one;
+none reports that none was declared; more than one with none named refuses, listing the ids it
+could not choose between. Never by load order, by file name, or by there happening to be only
+one — a second CPI series is a data-only addition (§27.4), and a rule that silently picked
+would make adding one move a figure with nothing in the output to see.
+
+**Nothing ranks on it.** The ranking (§34) and the dominance pass over it (§36) read the money
+and the days they already read. That is Principle VI's display rule in another shape: a figure
+added for the reader never reorders the answer. It reaches the published schema, the run
+manifest and the result digest; **no renderer prints it yet**, and `the-real-rate-reaches-no-reader`
+in `specs/features.toml` is what that waits on.
+
+**Today every realized half refuses.** The declared series ends 2025-10 and the horizons start
+2026-09, so no tuple span this feature sees is covered, and each refusal names the months of
+its own window. The assumed half carries the owner's declared belief and is labelled
+`declared_assumption` wherever it appears.
+
 ## 28. The tax year: assessed to a year, paid from cash, and never labelled
 
 Feature 001 charged tax per event and left the timing open. This section is what closed it.
@@ -3107,6 +3144,8 @@ unaffected in all three:
 
 Such a tuple is **not comparison-ready**: it is reported, and kept out of the ranking, exactly
 as 002 keeps a candidate with no round-trip figure out of one.
+
+The rate's real counterpart sits beside it and is METHODOLOGY §27.7.
 
 ### 29.6 Where an instrument is reached
 

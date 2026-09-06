@@ -2578,6 +2578,14 @@ class TupleDeclarations:
     quotation_file: Path
     """Which file declared the spread-holds belief every early-exit figure rests on."""
 
+    inflation: InflationDeclarations
+    """The two deflators a real figure needs, and which file declared each (024 FR-012).
+
+    The whole record rather than the two values :attr:`registries` flattens, because
+    ``manifest.inflation_input_refs`` takes it whole; loose paths beside the registries would
+    be the same fact declared twice.
+    """
+
     registries: Registries
     """The same set again, flattened into the record the pure core takes.
 
@@ -2915,6 +2923,7 @@ def tuple_from_data_root(
             "check the data root, or declare how each instrument is reached",
         )
     early_exit, quotation_file = _resolved_quotation_belief(root, covered.ramp.streams)
+    inflation = inflation_from_data_root(root)
     access, declaring = _resolved_access(
         files,
         instruments=instruments.instruments,
@@ -2929,6 +2938,7 @@ def tuple_from_data_root(
         access=access,
         access_files=declaring,
         quotation_file=quotation_file,
+        inflation=inflation,
         registries=Registries(
             instruments=instruments.instruments,
             funds=instruments.funds,
@@ -2940,6 +2950,8 @@ def tuple_from_data_root(
             streams=covered.ramp.streams,
             kinds=covered.ramp.kinds,
             spendable=covered.spendable,
+            cpi=inflation.series,
+            inflation=inflation.assumption,
             quotation_holds=early_exit,
             base_currency=covered.ramp.base_currency,
         ),
