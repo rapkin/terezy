@@ -19,14 +19,14 @@
 # else, so a file whose horizons moved with the calendar would be a different question every day
 # under one digest. It is a parameter of the verb, and the manifest records both.
 #
-# ## Two of the four words resolve to nothing, and that is the answer
+# ## One of the four words resolves to nothing, and that is the answer
 #
-# `ovdp` and `inzhur` are declared groups. `cash` and `btc` are declared by nothing at all —
-# there is no instrument representing a hryvnia balance held at a venue, and none representing
-# a held BTC position — so they land in the answer's undeclared population, by the words he
-# wrote. Both are owner verification tasks in `specs/015-the-question/spec.md`: a cash
-# instrument's terms and a BTC instrument's terms and tax class are market and legal values
-# that must come from cited sources entered as data, and are not an implementer's to invent.
+# `cash`, `ovdp` and `inzhur` are declared groups. `btc` is declared by nothing at all — there
+# is no instrument representing a held BTC position — so it lands in the answer's undeclared
+# population, by the word he wrote. It is an owner verification task in
+# `specs/015-the-question/spec.md`: a BTC instrument's terms and tax class are market and legal
+# values that must come from cited sources entered as data, and are not an implementer's to
+# invent.
 #
 # ## The facts below the owner still has to confirm
 #
@@ -121,6 +121,13 @@ reserve      = []
   # A plan per SUBJECT, not per instrument. That is what stops this file growing an entry per
   # issue when feature 016 declares 24 real ОВДП: a new issue joins the group by carrying the
   # label, and nothing here changes.
+  # A balance has nothing to run: no lots to choose between, no coupon to have a policy for,
+  # no liquidity mode and no exit date. The plan exists because 014 FR-003 refuses an
+  # instrument with none, and every field of the other two kinds is refused on it at load.
+  [[question.plan]]
+  subject            = "cash"
+  kind               = "cash"
+
   [[question.plan]]
   subject            = "ovdp"
   kind               = "bond"

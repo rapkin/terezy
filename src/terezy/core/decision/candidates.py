@@ -6,27 +6,28 @@ the reason recorded, because 'your preferred plan is impossible in March' is its
 
 ## This module constructs nothing
 
-Both route terms of every candidate are read off what
+Every route term of every candidate is read off what
 :func:`terezy.core.routes.compose.compose` emitted. Nothing here builds a chain, extends one, or
-decides that two routes join, and no rule about what connects lives here (FR-002). The
-**single** permitted construction is the identity exit, and it is about the *absence* of a chain
-rather than about what connects.
+decides that two routes join, and no rule about what connects lives here (FR-002). The two
+permitted constructions are the identity exit and the identity entry, and both are about the
+*absence* of a chain rather than about what connects.
 
 ## It adds no feasibility rule either
 
 Pruning is feature 010's typed refusals, reached by ``compare``'s own loop, and this module
 contains no pre-screen, no cheap filter and no early exit that skips evaluation (FR-006,
-FR-007). Two of ``compose``'s own guards -- a segment bound below one, a stream that already
-arrives where the purchase happens -- are deliberately **not** re-checked before calling it: a
-second copy of a rule is where the drift happens.
+FR-007). ``compose``'s bound guard is read through its own
+:func:`~terezy.core.routes.compose.admits_nothing` rather than copied, because a pair the money
+has already reached short-circuits before ``compose`` is called and the bound still has to
+refuse the whole question.
 
 ## Three columns, because a pair can fail in a way no candidate-level reason can carry
 
-A ``Tuple`` cannot exist without a ``route_in``, so 010 was never asked whether a way in exists;
-it was handed one, and the fact is about an ``(instrument, stream)`` pair rather than about a
-candidate. So a pair that yields nothing is its own population and is never counted among the
-drops: a drop count folding in combinations that were never real is a figure a reader divides
-by and gets a meaningless answer (FR-008).
+Whether the routes reach an instrument at all is a fact about an ``(instrument, stream)`` pair
+rather than about a candidate, and 010 is never asked it -- it is handed a way in. So a pair
+that yields nothing is its own population and is never counted among the drops: a drop count
+folding in combinations that were never real is a figure a reader divides by and gets a
+meaningless answer (FR-008).
 
 ## Enumeration, not search
 
@@ -59,7 +60,6 @@ from terezy.core.results.candidates import (
     MoreThanOneStreamInTheSet,
     NoPlanSupplied,
     NothingConnects,
-    NothingNeedsToConnect,
     PairYieldedNoCandidate,
     PlannedCandidate,
     Question,
@@ -77,15 +77,16 @@ from terezy.core.results.tuple import (
     Tuple,
     TupleOutcome,
 )
-from terezy.core.routes.compose import compose
+from terezy.core.routes.compose import admits_nothing, compose
 from terezy.core.routes.path import (
+    ENTRY_BY_IDENTITY,
     EXIT_BY_IDENTITY,
-    Candidate,
+    EntryPath,
     ExitChain,
-    candidate_id,
+    entry_id,
+    entry_segments_of,
     exit_chain_of,
     exit_segments_of,
-    segments_of,
 )
 
 if TYPE_CHECKING:  # pragma: no cover -- typing only
@@ -95,6 +96,7 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.primitives.currency import Currency
     from terezy.core.primitives.provenance import Provenance
     from terezy.core.routes.legs import Route
+    from terezy.core.streams.streams import IncomeStream
 
 
 def enumerate_candidates(
@@ -298,16 +300,18 @@ def _considered(
     """
     entries = []
     for instrument_id in sorted(registries.access.keys() & subjects):
-        fund = registries.funds.get(instrument_id)
-        bond = registries.instruments.get(instrument_id)
-        declared = fund if fund is not None else bond
+        declared = (
+            registries.funds.get(instrument_id)
+            or registries.cash.get(instrument_id)
+            or registries.instruments.get(instrument_id)
+        )
         if declared is None:
             continue
         entries.append((instrument_id, registries.access[instrument_id], currency_of(declared)))
     return tuple(entries)
 
 
-_Reach = dict[tuple[str, str], tuple[tuple[Candidate, ...], tuple[ExitChain, ...]]]
+_Reach = dict[tuple[str, str], tuple[tuple[EntryPath, ...], tuple[ExitChain, ...]]]
 """For each pair that connects, the ways in and the ways out, both read off ``compose``."""
 
 
@@ -322,28 +326,18 @@ def _walk(
     reach: _Reach = {}
     empty: list[PairYieldedNoCandidate] = []
     for instrument_id, access, currency in considered:
+        destination = Destination(venue_id=access.bought_at, currency=currency)
         for stream_id in sorted(registries.streams):
-            ways_in = compose(
+            stream = registries.streams[stream_id]
+            ways_in = _ways_in(
+                stream,
+                destination,
                 routes=routes,
-                stream=registries.streams[stream_id],
-                destination=Destination(venue_id=access.bought_at, currency=currency),
-                direction="inbound",
-                regime_id=question.regime_id,
-                bound=question.bound,
+                question=question,
                 spendable=registries.spendable,
             )
             if isinstance(ways_in, CompositionRefused):
-                about_the_question = _about_the_question(ways_in)
-                if about_the_question is not None:
-                    return about_the_question
-                empty.append(
-                    PairYieldedNoCandidate(
-                        instrument_id=instrument_id,
-                        stream_id=stream_id,
-                        why=NothingNeedsToConnect(refusal=ways_in),
-                    )
-                )
-                continue
+                return _about_the_question(ways_in)
             ways_out = _ways_out(
                 access,
                 currency=currency,
@@ -355,7 +349,7 @@ def _walk(
             if not isinstance(ways_out, tuple):
                 return ways_out
             absent = _nothing_connects(
-                ways_in.candidates,
+                ways_in,
                 ways_out,
                 instrument_id=instrument_id,
                 stream_id=stream_id,
@@ -368,8 +362,51 @@ def _walk(
                     )
                 )
                 continue
-            reach[instrument_id, stream_id] = (ways_in.candidates, ways_out)
+            reach[instrument_id, stream_id] = (ways_in, ways_out)
     return reach, tuple(empty)
+
+
+def _ways_in(
+    stream: IncomeStream,
+    destination: Destination,
+    *,
+    routes: Mapping[str, Route],
+    question: Question,
+    spendable: frozenset[SpendableEndpoint],
+) -> tuple[EntryPath, ...] | CompositionRefused:
+    """Every declared way into the buying venue, or the identity entry where none is needed.
+
+    **The second construction this module makes** (023 FR-015), and the mirror of
+    :func:`_ways_out`'s. Where the stream already arrives at the buying venue in the
+    instrument's own currency, the way in *is* the identity entry: nothing has to move, and no
+    corridor from a venue to itself is invented. ``compose`` is not asked, because what it
+    answers for such a pair is its ``ALREADY_ARRIVED`` refusal -- which stays exactly as it is,
+    since refusing to route money to where it already is remains correct.
+
+    The **bound** is still asked, and it has to be: ``compose`` checks it before the arrival
+    comparison, so a bound admitting nothing would otherwise be stepped over by a registry
+    whose pairs are all identity and yield candidates from a bound that admits none. Where it
+    admits nothing the short-circuit does not fire, ``compose`` is called and answers with its
+    own refusal -- which is a statement about the question rather than a corridor.
+    """
+    already_there = (stream.arrives_at, stream.amount.currency) == (
+        destination.venue_id,
+        destination.currency,
+    )
+    if already_there and not admits_nothing(question.bound):
+        return (ENTRY_BY_IDENTITY,)
+    enumerated = compose(
+        routes=routes,
+        stream=stream,
+        destination=destination,
+        direction="inbound",
+        regime_id=question.regime_id,
+        bound=question.bound,
+        spendable=spendable,
+    )
+    if isinstance(enumerated, CompositionRefused):
+        return enumerated
+    return enumerated.candidates
 
 
 def _ways_out(
@@ -423,25 +460,32 @@ def _question_refusal(refusal: CompositionRefused) -> QuestionDoesNotStandUp:
     )
 
 
-def _about_the_question(refusal: CompositionRefused) -> QuestionDoesNotStandUp | None:
-    """Whether ``compose`` refused about the *question* rather than about this one pair.
+def _about_the_question(refusal: CompositionRefused) -> QuestionDoesNotStandUp:
+    """``compose``'s refusal, read off the record and never off its text (FR-014a).
 
-    FR-014a: read off the record, never off its text. *The money is already where it was
-    wanted* is one pair with nothing missing, and belongs in the no-candidate column; the other
-    two are true of every pair at once, so enumerating the rest would report a set shaped by a
-    broken input as though it were an answer.
+    The match stays **exhaustive** over a closed enum rather than losing an arm: deleting the
+    *already arrived* case would leave a member nothing handles the day another caller reaches
+    it. It raises because :func:`_ways_in` compares the same venue and currency ``compose``
+    does and short-circuits first, so reaching here is a programmer error rather than a fact
+    about the money -- the two comparisons having come apart.
     """
     match refusal.case:
         case Unaskable.BOUND_ADMITS_NOTHING | Unaskable.NO_SPENDABLE_ENDPOINT:
             return _question_refusal(refusal)
         case Unaskable.ALREADY_ARRIVED:
-            return None
+            raise ValueError(
+                f"compose refused the pair ({refusal.stream_id!r}, {refusal.destination_id!r}) "
+                "because the money is already where it was wanted, and enumeration short-"
+                "circuits on exactly that condition before asking: such a pair is an entry by "
+                "identity and never reaches compose. Reaching here means the two comparisons "
+                "have come apart."
+            )
         case _:  # pragma: no cover -- mypy proves this unreachable
             assert_never(refusal.case)
 
 
 def _nothing_connects(
-    ways_in: Sequence[Candidate],
+    ways_in: Sequence[EntryPath],
     ways_out: Sequence[ExitChain],
     *,
     instrument_id: str,
@@ -560,7 +604,7 @@ def _within_the_ceiling(
 def _ordered(reach: _Reach, question: Question) -> tuple[PlannedCandidate, ...]:
     """Every candidate, totally ordered by the declarations and the caller's inputs alone.
 
-    FR-016: instrument id, stream id, the way in's ``candidate_id``, the way out's segment ids,
+    FR-016: instrument id, stream id, the way in's ``entry_id``, the way out's segment ids,
     then the plan's position in the caller's sequence. Loading the same declarations in a
     different file order changes neither membership nor sequence, because no term of the key is
     a property of the walk.
@@ -575,7 +619,7 @@ def _ordered(reach: _Reach, question: Question) -> tuple[PlannedCandidate, ...]:
                             (
                                 instrument_id,
                                 stream_id,
-                                candidate_id(way_in),
+                                entry_id(way_in),
                                 exit_segments_of(way_out),
                                 position,
                             ),
@@ -608,7 +652,7 @@ def _route_ids_of(key: Tuple) -> tuple[str, ...]:
     """
     way_out = key.route_out
     out = exit_segments_of(way_out) if isinstance(way_out, ExitChain) else ()
-    return (*segments_of(key.route_in), *out)
+    return (*entry_segments_of(key.route_in), *out)
 
 
 def _undeclared_routes(
@@ -616,7 +660,7 @@ def _undeclared_routes(
 ) -> UndeclaredRouteSupplied | None:
     """Every route id named by a key resolves against the registry the evaluation will use."""
     for part, ids in (
-        ("route_in", [name for key in keys for name in segments_of(key.route_in)]),
+        ("route_in", [name for key in keys for name in entry_segments_of(key.route_in)]),
         (
             "route_out",
             [

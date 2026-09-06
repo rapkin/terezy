@@ -452,3 +452,15 @@ period's interest instead of the round-trip spread.
 | **D3** | Untouched. A restructuring haircut is still nobody's declaration. |
 | **E5** | Pressed once more, and this time on a figure built by arithmetic across two files: a carried price is a quotation less one declared accrual plus another, and it carries the marks of the quotation **and** of every coupon that bounded a period it used (`tests/worked_examples/test_accrued_interest.py`, `tests/worked_examples/test_early_exit_sale.py`). A subtraction that laundered either would be the top-severity defect Principle I names. |
 | **K1** | Reinforced: both goldens moved and were regenerated deliberately, with one moved line hand-checked against the worked example. `the_answer.golden.txt` records three issues leaving as **named refusals** rather than as a shorter list, which is what keeps a shrinking population from reading as a disappearance. |
+
+**023-cash-instrument** closes **no** row and moves **I4** closer than any feature before it.
+What it lands is the row's own subject: a `cash_balance` declared at the venue the owner's
+salary already arrives at, reached by an identity entry and left by an identity exit, ranked in
+the same list as everything else.
+
+| Row | How, and why the box does not move |
+|---|---|
+| **I4** | *The naive baseline is always scored and always shown.* **What this closes:** the cash instrument now exists, is declared, and is scored — at one month it is non-dominated and dominates the declared benchmark, which is the sentence the row exists to make sayable. **What it does not close:** I4's own words name `50/50 OVDP + VWCE`, an **allocation** over candidates, and nothing in this engine can represent one. The recorded `zero-hop-way-in` gap that stood in the way is closed by this feature and the no-candidate column's second member retired with it. |
+| **B12** | Reinforced from the far end: the baseline joins the ranking without a rule of its own. Its entry charges nothing because it walks no leg, not because a heuristic exempted it, and it is dominated at three and twelve months by ordinary comparison. |
+| **E5** | Pressed on a figure whose only observation decides it without appearing in its arithmetic: what a balance returns is what went in **because** the declared rate is zero, so the mark reaches the amount through `money.also_resting_on` rather than through a multiplication (`tests/worked_examples/test_cash_reaches_the_amount.py`, `tests/invariants/test_cash_invariants.py`). `verified_on` is empty until the owner cites Monobank's terms, and every cash figure renders marked. |
+| **K1** | Reinforced: both goldens moved and were regenerated deliberately, with the moved figure hand-checked — `0x1.86a0000000000p+15` is 50 000.00 exactly, the outlay unchanged. |

@@ -354,6 +354,18 @@ def compose(
     return Enumeration(candidates=candidates, bound=bound, regime_id=regime_id)
 
 
+def admits_nothing(bound: SegmentBound) -> bool:
+    """Whether a declared bound admits no candidate at all -- not even a declared route.
+
+    Public because it is the **first** thing :func:`_refusal` asks and it has to stay first for
+    a caller that short-circuits: 023's enumeration constructs an identity way in for a pair
+    the money has already reached instead of asking for a corridor, and a bound admitting
+    nothing must still refuse the whole question rather than being stepped over. One definition
+    and two readers, because a second copy of this rule is where the two would drift.
+    """
+    return bound.max_segments < 1
+
+
 def _refusal(
     *,
     stream: IncomeStream,
@@ -369,7 +381,7 @@ def _refusal(
     itself does not stand up, and returning an empty candidate set for one of them would report
     a registry gap that does not exist.
     """
-    if bound.max_segments < 1:
+    if admits_nothing(bound):
         return CompositionRefused(
             case=Unaskable.BOUND_ADMITS_NOTHING,
             reason=(

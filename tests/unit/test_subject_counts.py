@@ -146,12 +146,12 @@ def test_a_plan_keyed_by_a_word_that_runs_nothing_refuses_the_question() -> None
 
 
 def test_a_plan_for_a_subject_the_registry_does_not_declare_is_not_refused() -> None:
-    """``cash`` is a legitimate subject with a legitimate plan and an empty answer."""
+    """``btc`` is a legitimate subject with a legitimate plan and an empty answer."""
     question = fixtures.owners_question()
     result = fixtures.answered(
         fixtures.with_plans(
-            fixtures.with_subjects(question, fixtures.OVDP, "cash"),
-            {fixtures.OVDP: question.plans[fixtures.OVDP], "cash": question.plans[fixtures.OVDP]},
+            fixtures.with_subjects(question, fixtures.OVDP, "btc"),
+            {fixtures.OVDP: question.plans[fixtures.OVDP], "btc": question.plans[fixtures.OVDP]},
         )
     )
     assert subject_counts(result, result.sections[0]).undeclared == 1

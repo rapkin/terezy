@@ -81,9 +81,11 @@ from typing import TYPE_CHECKING, Final, Literal, assert_never
 
 from terezy.core.errors import InconsistentTerms, LedgerInvariantError
 from terezy.core.instruments import accrual
+from terezy.core.instruments import cash as cash_terms
 from terezy.core.instruments import fund as fund_terms
 from terezy.core.instruments import registry as instrument_registry
 from terezy.core.instruments import terms as instrument_terms
+from terezy.core.instruments.cash import CashAssumptions, CashDeclaration
 from terezy.core.instruments.fund import FundDeclaration
 from terezy.core.instruments.interface import (
     Assumptions,
@@ -102,8 +104,10 @@ from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance
 from terezy.core.primitives.rates import NominalRate
 from terezy.core.primitives.tolerance import is_close
+from terezy.core.results import cash as cash_results
 from terezy.core.results import fund as fund_results
 from terezy.core.results import project as bond_results
+from terezy.core.results.cash import CashProjection
 from terezy.core.results.fund import FundAssumptions, FundProjection, RangeProjection
 from terezy.core.results.hurdle import CashFlow, internal_rate_of_return
 from terezy.core.results.project import Projection
@@ -124,6 +128,7 @@ from terezy.core.results.tuple import (
     DeclarationMissing,
     FundedFromAnotherStream,
     InstrumentDemandsCash,
+    InstrumentPlan,
     InstrumentRefused,
     NoExitRouteDeclared,
     NoExitTermsDeclared,
@@ -151,16 +156,18 @@ from terezy.core.routes.path import (
     EXIT_BY_IDENTITY,
     Candidate,
     DeclaredExit,
+    EntryByIdentity,
+    EntryPath,
     ExitByIdentity,
     ExitChain,
     ExitChoice,
     FromTheDeclaration,
+    entry_segments_of,
     exit_segments_of,
-    segments_of,
 )
 from terezy.core.scenarios import quotation
 from terezy.core.scenarios.quotation import QuotationHolds
-from terezy.core.tax.interface import TaxClass
+from terezy.core.tax.interface import TaxableEventKind, TaxCharge, TaxClass
 
 if TYPE_CHECKING:  # pragma: no cover -- typing only
     from collections.abc import Mapping
@@ -172,16 +179,18 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.routes.legs import Route
     from terezy.core.streams.streams import IncomeStream
 
-Declared = InstrumentDeclaration | FundDeclaration
-"""The two declaration kinds a tuple can name, matched with ``match``.
+Declared = InstrumentDeclaration | FundDeclaration | CashDeclaration
+"""The declaration kinds a tuple can name, matched with ``match``.
 
-⚙ **A two-armed match, and the seam is recorded rather than hidden.** The two projections
-return different shapes, so the join has to know which one to call. That is a branch on a
-**declaration kind** -- an algorithm, which Principle II leaves as code -- and never a branch
-on an instrument id, which it forbids and which ``tests/contract/test_h1_data_only.py``
-scans for. Adding a third instrument is data; adding a third kind is code, here and wherever
-else the kind is dispatched on.
+**The seam is recorded rather than hidden.** The projections return different shapes, so the
+join has to know which one to call. That is a branch on a **declaration kind** -- an algorithm,
+which Principle II leaves as code -- and never a branch on an instrument id, which it forbids
+and which ``tests/contract/test_h1_data_only.py`` scans for. Adding another instrument is
+data; adding another kind is code, here and wherever else the kind is dispatched on.
 """
+
+Projected = Projection | FundProjection | CashProjection
+"""What a projection returns, whichever kind produced it: the union every figure is read off."""
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -196,6 +205,15 @@ class Registries:
 
     instruments: Mapping[str, InstrumentDeclaration]
     funds: Mapping[str, FundDeclaration]
+    cash: Mapping[str, CashDeclaration]
+    """Declared cash balances by id.
+
+    A third mapping rather than a widened first, on :attr:`funds`' argument. It is read
+    wherever the other two are, and the reason is Principle IV's: an id in neither existing map
+    was skipped by enumeration with **no refusal at all**, so a declared balance would have
+    disappeared from the comparison silently (023 FR-008a).
+    """
+
     tax_classes: Mapping[str, TaxClass]
     access: Mapping[str, InstrumentAccess]
     routes: Mapping[str, Route]
@@ -307,42 +325,64 @@ def _route_in(
     The order matters and is the plan's: the chaining rule first, because it is the part that
     can be silently wrong, and everything after it is a sum of calls that already work.
 
-    ⚙ **``cost_one``'s own round-trip figure is deliberately unused.** This tuple's way out
+    **``cost_one``'s own round-trip figure is deliberately unused.** This tuple's way out
     starts where the *instrument* releases its proceeds, which is not in general where the
     inbound chain ended, so that figure is about a different journey and reporting it would put
     a figure for one journey in the slot for another.
     """
-    costed = cost.cost_one(
-        tuple_.route_in,
-        amount,
-        routes=registries.routes,
-        channels=registries.channels,
-        streams=registries.streams,
-        kinds=registries.kinds,
-        on_date=horizon.start,
-        as_of=as_of,
-        spendable=registries.spendable,
-    )
-    if isinstance(costed, RouteUnusable):
-        return RouteInUnusable(
-            refused=costed,
-            reason=(
-                f"the way in to {prepared.access.bought_at!r} will not carry "
-                f"{amount.amount!r} {amount.currency.value} on {horizon.start.isoformat()}: "
-                f"{costed.reason}"
-            ),
+    entry = tuple_.route_in
+    if isinstance(entry, EntryByIdentity):
+        seam = _identity_way_in(prepared, amount)
+        if seam is not None:
+            return seam
+        # No cap check, and its absence is the entry rather than an omission: a ceiling is a
+        # term of a declared leg and this way in walks none, so there is no rail to exceed.
+        costed = _Costed(
+            one_way=cost.cost_entry(entry, amount),
+            latency_days=0,
+            status="open",
+            disruption=0.0,
+            ceiling=None,
         )
-    seam_in = _seam_in(tuple_, prepared, costed.one_way.arrived)
-    if seam_in is not None:
-        return seam_in
-    # After the seam, not before, and the order is a decision rather than a habit: a seam
-    # mismatch says the tuple is impossible at **any** amount in any month, while a cap says
-    # it is impossible at *this* amount *this* month. Reporting the cap first hands the owner
-    # a remedy that reads as actionable -- send at most the ceiling -- and sending less would
-    # then reveal a seam the first refusal had concealed.
-    capped = _over_the_monthly_cap(tuple_.route_in, costed.ceiling, amount)
-    if capped is not None:
-        return capped
+    else:
+        priced = cost.cost_one(
+            entry,
+            amount,
+            routes=registries.routes,
+            channels=registries.channels,
+            streams=registries.streams,
+            kinds=registries.kinds,
+            on_date=horizon.start,
+            as_of=as_of,
+            spendable=registries.spendable,
+        )
+        if isinstance(priced, RouteUnusable):
+            return RouteInUnusable(
+                refused=priced,
+                reason=(
+                    f"the way in to {prepared.access.bought_at!r} will not carry "
+                    f"{amount.amount!r} {amount.currency.value} on "
+                    f"{horizon.start.isoformat()}: {priced.reason}"
+                ),
+            )
+        seam_in = _seam_in(entry, prepared, priced.one_way.arrived)
+        if seam_in is not None:
+            return seam_in
+        # After the seam, not before, and the order is a decision rather than a habit: a seam
+        # mismatch says the tuple is impossible at **any** amount in any month, while a cap
+        # says it is impossible at *this* amount *this* month. Reporting the cap first hands
+        # the owner a remedy that reads as actionable -- send at most the ceiling -- and
+        # sending less would then reveal a seam the first refusal had concealed.
+        capped = _over_the_monthly_cap(entry, priced.ceiling, amount)
+        if capped is not None:
+            return capped
+        costed = _Costed(
+            one_way=priced.one_way,
+            latency_days=priced.latency_days,
+            status=priced.status,
+            disruption=priced.disruption_probability,
+            ceiling=priced.ceiling,
+        )
     proceeds_at: Junction = (prepared.access.proceeds_to, prepared.currency.value)
     way_out = _way_out_chain(tuple_, prepared, proceeds_at, registries)
     if not isinstance(way_out, ExitChain):
@@ -351,9 +391,55 @@ def _route_in(
         one_way=costed.one_way,
         latency_days=costed.latency_days,
         status=costed.status,
-        disruption=costed.disruption_probability,
+        disruption=costed.disruption,
         proceeds_at=proceeds_at,
         chain=way_out,
+    )
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class _Costed:
+    """What a way in costs, from whichever of the two kinds of way in it is.
+
+    The four figures `_Routed` carries about the inbound leg, gathered so the identity branch
+    and the routed one meet at one point instead of building a `_Routed` each -- which is where
+    the two would come to disagree about what an unwalked chain reports.
+    """
+
+    one_way: OneWayCost
+    latency_days: int
+    status: RouteStatus
+    disruption: float
+    ceiling: Money | None
+
+
+def _identity_way_in(prepared: _Prepared, amount: Money) -> SeamDoesNotChain | None:
+    """*There is nothing to do* is a claim about where the money is, and it is checked.
+
+    FR-013, and exactly :func:`_identity_way_out`'s rule at the near end: derived from the
+    declarations the entry is safe by construction, asserted by a caller it is the bare
+    statement that the stream already arrives where the purchase happens -- and a caller who
+    asserts it wrongly would have the purchase made with money that is somewhere else.
+
+    The stream's own arrival, not the amount's origin: the amount is what the caller chose to
+    move, while ``arrives_at`` is where the declarations say this income lands.
+    """
+    left: Junction = (prepared.stream.arrives_at, amount.currency.value)
+    right: Junction = (prepared.access.bought_at, prepared.currency.value)
+    if left == right:
+        return None
+    return SeamDoesNotChain(
+        seam="route_in_to_purchase",
+        left=f"{left[0]}/{left[1]}",
+        right=f"{right[0]}/{right[1]}",
+        reason=(
+            f"there is said to be nothing to do because {prepared.stream.id!r} already "
+            f"arrives as {left[1]} at {left[0]!r}, and {prepared.declared.id!r} is bought as "
+            f"{right[1]} at {right[0]!r}. The two do not meet, so the purchase would be made "
+            "with money that is somewhere else: what an entry by identity claims is that no "
+            "corridor is needed, and where one is needed it has to be declared and costed "
+            "rather than assumed free (FR-013)."
+        ),
     )
 
 
@@ -415,7 +501,7 @@ def _hold(
         tax_classes=registries.tax_classes,
         registries=registries,
     )
-    if not isinstance(projected, Projection | FundProjection):
+    if not isinstance(projected, Projection | FundProjection | CashProjection):
         return projected
     repatriated = _repatriate(
         tuple_, prepared, projected, routed=routed, as_of=as_of, registries=registries
@@ -459,7 +545,7 @@ class _Prepared:
     declared: Declared
     access: InstrumentAccess
     currency: Currency
-    plan: Assumptions | FundAssumptions
+    plan: InstrumentPlan
     stream: IncomeStream
 
 
@@ -473,7 +559,7 @@ def _instrument_side(
     and what follows is the route side.
     """
     declared = _declaration(tuple_.instrument_id, registries)
-    if not isinstance(declared, InstrumentDeclaration | FundDeclaration):
+    if isinstance(declared, DeclarationMissing):
         return declared
     access = registries.access.get(tuple_.instrument_id)
     if access is None:
@@ -518,13 +604,16 @@ def _prepare(tuple_: Tuple, registries: Registries) -> _Prepared | TupleRefused:
                 f"{sorted(registries.streams)}."
             ),
         )
-    if tuple_.route_in.stream_id != tuple_.stream_id:
+    entry = tuple_.route_in
+    # An identity entry names no stream and so cannot name another one: the money that funds
+    # the purchase is the money that already arrived, in the stream the tuple names.
+    if not isinstance(entry, EntryByIdentity) and entry.stream_id != tuple_.stream_id:
         return FundedFromAnotherStream(
             tuple_stream_id=tuple_.stream_id,
-            route_stream_id=tuple_.route_in.stream_id,
+            route_stream_id=entry.stream_id,
             reason=(
                 f"this tuple says it is funded from {tuple_.stream_id!r}, and its way in is "
-                f"costed from {tuple_.route_in.stream_id!r}. Which income pays for a purchase "
+                f"costed from {entry.stream_id!r}. Which income pays for a purchase "
                 "is part of what the cost *is* (Principle VI), so the two cannot differ: the "
                 "figures would be a ramp from one stream reported under the key of another, "
                 "and both halves would look entirely reasonable. Neither is preferred over "
@@ -532,7 +621,7 @@ def _prepare(tuple_: Tuple, registries: Registries) -> _Prepared | TupleRefused:
                 "way in nobody named or rewrite the key the comparison is built on."
             ),
         )
-    unknown = [name for name in segments_of(tuple_.route_in) if name not in registries.routes]
+    unknown = [name for name in entry_segments_of(entry) if name not in registries.routes]
     if unknown:
         return DeclarationMissing(
             part="route_in",
@@ -547,10 +636,13 @@ def _prepare(tuple_: Tuple, registries: Registries) -> _Prepared | TupleRefused:
 
 
 def _declaration(instrument_id: str, registries: Registries) -> Declared | DeclarationMissing:
-    """The declaration an id names, of either kind, or a refusal listing what is declared."""
+    """The declaration an id names, of whichever kind, or a refusal listing what is declared."""
     fund = registries.funds.get(instrument_id)
     if fund is not None:
         return fund
+    balance = registries.cash.get(instrument_id)
+    if balance is not None:
+        return balance
     bond = registries.instruments.get(instrument_id)
     if bond is not None:
         return bond
@@ -559,7 +651,7 @@ def _declaration(instrument_id: str, registries: Registries) -> Declared | Decla
         what=f"instrument {instrument_id!r}",
         reason=(
             f"no declaration under instruments/ declares {instrument_id!r}. Declared: "
-            f"{sorted([*registries.instruments, *registries.funds])}."
+            f"{sorted([*registries.instruments, *registries.funds, *registries.cash])}."
         ),
     )
 
@@ -572,10 +664,27 @@ def currency_of(declared: Declared) -> Currency:
     of *which field of which declaration kind holds the currency* is one fact in two places.
     """
     match declared:
-        case InstrumentDeclaration():
+        case InstrumentDeclaration() | CashDeclaration():
             return declared.currency
         case FundDeclaration():
             return declared.unit_currency
+        case _:  # pragma: no cover -- mypy proves this unreachable
+            assert_never(declared)
+
+
+def _tax_classes_of(declared: Declared) -> Mapping[TaxableEventKind, str]:
+    """Which declared class governs each kind of income this instrument pays.
+
+    Empty for a balance, and that is the declaration's answer rather than an omitted field
+    (FR-009): a release returns the basis, so no gain and no income arise and there is nothing
+    for a class to charge. A field on ``CashDeclaration`` able to hold only one value would be
+    somewhere for a later contributor to name one.
+    """
+    match declared:
+        case InstrumentDeclaration() | FundDeclaration():
+            return declared.tax_classes
+        case CashDeclaration():
+            return {}
         case _:  # pragma: no cover -- mypy proves this unreachable
             assert_never(declared)
 
@@ -590,7 +699,7 @@ def _unresolved_class(
     part named so the remedy is a file in ``data/tax/`` rather than a search.
     """
     missing = sorted(
-        {class_id for class_id in declared.tax_classes.values() if class_id not in tax_classes}
+        {class_id for class_id in _tax_classes_of(declared).values() if class_id not in tax_classes}
     )
     if not missing:
         return None
@@ -616,7 +725,7 @@ def _foreign_tax_currency(
     the shipped registry -- every declared instrument is hryvnia -- and that is a property of
     today's data rather than of the arithmetic, which is why the guard exists.
     """
-    if currency is base_currency or not declared.tax_classes:
+    if currency is base_currency or not _tax_classes_of(declared):
         return None
     return TaxCurrencyConversionUnavailable(
         instrument_id=declared.id,
@@ -638,13 +747,15 @@ def _foreign_tax_currency(
 
 
 def _plan_for(
-    declared: Declared, exit_terms: Assumptions | FundAssumptions
-) -> Assumptions | FundAssumptions | PlanDoesNotFitInstrument:
+    declared: Declared, exit_terms: InstrumentPlan
+) -> InstrumentPlan | PlanDoesNotFitInstrument:
     """The run settings, checked against the declaration kind they are settings for."""
     match declared, exit_terms:
         case InstrumentDeclaration(), Assumptions():
             return exit_terms
         case FundDeclaration(), FundAssumptions():
+            return exit_terms
+        case CashDeclaration(), CashAssumptions():
             return exit_terms
         case _:
             return PlanDoesNotFitInstrument(
@@ -664,14 +775,14 @@ def _plan_for(
 # ---------------------------------------------------------------------------
 
 
-def _seam_in(tuple_: Tuple, prepared: _Prepared, arrived: Money) -> SeamDoesNotChain | None:
+def _seam_in(entry: Candidate, prepared: _Prepared, arrived: Money) -> SeamDoesNotChain | None:
     """The way in must end where and in the currency the purchase begins (FR-004).
 
     Both halves, and the venue half is the one that has no other guard: two hryvnia venues
     look identical to a currency check, and a way in that lands the money at the wrong one
     would produce a purchase funded by money that never got there.
     """
-    left: Junction = (tuple_.route_in.destination_id, arrived.currency.value)
+    left: Junction = (entry.destination_id, arrived.currency.value)
     right: Junction = (prepared.access.bought_at, prepared.currency.value)
     if left == right:
         return None
@@ -801,18 +912,24 @@ def _chosen_way_out(
         return choice
     if proceeds_at in cost.spendable_junctions(registries.spendable):
         return EXIT_BY_IDENTITY
-    arriving = registries.routes[segments_of(tuple_.route_in)[-1]]
-    partner = arriving.partner_route
+    segments = entry_segments_of(tuple_.route_in)
+    arriving = None if not segments else registries.routes[segments[-1]]
+    partner = None if arriving is None else arriving.partner_route
     if partner is None:
         return NoExitRouteDeclared(
             unknown=ExitCostUnknown(
                 reason=(
-                    f"route {arriving.id!r} declares no partner_route, so nobody has costed "
-                    "the way out. Round-trip cost is computed from separately declared exit "
-                    "routes and never by reversing the way in (FR-027), and the one-way "
-                    "figure is not promoted into its place (FR-030)."
+                    (
+                        f"route {arriving.id!r} declares no partner_route"
+                        if arriving is not None
+                        else "the way in walks no declared route, so there is no partner_route "
+                        "to read"
+                    )
+                    + ", so nobody has costed the way out. Round-trip cost is computed from "
+                    "separately declared exit routes and never by reversing the way in "
+                    "(FR-027), and the one-way figure is not promoted into its place (FR-030)."
                 ),
-                missing_partner_for=arriving.id,
+                missing_partner_for="(entry by identity)" if arriving is None else arriving.id,
             ),
             reason=(
                 f"nothing declares a way out of {proceeds_at[0]!r} for "
@@ -840,7 +957,7 @@ class _Acquisition:
 
 
 def _acquire(
-    prepared: _Prepared, path: Candidate, arrived: Money, *, purchased_on: date
+    prepared: _Prepared, path: EntryPath, arrived: Money, *, purchased_on: date
 ) -> _Acquisition | TupleRefused:
     """Turn what arrived into units, at the declared price and the declared increment.
 
@@ -965,6 +1082,11 @@ def _price_for(prepared: _Prepared, *, purchased_on: date) -> Money | Instrument
     match prepared.declared, prepared.plan:
         case FundDeclaration(), FundAssumptions():
             return fund_terms.entry_price_for(prepared.declared, prepared.plan.liquidity_mode)
+        case CashDeclaration(), _:
+            # Sizing is identity: an amount of the declared currency buys that amount of
+            # balance (FR-005). What the declaration DOES observe is the rate, and its mark
+            # reaches every figure through `_projection_provenance`.
+            return money.unit(prepared.currency)
         case InstrumentDeclaration(), _:
             quoted = prepared.access.quote
             if quoted is None:  # pragma: no cover -- the resolver refuses this at load
@@ -1036,7 +1158,7 @@ def _minimum_ticket(prepared: _Prepared) -> Money | None:
     match prepared.declared:
         case InstrumentDeclaration():
             return prepared.declared.constraints.min_ticket
-        case FundDeclaration():
+        case FundDeclaration() | CashDeclaration():
             return None
         case _:  # pragma: no cover -- mypy proves this unreachable
             assert_never(prepared.declared)
@@ -1052,7 +1174,7 @@ def _min_unit(prepared: _Prepared) -> float:
     match prepared.declared:
         case InstrumentDeclaration():
             return prepared.declared.constraints.min_unit
-        case FundDeclaration():
+        case FundDeclaration() | CashDeclaration():
             return 0.0
         case _:  # pragma: no cover -- mypy proves this unreachable
             assert_never(prepared.declared)
@@ -1091,7 +1213,7 @@ def _project(
     horizon: DateRange,
     tax_classes: Mapping[str, TaxClass],
     registries: Registries,
-) -> Projection | FundProjection | TupleRefused:
+) -> Projected | TupleRefused:
     """Run the holding through the call that owns its lifecycle, and read the refusals.
 
     Nothing about the lifecycle happens here. What this function does is translate the owning
@@ -1130,6 +1252,10 @@ def _project(
                     prepared.plan,
                     tax_classes=tax_classes,
                 ),
+            )
+        case CashDeclaration(), CashAssumptions():
+            return _cash_outcome(
+                prepared, cash_results.project_cash(prepared.declared, holding, window)
             )
         case _:  # pragma: no cover -- `_plan_for` has already refused a mismatch
             raise ValueError(
@@ -1183,6 +1309,23 @@ def _bond_outcome(
             return InstrumentRefused(instrument_id=prepared.declared.id, reason=outcome.reason)
 
 
+def _cash_outcome(
+    prepared: _Prepared, outcome: CashProjection | InconsistentTerms
+) -> CashProjection | TupleRefused:
+    """A balance projection, or the refusal its one failure becomes.
+
+    One arm where a bond has four, and no `case _`: `project_cash` returns two things and
+    mypy proves the match exhaustive.
+    """
+    match outcome:
+        case CashProjection():
+            return outcome
+        case InconsistentTerms():
+            return InstrumentRefused(instrument_id=prepared.declared.id, reason=outcome.reason)
+        case _:  # pragma: no cover -- mypy proves this unreachable
+            assert_never(outcome)
+
+
 def _fund_outcome(
     prepared: _Prepared, outcome: fund_results.FundOutcome
 ) -> FundProjection | TupleRefused:
@@ -1233,7 +1376,7 @@ def _reason_of(outcome: object) -> str:
 def _repatriate(
     tuple_: Tuple,
     prepared: _Prepared,
-    projected: Projection | FundProjection,
+    projected: Projected,
     *,
     routed: _Routed,
     as_of: date,
@@ -1343,7 +1486,24 @@ def _over_the_way_out_cap(
     )
 
 
-def _released_by_date(projected: Projection | FundProjection) -> tuple[tuple[date, Money], ...]:
+def _charges_of(projected: Projected) -> tuple[TaxCharge, ...]:
+    """Every tax charge a projection recorded, whichever kind produced it.
+
+    Empty for a balance, and the emptiness is the declaration's answer rather than a table the
+    join failed to read: proceeds equal basis, so no charge is assessed and none is recorded
+    (FR-009). A field on ``CashProjection`` able to hold only the empty tuple would be
+    somewhere for a later contributor to put one.
+    """
+    match projected:
+        case Projection() | FundProjection():
+            return projected.charges
+        case CashProjection():
+            return ()
+        case _:  # pragma: no cover -- mypy proves this unreachable
+            assert_never(projected)
+
+
+def _released_by_date(projected: Projected) -> tuple[tuple[date, Money], ...]:
     """The holding's net-of-tax cash effect per date, in date order, purchase excluded.
 
     The purchase is excluded because the join already paid for it: it is the arriving amount
@@ -1384,7 +1544,7 @@ def _released_by_date(projected: Projection | FundProjection) -> tuple[tuple[dat
         if event.kind is EventKind.PURCHASE:
             continue
         by_date.setdefault(event.occurred_on, []).append(event.amount)
-    for charge in projected.charges:
+    for charge in _charges_of(projected):
         taxed = taxed_on.get(charge.event_sequence)
         if taxed is None:  # pragma: no cover -- both projections renumber before they fold
             raise LedgerInvariantError(
@@ -1446,7 +1606,7 @@ than from the event. Each has a line of its own.
 def _assemble(
     tuple_: Tuple,
     prepared: _Prepared,
-    projected: Projection | FundProjection,
+    projected: Projected,
     *,
     outlay: Money,
     one_way: OneWayCost,
@@ -1599,6 +1759,11 @@ def _declaration_provenance(prepared: _Prepared) -> Provenance:
         case FundDeclaration():
             tables.append(prepared.declared.liquidity.legal.provenance)
             tables.append(prepared.declared.liquidity.practice.provenance)
+        case CashDeclaration():
+            # A balance declares no table the join reads: no constraints, no liquidity terms.
+            # Its one citation is the rate, and it arrives through the projection, which is
+            # where a bond's terms already arrive.
+            pass
         case _:  # pragma: no cover -- mypy proves this unreachable
             assert_never(prepared.declared)
     return prov.merge_all(tables)
@@ -1606,7 +1771,7 @@ def _declaration_provenance(prepared: _Prepared) -> Provenance:
 
 def _parts(
     prepared: _Prepared,
-    projected: Projection | FundProjection,
+    projected: Projected,
     *,
     one_way: OneWayCost,
     way_out_costs: tuple[WayOutCost, ...],
@@ -1663,9 +1828,7 @@ def _parts(
     )
 
 
-def _exit_terms_line(
-    prepared: _Prepared, projected: Projection | FundProjection
-) -> tuple[Money, str]:
+def _exit_terms_line(prepared: _Prepared, projected: Projected) -> tuple[Money, str]:
     """What the instrument's own way out gave up, and where the figure came from."""
     match projected:
         case FundProjection():
@@ -1680,11 +1843,17 @@ def _exit_terms_line(
                 "declared terms charge nothing to leave, and this zero is recorded rather "
                 "than assumed",
             )
+        case CashProjection():
+            return (
+                money.zero(prepared.currency),
+                "instrument.balance -- a balance is released at its own amount; the declared "
+                "terms charge nothing to leave, and this zero is recorded rather than assumed",
+            )
         case _:  # pragma: no cover -- mypy proves this unreachable
             assert_never(projected)
 
 
-def _purchase_amount(projected: Projection | FundProjection) -> Money:
+def _purchase_amount(projected: Projected) -> Money:
     """The purchase event's own amount, read off the ledger rather than recomputed.
 
     Read back rather than reported from the join's own multiplication, so the ``entry`` line
@@ -1700,23 +1869,27 @@ def _purchase_amount(projected: Projection | FundProjection) -> Money:
     )
 
 
-def _total_tax(projected: Projection | FundProjection) -> Money:
+def _total_tax(projected: Projected) -> Money:
     """Every charge over the holding's life, from whichever result records it."""
     match projected:
         case Projection():
             return projected.hurdle.total_tax
         case FundProjection():
             return projected.total_tax
+        case CashProjection():
+            # Not an exemption and not an unread rule: proceeds equal basis, so no gain and no
+            # income arise and there is nothing to charge (FR-009).
+            return money.zero(projected.released.currency)
         case _:  # pragma: no cover -- mypy proves this unreachable
             assert_never(projected)
 
 
-def _projection_provenance(projected: Projection | FundProjection) -> Provenance:
+def _projection_provenance(projected: Projected) -> Provenance:
     """Every source the holding's own figures rest on."""
     match projected:
         case Projection():
             return projected.hurdle.provenance
-        case FundProjection():
+        case FundProjection() | CashProjection():
             return projected.provenance
         case _:  # pragma: no cover -- mypy proves this unreachable
             assert_never(projected)
@@ -1736,6 +1909,8 @@ def _day_count_of(prepared: _Prepared) -> str:
             return instrument_terms.day_count_of(prepared.declared.terms)
         case FundDeclaration():
             return prepared.declared.day_count
+        case CashDeclaration():
+            return cash_terms.DAY_COUNT
         case _:  # pragma: no cover -- mypy proves this unreachable
             assert_never(prepared.declared)
 
@@ -1750,7 +1925,7 @@ def _excludes_of(prepared: _Prepared) -> frozenset[str]:
     match prepared.declared:
         case InstrumentDeclaration():
             return EXCLUDES | instrument_terms.excludes_of(prepared.declared.terms)
-        case FundDeclaration():
+        case FundDeclaration() | CashDeclaration():
             return EXCLUDES
         case _:  # pragma: no cover -- mypy proves this unreachable
             assert_never(prepared.declared)
@@ -1857,6 +2032,23 @@ def _rate(
             missing="a conventional series -- one payment out at the start, receipts after it",
         )
     year_fraction = day_count(_day_count_of(prepared))
+    if all(year_fraction(span.start, arrival.arrived_on) == 0.0 for arrival in arrivals):
+        # `internal_rate_of_return`'s precondition is one payment out at the start and receipts
+        # **afterwards**: money out and the same money back on one date discounts to zero at
+        # every rate, so the bracket never crosses and the root find raises. Reported as a
+        # typed absence rather than allowed to raise, because it is a fact about the round
+        # trip. Reachable only where a holding returns its money on the day it was bought,
+        # which needs both legs to be instant -- a balance over a horizon of no length.
+        return RateNotComparable(
+            reason=(
+                f"the round trip left and returned {received.amount!r} {endpoint.value} on "
+                f"{span.start.isoformat()}, so it took no time at all. A return over a period "
+                "of zero length is not a rate: every rate discounts these flows to the same "
+                "nothing, and reporting one would be choosing a number the arithmetic does "
+                "not distinguish. The amounts are reported as they stand."
+            ),
+            missing="a span of more than no time to measure a return over",
+        )
     flows: list[CashFlow] = [(0.0, -invested.amount)]
     flows.extend(
         (year_fraction(span.start, arrival.arrived_on), arrival.amount.amount)
@@ -1867,7 +2059,7 @@ def _rate(
 
 def _rests_on(
     prepared: _Prepared,
-    projected: Projection | FundProjection,
+    projected: Projected,
     *,
     span: DateRange,
     horizon: DateRange,
@@ -1893,6 +2085,11 @@ def _rests_on(
     match projected, prepared.plan:
         case FundProjection(), _:
             stated.extend(projected.rests_on)
+        case CashProjection(), CashAssumptions():
+            # Nothing is added, and the emptiness is the claim: a balance is struck at no
+            # quotation and states no belief about a future spread, so a figure it produces
+            # rests on the declarations alone (FR-021).
+            pass
         case Projection(), Assumptions():
             stated.append(
                 f"coupons are handled under the {prepared.plan.coupon_policy!r} policy and "
@@ -1912,7 +2109,7 @@ def _rests_on(
 
 def _carried_quotation(
     prepared: _Prepared,
-    projected: Projection | FundProjection,
+    projected: Projected,
     *,
     purchased_on: date,
     quotation_holds: QuotationHolds,

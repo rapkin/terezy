@@ -134,6 +134,7 @@ from terezy.core.routes.path import (
     ComposedExit,
     ComposedPath,
     DeclaredExit,
+    EntryByIdentity,
     ExitByIdentity,
     ExitChain,
     ExitChoice,
@@ -1450,6 +1451,37 @@ def _way_out(
         status=status,
         disruption_probability=walk.disruption,
     )
+
+
+def cost_entry(entry: EntryByIdentity, amount: Money) -> OneWayCost:
+    """*There is nothing to do* on the way in, costed: nothing charged, nothing converted.
+
+    :data:`~terezy.core.routes.path.ENTRY_BY_IDENTITY`'s figure, and the mirror of the branch
+    :func:`cost_exit` takes for the far end. It walks no leg, so every component is a
+    **recorded zero** rather than an omitted part and the arriving amount is the amount sent.
+
+    **``entry`` is the sentinel type and not the whole union, and that is the parameter's
+    whole job.** It is what makes this function unable to price a corridor: a
+    ``FundingPath`` or a ``ComposedPath`` names legs, and handing one to a function that
+    charges nothing would be a free journey with a declared-looking key. There is
+    correspondingly no ``FundingPath`` here to key the figure by -- inventing a route id for a
+    corridor nobody declared is the thing FR-008's key exists to make impossible, and
+    ``tests/contract/test_per_destination_cost_unrepresentable.py`` admits the absence on
+    exactly that argument.
+
+    Unlike the exit's identity branch there is nothing here to check: that the money really is
+    where the purchase happens is a claim about a stream and an access declaration, neither of
+    which this module holds, and it is checked at the join where both are (023 FR-013).
+
+    A negative amount raises, on :func:`cost_one`'s reasoning.
+    """
+    if amount.amount < 0.0:
+        raise ValueError(
+            f"an amount of {amount.amount!r} {amount.currency.value} cannot be placed by "
+            f"{entry.value!r}: a negative movement is not this one in reverse, so it is an "
+            "arithmetic error in the caller rather than a fact about the money"
+        )
+    return _one_way(amount, _initial(amount))
 
 
 def cost_exit(

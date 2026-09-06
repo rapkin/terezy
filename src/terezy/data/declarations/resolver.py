@@ -37,7 +37,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from terezy.core.decision.tuple_outcome import Registries
 from terezy.core.instruments import registry as instrument_registry
@@ -54,6 +54,7 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.calendars.working_day import WorkingDayCalendar
     from terezy.core.inflation.series import CpiSeries, InflationAssumption
     from terezy.core.instruments.access import InstrumentAccess
+    from terezy.core.instruments.cash import CashDeclaration
     from terezy.core.instruments.fund import FundDeclaration
     from terezy.core.instruments.groups import InstrumentGroup
     from terezy.core.instruments.interface import InstrumentDeclaration
@@ -133,6 +134,17 @@ class Declarations:
     fund_files: Mapping[str, Path]
     """Which file declared each fund."""
 
+    cash: Mapping[str, CashDeclaration]
+    """Declared cash balances by id.
+
+    A third map on :attr:`funds`' argument, and the same shared id space: a balance and a bond
+    declaring one id is a duplicate and is refused, because a holding names an instrument by id
+    and would otherwise resolve to whichever map was searched first.
+    """
+
+    cash_files: Mapping[str, Path]
+    """Which file declared each balance."""
+
     groups: Mapping[str, InstrumentGroup]
     """The declared group vocabulary by id (015 FR-007a).
 
@@ -198,6 +210,8 @@ def resolve(
     instrument_files_by_id: dict[str, Path] = {}
     funds: dict[str, FundDeclaration] = {}
     fund_files_by_id: dict[str, Path] = {}
+    cash: dict[str, CashDeclaration] = {}
+    cash_files_by_id: dict[str, Path] = {}
     files_by_id: dict[str, Path] = {}
     for path in instrument_files:
         # ⚙ feature 006: one directory, several kinds of declaration, told apart by the one
@@ -217,6 +231,20 @@ def resolve(
             funds[declared_fund.id] = declared_fund
             fund_files_by_id[declared_fund.id] = path
             files_by_id[declared_fund.id] = path
+            continue
+        if read is loader.cash_from_file:
+            declared_cash = loader.cash_from_file(path)
+            if declared_cash.id in files_by_id:
+                raise _refuse_duplicate(
+                    "instrument",
+                    declared_cash.id,
+                    "instrument.id",
+                    files_by_id[declared_cash.id],
+                    path,
+                )
+            cash[declared_cash.id] = declared_cash
+            cash_files_by_id[declared_cash.id] = path
+            files_by_id[declared_cash.id] = path
             continue
         # ⚙ feature 013: both bond forms produce an ``InstrumentDeclaration``, so the id
         # space, the duplicate check and the tax-class resolution below are shared. A
@@ -253,6 +281,10 @@ def resolve(
             path=fund_files_by_id[identifier],
         )
         _check_groups(declared_fund.groups, groups, path=fund_files_by_id[identifier])
+    # No tax-class references to check: a balance names none, and none is needed -- a release
+    # returns the basis, so no gain and no income arise (023 FR-009).
+    for identifier, declared_cash in cash.items():
+        _check_groups(declared_cash.groups, groups, path=cash_files_by_id[identifier])
 
     return Declarations(
         instruments=instruments,
@@ -261,6 +293,8 @@ def resolve(
         tax_class_files=tax_class_files,
         funds=funds,
         fund_files=fund_files_by_id,
+        cash=cash,
+        cash_files=cash_files_by_id,
         groups=groups,
         groups_file=groups_file,
     )
@@ -1917,6 +1951,7 @@ LOADERS_BY_KIND: Mapping[str, Callable[[Path], object]] = {
     instrument_registry.FIXED_INCOME: loader.instrument_from_file,
     instrument_registry.ENUMERATED_SCHEDULE: loader.enumerated_instrument_from_file,
     instrument_registry.COLLECTIVE_INVESTMENT_FUND: loader.fund_from_file,
+    instrument_registry.CASH_BALANCE: loader.cash_from_file,
 }
 """Which loader parses each declared ``[instrument] class``.
 
@@ -2552,15 +2587,27 @@ class TupleDeclarations:
     """
 
 
+Pricing = Literal["access_quote", "self_priced", "identity"]
+"""Where the price of one unit comes from, as the **three** answers the declarations give.
+
+Not a boolean, because there are three and the third is not the absence of the other two: a
+bond is priced by a venue quotation and **must** carry one; a fund prices itself from its
+declared NAV and the entry markup and **must not**; and a balance is priced by identity -- one
+hryvnia of balance costs one hryvnia -- so a declared price would be one fact in two places
+with nothing to say which the code read.
+"""
+
+
 def _access_instrument_currency(
     entry: InstrumentAccess,
     *,
     instruments: Mapping[str, InstrumentDeclaration],
     funds: Mapping[str, FundDeclaration],
+    cash: Mapping[str, CashDeclaration],
     path: Path,
     field_prefix: str,
-) -> tuple[Currency, bool]:
-    """The declared currency of the instrument an entry names, and whether it self-prices.
+) -> tuple[Currency, Pricing]:
+    """The declared currency of the instrument an entry names, and where its price comes from.
 
     Both answers come from the same lookup, deliberately: they are two readings of *which
     declaration this is*, and computing them separately would let an entry be checked against
@@ -2568,10 +2615,13 @@ def _access_instrument_currency(
     """
     fund = funds.get(entry.instrument_id)
     if fund is not None:
-        return fund.unit_currency, True
+        return fund.unit_currency, "self_priced"
+    balance = cash.get(entry.instrument_id)
+    if balance is not None:
+        return balance.currency, "identity"
     declared = instruments.get(entry.instrument_id)
     if declared is not None:
-        return declared.currency, False
+        return declared.currency, "access_quote"
     raise DeclarationError(
         path,
         f"{field_prefix}.instrument_id",
@@ -2579,7 +2629,7 @@ def _access_instrument_currency(
         f"{INSTRUMENTS_DIR}/ declares it. An access entry for an instrument nobody declared "
         "describes a journey to nothing, and it is refused here rather than surfacing later "
         "as a tuple that refuses for a reason naming the wrong file. Declared instruments: "
-        f"{sorted([*instruments, *funds])}.",
+        f"{sorted([*instruments, *funds, *cash])}.",
         "name a declared instrument, or add the instrument declaration",
     )
 
@@ -2590,14 +2640,15 @@ def _check_access(
     position: int,
     instruments: Mapping[str, InstrumentDeclaration],
     funds: Mapping[str, FundDeclaration],
+    cash: Mapping[str, CashDeclaration],
     venues: Mapping[str, Venue],
     kinds: Mapping[str, ObservationKind],
     path: Path,
 ) -> None:
     """One access entry against the instruments, the venues, the kinds and its own pricing."""
     prefix = f"{loader.ACCESS_TABLE}[{position}]"
-    currency, self_priced = _access_instrument_currency(
-        entry, instruments=instruments, funds=funds, path=path, field_prefix=prefix
+    currency, pricing = _access_instrument_currency(
+        entry, instruments=instruments, funds=funds, cash=cash, path=path, field_prefix=prefix
     )
     for field, venue_id in (("bought_at", entry.bought_at), ("proceeds_to", entry.proceeds_to)):
         _check_venue(venue_id, currency, venues, path=path, field_path=f"{prefix}.{field}")
@@ -2607,12 +2658,8 @@ def _check_access(
         _check_kind(
             entry.resale_price.kind, kinds, path=path, field_path=f"{prefix}.resale_price.kind"
         )
-    _check_access_price(
-        entry, currency=currency, self_priced=self_priced, path=path, field_prefix=prefix
-    )
-    _check_resale_price(
-        entry, currency=currency, self_priced=self_priced, path=path, field_prefix=prefix
-    )
+    _check_access_price(entry, currency=currency, pricing=pricing, path=path, field_prefix=prefix)
+    _check_resale_price(entry, currency=currency, pricing=pricing, path=path, field_prefix=prefix)
     _check_one_observation(entry, path=path, field_prefix=prefix)
 
 
@@ -2645,22 +2692,22 @@ def _check_resale_price(
     entry: InstrumentAccess,
     *,
     currency: Currency,
-    self_priced: bool,
+    pricing: Pricing,
     path: Path,
     field_prefix: str,
 ) -> None:
-    """A resale price is optional, is in the instrument's currency, and is not a fund's.
+    """A resale price is optional, is in the instrument's currency, and is a bond's alone.
 
     Optional because its absence is what 015 FR-031 refuses by name: an early exit that cannot
     be struck reports a missing declaration rather than a figure. A
     **fund** may not declare one, on the purchase quote's reasoning: it prices its own exit from
     its declared NAV and its declared exit discount, and a second price in a second file is one
-    fact in two places.
+    fact in two places. Nor may a **balance**, whose exit is the same identity its entry is.
     """
     quote = entry.resale_price
     if quote is None:
         return
-    if self_priced:
+    if pricing == "self_priced":
         raise DeclarationError(
             path,
             f"{field_prefix}.resale_price",
@@ -2669,6 +2716,17 @@ def _check_resale_price(
             "or ignored: an exit priced in two files is one fact in two places, and the day "
             "either moved the figure would rest on whichever the code happened to read.",
             "delete the [access.resale_price] table; the fund's own terms price its exit",
+        )
+    if pricing == "identity":
+        raise DeclarationError(
+            path,
+            f"{field_prefix}.resale_price",
+            f"quotes a resale price for {entry.instrument_id!r}, which is a balance: one "
+            f"{currency.value} of it is worth one {currency.value} on the way out as on the "
+            "way in. A declared price would be one fact in two places, and a balance released "
+            "at anything but its own amount would report a gain or a loss on money that never "
+            "moved.",
+            "delete the [access.resale_price] table",
         )
     if quote.price.currency is not currency:
         raise DeclarationError(
@@ -2686,14 +2744,25 @@ def _check_access_price(
     entry: InstrumentAccess,
     *,
     currency: Currency,
-    self_priced: bool,
+    pricing: Pricing,
     path: Path,
     field_prefix: str,
 ) -> None:
     """A price is declared exactly where the instrument states none, and in its currency."""
     quote = entry.quote
     price = None if quote is None else quote.price
-    if self_priced and price is not None:
+    if pricing == "identity" and price is not None:
+        raise DeclarationError(
+            path,
+            f"{field_prefix}.price",
+            f"quotes a unit price for {entry.instrument_id!r}, which is a balance: one "
+            f"{currency.value} of it costs one {currency.value}, and sizing a purchase is "
+            "identity rather than a division. A declared price would be one fact in two "
+            "places, and any figure but one would let an amount buy more or less balance "
+            "than it is.",
+            "delete the [access.price] table; a balance is priced by what it is",
+        )
+    if pricing == "self_priced" and price is not None:
         raise DeclarationError(
             path,
             f"{field_prefix}.price",
@@ -2704,7 +2773,7 @@ def _check_access_price(
             "nothing in the output to say which.",
             "delete the [access.price] table; the fund's own declaration prices it",
         )
-    if not self_priced and price is None:
+    if pricing == "access_quote" and price is None:
         raise DeclarationError(
             path,
             field_prefix,
@@ -2732,6 +2801,7 @@ def _resolved_access(
     *,
     instruments: Mapping[str, InstrumentDeclaration],
     funds: Mapping[str, FundDeclaration],
+    cash: Mapping[str, CashDeclaration],
     venues: Mapping[str, Venue],
     kinds: Mapping[str, ObservationKind],
 ) -> tuple[dict[str, InstrumentAccess], dict[str, Path]]:
@@ -2753,6 +2823,7 @@ def _resolved_access(
                 position=position,
                 instruments=instruments,
                 funds=funds,
+                cash=cash,
                 venues=venues,
                 kinds=kinds,
                 path=path,
@@ -2848,6 +2919,7 @@ def tuple_from_data_root(
         files,
         instruments=instruments.instruments,
         funds=instruments.funds,
+        cash=instruments.cash,
         venues=covered.ramp.venues,
         kinds=covered.ramp.kinds,
     )
@@ -2860,6 +2932,7 @@ def tuple_from_data_root(
         registries=Registries(
             instruments=instruments.instruments,
             funds=instruments.funds,
+            cash=instruments.cash,
             tax_classes=instruments.tax_classes,
             access=access,
             routes=covered.ramp.routes,

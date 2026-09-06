@@ -1,0 +1,50 @@
+# Кеш — the hryvnia balance the owner's salary already sits in, paying nothing.
+#
+# **The first word of the owner's question**, and the naive baseline Principle I requires to be
+# always scored and always shown. Everything else in his comparison is measured against doing
+# nothing, and until this file existed doing nothing was not in the comparison at all.
+#
+# **THE ONE OBSERVED VALUE IS THE RATE, AND `verified_on` IS EMPTY.** The owner stated on
+# 2026-09-02 that his Monobank hryvnia balance pays 0 %. That statement stands as the source
+# until he supplies either the URL of Monobank's published terms for the account or confirmation
+# that his own statement is the citation — 023's owner verification task 1. So every figure this
+# instrument produces renders marked, which is the correct state rather than a deficiency to
+# work around.
+#
+# **What the citation is a claim about is not really the zero.** It is that this product is a
+# BALANCE and not a DEPOSIT — a fact about a bank, and one that can be wrong or can change. The
+# loader refuses any rate but exactly zero, naming what a deposit would need instead: a dated
+# rate schedule, how often it capitalises, what an early withdrawal forfeits, and the class the
+# interest is taxed under. Every one of those is the bank's and every one needs a source.
+#
+# **`retrieved_on` post-dates the question's `as_of`, deliberately.** The question is asked as of
+# 2026-08-30 and the owner stated the rate on 2026-09-02, so the source ages to a negative number
+# and reports current — the right verdict for a source newer than the question, and written down
+# because a reviewer meeting a negative age would otherwise have to work it out.
+#
+# **The venue is a synthetic fixture and the product is real.** `data/venues.toml` labels
+# `monobank_uah` SYNTHETIC FIXTURE, so this is an account the owner holds reached through a
+# fixture venue — the standing the 24 real ОВДП already have through invented corridors.
+#
+# **No tax class, and none is needed.** The balance is released at the amount it was opened with,
+# so proceeds equal basis: no gain is realised and no income arises. That is arithmetic rather
+# than an exemption, and an exemption would be a legal value needing a citation nobody has.
+#
+# **No minimum ticket and no unit increment.** Any amount of hryvnia is holdable, so nothing can
+# be stranded and no undeployed-cash record is produced. There is nowhere in this file to declare
+# either, which is one of the reasons the class exists.
+
+[instrument]
+id            = "cash_uah_monobank"
+name          = "Monobank hryvnia balance (0 %)"
+class         = "cash_balance"
+currency      = "UAH"
+is_synthetic  = false
+groups        = ["cash"]
+
+  [instrument.balance]
+  rate_pct = 0.0
+  kind         = "bank_balance_terms"
+  source       = "The owner, 2026-09-02: «Кеш це гривня на Monobank під 0 %». His own statement about his own account, recorded as the source because no published Monobank page for this account has been cited yet. UNVERIFIED and it stays that way until he supplies the account's published terms or confirms this statement is the citation (023 owner verification task 1). The claim is not merely that the rate is zero: it is that this product is a current-account BALANCE and not a deposit."
+  retrieved_on = "2026-09-02"
+  verified_on  = ""

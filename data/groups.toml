@@ -34,3 +34,7 @@ name = "Ukrainian government bonds (ОВДП)"
 [[group]]
 id   = "inzhur"
 name = "Inzhur funds"
+
+[[group]]
+id   = "cash"
+name = "Hryvnia balances held at a venue"
