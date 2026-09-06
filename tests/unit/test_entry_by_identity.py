@@ -19,9 +19,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Final
 
+import pytest
+
+from terezy.core.decision import candidates as module
 from terezy.core.decision.tuple_outcome import evaluate
+from terezy.core.primitives import money
 from terezy.core.primitives import provenance as prov
 from terezy.core.results.candidates import CandidateSet
+from terezy.core.results.composed import CompositionRefused, Unaskable
 from terezy.core.results.tuple import HOLD_AS_CASH, SeamDoesNotChain, Tuple, TupleOutcome
 from terezy.core.routes.cost import cost_entry
 from terezy.core.routes.path import (
@@ -142,3 +147,32 @@ def test_the_purchase_is_dated_the_horizons_first_day_and_ramp_in_is_a_recorded_
     assert ramp_in.amount.amount == 0.0
     assert outcome.span.start == fixtures.HORIZON.start
     assert outcome.arrivals[0].released_on >= fixtures.HORIZON.start
+
+
+def test_a_negative_amount_raises_rather_than_costing_a_gain() -> None:
+    """`cost_one`'s and `cost_exit`'s guard, on the third entry point.
+
+    A negative movement is not this one in reverse, so it can only be a caller's arithmetic
+    error -- and costing it would report a negative charge that reads as a gain, which is the
+    figure the guard exists to keep out of a comparison.
+    """
+    with pytest.raises(ValueError, match="cannot be placed by"):
+        cost_entry(ENTRY_BY_IDENTITY, money.scale(fixtures.AMOUNT_UAH, -1.0))
+
+
+def test_composes_already_arrived_case_can_no_longer_reach_enumeration() -> None:
+    """FR-016a. The arm is kept and raises rather than being deleted from a closed enum.
+
+    Reached by calling the reader directly, because the invariant it names is what makes it
+    unreachable through `enumerate_candidates`: enumeration compares the same venue and
+    currency `compose` does and short-circuits first. Asserting the message says the guard
+    describes what it does -- a raise here is a programmer error, never a fact about money.
+    """
+    refusal = CompositionRefused(
+        case=Unaskable.ALREADY_ARRIVED,
+        reason="a fixture standing where compose's own words would be",
+        destination_id=SALARY_LANDS_AT,
+        stream_id=fixtures.SALARY,
+    )
+    with pytest.raises(ValueError, match="already where it was wanted"):
+        module._about_the_question(refusal)
