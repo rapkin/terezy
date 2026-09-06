@@ -30,22 +30,24 @@ test("a screen of every kind renders without an error, a 4xx, or an empty slot",
 }) => {
   await offline(page);
   const faults: Fault[] = [];
-  let where = "before the first page";
+  // The screen is read at the moment the event fires, never off a variable the next navigation
+  // has already reassigned: a request the previous page started can settle after the next one
+  // has loaded, and a fault attributed there sends the reader to a screen that is fine.
+  const seen = (what: string): Fault => ({ where: page.url(), what });
 
   page.on("console", (message) => {
-    if (message.type() === "error") faults.push({ where, what: `console: ${message.text()}` });
+    if (message.type() === "error") faults.push(seen(`console: ${message.text()}`));
   });
   page.on("pageerror", (error) => {
-    faults.push({ where, what: `uncaught: ${error.message}` });
+    faults.push(seen(`uncaught: ${error.message}`));
   });
   page.on("response", (answer) => {
     if (answer.status() >= 400) {
-      faults.push({ where, what: `${String(answer.status())} from ${answer.url()}` });
+      faults.push(seen(`${String(answer.status())} from ${answer.url()}`));
     }
   });
 
   async function visit(path: string): Promise<void> {
-    where = path;
     await page.goto(path, { waitUntil: "networkidle" });
     const main = page.locator("main");
     await expect(main, `${path} rendered a main region with nothing in it`).not.toBeEmpty();

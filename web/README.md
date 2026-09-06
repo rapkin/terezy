@@ -15,8 +15,10 @@ under the same origin. Stop it with `docker compose down`.
 ## Development — two processes
 
 ```bash
-uv run python -m terezy.api.http   # terminal 1, anywhere inside the checkout
-pnpm -C web dev                    # terminal 2
+pnpm -C web install --frozen-lockfile   # once, per clone
+
+uv run python -m terezy.api.http        # terminal 1, anywhere inside the checkout
+pnpm -C web dev                         # terminal 2
 ```
 
 Open the URL the dev server prints (<http://127.0.0.1:5173>). Above that banner, as it starts,

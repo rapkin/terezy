@@ -64,6 +64,15 @@ def data_root_in_force(
 ) -> DataRootFound | DataRootMissing:
     """The root this process reads declarations from, or the refusal that stops it starting."""
     if declared is not None:
+        if not declared.strip():
+            return DataRootMissing(
+                reason=(
+                    f"{DATA_ROOT_VARIABLE} is set to an empty value, which is not a path -- read "
+                    "as a path it is the working directory, which is the dependence this is "
+                    "resolved to avoid. Set it to the directory holding "
+                    f"{resolver.VENUES_FILE}, or unset it."
+                )
+            )
         return _checked(Path(declared), named_by=f"{DATA_ROOT_VARIABLE}={declared}")
     if packaged is None:
         return DataRootMissing(

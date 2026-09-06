@@ -95,6 +95,19 @@ def test_a_root_the_variable_names_and_that_does_not_exist_is_named(tmp_path: Pa
     assert resolver.VENUES_FILE in resolved.reason
 
 
+@pytest.mark.parametrize("empty", ["", "   "])
+def test_an_empty_variable_is_refused_rather_than_read_as_the_cwd(empty: str) -> None:
+    """``Path("")`` is ``.``, so an unset expansion in a wrapper script or a compose `.env` would
+    put the data root back on the working directory -- the whole defect, arriving through the
+    variable that fixes it. Refused by name rather than read as unset, because a value somebody
+    typed and a value nobody typed are different facts (Principle IV)."""
+    resolved = roots.data_root_in_force(empty, packaged=roots.packaged_default())
+
+    assert isinstance(resolved, roots.DataRootMissing)
+    assert roots.DATA_ROOT_VARIABLE in resolved.reason
+    assert "empty" in resolved.reason
+
+
 def test_an_installation_outside_a_checkout_has_no_default() -> None:
     """With no packaged checkout to fall back on there is no root to guess at, and guessing is
     what produced a 500 per request instead of a refusal at boot."""
