@@ -130,7 +130,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: corepack enable
+      # `pnpm -C web` runs from the repo root, where no package.json pins a version, so corepack
+      # resolves the latest pnpm and pnpm then refuses the pin in web/package.json. Activate the
+      # pinned one from that single source instead of repeating the version here.
+      - run: corepack enable && corepack prepare "$(node -p "require('./web/package.json').packageManager")" --activate
       - run: uv sync --all-extras --dev
       - run: pnpm -C web install --frozen-lockfile
       # This is the type-sync gate as well as the typecheck: the document is generated on the fly
@@ -149,7 +152,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: corepack enable
+      # `pnpm -C web` runs from the repo root, where no package.json pins a version, so corepack
+      # resolves the latest pnpm and pnpm then refuses the pin in web/package.json. Activate the
+      # pinned one from that single source instead of repeating the version here.
+      - run: corepack enable && corepack prepare "$(node -p "require('./web/package.json').packageManager")" --activate
       - run: uv sync --all-extras --dev
       - run: pnpm -C web install --frozen-lockfile
       # Carries FR-004's no-`default`-arm rule and FR-021a's one-clock rule.
@@ -166,7 +172,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: corepack enable
+      # `pnpm -C web` runs from the repo root, where no package.json pins a version, so corepack
+      # resolves the latest pnpm and pnpm then refuses the pin in web/package.json. Activate the
+      # pinned one from that single source instead of repeating the version here.
+      - run: corepack enable && corepack prepare "$(node -p "require('./web/package.json').packageManager")" --activate
       - run: uv sync --all-extras --dev
       - run: pnpm -C web install --frozen-lockfile
       - run: pnpm -C web test
@@ -182,7 +191,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: corepack enable
+      # `pnpm -C web` runs from the repo root, where no package.json pins a version, so corepack
+      # resolves the latest pnpm and pnpm then refuses the pin in web/package.json. Activate the
+      # pinned one from that single source instead of repeating the version here.
+      - run: corepack enable && corepack prepare "$(node -p "require('./web/package.json').packageManager")" --activate
       - run: uv sync --all-extras --dev
       - run: pnpm -C web install --frozen-lockfile
       - run: pnpm -C web build
@@ -200,7 +212,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: corepack enable
+      # `pnpm -C web` runs from the repo root, where no package.json pins a version, so corepack
+      # resolves the latest pnpm and pnpm then refuses the pin in web/package.json. Activate the
+      # pinned one from that single source instead of repeating the version here.
+      - run: corepack enable && corepack prepare "$(node -p "require('./web/package.json').packageManager")" --activate
       - run: uv sync --all-extras --dev
       - run: pnpm -C web install --frozen-lockfile
       - run: pnpm -C web exec playwright install --with-deps chromium
