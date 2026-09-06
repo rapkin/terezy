@@ -178,7 +178,7 @@ note   = "Owner 2026-09-02/03 -- he holds BTC and wants it counted, not bought. 
 
 [[feature]]
 id     = "026-answer-screen"
-status = "planned"
+status = "in-progress"
 needs  = ["019-decision-layer", "021-web-declared-data"]
 why    = "019 produces the non-dominated set, the separating assumptions and the benchmark standing this screen renders, and nothing else reports them to a reader; 021 owns the client, its router, its figure/mark/refusal components and the `as_of` search parameter this page reuses unchanged"
 note   = """
