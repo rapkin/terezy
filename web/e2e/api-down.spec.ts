@@ -6,9 +6,9 @@ import { START_COMMAND } from "../src/api/client";
  * FR-006 for the state the reader actually hits first: the API is not running.
  *
  * The dev server answers a proxied request it cannot forward with a 500 whose body is not this
- * API's; in production nothing answers at all. Both used to reach the screen as a generic
- * non-JSON answer explained as *the client's own fallback document* — a sentence that is false
- * here, and pointed the reader at the routing rather than at the process that is not running.
+ * API's; in production the fetch itself fails. Each is its own named state, because what the
+ * reader has to act on is the process, and a screen that named the routing instead would send
+ * them to the one place the fault is not.
  *
  * The API is intercepted rather than stopped: the suite starts one server for every worker, and
  * a test that killed it would decide the outcome of whatever ran beside it.
