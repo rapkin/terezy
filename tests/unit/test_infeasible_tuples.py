@@ -17,7 +17,7 @@ purchase is feasible from one and infeasible from another.
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import date
+from datetime import date, timedelta
 from typing import Final
 
 import pytest
@@ -31,6 +31,7 @@ from terezy.core.results.tuple import (
     BelowMinimumTicket,
     BuysNoWholeUnit,
     InstrumentRefused,
+    RemainderCameHome,
     RouteInCapExceeded,
     RouteInUnusable,
     SeamDoesNotChain,
@@ -43,9 +44,25 @@ from tests import tuple_registries as fixtures
 
 UAH: Final = fixtures.UAH
 FLAT_FEE_ROUTE: Final = "test_flat_fee_in"
+IN_LATENCY_DAYS: Final = 1
+EXIT_LATENCY_DAYS: Final = 3
+"""What `inzhur_direct` and `inzhur_to_monobank` declare."""
 
 
-def _registries(*, flat: float = 0.0) -> Registries:
+def _came_home(outcome: TupleOutcome) -> RemainderCameHome:
+    undeployed = outcome.undeployed
+    assert undeployed is not None
+    assert isinstance(undeployed.journey, RemainderCameHome), undeployed.journey
+    return undeployed.journey
+
+
+def _rate_of(outcome: TupleOutcome) -> float:
+    rate = outcome.implied_rate
+    assert isinstance(rate, NominalRate), rate
+    return rate.value
+
+
+def _registries(*, flat: float = 0.0, out_route: str = fixtures.DOMESTIC_OUT) -> Registries:
     return fixtures.with_new_route(
         fixtures.declared(),
         fixtures.route(
@@ -53,9 +70,21 @@ def _registries(*, flat: float = 0.0) -> Registries:
             origin="monobank_uah",
             destination="inzhur",
             direction="inbound",
-            partner=fixtures.DOMESTIC_OUT,
+            partner=out_route,
             fee_fixed=flat,
         ),
+    )
+
+
+INSTANT_OUT: Final = "test_instant_out"
+"""A way out declaring no latency at all, where the shipped `inzhur_to_monobank` declares
+three days. Free either way, so the only difference between the two is the wait."""
+
+
+def _registries_out_instantly(*, flat: float) -> Registries:
+    return fixtures.with_new_route(
+        _registries(flat=flat, out_route=INSTANT_OUT),
+        fixtures.route(INSTANT_OUT, origin="inzhur", destination="monobank_uah", direction="exit"),
     )
 
 
@@ -153,51 +182,79 @@ class TestARemainderTheIncrementCannotDeploy:
         assert_money_close(undeployed.amount, Money(500.0, UAH, prov.EMPTY))
         assert undeployed.venue_id == "inzhur"
 
-    def test_the_remainder_is_not_in_the_amount_that_reaches_the_endpoint(self) -> None:
-        # It is money that made the trip and bought nothing, and it is still at the venue.
-        # Sweeping it into `reaches` would report it as having come home.
+    def test_the_remainder_comes_home_and_is_part_of_what_reaches_the_endpoint(self) -> None:
+        # Owner decision 2026-09-06: it can be withdrawn from the broker, so it is, along the
+        # tuple's own declared way out. The two purchases hold the same one unit and return
+        # the same arrivals; what separates them is the 500.00 coming back.
         outcome = _evaluate(_registries(), fixtures.hurdle_tuple(), 1_500.0)
         assert isinstance(outcome, TupleOutcome)
         one_unit = _evaluate(_registries(), fixtures.hurdle_tuple(), 1_000.0)
         assert isinstance(one_unit, TupleOutcome)
-        assert is_close(outcome.reaches.amount, one_unit.reaches.amount)
+        undeployed = outcome.undeployed
+        assert undeployed is not None
+        # `inzhur_to_monobank` charges nothing, so all 500.00 of it arrives -- and the
+        # subtraction is against the record's own figure rather than against 500.00, so a
+        # route that charged would still be checked here.
+        assert_money_close(_came_home(outcome).reached, Money(500.0, UAH, prov.EMPTY))
+        assert is_close(
+            outcome.reaches.amount - one_unit.reaches.amount, _came_home(outcome).reached.amount
+        )
+        assert one_unit.undeployed is None
+
+    def test_it_leaves_on_the_purchase_date_and_arrives_the_way_outs_latency_later(self) -> None:
+        # It never became a position, so it waits for nothing: it leaves on the purchase
+        # date, which is `inzhur_direct`'s one declared day after the outlay, and arrives
+        # `inzhur_to_monobank`'s three declared days after that. Both are inside the span.
+        outcome = _evaluate(_registries(), fixtures.hurdle_tuple(), 1_500.0)
+        assert isinstance(outcome, TupleOutcome)
+        journey = _came_home(outcome)
+        assert journey.left_on == fixtures.HORIZON.start + timedelta(days=IN_LATENCY_DAYS)
+        assert journey.arrived_on == journey.left_on + timedelta(days=EXIT_LATENCY_DAYS)
 
     def _rate_over_flat_fee(self, flat: float, sent: float) -> float:
         """The rate of one purchase over a way in charging a flat fee and nothing else.
 
         A **flat** fee rather than a percentage: it keeps ``outlay`` and ``arrived`` different
-        numbers -- which a free route does not, and which is what the two tests below turn on
-        -- while leaving two amounts that buy the same units with the same money invested.
+        numbers -- which a free route does not, and which is what the tests below turn on --
+        while leaving two amounts that buy the same units with the same money invested.
         """
         outcome = _evaluate(_registries(flat=flat), _via_flat_fee(), sent, horizon=AT_ISSUE)
         assert isinstance(outcome, TupleOutcome), outcome
-        rate = outcome.implied_rate
-        assert isinstance(rate, NominalRate)
-        return rate.value
+        return _rate_of(outcome)
 
-    def test_the_remainder_moves_the_rate_by_nothing(self) -> None:
+    def test_a_remainder_home_the_same_day_moves_the_rate_by_nothing(self) -> None:
         # **Two rates, compared**, and over a way in that *charges* -- because on a free route
-        # the outlay and the arriving amount are the same number, and then "netted off the
-        # outlay" and "measured on what arrived" cannot be told apart. This test used to run
-        # on one, and its name was a claim its arithmetic could not make.
+        # the outlay and the arriving amount are the same number, and then "the remainder came
+        # back" and "the remainder never left" cannot be told apart.
         #
         #   100.00 flat, 10 100.00 sent -> 10 000.00 arrives -> 10 units, nothing left over
         #   100.00 flat, 10 500.00 sent -> 10 400.00 arrives -> 10 units, 400.00 left over
         #
         # Both hold the same ten units of issue A and return the same arrivals on the same
-        # dates, and both invested 10 100.00: the 400.00 sitting at `inzhur` is netted off the
-        # outlay rather than discounted as a loss. Charging it as one puts these two figures
-        # percentage points apart and reports a 16% sovereign bond well below its coupon.
-        exact = _evaluate(_registries(flat=100.0), _via_flat_fee(), 10_100.0, horizon=AT_ISSUE)
-        remainder = _evaluate(_registries(flat=100.0), _via_flat_fee(), 10_500.0, horizon=AT_ISSUE)
+        # dates. Over a way out that is free and instant the 400.00 is back on the purchase
+        # date, so the series is 10 500.00 out and 400.00 straight back in -- arithmetically
+        # the 10 100.00 of the other, and the rates are equal to the last bit. Charging the
+        # remainder as a loss puts these two figures percentage points apart and reports a 16%
+        # sovereign bond well below its coupon.
+        registries = _registries_out_instantly(flat=100.0)
+        exact = _evaluate(registries, _via_flat_fee(), 10_100.0, horizon=AT_ISSUE)
+        remainder = _evaluate(registries, _via_flat_fee(), 10_500.0, horizon=AT_ISSUE)
         assert isinstance(exact, TupleOutcome), exact
         assert isinstance(remainder, TupleOutcome), remainder
         assert exact.undeployed is None
         assert remainder.undeployed is not None
         assert_money_close(remainder.undeployed.amount, Money(400.0, UAH, prov.EMPTY))
-        assert is_close(
-            self._rate_over_flat_fee(100.0, 10_500.0), self._rate_over_flat_fee(100.0, 10_100.0)
-        )
+        assert _rate_of(remainder) == _rate_of(exact)
+
+    def test_the_three_days_the_way_out_declares_are_what_separates_them(self) -> None:
+        # The same pair over `inzhur_to_monobank`, which is free and takes three days. Waiting
+        # is a cost (010 FR-015), so the outcome carrying a remainder now returns strictly
+        # less -- and by three days of it on 400.00, which is basis points and not percent.
+        # Ignoring the declared latency makes these two equal again.
+        exact = self._rate_over_flat_fee(100.0, 10_100.0)
+        remainder = self._rate_over_flat_fee(100.0, 10_500.0)
+        assert remainder < exact
+        assert exact - remainder < 0.001
 
     def test_the_denominator_is_the_outlay_and_not_what_arrived(self) -> None:
         # The discriminator, with no present-value arithmetic in it: two purchases whose
@@ -215,15 +272,15 @@ class TestARemainderTheIncrementCannotDeploy:
         assert not is_close(cheap, dear)
         assert dear < cheap
 
-    def test_the_assumption_the_netting_makes_is_on_the_outcomes_face(self) -> None:
-        # Netting the remainder off the outlay assumes it is recoverable at par, and it is
-        # not: it sits behind the same exit the holding does. The assumption is stated rather
-        # than buried, which is the only thing that makes the netting honest.
+    def test_the_recovery_is_something_the_outcome_accounts_for_rather_than_excludes(
+        self,
+    ) -> None:
+        # The scope statements are what a reader meets, so they move with the behaviour: the
+        # journey home is priced, so `excludes` may no longer say it is not costed.
         outcome = _evaluate(_registries(), fixtures.hurdle_tuple(), 1_500.0)
         assert isinstance(outcome, TupleOutcome)
-        clause = next(item for item in outcome.excludes if "undeployed" in item)
-        assert "money actually invested" in clause
-        assert "what getting it back would cost" in clause
+        assert not [item for item in outcome.excludes if "undeployed" in item]
+        assert [item for item in outcome.accounts_for if "the remainder" in item]
 
     def test_an_exact_multiple_leaves_no_remainder_at_all(self) -> None:
         # `None` rather than a zero, because "there was nothing left over" and "the leftover

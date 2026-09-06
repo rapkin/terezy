@@ -169,30 +169,64 @@ class Arrival:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
+class RemainderCameHome:
+    """The remainder's own journey out along the tuple's declared way out."""
+
+    left_on: date
+    """The purchase date: it became no position, so it waits for nothing before leaving."""
+
+    arrived_on: date
+    """:attr:`left_on` plus the way out's declared latency."""
+
+    reached: Money
+    """What reached the spendable endpoint, in the endpoint's currency, net of the way out's
+    charge and of no tax."""
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class RemainderStayed:
+    """The tuple's declared way out will not carry the remainder, so it is where it was left.
+
+    Reported rather than refusing the tuple: the position itself came home perfectly well, and
+    what is stranded is the change from the purchase. It is out of
+    :attr:`TupleOutcome.reaches` and out of the rate, which is what the amount beside this
+    reason is for.
+    """
+
+    reason: str
+    """Why the declared way out will not carry it, in the output's own words."""
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class UndeployedCash:
-    """Money that made the trip in and bought nothing, reported with its amount and location.
+    """Money that made the trip in, bought nothing, and came home along the declared way out.
 
-    FR-003. It is neither vanished nor swept into the rate as though it were invested: the
-    minimum buyable increment left it over, it is sitting at the purchase venue, and both
-    facts are on the record. Rounding it into the purchase would spend money the owner did not
-    agree to spend; rounding it out of the report would make the money disappear.
+    FR-003 under the owner's decision of 2026-09-06
+    (``specs/decisions/2026-09-06-undeployed-remainder-returns.toml``): the remainder is
+    withdrawable from the purchase venue, so it rides the tuple's own declared way out rather
+    than sitting there. It **never became a position**, which is what fixes every term of that
+    journey: it leaves on the purchase date, it is charged whatever the way out charges, and
+    it bears **no tax** -- nothing was disposed of and there is no gain. So it is part of
+    :attr:`TupleOutcome.reaches` and its arrival is inside the span the rate is measured over.
 
-    It is deliberately **not** part of :attr:`TupleOutcome.reaches`, and it is netted off the
-    outlay the rate is measured against rather than left in the series. Bringing it home would
-    mean deciding *when* the owner sweeps it -- an assumption nobody declared -- and pricing a
-    second journey nobody asked for; leaving it in the outlay would price it as a **total
-    loss**, which it is not. So the rate is measured on the money that was actually invested,
-    and what was not invested is stated beside it.
+    Where the way out will not carry it -- it is at the purchase venue and the chain departs
+    from wherever the instrument releases its **proceeds**, which are two declarations --
+    :attr:`journey` says so and the amount stays out of both figures.
 
-    Both halves of that are on the outcome's face rather than only here: see the undeployed
-    clause of :data:`EXCLUDES`, which says the recovery is not costed.
+    Reported as its own record either way, rather than folded in with what the instrument
+    released: money the purchase could not deploy and money a holding paid out are different
+    facts, and rounding the remainder into the purchase would spend money the owner did not
+    agree to spend.
     """
 
     amount: Money
-    """What was left over, in the instrument's currency."""
+    """What was left over, in the instrument's currency, at :attr:`venue_id`."""
 
     venue_id: str
-    """Where it is sitting: the venue the purchase was made at."""
+    """Where the purchase was made, and where this money left from."""
+
+    journey: RemainderCameHome | RemainderStayed
+    """Whether it got home, and on what terms."""
 
     reason: str
     """Why it could not be deployed, naming the constraint -- the minimum buyable increment
@@ -205,7 +239,8 @@ ACCOUNTS_FOR: Final[frozenset[str]] = frozenset(
         "the instrument's entry terms, including any declared markup",
         "tax on every taxable event over the holding's life",
         "the instrument's own exit terms, as explicit lines",
-        "exit route costs (out), charged on each amount the instrument released",
+        "exit route costs (out), charged on each amount that travelled it: every release, "
+        "and the remainder the purchase could not deploy",
         "ramp and settlement latency, inside the span the rate is measured over",
     }
 )
@@ -221,9 +256,6 @@ EXCLUDES: Final[frozenset[str]] = frozenset(
     {
         "inflation (every figure here is nominal)",
         "the risk class, which is declared and carried but never scored",
-        "the cost of recovering undeployed cash: the rate is measured on the money actually "
-        "invested, and the remainder is reported at the venue it is sitting at, with no "
-        "figure for what getting it back would cost",
         "public holidays (weekends are observed; no holiday calendar is modelled)",
         "when the tax is paid: the charge is netted on the date the income accrued, not on "
         "the declared deadline in a later year, so the money leaves sooner here than it does "
@@ -293,9 +325,11 @@ class TupleOutcome:
     outlay: Money
     """What left the income stream, in the stream's currency, on :attr:`span`'s first day.
 
-    The whole amount, including any part of it :attr:`undeployed` says bought nothing --
-    :attr:`implied_rate` is the figure measured net of that, and reporting the netted number
-    here as well would leave the money that made the trip unaccounted for anywhere.
+    The whole amount, and the whole amount is what :attr:`implied_rate` is measured against:
+    since 2026-09-06 the part of it :attr:`undeployed` says bought nothing comes home along
+    the declared way out, so it is a receipt in the series rather than a deduction from the
+    denominator. A remainder the way out will not carry is a receipt that never arrives, which
+    is the loss it actually is.
     """
 
     parts: tuple[PartContribution, ...]
@@ -313,7 +347,8 @@ class TupleOutcome:
     """
 
     reaches: Money
-    """The sum of :attr:`arrivals`, in the spendable endpoint's currency.
+    """The sum of :attr:`arrivals` and of the remainder's own arrival where it had one, in the
+    spendable endpoint's currency.
 
     What the owner can actually spend. Deliberately **not** annualised, discounted or netted
     against the outlay: it is an amount, and the rate beside it is the other question.
@@ -322,17 +357,12 @@ class TupleOutcome:
     implied_rate: NominalRate | RateNotComparable
     """The money-weighted return over :attr:`span` (FR-015), or a typed statement of why none.
 
-    The internal rate of return of the arrivals on their own dates against the money actually
-    invested -- :attr:`outlay` less whatever :attr:`undeployed` says bought nothing -- measured
-    with the instrument's declared day-count convention, the same convention that sized the
-    instrument's flows. Computed by
+    The internal rate of return, on their own dates, of the arrivals and of the remainder's
+    own arrival against the whole :attr:`outlay`, measured with the instrument's declared
+    day-count convention, the same convention that sized the instrument's flows. Computed by
     :func:`terezy.core.results.hurdle.internal_rate_of_return`, which is also what produces
     feature 001's benchmark, so hurdle-versus-tuple is one kind of number against the same
     kind.
-
-    **A remainder therefore moves this figure by nothing at all**, which is the honest answer:
-    the same holding was bought either way, and a whole outlay against a part-sized holding
-    would price the stranded cash as a total loss.
 
     Ramp latency and settlement latency sit **inside** the span, because waiting is a cost
     (owner decision, 2026-08-22).
@@ -355,7 +385,8 @@ class TupleOutcome:
     """
 
     undeployed: UndeployedCash | None
-    """Money that arrived and bought nothing, or ``None`` where the purchase deployed it all.
+    """Money that arrived and bought nothing, with what became of it, or ``None`` where the
+    purchase deployed it all.
 
     ``None`` means there was no remainder, which is a different claim from a remainder of
     zero being unreported -- and it is exactly what a whole-unit purchase of an exact multiple
@@ -532,10 +563,9 @@ class SeamDoesNotChain:
     FR-004, and the one place this feature is most likely to be silently wrong. Feature 004
     shipped an exit chain anchored at neither end: money moved between venues for free, and
     the record still read as a coherent three-hop journey -- an arriving amount in one currency
-    beside a cost fraction computed in another. Two more places where two declarations have to
-    meet at a *venue* are available here, so both are anchored and each is tested with a
-    deliberate mismatch. The third seam is not a place at all and has its own record:
-    :class:`FundedFromAnotherStream`.
+    beside a cost fraction computed in another. The same failure is available here twice, so
+    both are anchored and each is tested with a deliberate mismatch. The third seam is not a
+    place at all and has its own record: :class:`FundedFromAnotherStream`.
 
     Bridging the gap is what must never happen: a conversion or a transfer nobody declared,
     inserted to make two declarations meet, is an invented leg at an invented rate.
@@ -640,7 +670,7 @@ class RouteInCapExceeded:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class WayOutCapExceeded:
-    """A monthly ceiling on the way out, below what the instrument released on one date.
+    """A monthly ceiling on the way out, below an amount that was to travel it on one date.
 
     :class:`RouteInCapExceeded`'s twin, and a separate record for the reason
     :class:`WayOutUnusable` is one: the remedies differ, and a cap that carries every coupon
@@ -649,7 +679,7 @@ class WayOutCapExceeded:
     the first thing a reader needs and the thing the inbound record has no field for.
 
     **It checks one movement against the ceiling, not a month's worth against it.** Several
-    releases can fall in one month and share one rail's allowance; adding them up is the
+    movements can fall in one month and share one rail's allowance; adding them up is the
     capacity accumulator's job (FR-012, FR-015), and a tuple carries no accumulator. So this
     is the *loosest* honest check -- it fires only where a single release alone exceeds the
     cap -- and the gap is stated rather than left to be discovered: two coupons of 700.00 in
@@ -661,10 +691,11 @@ class WayOutCapExceeded:
     """Which way out declares the ceiling, and from which stream (FR-008)."""
 
     released_on: date
-    """The date of the release that could not be carried. :class:`WayOutUnusable` carries the
-    same field for the same reason: "the way out will not carry it" is unactionable until a
-    reader knows *which* movement, and the answer decides whether the remedy is a different
-    exit or a different exit date."""
+    """The date the amount that could not be carried was to set out -- a release date, or the
+    purchase date for the remainder the purchase could not deploy. :class:`WayOutUnusable`
+    carries the same field for the same reason: "the way out will not carry it" is
+    unactionable until a reader knows *which* movement, and the answer decides whether the
+    remedy is a different exit or a different exit date."""
 
     ceiling: Money
     """The tightest monthly cap any leg of the way out declares, in the released currency."""

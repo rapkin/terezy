@@ -1,0 +1,58 @@
+# Owner decision of 2026-09-06: what happens to the money a purchase cannot deploy.
+#
+# Volunteered rather than asked, reading his own answer, and it supersedes a requirement
+# already written and implemented in feature 010 -- which is why it is recorded here and
+# marked in place in specs/010-full-tuple/spec.md rather than folded silently into the text.
+#
+# The owner's words are quoted verbatim in Ukrainian under `said`. Everything else is
+# relayed in English; the reasoning under `notes` is his, the wording is not.
+exported_on = "2026-09-06"
+
+[[decision]]
+n        = 1
+feature  = "010-full-tuple"
+title    = "The undeployed remainder comes home along the declared way out"
+question = "A purchase buys whole units and leaves change at the broker. Is that change reported where it sits, or does it travel home like everything else the tuple sends back?"
+options  = [
+    "It stays at the purchase venue: reported with its amount and location beside `reaches`, out of `reaches`, and netted off the outlay the rate is measured against",
+    "It returns by the tuple's own declared exit route: it leaves on the purchase date, bears that route's declared cost and latency, bears no tax, and is part of `reaches`",
+]
+choice   = "It returns by the declared exit route"
+reason   = "the change can be withdrawn from the broker, so a figure that leaves it there is not what comes back"
+said     = "насправді оці лишні гроші з брокерського рахунку можна вивести назад без комісій та податків. дивно що це не працює"
+notes    = """
+What he was looking at: UA4000235865 at one month, 45 x 1 100.11 = 49 505.32 deployed of the
+50 000.00 he asked about, 494.68 left over, and a card reading `49 760.50 back` -- which reads
+as a loss and is not one. The 494.68 was neither lost nor spent; it was sitting at `inzhur`,
+and he can move it to his own bank.
+
+**Every term of the journey is fixed by the fact that it never became a position.** It leaves
+the purchase venue on the **purchase date**, because there is nothing for it to wait for. It
+bears the **exit route's declared cost** -- whatever that route declares, and a fee schedule of
+zero is what `inzhur_to_monobank` declares today rather than a rule about remainders. It bears
+the exit route's declared **latency**, because waiting is a cost (owner decision 2026-08-22)
+and this money waits like any other. It bears **no tax**: nothing was disposed of, so there is
+no gain and no charge to compute.
+
+**What this replaces.** 010 kept the remainder out of `reaches` and netted it off the outlay
+the rate was measured against, on the reasoning that bringing it home needed a date nobody had
+declared and a journey nobody had priced. The date is the purchase date and the journey is the
+tuple's own declared way out, so neither is missing -- and netting assumed the remainder was
+recoverable at par and free, which is an assumption where this is a costed movement. The rate
+is now measured against the **whole outlay** with the remainder's arrival as a receipt in the
+series, which is the same figure when the way out is free and instant and an honestly smaller
+one when it is not.
+
+**Where the way out will not carry it** the remainder stays where it was left and says so, and
+that is a report rather than a refusal of the tuple: a release that cannot come home means the
+holding cannot be liquidated, while a remainder that cannot come home is the change from the
+purchase and the position beside it is unaffected. It reaches this most often because the
+remainder is at the venue the purchase was made at while the chain departs from wherever the
+instrument releases its proceeds, and those are two declarations.
+
+**What moved.** `reaches` rises by the remainder for every candidate that leaves one, the
+dominance fronts of feature 019 move with it, and both goldens were regenerated. The one-month
+answer for UA4000238968 goes from 49 776.69 to 50 612.76, at which point `reaches - outlay` is
+612.76 and is exactly 29 days of that issue's own accrual on 44 units -- an identity that could
+not be stated against the old figure at all.
+"""

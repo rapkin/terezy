@@ -230,7 +230,8 @@ changed.
   and never silently dropped from the comparison.
 - **A remainder after buying whole units** — undeployed cash, reported with its amount
   and location; it is part of the outcome (money that made the trip and bought nothing),
-  not a discarded rounding artifact.
+  not a discarded rounding artifact. Since 2026-09-06 it also travels the declared way
+  out on the purchase date and is part of what reaches the endpoint (FR-003a).
 - **A tuple tied with the hurdle within tolerance** — a tie, reported as a tie. "Nothing
   beats the hurdle" must be sayable when it is true, including when it is true by a
   whisker in either direction.
@@ -276,6 +277,29 @@ changed.
   instrument's declared minimum ticket and unit size. A remainder the purchase cannot
   deploy MUST be reported as undeployed cash with its amount and location, never
   vanished and never silently swept into the outcome's rate as if invested.
+
+  ~~It is deliberately not part of what reaches the spendable endpoint, and is netted off
+  the outlay the rate is measured against: bringing it home would need a date nobody
+  declared and a second journey nobody priced.~~ **SUPERSEDED 2026-09-06**
+  (`specs/decisions/2026-09-06-undeployed-remainder-returns.toml`) — see **FR-003a**.
+
+- **FR-003a** — **owner decision 2026-09-06**: the remainder MUST come home along the
+  tuple's **own declared way out**. It never became a position, and that fixes every
+  term: it leaves the purchase venue on the **purchase date**, bears the exit route's
+  **declared cost** — whatever that route declares, zero being a declared value like any
+  other — bears that route's **declared latency**, and bears **no tax**, because nothing
+  was disposed of and there is no gain. It is therefore part of what reaches the
+  spendable endpoint, its arrival is inside the span the rate is measured over, and the
+  rate is measured against the **whole outlay** rather than against the outlay less the
+  remainder.
+
+  Where the declared way out will not carry it — most often because the remainder is at
+  the venue the purchase was made at while the chain departs from where the instrument
+  releases its proceeds, which are two declarations — the outcome MUST say so in a typed
+  statement carrying the reason, and the amount stays out of both figures. That is a
+  report and **not** a refusal of the tuple: a release that cannot come home means the
+  holding cannot be liquidated, while a remainder that cannot come home is the change
+  from the purchase and the position beside it is unaffected.
 - **FR-004**: A tuple's parts MUST chain: the route in ends where and in the currency
   the instrument is bought; the instrument's exit proceeds start where and in the
   currency the route out begins. A mismatch MUST be refused naming both sides, never
@@ -330,7 +354,9 @@ changed.
   reaching the spendable endpoint and as a rate comparable against the hurdle. That
   rate is a **money-weighted return over the tuple's actual span from first outlay to
   money reaching the spendable endpoint** — ramp latency and redemption latency sit
-  *inside* the span, because waiting is a cost (owner decision, 2026-08-22). The
+  *inside* the span, because waiting is a cost (owner decision, 2026-08-22), and since
+  2026-09-06 the undeployed remainder's own arrival is one of the receipts in it
+  (FR-003a). The
   comparability consequence is stated rather than assumed: the hurdle's benchmark
   figure in the comparison is produced by this same pipeline over the same horizon
   (FR-012), so hurdle-versus-tuple is rate-versus-rate over one span. Feature 001's

@@ -287,6 +287,7 @@ DECLARATIONS_WITHOUT_A_REASON = frozenset(
         "summary.KeyedSummary",
         "summary.SingletonSummary",
         "tuple.Comparison",
+        "tuple.RemainderCameHome",
         "venues.Venue",
         "working_day.DeclaredHoliday",
         "working_day.DeclaredRestDay",
