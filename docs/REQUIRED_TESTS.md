@@ -462,3 +462,15 @@ hurdle carries — and consumes no second series, so nothing about the switch mo
 |---|---|
 | **F4** | Reinforced on a second figure. `TupleOutcome.real` is filled by 007's own `real_terms` over the outcome's `implied_rate`, deflated by the exact Fisher relation over the window derived from its `span`; the realized half names the months of that window the declared series does not cover and the assumed half carries the declared belief, labelled. `tests/worked_examples/test_real_terms_on_a_tuple.py`, `tests/unit/test_real_terms_refusals.py`, `tests/unit/test_deflation_window.py`. What F4 asks — that the **display** selects the deflator — still has no display switch and no second series consumed, so the box is unchanged. |
 | **K1** | Reinforced: `the_answer.golden.txt` moved by exactly two kinds of line, its `[digest]` and the retired `no_real_terms_figure` exclusion, and `candidate_set.golden.txt` is asserted byte-identical by `tests/contract/test_the_real_figure_moves_no_order.py` — the ranking inputs are the key, the amount and the nominal rate, and none of the three moved. |
+
+**023-cash-instrument** closes **no** row and moves **I4** closer than any feature before it.
+What it lands is the row's own subject: a `cash_balance` declared at the venue the owner's
+salary already arrives at, reached by an identity entry and left by an identity exit, ranked in
+the same list as everything else.
+
+| Row | How, and why the box does not move |
+|---|---|
+| **I4** | *The naive baseline is always scored and always shown.* **What this closes:** the cash instrument now exists, is declared, and is scored — at one month it is non-dominated and dominates the declared benchmark, which is the sentence the row exists to make sayable. **What it does not close:** I4's own words name `50/50 OVDP + VWCE`, an **allocation** over candidates, and nothing in this engine can represent one. The recorded `zero-hop-way-in` gap that stood in the way is closed by this feature and the no-candidate column's second member retired with it. |
+| **B12** | Reinforced from the far end: the baseline joins the ranking without a rule of its own. Its entry charges nothing because it walks no leg, not because a heuristic exempted it, and it is dominated at three and twelve months by ordinary comparison. |
+| **E5** | Pressed on a figure whose only observation decides it without appearing in its arithmetic: what a balance returns is what went in **because** the declared rate is zero, so the mark reaches the amount through `money.also_resting_on` rather than through a multiplication (`tests/worked_examples/test_cash_reaches_the_amount.py`, `tests/invariants/test_cash_invariants.py`). `verified_on` is empty until the owner cites Monobank's terms, and every cash figure renders marked. |
+| **K1** | Reinforced: both goldens moved and were regenerated deliberately, with the moved figure hand-checked — `0x1.86a0000000000p+15` is 50 000.00 exactly, the outlay unchanged. |

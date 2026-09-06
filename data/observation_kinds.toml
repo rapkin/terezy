@@ -71,3 +71,8 @@ note           = "A published price index for a month that has ended is a histor
 id             = "official_rate"
 staleness_days = 7
 note           = "An official rate published for a date that has passed is a historical fact and does not decay -- what ages here is the RETRIEVAL, exactly as for cpi_index, and the publisher adds a rate every calendar day rather than a value every month. Seven days is the re-fetch prompt for a daily series: a series fetched a month ago is a month short of its own end, and a tax base is struck on a specific date rather than over a window, so the missing end is not a smaller error than a missing month. Its own kind rather than tax_rule, because a legal RATE changes by legislation and prompts a re-read, while a rate SERIES goes out of date by standing still."
+
+[[kind]]
+id             = "bank_balance_terms"
+staleness_days = 180
+note           = "What a bank pays on a current-account balance, and — the claim that actually matters — that the product is a BALANCE rather than a deposit. Its own kind because none of the others covers it: bank_fee_schedule is a tariff the bank CHARGES and venue_terms is a condition of DEALING, and a kind with no threshold fails at load, so borrowing either would put this figure's expiry under an interval set for something else. Half the tariff interval, because a bank restructures what an account pays more readily than it reprices its fees — and because the day it starts paying something the declaration must be refused rather than quietly kept."

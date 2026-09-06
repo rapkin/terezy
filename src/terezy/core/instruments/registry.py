@@ -150,13 +150,21 @@ COLLECTIVE_INVESTMENT_FUND: Final = "collective_investment_fund"
 """A collective-investment fund: `core.instruments.fund`, projected by
 `core.results.fund.project_fund`."""
 
+CASH_BALANCE: Final = "cash_balance"
+"""A balance held at a venue, in one currency, paying a declared zero:
+`core.instruments.cash`, projected by `core.results.cash.project_cash`.
+
+Out of :data:`REGISTRY` on the argument the section above makes for a fund, and the plainest
+instance of it: a balance produces no event stream at all.
+"""
+
 DECLARATION_KINDS: Final[frozenset[str]] = frozenset(
-    {FIXED_INCOME, ENUMERATED_SCHEDULE, COLLECTIVE_INVESTMENT_FUND}
+    {FIXED_INCOME, ENUMERATED_SCHEDULE, COLLECTIVE_INVESTMENT_FUND, CASH_BALANCE}
 )
 """Every ``[instrument] class`` a declaration file may name, instrument or otherwise.
 
 The vocabulary lives in `core` because it is domain knowledge; which *loader* parses each
 one is the data layer's business and lives beside the loaders. Reading the set from here
 is what lets `data.declarations.resolver` dispatch on a declared name rather than on an
-``if`` naming one class -- a branch that would have to be edited for a third kind.
+``if`` naming one class -- a branch that would have to be edited for every new kind.
 """

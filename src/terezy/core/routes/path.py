@@ -215,6 +215,41 @@ would erase a difference the owner acts on.
 """
 
 
+class EntryByIdentity(Enum):
+    """The stream already arrives where the purchase happens, so no way in is required.
+
+    :class:`ExitByIdentity`'s mirror, and the same Principle I distinction on the other end: a
+    journey that costs nothing **because there is nothing to do** is a different claim from one
+    whose fees happened to cancel. ``None`` would say "no way in"; an empty
+    :class:`ComposedPath` would say "a chain that charged nothing"; only a named value says
+    *the money is already at the venue that sells the thing*.
+
+    Legal exactly where the stream's arrival venue and currency equal the instrument's buying
+    venue and declared currency, and that claim is checked at the join against the
+    declarations rather than trusted from a caller -- the rule ``_identity_way_out`` already
+    applies to the far end.
+    """
+
+    ENTRY_BY_IDENTITY = "entry_by_identity"
+
+
+ENTRY_BY_IDENTITY: Final = EntryByIdentity.ENTRY_BY_IDENTITY
+"""The sentinel itself, so call sites read as the claim rather than as an enum lookup."""
+
+
+EntryPath = Candidate | EntryByIdentity
+"""How money gets in: one declared route, a chain of them, or nothing to do at all."""
+
+
+IDENTITY_ENTRY_ID: Final = "(entry by identity)"
+"""What an identity way in is named by, in an ordering key and in a canonical record.
+
+A named absence rather than a route id -- there is no declaration to name -- and spelled with
+brackets and spaces so it cannot collide with a declared one, on ``cost._IDENTITY_ROUTE``'s
+precedent.
+"""
+
+
 class FromTheDeclaration(Enum):
     """Cost the round trip through the way out the inbound declaration itself names.
 
@@ -322,6 +357,37 @@ def exit_chain_of(candidate: Candidate) -> ExitChain:
     if len(segments) == 1:
         return DeclaredExit(route_id=segments[0])
     return ComposedExit(segments=segments)
+
+
+def entry_id(entry: EntryPath) -> str:
+    """A way in as one string: its route ids joined, or the identity entry's own name.
+
+    FR-017. Rendering the sentinel under :func:`candidate_id`'s joined-ids form would give it
+    the empty string, and an empty way in is what a caller reads as *a chain of nothing* --
+    one member of the union under another's name, in the record a digest is taken over.
+    """
+    match entry:
+        case FundingPath() | ComposedPath():
+            return candidate_id(entry)
+        case EntryByIdentity():
+            return IDENTITY_ENTRY_ID
+        case _:  # pragma: no cover -- mypy proves this unreachable
+            assert_never(entry)
+
+
+def entry_segments_of(entry: EntryPath) -> tuple[str, ...]:
+    """The declared route ids a way in is made of, in order.
+
+    **Empty for :data:`ENTRY_BY_IDENTITY`**, and the emptiness is the claim rather than a gap:
+    there are no legs to walk, none to charge for and none to resolve against the registry.
+    """
+    match entry:
+        case FundingPath() | ComposedPath():
+            return segments_of(entry)
+        case EntryByIdentity():
+            return ()
+        case _:  # pragma: no cover -- mypy proves this unreachable
+            assert_never(entry)
 
 
 def candidate_id(candidate: Candidate) -> str:

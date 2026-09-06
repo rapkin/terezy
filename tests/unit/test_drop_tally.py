@@ -18,7 +18,11 @@ from terezy.core.decision.candidates import drop_tally, dropped, survey
 from terezy.core.primitives.money import Money
 from terezy.core.results.candidates import CandidateSurvey
 from terezy.core.results.tuple import DeclarationMissing
-from terezy.core.routes.path import ExitChain, exit_segments_of, segments_of
+from terezy.core.routes.path import (
+    ExitChain,
+    entry_segments_of,
+    exit_segments_of,
+)
 from tests import candidate_registries as fixtures
 
 if TYPE_CHECKING:  # pragma: no cover -- typing only
@@ -98,7 +102,7 @@ def test_every_group_matches_a_tally_recomputed_here_by_hand() -> None:
         assert group.streams == tuple(sorted({item.key.stream_id for item in members}))
         assert group.routes == tuple(
             sorted(
-                {name for item in members for name in segments_of(item.key.route_in)}
+                {name for item in members for name in entry_segments_of(item.key.route_in)}
                 | {
                     name
                     for item in members

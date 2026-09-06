@@ -71,6 +71,7 @@ from terezy.core.inflation.series import (
 )
 from terezy.core.instruments import registry as instrument_registry
 from terezy.core.instruments.access import InstrumentAccess, VenueQuote
+from terezy.core.instruments.cash import CashAssumptions, CashDeclaration
 from terezy.core.instruments.fund import (
     BuybackAvailability,
     CapEntry,
@@ -3117,6 +3118,74 @@ def fund_from_file(path: Path) -> FundDeclaration:
     )
 
 
+# ---------------------------------------------------------------------------
+# 023-cash-instrument: a balance held at a venue
+# ---------------------------------------------------------------------------
+
+
+def cash_from_file(path: Path) -> CashDeclaration:
+    """One ``data/instruments/<id>.toml`` declaring a balance, as a ``CashDeclaration``.
+
+    Nothing is inferred from the file *name*, as with a bond and a fund.
+    """
+    document = read_document(path)
+    table = _validate(schema.CashFile, document, path).instrument
+    prefix = INSTRUMENT_TABLE
+    _known(
+        path,
+        f"{prefix}.class",
+        table.instrument_class,
+        {instrument_registry.CASH_BALANCE: "a cash balance"},
+        "cash instrument class",
+    )
+    balance = f"{prefix}.balance"
+    if table.balance.rate_pct != 0.0:
+        raise DeclarationError(
+            path,
+            f"{balance}.rate_pct",
+            f"declares {table.balance.rate_pct!r}, and a cash balance pays exactly nothing. A "
+            "balance that pays something is a **deposit**, and a deposit is declared by terms "
+            "this record has nowhere to put and this engine does not model: the rate schedule, "
+            "how often it capitalises, what an early withdrawal forfeits, and which class the "
+            "interest is taxed under. Every one of those is the bank's, and every one needs a "
+            "citation.",
+            "declare rate_pct = 0.0, or declare the deposit's terms as a different instrument "
+            "class once this engine models one",
+        )
+    return CashDeclaration(
+        id=_require_text(
+            path,
+            f"{prefix}.id",
+            table.id,
+            "every declaration needs an identifier, because that is what a holding and a "
+            "result refer to it by",
+        ),
+        name=_require_text(
+            path,
+            f"{prefix}.name",
+            table.name,
+            "a declaration a reader cannot recognise by name is one they cannot check",
+        ),
+        instrument_class=table.instrument_class,
+        currency=_currency(path, f"{prefix}.currency", table.currency),
+        is_synthetic=table.is_synthetic,
+        rate=_as_fraction(table.balance.rate_pct),
+        rate_provenance=prov.of(
+            [
+                _source_ref(
+                    path,
+                    balance,
+                    source=table.balance.source,
+                    retrieved_on=table.balance.retrieved_on,
+                    verified_on=table.balance.verified_on,
+                    kind=table.balance.kind,
+                )
+            ]
+        ),
+        groups=_group_labels(path, f"{prefix}.groups", table.groups),
+    )
+
+
 def declared_class_of(path: Path) -> str:
     """The ``[instrument] class`` of a declaration file, read without validating the rest.
 
@@ -3143,7 +3212,7 @@ def declared_class_of(path: Path) -> str:
             "is missing or empty, so nothing can say which kind of declaration this is. "
             "There is no default: reading an unlabelled file as a bond would fail later, "
             "against a field the reader never wrote.",
-            'declare class = "fixed_income" or class = "collective_investment_fund"',
+            f"declare one of: {', '.join(sorted(instrument_registry.DECLARATION_KINDS))}",
         )
     return declared
 
@@ -5406,8 +5475,9 @@ QUESTION_TABLE: Final = "question"
 
 BOND_PLAN: Final = "bond"
 FUND_PLAN: Final = "fund"
-PLAN_KINDS: Final = (BOND_PLAN, FUND_PLAN)
-"""What a run plan may be for. Closed: a typo selects nothing rather than the other kind."""
+CASH_PLAN: Final = "cash"
+PLAN_KINDS: Final = (BOND_PLAN, FUND_PLAN, CASH_PLAN)
+"""What a run plan may be for. Closed: a typo selects nothing rather than another kind."""
 
 HOLD_TO_TERMINATION: Final = "termination"
 """What a fund plan writes where the holding runs to the fund's own end.
@@ -5686,30 +5756,40 @@ def _question_plans(
 
 def _question_plan(
     path: Path, field: str, entry: schema.QuestionPlanTable
-) -> Assumptions | FundAssumptions:
+) -> Assumptions | FundAssumptions | CashAssumptions:
     """One run plan, of the kind it declares itself to be."""
     kind = entry.kind
     if kind not in PLAN_KINDS:
         raise DeclarationError(
             path,
             f"{field}.kind",
-            f"declares {kind!r}, and a run plan is for a {BOND_PLAN!r} or a {FUND_PLAN!r}. "
-            "Which one is declared rather than inferred from the fields present, so a typo is "
-            "refused instead of quietly selecting the other kind's plan.",
+            f"declares {kind!r}, and a run plan is for one of {sorted(PLAN_KINDS)}. Which one "
+            "is declared rather than inferred from the fields present, so a typo is refused "
+            "instead of quietly selecting another kind's plan.",
             f"write one of {sorted(PLAN_KINDS)}",
         )
-    consumption = _require_text(
-        path,
-        f"{field}.consumption_method",
-        entry.consumption_method,
-        "which lots a disposal consumes changes the gain and the tax on it, and there is no "
-        "default anywhere in the stack",
-    )
     fund_only = {
         "liquidity_mode": entry.liquidity_mode,
         "buyback": entry.buyback,
         "exit_on": entry.exit_on,
     }
+    if kind == CASH_PLAN:
+        for name, value in (
+            ("consumption_method", entry.consumption_method),
+            ("coupon_policy", entry.coupon_policy),
+            ("yield_point", entry.yield_point),
+            ("exchange_rate", entry.exchange_rate),
+            *fund_only.items(),
+        ):
+            _refuse_field_of_the_other_kind(path, field, name, value, kind=CASH_PLAN)
+        return CashAssumptions()
+    consumption = _require_text(
+        path,
+        f"{field}.consumption_method",
+        entry.consumption_method or "",
+        "which lots a disposal consumes changes the gain and the tax on it, and there is no "
+        "default anywhere in the stack",
+    )
     if kind == BOND_PLAN:
         for name, value in (("yield_point", entry.yield_point), *fund_only.items()):
             _refuse_field_of_the_other_kind(path, field, name, value, kind=BOND_PLAN)

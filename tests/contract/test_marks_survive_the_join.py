@@ -30,6 +30,7 @@ from terezy.core.primitives import staleness as stale
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance, SourceRef
 from terezy.core.primitives.staleness import ObservationKind
+from terezy.core.results import canonical
 from terezy.core.results.tuple import Comparison, Tuple, TupleOutcome
 from terezy.core.routes.legs import Leg, Route
 from tests import tuple_registries as fixtures
@@ -501,3 +502,83 @@ class TestEveryDeclaredTableTheTupleReadReachesTheOutcome:
         declared = self._declared(registries, candidate)
         carried = {source.id for source in _outcome(registries, candidate).provenance.sources}
         assert len(declared & carried) >= len(declared) - 2
+
+
+RATE: Final = "instruments/cash_uah_monobank.toml#instrument.balance"
+"""The one observed value a balance declares. Its own file and table, as the loader spells it."""
+
+
+class TestABalanceCarriesItsOneCitationAndPicksUpNoOther:
+    """The third declaration kind, whose shape makes the propagation checkable exactly.
+
+    A bond's outcome rests on tables from four parts, so the battery above has to verify three
+    of them to isolate the fourth. A balance rests on **one** observed value -- the declared
+    rate -- because both its legs are identity and walk no declared route, and it names no tax
+    class. So the control needs no isolation: an outcome that carries a mark with the rate
+    verified picked one up from somewhere nothing declared.
+    """
+
+    @staticmethod
+    def _with_the_rate(*, verified: bool) -> Registries:
+        registries = fixtures.declared()
+        declared = registries.cash[fixtures.CASH]
+        return replace(
+            registries,
+            cash={
+                **registries.cash,
+                fixtures.CASH: replace(
+                    declared,
+                    rate_provenance=_verified_unless(declared.rate_provenance, verified=verified),
+                ),
+            },
+        )
+
+    def test_the_shipped_declaration_leaves_the_rate_unverified(self) -> None:
+        # The premise both cases below rest on, so a filled-in `verified_on` fails here rather
+        # than silently turning the first case into the second.
+        assert prov.is_unverified(fixtures.declared().cash[fixtures.CASH].rate_provenance)
+
+    def test_an_unverified_rate_marks_the_outcome_and_names_itself(self) -> None:
+        outcome = _outcome(self._with_the_rate(verified=False), fixtures.cash_tuple())
+        assert prov.is_unverified(outcome.provenance)
+        assert {source.id for source in prov.unverified_sources(outcome.provenance)} == {RATE}
+
+    def test_verifying_that_one_rate_leaves_the_outcome_unmarked(self) -> None:
+        # And this is what says the identity legs contribute no citation: a route's leg or a
+        # venue quote reaching the outcome from somewhere would still mark it here, because
+        # nothing else in this registry was verified.
+        assert not prov.is_unverified(
+            _outcome(self._with_the_rate(verified=True), fixtures.cash_tuple()).provenance
+        )
+
+    def test_the_one_source_it_carries_is_the_rate_and_nothing_else(self) -> None:
+        outcome = _outcome(self._with_the_rate(verified=True), fixtures.cash_tuple())
+        assert {source.id for source in outcome.provenance.sources} == {RATE}
+
+    def test_the_amount_that_reaches_the_endpoint_carries_the_rate_itself(self) -> None:
+        """The assertion that bites, and the reason it is not the one above.
+
+        ``TupleOutcome.provenance`` is a union reached by two paths -- the projection's own
+        mark and the way out's walk over the released amount -- so removing either alone leaves
+        it marked and an assertion on it would pass on a join that had stopped propagating.
+        ``reaches`` is a single ``Money``: the mark is on it or it is not.
+        """
+        outcome = _outcome(self._with_the_rate(verified=False), fixtures.cash_tuple())
+        assert {source.id for source in outcome.reaches.provenance.sources} == {RATE}
+        assert prov.is_unverified(outcome.reaches.provenance)
+
+    def test_filling_the_verification_date_in_moves_no_figure(self) -> None:
+        """023 SC-008's other half, over the one declaration where it is checkable exactly.
+
+        The rate is the balance's only observed value, so verifying it is the whole of what a
+        ``verified_on`` could move here. What must change is the mark and nothing else: a
+        digest or an amount that moved on a verification date would make filling one in a
+        change to the answer rather than a change to what is known about it.
+        """
+        unverified = _outcome(self._with_the_rate(verified=False), fixtures.cash_tuple())
+        verified = _outcome(self._with_the_rate(verified=True), fixtures.cash_tuple())
+        assert unverified.reaches.amount == verified.reaches.amount
+        assert unverified.implied_rate == verified.implied_rate
+        assert canonical.of_outcome(unverified) == canonical.of_outcome(verified)
+        assert prov.is_unverified(unverified.provenance)
+        assert not prov.is_unverified(verified.provenance)

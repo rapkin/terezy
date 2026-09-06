@@ -164,7 +164,7 @@ note   = "Owner decision 2026-09-05 -- an early exit must return a real holding 
 
 [[feature]]
 id     = "023-cash-instrument"
-status = "planned"
+status = "in-progress"
 needs  = ["014-candidates", "015-the-question"]
 why    = "014 owns the no-candidate column this retires, the enumeration that must construct the identity way in instead of calling compose, and the total order the entry needs a position in; 015 owns the group vocabulary `cash` resolves through and the three-state subject population it moves between. Transitively covers 010 (Tuple.route_in widens) and 003 (EXIT_BY_IDENTITY, the precedent the way in mirrors)."
 note   = "Declares the do-nothing baseline the owner named first, and closes zero-hop-way-in in the same change that makes it live. Owner statement 2026-09-02; see specs/023-cash-instrument/spec.md."

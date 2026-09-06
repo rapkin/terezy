@@ -400,6 +400,10 @@ X: int = 1
         and it is a second declaration **form** rather than a second issue. The scoping
         briefly dropped the closed-set assertion altogether, which is the half Principle
         II's four-interface limit actually rests on; it is back below, one entry wider.
+
+        The two sets move independently, which is the point of asserting both: 006 and 023 each
+        widened the **vocabulary** without touching `REGISTRY`, because neither a fund nor a
+        balance projects as an event stream.
         """
         declarations = _declarations()
         classes = {
@@ -421,6 +425,7 @@ X: int = 1
             instrument_registry.FIXED_INCOME,
             instrument_registry.ENUMERATED_SCHEDULE,
             instrument_registry.COLLECTIVE_INVESTMENT_FUND,
+            instrument_registry.CASH_BALANCE,
         } == instrument_registry.DECLARATION_KINDS, (
             "the vocabulary of declaration kinds is closed for the same reason"
         )

@@ -21,7 +21,10 @@ from typing import TYPE_CHECKING
 from terezy.core.decision.candidates import enumerate_candidates
 from terezy.core.primitives.currency import Currency
 from terezy.core.results.candidates import CandidateSet
-from terezy.core.routes.path import candidate_id, exit_segments_of
+from terezy.core.routes.path import (
+    entry_id,
+    exit_segments_of,
+)
 from terezy.data.declarations import resolver
 from tests import candidate_registries as fixtures
 from tests import tuple_registries as tuples
@@ -99,14 +102,14 @@ def test_the_sequence_is_the_one_fr016s_five_terms_imply() -> None:
     )
     produced = _enumerate(registries, plans).candidates
     assert produced
-    assert len({candidate_id(item.key.route_in) for item in produced}) > 1
+    assert len({entry_id(item.key.route_in) for item in produced}) > 1
     assert len({item.plan_position for item in produced}) > 1
     expected = sorted(
         produced,
         key=lambda item: (
             item.key.instrument_id,
             item.key.stream_id,
-            candidate_id(item.key.route_in),
+            entry_id(item.key.route_in),
             exit_segments_of(item.key.route_out),  # type: ignore[arg-type]
             item.plan_position,
         ),

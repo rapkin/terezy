@@ -92,6 +92,20 @@ def zero(currency: Currency) -> Money:
     return Money(0.0, currency, prov.EMPTY)
 
 
+def unit(currency: Currency) -> Money:
+    """One of a stated currency, resting on no source.
+
+    The multiplicative identity, and :func:`zero`'s argument applies unchanged: one hryvnia is
+    one hryvnia is arithmetic rather than an observation, so there is nothing here for a source
+    to vouch for and ``EMPTY`` is the honest mark. It is **not** a licence to price anything
+    else at par: a declared price is a market fact and belongs in a declaration.
+
+    It exists so that sizing a purchase by identity -- one unit of balance per unit of currency
+    -- does not have to construct money outside this module.
+    """
+    return Money(1.0, currency, prov.EMPTY)
+
+
 def _same_currency(left: Money, right: Money, operation: str) -> Currency:
     """The shared currency of two amounts, or a raised mismatch.
 

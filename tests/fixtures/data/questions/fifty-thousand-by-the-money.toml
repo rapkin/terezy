@@ -51,6 +51,10 @@ reserve      = []
   end   = "2027-09-01"
 
   [[question.plan]]
+  subject            = "cash"
+  kind               = "cash"
+
+  [[question.plan]]
   subject            = "ovdp"
   kind               = "bond"
   consumption_method = "fifo"

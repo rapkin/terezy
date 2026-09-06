@@ -65,19 +65,19 @@ class TestTheThreePopulationsPartitionEverythingConsidered:
         pairs_enumerated = {
             (item.key.instrument_id, item.key.stream_id) for item in enumerated.candidates
         }
-        assert len(pairs_enumerated) == 33
-        assert len(enumerated.no_candidate) == 33
+        assert len(pairs_enumerated) == 34
+        assert len(enumerated.no_candidate) == 34
         assert len(pairs_enumerated) + len(enumerated.no_candidate) == enumerated.pairs_considered
-        assert enumerated.pairs_considered == 66
+        assert enumerated.pairs_considered == 68
 
     def test_candidates_enumerated_equals_evaluated_plus_dropped(self) -> None:
         result = _survey()
-        assert len(evaluated(result.comparison)) == 20
+        assert len(evaluated(result.comparison)) == 21
         assert len(dropped(result.comparison)) == 13
         assert len(evaluated(result.comparison)) + len(dropped(result.comparison)) == len(
             result.enumerated.candidates
         )
-        assert len(result.enumerated.candidates) == 33
+        assert len(result.enumerated.candidates) == 34
 
     def test_every_enumerated_key_lands_in_exactly_one_of_the_two_columns(self) -> None:
         """The identity above holds by count; this holds it by **membership**, which is what a
