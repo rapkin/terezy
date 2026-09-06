@@ -11,15 +11,42 @@ import { LongValue } from "@/components/record/LongValue";
  */
 export function Refusal({ refusal }: { refusal: RefusalValue }) {
   return (
+    <RefusalChrome tag={refusal.tag} reason={refusal.reason}>
+      <RefusalDetail refusal={refusal} />
+    </RefusalChrome>
+  );
+}
+
+/**
+ * The refusal's rendering, apart from the union it narrows.
+ *
+ * The answer carries refusals of its own — `tuple.RateNotComparable`, and sixteen more inside a
+ * `RefusedTuple` — which are **not** members of the envelope union above and cannot be: that
+ * union is what the switch here is exhaustive over, and widening it would replace a total
+ * renderer with forty arms. They reach the same chrome through this, so a refused figure looks
+ * like every other refused figure rather than like a second thing.
+ */
+export function RefusalChrome({
+  tag,
+  reason,
+  children,
+}: {
+  tag: string;
+  reason: string;
+  children?: React.ReactNode;
+}) {
+  return (
     <div
       role="note"
       data-figure="refused"
-      data-refusal={refusal.tag}
+      data-refusal={tag}
       className="rounded border border-[var(--refuse-border)] bg-[var(--refuse-surface)] p-2 text-[var(--refuse-ink)]"
     >
-      <p className="text-xs font-semibold">refused: {refusal.tag}</p>
-      <LongValue text={refusal.reason} />
-      <RefusalDetail refusal={refusal} />
+      <p className="text-xs font-semibold">refused: {tag}</p>
+      <div data-served-text="reason">
+        <LongValue text={reason} />
+      </div>
+      {children}
     </div>
   );
 }

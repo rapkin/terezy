@@ -56,3 +56,32 @@ export function observationsQuery(
     ...STABLE,
   });
 }
+
+/**
+ * The answer to one declared question (026 FR-008).
+ *
+ * `/api/registry` is deliberately **not** read on this page: it is 2.6 MB and nothing on the
+ * answer screen looks at a category index.
+ */
+export function answerQuery(questionId: string, asOf: string) {
+  return queryOptions<Answered>({
+    queryKey: ["answer", questionId, asOf],
+    queryFn: () => request(path("questions", questionId, "answer"), { as_of: asOf }),
+    ...STABLE,
+  });
+}
+
+/**
+ * One instrument read, for the kind its tile is drawn from (026 FR-006).
+ *
+ * The same shape as `recordQuery` and a separate key on purpose: the answer screen asks for one
+ * read per **distinct** member id, and sharing a key with the browser's record screen would make
+ * a page that opened one instrument look like a page that had read them all.
+ */
+export function instrumentQuery(instrumentId: string, asOf: string) {
+  return queryOptions<Answered>({
+    queryKey: ["instrument-kind", instrumentId, asOf],
+    queryFn: () => request(path("instruments", instrumentId), { as_of: asOf }),
+    ...STABLE,
+  });
+}

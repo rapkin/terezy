@@ -80,6 +80,17 @@ export function count(value: number): string {
 }
 
 /**
+ * A bare number a served state carries — a ceiling, a segment bound — which is not a figure a
+ * decision rests on and has no unit of its own.
+ *
+ * A whole one is a count; a fractional one takes the money precision rather than a third one,
+ * because a second rendering precision in this module is the drift FR-026 exists to prevent.
+ */
+export function plain(value: number): string {
+  return Number.isInteger(value) ? count(value) : fixed(value, MONEY_DECIMALS);
+}
+
+/**
  * An ISO date as `4 Oct 2026`.
  *
  * Parsed by splitting rather than by `Date`, which is FR-021a's rule and also the correct one

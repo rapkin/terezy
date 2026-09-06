@@ -47,7 +47,10 @@ function RootLayout() {
   const nav = (
     <>
       <Link to="/" search={{ as_of: search.as_of }} className="underline">
-        overview
+        the answer
+      </Link>
+      <Link to="/data" search={{ as_of: search.as_of }} className="underline">
+        declared data
       </Link>
       {SERIES.map((series) => (
         <Link key={series.to} to={series.to} search={{ as_of: search.as_of }} className="underline">

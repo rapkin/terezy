@@ -12,6 +12,7 @@ import type {
   RegistrySummary,
   SeriesListing,
   SeriesWindow,
+  TheAnswer,
 } from "@/api/shapes";
 
 export function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
@@ -77,4 +78,19 @@ export function isSeriesWindow(body: unknown): body is SeriesWindow {
   const tag = tagOf(body);
   if (tag === null || !tag.startsWith("envelopes.WindowOf") || !isRecord(body)) return false;
   return "result" in body && tagOf(body["result"]) !== null;
+}
+
+/**
+ * The answer envelope, keyed on the three fields the screen reads.
+ *
+ * `question_id` is in the predicate because `result` and `as_of` alone also describe a category
+ * read, and narrowing on those would be a claim this screen cannot keep.
+ */
+export function isTheAnswer(body: unknown): body is TheAnswer {
+  return (
+    tagOf(body) === "envelopes.TheAnswer" &&
+    isRecord(body) &&
+    typeof body["question_id"] === "string" &&
+    tagOf(body["result"]) !== null
+  );
 }
