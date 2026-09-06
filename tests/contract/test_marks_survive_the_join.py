@@ -30,6 +30,7 @@ from terezy.core.primitives import staleness as stale
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance, SourceRef
 from terezy.core.primitives.staleness import ObservationKind
+from terezy.core.results import canonical
 from terezy.core.results.tuple import Comparison, Tuple, TupleOutcome
 from terezy.core.routes.legs import Leg, Route
 from tests import tuple_registries as fixtures
@@ -565,3 +566,19 @@ class TestABalanceCarriesItsOneCitationAndPicksUpNoOther:
         outcome = _outcome(self._with_the_rate(verified=False), fixtures.cash_tuple())
         assert {source.id for source in outcome.reaches.provenance.sources} == {RATE}
         assert prov.is_unverified(outcome.reaches.provenance)
+
+    def test_filling_the_verification_date_in_moves_no_figure(self) -> None:
+        """023 SC-008's other half, over the one declaration where it is checkable exactly.
+
+        The rate is the balance's only observed value, so verifying it is the whole of what a
+        ``verified_on`` could move here. What must change is the mark and nothing else: a
+        digest or an amount that moved on a verification date would make filling one in a
+        change to the answer rather than a change to what is known about it.
+        """
+        unverified = _outcome(self._with_the_rate(verified=False), fixtures.cash_tuple())
+        verified = _outcome(self._with_the_rate(verified=True), fixtures.cash_tuple())
+        assert unverified.reaches.amount == verified.reaches.amount
+        assert unverified.implied_rate == verified.implied_rate
+        assert canonical.of_outcome(unverified) == canonical.of_outcome(verified)
+        assert prov.is_unverified(unverified.provenance)
+        assert not prov.is_unverified(verified.provenance)
