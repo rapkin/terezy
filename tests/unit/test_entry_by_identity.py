@@ -25,6 +25,8 @@ from terezy.core.decision import candidates as module
 from terezy.core.decision.tuple_outcome import evaluate
 from terezy.core.primitives import money
 from terezy.core.primitives import provenance as prov
+from terezy.core.primitives.currency import Currency
+from terezy.core.primitives.money import Money
 from terezy.core.results.candidates import CandidateSet
 from terezy.core.results.composed import CompositionRefused, Unaskable
 from terezy.core.results.tuple import HOLD_AS_CASH, SeamDoesNotChain, Tuple, TupleOutcome
@@ -39,10 +41,17 @@ from tests import candidate_registries as fixtures
 
 if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.decision.tuple_outcome import Registries
+    from terezy.core.streams.streams import IncomeStream
 
 OVDP: Final = "ovdp_synthetic_a"
 SALARY_LANDS_AT: Final = "monobank_uah"
 """Where `salary_uah` arrives, and therefore the venue an identity entry is legal at."""
+
+
+def _salary() -> IncomeStream:
+    """The declared hryvnia stream, read rather than built: it is what an amount is checked
+    against, so a fixture stating its own currency would let the check pass on a fiction."""
+    return fixtures.declared().streams[fixtures.SALARY]
 
 
 def _bought_where_the_salary_lands() -> Registries:
@@ -115,7 +124,7 @@ def test_asserted_where_the_money_is_not_there_it_is_refused_with_the_seam_named
 
 def test_it_charges_nothing_and_takes_no_time() -> None:
     """FR-014, at the costing. Every component present at zero rather than absent."""
-    costed = cost_entry(ENTRY_BY_IDENTITY, fixtures.AMOUNT_UAH)
+    costed = cost_entry(ENTRY_BY_IDENTITY, fixtures.AMOUNT_UAH, stream=_salary())
     assert costed.sent == fixtures.AMOUNT_UAH
     assert costed.arrived == fixtures.AMOUNT_UAH
     assert costed.fraction == 0.0
@@ -157,7 +166,7 @@ def test_a_negative_amount_raises_rather_than_costing_a_gain() -> None:
     figure the guard exists to keep out of a comparison.
     """
     with pytest.raises(ValueError, match="cannot be placed by"):
-        cost_entry(ENTRY_BY_IDENTITY, money.scale(fixtures.AMOUNT_UAH, -1.0))
+        cost_entry(ENTRY_BY_IDENTITY, money.scale(fixtures.AMOUNT_UAH, -1.0), stream=_salary())
 
 
 def test_composes_already_arrived_case_can_no_longer_reach_enumeration() -> None:
@@ -176,3 +185,45 @@ def test_composes_already_arrived_case_can_no_longer_reach_enumeration() -> None
     )
     with pytest.raises(ValueError, match="already where it was wanted"):
         module._about_the_question(refusal)
+
+
+def test_an_amount_in_a_currency_the_stream_does_not_deliver_raises() -> None:
+    """`cost_one`'s rule on the branch that has no walk to enforce it (FR-008).
+
+    An entry by identity moves nothing and converts nothing, so an amount in another currency
+    is not a free conversion — it is a caller's error, and accepting it would attribute a real
+    figure to income that never delivered it.
+    """
+    dollars = Money(1_000.0, Currency.USD, prov.EMPTY)
+    with pytest.raises(ValueError, match="cannot be funded from stream"):
+        cost_entry(ENTRY_BY_IDENTITY, dollars, stream=_salary())
+
+
+def test_the_seam_reads_the_streams_declared_currency_and_not_the_amount() -> None:
+    """FR-013's half a caller could otherwise satisfy by choosing the amount.
+
+    The dollar stream arrives at its own venue, so an identity entry asserted for it against a
+    hryvnia instrument must refuse — and it must refuse **whatever currency the caller hands
+    in**. Comparing the amount would let a hryvnia amount make a dollar stream look as though
+    it already delivered hryvnia, which is an undeclared conversion charged at nothing.
+    """
+    registries = fixtures.with_access(fixtures.declared(), OVDP, bought_at="deel")
+    refusal = evaluate(
+        Tuple(
+            instrument_id=OVDP,
+            stream_id=fixtures.CONTRACT,
+            route_in=ENTRY_BY_IDENTITY,
+            exit_terms=fixtures.HOLD_TO_MATURITY,
+            route_out=FROM_THE_DECLARATION,
+        ),
+        amount=Money(fixtures.AMOUNT_USD.amount, Currency.USD, prov.EMPTY),
+        horizon=fixtures.HORIZON,
+        as_of=fixtures.AS_OF,
+        continuation=HOLD_AS_CASH,
+        registries=registries,
+    )
+    # `deel` is where the dollar stream arrives, so the venue halves agree and only the
+    # currency separates them: the instrument is hryvnia and the stream delivers dollars.
+    assert isinstance(refusal, SeamDoesNotChain), refusal
+    assert refusal.left == "deel/USD"
+    assert refusal.right == "deel/UAH"

@@ -20,6 +20,7 @@ from tests import candidate_registries as fixtures
 if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.decision.tuple_outcome import Registries
 
+CASH = "cash_uah_monobank"
 OVDP = "ovdp_synthetic_a"
 
 
@@ -63,7 +64,11 @@ class TestAnAbsentCorridorIsReportedAsAnAbsentCorridor:
             ceiling=fixtures.ceiling(10_000),
         )
         assert isinstance(enumerated, CandidateSet), enumerated
-        assert {candidate.key.route_out for candidate in enumerated.candidates} <= {
+        # Membership, not a subset: `<= {EXIT_BY_IDENTITY}` alone is satisfied by an empty
+        # set, so it would stay green if the balance stopped being enumerated at all -- which
+        # is the disappearance this case exists to catch.
+        assert [candidate.key.instrument_id for candidate in enumerated.candidates] == [CASH]
+        assert {candidate.key.route_out for candidate in enumerated.candidates} == {
             EXIT_BY_IDENTITY
         }
         assert "route_out" in {pair.why.side for pair in enumerated.no_candidate}

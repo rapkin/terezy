@@ -89,17 +89,22 @@ def test_every_raise_is_one_a_programmer_error_earns() -> None:
     assert raised["core/results/candidates.py"] == [], "a record must never raise"
     permitted = raised["core/decision/candidates.py"]
     assert len(permitted) == 2, permitted
-    phrases = set()
+    # One phrase per raise, matched against its own message. Unioning them across both would
+    # let a single raise carrying both phrases stand in for two, which is the substitution the
+    # naming exists to prevent.
+    matched = []
     for node in permitted:
         call = node.exc
         assert isinstance(call, ast.Call)
         assert isinstance(call.func, ast.Name)
         assert call.func.id == "ValueError"
         unparsed = ast.unparse(call)
-        phrases |= {
+        found = [
             phrase for phrase in ("no amount", "already where it was wanted") if phrase in unparsed
-        }
-    assert phrases == {"no amount", "already where it was wanted"}
+        ]
+        assert len(found) == 1, (unparsed, found)
+        matched.extend(found)
+    assert sorted(matched) == ["already where it was wanted", "no amount"]
 
 
 def test_no_module_names_a_rate_a_channel_or_a_conversion() -> None:

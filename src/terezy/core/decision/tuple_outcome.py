@@ -333,13 +333,13 @@ def _route_in(
     """
     entry = tuple_.route_in
     if isinstance(entry, EntryByIdentity):
-        seam = _identity_way_in(prepared, amount)
+        seam = _identity_way_in(prepared)
         if seam is not None:
             return seam
         # No cap check, and its absence is the entry rather than an omission: a ceiling is a
         # term of a declared leg and this way in walks none, so there is no rail to exceed.
         costed = _Costed(
-            one_way=cost.cost_entry(entry, amount),
+            one_way=cost.cost_entry(entry, amount, stream=prepared.stream),
             latency_days=0,
             status="open",
             disruption=0.0,
@@ -411,7 +411,7 @@ class _Costed:
     disruption: float
 
 
-def _identity_way_in(prepared: _Prepared, amount: Money) -> SeamDoesNotChain | None:
+def _identity_way_in(prepared: _Prepared) -> SeamDoesNotChain | None:
     """*There is nothing to do* is a claim about where the money is, and it is checked.
 
     FR-013, and exactly :func:`_identity_way_out`'s rule at the near end: derived from the
@@ -419,10 +419,15 @@ def _identity_way_in(prepared: _Prepared, amount: Money) -> SeamDoesNotChain | N
     statement that the stream already arrives where the purchase happens -- and a caller who
     asserts it wrongly would have the purchase made with money that is somewhere else.
 
-    The stream's own arrival, not the amount's origin: the amount is what the caller chose to
-    move, while ``arrives_at`` is where the declarations say this income lands.
+    **Both halves come from declarations, and the currency half is the one that matters.** The
+    amount the caller chose to move says nothing about what the stream delivers, so comparing
+    it here would pass a dollar stream against a hryvnia instrument whenever the caller handed
+    in hryvnia -- an undeclared conversion, charged nothing, on the one branch where no walk
+    exists to refuse it. The comparison is character-for-character the one
+    ``candidates._ways_in`` short-circuits on, which is what makes ``compose``'s *already
+    arrived* case unreachable from enumeration.
     """
-    left: Junction = (prepared.stream.arrives_at, amount.currency.value)
+    left: Junction = (prepared.stream.arrives_at, prepared.stream.amount.currency.value)
     right: Junction = (prepared.access.bought_at, prepared.currency.value)
     if left == right:
         return None
@@ -1312,8 +1317,8 @@ def _cash_outcome(
 ) -> CashProjection | TupleRefused:
     """A balance projection, or the refusal its one failure becomes.
 
-    One arm where a bond has four, and no `case _`: `project_cash` returns two things and
-    mypy proves the match exhaustive.
+    One arm where a bond has four: `project_cash` returns two things, and the second is the
+    only way a window can be wrong about a balance.
     """
     match outcome:
         case CashProjection():
@@ -2039,11 +2044,12 @@ def _rate(
         # which needs both legs to be instant -- a balance over a horizon of no length.
         return RateNotComparable(
             reason=(
-                f"the round trip left and returned {received.amount!r} {endpoint.value} on "
-                f"{span.start.isoformat()}, so it took no time at all. A return over a period "
-                "of zero length is not a rate: every rate discounts these flows to the same "
-                "nothing, and reporting one would be choosing a number the arithmetic does "
-                "not distinguish. The amounts are reported as they stand."
+                f"{invested.amount!r} {invested.currency.value} was invested and "
+                f"{received.amount!r} {endpoint.value} came back, both on "
+                f"{span.start.isoformat()}: the round trip took no time at all. A return over "
+                "a period of zero length is not a rate -- every rate discounts these flows to "
+                "the same nothing, so reporting one would be choosing a number the arithmetic "
+                "does not distinguish. The amounts are reported as they stand."
             ),
             missing="a span of more than no time to measure a return over",
         )

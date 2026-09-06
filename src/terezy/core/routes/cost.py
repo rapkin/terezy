@@ -1453,7 +1453,7 @@ def _way_out(
     )
 
 
-def cost_entry(entry: EntryByIdentity, amount: Money) -> OneWayCost:
+def cost_entry(entry: EntryByIdentity, amount: Money, *, stream: IncomeStream) -> OneWayCost:
     """*There is nothing to do* on the way in, costed: nothing charged, nothing converted.
 
     :data:`~terezy.core.routes.path.ENTRY_BY_IDENTITY`'s figure, and the mirror of the branch
@@ -1469,12 +1469,26 @@ def cost_entry(entry: EntryByIdentity, amount: Money) -> OneWayCost:
     ``tests/contract/test_per_destination_cost_unrepresentable.py`` admits the absence on
     exactly that argument.
 
-    Unlike the exit's identity branch there is nothing here to check: that the money really is
-    where the purchase happens is a claim about a stream and an access declaration, neither of
-    which this module holds, and it is checked at the join where both are (023 FR-013).
+    That the money really is where the purchase happens is a claim about a **declaration** --
+    the stream's arrival venue against the instrument's buying venue -- and it is checked at
+    the join, which holds both (023 FR-013).
+
+    What is checked here is :func:`cost_one`'s own rule, and it has to be: the amount must be
+    in the currency the named stream delivers. Costing money the stream never delivered would
+    attribute a real figure to the wrong income, and on this branch there is no walk to raise
+    it -- the identity entry converts nothing, so a currency it silently accepted would be an
+    undeclared conversion charged at nothing.
 
     A negative amount raises, on :func:`cost_one`'s reasoning.
     """
+    if amount.currency is not stream.amount.currency:
+        raise ValueError(
+            f"an amount of {amount.amount!r} {amount.currency.value} cannot be funded from "
+            f"stream {stream.id!r}, which delivers {stream.amount.currency.value}: the stream "
+            "is part of what a cost *is* (FR-008). An entry by identity moves nothing and "
+            "converts nothing, so an amount in another currency is not a free conversion -- "
+            "it is a caller's error, and it raises rather than returning a cost."
+        )
     if amount.amount < 0.0:
         raise ValueError(
             f"an amount of {amount.amount!r} {amount.currency.value} cannot be placed by "

@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final
 
 from terezy.core.errors import InconsistentTerms
+from terezy.core.instruments import acquire
 from terezy.core.instruments.cash import CashDeclaration
 from terezy.core.ledger import engine, lots
 from terezy.core.ledger.engine import LedgerState
@@ -121,7 +122,7 @@ def project_cash(
                     f"{holding.cost.currency.value}"
                 ),
             ),
-            lot_ref=LotRef(instrument_id=declaration.id, lot_id=_lot_id(holding)),
+            lot_ref=LotRef(instrument_id=declaration.id, lot_id=acquire.lot_id_for(holding)),
             quantity=holding.quantity,
             allocated_to=None,
             capacity_pool=None,
@@ -155,11 +156,6 @@ def project_cash(
         released=released,
         provenance=declaration.rate_provenance,
     )
-
-
-def _lot_id(holding: Holding) -> str:
-    """The identity of the lot the placement opens, on ``fund.lot_id_for``'s rule."""
-    return f"{holding.instrument_id}@{holding.purchased_on.isoformat()}"
 
 
 __all__ = ["CashProjection", "project_cash"]
