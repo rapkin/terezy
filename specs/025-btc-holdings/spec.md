@@ -247,8 +247,9 @@ the loader rather than in a reviewer's attention.
 - **FR-023**: The file MUST record the symbol **as requested**, and MUST NOT split it into a
   base and a quote asset: klines publishes neither, and choosing where `BTCUSDT` divides would be
   the fetcher making a judgement — FR-019's objection to the ticker, in another place. What the
-  quote asset is worth in dollars is therefore the owner's declaration, never the fetcher's
-  [NEEDS CLARIFICATION: see Clarification 1].
+  quote asset is worth in dollars is therefore the owner's declaration, never the fetcher's: a
+  belief in `data/scenarios/` that one USDT is one USD, marked an assumption on every figure
+  derived through it (Clarification 1, answered 2026-09-07).
 - **FR-024**: Every row MUST be a **closed** day: the script MUST refuse a row dated on or after
   its own retrieval date, because the current day's kline is still open and its close is the last
   trade so far. The newest usable price is the previous day's, and a run whose `as_of` is the
@@ -286,38 +287,29 @@ the loader rather than in a reviewer's attention.
   already holds it.
 - **FR-030**: The answer MUST report, for each held position: the quantity, the observed price
   with its observation date, the value, the hryvnia basis, the nominal change, and — as typed
-  refusals or exclusions, never as absences — no tax, no yield and no rank. A held position MUST
-  NOT be enumerated as a candidate and MUST NOT be ranked against the benchmark
-  [NEEDS CLARIFICATION: see Clarification 2].
+  refusals or exclusions, never as absences — no tax, no yield and no rank. Those figures MUST
+  reach the reader in the answer's own **held** section, beside the horizon sections; a held
+  position MUST NOT be enumerated as a candidate and MUST NOT be ranked against the benchmark
+  (Clarification 2, answered 2026-09-07).
 
-## Clarifications the owner must settle
+## Clarifications
 
-**1. What stands between USDT and USD.** The price this repository can fetch is
-`BTCUSDT`; every hryvnia figure downstream needs dollars. Three ways, and no default:
+Both answered by the owner on 2026-09-07; the questions as asked, the options offered and his
+words are in `specs/decisions/2026-09-07-clarify-025.toml`. What is here is what each answer
+changed.
 
-| | What it means | What it costs |
-|---|---|---|
-| **A** *(recommended)* | A declared belief in `data/scenarios/` that one USDT is one USD, labelled an assumption with the owner's reason | Produces a number. Every BTC figure carries the assumption's mark, so the belief is visible wherever it acted — the shape 015 FR-032 already uses for the quotation belief |
-| **B** | Refuse every dollar and hryvnia figure; report the position in USDT only | Honest and useless: the held section states a number he cannot spend and cannot compare to anything |
-| **C** | Declare a cited USDT/USD rate as an observation from a source | The most correct, and it needs a source nobody has picked. It is also a second fetch, a second provenance and a second staleness kind |
+**Q1 — What stands between USDT and USD?** «Прирівнюй до долара» — a **declared belief** in
+`data/scenarios/` that one USDT is one USD, carrying `is_assumption = true` and the owner's
+reason where an observation carries a source, exactly as the quotation belief does (015 FR-032).
+It is never a silent equality: with no belief declared, the dollar figure refuses by name rather
+than appearing. Every dollar and hryvnia figure for a held position therefore carries three
+marks — the belief, the unverified quotation, and the estimated basis — and FR-023 and FR-027 are
+unconditional. Option C stays the widening: a cited USDT/USD observation replaces the belief by
+changing a data file and nothing else.
 
-Recommendation **A**. The peg is what he actually believes, the mark is what makes it a belief
-rather than a fact, and B produces an answer that cannot be read against the other three
-subjects. C stays open as the widening: swapping a declared belief for a cited observation
-changes a data file and nothing else.
-
-**2. Where a held position appears.** It is not a candidate for the 50 000 and cannot be made
-one: `Tuple.route_in` is required and there is no zero-hop entry (`zero-hop-way-in`, recorded in
-015 for held cash, unchanged here).
-
-| | Shape | What it costs |
-|---|---|---|
-| **A** *(recommended)* | Its own **held** section, beside the horizon sections, with its own fields | The ranking keeps answering one question — where the 50 000 should go. Held positions are reported in full and never compete with things he could buy |
-| **B** | A baseline row inside each horizon's ranking | Needs a purchase price, a funding route and an exit for a purchase that will not happen; every one of them would be invented |
-| **C** | Only a subject standing, with no figures | Says he holds it and refuses to say what it is worth, which is the question he asked |
-
-Recommendation **A**. B is the shape that would produce a confident wrong number, which is what
-this project exists to remove.
+**Q2 — Where does a held position appear?** In the answer's own **held** section, beside the
+horizon sections. The ranking keeps answering one question — where the 50 000 should go — and a
+held position never competes with something he could buy. FR-029 and FR-030 are unconditional.
 
 **A third question was asked and withdrawn.** How fast a crypto price goes stale looked like the
 owner's line to draw, and it is not a question this design can act on: under FR-011 and FR-024

@@ -5,12 +5,10 @@
 **Branch**: this specification is written on `spec/025-btc` and lands squashed. The
 implementation gets its own branch, `feat/025-btc-holdings`, landing by a `--no-ff` merge.
 
-**Implementation is gated, and the gate is by artefact.** Two clarifications are open and each
-decides a value an implementer may not choose: the instrument's price currency (Clarification 1)
-and the answer's shape (Clarification 2). They block no code — the overlay, the declaration kind,
-the loader, the provider and the strike are all exercisable against fixtures. **Code and fixtures
-may be written; nothing under `data/` that turns on an unanswered question may be committed.**
-`features.toml` says `drafted` for that reason.
+**Both clarifications are answered** (2026-09-07,
+`specs/decisions/2026-09-07-clarify-025.toml`): the instrument is priced in USD through a
+declared USDT=USD belief, and a held position gets its own section of the answer. Nothing in this
+plan is gated any more, and `features.toml` moves off `drafted`.
 
 ## Summary
 
@@ -122,11 +120,9 @@ therefore stops tagging a cost it cannot know the currency of. The worked exampl
 first, on placeholder figures; `tests/invariants/` gains the property that no figure resting on a
 struck estimated basis shows fewer than two marks.
 
-**Phase 5 — the shipped data, and the answer.** Blocked until the owner has settled all three.
-The USDT treatment decides the instrument's declared currency and whether a hryvnia value exists
-at all; the threshold decides the kind's `staleness_days` and lets the observation file land; the
-section shape decides whether `SubjectStanding` gains a fifth member and whether `Answer` gains a
-held section. Then the goldens, the OpenAPI document and `docs/METHODOLOGY.md`.
+**Phase 5 — the shipped data, and the answer.** The USDT belief is declared and the instrument
+states USD; `SubjectStanding` gains a fifth member and `Answer` gains a held section. Then the
+goldens, the OpenAPI document and `docs/METHODOLOGY.md`.
 
 ## Which tests re-measure, and which are written by hand
 

@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain — **two open**, both for the owner
+- [x] No [NEEDS CLARIFICATION] markers remain — both answered 2026-09-07, `specs/decisions/2026-09-07-clarify-025.toml`
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic
@@ -37,12 +37,11 @@ other past it — four of its findings were exactly that — so what was cut was
 what was kept is the decisions-against-alternatives and the thirty requirements. Recorded as
 residue rather than met.
 
-**Two clarifications are open and the feature is `drafted`, not `spec`.** Each is a value the
-owner declares and an implementer may not: what stands between USDT and USD, and whether a held
-position gets its own section. Both carry options and a recommendation; neither is a legal or tax
-value, and the one that is — the tax class — is refused by FR-014 rather than asked. **A third
-was asked and withdrawn**: the staleness threshold cannot fire under this design, and asking for
-a number that changes nothing is the more expensive mistake (FR-024).
+**Both clarifications were answered on 2026-09-07** — USDT is taken equal to USD as a declared
+belief, and a held position gets its own section. Neither was a legal or tax value; the one that
+is — the tax class — is refused by FR-014 rather than asked. **A third was asked and withdrawn**:
+the staleness threshold cannot fire under this design, and asking for a number that changes
+nothing is the more expensive mistake (FR-024).
 
 Module, record and endpoint names appear in the requirements deliberately. Half of this feature
 is a statement about *where a thing may not go* — a real figure out of `data/`, a price out of
@@ -62,9 +61,6 @@ provenance mark or a false guard.
   the trimming removed was restating; what stayed is the decisions-against-alternatives and the
   thirty requirements. Splitting the feature would put the overlay in one spec and the
   instrument in another, and neither half is usable alone.
-- **`status = "drafted"` while `plan.md` and `tasks.md` exist.** The graph's vocabulary has no
-  word for it, and `drafted` is the reading that blocks implementation, which is the safe one.
-  Recorded as `the-graph-has-no-word-for-drafted-and-planned` in `specs/features.toml`.
 - **025 and 019 are declared parallel and are not.** Both regenerate
   `tests/golden/the_answer.golden.txt`. Recorded in 025's `why`; whichever lands second
   re-measures.

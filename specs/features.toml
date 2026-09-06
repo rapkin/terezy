@@ -171,10 +171,10 @@ note   = "Declares the do-nothing baseline the owner named first, and closes zer
 
 [[feature]]
 id     = "025-btc-holdings"
-status = "drafted"
+status = "planned"
 needs  = ["008-seed-and-goals", "011-official-rate", "015-the-question", "018-nbu-rate-series", "020-http-api"]
 why    = "008 declares the seed lots this position is made of and the estimated basis it carries; 011 strikes the dollar cost into hryvnia at the acquisition date and 018 is the series it strikes from -- both, because 011 shipped the machinery empty; 015 is where `btc` resolves to nothing and the verification task that says what would close it; 020 publishes the schema this feature edits, since a fifth subject standing regenerates the OpenAPI document. NOT parallel with 019 in practice: both regenerate tests/golden/the_answer.golden.txt and whichever lands second re-measures"
-note   = "Owner 2026-09-02/03 -- he holds BTC and wants it counted, not bought. `drafted` with plan.md and tasks.md written: two clarifications are open and tasks.md holds every artefact that turns on one in a phase that may not start. See specs/025-btc-holdings/spec.md."
+note   = "Owner 2026-09-02/03 -- he holds BTC and wants it counted, not bought. Both clarifications answered 2026-09-07 in specs/decisions/2026-09-07-clarify-025.toml -- USDT taken equal to USD as a declared belief, and a held section of its own."
 
 [[feature]]
 id     = "026-answer-screen"
@@ -184,11 +184,6 @@ why    = "019 produces the non-dominated set, the separating assumptions and the
 note   = """
 The home page becomes the answer; both clarifications answered 2026-09-06 in specs/decisions/2026-09-06-clarify-026.toml -- five venue kinds, and `money back` as one served figure.
 Implementation additionally waits on the fix/undeployed-remainder branch, which `needs` cannot name because it is a fix and not a feature: until it lands, `reaches` is the deployed part alone."""
-
-[[future]]
-id    = "the-graph-has-no-word-for-drafted-and-planned"
-after = ["025-btc-holdings"]
-note  = "`drafted` says planning may not start; `planned` says plan.md and tasks.md exist. 025 is both TODAY, so the graph asserts something false about it right now rather than later. Recorded 2026-09-06 by 025's review."
 
 [[feature]]
 id     = "024-real-terms-tuple"
