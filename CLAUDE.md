@@ -86,7 +86,7 @@ after landing. Details: `specs/README.md`.
 
 ```bash
 uv sync --all-extras --dev
-uv run pytest -x -q -n auto                   # checkpoint gate: parallel, no coverage
+uv run pytest -x -q -n auto --dist loadfile   # checkpoint gate: parallel, no coverage
 uv run pytest --cov                           # landing and CI gate: coverage floor
 uv run pytest -m "contract or invariant"      # constitution compliance tests
 uv run ruff check . && uv run ruff format .

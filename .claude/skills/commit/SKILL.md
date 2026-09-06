@@ -65,7 +65,7 @@ one here means a red build. Run the cheap subset that matches what changed:
 uv run ruff check . && uv run ruff format --check .   # any Python change
 uv run mypy                                          # any Python change
 uv run lint-imports                                  # any src/ change
-uv run pytest -x -q -n auto                          # any src/ or tests/ change
+uv run pytest -x -q -n auto --dist loadfile          # any src/ or tests/ change
 uv run python scripts/check_provenance.py            # any data/ change
 ```
 
