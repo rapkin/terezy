@@ -125,6 +125,8 @@ class TestTheSameInstrumentFromTwoStreamsIsTwoOutcomes:
         costly = _outcome(_tuple(SECOND_STREAM, COSTLY_ROUTE))
         assert free.key.stream_id == fixtures.SALARY
         assert costly.key.stream_id == SECOND_STREAM
+        assert isinstance(free.key.route_in, FundingPath)
+        assert isinstance(costly.key.route_in, FundingPath)
         assert free.key.route_in.destination_id == costly.key.route_in.destination_id
         assert free.key != costly.key
 
@@ -155,6 +157,7 @@ class TestNoFigureIsAttributableToTheInstrumentAlone:
         outcome = _outcome(_tuple(fixtures.SALARY, FREE_ROUTE))
         assert outcome.key.instrument_id
         assert outcome.key.stream_id
+        assert isinstance(outcome.key.route_in, FundingPath)
         assert outcome.key.route_in.destination_id
         assert outcome.key.route_out is not None
         assert outcome.key.exit_terms is not None
@@ -169,6 +172,7 @@ class TestTheStreamIsTheTermAndNotTheRouteWearingItsName:
         first = _outcome(_tuple(fixtures.SALARY, FREE_ROUTE))
         second = _outcome(_tuple(SECOND_STREAM, FREE_ROUTE))
         assert first.key != second.key
+        assert isinstance(second.key.route_in, FundingPath)
         assert first.key.route_in == replace(second.key.route_in, stream_id=fixtures.SALARY)
         assert is_close(first.reaches.amount, second.reaches.amount)
 

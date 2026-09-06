@@ -16,7 +16,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from terezy.core.results.candidates import CandidateSet
-from terezy.core.routes.path import candidate_id
+from terezy.core.routes.path import (
+    entry_id,
+)
 from tests import candidate_registries as fixtures
 from tests import tuple_registries as tuples
 
@@ -87,7 +89,7 @@ def test_the_symmetric_difference_is_a_finding_about_the_regime_that_lacks_it() 
     rich = {item.key for item in _believed(registries, NORMALIZED, wide).candidates}
     only_when_believed = rich - lean
     assert only_when_believed
-    assert {candidate_id(key.route_in) for key in only_when_believed} == {SECOND_WAY_IN}
+    assert {entry_id(key.route_in) for key in only_when_believed} == {SECOND_WAY_IN}
 
 
 def test_neither_set_carries_the_other_regimes_corridor() -> None:
@@ -96,4 +98,4 @@ def test_neither_set_carries_the_other_regimes_corridor() -> None:
     figure in it rest on a world nobody stated."""
     registries, _, narrow = _worlds()
     lean = _believed(registries, WARTIME, narrow)
-    assert SECOND_WAY_IN not in {candidate_id(item.key.route_in) for item in lean.candidates}
+    assert SECOND_WAY_IN not in {entry_id(item.key.route_in) for item in lean.candidates}

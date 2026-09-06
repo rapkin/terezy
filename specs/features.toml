@@ -164,7 +164,7 @@ note   = "Owner decision 2026-09-05 -- an early exit must return a real holding 
 
 [[feature]]
 id     = "023-cash-instrument"
-status = "planned"
+status = "done"
 needs  = ["014-candidates", "015-the-question"]
 why    = "014 owns the no-candidate column this retires, the enumeration that must construct the identity way in instead of calling compose, and the total order the entry needs a position in; 015 owns the group vocabulary `cash` resolves through and the three-state subject population it moves between. Transitively covers 010 (Tuple.route_in widens) and 003 (EXIT_BY_IDENTITY, the precedent the way in mirrors)."
 note   = "Declares the do-nothing baseline the owner named first, and closes zero-hop-way-in in the same change that makes it live. Owner statement 2026-09-02; see specs/023-cash-instrument/spec.md."
@@ -184,6 +184,20 @@ why    = "019 produces the non-dominated set, the separating assumptions and the
 note   = """
 The home page becomes the answer; both clarifications answered 2026-09-06 in specs/decisions/2026-09-06-clarify-026.toml -- five venue kinds, and `money back` as one served figure.
 Implementation additionally waits on the fix/undeployed-remainder branch, which `needs` cannot name because it is a fix and not a feature: until it lands, `reaches` is the deployed part alone."""
+
+[[feature]]
+id     = "028-scenario-comparison"
+status = "drafted"
+needs  = ["026-answer-screen"]
+why    = "a column of this screen IS 026's answer screen -- its candidate card, refusal group, figure slot and formatting module -- so building the second column before the first has landed would rebuild them"
+note   = """
+Closes 015 owner verification task 4 as 015 itself framed it: two questions and a reading across them. Measured 2026-09-07: the answer endpoint takes no `scenario_id` and `war_end` moves nothing in the owner's answer.
+`drafted` -- two clarifications are open and tasks.md puts what turns on the second in a phase that may not start; see specs/028-scenario-comparison/spec.md."""
+
+[[future]]
+id    = "regime-declared-by-two-scenarios-resolves-by-the-first-id"
+after = ["028-scenario-comparison"]
+note  = "READ IN THE CODE 2026-09-07 while specifying 028: `api/answer.py::_scenario_of` walks `sorted(ramp.scenarios.items())` -- sorted by the SCENARIO ID the declaration states, which the filename need not match -- and returns the first whose regimes include the question's id, while duplicate regime ids are refused only WITHIN one scenario -- so two scenarios naming one regime load, the run silently takes the alphabetically first, and `RunManifest` records the regime and not the scenario. Unreachable in the shipped registry, which declares one scenario. The remedy is the owner's shape to choose -- refuse the ambiguity at load, or record the scenario on the manifest -- and 028 FR-015 states the ambiguity on screen rather than resolving it. Deliberately not built."
 
 [[future]]
 id    = "the-graph-has-no-word-for-drafted-and-planned"

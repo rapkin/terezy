@@ -19,6 +19,7 @@ from terezy.api.http import envelopes
 from terezy.core.calendars.working_day import WorkingDayCalendar
 from terezy.core.inflation.series import CpiSeries, InflationAssumption
 from terezy.core.instruments.access import InstrumentAccess
+from terezy.core.instruments.cash import CashDeclaration
 from terezy.core.instruments.fund import FundDeclaration
 from terezy.core.instruments.groups import InstrumentGroup
 from terezy.core.instruments.interface import InstrumentDeclaration
@@ -154,8 +155,8 @@ class Category:
 def _instruments(ask: Ask) -> KeyedRecords:
     declared = resolver.from_data_root(ask.root)
     return KeyedRecords(
-        records={**declared.instruments, **declared.funds},
-        files={**declared.instrument_files, **declared.fund_files},
+        records={**declared.instruments, **declared.funds, **declared.cash},
+        files={**declared.instrument_files, **declared.fund_files, **declared.cash_files},
     )
 
 
@@ -359,7 +360,7 @@ CATEGORIES: Final[tuple[Category, ...]] = (
         "instruments",
         "INSTRUMENTS_DIR",
         False,
-        Keyed(_instruments, InstrumentDeclaration | FundDeclaration),
+        Keyed(_instruments, InstrumentDeclaration | FundDeclaration | CashDeclaration),
     ),
     Category("groups", "GROUPS_FILE", False, Keyed(_groups, InstrumentGroup)),
     Category("tax-classes", "TAX_DIR", False, Keyed(_tax_classes, TaxClass)),

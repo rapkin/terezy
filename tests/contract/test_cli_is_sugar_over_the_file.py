@@ -452,8 +452,7 @@ def test_the_hurdle_is_marked_by_identity_and_not_by_position() -> None:
 def test_the_undeclared_subjects_are_named_by_the_words_he_wrote() -> None:
     lines, _ = _run()
     output = "\n".join(lines)
-    for word in ("cash", "btc"):
-        assert f"  {word}: NOTHING IS DECLARED BY THAT NAME" in output
+    assert "  btc: NOTHING IS DECLARED BY THAT NAME" in output
 
 
 def test_main_returns_zero_for_an_answer_and_one_for_a_refusal(

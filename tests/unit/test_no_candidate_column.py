@@ -1,13 +1,11 @@
-"""FR-013 versus FR-014: two pairs that yield nothing, and two opposite remedies.
+"""FR-013: the pairs that yield nothing, and the side each of them is missing.
 
-**The discrimination is by record and never by text** (FR-014a). `NothingConnects` says the
-routes declare no corridor and the remedy is a declaration; `NothingNeedsToConnect` says the
-money is already where it was wanted and the remedy is nothing at all. Reporting the second as
-the first would send the owner to declare a corridor that is not missing -- and it is the
-reading an implementer reaches for, because both look like *no candidate* from a row count.
+`NothingConnects` says the routes declare no corridor and the remedy is a declaration, and it
+names **which side** came back empty -- a corridor into the buying venue, or one out of the
+venue the proceeds land at -- because the two remedies differ and a row count shows neither.
 
-Neither ever appears among the dropped candidates. A drop count that folded in combinations
-which were never real is a figure a reader divides by and gets a meaningless answer.
+It never appears among the dropped candidates. A drop count that folded in combinations which
+were never real is a figure a reader divides by and gets a meaningless answer.
 """
 
 from __future__ import annotations
@@ -15,20 +13,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from terezy.core.decision.candidates import enumerate_candidates
-from terezy.core.primitives.currency import Currency
-from terezy.core.results.candidates import (
-    CandidateSet,
-    NothingConnects,
-    NothingNeedsToConnect,
-)
-from terezy.core.results.composed import CompositionRefused, Unaskable
-from terezy.core.results.coverage import Destination
-from terezy.core.routes.compose import compose
+from terezy.core.results.candidates import CandidateSet
+from terezy.core.routes.path import EXIT_BY_IDENTITY
 from tests import candidate_registries as fixtures
 
 if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.decision.tuple_outcome import Registries
 
+CASH = "cash_uah_monobank"
 OVDP = "ovdp_synthetic_a"
 
 
@@ -48,12 +40,17 @@ class TestAnAbsentCorridorIsReportedAsAnAbsentCorridor:
         pairs = _enumerate(fixtures.declared()).no_candidate
         assert pairs
         for pair in pairs:
-            assert isinstance(pair.why, NothingConnects), pair
-            assert pair.why.side == "route_in"
+            assert pair.why.side == "route_in", pair
 
     def test_a_registry_with_no_way_out_reports_the_other_side(self) -> None:
-        """The exit half, which no declared registry reaches: every instrument's
-        proceeds land at `inzhur`, which `inzhur_to_monobank` carries out of."""
+        """The exit half. Every instrument bought at `inzhur` releases its proceeds there, and
+        `inzhur_to_monobank` is the only declared corridor out of it.
+
+        What survives is the balance, whose proceeds land somewhere the owner already spends
+        from: its way out is the identity exit and needs no corridor at all. Asserted rather
+        than excluded, because a candidate surviving the removal for the *wrong* reason -- a
+        corridor nobody declared -- is what this suite exists to catch.
+        """
         registries = fixtures.declared()
         routes = {
             route_id: route
@@ -67,83 +64,14 @@ class TestAnAbsentCorridorIsReportedAsAnAbsentCorridor:
             ceiling=fixtures.ceiling(10_000),
         )
         assert isinstance(enumerated, CandidateSet), enumerated
-        assert enumerated.candidates == ()
-        sides = {
-            pair.why.side
-            for pair in enumerated.no_candidate
-            if isinstance(pair.why, NothingConnects)
+        # Membership, not a subset: `<= {EXIT_BY_IDENTITY}` alone is satisfied by an empty
+        # set, so it would stay green if the balance stopped being enumerated at all -- which
+        # is the disappearance this case exists to catch.
+        assert [candidate.key.instrument_id for candidate in enumerated.candidates] == [CASH]
+        assert {candidate.key.route_out for candidate in enumerated.candidates} == {
+            EXIT_BY_IDENTITY
         }
-        assert "route_out" in sides
-
-
-class TestMoneyAlreadyWhereItWasWantedIsNotAGapInTheRegistry:
-    """FR-014, and the `zero-hop-way-in` gap made visible rather than closed.
-
-    A stream arriving in the right currency at the venue an instrument is bought at needs no way
-    in -- and 010's `Tuple` requires one, so that candidate is not representable. What the column
-    reports is the *pair*, with compose's own words, so the missing candidate is never mistaken
-    for a corridor nobody declared.
-    """
-
-    @staticmethod
-    def _bought_where_the_salary_lands() -> Registries:
-        return fixtures.with_access(fixtures.declared(), OVDP, bought_at="monobank_uah")
-
-    def test_the_pair_is_reported_with_the_other_reason_type(self) -> None:
-        pairs = _enumerate(self._bought_where_the_salary_lands()).no_candidate
-        already = [
-            pair
-            for pair in pairs
-            if pair.instrument_id == OVDP and pair.stream_id == fixtures.SALARY
-        ]
-        assert len(already) == 1
-        assert isinstance(already[0].why, NothingNeedsToConnect)
-
-    def test_it_carries_composes_case_so_nothing_reads_the_words_to_classify_it(self) -> None:
-        pairs = _enumerate(self._bought_where_the_salary_lands()).no_candidate
-        why = next(
-            pair.why
-            for pair in pairs
-            if pair.instrument_id == OVDP and pair.stream_id == fixtures.SALARY
-        )
-        assert isinstance(why, NothingNeedsToConnect)
-        assert why.refusal.case is Unaskable.ALREADY_ARRIVED
-
-    def test_composes_reason_reaches_the_report_verbatim(self) -> None:
-        """SC-008, asserted by string equality against `compose`'s own answer.
-
-        Rebuilt by calling `compose` here rather than compared against a copy of the sentence:
-        a copy would agree with itself forever, which is exactly the staleness the assertion
-        exists to catch.
-        """
-        registries = self._bought_where_the_salary_lands()
-        refusal = compose(
-            routes=registries.routes,
-            stream=registries.streams[fixtures.SALARY],
-            destination=Destination(venue_id="monobank_uah", currency=Currency.UAH),
-            direction="inbound",
-            regime_id=fixtures.question(registries).regime_id,
-            bound=fixtures.declarations().composition.bound,
-            spendable=registries.spendable,
-        )
-        why = next(
-            pair.why
-            for pair in _enumerate(registries).no_candidate
-            if pair.instrument_id == OVDP and pair.stream_id == fixtures.SALARY
-        )
-        assert isinstance(refusal, CompositionRefused)
-        assert isinstance(why, NothingNeedsToConnect)
-        assert why.refusal.reason == refusal.reason
-
-    def test_the_other_stream_for_the_same_instrument_is_still_a_plain_gap(self) -> None:
-        """The two reasons appear side by side for one instrument, which is what makes the
-        distinction load-bearing rather than a property of a whole registry."""
-        pairs = {
-            (pair.instrument_id, pair.stream_id): pair.why
-            for pair in _enumerate(self._bought_where_the_salary_lands()).no_candidate
-        }
-        assert isinstance(pairs[OVDP, fixtures.SALARY], NothingNeedsToConnect)
-        assert isinstance(pairs[OVDP, fixtures.CONTRACT], NothingConnects)
+        assert "route_out" in {pair.why.side for pair in enumerated.no_candidate}
 
 
 def test_a_pair_yielding_nothing_is_never_among_the_candidates() -> None:

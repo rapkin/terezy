@@ -1327,8 +1327,14 @@ class TestNoFieldDefaultStandsInForAValue:
         # `every_declared_instrument` reading, for its reason: two shapes side by side would
         # leave which one is in force to be settled by whichever the code read first.
         "BandTable": frozenset({"amount", "currency", "fraction_of_the_question_amount", "days"}),
+        # Every field but the subject and the kind, because each belongs to some kinds of plan
+        # and not to others -- and the loader **requires** each of them on the kinds that have
+        # one, naming the file and the field. `consumption_method` joined with 023: a balance
+        # opens one lot and closes it, so there is no choice between lots to state and a cash
+        # plan declaring one is refused.
         "QuestionPlanTable": frozenset(
             {
+                "consumption_method",
                 "coupon_policy",
                 "liquidity_mode",
                 "buyback",

@@ -40,10 +40,20 @@ def _set(registries: Registries) -> CandidateSet:
     return result
 
 
-def test_the_declared_registry_reaches_this_nowhere() -> None:
+def test_no_declared_bond_or_fund_reaches_this_without_the_fixture() -> None:
     """The control that makes the fixture mean something: on the declarations as they stand
-    every way out is a declared chain, so finding the sentinel there would be finding a bug."""
-    ways_out = {item.key.route_out for item in _set(fixtures.declared()).candidates}
+    every *bought* instrument's way out is a declared chain, so finding the sentinel on one
+    would be finding a bug.
+
+    A cash balance is the exception and not an edit: since 023 its proceeds land where the
+    owner already spends, which is the whole of what makes it the do-nothing baseline.
+    """
+    registries = fixtures.declared()
+    ways_out = {
+        item.key.route_out
+        for item in _set(registries).candidates
+        if item.key.instrument_id not in registries.cash
+    }
     assert ways_out == {DeclaredExit(route_id="inzhur_to_monobank")}
 
 

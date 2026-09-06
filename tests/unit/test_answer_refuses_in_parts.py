@@ -142,8 +142,8 @@ def test_the_answer_stands_when_no_horizon_produced_a_ranking() -> None:
 def test_a_question_whose_subjects_the_registry_declares_none_of_still_answers() -> None:
     """SC-020. Every named subject in the undeclared population, every section empty."""
     question = fixtures.owners_question()
-    narrowed = fixtures.with_plans(fixtures.with_subjects(question, "cash", "btc"), {})
-    result = fixtures.answered(replace(narrowed, benchmark_instrument_id="cash"))
+    narrowed = fixtures.with_plans(fixtures.with_subjects(question, "btc", "gold"), {})
+    result = fixtures.answered(replace(narrowed, benchmark_instrument_id="btc"))
     assert isinstance(result, Answer)
     assert len(result.sections) == 3
     for section in result.sections:
@@ -249,9 +249,9 @@ def test_a_section_that_refused_before_enumerating_says_so_rather_than_naming_a_
     result = _plant_ceiling()
     for section in result.sections:
         counts = subject_counts(result, section)
-        assert counts.not_assessed == 2
+        assert counts.not_assessed == 3
         assert counts.declared_but_unreached == 0
-        assert counts.undeclared == 2
+        assert counts.undeclared == 1
         assert not [item for item in section.standings if isinstance(item, SubjectUnreached)]
 
 
@@ -259,10 +259,10 @@ def test_a_benchmark_that_yields_nothing_still_knows_which_subjects_connect() ->
     """Enumeration succeeded there -- the benchmark is what failed -- so the set is in hand."""
     question = fixtures.owners_question()
     narrowed = fixtures.with_plans(
-        fixtures.with_subjects(question, fixtures.OVDP, "cash"),
+        fixtures.with_subjects(question, fixtures.OVDP, "btc"),
         {fixtures.OVDP: question.plans[fixtures.OVDP]},
     )
-    result = fixtures.answered(replace(narrowed, benchmark_instrument_id="cash"))
+    result = fixtures.answered(replace(narrowed, benchmark_instrument_id="btc"))
     for section in result.sections:
         assert isinstance(section.outcome, BenchmarkYieldsNoCandidate)
         counts = subject_counts(result, section)

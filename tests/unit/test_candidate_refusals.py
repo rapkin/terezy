@@ -28,7 +28,9 @@ from terezy.core.results.candidates import (
     UndeclaredRouteSupplied,
 )
 from terezy.core.results.composed import SegmentBound, Unaskable
-from terezy.core.routes.path import segments_of
+from terezy.core.routes.path import (
+    entry_segments_of,
+)
 from tests import candidate_registries as fixtures
 from tests import tuple_registries as tuples
 
@@ -171,7 +173,7 @@ class TestARouteTheRegistryDoesNotDeclare:
         )
         assert isinstance(result, CandidateSet), result
         assert extra.id in {
-            name for item in result.candidates for name in segments_of(item.key.route_in)
+            name for item in result.candidates for name in entry_segments_of(item.key.route_in)
         }
 
 

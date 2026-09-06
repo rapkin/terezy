@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Final, Literal
 
 from terezy.core.decision.candidates import enumerate_candidates
+from terezy.core.instruments.cash import CashAssumptions
 from terezy.core.instruments.fund import ChosenPoint, FundDeclaration
 from terezy.core.instruments.interface import Assumptions, DateRange
 from terezy.core.primitives import provenance as prov
@@ -29,7 +30,7 @@ from terezy.core.results.candidates import (
 )
 from terezy.core.results.coverage import IMPLICIT_REGIME_ID, SpendableEndpoint
 from terezy.core.results.fund import FundAssumptions
-from terezy.core.results.tuple import HOLD_AS_CASH, Tuple
+from terezy.core.results.tuple import HOLD_AS_CASH, InstrumentPlan, Tuple
 from terezy.data.declarations import resolver
 from tests import data_roots
 
@@ -38,7 +39,6 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
 
     from terezy.core.decision.tuple_outcome import Registries
     from terezy.core.results.composed import SegmentBound
-    from terezy.core.results.tuple import InstrumentPlan
     from terezy.core.routes.legs import Route
 
 REPO_ROOT: Final = data_roots.REPO_ROOT
@@ -136,18 +136,22 @@ def declared(root: Path = DATA_ROOT) -> Registries:
 def one_plan_each(registries: Registries) -> dict[str, tuple[InstrumentPlan, ...]]:
     """One run plan per declared instrument, of the kind that instrument's declaration takes.
 
-    A fund gets a fund plan and a bond gets a bond plan, because a plan of the wrong kind is
+    Each declaration kind gets its own kind of plan, because a plan of the wrong kind is
     ``PlanDoesNotFitInstrument`` -- a *drop*, which several suites here plant deliberately and
     none of them wants by accident.
     """
     return {
-        instrument_id: (
-            (fund_plan(registries.funds[instrument_id]),)
-            if instrument_id in registries.funds
-            else (HOLD_TO_MATURITY,)
-        )
+        instrument_id: (_plan_for(registries, instrument_id),)
         for instrument_id in sorted(registries.access)
     }
+
+
+def _plan_for(registries: Registries, instrument_id: str) -> InstrumentPlan:
+    if instrument_id in registries.funds:
+        return fund_plan(registries.funds[instrument_id])
+    if instrument_id in registries.cash:
+        return CashAssumptions()
+    return HOLD_TO_MATURITY
 
 
 def question(

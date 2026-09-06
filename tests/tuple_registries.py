@@ -18,6 +18,7 @@ from typing import Any, Final
 
 from terezy.core.decision.tuple_outcome import Registries
 from terezy.core.instruments.access import InstrumentAccess, VenueQuote
+from terezy.core.instruments.cash import CashAssumptions
 from terezy.core.instruments.fund import BuybackAvailability, ChosenPoint, LiquidityMode
 from terezy.core.instruments.interface import Assumptions, DateRange
 from terezy.core.primitives import provenance as prov
@@ -27,6 +28,7 @@ from terezy.core.results.fund import FundAssumptions
 from terezy.core.results.tuple import HOLD_AS_CASH, Tuple
 from terezy.core.routes.legs import Leg, Route
 from terezy.core.routes.path import (
+    ENTRY_BY_IDENTITY,
     EXIT_BY_IDENTITY,
     FROM_THE_DECLARATION,
     DeclaredExit,
@@ -49,6 +51,7 @@ UAH: Final = Currency.UAH
 __all__ = [
     "AMOUNT",
     "AS_OF",
+    "CASH",
     "DATA_ROOT",
     "DOMESTIC_IN",
     "DOMESTIC_OUT",
@@ -77,6 +80,7 @@ __all__ = [
     "Registries",
     "VenueQuote",
     "access",
+    "cash_tuple",
     "date",
     "declared",
     "fund_tuple",
@@ -130,6 +134,7 @@ HORIZON: Final = DateRange(start=OUTLAY_ON, end=HORIZON_END)
 AMOUNT: Final = Money(10_000.0, UAH, prov.EMPTY)
 """Ten units of issue A at its declared par price of 1 000.00, so nothing is left undeployed."""
 
+CASH: Final = "cash_uah_monobank"
 OVDP: Final = "ovdp_synthetic_a"
 SALARY: Final = "salary_uah"
 DOMESTIC_IN: Final = "inzhur_direct"
@@ -167,6 +172,21 @@ def hurdle_tuple(*, route_out: ExitChoice = FROM_THE_DECLARATION) -> Tuple:
         route_in=FundingPath(destination_id="inzhur", stream_id=SALARY, route_id=DOMESTIC_IN),
         exit_terms=HOLD_TO_MATURITY,
         route_out=route_out,
+    )
+
+
+def cash_tuple(instrument_id: str = CASH, *, stream_id: str = SALARY) -> Tuple:
+    """A balance bought and spent at the venue the hryvnia salary already arrives at.
+
+    Both legs identity, which is what makes it the do-nothing baseline rather than a cheap
+    journey: no route is named on either side, so no route's citation can reach its figures.
+    """
+    return Tuple(
+        instrument_id=instrument_id,
+        stream_id=stream_id,
+        route_in=ENTRY_BY_IDENTITY,
+        exit_terms=CashAssumptions(),
+        route_out=EXIT_BY_IDENTITY,
     )
 
 

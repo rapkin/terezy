@@ -170,4 +170,5 @@ def declared_labels(
     return {
         **{name: item.groups for name, item in registries.instruments.items()},
         **{name: item.groups for name, item in registries.funds.items()},
+        **{name: item.groups for name, item in registries.cash.items()},
     }
