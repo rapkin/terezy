@@ -176,6 +176,13 @@ needs  = ["008-seed-and-goals", "011-official-rate", "015-the-question", "018-nb
 why    = "008 declares the seed lots this position is made of and the estimated basis it carries; 011 strikes the dollar cost into hryvnia at the acquisition date and 018 is the series it strikes from -- both, because 011 shipped the machinery empty; 015 is where `btc` resolves to nothing and the verification task that says what would close it; 020 publishes the schema this feature edits, since a fifth subject standing regenerates the OpenAPI document. NOT parallel with 019 in practice: both regenerate tests/golden/the_answer.golden.txt and whichever lands second re-measures"
 note   = "Owner 2026-09-02/03 -- he holds BTC and wants it counted, not bought. `drafted` with plan.md and tasks.md written: two clarifications are open and tasks.md holds every artefact that turns on one in a phase that may not start. See specs/025-btc-holdings/spec.md."
 
+[[feature]]
+id     = "026-answer-screen"
+status = "drafted"
+needs  = ["019-decision-layer", "021-web-declared-data"]
+why    = "019 produces the non-dominated set, the separating assumptions and the benchmark standing this screen renders, and nothing else reports them to a reader; 021 owns the client, its router, its figure/mark/refusal components and the `as_of` search parameter this page reuses unchanged"
+note   = "The home page becomes the answer, drawn in the visual language the owner chose 2026-09-06. ZERO ENGINE CHANGES is his constraint, with one declared exception (FR-007's venue kind): the screen renders what the API serves today and every gap is a listed obligation, not a blocker."
+
 [[future]]
 id    = "the-graph-has-no-word-for-drafted-and-planned"
 after = ["025-btc-holdings"]
@@ -343,7 +350,7 @@ note  = "A bond sold before maturity fetches what the market pays that day, and 
 [[future]]
 id    = "cli-renders-raw-floats"
 after = ["015-the-question"]
-note  = "The CLI prints unrounded floats -- an amount as 49834.350000000006, a rate as 3.7e-16 -- so a correct figure reads as a broken one. Formatting only; see specs/015-the-question/spec.md for what the answer output carries."
+note  = "The CLI prints unrounded floats -- an amount as 49834.350000000006, a rate as 3.7e-16 -- so a correct figure reads as a broken one. Formatting only; see specs/015-the-question/spec.md for what the answer output carries. THE WEB HALF IS CLOSED BY 026-answer-screen (its FR-026, one formatting module); the CLI stays as it is, so this entry stays open."
 
 [[future]]
 id    = "generative-accrual-boundaries"
@@ -359,3 +366,13 @@ note  = "A series route loaded without a window redirects to the API's declared 
 id    = "one-invariant-module-depends-on-worker-assignment"
 after = ["003-route-coverage"]
 note  = "`tests/invariants/test_coverage_costing_agreement.py::test_the_battery_produced_both_ready_and_not_ready_verdicts` reads a module-level `_SEEN` the property above it fills, so it passes only when both run in the same process. Under `pytest -n auto` xdist may put them on different workers and it fails with `the battery only produced nothing` -- reproduced three times in ten runs on 2026-09-06, and green in ten of ten under `-n auto --dist loadfile`. So the vacuity guard is real but its verdict depends on scheduling, which is the shape a false guard has. What would close it is pinning the module to one worker (`xdist_group`) or making the battery a fixture the guard reads directly rather than a module global. Found while running the gates on an unrelated branch, 2026-09-06."
+
+[[future]]
+id    = "the-interactive-graph"
+after = ["026-answer-screen"]
+note  = "Entities as nodes, routes as edges, a candidate's path lit on selection -- the owner asked for it 2026-09-06 and 026 draws no edges. It needs the edge vocabulary settled first: the visual language names transfer/FX/purchase/redemption while `core/routes/legs.py` declares transfer|fx|trade|withdrawal, and purchase and redemption are stages of a tuple rather than legs."
+
+[[future]]
+id    = "the-answer-document-is-too-big-for-a-screen"
+after = ["026-answer-screen"]
+note  = "MEASURED 2026-09-06: /api/questions/fifty-thousand-hryvnia/answer is 8.0 MB on the wire, 4.6 MB of it dominance.dominated, because every verdict carries both candidates' merged provenance and staleness. 026 fetches it whole behind a named loading state; the remedy is OB-10 in its spec and never a client-side trim, which would be the truncation its FR-008 forbids."
