@@ -1440,11 +1440,18 @@ def _send_the_remainder_home(
     )
     if isinstance(way_out, RouteUnusable):
         return _stayed(prepared, remainder, way_out.reason), None
-    # The refusal is read for its reason rather than returned: the ceiling rule lives in one
-    # place and only what a caller does with its answer differs.
+    # The ceiling rule lives in `_over_the_way_out_cap` and is read here rather than restated;
+    # its own reason is not, because that one says the tuple was refused and this one is not.
     capped = _over_the_way_out_cap(way_out, remainder.amount, purchased_on)
     if capped is not None:
-        return _stayed(prepared, remainder, capped.reason), None
+        return _stayed(
+            prepared,
+            remainder,
+            f"the way out declares a monthly ceiling of {capped.ceiling.amount!r} "
+            f"{capped.ceiling.currency.value}, and {capped.excess.amount!r} of the remainder "
+            "is over it. Splitting a movement across months needs a declared fallback policy "
+            "and the month's consumed capacity, neither of which a tuple carries.",
+        ), None
     return (
         UndeployedCash(
             amount=remainder.amount,
@@ -1460,6 +1467,14 @@ def _send_the_remainder_home(
     )
 
 
+def _stranded(undeployed: UndeployedCash | None) -> Money | None:
+    """The part of the outlay that never came home, or ``None`` where none is."""
+    match undeployed:
+        case UndeployedCash(journey=RemainderStayed(), amount=amount):
+            return amount
+    return None
+
+
 def _stayed(prepared: _Prepared, remainder: _Remainder, why: str) -> UndeployedCash:
     """The remainder, left where the purchase left it, with the reason it could not travel."""
     return UndeployedCash(
@@ -1469,8 +1484,8 @@ def _stayed(prepared: _Prepared, remainder: _Remainder, why: str) -> UndeployedC
             reason=(
                 f"{remainder.amount.amount!r} {remainder.amount.currency.value} could not "
                 f"leave {prepared.access.bought_at!r} along this tuple's declared way out: "
-                f"{why} It is out of what reaches a spendable endpoint and out of the rate, "
-                "because it did not come home."
+                f"{why} It is out of what reaches a spendable endpoint, and the rate is "
+                "refused rather than measured, because part of the outlay never came home."
             )
         ),
         reason=remainder.reason,
@@ -1625,6 +1640,7 @@ def _assemble(
         prepared,
         outlay=outlay,
         arriving=home,
+        stranded=_stranded(undeployed),
         endpoint_currency=endpoint_currency,
         span=span,
     )
@@ -1921,6 +1937,7 @@ def _rate(
     *,
     outlay: Money,
     arriving: tuple[tuple[date, Money], ...],
+    stranded: Money | None,
     endpoint_currency: Currency,
     span: DateRange,
 ) -> NominalRate | RateNotComparable:
@@ -1931,6 +1948,11 @@ def _rate(
     which comes home along the declared way out with its own cost and its own arrival date.
     Netting it off the denominator instead would assume it recoverable at par and free, and it
     is neither: it is a costed movement like any other.
+
+    **Where the way out would not carry it there is no figure at all**, and that is Principle I
+    rather than caution: measuring on the whole outlay prices the stranded amount at zero and
+    netting it off prices it at par, nothing declares which it is worth, and both look like a
+    real rate. The amount is unaffected and is reported.
 
     Time is measured with the **instrument's declared day-count convention**, from the first
     outlay -- the same convention that sized the instrument's own flows, so this rate and
@@ -1943,13 +1965,28 @@ def _rate(
     against the same kind rather than two figures that resemble each other.
 
     Its precondition is a **conventional series** -- one payment out at the start, receipts
-    afterwards -- and that precondition is checked here rather than discovered as an
-    exception, because a series that fails it is a fact about this round trip (everything was
-    eaten by fees, or nothing came back) and not a caller's mistake. A round trip with no
-    arrivals at all falls into the same check rather than into a guard of its own: a total of
-    nothing is not positive, and one statement covers both.
+    afterwards, over a period -- and it is checked here rather than discovered as an exception,
+    because a series that fails it is a fact about this round trip and not a caller's mistake.
+    Two ways it fails, and neither is the caller's fault: nothing positive came back
+    (everything was eaten by fees, or nothing came back at all), or everything came back on the
+    day it left, so there is no period for a return to be over and the present value never
+    crosses zero. ``internal_rate_of_return`` raises on both, by its own contract.
     """
     endpoint = endpoint_currency
+    if stranded is not None:
+        return RateNotComparable(
+            reason=(
+                f"{stranded.amount!r} {stranded.currency.value} of the {outlay.amount!r} that "
+                "left the stream never came home: the declared way out will not carry the "
+                "remainder the purchase could not deploy. Measuring the return on the whole "
+                "outlay prices that amount at zero and netting it off prices it at par, "
+                "nothing declares which it is worth, and both produce a figure that looks "
+                "like a rate. The amount that reaches a spendable endpoint is unaffected and "
+                "is reported, with the remainder beside it."
+            ),
+            missing="a declared way home for the remainder, or a declared value for cash "
+            "stranded at a venue",
+        )
     # One guard for one rule: what left and what came back have to be in one currency, because
     # a money-weighted return over two of them is not a rate of anything. Valuing one in the
     # other needs a rate that values a currency *for a return*, and neither rate this system
@@ -1978,6 +2015,21 @@ def _rate(
                 "amounts are reported as they stand."
             ),
             missing="a conventional series -- one payment out at the start, receipts after it",
+        )
+    # Unreachable on today's declarations -- every shipped and fixture way out declares a
+    # latency, and a holding that releases nothing still sells at the window's end. Written
+    # because the remainder made a same-day receipt possible for the first time, and the
+    # alternative to a typed refusal here is `internal_rate_of_return` raising out of the
+    # pure core.
+    if span.end == span.start:
+        return RateNotComparable(
+            reason=(
+                f"everything came back on {span.start.isoformat()}, the day the money left, so "
+                "there is no period for a return to be a return over. A present value that "
+                "does not move with the rate crosses zero at no rate at all, and reporting one "
+                "would be inventing a period nobody waited."
+            ),
+            missing="a span -- a rate of return is a rate over a period",
         )
     year_fraction = day_count(_day_count_of(prepared))
     flows: list[CashFlow] = [(0.0, -outlay.amount)]

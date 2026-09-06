@@ -3049,11 +3049,13 @@ reaches a spendable endpoint, and the rate is measured against the whole amount 
 stream rather than against the outlay less the remainder.
 
 Where the declared way out will not carry it, the remainder stays where it was left and the
-outcome says so, with the amount out of both figures. The usual cause is that the remainder is
-at the venue the purchase was made at while the chain departs from where the instrument
-releases its **proceeds** — two declarations, and crossing them would be §29.2's invented leg.
-That is a report and not a refusal of the tuple: a release that cannot come home means the
-holding cannot be liquidated, and a remainder that cannot come home is the change from the
+outcome says so. The usual cause is that the remainder is at the venue the purchase was made at
+while the chain departs from where the instrument releases its **proceeds** — two declarations,
+and crossing them would be §29.2's invented leg. The amount is then outside what reaches the
+endpoint and the **rate is refused**: on the whole outlay the stranded amount is priced at
+zero, netted off it is priced at par, nothing declares which it is worth, and both read as a
+rate. That is a report and not a refusal of the tuple: a release that cannot come home means
+the holding cannot be liquidated, and a remainder that cannot come home is the change from the
 purchase, with the position beside it unaffected.
 
 A **declared monthly ceiling refuses, on both sides of the round trip** (FR-016: the rules
@@ -3157,6 +3159,8 @@ unaffected in all three:
   rate of anything, and valuing one in the other needs a reference rate on a date, which is
   feature 011. A channel rate is not one: a channel is a market you transact in, and the rate
   that values an outlay against a return is a reference;
+* part of the outlay never came home, because the declared way out would not carry the
+  undeployed remainder (§29.3);
 * the round trip returned nothing;
 * an arrival is negative, because the repatriation charges exceeded what was released. A
   series that is not one payment out followed by receipts has no single internal rate of

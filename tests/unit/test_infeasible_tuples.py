@@ -31,7 +31,9 @@ from terezy.core.results.tuple import (
     BelowMinimumTicket,
     BuysNoWholeUnit,
     InstrumentRefused,
+    RateNotComparable,
     RemainderCameHome,
+    RemainderStayed,
     RouteInCapExceeded,
     RouteInUnusable,
     SeamDoesNotChain,
@@ -40,10 +42,15 @@ from terezy.core.results.tuple import (
     WayOutCapExceeded,
     WayOutUnusable,
 )
+from terezy.core.routes.path import EXIT_BY_IDENTITY
 from tests import tuple_registries as fixtures
 
 UAH: Final = fixtures.UAH
 FLAT_FEE_ROUTE: Final = "test_flat_fee_in"
+SPENDABLE_VENUE: Final = "monobank_uah"
+"""A declared spendable endpoint, so moving an instrument's proceeds there makes the way out
+the identity exit."""
+
 IN_LATENCY_DAYS: Final = 1
 EXIT_LATENCY_DAYS: Final = 3
 """What `inzhur_direct` and `inzhur_to_monobank` declare."""
@@ -275,12 +282,12 @@ class TestARemainderTheIncrementCannotDeploy:
     def test_the_recovery_is_something_the_outcome_accounts_for_rather_than_excludes(
         self,
     ) -> None:
-        # The scope statements are what a reader meets, so they move with the behaviour: the
-        # journey home is priced, so `excludes` may no longer say it is not costed.
+        # The scope statements are what a reader meets, so they move with the behaviour: this
+        # remainder's journey home is priced, so `excludes` may no longer say it is not costed.
         outcome = _evaluate(_registries(), fixtures.hurdle_tuple(), 1_500.0)
         assert isinstance(outcome, TupleOutcome)
+        assert isinstance(_came_home(outcome), RemainderCameHome)
         assert not [item for item in outcome.excludes if "undeployed" in item]
-        assert [item for item in outcome.accounts_for if "the remainder" in item]
 
     def test_an_exact_multiple_leaves_no_remainder_at_all(self) -> None:
         # `None` rather than a zero, because "there was nothing left over" and "the leftover
@@ -290,6 +297,56 @@ class TestARemainderTheIncrementCannotDeploy:
         outcome = _evaluate(_registries(), fixtures.hurdle_tuple(), 10_000.0)
         assert isinstance(outcome, TupleOutcome), outcome
         assert outcome.undeployed is None
+
+
+class TestARemainderTheDeclaredWayOutWillNotCarry:
+    """The remainder is at the **purchase** venue and the way out departs from where the
+    proceeds land, which are two declarations (FR-003a).
+
+    The fixture moves one instrument's ``proceeds_to`` to a venue the owner already spends
+    from, so the way out is the identity exit and there is nothing declared that carries cash
+    from `inzhur` to it. That is the shape `tests/unit/test_identity_exit_candidate.py` builds
+    for a different reason, and it is why this arm is a reported state rather than a branch
+    nothing reaches.
+    """
+
+    def _outcome(self, amount: float) -> TupleOutcome:
+        registries = fixtures.with_access(_registries(), fixtures.OVDP, proceeds_to=SPENDABLE_VENUE)
+        candidate = replace(fixtures.hurdle_tuple(), route_out=EXIT_BY_IDENTITY)
+        outcome = _evaluate(registries, candidate, amount)
+        assert isinstance(outcome, TupleOutcome), outcome
+        return outcome
+
+    def test_the_tuple_is_reported_and_the_remainder_stays_where_it_was_left(self) -> None:
+        # Not a refusal: the position came home perfectly well, and what is stranded is the
+        # 500.00 of change. Refusing the whole tuple would throw away a complete answer.
+        outcome = self._outcome(1_500.0)
+        undeployed = outcome.undeployed
+        assert undeployed is not None
+        assert isinstance(undeployed.journey, RemainderStayed), undeployed.journey
+        assert_money_close(undeployed.amount, Money(500.0, UAH, prov.EMPTY))
+        assert undeployed.venue_id == "inzhur"
+        assert "inzhur" in undeployed.journey.reason
+        assert SPENDABLE_VENUE in undeployed.journey.reason
+
+    def test_it_is_out_of_what_reaches_the_endpoint(self) -> None:
+        # The same holding either way, so the 500.00 is the whole of the difference -- and
+        # here there is none, because it never travelled.
+        assert is_close(
+            self._outcome(1_500.0).reaches.amount, self._outcome(1_000.0).reaches.amount
+        )
+
+    def test_the_rate_is_refused_rather_than_pricing_the_stranded_amount(self) -> None:
+        # Principle I. On the whole outlay the 500.00 is priced at zero and this 16% bond
+        # reports -7.11%; netted off the outlay it is priced at par. Nothing declares which
+        # stranded cash is worth, and both figures read as a rate -- so there is no figure.
+        # The exact multiple beside it strands nothing and keeps its rate, which is what says
+        # the refusal is about the remainder and not about the fixture.
+        refused = self._outcome(1_500.0).implied_rate
+        assert isinstance(refused, RateNotComparable), refused
+        assert "500.0" in refused.reason
+        assert "never came home" in refused.reason
+        assert isinstance(self._outcome(1_000.0).implied_rate, NominalRate)
 
 
 class TestADeclarationWithNoIncrementLeavesNoRemainderAtAll:

@@ -351,7 +351,7 @@ class TestAScopeStatementIsCheckedAgainstTheBehaviourItDescribes:
         #   in 100.00 flat, out 25.00 flat, 10 500.00 sent -> 10 400.00 arrives, 400.00 over
         exact = _outcome(10_100.0, flat=100.0, out_flat=25.0)
         stranded = _outcome(10_500.0, flat=100.0, out_flat=25.0)
-        clause = next(item for item in stranded.accounts_for if "the remainder" in item)
+        clause = next(item for item in stranded.accounts_for if "travelled it" in item)
         assert "exit route costs (out)" in clause
         undeployed = stranded.undeployed
         assert undeployed is not None

@@ -108,17 +108,21 @@ def test_the_standing_is_not_derived_from_010s_one_dimensional_verdict() -> None
 @pytest.mark.parametrize("index", HORIZONS)
 def test_neither_verdict_is_the_other_at_any_horizon(index: int) -> None:
     """And the disagreement is on the record rather than resolved, because resolving it needs a
-    weight (FR-005). At twelve months it is at its sharpest: twelve candidates out-rate the
-    hurdle and none of them dominates it."""
+    weight (FR-005). At twelve months it is at its sharpest: candidates out-rate the hurdle and
+    none of them dominates it.
+
+    The expected standing is asserted per horizon rather than read off the result. Without it
+    the twelve-month case degenerates -- ``dominators`` is empty there, so ``beats !=
+    dominators`` follows from ``beats`` alone and would survive the two verdicts becoming one.
+    """
     section = sections.section(index)
     standing = sections.result(section).benchmark_standing
     comparison = section.outcome.comparison  # type: ignore[union-attr]
     assert isinstance(comparison, Comparison)
     beats = {comparison.ranked[position].key for position in comparison.beats_benchmark}
-    dominators = (
-        {verdict.dominates for verdict in standing.by}
-        if isinstance(standing, HurdleIsDominated)
-        else set()
-    )
     assert beats
-    assert beats != dominators
+    if index in DOMINATED_AT:
+        assert isinstance(standing, HurdleIsDominated), standing
+        assert beats != {verdict.dominates for verdict in standing.by}
+    else:
+        assert isinstance(standing, NothingDominatesTheHurdle), standing

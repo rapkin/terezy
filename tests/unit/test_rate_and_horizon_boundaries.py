@@ -384,17 +384,13 @@ class TestTheOtherWaysAPartRefuses:
 
 
 class TestAForeignInstrumentIsClosedByTwoGuardsAndNotByTheShippedData:
-    """Why the rate's three-currency case has no test: it has no way in.
+    """A foreign-currency bond is closed twice over, and both halves are asserted here.
 
-    The rate is refused where what left, what stayed behind undeployed and what came back are
-    not all in one currency. The third amount is reachable only from a *bond* -- nothing else
-    declares a ``min_unit``, so nothing else leaves a remainder -- and a foreign-currency bond
-    is closed twice over. Both halves are asserted here rather than described, because "this
-    branch is unreachable" is precisely the claim that quietly stops being true: a later
-    feature that lets a projection hold a position and its tax in two currencies, or that lets
-    an instrument declare an exempt kind without a class, opens it, and it should fail a test
-    on the way rather than surface as a rate that appears at one amount and vanishes at
-    another.
+    Described rather than left implicit because "this branch is unreachable" is precisely the
+    claim that quietly stops being true: a later feature that lets a projection hold a position
+    and its tax in two currencies, or that lets an instrument declare an exempt kind without a
+    class, opens it, and it should fail a test on the way rather than surface as a figure
+    nobody expected.
     """
 
     def _foreign(self, *, declares_tax: bool) -> Registries:

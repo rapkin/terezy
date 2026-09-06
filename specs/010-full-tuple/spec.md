@@ -296,10 +296,13 @@ changed.
   Where the declared way out will not carry it — most often because the remainder is at
   the venue the purchase was made at while the chain departs from where the instrument
   releases its proceeds, which are two declarations — the outcome MUST say so in a typed
-  statement carrying the reason, and the amount stays out of both figures. That is a
-  report and **not** a refusal of the tuple: a release that cannot come home means the
-  holding cannot be liquidated, while a remainder that cannot come home is the change
-  from the purchase and the position beside it is unaffected.
+  statement carrying the reason, the amount stays out of what reaches the endpoint, and
+  the **rate MUST be a typed refusal**: measuring on the whole outlay prices the stranded
+  amount at zero and netting it off prices it at par, nothing declares which it is worth,
+  and both produce a figure that reads as a rate. That is a report and **not** a refusal
+  of the tuple: a release that cannot come home means the holding cannot be liquidated,
+  while a remainder that cannot come home is the change from the purchase and the
+  position beside it is unaffected.
 - **FR-004**: A tuple's parts MUST chain: the route in ends where and in the currency
   the instrument is bought; the instrument's exit proceeds start where and in the
   currency the route out begins. A mismatch MUST be refused naming both sides, never

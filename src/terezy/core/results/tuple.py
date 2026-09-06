@@ -190,8 +190,9 @@ class RemainderStayed:
 
     Reported rather than refusing the tuple: the position itself came home perfectly well, and
     what is stranded is the change from the purchase. It is out of
-    :attr:`TupleOutcome.reaches` and out of the rate, which is what the amount beside this
-    reason is for.
+    :attr:`TupleOutcome.reaches`, and :attr:`TupleOutcome.implied_rate` is a typed refusal --
+    part of the outlay never came home, and nothing declares whether stranded cash is worth
+    par or nothing.
     """
 
     reason: str
@@ -236,8 +237,7 @@ ACCOUNTS_FOR: Final[frozenset[str]] = frozenset(
         "the instrument's entry terms, including any declared markup",
         "tax on every taxable event over the holding's life",
         "the instrument's own exit terms, as explicit lines",
-        "exit route costs (out), charged on each amount that travelled it: every release, "
-        "and the remainder the purchase could not deploy",
+        "exit route costs (out), charged on each amount that travelled it",
         "ramp and settlement latency, inside the span the rate is measured over",
     }
 )
