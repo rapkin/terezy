@@ -27,14 +27,18 @@ import pytest
 
 from terezy.core.decision import answer as verb
 from terezy.core.decision.answer import section_evaluated
+from terezy.core.inflation.series import deflation_window
 from terezy.core.instruments.interface import DateRange
 from terezy.core.primitives import provenance as prov
-from terezy.core.primitives.rates import RealRate, RealTermsUnavailable
+from terezy.core.primitives.periods import months_in
+from terezy.core.primitives.rates import NominalRate, RealRate, RealTermsUnavailable
 from terezy.core.results import answer as records
 from terezy.core.results import question as question_records
 from terezy.core.results.answer import Answer, Direction, Exclusion
+from terezy.core.results.tuple import TupleOutcome
 from terezy.core.scenarios import quotation
 from tests import answer_registries as fixtures
+from tests import cpi_fixtures
 
 pytestmark = pytest.mark.contract
 
@@ -55,9 +59,7 @@ FORBIDDEN_IN_THIS_FEATURE: Final = (
 """Every way a rate could reach a figure here. **Not** ``exchange_rate``: FR-021a requires the
 owner to be able to *state* one, and forbidding the word would forbid the record he states."""
 
-ANSWER_WIDE: Final = frozenset(
-    {Exclusion.NO_REAL_TERMS_FIGURE, Exclusion.NO_INCOME_TAX_ON_THE_STATED_AMOUNT}
-)
+ANSWER_WIDE: Final = frozenset({Exclusion.NO_INCOME_TAX_ON_THE_STATED_AMOUNT})
 
 EARLY_EXIT_CLAIMS: Final = frozenset(
     {
@@ -139,7 +141,6 @@ def _vocabulary(result: Answer) -> set[str]:
         result.question.continuation.value,
         *(member.value for member in Exclusion),
         *(member.value for member in Direction),
-        verb.REAL_TERMS_SUPPLIED_BY,
         verb.INCOME_TAX_SUPPLIED_BY,
         verb.RATE_RISK_SUPPLIED_BY,
         verb.CLEAN_PRICE_SUPPLIED_BY,
@@ -175,17 +176,41 @@ def test_no_module_of_this_feature_derives_a_rate(module: Path) -> None:
         assert token not in executable, f"{module.name} mentions {token!r}"
 
 
-def test_the_two_answer_wide_exclusions_are_always_stated() -> None:
+def test_the_answer_wide_exclusion_is_always_stated() -> None:
     """SC-021's first half. An exclusion that is not stated is a silent default."""
     result = fixtures.answered()
     stated = {item.what for item in result.excludes if item.applies_to is None}
     assert stated == ANSWER_WIDE
 
 
-def test_no_real_terms_figure_appears_anywhere_in_the_result() -> None:
-    """SC-021's second half: the exclusion and the absence checked against each other."""
-    walked = _walk(fixtures.answered())
-    assert not [item for item in walked if isinstance(item, RealRate | RealTermsUnavailable)]
+def test_every_outcome_the_answer_holds_carries_a_computed_real_terms_figure() -> None:
+    """024 SC-006: the same walk, the opposite claim.
+
+    015 asserted that no real figure appeared anywhere in the answer, which is what its
+    `NO_REAL_TERMS_FIGURE` exclusion said in words. The walk rather than `section_evaluated`,
+    because it reaches every outcome the answer holds anywhere -- the ranked, the withheld and
+    the not-comparable alike -- and the claim is about all of them.
+
+    **That the slot is a union arm is the type's job, so this asserts what the type cannot:**
+    an outcome with a rate and an elapsed month in its window carries a *computed* assumed
+    figure. Filling the field with `hurdle.NOT_DEFLATED` would satisfy every structural check
+    and report two absences the run did not have.
+    """
+    result = fixtures.answered()
+    outcomes = [item for item in _walk(result) if isinstance(item, TupleOutcome)]
+    computed = 0
+
+    assert outcomes
+    for outcome in outcomes:
+        assert isinstance(outcome.real.realized, RealTermsUnavailable), outcome.key.instrument_id
+        if not isinstance(outcome.implied_rate, NominalRate):
+            continue
+        if not months_in(deflation_window(outcome.span.start, outcome.span.end)):
+            continue
+        assert isinstance(outcome.real.assumed, RealRate), outcome.key.instrument_id
+        computed += 1
+
+    assert computed
 
 
 def test_every_figure_the_shipped_answer_reports_carries_the_marks_of_its_registry() -> None:
@@ -207,6 +232,40 @@ def test_the_answers_marks_are_the_union_of_what_its_figures_rest_on() -> None:
     for section in result.sections:
         for outcome in section_evaluated(section):
             assert outcome.provenance.sources <= result.provenance.sources
+
+
+def test_the_answer_carries_the_deflators_marks_and_its_staleness_too() -> None:
+    """024 FR-011 at the answer's own level, not only the figure's.
+
+    An outcome's `provenance` deliberately excludes the CPI observations and the belief -- they
+    are not among the holding's inputs -- so a roll-up over `item.provenance` alone leaves a
+    source that is behind a **reported figure** outside `Answer.provenance`, which documents
+    itself as the union over every declaration behind every figure reported.
+
+    Run under a *cited* forecast, because the shipped placeholder belief carries no citation and
+    every realized half refuses: the gap is invisible on today's data and opens the day a
+    forecast is declared or the series is extended past a horizon.
+    """
+    supplied = fixtures.shipped_inputs()
+    forecast = cpi_fixtures.forecast_assumption(0.12, retrieved_on=date(2020, 1, 1))
+    result = fixtures.answered(
+        supplied=replace(supplied, registries=replace(supplied.registries, inflation=forecast))
+    )
+    behind = {
+        source.id
+        for section in result.sections
+        for outcome in section_evaluated(section)
+        if isinstance(outcome.real.assumed, RealRate)
+        for source in outcome.real.assumed.provenance.sources
+    }
+
+    assert behind
+    assert behind <= {source.id for source in result.provenance.sources}
+    assert {entry.source_id for entry in result.staleness.stale}, (
+        "a forecast retrieved in 2020 is long past its declared threshold, and an answer whose "
+        "every assumed figure rests on it reporting no stale source at all is the silently "
+        "stale value Principle I puts in the top severity class"
+    )
 
 
 def test_every_early_exit_figure_names_the_assumption_it_rests_on() -> None:

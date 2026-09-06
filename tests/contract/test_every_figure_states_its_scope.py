@@ -51,6 +51,9 @@ CLASSIFIED: Final[frozenset[str]] = frozenset(
         # The two figures, each labelled by its own field name (research.md D8).
         "reaches",
         "implied_rate",
+        # What the rate returns in purchasing power: two figures or two reasons, never a
+        # blend, and a different type from the nominal figure beside it (024 FR-001).
+        "real",
         # What the figures are of, and over what.
         "outlay",
         "arrivals",

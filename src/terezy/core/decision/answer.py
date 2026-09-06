@@ -28,6 +28,7 @@ from terezy.core.decision.dominance import dominance
 from terezy.core.decision.tuple_outcome import Registries
 from terezy.core.primitives import money, staleness
 from terezy.core.primitives import provenance as prov
+from terezy.core.primitives.rates import RealRate
 from terezy.core.results import candidates as candidate_results
 from terezy.core.results.answer import (
     AmountForAnUndeclaredStream,
@@ -77,7 +78,6 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.routes.legs import Route
     from terezy.core.scenarios.early_exit import SoldEarly
 
-REAL_TERMS_SUPPLIED_BY = "a real-terms rate on TupleOutcome, which feature 010 does not produce"
 INCOME_TAX_SUPPLIED_BY = "a deployable-capacity figure, which is a question about a stream"
 RATE_RISK_SUPPLIED_BY = "[[future]] secondary-market-rate-risk"
 CLEAN_PRICE_SUPPLIED_BY = "[[future]] secondary-market-rate-risk"
@@ -538,19 +538,13 @@ def _verdict(item: TupleOutcome, reserve: Reserve) -> ReserveVerdict:
 
 
 def _answer_wide_excludes() -> tuple[StatedExclusion, ...]:
-    """The two an answer always states, whatever it computed.
+    """The one an answer always states, whatever it computed.
 
     Every candidate-specific exclusion is on its **section**, because it is specific to a
     candidate *in a window*: the same key can be an early exit at one month and a
     hold-to-maturity at twelve.
     """
     return (
-        StatedExclusion(
-            what=Exclusion.NO_REAL_TERMS_FIGURE,
-            applies_to=None,
-            supplied_by=REAL_TERMS_SUPPLIED_BY,
-            direction=None,
-        ),
         StatedExclusion(
             what=Exclusion.NO_INCOME_TAX_ON_THE_STATED_AMOUNT,
             applies_to=None,
@@ -614,6 +608,20 @@ def _early_exit_exclusions(key: Tuple, sold: SoldEarly) -> tuple[StatedExclusion
     )
 
 
+def _real_figures(item: TupleOutcome) -> tuple[RealRate, ...]:
+    """The computed halves of an outcome's real slot, which carry marks the outcome does not.
+
+    An outcome's own ``provenance`` deliberately excludes the deflator -- the CPI observations
+    and the declared belief are not among the holding's inputs, and putting them there would
+    make the *nominal* figure appear to rest on the price index (024 FR-011). So the answer's
+    roll-up has to reach them here, or a source behind a reported figure sits outside the union
+    the answer says it is.
+    """
+    return tuple(
+        figure for figure in (item.real.realized, item.real.assumed) if isinstance(figure, RealRate)
+    )
+
+
 def _reported_provenance(sections: Sequence[HorizonSection]) -> list[prov.Provenance]:
     """Every mark behind every figure the answer reports, and behind the sets it enumerated."""
     marks: list[prov.Provenance] = []
@@ -621,7 +629,9 @@ def _reported_provenance(sections: Sequence[HorizonSection]) -> list[prov.Proven
         enumerated = _enumerated_of(section.outcome)
         if enumerated is not None:
             marks.append(enumerated.provenance)
-        marks.extend(item.provenance for item in section_evaluated(section))
+        for item in section_evaluated(section):
+            marks.append(item.provenance)
+            marks.extend(figure.provenance for figure in _real_figures(item))
     return marks
 
 
@@ -632,7 +642,9 @@ def _reported_staleness(sections: Sequence[HorizonSection]) -> list[staleness.St
         enumerated = _enumerated_of(section.outcome)
         if enumerated is not None:
             verdicts.append(enumerated.staleness)
-        verdicts.extend(item.staleness for item in section_evaluated(section))
+        for item in section_evaluated(section):
+            verdicts.append(item.staleness)
+            verdicts.extend(figure.staleness for figure in _real_figures(item))
     return verdicts
 
 

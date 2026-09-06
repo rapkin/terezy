@@ -41,6 +41,7 @@ from terezy.core.primitives.provenance import Provenance
 from terezy.core.primitives.rates import NominalRate
 from terezy.core.primitives.staleness import StalenessVerdict
 from terezy.core.results.fund import FundAssumptions
+from terezy.core.results.hurdle import RealTerms
 from terezy.core.results.ramp import ExitCostUnknown, RouteUnusable
 from terezy.core.routes.legs import RouteStatus
 from terezy.core.routes.path import Candidate, ExitChoice
@@ -219,7 +220,8 @@ line here and add one there, in one change, where a reviewer sees both.
 
 EXCLUDES: Final[frozenset[str]] = frozenset(
     {
-        "inflation (every figure here is nominal)",
+        "inflation on the amounts: the outlay and what reaches a spendable endpoint are "
+        "nominal, and only the rate has a real counterpart beside it",
         "the risk class, which is declared and carried but never scored",
         "the cost of recovering undeployed cash: the rate is measured on the money actually "
         "invested, and the remainder is reported at the venue it is sitting at, with no "
@@ -341,6 +343,19 @@ class TupleOutcome:
     funded in one currency and spent in another has an amount and no rate -- see
     :class:`RateNotComparable` -- and :attr:`reaches` is unaffected, because what arrives is a
     fact about money rather than a ratio between two currencies.
+    """
+
+    real: RealTerms
+    """What :attr:`implied_rate` returns in purchasing power: two figures, or two reasons.
+
+    The same record the hurdle carries and filled by the same function, so a candidate's real
+    figure is comparable with the benchmark's field for field. Present on every evaluated
+    outcome and never optional: one half deflated by declared CPI observations covering the
+    whole window, the other by the declared future-inflation belief, and where either input is
+    missing that half alone is typed-unavailable naming what is missing (024 FR-001, FR-003).
+
+    **Never ranked on, compared on, or used to choose a benchmark** (024 FR-017): a figure
+    added for the reader must not reorder the answer.
     """
 
     span: DateRange

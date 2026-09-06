@@ -236,7 +236,7 @@ def _deflated(*, as_of: date | None, verified_on: date | None = None) -> RealRat
         nominal_staleness=staleness.UNASSESSED,
         deflation=cpi_fixtures.deflation(
             window=cpi_fixtures.window("2025-09", "2025-11"),
-            series=declared,
+            series=cpi_fixtures.declaring(declared),
             ageing=None if as_of is None else cpi_fixtures.ageing_at(as_of, _kinds()),
         ),
     )
@@ -346,7 +346,7 @@ def test_the_nominal_sides_verdict_is_merged_into_the_real_figure() -> None:
         nominal_staleness=aged_nominal,
         deflation=cpi_fixtures.deflation(
             window=cpi_fixtures.window("2025-09", "2025-11"),
-            series=_series(),
+            series=cpi_fixtures.declaring(_series()),
             ageing=cpi_fixtures.ageing_at(date(2026, 2, 1), _kinds()),
         ),
     ).realized
@@ -375,7 +375,7 @@ def test_a_projection_carries_the_staleness_all_the_way_to_the_hurdle_rate() -> 
         synthetic.horizon(start=purchased_on),
         synthetic.assumptions(),
         tax_classes=synthetic.TAX_PACK,
-        cpi_series=declared,
+        cpi_series=cpi_fixtures.declaring(declared),
         ageing=cpi_fixtures.ageing_at(date(2026, 6, 1), _kinds()),
     )
     assert isinstance(outcome, Projection)
