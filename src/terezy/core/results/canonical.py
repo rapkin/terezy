@@ -320,8 +320,7 @@ def of_tuple_key(value: Tuple) -> tuple[Canonical, ...]:
 
 def of_outcome(value: TupleOutcome) -> tuple[Canonical, ...]:
     """One evaluated candidate: its key, what reaches, the rate it is ranked by, and its real
-    counterpart -- tagged by :func:`of_real_figure`, so a real rate and its absence cannot
-    digest alike."""
+    counterpart."""
     rate = value.implied_rate
     return (
         of_tuple_key(value.key),

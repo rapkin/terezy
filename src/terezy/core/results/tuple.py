@@ -354,9 +354,8 @@ class TupleOutcome:
     whole window, the other by the declared future-inflation belief, and where either input is
     missing that half alone is typed-unavailable naming what is missing (024 FR-001, FR-003).
 
-    **Never ranked on, compared on, or used to choose a benchmark** (024 FR-017). It is written
-    here and read by renderers and the canonical form; nothing under ``core/decision/`` besides
-    the construction site names it.
+    **Never ranked on, compared on, or used to choose a benchmark** (024 FR-017): a figure
+    added for the reader must not reorder the answer.
     """
 
     span: DateRange

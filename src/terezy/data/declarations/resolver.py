@@ -2547,8 +2547,8 @@ class TupleDeclarations:
     """The two deflators a real figure needs, and which file declared each (024 FR-012).
 
     The whole record rather than the two values :attr:`registries` flattens, because
-    ``manifest.inflation_input_refs`` reads all four of its fields and loose paths beside the
-    registries would be the same fact declared twice.
+    ``manifest.inflation_input_refs`` takes it whole; loose paths beside the registries would
+    be the same fact declared twice.
     """
 
     registries: Registries

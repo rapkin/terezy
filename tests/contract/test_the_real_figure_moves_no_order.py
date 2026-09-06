@@ -61,10 +61,6 @@ def _under(assumption: InflationAssumption | None) -> Answer:
     )
 
 
-def _survey(section: HorizonSection) -> CandidateSurvey | None:
-    return section.outcome if isinstance(section.outcome, CandidateSurvey) else None
-
-
 def _declared() -> Answer:
     return _under(fixtures.shipped_inputs().registries.inflation)
 
@@ -100,8 +96,6 @@ def test_another_belief_moves_no_amount_rate_refusal_or_dominance_verdict(
             assert left.key == right.key
             assert left.reaches == right.reaches
             assert left.implied_rate == right.implied_rate
-            assert left.arrivals == right.arrivals
-            assert left.outlay == right.outlay
             assert replace(left, real=right.real) == right
         assert _refusals(one) == _refusals(two)
         assert one.dominance == two.dominance
@@ -109,8 +103,8 @@ def test_another_belief_moves_no_amount_rate_refusal_or_dominance_verdict(
 
 def _refusals(section: HorizonSection) -> tuple[object, ...]:
     """Every candidate the comparison dropped, with the typed reason it was dropped for."""
-    survey = _survey(section)
-    if survey is None or not isinstance(survey.comparison, Comparison):
+    survey = section.outcome
+    if not isinstance(survey, CandidateSurvey) or not isinstance(survey.comparison, Comparison):
         return (type(section.outcome).__name__,)
     return tuple(dropped(survey.comparison))
 
@@ -145,10 +139,10 @@ def test_the_candidate_surveys_recorded_digest_is_unchanged() -> None:
 def test_no_module_that_orders_a_comparison_names_the_real_slot() -> None:
     """FR-017 as a property of the call graph, which is what makes it hard to lose.
 
-    A source scan rather than an ordinary test because the claim is about *absence* -- nothing
-    reads the field -- and no behavioural test can distinguish "not sorted on" from "sorted on,
-    and the two orders happen to agree". The two answers above cover the behaviour; this covers
-    the reason it cannot regress under a registry where they would agree by luck.
+    A source scan rather than an ordinary test because what it catches is wider than the
+    ordering the tests above measure: a tie-break, a benchmark choice or a band resolved on the
+    real figure would each agree with today's answer on today's registry and be a different
+    engine. The claim is that nothing outside the construction site reads the field at all.
     """
     ordering = Path(__file__).parents[2] / "src" / "terezy" / "core" / "decision"
     named = {

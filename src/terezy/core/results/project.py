@@ -73,7 +73,6 @@ from terezy.core.ledger.events import CausationKind, CausationRef, Event, EventK
 from terezy.core.primitives import conventions, money
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.money import Money
-from terezy.core.primitives.periods import Window
 from terezy.core.primitives.staleness import Ageing
 from terezy.core.results import hurdle as hurdle_figures
 from terezy.core.results import schedule as schedule_rows
@@ -338,7 +337,13 @@ def project(
                 prov.merge_all(charge.provenance for charge in charges),
             ),
             deflate_with=hurdle_figures.Deflation(
-                window=_deflation_window(holding, contractual_events),
+                # The purchase date is what the money left on for a projection -- there is no
+                # ramp between them -- and the last contractual flow is what the yield
+                # annualises to, which is why the horizon is not read here.
+                window=cpi.deflation_window(
+                    holding.purchased_on,
+                    max(event.occurred_on for event in contractual_events),
+                ),
                 series={} if cpi_series is None else cpi_series,
                 assumption=inflation_assumption,
                 ageing=ageing,
@@ -551,18 +556,6 @@ def _governed_by(
         category_id=category.id,
         treatment=category.treatment.value,
         reason=_what_the_treatment_means(category.treatment),
-    )
-
-
-def _deflation_window(holding: Holding, contractual: Sequence[Event]) -> Window:
-    """The span a real counterpart of the contractual yield is deflated over (007 FR-007).
-
-    The purchase date is what the money left on for a projection -- there is no ramp between
-    them -- and the last contractual flow is what the yield annualises to, which is why the
-    horizon is not read here.
-    """
-    return cpi.deflation_window(
-        holding.purchased_on, max(event.occurred_on for event in contractual)
     )
 
 

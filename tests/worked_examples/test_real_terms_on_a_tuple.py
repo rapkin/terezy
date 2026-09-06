@@ -69,8 +69,9 @@ def _twelve_months() -> list[TupleOutcome]:
 
 
 def _outcome(instrument_id: str = INSTRUMENT) -> TupleOutcome:
-    found = [item for item in _twelve_months() if item.key.instrument_id == instrument_id]
-    assert len(found) == 1, [item.key.instrument_id for item in _twelve_months()]
+    evaluated = _twelve_months()
+    found = [item for item in evaluated if item.key.instrument_id == instrument_id]
+    assert len(found) == 1, [item.key.instrument_id for item in evaluated]
     return found[0]
 
 

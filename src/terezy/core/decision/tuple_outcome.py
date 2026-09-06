@@ -211,9 +211,9 @@ class Registries:
     cpi: Mapping[str, CpiSeries]
     """Every CPI series this run declares, by declared id. Empty when it declares none.
 
-    The whole mapping and not one series, and no default: an absent deflator is a *reported
-    reason* (024 FR-013), and which series a figure is real against is decided inside the slot
-    that fills it rather than by whoever assembled this record (024 FR-013a).
+    No default: an absent deflator is a *reported reason* rather than an error (024 FR-013).
+    The whole mapping and not one series, for the reason
+    :attr:`~terezy.core.results.hurdle.Deflation.series` gives.
     """
 
     inflation: InflationAssumption | None
@@ -1533,9 +1533,8 @@ def _assemble(
         arrivals=arrivals,
         reaches=reaches,
         implied_rate=rate,
-        # Every refusal belongs inside `real_terms`, which stays the only place a slot is
-        # filled: `nominal=None` is how "there is nothing to deflate" is reached (FR-002),
-        # rather than by a branch here that would state the same rule a second time.
+        # `nominal=None` is how FR-002's "there is nothing to deflate" is reached, rather than
+        # by a branch here: no refusal is decided at this site.
         real=hurdle_figures.real_terms(
             nominal=rate if isinstance(rate, NominalRate) else None,
             nominal_provenance=provenance,
