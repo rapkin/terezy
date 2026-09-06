@@ -277,6 +277,7 @@ DECLARATIONS_WITHOUT_A_REASON = frozenset(
         "path.FundingPath",
         "question.Question",
         "rates.NominalRate",
+        "rates.RealRate",
         "scheme.CreditingDestination",
         "scheme.TaxationScheme",
         "seeds.BasisKnown",

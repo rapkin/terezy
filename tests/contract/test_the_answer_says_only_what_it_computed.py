@@ -33,6 +33,7 @@ from terezy.core.primitives.rates import RealRate, RealTermsUnavailable
 from terezy.core.results import answer as records
 from terezy.core.results import question as question_records
 from terezy.core.results.answer import Answer, Direction, Exclusion
+from terezy.core.results.tuple import TupleOutcome
 from terezy.core.scenarios import quotation
 from tests import answer_registries as fixtures
 
@@ -182,10 +183,21 @@ def test_the_two_answer_wide_exclusions_are_always_stated() -> None:
     assert stated == ANSWER_WIDE
 
 
-def test_no_real_terms_figure_appears_anywhere_in_the_result() -> None:
-    """SC-021's second half: the exclusion and the absence checked against each other."""
-    walked = _walk(fixtures.answered())
-    assert not [item for item in walked if isinstance(item, RealRate | RealTermsUnavailable)]
+def test_every_evaluated_outcome_carries_a_real_terms_figure() -> None:
+    """024 SC-006: the same walk, the opposite claim.
+
+    015 asserted that no real figure appeared anywhere in the answer, which is what its
+    `NO_REAL_TERMS_FIGURE` exclusion said in words. 024 fills the slot, so what the walk now
+    proves is that no evaluated outcome was left without one -- neither a blank nor an omitted
+    field, which is the shape a partially-filled slot would take.
+    """
+    result = fixtures.answered()
+    outcomes = [item for item in _walk(result) if isinstance(item, TupleOutcome)]
+
+    assert outcomes
+    for outcome in outcomes:
+        for figure in (outcome.real.realized, outcome.real.assumed):
+            assert isinstance(figure, RealRate | RealTermsUnavailable), outcome.key.instrument_id
 
 
 def test_every_figure_the_shipped_answer_reports_carries_the_marks_of_its_registry() -> None:

@@ -80,6 +80,7 @@ from datetime import date, timedelta
 from typing import TYPE_CHECKING, Final, Literal, assert_never
 
 from terezy.core.errors import InconsistentTerms, LedgerInvariantError
+from terezy.core.inflation import series as cpi_series
 from terezy.core.inflation.series import CpiSeries, InflationAssumption
 from terezy.core.instruments import accrual
 from terezy.core.instruments import fund as fund_terms
@@ -102,8 +103,10 @@ from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance
 from terezy.core.primitives.rates import NominalRate
+from terezy.core.primitives.staleness import Ageing
 from terezy.core.primitives.tolerance import is_close
 from terezy.core.results import fund as fund_results
+from terezy.core.results import hurdle as hurdle_figures
 from terezy.core.results import project as bond_results
 from terezy.core.results.fund import FundAssumptions, FundProjection, RangeProjection
 from terezy.core.results.hurdle import CashFlow, internal_rate_of_return
@@ -455,6 +458,8 @@ def _hold(
         continuation=continuation,
         quotation_holds=registries.quotation_holds,
         kinds=registries.kinds,
+        cpi=registries.cpi,
+        inflation=registries.inflation,
         as_of=as_of,
     )
 
@@ -1477,6 +1482,8 @@ def _assemble(
     continuation: ContinuationAssumption,
     quotation_holds: QuotationHolds,
     kinds: Mapping[str, ObservationKind],
+    cpi: Mapping[str, CpiSeries],
+    inflation: InflationAssumption | None,
     as_of: date,
 ) -> TupleOutcome:
     """Everything the owning calls returned, summed and chained. No new arithmetic here.
@@ -1504,19 +1511,41 @@ def _assemble(
         start=horizon.start,
         end=max((arrival.arrived_on for arrival in arrivals), default=horizon.start),
     )
+    rate = _rate(
+        prepared,
+        outlay=outlay,
+        undeployed=undeployed,
+        arrivals=arrivals,
+        endpoint_currency=endpoint_currency,
+        span=span,
+    )
+    staleness = stale.merge_all(
+        [
+            one_way.staleness,
+            *(charged.staleness for charged in way_out_costs),
+            stale.staleness_of_sources(provenance, kinds, as_of=as_of),
+        ]
+    )
     return TupleOutcome(
         key=tuple_,
         outlay=outlay,
         parts=_parts(prepared, projected, one_way=one_way, way_out_costs=way_out_costs),
         arrivals=arrivals,
         reaches=reaches,
-        implied_rate=_rate(
-            prepared,
-            outlay=outlay,
-            undeployed=undeployed,
-            arrivals=arrivals,
-            endpoint_currency=endpoint_currency,
-            span=span,
+        implied_rate=rate,
+        # Every refusal belongs inside `real_terms`, which stays the only place a slot is
+        # filled: `nominal=None` is how "there is nothing to deflate" is reached (FR-002),
+        # rather than by a branch here that would state the same rule a second time.
+        real=hurdle_figures.real_terms(
+            nominal=rate if isinstance(rate, NominalRate) else None,
+            nominal_provenance=provenance,
+            nominal_staleness=staleness,
+            deflation=hurdle_figures.Deflation(
+                window=cpi_series.deflation_window(span.start, span.end),
+                series=cpi,
+                assumption=inflation,
+                ageing=Ageing(kinds=kinds, as_of=as_of),
+            ),
         ),
         span=span,
         horizon=horizon,
@@ -1536,19 +1565,7 @@ def _assemble(
         accounts_for=ACCOUNTS_FOR,
         excludes=_excludes_of(prepared),
         provenance=provenance,
-        # The costing's own verdicts, plus every source behind the outcome aged under the
-        # kind its own citation declares. The third is not a tidier restatement of the first
-        # two: it is the only thing that reaches the instrument's terms, its constraints, the
-        # tax pack's rates and a fund's tables, none of whose core records names a kind and
-        # none of which any other call ages (FR-019). Merging is a union at the strictest
-        # reading, so a source both of them reach arrives once.
-        staleness=stale.merge_all(
-            [
-                one_way.staleness,
-                *(charged.staleness for charged in way_out_costs),
-                stale.staleness_of_sources(provenance, kinds, as_of=as_of),
-            ]
-        ),
+        staleness=staleness,
     )
 
 

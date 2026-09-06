@@ -47,7 +47,7 @@ from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.conventions import AmountsAsDeclared, ConventionsApplied
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
-from terezy.core.primitives.rates import NominalRate
+from terezy.core.primitives.rates import NominalRate, RealRate, RealTermsUnavailable
 from terezy.core.primitives.tolerance import TOLERANCE, is_close
 from terezy.core.results import project
 from terezy.core.results.project import Projection
@@ -66,7 +66,7 @@ REGISTRIES = fixtures.without_latency(fixtures.declared())
 cost and it is the same cost on both sides, but leaving it in would need a tolerance loose
 enough to hide the thing this test is looking for."""
 
-WITHIN_TOLERANCE = frozenset({"implied_rate", "parts", "arrivals"})
+WITHIN_TOLERANCE = frozenset({"implied_rate", "parts", "arrivals", "real"})
 """Fields whose *contents* are compared above at the imported tolerance rather than by
 equality, because the two forms reach the same amount by different arithmetic.
 
@@ -155,6 +155,22 @@ class TestEveryFigureAgrees:
     def test_the_same_implied_rate(self) -> None:
         assert is_close(_rate(_generative()), _rate(_enumerated()))
 
+    def test_the_same_real_rate_over_the_same_window(self) -> None:
+        """The deflation of two figures that agree to tolerance agrees to tolerance.
+
+        Compared here rather than by the sweep because the record also carries the provenance
+        of both forms' own declarations, which differ by design -- and because a realized half
+        that stopped refusing on one form and not the other is the interesting failure.
+        """
+        one, other = _generative().real, _enumerated().real
+        assert isinstance(one.assumed, RealRate)
+        assert isinstance(other.assumed, RealRate)
+        assert is_close(one.assumed.value, other.assumed.value)
+        assert one.assumed.window == other.assumed.window
+        assert one.assumed.series_id == other.assumed.series_id
+        assert isinstance(one.realized, RealTermsUnavailable)
+        assert isinstance(other.realized, RealTermsUnavailable)
+
     def test_the_same_span_and_horizon(self) -> None:
         assert _generative().span == _enumerated().span
         assert _generative().horizon == _enumerated().horizon
@@ -223,6 +239,7 @@ class TestTheOnlyDifferencesArePermittedOnes:
                 assert one.currency == other.currency, field
             elif field in WITHIN_TOLERANCE:
                 assert len(one) == len(other) if hasattr(one, "__len__") else True, field
+                assert type(one) is type(other), field
             else:
                 assert one == other, field
 

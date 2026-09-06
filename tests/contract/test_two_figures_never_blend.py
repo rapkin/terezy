@@ -433,6 +433,11 @@ MODULES_ALLOWED_TO_TOUCH = {
     "RealTerms": {
         "src/terezy/core/results/hurdle.py",
         "src/terezy/core/results/canonical.py",
+        # Joined in 024: `TupleOutcome.real` is annotated with it. The annotation is the whole
+        # mention -- the record is built by `hurdle.real_terms` and nothing here fills a half --
+        # and that is what makes a nominal rate unassignable into the slot by mypy rather than
+        # by a test.
+        "src/terezy/core/results/tuple.py",
     },
 }
 """Which modules may name a real figure in executable code, and nothing else may.
