@@ -1382,6 +1382,12 @@ class TestNoFieldDefaultStandsInForAValue:
         "SchemeTable": frozenset({"rate_component", "periodic_component"}),
         "RateComponentTable": frozenset({"context"}),
         "PeriodicComponentTable": frozenset({"context"}),
+        # The one entry here whose optional field has no legal value: absence is the ONLY
+        # permitted state, and the field exists so that stating a price can be refused with
+        # its reason (025 FR-011) rather than with `extra="forbid"`'s "unexpected field". The
+        # reason is the point -- a held asset's price is a dated observation, and one fact in
+        # two files disagrees the day either moves. Nothing ever stands in for a value here.
+        "HeldAssetTable": frozenset({"price"}),
     }
 
     @staticmethod

@@ -87,6 +87,7 @@ from terezy.core.instruments import fund as fund_terms
 from terezy.core.instruments import registry as instrument_registry
 from terezy.core.instruments import terms as instrument_terms
 from terezy.core.instruments.fund import FundDeclaration
+from terezy.core.instruments.held import HeldAssetDeclaration
 from terezy.core.instruments.interface import (
     Assumptions,
     DateRange,
@@ -200,6 +201,14 @@ class Registries:
 
     instruments: Mapping[str, InstrumentDeclaration]
     funds: Mapping[str, FundDeclaration]
+    held: Mapping[str, HeldAssetDeclaration]
+    """Assets held for their price alone (025 FR-009). Empty is ordinary.
+
+    Never a candidate: a tuple requires a way in, and a held position was not funded through a
+    declared corridor. It is here because the group vocabulary and the subject resolution read
+    every declared id, and a held asset a question names must not resolve to nothing.
+    """
+
     tax_classes: Mapping[str, TaxClass]
     access: Mapping[str, InstrumentAccess]
     routes: Mapping[str, Route]

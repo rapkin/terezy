@@ -89,6 +89,7 @@ from terezy.core.instruments.fund import (
     VerificationTask,
 )
 from terezy.core.instruments.groups import InstrumentGroup
+from terezy.core.instruments.held import HeldAssetDeclaration
 from terezy.core.instruments.interface import (
     PAYMENT_KINDS,
     Assumptions,
@@ -3117,6 +3118,69 @@ def fund_from_file(path: Path) -> FundDeclaration:
     )
 
 
+def held_asset_from_file(path: Path) -> HeldAssetDeclaration:
+    """One ``data/instruments/<id>.toml`` declaring a held asset (025 FR-009).
+
+    **The tax-class reference is required and is not resolved here or anywhere.** For a bond an
+    unresolved class is refused by the resolver, because a projection would otherwise charge
+    nothing; a held asset projects nothing, and the refusal is the reported figure. What is
+    still required is that a class be *named*: a holding with none would report no tax because
+    nobody said what its tax was, which reads exactly like an exemption.
+    """
+    document = read_document(path)
+    table = _validate(schema.HeldAssetFile, document, path).instrument
+    prefix = INSTRUMENT_TABLE
+    _known(
+        path,
+        f"{prefix}.class",
+        table.instrument_class,
+        {instrument_registry.HELD_ASSET: "an asset held for its price alone"},
+        "held-asset instrument class",
+    )
+    if table.price is not None:
+        raise DeclarationError(
+            path,
+            f"{prefix}.price",
+            f"states the price {table.price!r}. A held asset's price is a dated observation "
+            "under data/observations/, selected by the run's own as_of, and a declaration "
+            "stating one would be the same fact in two files -- which disagree the day either "
+            "moves, with nothing to say which the figures used.",
+            "delete the key; the price comes from the observation the fetch script writes",
+        )
+    return HeldAssetDeclaration(
+        id=_require_text(
+            path,
+            f"{prefix}.id",
+            table.id,
+            "a holding names its asset by id, and an unnamed one cannot be held",
+        ),
+        name=_require_text(
+            path,
+            f"{prefix}.name",
+            table.name,
+            "a reader is shown the name; an empty one names nothing",
+        ),
+        quantity_unit=_require_text(
+            path,
+            f"{prefix}.quantity_unit",
+            table.quantity_unit,
+            "a number of units means nothing without the unit, and no other field carries it",
+        ),
+        price_currency=_currency(path, f"{prefix}.price_currency", table.price_currency),
+        venue_id=_require_text(
+            path,
+            f"{prefix}.venue_id",
+            table.venue_id,
+            "where the units sit is checked against the declared venues (025 FR-009)",
+        ),
+        is_synthetic=table.is_synthetic,
+        tax_classes=_tax_class_references(
+            path, table.tax_classes, field_prefix=f"{prefix}.tax_classes"
+        ),
+        groups=_group_labels(path, f"{prefix}.groups", table.groups),
+    )
+
+
 def declared_class_of(path: Path) -> str:
     """The ``[instrument] class`` of a declaration file, read without validating the rest.
 
@@ -3143,7 +3207,7 @@ def declared_class_of(path: Path) -> str:
             "is missing or empty, so nothing can say which kind of declaration this is. "
             "There is no default: reading an unlabelled file as a bond would fail later, "
             "against a field the reader never wrote.",
-            'declare class = "fixed_income" or class = "collective_investment_fund"',
+            f"declare one of: {', '.join(sorted(instrument_registry.DECLARATION_KINDS))}",
         )
     return declared
 

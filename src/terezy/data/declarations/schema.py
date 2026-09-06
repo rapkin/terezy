@@ -1447,6 +1447,46 @@ class FundFile(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# 025-btc-holdings: an asset held for its price alone
+# ---------------------------------------------------------------------------
+
+
+class HeldAssetTable(BaseModel):
+    """``[instrument]`` for an asset whose only declared property is where its price lives."""
+
+    model_config = STRICT
+
+    id: str
+    name: str
+    instrument_class: str = Field(alias="class")
+    """``held_asset``. Aliased for the same reason a bond's and a fund's are."""
+
+    quantity_unit: str
+    price_currency: str
+    venue_id: str
+    is_synthetic: bool
+    tax_classes: dict[str, str]
+    groups: list[str]
+
+    price: float | None = None
+    """Declared **so that stating one can be refused with its reason** (025 FR-011).
+
+    ``extra="forbid"`` would already reject the key, with a message about an unexpected field.
+    That is a true statement and the wrong one: the reason a price may not be here is that the
+    price of a held asset is a dated observation, and one fact in two files is two facts the day
+    one of them moves. The loader refuses a non-``None`` value and says so.
+    """
+
+
+class HeldAssetFile(BaseModel):
+    """A whole held-asset document: exactly one asset, as with an instrument and a fund."""
+
+    model_config = STRICT
+
+    instrument: HeldAssetTable
+
+
+# ---------------------------------------------------------------------------
 # 004-composed-paths: the segment bound
 # ---------------------------------------------------------------------------
 #

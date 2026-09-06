@@ -150,8 +150,18 @@ COLLECTIVE_INVESTMENT_FUND: Final = "collective_investment_fund"
 """A collective-investment fund: `core.instruments.fund`, projected by
 `core.results.fund.project_fund`."""
 
+HELD_ASSET: Final = "held_asset"
+"""An asset held for its price alone: `core.instruments.held`.
+
+**Out of :data:`REGISTRY` for a stronger reason than the fund's**, and it is the same ruling.
+The fund is absent because its inputs, its failures and the arity of its answer differ from
+`InstrumentOps`'; a held asset is absent because it projects **no event stream at all**. There
+is no schedule to compute, so there is no part of the interface it could satisfy and nothing to
+put in a second record. No fifth plugin interface is added and none is needed.
+"""
+
 DECLARATION_KINDS: Final[frozenset[str]] = frozenset(
-    {FIXED_INCOME, ENUMERATED_SCHEDULE, COLLECTIVE_INVESTMENT_FUND}
+    {FIXED_INCOME, ENUMERATED_SCHEDULE, COLLECTIVE_INVESTMENT_FUND, HELD_ASSET}
 )
 """Every ``[instrument] class`` a declaration file may name, instrument or otherwise.
 

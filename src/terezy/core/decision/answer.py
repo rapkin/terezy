@@ -220,8 +220,12 @@ def _resolve_one(word: str, inputs: AnswerInputs) -> ResolvedSubject:
 
 
 def _declared(inputs: AnswerInputs) -> frozenset[str]:
-    """Every instrument id the registry declares, of either declaration kind."""
-    return frozenset(inputs.registries.instruments) | frozenset(inputs.registries.funds)
+    """Every instrument id the registry declares, of any declaration kind."""
+    return (
+        frozenset(inputs.registries.instruments)
+        | frozenset(inputs.registries.funds)
+        | frozenset(inputs.registries.held)
+    )
 
 
 def _labels(inputs: AnswerInputs) -> Mapping[str, tuple[str, ...]]:
@@ -229,6 +233,7 @@ def _labels(inputs: AnswerInputs) -> Mapping[str, tuple[str, ...]]:
     return {
         **{name: declared.groups for name, declared in inputs.registries.instruments.items()},
         **{name: declared.groups for name, declared in inputs.registries.funds.items()},
+        **{name: declared.groups for name, declared in inputs.registries.held.items()},
     }
 
 

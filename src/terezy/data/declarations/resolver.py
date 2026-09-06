@@ -56,6 +56,7 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.instruments.access import InstrumentAccess
     from terezy.core.instruments.fund import FundDeclaration
     from terezy.core.instruments.groups import InstrumentGroup
+    from terezy.core.instruments.held import HeldAssetDeclaration
     from terezy.core.instruments.interface import InstrumentDeclaration
     from terezy.core.ledger.seeds import SeedLot
     from terezy.core.primitives.currency import Currency
@@ -133,6 +134,18 @@ class Declarations:
     fund_files: Mapping[str, Path]
     """Which file declared each fund."""
 
+    held: Mapping[str, HeldAssetDeclaration]
+    """Declared held assets by id (025 FR-009).
+
+    A third map for the reason :attr:`funds` is a second: a held asset shares an id space with
+    a bond and a fund and nothing else. It projects no event stream, so no consumer of
+    :attr:`instruments` could read one, and a union type here would make every one of them
+    narrow before it could touch a field.
+    """
+
+    held_files: Mapping[str, Path]
+    """Which file declared each held asset."""
+
     groups: Mapping[str, InstrumentGroup]
     """The declared group vocabulary by id (015 FR-007a).
 
@@ -198,6 +211,8 @@ def resolve(
     instrument_files_by_id: dict[str, Path] = {}
     funds: dict[str, FundDeclaration] = {}
     fund_files_by_id: dict[str, Path] = {}
+    held: dict[str, HeldAssetDeclaration] = {}
+    held_files_by_id: dict[str, Path] = {}
     files_by_id: dict[str, Path] = {}
     for path in instrument_files:
         # ⚙ feature 006: one directory, several kinds of declaration, told apart by the one
@@ -217,6 +232,20 @@ def resolve(
             funds[declared_fund.id] = declared_fund
             fund_files_by_id[declared_fund.id] = path
             files_by_id[declared_fund.id] = path
+            continue
+        if read is loader.held_asset_from_file:
+            declared_held = loader.held_asset_from_file(path)
+            if declared_held.id in files_by_id:
+                raise _refuse_duplicate(
+                    "instrument",
+                    declared_held.id,
+                    "instrument.id",
+                    files_by_id[declared_held.id],
+                    path,
+                )
+            held[declared_held.id] = declared_held
+            held_files_by_id[declared_held.id] = path
+            files_by_id[declared_held.id] = path
             continue
         # ⚙ feature 013: both bond forms produce an ``InstrumentDeclaration``, so the id
         # space, the duplicate check and the tax-class resolution below are shared. A
@@ -253,6 +282,8 @@ def resolve(
             path=fund_files_by_id[identifier],
         )
         _check_groups(declared_fund.groups, groups, path=fund_files_by_id[identifier])
+    for identifier, declared_held in held.items():
+        _check_groups(declared_held.groups, groups, path=held_files_by_id[identifier])
 
     return Declarations(
         instruments=instruments,
@@ -261,6 +292,8 @@ def resolve(
         tax_class_files=tax_class_files,
         funds=funds,
         fund_files=fund_files_by_id,
+        held=held,
+        held_files=held_files_by_id,
         groups=groups,
         groups_file=groups_file,
     )
@@ -1917,6 +1950,7 @@ LOADERS_BY_KIND: Mapping[str, Callable[[Path], object]] = {
     instrument_registry.FIXED_INCOME: loader.instrument_from_file,
     instrument_registry.ENUMERATED_SCHEDULE: loader.enumerated_instrument_from_file,
     instrument_registry.COLLECTIVE_INVESTMENT_FUND: loader.fund_from_file,
+    instrument_registry.HELD_ASSET: loader.held_asset_from_file,
 }
 """Which loader parses each declared ``[instrument] class``.
 
@@ -2127,24 +2161,29 @@ class SeedAndGoalDeclarations:
 def _check_seed_instruments(
     declared: Sequence[SeedLot],
     instruments: Mapping[str, InstrumentDeclaration],
+    held: Mapping[str, HeldAssetDeclaration],
     *,
     path: Path,
 ) -> None:
-    """FR-005: every seed names a curated instrument, or the load fails naming both.
+    """FR-005: every seed names a curated declaration, or the load fails naming both.
+
+    Held assets join the set a lot may name (025 FR-012): a holding of one is exactly what the
+    owner declares, and it is the only way a quantity ever enters the system.
 
     ``core.ledger.seeds.opening_events`` refuses the same thing as a typed
     ``SeedInstrumentUndeclared``, for a caller that assembles lots without a file. Both exist
     on :class:`UnresolvedTaxClass`'s precedent, and for its reason: the core cannot name a file
     it never saw, and FR-005 asks for the file.
     """
+    declarable = {**instruments, **held}
     for position, lot in enumerate(declared):
-        if lot.instrument_id in instruments:
+        if lot.instrument_id in declarable:
             continue
         raise DeclarationError(
             path,
             f"{loader.SEED_TABLE}[{position}].instrument_id",
             f"names the instrument {lot.instrument_id!r}, which no curated declaration "
-            f"defines. Declared instruments: {sorted(instruments)}. No placeholder is created "
+            f"defines. Declared instruments: {sorted(declarable)}. No placeholder is created "
             "for it: every figure derived from a holding of an invented instrument would be a "
             "confident answer about something that does not exist.",
             "correct the id, or declare the instrument under data/instruments/",
@@ -2286,6 +2325,7 @@ def resolve_seeds_and_goals(
     overlay_seed_file: Path | None,
     goal_file: Path | None,
     instruments: Mapping[str, InstrumentDeclaration],
+    held: Mapping[str, HeldAssetDeclaration],
     base_currency: Currency,
 ) -> SeedAndGoalDeclarations:
     """The owner's declared holdings and targets, checked against the curated set and the run.
@@ -2323,7 +2363,7 @@ def resolve_seeds_and_goals(
     declared_seeds = shipped_seeds + private_seeds
     for path, lots in ((seed_file, shipped_seeds), (overlay_seed_file, private_seeds)):
         if path is not None:
-            _check_seed_instruments(lots, instruments, path=path)
+            _check_seed_instruments(lots, instruments, held, path=path)
     if goal_file is not None:
         goal_owner, declared_goals = loader.goals_from_file(goal_file)
         _check_goal_currencies(declared_goals, base_currency=base_currency, path=goal_file)
@@ -2383,11 +2423,13 @@ def seeds_and_goals_from_data_roots(
     if roots.overlay is not None:
         _check_overlay_directories(roots.overlay)
         overlay_seed_file = _at_most_one(roots.overlay, SEEDS_DIR)
+    curated = from_data_root(roots.shipped)
     return resolve_seeds_and_goals(
         seed_file=_at_most_one(roots.shipped, SEEDS_DIR),
         overlay_seed_file=overlay_seed_file,
         goal_file=_at_most_one(roots.shipped, GOALS_DIR),
-        instruments=from_data_root(roots.shipped).instruments,
+        instruments=curated.instruments,
+        held=curated.held,
         base_currency=base_currency,
     )
 
@@ -3065,6 +3107,7 @@ def tuple_from_data_root(
         registries=Registries(
             instruments=instruments.instruments,
             funds=instruments.funds,
+            held=instruments.held,
             tax_classes=instruments.tax_classes,
             access=access,
             routes=covered.ramp.routes,

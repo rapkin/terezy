@@ -421,6 +421,7 @@ X: int = 1
             instrument_registry.FIXED_INCOME,
             instrument_registry.ENUMERATED_SCHEDULE,
             instrument_registry.COLLECTIVE_INVESTMENT_FUND,
+            instrument_registry.HELD_ASSET,
         } == instrument_registry.DECLARATION_KINDS, (
             "the vocabulary of declaration kinds is closed for the same reason"
         )
