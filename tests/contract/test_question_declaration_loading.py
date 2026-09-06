@@ -16,6 +16,7 @@ Every broken variant is a mutation of the **shipped** question, on
 from __future__ import annotations
 
 import shutil
+from dataclasses import replace
 from datetime import date
 from pathlib import Path
 
@@ -317,3 +318,55 @@ def test_a_subject_that_names_nothing_does_not_refuse(tmp_path: Path) -> None:
     """FR-009's asymmetry, from the load side. ``cash`` and ``btc`` are already exactly this."""
     root, _ = _into_root(tmp_path, ("subjects     =", 'subjects     = ["not_a_thing"]  #'))
     assert _resolve(root).questions["fifty-thousand-hryvnia"].subjects == ("not_a_thing",)
+
+
+# ---------------------------------------------------------------------------
+# 019 FR-001a: the objective set the question is answered under
+# ---------------------------------------------------------------------------
+
+
+def test_a_question_naming_no_objective_set_is_refused(tmp_path: Path) -> None:
+    """There is no default set, so a forgotten line must never read as a chosen criterion."""
+    broken = _refused_at(_dropped(tmp_path, "objectives   ="), "objectives")
+    assert "required" in broken.problem or "objectives" in broken.problem
+
+
+def test_a_blank_objective_set_name_is_refused(tmp_path: Path) -> None:
+    broken = _refused_at(
+        _edited(tmp_path, ('objectives   = "money-and-when"', 'objectives   = ""')), "objectives"
+    )
+    assert broken.remedy is not None
+
+
+def test_a_question_naming_an_undeclared_objective_set_is_refused(tmp_path: Path) -> None:
+    """Refused in ``resolver.check_question``, which is the cross-file check that has both.
+
+    Not as a typed runtime verdict beside ``BenchmarkOutsideTheSubjects``: FR-026 says a runtime
+    refusal for it would be a second answer to a question the loader has already refused.
+    """
+    root, target = _into_root(
+        tmp_path, ('objectives   = "money-and-when"', 'objectives   = "money-alone"')
+    )
+    with pytest.raises(DeclarationError) as caught:
+        _resolve(root)
+    assert caught.value.file == target
+    assert "objectives" in caught.value.field_path
+    assert "money-alone" in caught.value.problem
+    assert "money-and-when" in caught.value.problem
+
+
+def test_a_question_built_from_flags_goes_through_the_same_check(tmp_path: Path) -> None:
+    """A record a caller built is checked too, because ``answer_declared`` calls the same rule.
+
+    The guarantee *flags are sugar over the file* has to cover the refusal or it is not one.
+    """
+    declarations = _resolve(DATA_ROOT)
+    question = loader.question_from_file(QUESTION)
+    with pytest.raises(DeclarationError) as caught:
+        resolver.check_question(
+            replace(question, objective_set_id="money-alone"),
+            declarations.tuples.registries.streams,
+            path=Path("<flags>"),
+            objective_sets=declarations.objective_sets,
+        )
+    assert "money-alone" in caught.value.problem

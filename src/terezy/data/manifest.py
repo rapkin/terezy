@@ -148,6 +148,7 @@ InputKind = Literal[
     "group_vocabulary",
     "inflation_assumption",
     "instrument",
+    "objective_set",
     "observation_kind",
     "official_rate",
     "question",
@@ -701,6 +702,10 @@ def answer_input_refs(declarations: resolver.AnswerDeclarations) -> tuple[InputR
         *(
             _ref("question", identifier, path, prov.EMPTY)
             for identifier, path in declarations.question_files.items()
+        ),
+        *(
+            _ref("objective_set", identifier, path, prov.EMPTY)
+            for identifier, path in declarations.objective_set_files.items()
         ),
         *(
             _ref(

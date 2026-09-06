@@ -1,0 +1,83 @@
+# The owner's question again, differing in ONE field: the objective set it is answered under.
+#
+# It exists for required test I2 and for nothing else (019 SC-002). Two questions alike but for
+# that name, over one registry, must produce different non-dominated sets, and each answer's
+# manifest must name its own objective file with its own digest -- which is not demonstrable
+# from one question, however many objective sets are declared beside it.
+#
+# Everything else is a copy of `data/questions/fifty-thousand.toml`, deliberately: a fixture
+# that also changed the amount, the horizons or the benchmark would leave which difference
+# produced the different answer unsettled, which is the whole of what the criterion asserts.
+
+[owner]
+id = "owner-001"
+
+[question]
+id           = "fifty-thousand-hryvnia-by-the-money"
+asked_on     = "2026-08-30"
+
+regime       = "(no regime declared)"
+
+continuation = "hold_as_cash"
+
+benchmark    = "UA4000231195"
+
+objectives   = "money-alone"
+
+subjects     = ["cash", "ovdp", "inzhur", "btc"]
+
+reserve      = []
+
+  [[question.amount]]
+  stream   = "salary_uah"
+  amount   = 50000.0
+  currency = "UAH"
+
+  [[question.amount]]
+  stream   = "contract_usd"
+  amount   = 1.0
+  currency = "USD"
+
+  [[question.horizon]]
+  start = "2026-09-01"
+  end   = "2026-10-01"
+
+  [[question.horizon]]
+  start = "2026-09-01"
+  end   = "2026-12-01"
+
+  [[question.horizon]]
+  start = "2026-09-01"
+  end   = "2027-09-01"
+
+  [[question.plan]]
+  subject            = "ovdp"
+  kind               = "bond"
+  consumption_method = "fifo"
+  coupon_policy      = "hold_cash"
+
+  [[question.plan]]
+  subject            = "inzhur_reit"
+  kind               = "fund"
+  consumption_method = "fifo"
+  liquidity_mode     = "practice"
+  buyback            = "available"
+  exit_on            = "2028-01-17"
+
+    [question.plan.yield_point]
+    rate_pct      = 9.5
+    is_assumption = true
+    rationale     = "OWNER'S CHOICE inside the range this fund itself states — the low end, so the figure is the least flattering one the range admits rather than a midpoint nobody stated. Not observed and not a forecast."
+
+  [[question.plan]]
+  subject            = "inzhur_miltech"
+  kind               = "fund"
+  consumption_method = "fifo"
+  liquidity_mode     = "practice"
+  buyback            = "available"
+  exit_on            = "2028-01-17"
+
+    [question.plan.yield_point]
+    rate_pct      = 25.0
+    is_assumption = true
+    rationale     = "OWNER'S CHOICE inside the range this fund itself states — the low end, so the figure is the least flattering one the range admits rather than a midpoint nobody stated. Not observed and not a forecast."

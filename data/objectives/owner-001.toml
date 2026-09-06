@@ -1,0 +1,47 @@
+# The owner's own criteria, answered 2026-09-03 (`specs/decisions/2026-09-03-clarify-019.toml`).
+#
+# Two questions were put to him and both answers are here. CL-1 asked which criteria a
+# non-dominated set is taken over: he took the money and the date, and declined the rate as a
+# third. CL-2 asked how close is too close to call, in hryvnia and in days: he answered in
+# PERCENT on the money and in days on the date.
+#
+# **No citation keys, and their absence is the design** (019 FR-004). How much precision a
+# person believes his inputs support is a statement about him, not an observation of the world,
+# so there is nothing for a source to vouch for. `data/objectives/` is named in `EXEMPT_DIRS` of
+# `scripts/check_provenance.py` with that reason recorded beside it.
+#
+# **No weight, no score, no coefficient and no priority**, and the absence is the requirement
+# rather than an omission (FR-005). A weighted sum of two objectives is a composite driving the
+# ordering, which required test B12 forbids; a partial order is what makes this step need no
+# calibration at all.
+#
+# The declared order is the order they were asked in and means nothing else.
+
+[owner]
+id = "owner-001"
+
+[objective_set]
+id = "money-and-when"
+
+  # More money reaching a spendable endpoint is better. He was asked for a band in hryvnia and
+  # answered 0.01 %, so the file stores his shape: a FRACTION, 0.0001 — not 0.01, which would be
+  # a hundred times what he said. On the 50 000 UAH his question states it resolves to 5.00 UAH,
+  # and it resolves against the QUESTION'S amount rather than a candidate's own figure, because
+  # a fraction of each candidate's figure is a different width for A against B than for B
+  # against A and indistinguishability would stop being symmetric (FR-011d).
+  [[objective_set.objective]]
+  criterion = "money_at_the_endpoint"
+  direction = "more_is_better"
+
+    [objective_set.objective.band]
+    fraction_of_the_question_amount = 0.0001
+
+  # Sooner is better, which on a date is `less_is_better`: the vocabulary is two tokens and has
+  # no per-criterion synonym. A percentage of a date means nothing, so the band is a count of
+  # days.
+  [[objective_set.objective]]
+  criterion = "all_money_back_on"
+  direction = "less_is_better"
+
+    [objective_set.objective.band]
+    days = 7

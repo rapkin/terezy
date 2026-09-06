@@ -31,6 +31,7 @@ from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance
 from terezy.core.primitives.staleness import StalenessVerdict
 from terezy.core.results.candidates import CandidateSet, CandidateSurvey, SurveyRefused
+from terezy.core.results.dominance import DominanceRefused, DominanceResult
 from terezy.core.results.question import Question, Reserve
 from terezy.core.results.tuple import Arrival, Tuple
 
@@ -344,6 +345,14 @@ class HorizonSection:
 
     reserves: tuple[ReserveVerdict, ...]
     """One per ``(candidate x reserve)`` over the candidates this section evaluated."""
+
+    dominance: DominanceResult | DominanceRefused
+    """The non-dominated set over the declared objectives, or the typed refusal that replaced it.
+
+    019 FR-027: **beside** the survey, replacing, reordering and summarising nothing in it. Not
+    optional, because a section with no dominance reading is a section whose head reads as a
+    winner, and a ``None`` there would be the empty value standing for a failure FR-026 forbids.
+    """
 
     excludes: tuple[StatedExclusion, ...]
     """What **this section's** figures do not account for, per candidate (FR-023a, FR-033).

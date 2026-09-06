@@ -28,6 +28,7 @@ from terezy.core.results.candidates import CandidateCeiling
 from terezy.core.results.composed import SegmentBound
 from terezy.core.results.coverage import SpendableEndpoint
 from terezy.core.results.goal import Goal
+from terezy.core.results.objectives import ObjectiveSet
 from terezy.core.results.question import Question
 from terezy.core.routes.channels import FxChannel
 from terezy.core.routes.legs import Route
@@ -342,6 +343,13 @@ def _questions(ask: Ask) -> KeyedRecords:
     return KeyedRecords(records=answers.questions, files=answers.question_files)
 
 
+def _objective_sets(ask: Ask) -> KeyedRecords:
+    answers = resolver.answer_from_data_root(
+        ask.root, base_currency=ask.base_currency, scenario_id=ask.scenario_id
+    )
+    return KeyedRecords(records=answers.objective_sets, files=answers.objective_set_files)
+
+
 def _calendars(ask: Ask) -> KeyedRecords:
     calendars = resolver.working_day_calendars_from_data_root(ask.root, _ramp(ask).kinds)
     return KeyedRecords(records=calendars.calendars, files=calendars.files)
@@ -393,6 +401,7 @@ CATEGORIES: Final[tuple[Category, ...]] = (
         "quotation-belief", "QUOTATION_DIR", True, Document(_quotation_belief, QuotationHolds)
     ),
     Category("questions", "QUESTIONS_DIR", True, Keyed(_questions, Question)),
+    Category("objectives", "OBJECTIVES_DIR", True, Keyed(_objective_sets, ObjectiveSet)),
     Category("calendars", "CALENDARS_DIR", False, Keyed(_calendars, WorkingDayCalendar)),
 )
 

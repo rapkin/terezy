@@ -1582,6 +1582,15 @@ class QuestionTable(BaseModel):
     """Written ``reserve = []`` where the question states no need. Required, so a forgotten
     section and a stated absence are different files."""
 
+    objectives: str
+    """The declared objective set this question is answered under (019 FR-001a).
+
+    Required, with no default: a question with no objective set is a question with no answer,
+    and a default would make a forgotten line read as a chosen policy. On the question rather
+    than on the verb because a question is a declaration, so *which criteria this was answered
+    under* falls inside the digest that already makes an answer reproducible.
+    """
+
     subjects: list[str] | None = None
     every_declared_instrument: bool | None = None
     """Exactly one of the two is stated; neither and both are refused (015 FR-007). Omission
@@ -2890,3 +2899,77 @@ class CalendarFile(BaseModel):
     which a jurisdiction's holiday regime was suspended is expressible, and means it; a file
     that simply forgot its rows must not look identical to one declaring it has none.
     """
+
+
+# ---------------------------------------------------------------------------
+# 019-decision-layer: the objectives a dominance pass runs over
+# ---------------------------------------------------------------------------
+#
+# Same three settings as every model above, and the same standing rule: **zero field defaults**
+# except where an absent key is itself a positive statement. Here the exception is the band,
+# whose three shapes are declared as four optional keys and refused by the loader unless exactly
+# one shape is stated -- the `subjects` / `every_declared_instrument` reading, for its reason:
+# two shapes side by side would leave which one is in force to be settled by whichever the code
+# read first.
+#
+# No citation keys, and their absence is the design (FR-004). How much precision the owner
+# believes his inputs support is a statement about him, so there is nothing for a source to
+# vouch for. `data/objectives/` is already named in `EXEMPT_DIRS` of `scripts/check_provenance.py`
+# with that reason recorded beside it.
+
+
+class BandTable(BaseModel):
+    """``[objective_set.objective.band]`` -- how close is too close to call, in one shape.
+
+    Exactly one of three: an ``amount`` with its ``currency``, a
+    ``fraction_of_the_question_amount``, or a count of ``days``. The loader refuses none, two,
+    and a shape the criterion does not take, naming the criterion and the shapes it does.
+    """
+
+    model_config = STRICT
+
+    amount: float | None = None
+    currency: str | None = None
+    fraction_of_the_question_amount: float | None = None
+    days: int | None = None
+    """Typed ``int`` under ``strict=True``, so ``7.0`` is refused at the shape stage: half a
+    day is not a day the owner could have meant."""
+
+
+class ObjectiveTable(BaseModel):
+    """One ``[[objective_set.objective]]``: a criterion, a direction, and a band.
+
+    **No weight, no score, no coefficient and no priority key**, and their absence is the
+    requirement rather than an omission (FR-005): a weighted sum of two objectives is the
+    composite required test B12 forbids driving the primary ordering.
+    """
+
+    model_config = STRICT
+
+    criterion: str
+    """Resolved by the loader against the closed set ``core.results.objectives`` declares."""
+
+    direction: str
+    band: BandTable
+
+
+class ObjectiveSetTable(BaseModel):
+    """``[objective_set]`` -- one declared set of objectives."""
+
+    model_config = STRICT
+
+    id: str
+    """What a question names (FR-001a)."""
+
+    objective: list[ObjectiveTable]
+    """Non-empty, checked by the loader: a set with no objective decides nothing and would make
+    every candidate non-dominated while looking like a chosen policy."""
+
+
+class ObjectiveSetFile(BaseModel):
+    """A whole ``data/objectives/<id>.toml``: one owner, one objective set."""
+
+    model_config = STRICT
+
+    owner: OwnerTable
+    objective_set: ObjectiveSetTable

@@ -136,7 +136,7 @@ note   = "spec.md 2026-08-30; no open clarifications, three owner verification t
 
 [[feature]]
 id     = "019-decision-layer"
-status = "planned"
+status = "done"
 needs  = ["015-the-question", "016-real-ovdp"]
 why    = "015 because a dominance pass runs over what a horizon section evaluated -- section_evaluated is 015's, and its FR-030 withholding is what the pass must not decide standings from; 016 because the reason 014 gave for not building the non-dominated set was the measured size of the set, and 24 real issues is what expires it. Transitively covers 014 (every dimension the pass reads is 014 FR-020's) and 010 (the ranking, tie and benchmark rules it carries unchanged)."
 note   = "ALL FOUR CLARIFICATIONS ANSWERED 2026-09-03, so planning may start; the questions, the options and the owner's own words are in specs/decisions/2026-09-03-clarify-019.toml -- do not restate them. Three measurements were re-read under the answers rather than left standing: the benchmark counts, and the non-dominated sets at the declared bands, which the bands leave unchanged. Written for the registry AFTER the owner's 2026-09-02 decision (OVDP fixtures out, a real ISIN as benchmark), and the spec defines 'the shipped registry' as that state, once. Closes I2 only; Section A moves by nothing and the reason per row is decided rather than left. Four pieces of work sit outside this feature's module: the question schema's objective-set field (015), a slack-width function in core/primitives/tolerance.py, an InputKind member for the objective set, and the CLI rendering -- which includes Comparison.ties and Comparison.beats_benchmark, computed by the core today and appearing nowhere in src/terezy/cli/. PLANNED 2026-09-05. The three mechanics FR-011d left to the plan are settled in research.md D6: a fraction band resolves against the ONE amount the question states in the currency the pair is compared in, lazily -- only for a currency some pair is actually compared in; absent versus ambiguous are TWO typed refusals rather than a zero or an incomparable pair, because the cause is a declaration and not a figure; and the resolved width is carried once per (criterion, currency) on the section's result. TWO THINGS THE PLAN DID NOT CLOSE, both costs of the FRACTION shape rather than of the rule, and both the owner's line to write. First: his TOKEN 1.00 USD amount for contract_usd would resolve his 0.01 % to a band of 0.0001 USD, and that CLEARS FR-011c's floor -- the floor at two objectives is one slack, max(1e-9*|x|, 1e-9), which 1e-4 exceeds for any figure below 100 000; lazy resolution only keeps the width from being computed while no candidate delivers USD. Second, and likelier: 015 requires an amount for EVERY declared stream, so a second UAH stream is a routine data edit, and two amounts in one currency leave a fraction band with no single width -- FR-011's relation must be symmetric, so one currency admits one width -- and every section refuses. An ABSOLUTE money band, which FR-011d already permits, is immune to both. IMPLEMENTATION IS BLOCKED ON TWO BRANCHES NOT YET ON MAIN: fix/coupon-inside-the-window moves TupleOutcome.reaches, which IS the money objective, so the spec's non-dominated counts of 2, 3 and 10 are pre-fix readings and no test pins them; feat/real-only-registry is what makes 'the shipped registry' exist, and without it every section refuses under FR-018. That second branch ALSO already renders beats_benchmark, resolved to keys and narrowed to the reported population, in cli/main.py::_beats_line -- so what still reaches no reader after it lands is the TIE GROUPS themselves, and FR-029's task is scoped to those plus the three dominance populations."
@@ -161,6 +161,32 @@ status = "done"
 needs  = ["013-enumerated-schedule", "016-real-ovdp"]
 why    = "013 declares the day count and is the FR-017 prohibition this lifts; 016 is what supplies every coupon date, which is the fact FR-017 said was missing"
 note   = "Owner decision 2026-09-05 -- an early exit must return a real holding period's interest, not the spread. Closes the enumerated-accrued-interest and the-buy-quotation-is-not-carried futures together; see specs/022-accrued-interest/spec.md."
+
+[[feature]]
+id     = "023-cash-instrument"
+status = "planned"
+needs  = ["014-candidates", "015-the-question"]
+why    = "014 owns the no-candidate column this retires, the enumeration that must construct the identity way in instead of calling compose, and the total order the entry needs a position in; 015 owns the group vocabulary `cash` resolves through and the three-state subject population it moves between. Transitively covers 010 (Tuple.route_in widens) and 003 (EXIT_BY_IDENTITY, the precedent the way in mirrors)."
+note   = "Declares the do-nothing baseline the owner named first, and closes zero-hop-way-in in the same change that makes it live. Owner statement 2026-09-02; see specs/023-cash-instrument/spec.md."
+
+[[feature]]
+id     = "025-btc-holdings"
+status = "drafted"
+needs  = ["008-seed-and-goals", "011-official-rate", "015-the-question", "018-nbu-rate-series", "020-http-api"]
+why    = "008 declares the seed lots this position is made of and the estimated basis it carries; 011 strikes the dollar cost into hryvnia at the acquisition date and 018 is the series it strikes from -- both, because 011 shipped the machinery empty; 015 is where `btc` resolves to nothing and the verification task that says what would close it; 020 publishes the schema this feature edits, since a fifth subject standing regenerates the OpenAPI document. NOT parallel with 019 in practice: both regenerate tests/golden/the_answer.golden.txt and whichever lands second re-measures"
+note   = "Owner 2026-09-02/03 -- he holds BTC and wants it counted, not bought. `drafted` with plan.md and tasks.md written: two clarifications are open and tasks.md holds every artefact that turns on one in a phase that may not start. See specs/025-btc-holdings/spec.md."
+
+[[future]]
+id    = "the-graph-has-no-word-for-drafted-and-planned"
+after = ["025-btc-holdings"]
+note  = "`drafted` says planning may not start; `planned` says plan.md and tasks.md exist. 025 is both TODAY, so the graph asserts something false about it right now rather than later. Recorded 2026-09-06 by 025's review."
+
+[[feature]]
+id     = "024-real-terms-tuple"
+status = "planned"
+needs  = ["007-cpi-real-terms", "015-the-question", "022-accrued-interest"]
+why    = "007 owns the relation, the coverage refusal and the function that fills a real slot; 015 states the absence this fills as a typed exclusion and is where that exclusion is deleted; 022 is what the deflated figure is, since it changed how `implied_rate` is computed and the spec's worked example is a post-022 number"
+note   = "Closes the real-terms-for-a-tuple future: the owner asked for inflation on 2026-09-03, and every candidate's rate was nominal while the benchmark's could be real. No clarification is open -- the future-span question is 007's owner decision of 2026-08-22 applied rather than re-asked; see specs/024-real-terms-tuple/spec.md."
 
 [[future]]
 id      = "web-display-currency-switch"
@@ -188,6 +214,16 @@ after = ["020-http-api"]
 note  = "Measured 2026-09-03 by flattening the refusal families this repository names and reading `dataclasses.fields`: 51 refusal records, 42 carry `reason: str`, 9 do not. Eight are the whole of `Answer`'s own `Refused` union and the ninth is `BenchmarkYieldsNoCandidate`, a refusal arm of `SectionOutcome` -- which is why 020's test DISCOVERS them by walking the response types rather than enumerating the unions, an audit that enumerates unions finds eight. 020 ships the schema marking `reason` optional (owner, 2026-09-03, answer 3), so a client narrows on the tag. Closing it is nine sentences nobody has written plus what the CLI prints, and it belongs to a feature about the answer's vocabulary rather than to one about serialising it."
 
 # Named future work — seams already recorded inside landed specs, not yet features.
+
+[[future]]
+id    = "a-fraction-band-resolves-against-a-token-amount"
+after = ["019-decision-layer"]
+note  = "Recorded by 019's plan (research D6) and unchanged by landing it: a fraction band would resolve against the owner's TOKEN 1.00 USD to a width of 0.0001 USD, which CLEARS FR-011c's floor, so lazy resolution only defers it until a candidate delivers dollars. The remedy is one line in his own question file -- a USD amount he means, or the absolute USD band FR-011d already permits. Deliberately not guarded, because a guard would have to decide what a token amount is."
+
+[[future]]
+id    = "a-second-stream-in-one-currency-refuses-a-fraction-band"
+after = ["019-decision-layer"]
+note  = "The likelier cost of the FRACTION shape, recorded by 019's plan and not closed: 015 requires an amount for every declared stream, so a second UAH stream is a routine data edit and leaves a fraction band with no single width -- FR-011's relation must be symmetric, so one currency admits one width -- and every section refuses with SeveralQuestionAmountsInTheCurrencyCompared. An absolute money band is immune. Deliberately not built."
 
 [[future]]
 id    = "naming-the-benchmark-reorders-a-bitwise-tie"
@@ -298,16 +334,6 @@ note  = "010's seventeen refusal records carry a `reason` string and NO provenan
 id    = "one-amount-per-stream-in-compare"
 after = ["014-candidates"]
 note  = "`core/decision/compare.py::compare` takes ONE `amount: Money` and scores every tuple in the set with it, while 014 FR-001 and FR-005 take an amount PER INCOME STREAM and forbid converting one into the other. The two agree only while a candidate set is single-stream, which is what the shipped registry yields (`contract_usd` connects to nothing inbound), so 014 SC-015 is constructible today and a two-stream set cannot be handed to `compare` at all. The fix is 010's to make -- one amount per stream on the call, struck against each tuple's own `stream_id` -- and it is a change to 010, made and reviewed there on the rule 014 FR-014a states, rather than a per-stream loop in the caller, which would produce one ranking per stream and no ranking of the set. Recorded 2026-08-30 while repairing 014's specification; deliberately not built. 014 SHIPPED THE REFUSAL RATHER THAN THE FIX: `survey` returns `MoreThanOneStreamInTheSet` naming both streams, so the disagreement is a typed output rather than a single amount silently scoring a set it does not describe. Unreachable from the shipped registry, and reached in `tests/unit/test_candidate_survey.py` by declaring the inbound USD-to-UAH corridor the registry lacks -- which is also the smallest change that makes the gap live."
-
-[[future]]
-id    = "zero-hop-way-in"
-after = ["014-candidates"]
-note  = "A stream that already arrives, in the right currency, at the venue an instrument is bought at needs no way in -- and `Tuple.route_in` is required, so that candidate is not representable. `compose` already refuses the question in exactly those words (`core/routes/compose.py::_refusal`: 'money that is already where it was wanted'), and 014 FR-014 carries that text verbatim onto the pair so it is never mistaken for a corridor nobody declared. What is missing is the candidate itself. **The same fact on the way OUT is already solved**: 003's FR-002 lets a spendable destination satisfy its own exit, and `EXIT_BY_IDENTITY` in `core/routes/path.py` is that sentinel -- so the shape of the fix is known and its argument is written down. Unreachable in the shipped registry, where every instrument is bought at `inzhur` and neither stream arrives there; it becomes live the day an instrument is declared bought at `monobank_uah` or `deel`. Recorded 2026-08-29 while specifying 014, as a gap rather than a clarification, because nothing today reaches it. 014 MADE IT VISIBLE: such a pair now stands in the no-candidate column carrying `NothingNeedsToConnect`, which holds compose's whole refusal record -- so its `case` distinguishes it from an undeclared corridor structurally and its `reason` reaches a reader verbatim (`tests/unit/test_no_candidate_column.py` asserts the text was not rewritten). What is still missing is the candidate."
-
-[[future]]
-id    = "real-terms-for-a-tuple"
-after = ["007-cpi-real-terms", "010-full-tuple"]
-note  = "A tuple has NO real-terms rate. Read in the code on 2026-08-30 rather than supposed: `TupleOutcome.implied_rate` is typed `NominalRate | RateNotComparable`, and the `RealRate | RealTermsUnavailable` slot 007 built lives on feature 001's hurdle record (`core/results/hurdle.py`) and on nothing the join produces. So a comparison of instruments answers in nominal terms only, while the benchmark it is ranked against can state a real one -- and the owner's question names inflation explicitly. Deflating the nominal rate is not a presentation choice: it is a new figure needing a formula, a `docs/METHODOLOGY.md` entry and a worked example, it must refuse by name where no CPI series covers the span (007's existing behaviour), and it is a change to 010's outcome record that moves figures 010's and 014's goldens pin. 015 states it as an EXCLUSION rather than filling it (015 FR-023a), which is why this is a recorded gap and not a silent absence. Recorded 2026-08-30 while specifying 015; deliberately not built."
 
 [[future]]
 id    = "secondary-market-rate-risk"

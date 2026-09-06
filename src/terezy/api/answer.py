@@ -30,6 +30,7 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from pathlib import Path
 
     from terezy.core.primitives.currency import Currency
+    from terezy.core.results.objectives import ObjectiveSet
     from terezy.core.results.question import Question
     from terezy.core.routes.legs import Route
     from terezy.data.manifest import RunManifest
@@ -47,7 +48,9 @@ class AnsweredQuestion:
     manifest: RunManifest
 
 
-def inputs_of(declarations: resolver.AnswerDeclarations, *, regime_id: str) -> AnswerInputs:
+def inputs_of(
+    declarations: resolver.AnswerDeclarations, *, regime_id: str, objective_set_id: str
+) -> AnswerInputs:
     """The verb's second parameter, built from a resolved data root.
 
     **The route set is the one the question's regime declares**, never the one a transition
@@ -58,10 +61,22 @@ def inputs_of(declarations: resolver.AnswerDeclarations, *, regime_id: str) -> A
     question naming ``normalized`` with horizons starting 2026-09-01 was answered over
     ``wartime``'s eight routes, two corridors short, under the label ``normalized``.
     """
+    declared = declarations.objective_sets
+    if objective_set_id not in declared:
+        raise DeclarationError(
+            declarations.candidates.candidates_file.parent.parent / resolver.OBJECTIVES_DIR,
+            "",
+            f"declares no objective set {objective_set_id!r}, which a question is answered "
+            f"under. Declared sets: {sorted(declared)}. There is no default: a run under "
+            "criteria nobody declared would take its dominance verdicts over a set the file "
+            "does not name (019 FR-001a).",
+            f"name one of {sorted(declared)}, or declare the set you meant",
+        )
+    objectives = declared[objective_set_id]
     coverage = declarations.candidates.composition.coverage
     routes = coverage.ramp.routes
     if not coverage.regimes:
-        return _inputs(declarations, routes)
+        return _inputs(declarations, routes, objectives)
     named = coverage.regimes.get(regime_id)
     if named is None:
         raise DeclarationError(
@@ -73,10 +88,15 @@ def inputs_of(declarations: resolver.AnswerDeclarations, *, regime_id: str) -> A
             "question's own world says do not exist.",
             f"name one of {sorted(coverage.regimes)}",
         )
-    return _inputs(declarations, {name: routes[name] for name in sorted(named.route_ids)})
+    narrowed = {name: routes[name] for name in sorted(named.route_ids)}
+    return _inputs(declarations, narrowed, objectives)
 
 
-def _inputs(declarations: resolver.AnswerDeclarations, routes: Mapping[str, Route]) -> AnswerInputs:
+def _inputs(
+    declarations: resolver.AnswerDeclarations,
+    routes: Mapping[str, Route],
+    objectives: ObjectiveSet,
+) -> AnswerInputs:
     """The bundle, over whichever route set the regime settled on."""
     return AnswerInputs(
         registries=declarations.tuples.registries,
@@ -84,6 +104,7 @@ def _inputs(declarations: resolver.AnswerDeclarations, routes: Mapping[str, Rout
         groups=declarations.tuples.instruments.groups,
         bound=declarations.candidates.composition.bound,
         ceiling=declarations.candidates.ceiling,
+        objectives=objectives,
     )
 
 
@@ -124,8 +145,21 @@ def answer_declared(
         base_currency=base_currency,
         scenario_id=_scenario_of(root, question.regime_id, base_currency=base_currency),
     )
-    resolver.check_question(question, declarations.tuples.registries.streams, path=declared_in)
-    result = answer(question, inputs_of(declarations, regime_id=question.regime_id), as_of)
+    resolver.check_question(
+        question,
+        declarations.tuples.registries.streams,
+        path=declared_in,
+        objective_sets=declarations.objective_sets,
+    )
+    result = answer(
+        question,
+        inputs_of(
+            declarations,
+            regime_id=question.regime_id,
+            objective_set_id=question.objective_set_id,
+        ),
+        as_of,
+    )
     return AnsweredQuestion(
         answer=result,
         manifest=run_manifest.of_answer(

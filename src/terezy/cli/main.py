@@ -22,6 +22,7 @@ import argparse
 import sys
 import tomllib
 from datetime import date
+from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, assert_never
 
@@ -29,12 +30,16 @@ from terezy.api.answer import AnsweredQuestion, answer_declared, answer_question
 from terezy.core.decision.answer import (
     benchmark_unavailable,
     key_agreement,
+    section_beats_benchmark,
     section_evaluated,
     section_ranking,
+    section_ties,
     subject_counts,
 )
+from terezy.core.decision.dominance import why_one_member
 from terezy.core.instruments.interface import Assumptions
 from terezy.core.primitives.currency import Currency
+from terezy.core.primitives.money import Money
 from terezy.core.primitives.rates import NominalRate
 from terezy.core.results.answer import (
     Answer,
@@ -54,8 +59,32 @@ from terezy.core.results.candidates import (
     NothingConnects,
     NothingNeedsToConnect,
 )
+from terezy.core.results.dominance import (
+    BenchmarkStanding,
+    DeliveredInTwoCurrencies,
+    DominanceResult,
+    Dominated,
+    EveryOtherIsDominated,
+    EveryOtherIsNotPlaced,
+    FigureMissing,
+    HurdleIsDominated,
+    IncomparablePair,
+    Mixed,
+    NoStatedAssumptionSeparatesThem,
+    NothingDominatesTheHurdle,
+    OnlyOneEvaluated,
+    SeparatingAssumptions,
+    TheSetDoesNotHaveOneMember,
+    WhyOneMember,
+)
 from terezy.core.results.fund import FundAssumptions
-from terezy.core.results.tuple import Comparison, InstrumentPlan, TupleOutcome
+from terezy.core.results.objectives import (
+    AbsoluteBand,
+    Band,
+    DaysBand,
+    FractionOfTheQuestionAmount,
+)
+from terezy.core.results.tuple import Comparison, InstrumentPlan, Tuple, TupleOutcome
 from terezy.core.routes.path import (
     ComposedExit,
     DeclaredExit,
@@ -197,12 +226,48 @@ def _named_scalars(record: object) -> list[str]:
     A record field is skipped rather than printed: ``BenchmarkYieldsNoCandidate`` carries the
     whole enumerated set, and a bare ``repr`` of it is thousands of characters where a sentence
     was intended. What the reader needs from a refusal is its ids, its counts and its reason.
+
+    **An ``Enum`` and a ``Money`` are readable and were not read.** 019's refusals name a
+    criterion and a currency and nothing else -- ``BandInAnotherCurrency`` carries three enum
+    members -- so under the narrower test they rendered as their type name and no reason at
+    all, which is the silent degradation Principle IV forbids. A tuple of them is rendered the
+    same way, because ``SeveralQuestionAmountsInTheCurrencyCompared`` names the streams whose
+    two amounts left a band with no single width, and *which two* is the whole of the remedy.
+
+    **A candidate key and a declared band are rendered rather than skipped.** Both are records,
+    so the narrower test dropped them: ``BenchmarkWasWithheld`` exists to name *which* hurdle
+    was withheld, and FR-011c's refusal has to name the band that failed beside the slack it
+    did not clear. A refusal missing either sends a reader to the wrong file.
     """
     return [
-        f"    {name} = {value}"
+        f"    {name} = {_readable(getattr(record, name))}"
         for name in getattr(type(record), "__slots__", ())
-        if isinstance(value := getattr(record, name), str | int | float | date)
+        if _is_readable(getattr(record, name))
     ]
+
+
+def _is_readable(value: object) -> bool:
+    """Whether a field is a figure a reader can take in, or a structure that would flood them."""
+    if isinstance(value, Tuple | AbsoluteBand | FractionOfTheQuestionAmount | DaysBand):
+        return True
+    if isinstance(value, tuple):
+        return all(_is_readable(item) for item in value)
+    return isinstance(value, str | int | float | date | Enum | Money)
+
+
+def _readable(value: object) -> str:
+    """One such field, in the words its own type carries."""
+    if isinstance(value, Tuple):
+        return _candidate(value)
+    if isinstance(value, AbsoluteBand | FractionOfTheQuestionAmount | DaysBand):
+        return _band_words(value)
+    if isinstance(value, tuple):
+        return ", ".join(_readable(item) for item in value)
+    if isinstance(value, Enum):
+        return str(value.value)
+    if isinstance(value, Money):
+        return f"{value.amount} {value.currency.value}"
+    return str(value)
 
 
 def _subject_lines(result: Answer) -> list[str]:
@@ -248,8 +313,197 @@ def _section_lines(result: Answer, section: HorizonSection) -> list[str]:
     for pair in section.outcome.enumerated.no_candidate:
         lines.append(f"  NO CANDIDATE {pair.instrument_id} from {pair.stream_id}: {_why(pair.why)}")
     lines.extend(_reserve_lines(section))
+    lines.extend(_dominance_lines(section))
     lines.extend(f"  {line}" for line in _exclusion_lines(section.excludes))
     return lines
+
+
+def _dominance_lines(section: HorizonSection) -> list[str]:
+    """All three of FR-008's populations, and everything the core computes about them.
+
+    019 FR-029. **All three**, because FR-014 requires *every other candidate is dominated* and
+    *every other is not placed* to be distinguishable on the record, and a surface rendering two
+    of three makes them indistinguishable to the one person who reads it -- which is this
+    feature's own defect one level down.
+
+    Every candidate is named by its instrument id and never by a position (FR-029a).
+    """
+    result = section.dominance
+    if not isinstance(result, DominanceResult):
+        return [
+            f"  NO DOMINANCE SET: {type(result).__name__}",
+            *_named_scalars(result),
+        ]
+    lines = [
+        f"  dominance under {result.objectives.id}: {len(result.non_dominated)} "
+        f"non-dominated, {len(result.dominated)} dominated, {len(result.not_placed)} not "
+        f"placed, {len(result.incomparable)} incomparable pair(s)",
+        *(f"    {line}" for line in _objective_lines(result)),
+    ]
+    lines.extend(f"    NON-DOMINATED {_candidate(key)}" for key in result.non_dominated)
+    for beaten in result.dominated:
+        lines.append(f"    DOMINATED {_candidate(beaten.key)}")
+        lines.extend(f"      {line}" for line in _dominators(beaten))
+    for unplaced in result.not_placed:
+        lines.append(f"    NOT PLACED {_candidate(unplaced.key)}")
+        lines.append(
+            f"      every one of its {len(unplaced.every_pair)} pair(s) is incomparable, "
+            "each listed below"
+        )
+    for pair in result.incomparable:
+        lines.append(f"    INCOMPARABLE on {pair.criterion.value}: {_why_incomparable(pair)}")
+        lines.append(f"      {_candidate(pair.left)}")
+        lines.append(f"      {_candidate(pair.right)}")
+    for close in result.indistinguishable:
+        lines.append(f"    INDISTINGUISHABLE {_candidate(close.key)}")
+        lines.extend(f"      from {_candidate(key)}" for key in close.neighbours)
+    if result.indistinguishable:
+        lines.append(
+            "      -- a relation between pairs and never a group: closeness within a band "
+            "does not chain, so no partition of them exists"
+        )
+    lines.append(f"    {_hurdle_line(result.benchmark_standing)}")
+    if isinstance(result.benchmark_standing, HurdleIsDominated):
+        lines.extend(
+            f"      by {_candidate(verdict.dominates)}" for verdict in result.benchmark_standing.by
+        )
+    if result.non_dominated:
+        # An empty set has no members to be separated by anything, and the record's
+        # *they rest on the same stated assumptions* is a claim about a population that is not
+        # there. The line below says the set is empty instead.
+        lines.extend(f"    {line}" for line in _separating_lines(result.separating))
+    lines.append(f"    {_one_member_line(why_one_member(result))}")
+    return lines
+
+
+def _objective_lines(result: DominanceResult) -> list[str]:
+    """The whole declared set beside every population it counts (FR-023).
+
+    A fraction is printed with **the width it resolved to**, because a fraction reported without
+    its width is a band nobody can check against a figure.
+    """
+    widths = {(band.criterion, band.currency): band for band in result.resolved_bands}
+    lines = []
+    for objective in result.objectives.objectives:
+        resolved = [
+            f"{band.width.amount} {band.currency.value} of {band.from_amount.amount} "
+            f"{band.currency.value}"
+            for (criterion, _), band in sorted(widths.items(), key=lambda item: item[0][1].value)
+            if criterion is objective.criterion
+        ]
+        lines.append(
+            f"objective {objective.criterion.value} {objective.direction.value}, band "
+            f"{_band_words(objective.band)}" + (f" = {'; '.join(resolved)}" if resolved else "")
+        )
+    return lines
+
+
+def _band_words(band: Band) -> str:
+    """One declared band in the shape it was declared in, never converted into another."""
+    match band:
+        case AbsoluteBand():
+            return f"{band.amount.amount} {band.amount.currency.value}"
+        case FractionOfTheQuestionAmount():
+            return f"{band.proportion} of the question's amount"
+        case DaysBand():
+            return f"{band.days} day(s)"
+        case _:  # pragma: no cover -- mypy proves this unreachable
+            assert_never(band)
+
+
+def _dominators(item: Dominated) -> list[str]:
+    """Every candidate that dominates this one, with the objectives each was strictly better on.
+
+    The **weak** half is not printed per dominator, and its absence is deliberate: by FR-007's
+    definition it holds on every declared objective, so printing it beside each of twenty
+    dominators is one sentence repeated twenty times. It is on the verdict record, where a
+    reader of one verdict finds it without the rule in hand.
+
+    One dominator per line, because a candidate is five terms and a run of them on one line is
+    a row nobody can read to its end.
+    """
+    return [
+        f"by {_candidate(verdict.dominates)}, strictly better on "
+        + ", ".join(criterion.value for criterion in verdict.strictly_better_on)
+        for verdict in item.dominated_by
+    ]
+
+
+def _why_incomparable(pair: IncomparablePair) -> str:
+    """What made one pair undecidable, in the terms the record carries."""
+    match pair.why:
+        case FigureMissing():
+            return f"no figure at {pair.why.what}"
+        case DeliveredInTwoCurrencies():
+            return (
+                f"delivered in {pair.why.left_currency.value} against "
+                f"{pair.why.right_currency.value}, and no exchange rate is consulted"
+            )
+        case _:  # pragma: no cover -- mypy proves this unreachable
+            assert_never(pair.why)
+
+
+def _hurdle_line(standing: BenchmarkStanding) -> str:
+    """Where the hurdle sits in the partial order.
+
+    *Nothing dominates the hurdle* is never rendered as *the hurdle is best*: other members may
+    sit beside it in the set, and a hurdle that dominates everything is a stronger fact.
+    """
+    match standing:
+        case NothingDominatesTheHurdle():
+            return f"NOTHING DOMINATES THE HURDLE {_candidate(standing.key)}"
+        case HurdleIsDominated():
+            return (
+                f"THE HURDLE IS DOMINATED, by {len(standing.by)} of them: "
+                f"{_candidate(standing.key)}"
+            )
+        case _:  # pragma: no cover -- mypy proves this unreachable
+            assert_never(standing)
+
+
+def _separating_lines(
+    separating: SeparatingAssumptions | NoStatedAssumptionSeparatesThem,
+) -> list[str]:
+    """What the members of the set do not share, in the words the core records carry.
+
+    It does **not** say which assumption decides between them: that needs a re-evaluation under
+    a changed assumption, which this feature deliberately does not perform.
+    """
+    if isinstance(separating, NoStatedAssumptionSeparatesThem):
+        return ["the members rest on the same stated assumptions; none separates them"]
+    lines = ["what the members do not share (which of them decides is NOT tested):"]
+    for member in separating.per_member:
+        carried = [*member.rests_on, *(item.what.value for item in member.excludes)]
+        lines.append(f"  {_candidate(member.key)}")
+        lines.extend(
+            f"    {claim}" for claim in (carried or ["nothing the others do not also carry"])
+        )
+    return lines
+
+
+def _one_member_line(reading: WhyOneMember) -> str:
+    """FR-014: where the set has one member, why -- and only one of the cases is a finding."""
+    match reading:
+        case TheSetDoesNotHaveOneMember() if not reading.members:
+            return (
+                "THE SET IS EMPTY: no candidate is non-dominated, because none of them could "
+                "be placed at all -- see the NOT PLACED rows above"
+            )
+        case TheSetDoesNotHaveOneMember():
+            return f"{reading.members} candidate(s) in the set; none is presented ahead of another"
+        case OnlyOneEvaluated():
+            return "one member because this section evaluated ONE candidate, which is not a win"
+        case EveryOtherIsDominated():
+            return "one member because every other evaluated candidate is dominated"
+        case EveryOtherIsNotPlaced():
+            return "one member because every other evaluated candidate is NOT PLACED"
+        case Mixed():
+            return (
+                f"one member: {reading.dominated} other(s) dominated and "
+                f"{reading.not_placed} not placed"
+            )
+        case _:  # pragma: no cover -- mypy proves this unreachable
+            assert_never(reading)
 
 
 def _ranking_lines(section: HorizonSection) -> list[str]:
@@ -272,8 +526,13 @@ def _ranking_lines(section: HorizonSection) -> list[str]:
         "are reported unranked rather than ordered."
     ]
     hurdle = None if compared is None else compared.ranked[compared.benchmark].key
+    ties = section_ties(section)
     if compared is not None:
-        lines.append(_beats_line(compared, ranked))
+        lines.append(_beats_line(compared, ranked, section_beats_benchmark(section), ties))
+        # Inside the guard, not beside it: the tie groups are read off the very ranking the
+        # branch above refuses to show when there is no hurdle to rank against, and printing
+        # them there would put the ordering back in front of a reader one line later.
+        lines.extend(_tie_lines(ties))
     for outcome in ranked:
         lines.extend(_figure_lines(outcome, hurdle=outcome.key == hurdle))
     for outcome in scored:
@@ -299,7 +558,12 @@ ONE_SPAN = 1
 """How many distinct span lengths a ranking must have for its rates to be comparable."""
 
 
-def _beats_line(comparison: Comparison, ranked: tuple[TupleOutcome, ...]) -> str:
+def _beats_line(
+    comparison: Comparison,
+    ranked: tuple[TupleOutcome, ...],
+    beats: Sequence[Tuple],
+    ties: Sequence[Sequence[Tuple]],
+) -> str:
     """How the ranking stands against its hurdle, in words, above the rows.
 
     **``beats_benchmark`` is computed for this and was rendered nowhere.** Constitution
@@ -310,10 +574,9 @@ def _beats_line(comparison: Comparison, ranked: tuple[TupleOutcome, ...]) -> str
 
     **Two index spaces meet here, and mixing them is silent.** Every index on ``comparison`` --
     ``benchmark``, ``ties``, ``beats_benchmark`` -- addresses ``comparison.ranked``, while
-    ``ranked`` is what ``section_ranking`` reports: the same order with every withheld
-    candidate removed (010 FR-030). So each index is resolved to a *key* against
-    ``comparison.ranked`` and then matched by identity, and a candidate this section refuses to
-    show is not counted as having beaten anything.
+    ``ranked`` is what ``section_ranking`` reports: the same order with every withheld candidate
+    removed (010 FR-030). ``section_beats_benchmark`` and ``section_ties`` do that resolution,
+    in the core, and this takes their output rather than an index (019 FR-029a).
 
     ``ranked`` must hold the hurdle, which is the caller's to guarantee: ``section_ranking``
     returns ``()`` when the benchmark is withheld, so a verdict is never asked for over a table
@@ -327,9 +590,7 @@ def _beats_line(comparison: Comparison, ranked: tuple[TupleOutcome, ...]) -> str
             f"a verdict was asked for over a ranking that does not show its own hurdle "
             f"{hurdle.key.instrument_id!r}; section_ranking returns () in that case"
         )
-    beaten = sum(
-        1 for index in comparison.beats_benchmark if comparison.ranked[index].key in reported
-    )
+    beaten = len(beats)
     others = len(ranked) - 1
     if not others:
         verdict = (
@@ -342,13 +603,23 @@ def _beats_line(comparison: Comparison, ranked: tuple[TupleOutcome, ...]) -> str
         verdict = (
             f"{beaten} of the {others} other row(s) beat the benchmark {hurdle.key.instrument_id}"
         )
-    if any(
-        hurdle.key in {comparison.ranked[index].key for index in group}
-        and len({comparison.ranked[index].key for index in group} & reported) > 1
-        for group in comparison.ties
-    ):
+    if any(hurdle.key in group for group in ties):
         verdict += ", and at least one candidate ties with it within the project tolerance"
     return f"  {verdict}.{_span_caveat(comparison, hurdle, ranked)}"
+
+
+def _tie_lines(ties: Sequence[Sequence[Tuple]]) -> list[str]:
+    """Which candidates tie with which, by id.
+
+    **Computed by the core since 010 and rendered nowhere until now** (019 FR-029). A ranking
+    printed without its tie groups is the machinery that keeps the head of a tied group from
+    reading as a winner, computed and withheld from the only person who reads it.
+    """
+    lines = []
+    for group in ties:
+        lines.append("  TIED within the project tolerance, in no order:")
+        lines.extend(f"    {_candidate(key)}" for key in group)
+    return lines
 
 
 def _span_caveat(
@@ -394,6 +665,23 @@ def _span_caveat(
     )
 
 
+def _candidate(key: Tuple) -> str:
+    """One candidate, by **all five** of 010's declared terms.
+
+    That is what makes two rows different rows, and an id alone renders them identically: one
+    instrument bought over two ways in, funded from two streams, or run to maturity against sold
+    at the window's end is two options. A question may also state several plans for one
+    instrument -- the shipped one states two that differ in their exit date -- so the plan's own
+    choices are printed rather than the name of its record.
+    """
+    return (
+        f"{key.instrument_id} from {key.stream_id} "
+        f"via {candidate_id(key.route_in)} "
+        f"out {_exit_choice(key.route_out)} "
+        f"run as {_plan_terms(key.exit_terms)}"
+    )
+
+
 def _figure_lines(outcome: TupleOutcome, *, hurdle: bool = False) -> list[str]:
     """One candidate's figures, with the currency, the rate and the terms that identify it.
 
@@ -414,11 +702,7 @@ def _figure_lines(outcome: TupleOutcome, *, hurdle: bool = False) -> list[str]:
     """
     rate = outcome.implied_rate
     return [
-        f"    {'[BENCHMARK] ' if hurdle else ''}{outcome.key.instrument_id} "
-        f"from {outcome.key.stream_id} "
-        f"via {candidate_id(outcome.key.route_in)} "
-        f"out {_exit_choice(outcome.key.route_out)} "
-        f"run as {_plan_terms(outcome.key.exit_terms)}",
+        f"    {'[BENCHMARK] ' if hurdle else ''}{_candidate(outcome.key)}",
         f"      reaches {outcome.reaches.amount} {outcome.reaches.currency.value}"
         + (
             f"; rate {rate.value}" if isinstance(rate, NominalRate) else f"; NO RATE: {rate.reason}"

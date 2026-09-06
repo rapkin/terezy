@@ -76,6 +76,12 @@ continuation = "hold_as_cash"
 # says so per section. This benchmark simply does not trip it except by seven days.
 benchmark    = "UA4000231195"
 
+# Which criteria the dominance pass is taken over, named rather than defaulted (019 FR-001a):
+# there is no default set, and a question that named none would be answered under criteria
+# nobody chose. It is a field of this file rather than a flag on the verb because the file's own
+# digest is what makes the answer reproducible.
+objectives   = "money-and-when"
+
 # The four words he said, in the order he said them. `subjects` and `every_declared_instrument`
 # are mutually exclusive and one of them is required: omission must never read as *everything*.
 subjects     = ["cash", "ovdp", "inzhur", "btc"]

@@ -88,6 +88,17 @@ class Question:
     horizons: tuple[DateRange, ...]
     """One or more windows, in the order declared, each becoming one section of the answer."""
 
+    objective_set_id: str
+    """The declared objective set this question is answered under (019 FR-001a).
+
+    Required, with no default: a run with no objective set has no dominance pass to make, and a
+    default would make a forgotten line read as a chosen policy. It is a field of the
+    **question** rather than a parameter of the verb because a question is a declaration, so
+    which criteria an answer was taken over falls inside the digest that already makes *the
+    answer I got last March* reproducible. ``as_of`` is excluded for the opposite reason: it is
+    a clock.
+    """
+
     benchmark_instrument_id: str
     """What everything is ranked against. Named by instrument id; more than one candidate for
     it refuses rather than settling by file order which figure the rest are measured by."""

@@ -43,9 +43,11 @@ from terezy.core.decision.answer import (
     subject_counts,
 )
 from terezy.core.decision.candidates import drop_tally, dropped
+from terezy.core.decision.dominance import why_one_member
 from terezy.core.primitives.currency import Currency
-from terezy.core.results.answer import Answer, DeclaredSubject
+from terezy.core.results.answer import Answer, DeclaredSubject, HorizonSection
 from terezy.core.results.candidates import CandidateSurvey
+from terezy.core.results.dominance import DominanceResult, NothingDominatesTheHurdle
 from terezy.data import manifest as run_manifest
 from tests import answer_registries as fixtures
 
@@ -112,6 +114,7 @@ def _render(result: Answer) -> str:
                 lines.append(
                     f"  dropped {group.refusal:28} {group.count}  {','.join(group.instruments)}"
                 )
+        lines.extend(_dominance_rows(section))
         for item in section.excludes:
             lines.append(
                 f"  excludes {item.what.value:38} "
@@ -130,6 +133,55 @@ def _render(result: Answer) -> str:
     lines.append(f"[keys] {type(key_agreement(result)).__name__}")
     lines.append(f"[digest] {run_manifest.digest_of_answer(result)}")
     return "\n".join(lines) + "\n"
+
+
+def _dominance_rows(section: HorizonSection) -> list[str]:
+    """The three populations and the hurdle's standing, by candidate id (019 SC-018).
+
+    Recorded because the artefact's value is that a diff to it is a finding: a declaration that
+    moves a candidate into or out of the non-dominated set is exactly the change a reader must
+    be shown, and a digest alone would say only that something moved.
+    """
+    result = section.dominance
+    if not isinstance(result, DominanceResult):
+        return [f"  dominance REFUSED {type(result).__name__}"]
+    rows = [
+        f"  dominance {result.objectives.id}  "
+        f"non_dominated={len(result.non_dominated)} dominated={len(result.dominated)} "
+        f"not_placed={len(result.not_placed)} incomparable={len(result.incomparable)}  "
+        f"{type(why_one_member(result)).__name__}"
+    ]
+    for band in result.resolved_bands:
+        rows.append(
+            f"    band {band.criterion.value:24} {band.currency.value} "
+            f"{band.width.amount.hex()} of {band.from_amount.amount.hex()}"
+        )
+    for key in result.non_dominated:
+        rows.append(f"    non-dominated {key.instrument_id}")
+    for beaten in result.dominated:
+        by = ",".join(sorted({item.dominates.instrument_id for item in beaten.dominated_by}))
+        rows.append(f"    dominated {beaten.key.instrument_id:24} by {by}")
+    for unplaced in result.not_placed:
+        rows.append(f"    not-placed {unplaced.key.instrument_id}")
+    for pair in result.incomparable:
+        rows.append(
+            f"    incomparable {pair.left.instrument_id} {pair.right.instrument_id} "
+            f"{pair.criterion.value} {type(pair.why).__name__}"
+        )
+    for close in result.indistinguishable:
+        neighbours = ",".join(key.instrument_id for key in close.neighbours)
+        rows.append(f"    indistinguishable {close.key.instrument_id:24} {neighbours}")
+    standing = result.benchmark_standing
+    rows.append(
+        f"    hurdle {standing.key.instrument_id} {type(standing).__name__}"
+        + (
+            ""
+            if isinstance(standing, NothingDominatesTheHurdle)
+            else " by " + ",".join(sorted({item.dominates.instrument_id for item in standing.by}))
+        )
+    )
+    rows.append(f"    separating {type(result.separating).__name__}")
+    return rows
 
 
 def _recorded() -> str:

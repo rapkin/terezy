@@ -24,6 +24,7 @@ from datetime import date
 from typing import TYPE_CHECKING
 
 from terezy.core.decision import candidates as enumeration
+from terezy.core.decision.dominance import dominance
 from terezy.core.decision.tuple_outcome import Registries
 from terezy.core.primitives import money, staleness
 from terezy.core.primitives import provenance as prov
@@ -70,6 +71,7 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.instruments.groups import InstrumentGroup
     from terezy.core.instruments.interface import DateRange
     from terezy.core.results.composed import SegmentBound
+    from terezy.core.results.objectives import ObjectiveSet
     from terezy.core.results.question import Question, Reserve
     from terezy.core.results.tuple import Arrival, InstrumentPlan
     from terezy.core.routes.legs import Route
@@ -100,6 +102,11 @@ class AnswerInputs:
     bound: SegmentBound
     ceiling: candidate_results.CandidateCeiling
 
+    objectives: ObjectiveSet
+    """The declared set the question names (019 FR-001a). Here rather than on the question
+    because the question names an **id** and resolving it is the data layer's, exactly as the
+    ceiling and the bound are."""
+
 
 def answer(question: Question, inputs: AnswerInputs, as_of: date) -> Answer | Refused:
     """Answer one declared question over one registry, at one as-of date.
@@ -126,7 +133,7 @@ def answer(question: Question, inputs: AnswerInputs, as_of: date) -> Answer | Re
         )
         if isinstance(outcome, BenchmarkYieldsSeveralCandidates):
             return outcome
-        sections.append(_section(question, subjects, horizon, outcome))
+        sections.append(_section(question, subjects, horizon, outcome, inputs.objectives))
     return Answer(
         question=question,
         as_of=as_of,
@@ -361,10 +368,24 @@ def _section(
     subjects: Sequence[ResolvedSubject],
     horizon: DateRange,
     outcome: SectionOutcome,
+    objectives: ObjectiveSet,
 ) -> HorizonSection:
-    """One section: the survey whole, plus what this feature withholds and what it verdicts."""
+    """One section: the survey whole, plus what this feature withholds and what it verdicts.
+
+    **The dominance pass is handed the parts rather than the section** (019 research D9a):
+    ``HorizonSection`` is frozen and carries the pass's own result, so a pass taking the finished
+    record could not be called before the record exists, and the two escapes -- a default on the
+    field, or a ``replace`` over a section whose ``dominance`` is momentarily wrong -- are both
+    the silent default this repository refuses everywhere else.
+    """
     late = _arrives_after_horizon(outcome, horizon)
     withheld = frozenset(item.key for item in late)
+    excludes = tuple(
+        stated
+        for item in _outcomes(outcome)
+        if item.key not in withheld
+        for stated in _stated_exclusions(item)
+    )
     return HorizonSection(
         horizon=horizon,
         outcome=outcome,
@@ -375,12 +396,14 @@ def _section(
             for reserve in question.reserves
             for verdict in _verdicts(outcome, reserve, withheld)
         ),
-        excludes=tuple(
-            stated
-            for item in _outcomes(outcome)
-            if item.key not in withheld
-            for stated in _stated_exclusions(item)
+        dominance=dominance(
+            outcome,
+            withheld=late,
+            excludes=excludes,
+            objectives=objectives,
+            amounts=question.amounts,
         ),
+        excludes=excludes,
     )
 
 
@@ -664,15 +687,68 @@ def section_ranking(section: HorizonSection) -> tuple[TupleOutcome, ...]:
     :func:`section_evaluated` is what carries the figures in those cases: they were computed and
     throwing them away would hide work the owner paid for.
     """
-    if not isinstance(section.outcome, CandidateSurvey):
-        return ()
-    comparison = section.outcome.comparison
-    if not isinstance(comparison, Comparison):
+    comparison = _comparison(section)
+    if comparison is None:
         return ()
     withheld = frozenset(item.key for item in section.arrives_after_horizon)
     if comparison.ranked[comparison.benchmark].key in withheld:
         return ()
     return tuple(item for item in comparison.ranked if item.key not in withheld)
+
+
+def section_ties(section: HorizonSection) -> tuple[tuple[Tuple, ...], ...]:
+    """010's tie groups, resolved to candidate keys and narrowed to the reported population.
+
+    019 FR-029a. ``Comparison.ties`` holds **indices into ``ranked``**, which FR-030 narrows
+    afterwards, so rendering them as they stand would put a withheld figure in front of a
+    reader. A group left with fewer than two members after narrowing is not a tie and is not
+    reported: a group of one is not a tie under any rule.
+
+    **What narrowing costs, stated rather than papered over.** ``tolerance.tied_groups``
+    anchors each group on its **first** member, which is what bounds a reported tie at one
+    tolerance wide. Where FR-030 withholds that anchor, the survivors were each within one
+    tolerance of a row that is no longer shown and may be up to two apart from each other -- so
+    a narrowed group is *at most two tolerances* wide rather than one. It is not recomputed
+    here: 010 owns the tie rule and FR-013 says this feature reads it rather than running a
+    second copy, which would report a strict winner in one comparison and a tie in the other.
+
+    Here rather than in the renderer so the command line computes nothing.
+    """
+    comparison = _comparison(section)
+    if comparison is None:
+        return ()
+    reported = frozenset(item.key for item in section_evaluated(section))
+    groups = (
+        tuple(key for key in (comparison.ranked[index].key for index in group) if key in reported)
+        for group in comparison.ties
+    )
+    return tuple(group for group in groups if len(group) > 1)
+
+
+def section_beats_benchmark(section: HorizonSection) -> tuple[Tuple, ...]:
+    """The candidates that beat the hurdle on the rate, resolved to keys and narrowed the same way.
+
+    Measured, ``inzhur_miltech`` is inside ``beats_benchmark`` at all three of the owner's
+    horizons and is withheld from every one of them: an index into a sequence somebody else
+    narrowed is the defect FR-029a exists to stop reaching a reader.
+    """
+    comparison = _comparison(section)
+    if comparison is None:
+        return ()
+    reported = frozenset(item.key for item in section_evaluated(section))
+    return tuple(
+        key
+        for key in (comparison.ranked[index].key for index in comparison.beats_benchmark)
+        if key in reported
+    )
+
+
+def _comparison(section: HorizonSection) -> Comparison | None:
+    """010's ranked comparison for this section, or ``None`` where there is none to read."""
+    if not isinstance(section.outcome, CandidateSurvey):
+        return None
+    comparison = section.outcome.comparison
+    return comparison if isinstance(comparison, Comparison) else None
 
 
 def benchmark_unavailable(section: HorizonSection) -> BenchmarkUnavailable | None:
@@ -756,8 +832,10 @@ __all__ = [
     "considered_ids",
     "cross_horizon",
     "key_agreement",
+    "section_beats_benchmark",
     "section_evaluated",
     "section_ranking",
+    "section_ties",
     "subject_counts",
     "undeclared",
 ]

@@ -53,6 +53,7 @@ is the engine's typed ``InconsistentTerms``, not a load error.
 from __future__ import annotations
 
 import itertools
+import math
 import tomllib
 from dataclasses import dataclass
 from datetime import date
@@ -112,6 +113,17 @@ from terezy.core.results.composed import SegmentBound
 from terezy.core.results.coverage import SpendableEndpoint
 from terezy.core.results.fund import FundAssumptions
 from terezy.core.results.goal import Goal
+from terezy.core.results.objectives import (
+    READS,
+    AbsoluteBand,
+    Band,
+    Criterion,
+    DaysBand,
+    FractionOfTheQuestionAmount,
+    Objective,
+    ObjectiveDirection,
+    ObjectiveSet,
+)
 from terezy.core.results.question import Question, Reserve
 from terezy.core.results.tuple import ContinuationAssumption, InstrumentPlan
 from terezy.core.routes import capacity, legs
@@ -5452,6 +5464,13 @@ def question_from_document(document: Mapping[str, Any], path: Path) -> Question:
         subjects=subjects,
         every_declared_instrument=table.every_declared_instrument is True,
         horizons=_question_horizons(path, table),
+        objective_set_id=_require_text(
+            path,
+            f"{prefix}.objectives",
+            table.objectives,
+            "a dominance pass has no default objective set, and a question that named none "
+            "would be answered under criteria nobody chose (019 FR-001a)",
+        ),
         benchmark_instrument_id=_require_text(
             path,
             f"{prefix}.benchmark",
@@ -6114,3 +6133,212 @@ def _scope(path: Path, value: str) -> wd.CalendarScope:
             f"one of: {', '.join(sorted(_SCOPES))}",
         )
     return _SCOPES[value]
+
+
+# ---------------------------------------------------------------------------
+# 019-decision-layer: the objectives a dominance pass runs over
+# ---------------------------------------------------------------------------
+#
+# The same four responsibilities -- read, shape, meaning, construct -- and `composition`'s
+# reading of what a per-owner policy file is: **no citation is read and none is expected**, and
+# **no default anywhere**. How much precision the owner believes his inputs support is a
+# statement about him rather than an observation of the world (FR-004).
+#
+# The refusals this loader owns are the ones a declaration file has the facts to decide:
+# a criterion outside the closed set, a direction outside it, a band that is not exactly one
+# shape, a band shape the criterion does not take, and a band that is not finite and strictly
+# positive (FR-011b, FR-011d).
+#
+# **FR-011c's acyclicity floor is deliberately not among them.** The slack it is measured
+# against depends on the magnitudes of the figures being compared, which a declaration file does
+# not carry, so a load-time check written against the bare constant would pass a band five
+# orders of magnitude too small and guarantee nothing. It is a refusal from the pass.
+
+OBJECTIVES_TABLE: Final = "objective_set"
+"""Root table of an objective-set file, and the prefix of every field path in one."""
+
+
+def objectives_from_file(path: Path) -> ObjectiveSet:
+    """One ``data/objectives/<id>.toml`` as the objective set it declares."""
+    document = read_document(path)
+    file = _validate(schema.ObjectiveSetFile, document, path)
+    table = file.objective_set
+    owner_id = _require_text(
+        path,
+        f"{OWNER_TABLE}.id",
+        file.owner.id,
+        "an objective set is one person's stated preference about his own comparison, and it "
+        "is resolved against that person's income streams (Principle VII)",
+    )
+    if not table.objective:
+        raise DeclarationError(
+            path,
+            f"{OBJECTIVES_TABLE}.objective",
+            "declares no objective. A set with nothing in it decides nothing: every candidate "
+            "would be non-dominated and the answer would look like a chosen policy rather than "
+            "a forgotten line.",
+            "declare at least one objective, with its criterion, direction and band",
+        )
+    objectives: list[Objective] = []
+    for position, entry in enumerate(table.objective):
+        objective = _objective(
+            path, entry, field_prefix=f"{OBJECTIVES_TABLE}.objective[{position}]"
+        )
+        if any(objective.criterion is already.criterion for already in objectives):
+            raise DeclarationError(
+                path,
+                f"{OBJECTIVES_TABLE}.objective[{position}].criterion",
+                f"declares {objective.criterion.value!r} a second time. One criterion is one "
+                "dimension of the partial order, and two entries for it would carry two "
+                "directions or two bands with nothing saying which is in force.",
+                f"declare {objective.criterion.value!r} once",
+            )
+        objectives.append(objective)
+    return ObjectiveSet(
+        id=_require_text(
+            path,
+            f"{OBJECTIVES_TABLE}.id",
+            table.id,
+            "a question names the objective set it is answered under, and the manifest records "
+            "which set produced an answer (019 FR-001a, FR-030)",
+        ),
+        owner_id=owner_id,
+        objectives=tuple(objectives),
+    )
+
+
+def _objective(path: Path, entry: schema.ObjectiveTable, *, field_prefix: str) -> Objective:
+    """One declared objective: a closed criterion, a closed direction, and one band shape."""
+    criterion = _closed_value(
+        path,
+        f"{field_prefix}.criterion",
+        entry.criterion,
+        {member.value: member for member in Criterion},
+        "a criterion is a reader over a figure the outcome record already carries, so a name "
+        "outside the closed set names a figure nothing computes",
+    )
+    direction = _closed_value(
+        path,
+        f"{field_prefix}.direction",
+        entry.direction,
+        {member.value: member for member in ObjectiveDirection},
+        "there are exactly two directions and no per-criterion synonym: *sooner is better* on "
+        "a date is less_is_better, and a third spelling is how one rule comes to be handled two "
+        "ways",
+    )
+    return Objective(
+        criterion=criterion,
+        direction=direction,
+        band=_band(path, entry.band, criterion, field_prefix=f"{field_prefix}.band"),
+    )
+
+
+def _band(path: Path, table: schema.BandTable, criterion: Criterion, *, field_prefix: str) -> Band:
+    """One indifference band, in exactly one shape, legal on its criterion and positive.
+
+    An ``amount`` without a ``currency`` is refused rather than defaulted to the base currency:
+    a band is compared against a figure whose currency is the spendable endpoint's, and a
+    guessed currency would be a width the owner did not state.
+    """
+    shapes = {
+        "amount/currency": table.amount is not None or table.currency is not None,
+        "fraction_of_the_question_amount": table.fraction_of_the_question_amount is not None,
+        "days": table.days is not None,
+    }
+    stated = sorted(name for name, present in shapes.items() if present)
+    if len(stated) != 1:
+        raise DeclarationError(
+            path,
+            field_prefix,
+            f"states {stated or 'no band shape'}, and exactly one is required. A band with no "
+            "shape is the default FR-011 refuses, and two shapes side by side would leave which "
+            "one is in force to be settled by whichever the code read first.",
+            f"state one of {sorted(shapes)}",
+        )
+    legal = _LEGAL_BAND_SHAPES[READS[criterion]]
+    if stated[0] not in legal:
+        raise DeclarationError(
+            path,
+            field_prefix,
+            f"states a {stated[0]} band on {criterion.value!r}, which reads a "
+            f"{READS[criterion]} figure. A percentage of a date means nothing and a count of "
+            "days is not an amount of money, so the shapes a criterion takes are fixed by what "
+            "it reads.",
+            f"state one of {sorted(legal)} on {criterion.value!r}",
+        )
+    if table.days is not None:
+        return DaysBand(
+            days=int(
+                _positive(
+                    path,
+                    f"{field_prefix}.days",
+                    table.days,
+                    "a band of zero days can never exceed the slack it has to clear, and a "
+                    "negative one would make a candidate dominate itself and empty the set "
+                    "(FR-011b)",
+                )
+            )
+        )
+    if table.fraction_of_the_question_amount is not None:
+        return FractionOfTheQuestionAmount(
+            proportion=_finite(
+                path,
+                f"{field_prefix}.fraction_of_the_question_amount",
+                _positive(
+                    path,
+                    f"{field_prefix}.fraction_of_the_question_amount",
+                    table.fraction_of_the_question_amount,
+                    "a band of zero can never exceed the slack it has to clear, and a negative "
+                    "one would make a candidate dominate itself and empty the set (FR-011b)",
+                ),
+            )
+        )
+    if table.amount is None or table.currency is None:
+        raise DeclarationError(
+            path,
+            field_prefix,
+            "states one half of an absolute band. An amount with no currency would be compared "
+            "against a figure whose currency is the spendable endpoint's, and guessing one "
+            "would be a width the owner did not state.",
+            "state amount and currency together, or write a fraction instead",
+        )
+    return AbsoluteBand(
+        amount=Money(
+            _finite(
+                path,
+                f"{field_prefix}.amount",
+                _positive(
+                    path,
+                    f"{field_prefix}.amount",
+                    table.amount,
+                    "a band of zero can never exceed the slack it has to clear, and a negative "
+                    "one would make a candidate dominate itself and empty the set (FR-011b)",
+                ),
+            ),
+            _currency(path, f"{field_prefix}.currency", table.currency),
+            prov.EMPTY,
+        )
+    )
+
+
+_LEGAL_BAND_SHAPES: Final[Mapping[str, frozenset[str]]] = {
+    "money": frozenset({"amount/currency", "fraction_of_the_question_amount"}),
+    "date": frozenset({"days"}),
+}
+"""Which band shapes each kind of figure takes (FR-011d). Both money shapes, because the
+clarification asked for hryvnia and was answered in percent: permitting only the shape used
+would refuse the one asked for."""
+
+
+def _finite(path: Path, field_path: str, value: float) -> float:
+    """A band that is a real width. Infinity would make every pair indistinguishable."""
+    if not math.isfinite(value):
+        raise DeclarationError(
+            path,
+            field_path,
+            f"is {value!r}. A band wider than any figure makes every candidate "
+            "indistinguishable from every other, which is not a statement about precision but "
+            "the absence of one (FR-011b).",
+            "write a finite width",
+        )
+    return value

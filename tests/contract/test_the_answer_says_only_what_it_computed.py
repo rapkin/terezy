@@ -135,6 +135,7 @@ def _vocabulary(result: Answer) -> set[str]:
         result.question.owner_id,
         result.question.regime_id,
         result.question.benchmark_instrument_id,
+        result.question.objective_set_id,
         result.question.continuation.value,
         *(member.value for member in Exclusion),
         *(member.value for member in Direction),

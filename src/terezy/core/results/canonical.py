@@ -46,8 +46,15 @@ from terezy.core.results.answer import (
     UndeclaredSubject,
 )
 from terezy.core.results.candidates import CandidateSurvey
+from terezy.core.results.dominance import DominanceRefused, DominanceResult
 from terezy.core.results.fund import FundAssumptions
 from terezy.core.results.hurdle import HurdleRate, RealTerms
+from terezy.core.results.objectives import (
+    AbsoluteBand,
+    Band,
+    DaysBand,
+    FractionOfTheQuestionAmount,
+)
 from terezy.core.results.project import (
     GovernedBy,
     Projection,
@@ -336,8 +343,72 @@ def of_section(value: HorizonSection) -> tuple[Canonical, ...]:
             for item in value.arrives_after_horizon
         ),
         tuple(_of_verdict(item) for item in value.reserves),
+        _of_dominance(value.dominance),
         tuple(_of_exclusion(item) for item in value.excludes),
     )
+
+
+def _of_dominance(value: DominanceResult | DominanceRefused) -> tuple[Canonical, ...]:
+    """The three populations and the hurdle's standing, or the **kind** of refusal.
+
+    A refusal renders as its type name and nothing else, on ``_of_section_outcome``'s rule: which
+    of them fired is what the answer says, and the words it says it in are prose a digest must
+    not move on.
+
+    **This moves every answer digest**, which is the correct outcome rather than a cost to
+    avoid: the alternative is a digest blind to the thing the section now reports.
+    """
+    if not isinstance(value, DominanceResult):
+        return (type(value).__name__,)
+    return (
+        type(value).__name__,
+        value.objectives.id,
+        tuple(
+            (objective.criterion.value, objective.direction.value, _of_band(objective.band))
+            for objective in value.objectives.objectives
+        ),
+        tuple(
+            (item.criterion.value, item.currency.value, ledger_canonical.of_money(item.width))
+            for item in value.resolved_bands
+        ),
+        tuple(of_tuple_key(key) for key in value.non_dominated),
+        tuple(
+            (
+                of_tuple_key(item.key),
+                tuple(of_tuple_key(verdict.dominates) for verdict in item.dominated_by),
+            )
+            for item in value.dominated
+        ),
+        tuple(of_tuple_key(item.key) for item in value.not_placed),
+        tuple(
+            (
+                of_tuple_key(item.left),
+                of_tuple_key(item.right),
+                item.criterion.value,
+                type(item.why).__name__,
+            )
+            for item in value.incomparable
+        ),
+        tuple(
+            (of_tuple_key(item.key), tuple(of_tuple_key(key) for key in item.neighbours))
+            for item in value.indistinguishable
+        ),
+        (type(value.benchmark_standing).__name__, of_tuple_key(value.benchmark_standing.key)),
+        type(value.separating).__name__,
+    )
+
+
+def _of_band(value: Band) -> tuple[Canonical, ...]:
+    """One declared band, by the shape it was stated in and the number it states."""
+    match value:
+        case AbsoluteBand():
+            return ("absolute", ledger_canonical.of_money(value.amount))
+        case FractionOfTheQuestionAmount():
+            return ("fraction", ledger_canonical.of_number(value.proportion))
+        case DaysBand():
+            return ("days", value.days)
+        case _:  # pragma: no cover -- mypy proves this unreachable
+            assert_never(value)
 
 
 def of_answer(value: Answer) -> tuple[Canonical, ...]:
