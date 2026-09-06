@@ -17,6 +17,7 @@ than the balance the shipped registry declares.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import TYPE_CHECKING, Final
 
 import pytest
@@ -27,8 +28,8 @@ from terezy.core.primitives import money
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
-from terezy.core.results.candidates import CandidateSet
-from terezy.core.results.composed import CompositionRefused, Unaskable
+from terezy.core.results.candidates import CandidateSet, QuestionDoesNotStandUp
+from terezy.core.results.composed import CompositionRefused, SegmentBound, Unaskable
 from terezy.core.results.tuple import HOLD_AS_CASH, SeamDoesNotChain, Tuple, TupleOutcome
 from terezy.core.routes.cost import cost_entry
 from terezy.core.routes.path import (
@@ -43,6 +44,7 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.decision.tuple_outcome import Registries
     from terezy.core.streams.streams import IncomeStream
 
+CASH: Final = "cash_uah_monobank"
 OVDP: Final = "ovdp_synthetic_a"
 SALARY_LANDS_AT: Final = "monobank_uah"
 """Where `salary_uah` arrives, and therefore the venue an identity entry is legal at."""
@@ -204,8 +206,12 @@ def test_the_seam_reads_the_streams_declared_currency_and_not_the_amount() -> No
 
     The dollar stream arrives at its own venue, so an identity entry asserted for it against a
     hryvnia instrument must refuse — and it must refuse **whatever currency the caller hands
-    in**. Comparing the amount would let a hryvnia amount make a dollar stream look as though
-    it already delivered hryvnia, which is an undeclared conversion charged at nothing.
+    in**. The amount is therefore deliberately **hryvnia**: it is the only input that tells the
+    two readings apart. Against a dollar amount both agree and the test would pass on the bug;
+    against this one the declared reading refuses at the seam, while reading `amount.currency`
+    would make a dollar stream look as though it had already delivered hryvnia — an undeclared
+    conversion charged at nothing, which `cost_entry`'s raise would then report as a caller's
+    arithmetic error rather than as the missing corridor it is.
     """
     registries = fixtures.with_access(fixtures.declared(), OVDP, bought_at="deel")
     refusal = evaluate(
@@ -216,7 +222,7 @@ def test_the_seam_reads_the_streams_declared_currency_and_not_the_amount() -> No
             exit_terms=fixtures.HOLD_TO_MATURITY,
             route_out=FROM_THE_DECLARATION,
         ),
-        amount=Money(fixtures.AMOUNT_USD.amount, Currency.USD, prov.EMPTY),
+        amount=Money(fixtures.AMOUNT_UAH.amount, Currency.UAH, prov.EMPTY),
         horizon=fixtures.HORIZON,
         as_of=fixtures.AS_OF,
         continuation=HOLD_AS_CASH,
@@ -227,3 +233,27 @@ def test_the_seam_reads_the_streams_declared_currency_and_not_the_amount() -> No
     assert isinstance(refusal, SeamDoesNotChain), refusal
     assert refusal.left == "deel/USD"
     assert refusal.right == "deel/UAH"
+
+
+def test_a_bound_that_admits_nothing_refuses_a_pair_the_money_has_already_reached() -> None:
+    """T018. The short-circuit must not step over `compose`'s first guard.
+
+    Run over a registry whose **only** pair is an identity one, because with any other pair
+    present a routed pair reaches `compose` first and the whole question refuses for that
+    reason instead — which is how a dropped bound check passes unnoticed. Here nothing else
+    can carry the refusal, so it has to come from the balance's own pair.
+    """
+    registries = fixtures.declared()
+    only_the_balance = replace(
+        registries,
+        access={CASH: registries.access[CASH]},
+        streams={fixtures.SALARY: registries.streams[fixtures.SALARY]},
+    )
+    question = fixtures.question(
+        only_the_balance,
+        bound=SegmentBound(max_segments=0),
+        amounts={fixtures.SALARY: fixtures.AMOUNT_UAH},
+    )
+    refused = fixtures.enumerated(only_the_balance, question_=question)
+    assert isinstance(refused, QuestionDoesNotStandUp), refused
+    assert refused.refusal.case is Unaskable.BOUND_ADMITS_NOTHING

@@ -2077,14 +2077,17 @@ def _rate(
         # which needs both legs to be instant -- a balance over a horizon of no length.
         return RateNotComparable(
             reason=(
-                f"{invested.amount!r} {invested.currency.value} was invested and "
-                f"{received.amount!r} {endpoint.value} came back, both on "
-                f"{span.start.isoformat()}: the round trip took no time at all. A return over "
-                "a period of zero length is not a rate -- every rate discounts these flows to "
-                "the same nothing, so reporting one would be choosing a number the arithmetic "
-                "does not distinguish. The amounts are reported as they stand."
+                f"{invested.amount!r} {invested.currency.value} was invested on "
+                f"{span.start.isoformat()} and {received.amount!r} {endpoint.value} came back "
+                f"by {span.end.isoformat()}, which {_day_count_of(prepared)!r} measures as no "
+                "time at all. A return over a span of zero length is not a rate -- every rate "
+                "discounts these flows to the same nothing, so reporting one would be choosing "
+                "a number the arithmetic does not distinguish. The dates are named beside the "
+                "convention because a convention can measure two of them as one: what is "
+                "refused is the span the rate would be annualised over, not the calendar. The "
+                "amounts are reported as they stand."
             ),
-            missing="a span of more than no time to measure a return over",
+            missing="a span the declared convention measures as more than no time",
         )
     flows: list[CashFlow] = [(0.0, -invested.amount)]
     flows.extend(

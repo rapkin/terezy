@@ -6,8 +6,13 @@ it is a separate claim that could be wrong on its own:
 ===========  ==========================================================================
 way in       entry by identity -- 0.00 UAH charged, 0 days, so the purchase is dated
              2026-09-01, the first day of every one of his horizons
-bought       50 000.00 UAH of balance at 1.00 UAH each: 50 000 units, nothing undeployed,
-             because a balance declares no increment to round to
+bought       50 000.00 UAH of balance, nothing undeployed, because a balance declares no
+             increment to round to. The unit price is the identity — one hryvnia of balance
+             per hryvnia — and it is **not asserted here**: with no increment and no minimum
+             ticket it cancels out of every reported figure, moving only the ledger quantity
+             an outcome does not carry. Mutation-checked (1.00 to 2.00 changes no figure in
+             the suite) and recorded rather than pinned by a test that would pass on its own
+             fixture
 lifecycle    +50 000.00 UAH, the balance released on the horizon's last day and nothing
              else: the declared rate is exactly 0 %, so no coupon, no distribution and no
              accrual is added to it. The same money as `entry`, from the other side --
