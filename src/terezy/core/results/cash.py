@@ -68,7 +68,14 @@ class CashProjection:
     construction, which is why no gain arises and no tax is charged."""
 
     provenance: Provenance
-    """The declared rate's citation, and the one observed value behind every figure here."""
+    """The declared rate's citation, and the one observed value behind every figure here.
+
+    **Deliberately the same source :attr:`released` already carries**, and it stays because the
+    two say different things: this is what the *projection* rested on, and the amount's own mark
+    is what travels with the money. Merging is a union, so the duplicate costs nothing -- what
+    it means is that neither path can be checked by removing the other, and the assertion that
+    bites is on ``TupleOutcome.reaches``.
+    """
 
 
 def project_cash(
