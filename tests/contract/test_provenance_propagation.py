@@ -55,6 +55,7 @@ from datetime import date
 
 import pytest
 
+from terezy.core.decision.answer import section_evaluated
 from terezy.core.inflation import series as cpi_series
 from terezy.core.instruments.fund import ExchangeRateAssumption
 from terezy.core.instruments.interface import (
@@ -82,6 +83,7 @@ from terezy.core.tax import flat_rate
 from terezy.core.tax import year as tax_year
 from terezy.core.tax.interface import TaxableEventKind, TaxCharge, TaxClass, TaxContext
 from terezy.data.declarations import loader, resolver
+from tests import answer_registries as answers
 from tests import cpi_fixtures, data_roots, declared_terms, synthetic, tax_years
 
 pytestmark = pytest.mark.contract
@@ -860,6 +862,30 @@ def test_the_assumed_figure_carries_the_forecasts_citation_and_the_nominal_side(
 
     assert len(figure.provenance.sources) == 2
     assert prov.is_unverified(figure.provenance)
+
+
+def test_a_tuples_real_figure_carries_the_outcomes_own_marks() -> None:
+    """024 FR-011 and SC-005, on the shipped answer rather than on a fixture.
+
+    The nominal side of a candidate's real figure is the whole outcome's provenance -- every
+    route leg, the instrument's terms, the tax entries that charged -- and every one of those is
+    unverified today. The declared belief carries no citation, so what this catches is the
+    transform dropping the *nominal* half: a figure passing `prov.EMPTY` here would come back
+    clean, which is the top-severity defect Principle I names.
+    """
+    result = answers.answered(supplied=answers.shipped_inputs())
+    figures = [
+        (outcome, outcome.real.assumed)
+        for section in result.sections
+        for outcome in section_evaluated(section)
+        if isinstance(outcome.real.assumed, RealRate)
+    ]
+
+    assert figures
+    for outcome, figure in figures:
+        assert isinstance(figure, RealRate)
+        assert outcome.provenance.sources <= figure.provenance.sources, outcome.key.instrument_id
+        assert prov.is_unverified(figure.provenance), outcome.key.instrument_id
 
 
 # ---------------------------------------------------------------------------
