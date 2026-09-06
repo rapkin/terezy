@@ -429,6 +429,11 @@ MODULES_ALLOWED_TO_TOUCH = {
         # figure's provenance deliberately excludes the CPI observations. It reads a figure
         # and never builds one -- `_construction_sites` above holds that line separately.
         "src/terezy/data/manifest.py",
+        # Joined in 024, and for the manifest's own reason one step earlier: an outcome's
+        # provenance excludes the deflator by design, so the answer's roll-up has to reach the
+        # figure to union its sources into `Answer.provenance`. It reads a figure and never
+        # builds one -- `_construction_sites` above holds that line separately.
+        "src/terezy/core/decision/answer.py",
     },
     "RealTerms": {
         "src/terezy/core/results/hurdle.py",

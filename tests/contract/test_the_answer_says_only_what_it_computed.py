@@ -38,6 +38,7 @@ from terezy.core.results.answer import Answer, Direction, Exclusion
 from terezy.core.results.tuple import TupleOutcome
 from terezy.core.scenarios import quotation
 from tests import answer_registries as fixtures
+from tests import cpi_fixtures
 
 pytestmark = pytest.mark.contract
 
@@ -231,6 +232,40 @@ def test_the_answers_marks_are_the_union_of_what_its_figures_rest_on() -> None:
     for section in result.sections:
         for outcome in section_evaluated(section):
             assert outcome.provenance.sources <= result.provenance.sources
+
+
+def test_the_answer_carries_the_deflators_marks_and_its_staleness_too() -> None:
+    """024 FR-011 at the answer's own level, not only the figure's.
+
+    An outcome's `provenance` deliberately excludes the CPI observations and the belief -- they
+    are not among the holding's inputs -- so a roll-up over `item.provenance` alone leaves a
+    source that is behind a **reported figure** outside `Answer.provenance`, which documents
+    itself as the union over every declaration behind every figure reported.
+
+    Run under a *cited* forecast, because the shipped placeholder belief carries no citation and
+    every realized half refuses: the gap is invisible on today's data and opens the day a
+    forecast is declared or the series is extended past a horizon.
+    """
+    supplied = fixtures.shipped_inputs()
+    forecast = cpi_fixtures.forecast_assumption(0.12, retrieved_on=date(2020, 1, 1))
+    result = fixtures.answered(
+        supplied=replace(supplied, registries=replace(supplied.registries, inflation=forecast))
+    )
+    behind = {
+        source.id
+        for section in result.sections
+        for outcome in section_evaluated(section)
+        if isinstance(outcome.real.assumed, RealRate)
+        for source in outcome.real.assumed.provenance.sources
+    }
+
+    assert behind
+    assert behind <= {source.id for source in result.provenance.sources}
+    assert {entry.source_id for entry in result.staleness.stale}, (
+        "a forecast retrieved in 2020 is long past its declared threshold, and an answer whose "
+        "every assumed figure rests on it reporting no stale source at all is the silently "
+        "stale value Principle I puts in the top severity class"
+    )
 
 
 def test_every_early_exit_figure_names_the_assumption_it_rests_on() -> None:

@@ -40,6 +40,21 @@ RECORDED_DIGEST: Final = "9ee9fb7897d14afc2f35901fd8f51817"
 that artefact does not carry this assertion along with it. It covers the key, the amount and
 the nominal rate; FR-018 is that this feature moves none of the three."""
 
+MAY_NAME_THE_REAL_SLOT: Final = {
+    # Builds it, and is the only place a slot is filled.
+    "tuple_outcome.py",
+    # Reads it, to union the deflator's sources into `Answer.provenance` and its verdict into
+    # `Answer.staleness` -- an outcome's own provenance excludes them by design (024 FR-011).
+    # Reading is not ordering; what this set forbids is `compare.py`, `candidates.py` or
+    # `dominance.py` joining it.
+    "answer.py",
+}
+"""Which modules under ``core/decision/`` may name the field, and nothing else may.
+
+An allowlist with a reason per entry, on ``test_two_figures_never_blend.MODULES_ALLOWED_TO_TOUCH``'s
+precedent: the way a rule like this rots is by someone widening it in passing.
+"""
+
 OTHER_BELIEF: Final = InflationAssumption(
     id="test_quarter_inflation",
     annual_rate=0.25,
@@ -142,13 +157,13 @@ def test_no_module_that_orders_a_comparison_names_the_real_slot() -> None:
     A source scan rather than an ordinary test because what it catches is wider than the
     ordering the tests above measure: a tie-break, a benchmark choice or a band resolved on the
     real figure would each agree with today's answer on today's registry and be a different
-    engine. The claim is that nothing outside the construction site reads the field at all.
+    engine.
     """
-    ordering = Path(__file__).parents[2] / "src" / "terezy" / "core" / "decision"
+    decision = Path(__file__).parents[2] / "src" / "terezy" / "core" / "decision"
     named = {
         path.name
-        for path in sorted(ordering.glob("*.py"))
+        for path in sorted(decision.glob("*.py"))
         if ".real" in path.read_text(encoding="utf-8")
     }
 
-    assert named == {"tuple_outcome.py"}, sorted(named)
+    assert named == MAY_NAME_THE_REAL_SLOT, sorted(named)

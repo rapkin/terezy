@@ -142,6 +142,7 @@ def forecast_assumption(
     *,
     assumption_id: str = "synthetic_published_forecast",
     verified_on: date | None = None,
+    retrieved_on: date = RETRIEVED_ON,
 ) -> InflationAssumption:
     """An external published forecast: cited, dated, ageing under a kind -- and still an assumption.
 
@@ -165,7 +166,7 @@ def forecast_assumption(
                         "SYNTHETIC FIXTURE -- an invented forecast, cited so that the "
                         "'a cited forecast is still an assumption' rule can be tested."
                     ),
-                    retrieved_on=RETRIEVED_ON,
+                    retrieved_on=retrieved_on,
                     verified_on=verified_on,
                 )
             ]
