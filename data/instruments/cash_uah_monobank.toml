@@ -12,10 +12,9 @@
 # work around.
 #
 # **What the citation is a claim about is not really the zero.** It is that this product is a
-# BALANCE and not a DEPOSIT — a fact about a bank, and one that can be wrong or can change. The
-# loader refuses any rate but exactly zero, naming what a deposit would need instead: a dated
-# rate schedule, how often it capitalises, what an early withdrawal forfeits, and the class the
-# interest is taxed under. Every one of those is the bank's and every one needs a source.
+# BALANCE and not a DEPOSIT — a fact about a bank, and one that can be wrong or can change. Any
+# other rate is refused at load rather than modelled: a deposit's terms are the bank's, and
+# every one of them needs a source.
 #
 # **`retrieved_on` post-dates the question's `as_of`, deliberately.** The question is asked as of
 # 2026-08-30 and the owner stated the rate on 2026-09-02, so the source ages to a negative number

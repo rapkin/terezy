@@ -39,7 +39,7 @@ canonical_encoding terezy-canonical-v3
 
 == inputs ==
 
-cash_balance         cash_uah_monobank            instruments/cash_uah_monobank.toml       sha256:70763e96f480e4720eed9bceaf2529ef535453d7e6792053a081f5aed80f8514
+cash_balance         cash_uah_monobank            instruments/cash_uah_monobank.toml       sha256:48fe42f6c58e0ca9f3f5cccdcba39635b5db5ff60bf559657f31116414046e5c
 cpi_series           ua_cpi_monthly               cpi/ua.toml                              sha256:d75f814e2940eec463499e39ea2adea07da6149ff79bfac4681d08a051b26c7e
 fund                 inzhur_miltech               instruments/inzhur_miltech.toml          sha256:80d0de1e1b51417e286adeb580b2f848b27a63f986af245691f64b9b76918fb8
 fund                 inzhur_reit                  instruments/inzhur_reit.toml             sha256:90999351e1dfcaf1e8bc0ef700b8e48b9973bd9e98973d9069ca5642034fb798

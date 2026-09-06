@@ -98,13 +98,10 @@ def unit(currency: Currency) -> Money:
     The multiplicative identity, and :func:`zero`'s argument applies unchanged: one hryvnia is
     one hryvnia is arithmetic rather than an observation, so there is nothing here for a source
     to vouch for and ``EMPTY`` is the honest mark. It is **not** a licence to price anything
-    else at par -- a declared price is a market fact and belongs in a declaration, which is why
-    a bond must quote one and a balance may not.
+    else at par: a declared price is a market fact and belongs in a declaration.
 
     It exists so that sizing a purchase by identity -- one unit of balance per unit of currency
-    -- does not have to construct money outside this module, which
-    ``tests/contract/test_money_construction_guard.py`` forbids for the reason that guard
-    states.
+    -- does not have to construct money outside this module.
     """
     return Money(1.0, currency, prov.EMPTY)
 

@@ -383,11 +383,9 @@ def _ways_in(
     answers for such a pair is its ``ALREADY_ARRIVED`` refusal -- which stays exactly as it is,
     since refusing to route money to where it already is remains correct.
 
-    The **bound** is still asked, and it has to be: ``compose`` checks it before the arrival
-    comparison, so a bound admitting nothing would otherwise be stepped over by a registry
-    whose pairs are all identity and yield candidates from a bound that admits none. Where it
-    admits nothing the short-circuit does not fire, ``compose`` is called and answers with its
-    own refusal -- which is a statement about the question rather than a corridor.
+    A bound that admits nothing does not short-circuit: ``compose`` is called and answers with
+    its own refusal, so a registry whose pairs are all identity cannot yield candidates from a
+    bound that admits none.
     """
     already_there = (stream.arrives_at, stream.amount.currency) == (
         destination.venue_id,
@@ -420,7 +418,7 @@ def _ways_out(
 ) -> tuple[ExitChain, ...] | EnumerationRefused:
     """Every declared way out of the venue the proceeds land at, or the identity exit.
 
-    **The one construction this module makes** (FR-002's carve-out, FR-004a). Where the
+    **One of the two constructions this module makes** (FR-002's carve-out, FR-004a). Where the
     instrument's ``proceeds_to`` is itself a declared spendable endpoint, the way out *is* the
     identity exit -- 003's FR-002, an owner decision this feature does not re-decide -- and no
     chain is enumerated beside it. That the sentinel supersedes exit routes actually declared

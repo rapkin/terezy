@@ -1,22 +1,13 @@
 """A cash balance as declared terms: a currency held at a venue, paying exactly nothing.
 
-The third declaration kind, and the one whose projection is not really a schedule at all. A
-bond is declared by a face value it repays, a date it repays on and a periodicity; a balance
-has none of the three, and every one of them is required, so declaring cash as a zero-coupon
-bond could only be done by inventing three values in a sourced directory where the provenance
-gate would then ask each of them for a citation nobody can give.
+**A zero-coupon bond was the alternative and it is rejected** (FR-003). A bond is declared by a
+face value it repays, a date it repays on and a periodicity; a balance has none of the three,
+every one is required, so the declaration could only be written by inventing three values in a
+sourced directory where the provenance gate then asks each of them for a citation nobody can
+give.
 
-**The rate is `Literal`-adjacent rather than free** (FR-003). It is a float because a rate is,
-and the data boundary refuses anything but exactly zero -- naming the file and the field, and
-saying that a balance paying something is a **deposit** whose rate, capitalisation,
-early-withdrawal penalty and interest taxation are the bank's terms and have to be cited. The
-check is at the boundary rather than in this record because that is where an error can name a
-file.
-
-**What the one citation is a claim about.** Not really *zero*: it is that this Monobank
-product is a zero-rate balance and **not** a deposit, which is a fact about a bank and can be
-wrong. So the rate carries the four citation keys like any other observed value, and every
-figure a balance produces inherits the mark.
+**The rate is refused at the data boundary rather than in this record**, because that is where
+an error can name a file and a field.
 
 **No minimum ticket, no unit increment, no tax class, and no field for one.** Any amount of
 the currency is holdable, so there is nothing to round to and nothing can be stranded; and a
@@ -41,14 +32,6 @@ move the implied rate -- a series of one outflow and one equal inflow has a root
 every span -- so requiring the declarer to state one would be asking for a convention that
 decides nothing. ``tests/invariants/test_cash_invariants.py`` asserts that over the whole
 registry of declared conventions rather than leaving it as a claim here.
-"""
-
-UNIT_PRICE: Final = 1.0
-"""What one unit of balance costs, in the balance's own currency.
-
-Sizing is identity: one hryvnia of balance costs one hryvnia. It is a constant rather than a
-declared ``[access.price]`` because a declared price would be one fact in two places, and the
-resolver refuses one for exactly that reason (FR-005).
 """
 
 
@@ -84,6 +67,9 @@ class CashDeclaration:
     Separate from the rate rather than a ``Money`` wrapping it, because a rate is not money.
     It reaches every figure through the projection, which is where a bond's terms already
     arrive.
+
+    What it vouches for is not the zero: it is that the product is a **balance** and not a
+    deposit, which is a fact about a bank and can be wrong.
     """
 
     groups: tuple[str, ...]
@@ -105,4 +91,4 @@ class CashAssumptions:
     """
 
 
-__all__ = ["DAY_COUNT", "UNIT_PRICE", "CashAssumptions", "CashDeclaration"]
+__all__ = ["DAY_COUNT", "CashAssumptions", "CashDeclaration"]

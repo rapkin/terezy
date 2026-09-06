@@ -123,7 +123,7 @@ reserve      = []
   # label, and nothing here changes.
   # A balance has nothing to run: no lots to choose between, no coupon to have a policy for,
   # no liquidity mode and no exit date. The plan exists because 014 FR-003 refuses an
-  # instrument with none, and every field of the other two kinds is refused on it at load.
+  # instrument with none.
   [[question.plan]]
   subject            = "cash"
   kind               = "cash"

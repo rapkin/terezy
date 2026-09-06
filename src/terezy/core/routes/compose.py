@@ -357,11 +357,8 @@ def compose(
 def admits_nothing(bound: SegmentBound) -> bool:
     """Whether a declared bound admits no candidate at all -- not even a declared route.
 
-    Public because it is the **first** thing :func:`_refusal` asks and it has to stay first for
-    a caller that short-circuits: 023's enumeration constructs an identity way in for a pair
-    the money has already reached instead of asking for a corridor, and a bound admitting
-    nothing must still refuse the whole question rather than being stepped over. One definition
-    and two readers, because a second copy of this rule is where the two would drift.
+    Public because a caller that short-circuits before asking :func:`compose` still has to
+    honour it, and a second copy of this rule is where the two would drift.
     """
     return bound.max_segments < 1
 

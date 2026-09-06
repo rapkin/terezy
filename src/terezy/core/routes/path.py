@@ -224,11 +224,6 @@ class EntryByIdentity(Enum):
     :class:`ComposedPath` would say "a chain that charged nothing"; only a named value says
     *the money is already at the venue that sells the thing*.
 
-    It carries no ``stream_id`` where a :class:`FundingPath` does, and that is not an omission:
-    a corridor is costed **from** a stream and could name a different one from the tuple's,
-    which is why ``FundedFromAnotherStream`` exists. There is nothing here to disagree -- the
-    money that funds the purchase is the money that arrived, in the stream the tuple names.
-
     Legal exactly where the stream's arrival venue and currency equal the instrument's buying
     venue and declared currency, and that claim is checked at the join against the
     declarations rather than trusted from a caller -- the rule ``_identity_way_out`` already

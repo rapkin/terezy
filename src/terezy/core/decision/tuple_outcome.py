@@ -154,6 +154,7 @@ from terezy.core.routes.cost import Junction
 from terezy.core.routes.legs import RouteStatus
 from terezy.core.routes.path import (
     EXIT_BY_IDENTITY,
+    IDENTITY_ENTRY_ID,
     Candidate,
     DeclaredExit,
     EntryByIdentity,
@@ -342,7 +343,6 @@ def _route_in(
             latency_days=0,
             status="open",
             disruption=0.0,
-            ceiling=None,
         )
     else:
         priced = cost.cost_one(
@@ -381,7 +381,6 @@ def _route_in(
             latency_days=priced.latency_days,
             status=priced.status,
             disruption=priced.disruption_probability,
-            ceiling=priced.ceiling,
         )
     proceeds_at: Junction = (prepared.access.proceeds_to, prepared.currency.value)
     way_out = _way_out_chain(tuple_, prepared, proceeds_at, registries)
@@ -410,7 +409,6 @@ class _Costed:
     latency_days: int
     status: RouteStatus
     disruption: float
-    ceiling: Money | None
 
 
 def _identity_way_in(prepared: _Prepared, amount: Money) -> SeamDoesNotChain | None:
@@ -929,7 +927,7 @@ def _chosen_way_out(
                     "separately declared exit routes and never by reversing the way in "
                     "(FR-027), and the one-way figure is not promoted into its place (FR-030)."
                 ),
-                missing_partner_for="(entry by identity)" if arriving is None else arriving.id,
+                missing_partner_for=IDENTITY_ENTRY_ID if arriving is None else arriving.id,
             ),
             reason=(
                 f"nothing declares a way out of {proceeds_at[0]!r} for "

@@ -154,10 +154,8 @@ CASH_BALANCE: Final = "cash_balance"
 """A balance held at a venue, in one currency, paying a declared zero:
 `core.instruments.cash`, projected by `core.results.cash.project_cash`.
 
-Out of :data:`REGISTRY` on the same argument the fund is out of it, and the plainest instance
-of it: `InstrumentOps` dispatches kinds whose projection **is** a stream of ledger events, and
-a balance produces none -- no coupon, no distribution, no accrual, and nothing for
-`coupons_per_unit` to answer.
+Out of :data:`REGISTRY` on the argument the section above makes for a fund, and the plainest
+instance of it: a balance produces no event stream at all.
 """
 
 DECLARATION_KINDS: Final[frozenset[str]] = frozenset(

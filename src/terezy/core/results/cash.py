@@ -16,11 +16,6 @@ so there is no gain to realise and no income to assess. That is a fact about the
 rather than an exemption: an exemption is a legal value and would need a citation, and this
 feature introduces none.
 
-**One lot, so the consumption method decides nothing.** The fold needs a method because a
-disposal in general selects between lots; here there is exactly one open lot at the only
-disposal, so every registered selection returns it. The method is named at the fold rather
-than carried on `CashAssumptions`, which would offer a caller a choice that cannot change an
-answer.
 """
 
 from __future__ import annotations
@@ -41,7 +36,13 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.instruments.interface import DateRange, Holding
 
 SELECTION: Final = lots.FIFO
-"""Which lot the one disposal consumes. See the module docstring: there is only one."""
+"""Which lot the one disposal consumes.
+
+The fold needs a method because a disposal in general selects between lots. Here one purchase
+opens one lot and one release closes it, so every registered selection returns the same lot --
+which is why the method is named here rather than carried on ``CashAssumptions``, where it
+would offer a caller a choice that cannot change an answer.
+"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,12 +68,7 @@ class CashProjection:
     construction, which is why no gain arises and no tax is charged."""
 
     provenance: Provenance
-    """The declared rate's citation.
-
-    The one observed value behind every figure a balance produces, and the claim it makes is
-    not really *zero*: it is that this is a zero-rate **balance** rather than a deposit. With
-    ``verified_on`` empty it renders marked, which is the correct state.
-    """
+    """The declared rate's citation, and the one observed value behind every figure here."""
 
 
 def project_cash(
