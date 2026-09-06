@@ -145,6 +145,7 @@ InputKind = Literal[
     "cpi_series",
     "quotation_assumption",
     "fund",
+    "goal",
     "group_vocabulary",
     "inflation_assumption",
     "instrument",
@@ -154,6 +155,7 @@ InputKind = Literal[
     "question",
     "route",
     "scenario",
+    "seed",
     "spendable",
     "stream",
     "tax_class",
@@ -184,8 +186,24 @@ reads, because SC-008 requires the manifest to name every file the run read: a r
 route, an access entry and a question and recorded none of them is a result that does not trace
 to what produced it, which Principle III says is not a result.
 
+``"seed"`` and ``"goal"`` joined with feature 025, when an answer began reading the owner's
+holdings in order to report a held position. One ``"seed"`` kind for both roots, because a
+shipped lot and a private one are the same sort of declaration; what tells them apart is the
+id, which :data:`OVERLAY_ID_PREFIX` puts on the private one. The goals file is recorded although
+no figure in an answer rests on it: it is parsed by the same call, and SC-008 asks the manifest
+to name every file the run **read**.
+
 **A member nothing constructs is not in the set.** An unreachable kind reads as coverage the
 manifest does not have, which is the shape of claim the walk exists to make impossible.
+"""
+
+OVERLAY_ID_PREFIX: Final[str] = "user/"
+"""What marks an input as having come from the private overlay (025 FR-008).
+
+:func:`file_name` renders both roots' seeds file as ``seeds/owner-001.toml``, so without a
+prefix the two would collide in one id space and a reader could not see that a private
+declaration was involved. It is a prefix on the **id** and never on a value: what the overlay
+said stays out of the manifest, and only that it was read goes in.
 """
 
 
@@ -772,8 +790,32 @@ def answer_input_refs(declarations: resolver.AnswerDeclarations) -> tuple[InputR
             declarations.tuples.quotation_file,
             prov.EMPTY,
         ),
+        *_holdings_refs(declarations.holdings),
     ]
     return tuple(sorted(refs, key=lambda ref: (ref.kind, ref.id)))
+
+
+def _holdings_refs(holdings: resolver.SeedAndGoalDeclarations) -> tuple[InputRef, ...]:
+    """The holdings files a run read, recorded by path and digest and never by value.
+
+    An overlay input's id carries :data:`OVERLAY_ID_PREFIX` so a reader of a result can see that
+    a private declaration was involved without seeing what it said (025 FR-008).
+    """
+    refs = []
+    if holdings.seed_file is not None:
+        refs.append(_ref("seed", holdings.seed_file.stem, holdings.seed_file, prov.EMPTY))
+    if holdings.overlay_seed_file is not None:
+        refs.append(
+            _ref(
+                "seed",
+                f"{OVERLAY_ID_PREFIX}{holdings.overlay_seed_file.stem}",
+                holdings.overlay_seed_file,
+                prov.EMPTY,
+            )
+        )
+    if holdings.goal_file is not None:
+        refs.append(_ref("goal", holdings.goal_file.stem, holdings.goal_file, prov.EMPTY))
+    return tuple(refs)
 
 
 def _access_prov(entry: InstrumentAccess) -> Provenance:

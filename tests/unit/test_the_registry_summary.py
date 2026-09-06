@@ -27,6 +27,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DATA_ROOT = SHIPPED
 AS_OF = {"as_of": "2026-09-03"}
 
+PRIVATE_OVERLAY = "private-seeds"
+"""The one category the shipped root cannot resolve: `data/user/` is gitignored (025 FR-002)."""
+
 
 @pytest.fixture(scope="module")
 def registry() -> dict[str, Any]:
@@ -53,8 +56,20 @@ def test_a_keyed_category_reports_a_count_and_a_singleton_reports_resolution(
             assert "resolved" not in row
         else:
             assert row["tag"] == "summary.SingletonSummary"
-            assert row["resolved"] is True
+            assert row["resolved"] is (category.id != PRIVATE_OVERLAY)
             assert "declared_ids" not in row
+
+
+def test_the_private_overlay_is_unresolved_over_the_shipped_root(registry: dict[str, Any]) -> None:
+    """025 FR-002: `data/user/` is gitignored, so a checkout has none and that is ordinary.
+
+    The row is present and says *nothing declared*, which is the distinction a missing row could
+    not make: the category exists, the loader looked, and the owner has declared no private
+    holding in this tree.
+    """
+    row = {row["category"]: row for row in registry["categories"]}[PRIVATE_OVERLAY]
+    assert row["resolved"] is False
+    assert row["files"] == []
 
 
 def test_a_singleton_the_loader_found_nothing_for_reports_unresolved(tmp_path: Path) -> None:

@@ -374,14 +374,18 @@ def test_a_seed_naming_an_undeclared_instrument_is_refused_at_load(tmp_path: Pat
         encoding="utf-8",
     )
     with pytest.raises(DeclarationError) as caught:
-        resolver.seeds_and_goals_from_data_root(root, base_currency=Currency.UAH)
+        resolver.seeds_and_goals_from_data_roots(
+            resolver.data_roots_of(root), base_currency=Currency.UAH
+        )
     _assert_names_file_and_field(caught.value, target, "instrument_id")
     assert "inzhur_reit" in caught.value.problem
 
 
 def test_the_composed_data_root_resolves() -> None:
     """The whole tree the battery above mutates, through the resolver a run would use."""
-    declared = resolver.seeds_and_goals_from_data_root(DATA_ROOT, base_currency=Currency.UAH)
+    declared = resolver.seeds_and_goals_from_data_roots(
+        resolver.data_roots_of(DATA_ROOT), base_currency=Currency.UAH
+    )
     assert declared.owner_id == "owner-001"
     assert len(declared.seeds) == 2
     assert declared.seed_file == SEEDS
@@ -400,8 +404,8 @@ def test_what_ships_declares_an_owner_and_no_lot() -> None:
     assert owner_id == "owner-001"
     assert declared == ()
 
-    resolved = resolver.seeds_and_goals_from_data_root(
-        data_roots.SHIPPED, base_currency=Currency.UAH
+    resolved = resolver.seeds_and_goals_from_data_roots(
+        resolver.data_roots_of(data_roots.SHIPPED), base_currency=Currency.UAH
     )
     assert resolved.seed_file == shipped
     assert resolved.seeds == ()

@@ -104,7 +104,9 @@ def test_resolving_seeds_and_goals_changes_no_curated_file(tmp_path: Path) -> No
     """SC-007's measurable half: compare the curated data before and after."""
     root = _scratch_root(tmp_path)
     before = _curated_digest(root)
-    resolved = resolver.seeds_and_goals_from_data_root(root, base_currency=Currency.UAH)
+    resolved = resolver.seeds_and_goals_from_data_roots(
+        resolver.data_roots_of(root), base_currency=Currency.UAH
+    )
     assert resolved.owner_id == OWNER
     assert _curated_digest(root) == before
 
@@ -116,14 +118,18 @@ def test_deleting_the_per_owner_files_removes_every_record_and_no_curated_one(
 
     Deleting his declarations must remove his holdings and his goal and nothing else -- which
     is what makes the boundary worth having: the private side can be thrown away without
-    damaging the shared side.
+    damaging the shared side. The private overlay goes with them: it is per-owner data on the
+    far side of the same boundary (025 FR-001).
     """
     root = _scratch_root(tmp_path)
     before = _curated_digest(root)
     shutil.rmtree(root / "seeds")
     shutil.rmtree(root / "goals")
+    shutil.rmtree(root / resolver.USER_DIR)
 
-    resolved = resolver.seeds_and_goals_from_data_root(root, base_currency=Currency.UAH)
+    resolved = resolver.seeds_and_goals_from_data_roots(
+        resolver.data_roots_of(root), base_currency=Currency.UAH
+    )
     assert resolved.seeds == ()
     assert resolved.goals == ()
     assert resolved.owner_id is None

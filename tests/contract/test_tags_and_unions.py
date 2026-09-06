@@ -245,6 +245,7 @@ DECLARATIONS_WITHOUT_A_REASON = frozenset(
         "citation_policy.CitationsRequired",
         "composed.SegmentBound",
         "quotation.QuotationHolds",
+        "envelopes.DeclaredPrivateSeeds",
         "envelopes.DeclaredSeeds",
         "envelopes.DeclaredSpendable",
         "envelopes.TaxPositions",

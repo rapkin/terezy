@@ -247,12 +247,33 @@ def _quotation_belief(ask: Ask) -> SingleRecord:
 
 
 def _seeds_and_goals(ask: Ask) -> resolver.SeedAndGoalDeclarations:
-    return resolver.seeds_and_goals_from_data_root(ask.root, base_currency=ask.base_currency)
+    return resolver.seeds_and_goals_from_data_roots(
+        resolver.data_roots_of(ask.root), base_currency=ask.base_currency
+    )
 
 
 def _seeds(ask: Ask) -> ManyRecords:
-    declared = _seeds_and_goals(ask)
+    """The lots the **shipped** root declares, and the file that declared them.
+
+    Not the union: ``ManyRecords`` names one file, and a lot the overlay declared served under
+    the shipped file's name would attribute a private figure to a committed artefact. The
+    overlay's lots are :func:`_private_seeds`.
+    """
+    declared = resolver.seeds_and_goals_from_data_roots(
+        resolver.DataRoots(shipped=ask.root, overlay=None), base_currency=ask.base_currency
+    )
     return ManyRecords(records=declared.seeds, file=declared.seed_file)
+
+
+def _private_seeds(ask: Ask) -> ManyRecords:
+    """The lots the gitignored overlay declares (025 FR-001).
+
+    Its own row rather than an exemption: the overlay has a loader, and this category set is
+    fail-closed precisely so that a directory the loader reads cannot be invisible here. An
+    absent overlay declares nothing and names no file, which is FR-002's ordinary state.
+    """
+    declared = _seeds_and_goals(ask)
+    return ManyRecords(records=declared.overlay_seeds, file=declared.overlay_seed_file)
 
 
 def _goals(ask: Ask) -> KeyedRecords:
@@ -376,6 +397,7 @@ CATEGORIES: Final[tuple[Category, ...]] = (
     ),
     Category("access", "ACCESS_DIR", True, Keyed(_access, InstrumentAccess)),
     Category("seeds", "SEEDS_DIR", False, Collection(_seeds, SeedLot)),
+    Category("private-seeds", "USER_DIR", True, Collection(_private_seeds, SeedLot)),
     Category("goals", "GOALS_DIR", False, Keyed(_goals, Goal)),
     Category("cpi", "CPI_DIR", False, Keyed(_cpi, CpiSeries)),
     Category(

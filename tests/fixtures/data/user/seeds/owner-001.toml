@@ -1,0 +1,16 @@
+# SYNTHETIC FIXTURE, in the position the PRIVATE OVERLAY occupies: `<root>/user/seeds/`.
+#
+# The overlay is where a declaration describing what the owner REALLY holds is allowed to live
+# (025 FR-001), and the shipped `data/user/` is gitignored so no such file is ever committed.
+# This one is under `tests/fixtures/data/`, which is not that path and is not gitignored, and
+# every lot in it is invented -- which is what makes the overlay's own machinery reachable by a
+# test at all.
+#
+# It joins the composed root's `seeds/owner-001.toml` rather than replacing it: the two roots
+# are unioned per instrument, and a lot of an instrument the other root also declares is refused
+# naming both files (FR-003).
+
+seed = []
+
+[owner]
+id = "owner-001"

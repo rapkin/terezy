@@ -37,7 +37,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 
 from terezy.core.decision.tuple_outcome import Registries
 from terezy.core.instruments import registry as instrument_registry
@@ -1998,6 +1998,77 @@ curated `venues.toml` -- the Principle VII boundary made structural (008 researc
 GOALS_DIR = "goals"
 """Where the owner's declared targets live under a data root."""
 
+USER_DIR = "user"
+"""The private overlay under a data root: gitignored, and the only place a real figure may live.
+
+025 FR-001. `data/README.md` rule 5 forbids committing a figure that describes the owner's
+actual position, and until this feature the rule was kept by a reviewer noticing. The overlay is
+where such a figure goes, and :func:`_check_not_synthetic_outside_the_overlay` is the rule made
+mechanical.
+"""
+
+OVERLAY_DIRS: Final[frozenset[str]] = frozenset({SEEDS_DIR})
+"""What the overlay may contain. **Fail-closed**: anything else is refused, naming it.
+
+`scripts/check_provenance.py`'s rule, for the same reason. A directory nobody declared would be
+read by nothing while looking exactly like a declaration that was read -- and the one root whose
+contents no reviewer ever sees is the worst place for a blind spot.
+"""
+
+
+@dataclass(frozen=True, slots=True)
+class DataRoots:
+    """The shipped root and the owner's private overlay, composed **in memory**.
+
+    Not on disk. `tests/data_roots.py` composes by copying one tree over another, which is right
+    for a fixture and wrong here: copying the owner's real figures into a temporary directory
+    puts them somewhere nobody gitignored.
+    """
+
+    shipped: Path
+    """What the tool ships: curated, committed, reviewed in git like code."""
+
+    overlay: Path | None
+    """The private root, or ``None`` where there is none.
+
+    ``None`` is an ordinary state and not a missing value (FR-002): a checkout with no private
+    declarations is what CI runs on, and the whole suite therefore exercises this branch.
+    """
+
+
+def data_roots_of(root: Path) -> DataRoots:
+    """One data root read as a pair: itself, and its ``user/`` overlay if it has one.
+
+    Where the overlay lives is a fact about the layout rather than a caller's choice, so every
+    entry point above this module keeps taking one path. A test wanting a different overlay
+    builds the record directly -- which is the only way to point at one that is not a
+    subdirectory of the root it overlays.
+    """
+    overlay = root / USER_DIR
+    return DataRoots(shipped=root, overlay=overlay if overlay.is_dir() else None)
+
+
+def _check_overlay_directories(overlay: Path) -> None:
+    """FR-006: the overlay holds what this feature declared, or the load fails naming what else.
+
+    Dot-entries are the filesystem's own -- ``.DS_Store``, an editor's swap file -- and are
+    skipped. Everything else is refused whether it is a directory or a file, because a
+    ``.toml`` sitting at the overlay's root would look exactly like a declaration and be read
+    by nothing at all.
+    """
+    for entry in sorted(overlay.iterdir()):
+        if entry.name.startswith(".") or entry.name in OVERLAY_DIRS:
+            continue
+        raise DeclarationError(
+            entry,
+            "",
+            f"is under the private overlay {overlay}, which holds "
+            f"{sorted(OVERLAY_DIRS)} and nothing else. It is refused rather than ignored: a "
+            "declaration nobody reads is indistinguishable from one that was read, and this "
+            "is the one root no reviewer ever sees.",
+            f"move it under one of {sorted(OVERLAY_DIRS)}, or delete it",
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class SeedAndGoalDeclarations:
@@ -2018,16 +2089,35 @@ class SeedAndGoalDeclarations:
     """
 
     seeds: tuple[SeedLot, ...]
-    """The declared opening lots, in file order. Empty is ordinary."""
+    """Every declared opening lot over both roots, shipped first then overlay. Empty is
+    ordinary, and it is what the ledger and the held section are computed from."""
+
+    overlay_seeds: tuple[SeedLot, ...]
+    """Which of them the private overlay declared (025 FR-003).
+
+    Stored rather than derived because it cannot be recovered: ``loader.source_id`` and
+    ``manifest.file_name`` both render a path as ``<parent>/<name>``, and the two roots'
+    seeds files are ``seeds/owner-001.toml`` under either -- so a lot carries nothing that
+    says which root it came from.
+    """
 
     goals: tuple[Goal, ...]
     """The declared targets, in file order. Empty is ordinary."""
 
     seed_file: Path | None
-    """Which file declared the lots, or ``None`` if none did.
+    """Which file under the **shipped** root declared lots, or ``None`` if none did.
 
     Not decoration: it is what lets a later failure name the file after the TOML has been
     discarded -- and what a test asserting the Principle VII boundary points at.
+    """
+
+    overlay_seed_file: Path | None
+    """Which file under the **overlay** declared lots, or ``None`` if none did (025 FR-008).
+
+    Kept apart from :attr:`seed_file` because ``manifest.file_name`` renders both as
+    ``seeds/owner-001.toml``: a manifest holding one field could not say which root a lot came
+    from, and *a private declaration was involved* is exactly what a reader of a result needs
+    to be told.
     """
 
     goal_file: Path | None
@@ -2118,26 +2208,122 @@ def _check_one_owner(
     )
 
 
+def _check_committable(declared: Sequence[SeedLot], *, path: Path) -> None:
+    """FR-005: a lot describing what the owner really holds may not live under a committed root.
+
+    `data/README.md` rule 5 made mechanical. What ships is a public fact or a *labelled*
+    fixture, and a label only a human can read is a rule kept by whoever happens to look.
+    """
+    for position, lot in enumerate(declared):
+        if lot.is_synthetic:
+            continue
+        raise DeclarationError(
+            path,
+            f"{loader.SEED_TABLE}[{position}].is_synthetic",
+            "is false, so this lot describes a real holding -- and this file is under the "
+            "shipped data root, which is committed and reviewed in git. A real position may "
+            "only be declared under the private overlay, which is gitignored and outside "
+            "every gate (data/README.md rule 5, Principle VII).",
+            f"move the lot to {USER_DIR}/{SEEDS_DIR}/, or label it is_synthetic = true if it "
+            "is an invented fixture",
+        )
+
+
+def _check_one_owner_across_roots(
+    shipped_owner: str | None, overlay_owner: str, *, overlay_path: Path
+) -> str:
+    """One run holds one person's life (Principle VII), across both roots as within one.
+
+    Raised against the overlay because the shipped file is resolved first and is the one
+    already in force, which is ``_check_one_owner``'s reasoning for naming the second file.
+    """
+    if shipped_owner is None or shipped_owner == overlay_owner:
+        return overlay_owner
+    raise DeclarationError(
+        overlay_path,
+        f"{loader.OWNER_TABLE}.id",
+        f"declares owner {overlay_owner!r} in the private overlay, and the shipped root "
+        f"declares lots belonging to {shipped_owner!r}. One run holds one person's holdings: "
+        "unioning two people's lots would put two portfolios in one ledger, and every figure "
+        "would describe a position nobody has.",
+        f"name {shipped_owner!r}, or move the other owner's lots out of this root",
+    )
+
+
+def _check_no_collision(
+    shipped: Sequence[SeedLot],
+    overlay: Sequence[SeedLot],
+    *,
+    shipped_path: Path,
+    overlay_path: Path,
+) -> None:
+    """FR-003: two roots may not declare lots of **one** instrument for one owner.
+
+    A seed carries no declared id, so the identity that can collide is the holding itself.
+    Lots of *different* instruments are two halves of one portfolio and are unioned; lots of
+    the same instrument in two roots cannot both be his position, and the overlay does not get
+    to silently replace or double what a reviewed file said.
+    """
+    private = {lot.instrument_id for lot in overlay}
+    for lot in shipped:
+        if lot.instrument_id not in private:
+            continue
+        raise DeclarationError(
+            overlay_path,
+            f"{loader.SEED_TABLE}.instrument_id",
+            f"declares lots of {lot.instrument_id!r}, and {shipped_path} declares lots of it "
+            "too. Both roots hold this owner's position in one instrument, and there is no "
+            "reading of that which is not a mistake: unioning them would double the holding, "
+            "and letting the overlay win would let an uncommitted file silently change what a "
+            "reviewed one said.",
+            f"declare {lot.instrument_id!r} in one root only",
+        )
+
+
 def resolve_seeds_and_goals(
     *,
     seed_file: Path | None,
+    overlay_seed_file: Path | None,
     goal_file: Path | None,
     instruments: Mapping[str, InstrumentDeclaration],
     base_currency: Currency,
 ) -> SeedAndGoalDeclarations:
     """The owner's declared holdings and targets, checked against the curated set and the run.
 
-    Either file may be ``None``, and both may be: that is a person who holds nothing and wants
+    Every file may be ``None``, and all may be: that is a person who holds nothing and wants
     nothing in particular, which is an ordinary state rather than a refusal (FR-024).
+
+    The two seed files are **unioned** into one sequence of lots in shipped-then-overlay order,
+    after the collision check has ruled out the reading under which the union would double a
+    holding.
     """
     seed_owner: str | None = None
     goal_owner: str | None = None
-    declared_seeds: tuple[SeedLot, ...] = ()
+    shipped_seeds: tuple[SeedLot, ...] = ()
+    private_seeds: tuple[SeedLot, ...] = ()
     declared_goals: tuple[Goal, ...] = ()
 
     if seed_file is not None:
-        seed_owner, declared_seeds = loader.seeds_from_file(seed_file, base_currency=base_currency)
-        _check_seed_instruments(declared_seeds, instruments, path=seed_file)
+        seed_owner, shipped_seeds = loader.seeds_from_file(seed_file, base_currency=base_currency)
+        _check_committable(shipped_seeds, path=seed_file)
+    if overlay_seed_file is not None:
+        private_owner, private_seeds = loader.seeds_from_file(
+            overlay_seed_file, base_currency=base_currency
+        )
+        seed_owner = _check_one_owner_across_roots(
+            seed_owner, private_owner, overlay_path=overlay_seed_file
+        )
+        if seed_file is not None:
+            _check_no_collision(
+                shipped_seeds,
+                private_seeds,
+                shipped_path=seed_file,
+                overlay_path=overlay_seed_file,
+            )
+    declared_seeds = shipped_seeds + private_seeds
+    for path, lots in ((seed_file, shipped_seeds), (overlay_seed_file, private_seeds)):
+        if path is not None:
+            _check_seed_instruments(lots, instruments, path=path)
     if goal_file is not None:
         goal_owner, declared_goals = loader.goals_from_file(goal_file)
         _check_goal_currencies(declared_goals, base_currency=base_currency, path=goal_file)
@@ -2145,8 +2331,10 @@ def resolve_seeds_and_goals(
     return SeedAndGoalDeclarations(
         owner_id=_check_one_owner(seed_owner, goal_owner, goal_path=goal_file),
         seeds=declared_seeds,
+        overlay_seeds=private_seeds,
         goals=declared_goals,
         seed_file=seed_file,
+        overlay_seed_file=overlay_seed_file,
         goal_file=goal_file,
     )
 
@@ -2177,22 +2365,29 @@ def _at_most_one(root: Path, directory: str) -> Path | None:
     return declared[0]
 
 
-def seeds_and_goals_from_data_root(
-    root: Path, *, base_currency: Currency
+def seeds_and_goals_from_data_roots(
+    roots: DataRoots, *, base_currency: Currency
 ) -> SeedAndGoalDeclarations:
-    """One owner's holdings and targets under a data root, resolved against its instruments.
+    """One owner's holdings and targets over both roots, resolved against the curated set.
 
-    The instrument set comes from :func:`from_data_root`, so a seed is checked against exactly
-    the declarations a projection would run with rather than against a set assembled twice.
+    The instrument set comes from :func:`from_data_root` over the **shipped** root, so a seed
+    is checked against exactly the declarations a projection would run with rather than
+    against a set assembled twice. The overlay declares no instrument: `data/user/` holds what
+    the owner has, and what a thing *is* stays curated and reviewed (FR-006).
 
     **A missing ``seeds/`` or ``goals/`` directory is not an error** (FR-024), unlike every
-    other family. See this section's banner for why the two cases are different rather than
-    inconsistent.
+    other family, and an absent overlay is the same ordinary state (FR-002). See this
+    section's banner for why the two cases are different rather than inconsistent.
     """
+    overlay_seed_file: Path | None = None
+    if roots.overlay is not None:
+        _check_overlay_directories(roots.overlay)
+        overlay_seed_file = _at_most_one(roots.overlay, SEEDS_DIR)
     return resolve_seeds_and_goals(
-        seed_file=_at_most_one(root, SEEDS_DIR),
-        goal_file=_at_most_one(root, GOALS_DIR),
-        instruments=from_data_root(root).instruments,
+        seed_file=_at_most_one(roots.shipped, SEEDS_DIR),
+        overlay_seed_file=overlay_seed_file,
+        goal_file=_at_most_one(roots.shipped, GOALS_DIR),
+        instruments=from_data_root(roots.shipped).instruments,
         base_currency=base_currency,
     )
 
@@ -3387,6 +3582,14 @@ class AnswerDeclarations:
     objective_set_files: Mapping[str, Path]
     """Which file declared each set, so the manifest records which one produced an answer."""
 
+    holdings: SeedAndGoalDeclarations
+    """What the owner already holds, over both roots (025 FR-001).
+
+    An answer reports a held position beside the candidates it ranks, so the lots are part of
+    what the verb reads rather than a separate load. The goals in this record are resolved with
+    them and are not read here; they arrive because one file pair declares both.
+    """
+
 
 def check_question(
     question: Question,
@@ -3506,6 +3709,7 @@ def answer_from_data_root(
         question_files=declaring,
         objective_sets=objective_sets,
         objective_set_files=objective_files,
+        holdings=seeds_and_goals_from_data_roots(data_roots_of(root), base_currency=base_currency),
     )
 
 
