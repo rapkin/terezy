@@ -54,6 +54,7 @@ from terezy.core.errors import (
     TaxFailure,
     UnresolvedTaxClass,
 )
+from terezy.core.inflation import series as cpi
 from terezy.core.inflation.series import CpiSeries, InflationAssumption
 from terezy.core.instruments import accrual, fixed_income
 from terezy.core.instruments import registry as instrument_registry
@@ -69,7 +70,7 @@ from terezy.core.instruments.interface import (
 from terezy.core.ledger import engine
 from terezy.core.ledger.engine import LedgerState
 from terezy.core.ledger.events import CausationKind, CausationRef, Event, EventKind
-from terezy.core.primitives import conventions, money, periods
+from terezy.core.primitives import conventions, money
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.periods import Window
@@ -554,27 +555,12 @@ def _governed_by(
 def _deflation_window(holding: Holding, contractual: Sequence[Event]) -> Window:
     """The span a real counterpart of the contractual yield is deflated over (007 FR-007).
 
-    From the month **after** the purchase to the month the last contractual flow lands in,
-    inclusive. Two boundary decisions, both made here rather than at each call site so they
-    cannot drift apart by a month:
-
-    * **The first month is the one after the purchase month**, because a published index for
-      month *M* measures the price change *during* *M* relative to *M-1*, and a purchase made
-      on any day of *M* has already paid *M*'s prices. The first change the owner actually
-      lives through is the one in *M + 1*. Counting *M* itself would charge the holding for
-      inflation that happened before it existed.
-    * **The last month is the last contractual flow's**, not the horizon's. The yield being
-      deflated is a property of the paper -- it annualises the contractual series -- so the
-      deflator has to span the same thing. A horizon running past redemption would deflate the
-      yield by months in which the holding had already paid out.
-
-    The count of months between the two is therefore the number of monthly price changes the
-    holding lived through, which is exactly what the annualisation divides by.
+    The purchase date is what the money left on for a projection -- there is no ramp between
+    them -- and the last contractual flow is what the yield annualises to, which is why the
+    horizon is not read here.
     """
-    last = max(event.occurred_on for event in contractual)
-    return Window(
-        first=periods.next_month(periods.month_of(holding.purchased_on)),
-        last=periods.month_of(last),
+    return cpi.deflation_window(
+        holding.purchased_on, max(event.occurred_on for event in contractual)
     )
 
 

@@ -51,7 +51,7 @@ from typing import Literal, assert_never
 
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives import staleness
-from terezy.core.primitives.periods import Window, months_in
+from terezy.core.primitives.periods import Window, month_of, months_in, next_month
 from terezy.core.primitives.provenance import Provenance
 from terezy.core.primitives.staleness import ObservationKind, StalenessVerdict
 
@@ -221,6 +221,32 @@ class InflationAssumption:
     different event with no threshold. A *retrieved* forecast does, on exactly the reasoning
     ``cpi_index`` carries: the publisher issues a new one and the old one is out of date.
     """
+
+
+def deflation_window(money_left_on: date, last_flow_on: date) -> Window:
+    """The months a rate measured between two dates is deflated over, inclusive (024 FR-005).
+
+    Two boundary decisions, made here rather than at each call site so that a projection's
+    window and a tuple's cannot drift apart by a month:
+
+    * **The first month is the one after the month the money left**, because a published index
+      for month *M* measures the price change *during* *M*, and money that left on any day of
+      *M* has already met *M*'s prices. The first change the owner lives through is *M + 1*.
+    * **The last month is the last flow's**, never a horizon's. The rate being deflated is
+      measured over the span between these two dates, so the deflator has to span the same
+      thing; a horizon running past the last flow would deflate by months in which the money
+      was already back.
+
+    ``money_left_on`` rather than a purchase date, and the difference is a month on a tuple:
+    an outlay precedes its purchase by the way in's declared latency, so an outlay made on the
+    last day of a month would start the window a month early if the purchase named it.
+
+    The count of months between the two is the number of price changes the money lived
+    through, which is what the annualisation divides by. A span inside one month yields a
+    window whose first month is after its last -- no elapsed month -- which the caller reports
+    by name rather than treating as zero inflation.
+    """
+    return Window(first=next_month(month_of(money_left_on)), last=month_of(last_flow_on))
 
 
 def coverage(series: CpiSeries, window: Window) -> Coverage:

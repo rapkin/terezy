@@ -183,7 +183,7 @@ note  = "`drafted` says planning may not start; `planned` says plan.md and tasks
 
 [[feature]]
 id     = "024-real-terms-tuple"
-status = "planned"
+status = "in-progress"
 needs  = ["007-cpi-real-terms", "015-the-question", "022-accrued-interest"]
 why    = "007 owns the relation, the coverage refusal and the function that fills a real slot; 015 states the absence this fills as a typed exclusion and is where that exclusion is deleted; 022 is what the deflated figure is, since it changed how `implied_rate` is computed and the spec's worked example is a post-022 number"
 note   = "Closes the real-terms-for-a-tuple future: the owner asked for inflation on 2026-09-03, and every candidate's rate was nominal while the benchmark's could be real. No clarification is open -- the future-span question is 007's owner decision of 2026-08-22 applied rather than re-asked; see specs/024-real-terms-tuple/spec.md."
