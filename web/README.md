@@ -15,7 +15,7 @@ under the same origin. Stop it with `docker compose down`.
 ## Development — two processes
 
 ```bash
-uv run python -m terezy.api.http   # terminal 1, from the repository ROOT
+uv run python -m terezy.api.http   # terminal 1, anywhere inside the checkout
 pnpm -C web dev                    # terminal 2
 ```
 
@@ -32,10 +32,10 @@ it cannot read instead of coming up and answering 500 to everything.
 - **"no route of the API produced this"** — either nothing is listening, or a request reached the
   API and failed inside it. Check the `/api →` line the dev server printed against the address
   the API says it is listening on, and then the API's own log.
-- **The API refused at startup, naming a path** — it was started somewhere it cannot find
-  declarations. It reads `data/` from the checkout it was imported from, so this means either an
-  installed copy or a `TEREZY_DATA_ROOT` pointing at the wrong directory. Set that variable to the
-  directory holding `venues.toml`.
+- **The API refused at startup and exited 1** — it found no declarations to read. It takes `data/`
+  from the checkout it was imported from, so this is either an installed copy, which has none, or
+  a `TEREZY_DATA_ROOT` pointing at the wrong directory, which the refusal names. Set that variable
+  to the directory holding `venues.toml`.
 - **A refusal with a reason, on the screen** — that is the API working. A refusal is a result:
   read what it names.
 

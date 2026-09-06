@@ -331,5 +331,5 @@ note  = "A series route loaded without a window redirects to the API's declared 
 
 [[future]]
 id    = "one-invariant-module-depends-on-worker-assignment"
-after = ["014-coverage-costing"]
+after = ["003-route-coverage"]
 note  = "`tests/invariants/test_coverage_costing_agreement.py::test_the_battery_produced_both_ready_and_not_ready_verdicts` reads a module-level `_SEEN` the property above it fills, so it passes only when both run in the same process. Under `pytest -n auto` xdist may put them on different workers and it fails with `the battery only produced nothing` -- reproduced three times in ten runs on 2026-09-06, and green in ten of ten under `-n auto --dist loadfile`. So the vacuity guard is real but its verdict depends on scheduling, which is the shape a false guard has. What would close it is pinning the module to one worker (`xdist_group`) or making the battery a fixture the guard reads directly rather than a module global. Found while running the gates on an unrelated branch, 2026-09-06."

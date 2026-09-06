@@ -9,7 +9,7 @@ covered it.
 
 :func:`terezy.api.http.service.client_root` is located from here for the same reason and had
 the same bug in its own half: the built client was looked for relative to the same wrong
-directory, so ``/`` answered a JSON 404 while every ``/api`` route answered 500.
+directory, so ``/`` answered a JSON 404 beside those 500s.
 """
 
 from __future__ import annotations
@@ -36,7 +36,8 @@ class DataRootFound:
 
 @dataclass(frozen=True)
 class DataRootMissing:
-    """No root to read, named with the path that was tried and the variable that overrides it."""
+    """No root to read. The reason names the variable that sets one, and the path that was tried
+    where there was one -- an installation outside a checkout tried nothing."""
 
     reason: str
 
