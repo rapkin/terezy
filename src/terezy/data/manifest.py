@@ -699,6 +699,7 @@ def answer_input_refs(declarations: resolver.AnswerDeclarations) -> tuple[InputR
     ramp = coverage.ramp
     refs = [
         *input_refs(declarations.tuples.instruments),
+        *inflation_input_refs(declarations.tuples.inflation),
         *(
             _ref("question", identifier, path, prov.EMPTY)
             for identifier, path in declarations.question_files.items()

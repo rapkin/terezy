@@ -54,14 +54,14 @@ SERIES = cpi_fixtures.series(cpi_fixtures.run_of("2026-01", 12, 101.0))
 WINDOW = cpi_fixtures.window("2026-01", "2026-12")
 
 
-def _both(assumption: object, *, series: object = SERIES) -> hurdle.RealTerms:
+def _both(assumption: object, *, series: object = None) -> hurdle.RealTerms:
     return hurdle.real_terms(
         nominal=NOMINAL,
         nominal_provenance=prov.EMPTY,
         nominal_staleness=staleness.UNASSESSED,
         deflation=cpi_fixtures.deflation(
             window=WINDOW,
-            series=series,  # type: ignore[arg-type]
+            series=cpi_fixtures.declaring(SERIES) if series is None else series,  # type: ignore[arg-type]
             assumption=assumption,  # type: ignore[arg-type]
         ),
     )
@@ -105,7 +105,7 @@ def test_the_two_figures_are_computed_independently_of_one_another() -> None:
 def test_removing_the_observations_leaves_the_assumed_figure_untouched() -> None:
     """The other direction of independence: the deflators do not borrow from one another."""
     with_series = _both(cpi_fixtures.owner_assumption(0.10))
-    without = _both(cpi_fixtures.owner_assumption(0.10), series=None)
+    without = _both(cpi_fixtures.owner_assumption(0.10), series={})
 
     assert with_series.assumed == without.assumed
 
@@ -429,10 +429,20 @@ MODULES_ALLOWED_TO_TOUCH = {
         # figure's provenance deliberately excludes the CPI observations. It reads a figure
         # and never builds one -- `_construction_sites` above holds that line separately.
         "src/terezy/data/manifest.py",
+        # Joined in 024, and for the manifest's own reason one step earlier: an outcome's
+        # provenance excludes the deflator by design, so the answer's roll-up has to reach the
+        # figure to union its sources into `Answer.provenance`. It reads a figure and never
+        # builds one -- `_construction_sites` above holds that line separately.
+        "src/terezy/core/decision/answer.py",
     },
     "RealTerms": {
         "src/terezy/core/results/hurdle.py",
         "src/terezy/core/results/canonical.py",
+        # Joined in 024: `TupleOutcome.real` is annotated with it. The annotation is the whole
+        # mention -- the record is built by `hurdle.real_terms` and nothing here fills a half --
+        # and that is what makes a nominal rate unassignable into the slot by mypy rather than
+        # by a test.
+        "src/terezy/core/results/tuple.py",
     },
 }
 """Which modules may name a real figure in executable code, and nothing else may.

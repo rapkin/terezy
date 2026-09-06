@@ -392,8 +392,7 @@
   excludes quoted_clean_price_is_assumed_constant UA4000235865             
   withheld inzhur_miltech           arrives 2028-01-20
 
-[excludes] no_real_terms_figure
 [excludes] no_income_tax_on_the_stated_amount
 
 [keys] SectionsAgreeByKey
-[digest] sha256:cb11e5083ae1a32ad57738e963cf7f603598e985efe9cb096b9e526a906219b2
+[digest] sha256:b578cdc9cb01dcc312994b970d8336a191cb21ee223dcfafab8d877dad799dc6

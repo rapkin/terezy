@@ -142,6 +142,7 @@ def forecast_assumption(
     *,
     assumption_id: str = "synthetic_published_forecast",
     verified_on: date | None = None,
+    retrieved_on: date = RETRIEVED_ON,
 ) -> InflationAssumption:
     """An external published forecast: cited, dated, ageing under a kind -- and still an assumption.
 
@@ -165,7 +166,7 @@ def forecast_assumption(
                         "SYNTHETIC FIXTURE -- an invented forecast, cited so that the "
                         "'a cited forecast is still an assumption' rule can be tested."
                     ),
-                    retrieved_on=RETRIEVED_ON,
+                    retrieved_on=retrieved_on,
                     verified_on=verified_on,
                 )
             ]
@@ -174,10 +175,15 @@ def forecast_assumption(
     )
 
 
+def declaring(*series: CpiSeries) -> dict[str, CpiSeries]:
+    """The declared-series mapping a run brings, keyed by declared id. Empty for no argument."""
+    return {declared.id: declared for declared in series}
+
+
 def deflation(
     *,
     window: Window,
-    series: CpiSeries | None = None,
+    series: Mapping[str, CpiSeries] | None = None,
     assumption: InflationAssumption | None = None,
     ageing: Ageing | None = None,
 ) -> Deflation:
@@ -188,7 +194,12 @@ def deflation(
     tests keep saying what they mean. The defaults are all-absent because that is the state
     every refusal test is a departure from.
     """
-    return Deflation(window=window, series=series, assumption=assumption, ageing=ageing)
+    return Deflation(
+        window=window,
+        series={} if series is None else series,
+        assumption=assumption,
+        ageing=ageing,
+    )
 
 
 def ageing_at(as_of: date, kinds: Mapping[str, ObservationKind]) -> Ageing:

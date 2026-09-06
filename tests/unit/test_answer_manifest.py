@@ -234,15 +234,29 @@ def test_two_refusals_of_two_kinds_do_not_share_one_digest() -> None:
     )
 
 
-NOT_READ_BY_AN_ANSWER: Final = frozenset({"cpi_series", "inflation_assumption", "official_rate"})
-"""Series an answer reads none of, named here so their absence is a claim rather than a gap.
+NOT_READ_BY_AN_ANSWER: Final = frozenset({"official_rate"})
+"""The one series an answer reads none of, named so its absence is a claim rather than a gap.
 
-The first two are 007's, and an answer computes no real-terms figure. The third is 018's, and
-015 FR-021 is the reason: **no rate is derived and none is read from a series.** A tuple whose
-figure would need one refuses by name -- ``inzhur_reit`` says so on the shipped registry -- and
-that refusal is only honest while nothing behind it quietly consults the National Bank. The
-answer's registries carry no ``AssessmentRules``, which is where an official rate would enter.
+018's, and 015 FR-021 is the reason: **no rate is derived and none is read from a series.** A
+tuple whose figure would need one refuses by name -- ``inzhur_reit`` says so on the shipped
+registry -- and that refusal is only honest while nothing behind it quietly consults the
+National Bank. The answer's registries carry no ``AssessmentRules``, which is where an official
+rate would enter.
 """
+
+
+def test_the_manifest_names_the_two_deflators_an_answer_was_given() -> None:
+    """024 FR-012: two runs differing only in the declared belief are two results.
+
+    The files rather than the ids, because the id is what a figure names and the file is what a
+    reader diffs: replacing the placeholder belief with a cited forecast keeps the id and moves
+    the version.
+    """
+    record: Any = _answered()
+    by_kind = {ref.kind: ref for ref in record.manifest.inputs}
+
+    assert by_kind["cpi_series"].file == "cpi/ua.toml"
+    assert by_kind["inflation_assumption"].file == "inflation/owner-001.toml"
 
 
 def test_every_input_kind_the_set_admits_is_one_the_walk_produces() -> None:

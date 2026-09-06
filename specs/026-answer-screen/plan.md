@@ -5,8 +5,8 @@
 **Branch**: this plan is written on `spec/026-answer-screen` and lands **squashed** — it is
 spec-directory work, not an implementation. The implementation branch is `feat/026-answer-screen`
 and lands by `--no-ff`; it may not start until `019-decision-layer` and `021-web-declared-data` are
-`done` on `main` (both are, 2026-09-06) and until Q1 and Q2 are answered for the tasks that turn on
-them.
+`done` on `main` (both are, 2026-09-06) and until `fix/undeployed-remainder` is on `main` — Q2's
+answer put *money back* in the engine rather than in the card (spec, *Clarifications*).
 
 ## Summary
 
@@ -64,10 +64,11 @@ separately; the served array holds 22.
 **Finding 3 — what the screen may compute, stated before an implementer has to guess.** Three
 operations look like computation and are not: a key-equality join (`non_dominated` → `ranked`),
 `Array.length` over a population the API sent, and grouping by typed fields. FR-009 permits exactly
-those three and nothing else. Two operations *are* computation and are bounded: adding `reaches` and
-`undeployed` **in one currency** (FR-017, subject to Q2), and comparing served span lengths for
-equality to decide whether the comparability banner shows (FR-014) — which yields a boolean, never a
-figure.
+those three and nothing else. **One** operation is computation and it is bounded: comparing served
+span lengths for equality to decide whether the comparability banner shows (FR-014) — which yields a
+boolean, never a figure. Adding two amounts was the second, and Q2's answer removed it rather than
+replacing it with a subtraction: `reaches` arrives whole and the remainder is served beside it, so the
+deployed part is never composed (FR-016, FR-017).
 
 **Finding 4 — the shared/unique split is already computed and must not be recomputed.** 019's
 `per_member[].rests_on` **is** the difference; the shared set is what an outcome's own `rests_on`
@@ -79,7 +80,7 @@ shares — so the folding puts 14 lines on the screen instead of 42, and the 2 g
 ## Technical Context
 
 **Language**: TypeScript, `strict`, in the existing `web/` tree. No Python changes except FR-007's
-venue `kind` (schema, core record, loader, `data/venues.toml`), which turns on Q1.
+venue `kind` (schema, core record, loader, `data/venues.toml`).
 
 **Primary dependencies**: none added. React, TanStack Router + Query, Tailwind, the copied shadcn
 components, Vitest, MSW and Playwright are all in `web/package.json` already. Icons are hand-written
@@ -147,15 +148,9 @@ tested with fixtures.
 **Phase 4 — the route.** `/` becomes the answer; the browser moves to secondary navigation; the
 loading and failure states wire up; Playwright runs against the real API.
 
-**Phase 5 — the venue `kind`** (turns on **Q1**): the core vocabulary, the schema field, the loader
-refusal, the nine data lines, and the tests that a malformed kind fails at load naming file and
-field. Last because nothing on this screen draws a venue, so it cannot block 1 to 4.
-
-**Q2 gates exactly one thing**: FR-016's card slot. Phase 3 builds the slot with both shapes behind
-one function and the test suite for both; which one renders is one line, decided when Q2 is
-answered. This is the 025 pattern — the artefacts that turn on an open marker live in a phase that
-may not start — narrowed to its smallest form, because the alternative would idle four phases on a
-presentation choice.
+**Phase 5 — the venue `kind`**: the five-member vocabulary the owner named, the schema field, the
+loader refusal, the nine data lines, and the tests that a malformed kind fails at load naming file
+and field. Last because nothing on this screen draws a venue, so it cannot block 1 to 4.
 
 ## Risks
 

@@ -54,6 +54,7 @@ from terezy.core.errors import (
     TaxFailure,
     UnresolvedTaxClass,
 )
+from terezy.core.inflation import series as cpi
 from terezy.core.inflation.series import CpiSeries, InflationAssumption
 from terezy.core.instruments import accrual, fixed_income
 from terezy.core.instruments import registry as instrument_registry
@@ -69,10 +70,9 @@ from terezy.core.instruments.interface import (
 from terezy.core.ledger import engine
 from terezy.core.ledger.engine import LedgerState
 from terezy.core.ledger.events import CausationKind, CausationRef, Event, EventKind
-from terezy.core.primitives import conventions, money, periods
+from terezy.core.primitives import conventions, money
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.money import Money
-from terezy.core.primitives.periods import Window
 from terezy.core.primitives.staleness import Ageing
 from terezy.core.results import hurdle as hurdle_figures
 from terezy.core.results import schedule as schedule_rows
@@ -221,7 +221,7 @@ def project(
     assumptions: Assumptions,
     *,
     tax_classes: Mapping[str, TaxClass],
-    cpi_series: CpiSeries | None = None,
+    cpi_series: Mapping[str, CpiSeries] | None = None,
     inflation_assumption: InflationAssumption | None = None,
     ageing: Ageing | None = None,
     assessment_rules: AssessmentRules | None = None,
@@ -235,8 +235,10 @@ def project(
     instrument references and this mapping does not contain is reported, never treated as
     untaxed: those are opposite claims and only one of them is cited.
 
-    **``cpi_series`` and ``inflation_assumption`` fill the real-terms slot.** Both
-    default to ``None``, and the default is not a silence: the resulting figures are
+    **``cpi_series`` and ``inflation_assumption`` fill the real-terms slot.** ``cpi_series``
+    is every series this run declares, keyed by declared id, because which one deflates a
+    figure is decided inside the slot rather than here (024 FR-013a). Both default to ``None``,
+    and the default is not a silence: the resulting figures are
     :data:`~terezy.core.results.hurdle.NOT_DEFLATED`, whose two reasons say *no CPI series was
     declared* and *no future-inflation assumption was declared* -- which is exactly what
     happened, and is what a reader is shown. 007's FR-006 and US1 scenario 5 require *a
@@ -335,8 +337,14 @@ def project(
                 prov.merge_all(charge.provenance for charge in charges),
             ),
             deflate_with=hurdle_figures.Deflation(
-                window=_deflation_window(holding, contractual_events),
-                series=cpi_series,
+                # The purchase date is what the money left on for a projection -- there is no
+                # ramp between them -- and the last contractual flow is what the yield
+                # annualises to, which is why the horizon is not read here.
+                window=cpi.deflation_window(
+                    holding.purchased_on,
+                    max(event.occurred_on for event in contractual_events),
+                ),
+                series={} if cpi_series is None else cpi_series,
                 assumption=inflation_assumption,
                 ageing=ageing,
             ),
@@ -548,33 +556,6 @@ def _governed_by(
         category_id=category.id,
         treatment=category.treatment.value,
         reason=_what_the_treatment_means(category.treatment),
-    )
-
-
-def _deflation_window(holding: Holding, contractual: Sequence[Event]) -> Window:
-    """The span a real counterpart of the contractual yield is deflated over (007 FR-007).
-
-    From the month **after** the purchase to the month the last contractual flow lands in,
-    inclusive. Two boundary decisions, both made here rather than at each call site so they
-    cannot drift apart by a month:
-
-    * **The first month is the one after the purchase month**, because a published index for
-      month *M* measures the price change *during* *M* relative to *M-1*, and a purchase made
-      on any day of *M* has already paid *M*'s prices. The first change the owner actually
-      lives through is the one in *M + 1*. Counting *M* itself would charge the holding for
-      inflation that happened before it existed.
-    * **The last month is the last contractual flow's**, not the horizon's. The yield being
-      deflated is a property of the paper -- it annualises the contractual series -- so the
-      deflator has to span the same thing. A horizon running past redemption would deflate the
-      yield by months in which the holding had already paid out.
-
-    The count of months between the two is therefore the number of monthly price changes the
-    holding lived through, which is exactly what the annualisation divides by.
-    """
-    last = max(event.occurred_on for event in contractual)
-    return Window(
-        first=periods.next_month(periods.month_of(holding.purchased_on)),
-        last=periods.month_of(last),
     )
 
 

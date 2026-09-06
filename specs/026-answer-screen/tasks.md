@@ -3,8 +3,10 @@
 **Feature**: `026-answer-screen` | **Plan**: [plan.md](./plan.md) | **Spec**: [spec.md](./spec.md)
 
 **Implementation may not start until `019-decision-layer` and `021-web-declared-data` are `done` on
-`main`.** Both are, 2026-09-06. The order below is the plan's: Phases 1–3 need no response body and
-no running server, so what is waiting when Phase 4 begins is a tested component library.
+`main`** — both are, 2026-09-06 — **and until `fix/undeployed-remainder` is on `main`**, which is what
+makes `reaches` the whole figure T023 renders. The order below is the plan's: Phases 1–3 need no
+response body and no running server, so what is waiting when Phase 4 begins is a tested component
+library.
 
 Tests are **not optional**. Principle V is NON-NEGOTIABLE; every component task is preceded by the
 test that fails before it exists.
@@ -14,15 +16,13 @@ test that fails before it exists.
 | **[P]** | parallelisable — a different file, no dependency on an incomplete task |
 | **[US1]**…**[US4]** | the user story it serves |
 | **[API]** | needs a response body or a running API |
-| **[Q1]** | turns on the venue-kind vocabulary. **Phase 5 may not start until it is answered** |
-| **[Q2]** | turns on what a card calls *money back*. Both shapes are built and tested; **which one renders is one line, and it waits** ([plan](./plan.md), Q2 gates exactly one thing) |
 
 ---
 
 ## Phase 1 — the language, with no API in it
 
 - [ ] T001 [P] Test: every member of the **instrument** vocabulary the document declares today — the bond classes and the fund read's tag (FR-006) — has a hue, an icon and a word — `web/tests/unit/kinds.test.ts`. The venue half is T046a, because its vocabulary does not exist until Phase 5.
-- [ ] T002 Add the kind tokens to `web/src/styles.css`: one hue per kind, ink `oklch(40% 0.11 h)` / tint `oklch(94% 0.03 h)`, each value once in `light-dark()`, cash achromatic (FR-001). The five venue hues land with Phase 5, or not at all under Q1 option C.
+- [ ] T002 Add the kind tokens to `web/src/styles.css`: one hue per kind, ink `oklch(40% 0.11 h)` / tint `oklch(94% 0.03 h)`, each value once in `light-dark()`, cash achromatic (FR-001). The five venue hues land with Phase 5.
 - [ ] T003 `web/src/design/kinds.ts` — the instrument kind → hue map as a mapped type over the vocabularies FR-006 names, so a member added leaves it one key short and the build red (FR-004).
 - [ ] T004 [P] Test: a rendered tile's kind is readable after every style declaration is stripped — `web/tests/unit/kind-tile.test.tsx` (FR-002).
 - [ ] T005 `web/src/design/icons/` — one 24-grid outline component per kind at stroke 1.75, and `KindTile` composing icon + text + tint (FR-002).
@@ -48,8 +48,8 @@ test that fails before it exists.
 
 - [ ] T020 [P] Test: each of `FigureSlot`'s three states inside a card, each badge variant, each kind tile, and no raw float in the output — `web/tests/unit/candidate-card.test.tsx` (FR-015, FR-023). [US2]
 - [ ] T021 `web/src/answer/components/CandidateCard.tsx` — FR-015's whole field order, the *indistinguishable from* line included, composing `FigureSlot`, `KindTile`, `Badge` and `format.ts`. [US2]
-- [ ] T022 [Q2] Test **both** shapes of *money back* — one summed figure with the split on expansion, and two figures each labelled by where it is — plus a cross-currency pair shown apart and a `null` remainder rendering as *nothing left over* — `web/tests/unit/money-back.test.tsx` (FR-016, FR-017).
-- [ ] T023 [Q2] `web/src/answer/components/MoneyBack.tsx` — both shapes behind one function; which renders is one line, decided by Q2 (FR-016, FR-017).
+- [ ] T022 Test: *money back* is the served `reaches`, with nothing added to it and no deployed part composed from it — an expansion carrying the served remainder record, a remainder the record says did not come home rendering as a named state, and a `null` remainder rendering as *nothing left over* — `web/tests/unit/money-back.test.tsx` (FR-016, FR-017).
+- [ ] T023 `web/src/answer/components/MoneyBack.tsx` — one figure from `reaches`, the served `UndeployedCash` record behind a disclosure (FR-016, FR-017).
 - [ ] T024 [P] Test: shown for mixed spans, absent for equal ones, and no span range in its text — `web/tests/unit/comparability-banner.test.tsx` (FR-014). [US1]
 - [ ] T025 `web/src/answer/components/ComparabilityBanner.tsx` — condition and consequence, no derived figure (FR-014). [US1]
 - [ ] T026 [P] Test: two members leaning on one belief render one line; two distinct belief ids render two — `web/tests/unit/belief-line.test.tsx` (FR-024). [US3]
@@ -78,14 +78,14 @@ test that fails before it exists.
 - [ ] T045a [P] E2E: loading `/` issues no request to `/api/registry`, asserted by failing the run on one — `web/e2e/answer-requests.spec.ts` (SC-008). [US1]
 - [ ] T045b [P] Test: no module under `web/src/answer/` or `web/src/design/` derives a kind from an id, a name or a path — a source scan beside the kind map, warranted because the typecheck cannot see a string built from `key.instrument_id` — `web/tests/unit/kind-provenance.test.ts` (SC-010, FR-005).
 
-## Phase 5 — the venue `kind` [Q1]
+## Phase 5 — the venue `kind`
 
 Last because nothing on this screen draws a venue, so it blocks no phase above.
 
-- [ ] T046 [Q1] Test: a venue declaring an unknown kind fails at load naming file and field — `tests/contract/test_venue_kind_declaration.py` (FR-007).
-- [ ] T046a [Q1] Test: every member of the venue kind vocabulary has a hue, an icon and a word — `web/tests/unit/kinds.test.ts`, extending T001 (FR-004).
-- [ ] T047 [Q1] Add the closed vocabulary to `src/terezy/core/routes/venues.py`, the `kind` field to `VenueTable` and the `Venue` record, and the `_known` check to the loader (FR-007).
-- [ ] T048 [Q1] Declare each venue's kind in `data/venues.toml` (nine lines) and regenerate whatever golden the change moves, quoting the moved lines in the commit message (Principle V).
+- [ ] T046 Test: a venue declaring an unknown kind fails at load naming file and field — `tests/contract/test_venue_kind_declaration.py` (FR-007).
+- [ ] T046a Test: every member of the venue kind vocabulary has a hue, an icon and a word — `web/tests/unit/kinds.test.ts`, extending T001 (FR-004).
+- [ ] T047 Add the five-member closed vocabulary — `bank`, `exchange`, `broker`, `platform`, `payroll` — to `src/terezy/core/routes/venues.py`, the `kind` field to `VenueTable` and the `Venue` record, and the `_known` check to the loader (FR-007).
+- [ ] T048 Declare each venue's kind in `data/venues.toml` (nine lines, the assignment in `specs/decisions/2026-09-06-clarify-026.toml`) and regenerate whatever golden the change moves, quoting the moved lines in the commit message (Principle V).
 
 ## Landing
 
