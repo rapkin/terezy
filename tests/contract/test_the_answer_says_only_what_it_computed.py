@@ -56,9 +56,7 @@ FORBIDDEN_IN_THIS_FEATURE: Final = (
 """Every way a rate could reach a figure here. **Not** ``exchange_rate``: FR-021a requires the
 owner to be able to *state* one, and forbidding the word would forbid the record he states."""
 
-ANSWER_WIDE: Final = frozenset(
-    {Exclusion.NO_REAL_TERMS_FIGURE, Exclusion.NO_INCOME_TAX_ON_THE_STATED_AMOUNT}
-)
+ANSWER_WIDE: Final = frozenset({Exclusion.NO_INCOME_TAX_ON_THE_STATED_AMOUNT})
 
 EARLY_EXIT_CLAIMS: Final = frozenset(
     {
@@ -140,7 +138,6 @@ def _vocabulary(result: Answer) -> set[str]:
         result.question.continuation.value,
         *(member.value for member in Exclusion),
         *(member.value for member in Direction),
-        verb.REAL_TERMS_SUPPLIED_BY,
         verb.INCOME_TAX_SUPPLIED_BY,
         verb.RATE_RISK_SUPPLIED_BY,
         verb.CLEAN_PRICE_SUPPLIED_BY,
@@ -176,7 +173,7 @@ def test_no_module_of_this_feature_derives_a_rate(module: Path) -> None:
         assert token not in executable, f"{module.name} mentions {token!r}"
 
 
-def test_the_two_answer_wide_exclusions_are_always_stated() -> None:
+def test_the_answer_wide_exclusion_is_always_stated() -> None:
     """SC-021's first half. An exclusion that is not stated is a silent default."""
     result = fixtures.answered()
     stated = {item.what for item in result.excludes if item.applies_to is None}

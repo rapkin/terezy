@@ -77,7 +77,6 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.routes.legs import Route
     from terezy.core.scenarios.early_exit import SoldEarly
 
-REAL_TERMS_SUPPLIED_BY = "a real-terms rate on TupleOutcome, which feature 010 does not produce"
 INCOME_TAX_SUPPLIED_BY = "a deployable-capacity figure, which is a question about a stream"
 RATE_RISK_SUPPLIED_BY = "[[future]] secondary-market-rate-risk"
 CLEAN_PRICE_SUPPLIED_BY = "[[future]] secondary-market-rate-risk"
@@ -538,19 +537,13 @@ def _verdict(item: TupleOutcome, reserve: Reserve) -> ReserveVerdict:
 
 
 def _answer_wide_excludes() -> tuple[StatedExclusion, ...]:
-    """The two an answer always states, whatever it computed.
+    """The one an answer always states, whatever it computed.
 
     Every candidate-specific exclusion is on its **section**, because it is specific to a
     candidate *in a window*: the same key can be an early exit at one month and a
     hold-to-maturity at twelve.
     """
     return (
-        StatedExclusion(
-            what=Exclusion.NO_REAL_TERMS_FIGURE,
-            applies_to=None,
-            supplied_by=REAL_TERMS_SUPPLIED_BY,
-            direction=None,
-        ),
         StatedExclusion(
             what=Exclusion.NO_INCOME_TAX_ON_THE_STATED_AMOUNT,
             applies_to=None,

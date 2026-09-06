@@ -220,7 +220,8 @@ line here and add one there, in one change, where a reviewer sees both.
 
 EXCLUDES: Final[frozenset[str]] = frozenset(
     {
-        "inflation (every figure here is nominal)",
+        "inflation on the amounts: the outlay and what reaches a spendable endpoint are "
+        "nominal, and only the rate has a real counterpart beside it",
         "the risk class, which is declared and carried but never scored",
         "the cost of recovering undeployed cash: the rate is measured on the money actually "
         "invested, and the remainder is reported at the venue it is sitting at, with no "
