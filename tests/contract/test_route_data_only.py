@@ -452,22 +452,32 @@ class TestNoSourceCodeKnowsAboutARouteOrAVenue:
 
     def test_no_module_mentions_a_declared_id(self) -> None:
         found = {
-            str(path.relative_to(SOURCE_ROOT)): [
-                identifier
-                for identifier in self.IDS
-                # Word boundaries, so a function named ``_bond_terms`` is not mistaken for
-                # the observation kind ``bond_terms``: what the scan is looking for is an id
-                # used as a value, and a helper whose name happens to contain one is not a
-                # branch on it.
-                if re.search(rf"\b{re.escape(identifier)}\b", _executable_source(path))
-            ]
+            str(path.relative_to(SOURCE_ROOT)): _ids_named(path, self.IDS)
             for path in sorted(SOURCE_ROOT.rglob("*.py"))
+            if _read_by_the_id_scan(path, root=SOURCE_ROOT)
         }
         offenders = {path: ids for path, ids in found.items() if ids}
         assert not offenders, (
             "a module names a specific route, venue, pool, stream or observation kind, so "
             f"that thing's behaviour is code rather than data (Principle II): {offenders}"
         )
+
+    def test_the_exemption_is_a_path_and_never_a_word(self, tmp_path: Path) -> None:
+        """The control for the exemption: the same line in any other tree still fails.
+
+        A keyword allowlist would have let a venue id into the engine, which is the one thing
+        this scan exists to catch.
+        """
+        naming_a_venue = 'HOST = "https://data-api.binance.vision"\n'
+        exempt = tmp_path / "data" / "providers" / "venue.py"
+        engine = tmp_path / "core" / "routes" / "venue.py"
+        for module in (exempt, engine):
+            module.parent.mkdir(parents=True, exist_ok=True)
+            module.write_text(naming_a_venue, encoding="utf-8")
+
+        assert _ids_named(engine, self.IDS) == ["binance"]
+        assert _read_by_the_id_scan(engine, root=tmp_path)
+        assert not _read_by_the_id_scan(exempt, root=tmp_path)
 
     def test_the_scan_would_catch_a_branch_on_an_id(self) -> None:
         """A scan that can never fail protects nothing, so prove it can.
@@ -611,6 +621,35 @@ def _strip_prose(source: str) -> str:
                 kept = [item for item in block if not _is_prose(item)]
                 setattr(node, field, kept or [ast.Pass()])
     return ast.unparse(tree)
+
+
+PROVIDER_TREE = ("data", "providers")
+"""The one tree under ``src/`` where a venue's own name is not a branch on an id.
+
+A ``Provider`` implementation names the venue it fetches from -- its host, its endpoint, its
+row shape -- and that is what one of the four permitted interfaces is *for*; there is no way
+to write one that does not. The exemption is a **path** rather than a permitted word, so the
+scan below keeps its whole subject: the engine, and every other module under ``data/``, still
+may not name a route, venue, pool or stream.
+"""
+
+
+def _read_by_the_id_scan(path: Path, *, root: Path) -> bool:
+    return path.relative_to(root).parts[: len(PROVIDER_TREE)] != PROVIDER_TREE
+
+
+def _ids_named(path: Path, ids: tuple[str, ...]) -> list[str]:
+    """Every declared id a module names as a value, its prose stripped.
+
+    Word boundaries, so a function named ``_bond_terms`` is not mistaken for the observation
+    kind ``bond_terms``: what the scan looks for is an id used as a value, and a helper whose
+    name happens to contain one is not a branch on it.
+    """
+    return [
+        identifier
+        for identifier in ids
+        if re.search(rf"\b{re.escape(identifier)}\b", _executable_source(path))
+    ]
 
 
 def _executable_source(path: Path) -> str:
