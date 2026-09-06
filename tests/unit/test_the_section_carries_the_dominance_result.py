@@ -119,6 +119,10 @@ def test_the_answer_holds_no_string_this_feature_composed() -> None:
         {member.value for member in Criterion}
         | {member.value for member in ObjectiveDirection}
         | _strings(answered.question)
+        # Every id the question's words resolved to. A ranked candidate's key holds one, and
+        # until 023 they all arrived incidentally through `rests_on`; a balance rests on
+        # nothing, so the vocabulary is now complete by construction rather than by luck.
+        | {text for item in answered.subjects for text in _strings(item)}
         | _strings(answered.excludes)
         | {text for section in answered.sections for text in _strings(section.excludes)}
         | outcomes

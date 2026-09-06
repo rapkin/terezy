@@ -115,11 +115,12 @@ def test_every_union_of_records_is_discriminated() -> None:
 
 @pytest.mark.contract
 def test_the_unions_a_discriminator_cannot_reach_are_the_ones_pinned() -> None:
-    """A union with a non-record arm cannot carry a discriminator; there is exactly one.
+    """A union with a non-record arm cannot carry a discriminator; these are the ones there are.
 
-    `ExitChoice` mixes two records with two single-member enum sentinels, and an enum arm has no
-    `tag` to switch on. Pinned so that a second such union is a deliberate edit -- a client
-    narrowing by shape is what FR-013 exists to prevent, and this is where the exception lives.
+    `ExitChoice` mixes two records with two single-member enum sentinels, and `EntryPath` mixes
+    two records with one -- an enum arm has no `tag` to switch on. Pinned so that a further such
+    union is a deliberate edit: a client narrowing by shape is what FR-013 exists to prevent,
+    and this is where the exceptions live.
     """
     schemas: dict[str, Any] = service.create_app(DATA_ROOT, client=None).openapi()["components"][
         "schemas"
@@ -130,7 +131,7 @@ def test_the_unions_a_discriminator_cannot_reach_are_the_ones_pinned() -> None:
         for union in _subschemas(held)
         if len(_refs(union)) > 1 and not _all_tagged(union, schemas)
     }
-    assert mixed == {"Route Out"}
+    assert mixed == {"Path", "Route In", "Route Out"}
 
 
 def _all_tagged(union: dict[str, Any], schemas: dict[str, Any]) -> bool:
@@ -240,7 +241,8 @@ DECLARATIONS_WITHOUT_A_REASON = frozenset(
         "answer.UndeclaredSubject",
         "candidates.CandidateCeiling",
         "candidates.CandidateSurvey",
-        "candidates.NothingNeedsToConnect",
+        "cash.CashAssumptions",
+        "cash.CashDeclaration",
         "channels.FxChannel",
         "citation_policy.CitationsRequired",
         "composed.SegmentBound",

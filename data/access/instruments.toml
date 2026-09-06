@@ -595,3 +595,20 @@ instrument_id = "inzhur_miltech"
 bought_at     = "inzhur"
 proceeds_to   = "inzhur"
 risk_class    = "venture_fund"
+
+# --- the balance, which is priced by what it is ------------------------------------------
+#
+# No [access.price] and no [access.resale_price], and both are refused at load rather than
+# merely omitted: one hryvnia of balance costs one hryvnia, on the way in and on the way out,
+# so a declared price would be one fact in two places and any figure but 1.00 would let an
+# amount buy more or less balance than it is.
+#
+# `bought_at` and `proceeds_to` are the venue the salary already arrives at, which is what makes
+# both legs of this candidate identity: nothing has to move to buy it and nothing has to move to
+# spend it. That is what a do-nothing baseline is.
+
+[[access]]
+instrument_id = "cash_uah_monobank"
+bought_at     = "monobank_uah"
+proceeds_to   = "monobank_uah"
+risk_class    = "bank_balance"

@@ -43,6 +43,16 @@ INSTRUMENTS = sorted(SHIPPED.access)
 ROUTES = sorted(SHIPPED.routes)
 STREAMS = sorted(SHIPPED.streams)
 
+NOT_A_BALANCE = sorted(set(INSTRUMENTS) - set(SHIPPED.cash))
+"""Every instrument but a cash balance, for the two cases below that need an **empty** set.
+
+A balance is the one declaration that survives both narrowings, and for its own reasons rather
+than by accident: its way in and its way out are identity, so removing every route cannot take
+it away, and it declares no minimum ticket, so no amount is too small to buy one. Excluded from
+those two cases rather than the cases being weakened, because what each asserts is an identity
+over a population it can name.
+"""
+
 
 def _narrowed(instruments: list[str], routes: list[str], streams: list[str]) -> Registries:
     """The declared registry with three of its families narrowed to the named members."""
@@ -153,18 +163,18 @@ def test_nothing_declared_at_all_considers_no_pairs_and_is_not_a_refusal() -> No
 
 def test_every_pair_yielding_nothing_still_partitions_the_pairs() -> None:
     """No routes at all: every pair is in the third column and none is a drop."""
-    registries = _narrowed(INSTRUMENTS, [], STREAMS)
+    registries = _narrowed(NOT_A_BALANCE, [], STREAMS)
     enumerated = fixtures.enumerated(registries)
     assert isinstance(enumerated, CandidateSet), enumerated
     assert enumerated.candidates == ()
     assert len(enumerated.no_candidate) == enumerated.pairs_considered
-    assert enumerated.pairs_considered == len(INSTRUMENTS) * len(STREAMS)
+    assert enumerated.pairs_considered == len(NOT_A_BALANCE) * len(STREAMS)
 
 
 def test_every_candidate_dropped_still_closes_the_second_identity() -> None:
     """An amount below every declared minimum ticket: the set is full and empty after
     evaluation, and the tally accounts for all of it."""
-    registries = _narrowed(INSTRUMENTS, ROUTES, [fixtures.SALARY])
+    registries = _narrowed(NOT_A_BALANCE, ROUTES, [fixtures.SALARY])
     question = fixtures.question(
         registries, amounts={fixtures.SALARY: Money(1.0, fixtures.UAH, prov.EMPTY)}
     )

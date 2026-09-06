@@ -206,16 +206,18 @@ def test_the_answer_matches_the_recorded_artefact() -> None:
 def test_the_recorded_artefact_ranks_every_bond_against_the_declared_benchmark() -> None:
     """The claim the artefact is kept for, pinned in the artefact itself.
 
-    21 at every horizon, and the benchmark among them: a ranking of 20 would mean an issue
+    22 at every horizon, and the benchmark among them: a ranking of 21 would mean a row
     dropped out and a ranking of 0 would mean the hurdle went missing, and the digest alone
     would say neither.
 
     21 of the 24 declared issues, not all of them: three were placed too recently for the
     2026-08-24 quotation to sit in any of their declared coupon periods, so no price can be
     carried to the purchase and they refuse by name (022 FR-001). They are in the artefact as
-    refusals, which is what keeps this count from reading as a disappearance.
+    refusals, which is what keeps this count from reading as a disappearance. The 22nd is the
+    balance 023 declared -- the do-nothing baseline, ranked in the same list rather than
+    described beside it (Principle I).
     """
-    assert _recorded().count("  ranked 21") == len(_answered().sections)
+    assert _recorded().count("  ranked 22") == len(_answered().sections)
     assert f"[benchmark] {fixtures.BENCHMARK}" in _recorded()
 
 

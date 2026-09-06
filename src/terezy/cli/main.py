@@ -37,6 +37,7 @@ from terezy.core.decision.answer import (
     subject_counts,
 )
 from terezy.core.decision.dominance import why_one_member
+from terezy.core.instruments.cash import CashAssumptions
 from terezy.core.instruments.interface import Assumptions
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
@@ -57,7 +58,6 @@ from terezy.core.results.candidates import (
     CandidateSurvey,
     NoCandidateReason,
     NothingConnects,
-    NothingNeedsToConnect,
 )
 from terezy.core.results.dominance import (
     BenchmarkStanding,
@@ -91,7 +91,7 @@ from terezy.core.routes.path import (
     ExitByIdentity,
     ExitChoice,
     FromTheDeclaration,
-    candidate_id,
+    entry_id,
 )
 from terezy.data.declarations import loader
 from terezy.data.declarations.errors import DeclarationError
@@ -676,7 +676,7 @@ def _candidate(key: Tuple) -> str:
     """
     return (
         f"{key.instrument_id} from {key.stream_id} "
-        f"via {candidate_id(key.route_in)} "
+        f"via {entry_id(key.route_in)} "
         f"out {_exit_choice(key.route_out)} "
         f"run as {_plan_terms(key.exit_terms)}"
     )
@@ -736,6 +736,8 @@ def _plan_terms(plan: InstrumentPlan) -> str:
                     "no stated rate" if rate is None else f"rate {rate.uah_per_unit}",
                 ]
             )
+        case CashAssumptions():
+            return "nothing to choose"
         case _:  # pragma: no cover -- mypy proves this unreachable
             assert_never(plan)
 
@@ -815,8 +817,6 @@ def _exclusion_lines(excludes: Sequence[StatedExclusion]) -> list[str]:
 def _why(reason: NoCandidateReason) -> str:
     """A no-candidate pair's reason, in compose's own words, carried verbatim (FR-011)."""
     match reason:
-        case NothingNeedsToConnect():
-            return reason.refusal.reason
         case NothingConnects():
             return reason.reason
         case _:  # pragma: no cover -- mypy proves this unreachable

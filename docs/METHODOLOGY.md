@@ -3241,6 +3241,48 @@ it benchmarks, and the drift is invisible because both figures look reasonable.
 Two outcomes within the project tolerance (§11) are a **tie**, including a tie with the
 hurdle — which is what makes *nothing beats the hurdle* sayable when it is true by a whisker.
 
+### 29.8a The do-nothing baseline: a balance, and both legs by identity
+
+Principle I requires the naive baseline to be **scored and shown**, and until 023 the owner's
+first word reached nothing. A `cash_balance` is a currency held at a venue paying a declared
+zero, and every term of its round trip is the absence of something:
+
+```
+way in      entry by identity          0.00 charged, 0 days
+bought      50 000.00 UAH of balance   at 1.00 per unit, no increment, nothing stranded
+lifecycle   the balance, released      on the horizon's last day, and nothing else
+tax         0.00                       proceeds equal basis, so no gain and no income arise
+way out     exit by identity           0.00 charged, 0 days
+reaches     50 000.00 UAH              implied rate 0.00 %, round trip 0.00 both legs
+```
+
+**Both identity legs are values, not `None` and not empty chains.** *A round trip that costs
+nothing because there is nothing to do* is a different claim from one whose fees cancelled, and
+only a named value says which. On the way out that is 003's `EXIT_BY_IDENTITY`; on the way in
+`ENTRY_BY_IDENTITY`, legal exactly where the stream's arrival venue and currency equal the
+instrument's buying venue and declared currency — and **checked against the declarations at the
+join** rather than trusted from a caller, because asserted by a caller it is a bare claim about
+where the money is.
+
+**No corridor from a venue to itself is invented.** Enumeration constructs the entry for such a
+pair instead of asking `compose`, whose refusal for it — *the money is already where it was
+wanted* — stays exactly as it is.
+
+**The zero rate is a cited claim and carries its mark.** What the citation is about is not
+really the zero: it is that the product is a **balance** and not a deposit, which is a fact
+about a bank and can be wrong. A declaration stating any other rate is refused at load, naming
+what a deposit would need instead.
+
+**The day count is the class's and a declaration may not state one.** With the rate pinned at
+zero a series of one outflow and one equal inflow has a root of zero under every declared
+convention, so requiring a declarer to state one would be asking for a convention that decides
+nothing — asserted over the whole registry in `tests/invariants/test_cash_invariants.py`.
+
+**The one case with no rate is a span of no length.** An internal rate of return needs receipts
+*after* the payment out; money out and the same money back on one date discounts to zero at
+every rate, so the outcome reports the amounts and a typed absence where the horizon is a
+single day.
+
 ### 29.9 Worked example
 
 `tests/worked_examples/test_full_round_trip.py` works one round trip out in full: the way in,

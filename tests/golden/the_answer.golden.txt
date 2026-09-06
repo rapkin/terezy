@@ -5,15 +5,15 @@
 
 [question] fifty-thousand-hryvnia  asked 2026-08-30  as_of 2026-08-30  regime (no regime declared)
 [benchmark] UA4000231195
-[considered] UA4000207518 UA4000230270 UA4000231195 UA4000233712 UA4000234223 UA4000234413 UA4000235196 UA4000235782 UA4000235865 UA4000236228 UA4000236475 UA4000236624 UA4000237416 UA4000237556 UA4000237804 UA4000238281 UA4000238968 UA4000238976 UA4000238992 UA4000239008 UA4000239016 UA4000239040 UA4000239081 UA4000239107 inzhur_miltech inzhur_reit
+[considered] UA4000207518 UA4000230270 UA4000231195 UA4000233712 UA4000234223 UA4000234413 UA4000235196 UA4000235782 UA4000235865 UA4000236228 UA4000236475 UA4000236624 UA4000237416 UA4000237556 UA4000237804 UA4000238281 UA4000238968 UA4000238976 UA4000238992 UA4000239008 UA4000239016 UA4000239040 UA4000239081 UA4000239107 cash_uah_monobank inzhur_miltech inzhur_reit
 
-[subject] cash                     undeclared  
+[subject] cash                     group       cash_uah_monobank
 [subject] ovdp                     group       UA4000207518 UA4000230270 UA4000231195 UA4000233712 UA4000234223 UA4000234413 UA4000235196 UA4000235782 UA4000235865 UA4000236228 UA4000236475 UA4000236624 UA4000237416 UA4000237556 UA4000237804 UA4000238281 UA4000238968 UA4000238976 UA4000238992 UA4000239008 UA4000239016 UA4000239040 UA4000239081 UA4000239107
 [subject] inzhur                   group       inzhur_miltech inzhur_reit
 [subject] btc                      undeclared  
 
-[section] 2026-09-01..2026-10-01  CandidateSurvey  reached=2 unreached=0 undeclared=2 ids=26
-  enumerated 26  no_candidate 26  pairs 52  comparison Comparison
+[section] 2026-09-01..2026-10-01  CandidateSurvey  reached=3 unreached=0 undeclared=1 ids=27
+  enumerated 27  no_candidate 27  pairs 54  comparison Comparison
   evaluated UA4000238968             reaches 0x1.8b69855855856p+15
   evaluated UA4000236475             reaches 0x1.8b7dda4da4da4p+15
   evaluated UA4000238281             reaches 0x1.8b82816816816p+15
@@ -35,9 +35,10 @@
   evaluated UA4000238992             reaches 0x1.89a06c96c96cbp+15
   evaluated UA4000239008             reaches 0x1.8936970309ca2p+15
   evaluated UA4000207518             reaches 0x1.8892f8f78f78fp+15
-  ranked 21
+  evaluated cash_uah_monobank        reaches 0x1.86a0000000000p+15
+  ranked 22
   dropped InstrumentRefused            4  UA4000239040,UA4000239081,UA4000239107,inzhur_reit
-  dominance money-and-when  non_dominated=3 dominated=18 not_placed=0 incomparable=0  TheSetDoesNotHaveOneMember
+  dominance money-and-when  non_dominated=3 dominated=19 not_placed=0 incomparable=0  TheSetDoesNotHaveOneMember
     band money_at_the_endpoint    UAH 0x1.4000000000000p+2 of 0x1.86a0000000000p+15
     non-dominated UA4000235865
     non-dominated UA4000236475
@@ -60,6 +61,7 @@
     dominated UA4000238992             by UA4000230270,UA4000231195,UA4000233712,UA4000234223,UA4000234413,UA4000235196,UA4000235782,UA4000236228,UA4000236475,UA4000236624,UA4000237416,UA4000237556,UA4000237804,UA4000238281,UA4000238968,UA4000238976,UA4000239016
     dominated UA4000239008             by UA4000230270,UA4000231195,UA4000233712,UA4000234223,UA4000234413,UA4000235196,UA4000235782,UA4000236228,UA4000236475,UA4000236624,UA4000237416,UA4000237556,UA4000237804,UA4000238281,UA4000238968,UA4000238976,UA4000238992,UA4000239016
     dominated UA4000239016             by UA4000236475,UA4000238281,UA4000238968
+    dominated cash_uah_monobank        by UA4000235865
     indistinguishable UA4000230270             UA4000236228
     indistinguishable UA4000231195             UA4000233712
     indistinguishable UA4000233712             UA4000231195
@@ -154,8 +156,8 @@
   excludes quoted_clean_price_is_assumed_constant UA4000207518             
   withheld inzhur_miltech           arrives 2028-01-20
 
-[section] 2026-09-01..2026-12-01  CandidateSurvey  reached=2 unreached=0 undeclared=2 ids=26
-  enumerated 26  no_candidate 26  pairs 52  comparison Comparison
+[section] 2026-09-01..2026-12-01  CandidateSurvey  reached=3 unreached=0 undeclared=1 ids=27
+  enumerated 27  no_candidate 27  pairs 54  comparison Comparison
   evaluated UA4000236475             reaches 0x1.95ba708708708p+15
   evaluated UA4000238968             reaches 0x1.957b573573574p+15
   evaluated UA4000230270             reaches 0x1.9650c907c3af6p+15
@@ -177,9 +179,10 @@
   evaluated UA4000239008             reaches 0x1.9321432dcc765p+15
   evaluated UA4000235865             reaches 0x1.889e5cc7660ffp+15
   evaluated UA4000207518             reaches 0x1.8efb9ab9ab9abp+15
-  ranked 21
+  evaluated cash_uah_monobank        reaches 0x1.86a0000000000p+15
+  ranked 22
   dropped InstrumentRefused            4  UA4000239040,UA4000239081,UA4000239107,inzhur_reit
-  dominance money-and-when  non_dominated=4 dominated=17 not_placed=0 incomparable=0  TheSetDoesNotHaveOneMember
+  dominance money-and-when  non_dominated=4 dominated=18 not_placed=0 incomparable=0  TheSetDoesNotHaveOneMember
     band money_at_the_endpoint    UAH 0x1.4000000000000p+2 of 0x1.86a0000000000p+15
     non-dominated UA4000230270
     non-dominated UA4000235865
@@ -202,6 +205,7 @@
     dominated UA4000238992             by UA4000230270,UA4000231195,UA4000233712,UA4000234223,UA4000234413,UA4000235196,UA4000235782,UA4000236228,UA4000236475,UA4000237556,UA4000237804,UA4000238281,UA4000238968,UA4000238976,UA4000239016
     dominated UA4000239008             by UA4000230270,UA4000231195,UA4000233712,UA4000234223,UA4000234413,UA4000235196,UA4000235782,UA4000236228,UA4000236475,UA4000237556,UA4000237804,UA4000238281,UA4000238968,UA4000238976,UA4000238992,UA4000239016
     dominated UA4000239016             by UA4000230270,UA4000231195,UA4000234413,UA4000235782,UA4000236475,UA4000238281,UA4000238968
+    dominated cash_uah_monobank        by UA4000235865,UA4000236624,UA4000237416
     indistinguishable UA4000231195             UA4000238281
     indistinguishable UA4000233712             UA4000235196,UA4000237804
     indistinguishable UA4000234223             UA4000238976
@@ -292,8 +296,8 @@
   excludes quoted_clean_price_is_assumed_constant UA4000207518             
   withheld inzhur_miltech           arrives 2028-01-20
 
-[section] 2026-09-01..2027-09-01  CandidateSurvey  reached=2 unreached=0 undeclared=2 ids=26
-  enumerated 26  no_candidate 26  pairs 52  comparison Comparison
+[section] 2026-09-01..2027-09-01  CandidateSurvey  reached=3 unreached=0 undeclared=1 ids=27
+  enumerated 27  no_candidate 27  pairs 54  comparison Comparison
   evaluated UA4000236475             reaches 0x1.c3b599999999ap+15
   evaluated UA4000238968             reaches 0x1.c2b6666666666p+15
   evaluated UA4000235196             reaches 0x1.c3cdccccccccdp+15
@@ -315,9 +319,10 @@
   evaluated UA4000237416             reaches 0x1.92166fefcbc98p+15
   evaluated UA4000236624             reaches 0x1.8cc98ffa99433p+15
   evaluated UA4000235865             reaches 0x1.889e5cc7660ffp+15
-  ranked 21
+  evaluated cash_uah_monobank        reaches 0x1.86a0000000000p+15
+  ranked 22
   dropped InstrumentRefused            4  UA4000239040,UA4000239081,UA4000239107,inzhur_reit
-  dominance money-and-when  non_dominated=13 dominated=8 not_placed=0 incomparable=0  TheSetDoesNotHaveOneMember
+  dominance money-and-when  non_dominated=13 dominated=9 not_placed=0 incomparable=0  TheSetDoesNotHaveOneMember
     band money_at_the_endpoint    UAH 0x1.4000000000000p+2 of 0x1.86a0000000000p+15
     non-dominated UA4000207518
     non-dominated UA4000230270
@@ -340,6 +345,7 @@
     dominated UA4000238968             by UA4000235196,UA4000235782,UA4000236475,UA4000237556,UA4000237804
     dominated UA4000238992             by UA4000233712,UA4000235196,UA4000235782,UA4000236475,UA4000237556,UA4000237804,UA4000238968
     dominated UA4000239008             by UA4000233712,UA4000235196,UA4000235782,UA4000236475,UA4000237556,UA4000237804,UA4000238968,UA4000238992
+    dominated cash_uah_monobank        by UA4000207518,UA4000230270,UA4000231195,UA4000234223,UA4000234413,UA4000235865,UA4000236228,UA4000236624,UA4000237416,UA4000238281,UA4000238976,UA4000239016
     hurdle UA4000231195 NothingDominatesTheHurdle
     separating SeparatingAssumptions
   excludes early_exit_is_a_point_not_a_distribution UA4000236475             more_certain_than_it_is
@@ -395,4 +401,4 @@
 [excludes] no_income_tax_on_the_stated_amount
 
 [keys] SectionsAgreeByKey
-[digest] sha256:b578cdc9cb01dcc312994b970d8336a191cb21ee223dcfafab8d877dad799dc6
+[digest] sha256:859da6a3d1988d9ef6f89430bba2611fd21c60c787ee71807b90644c0cb789fd

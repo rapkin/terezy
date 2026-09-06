@@ -181,29 +181,11 @@ class NothingConnects:
     """Why there is no option, in the output's own words."""
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
-class NothingNeedsToConnect:
-    """The stream already arrives where the purchase happens, so no way in is required (FR-014).
-
-    The **opposite of a gap**, and reporting it as one would send the owner to declare a corridor
-    that is not missing. What *is* missing is the candidate: 010's ``Tuple`` requires a
-    ``route_in``, so a zero-hop way in is not representable, and a pair standing in this column
-    is that recorded gap made visible rather than a permanent answer.
-    """
-
-    refusal: CompositionRefused
-    """004's whole record, carried rather than paraphrased.
-
-    Its ``case`` is what this feature matched on (FR-014a) and its ``reason`` is compose's own
-    words reaching the report verbatim -- neither copied here, because a copy is what goes stale.
-    """
-
-
-NoCandidateReason = NothingConnects | NothingNeedsToConnect
+NoCandidateReason = NothingConnects
 """Why an ``(instrument, stream)`` pair produced no candidate. Match exhaustively.
 
-Two records rather than one with a discriminator, because the two remedies are opposite and
-FR-014 requires them distinguishable **without reading prose**.
+One member, and the alias stays so a second reason is a widening here rather than a type
+appearing at every consumer at once.
 """
 
 
@@ -347,8 +329,8 @@ class QuestionDoesNotStandUp:
     broken registry as though it were an answer.
 
     Which of the three fired is read off :attr:`CompositionRefused.case` and never off its text
-    (FR-014a) -- the third, *the money is already where it was wanted*, is about one pair and
-    lands in :class:`NothingNeedsToConnect` instead.
+    (FR-014a) -- the third, *the money is already where it was wanted*, never reaches
+    enumeration at all: such a pair is an entry by identity and ``compose`` is not asked.
     """
 
     refusal: CompositionRefused
@@ -472,7 +454,6 @@ __all__ = [
     "NoCandidateReason",
     "NoPlanSupplied",
     "NothingConnects",
-    "NothingNeedsToConnect",
     "PairYieldedNoCandidate",
     "PlannedCandidate",
     "Question",

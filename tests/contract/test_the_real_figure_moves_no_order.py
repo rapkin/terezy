@@ -35,10 +35,14 @@ from tests import answer_registries as fixtures
 pytestmark = pytest.mark.contract
 
 GOLDEN_FILE: Final = Path(__file__).parents[1] / "golden" / "candidate_set.golden.txt"
-RECORDED_DIGEST: Final = "3ec9638e500742e9a923517d6cc4e326"
+RECORDED_DIGEST: Final = "85abd2c226d7690be92c47a902e7435a"
 """The digest recorded in `candidate_set.golden.txt`, retyped here so that a regeneration of
 that artefact does not carry this assertion along with it. It covers the key, the amount and
-the nominal rate; FR-018 is that this feature moves none of the three."""
+the nominal rate; FR-018 is that this feature moves none of the three.
+
+Re-measured when 023 declared a cash balance, which adds a **candidate** and therefore moves
+all three legitimately. Retyping it keeps the claim this constant makes -- that the real figure
+moves nothing -- which the two-belief comparison below is what actually tests."""
 
 MAY_NAME_THE_REAL_SLOT: Final = {
     # Builds it, and is the only place a slot is filled.

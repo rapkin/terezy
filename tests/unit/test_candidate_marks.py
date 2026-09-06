@@ -15,7 +15,10 @@ from terezy.core.decision.candidates import enumerate_candidates
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives import staleness
 from terezy.core.results.candidates import CandidateSet
-from terezy.core.routes.path import exit_segments_of, segments_of
+from terezy.core.routes.path import (
+    entry_segments_of,
+    exit_segments_of,
+)
 from tests import candidate_registries as fixtures
 
 
@@ -37,7 +40,7 @@ def test_every_source_behind_every_route_and_quote_the_walk_read_is_on_the_set()
     expected: set[object] = set()
     for candidate in enumerated.candidates:
         route_ids = [
-            *segments_of(candidate.key.route_in),
+            *entry_segments_of(candidate.key.route_in),
             *exit_segments_of(candidate.key.route_out),  # type: ignore[arg-type]
         ]
         for route_id in route_ids:

@@ -20,7 +20,13 @@ from terezy.core.decision.candidates import evaluated, survey
 from terezy.core.primitives.rates import NominalRate
 from terezy.core.results.candidates import CandidateSet, CandidateSurvey, Question
 from terezy.core.results.tuple import RateNotComparable
-from terezy.core.routes.path import ExitChain, exit_segments_of, segments_of
+from terezy.core.routes.path import (
+    ENTRY_BY_IDENTITY,
+    EXIT_BY_IDENTITY,
+    ExitChain,
+    entry_segments_of,
+    exit_segments_of,
+)
 from tests import candidate_registries as fixtures
 
 if TYPE_CHECKING:  # pragma: no cover -- typing only
@@ -79,10 +85,20 @@ def test_both_segment_counts_are_read_off_the_carried_key() -> None:
     """SC-012's second half, and part of why the key must travel: the counts are derived from
     it rather than stored, so a count and the chain it describes cannot disagree."""
     for outcome in _outcomes():
-        assert len(segments_of(outcome.key.route_in)) >= 1
+        # Two-armed, because one bound would be satisfiable by the wrong answer: zero segments
+        # exactly where there is nothing to do, and at least one wherever a corridor was
+        # walked. A single `>= 0` would stay green on a chain that reported none (023 FR-015).
+        way_in = entry_segments_of(outcome.key.route_in)
+        if outcome.key.route_in is ENTRY_BY_IDENTITY:
+            assert way_in == ()
+        else:
+            assert len(way_in) >= 1
         way_out = outcome.key.route_out
         assert isinstance(way_out, ExitChain)
-        assert len(exit_segments_of(way_out)) >= 0
+        if way_out is EXIT_BY_IDENTITY:
+            assert exit_segments_of(way_out) == ()
+        else:
+            assert len(exit_segments_of(way_out)) >= 1
 
 
 def test_no_field_this_feature_returns_is_a_lossy_projection_of_an_outcome() -> None:

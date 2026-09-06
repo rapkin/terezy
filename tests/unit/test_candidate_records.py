@@ -1,7 +1,7 @@
 """What the types claim, where a later change could break the claim with every behaviour green.
 
-FR-014's two no-candidate reasons stay two records, research D5's two unions stay nested, and
-FR-006's union stays at seventeen.
+FR-014's no-candidate reason names its side, research D5's two unions stay nested, and FR-006's
+union stays at seventeen.
 """
 
 from __future__ import annotations
@@ -13,18 +13,18 @@ from terezy.core.results import candidates as rec
 from terezy.core.results.tuple import TupleRefused
 
 
-class TestTheTwoNoCandidateReasonsAreDifferentTypes:
-    def test_they_are_two_records_and_not_one_with_a_flag(self) -> None:
-        members = set(get_args(rec.NoCandidateReason))
-        assert members == {rec.NothingConnects, rec.NothingNeedsToConnect}
+class TestTheOneNoCandidateReason:
+    def test_the_column_holds_the_absence_of_a_corridor_and_nothing_else(self) -> None:
+        """023 retired the second member: *the money is already where it was wanted* is a
+        candidate now, so the column that made it visible no longer holds it."""
+        assert get_args(rec.NoCandidateReason) == ()
+        assert rec.NoCandidateReason is rec.NothingConnects
 
-    def test_neither_carries_a_field_that_could_hold_the_other_s_claim(self) -> None:
-        """A discriminator field on either would be a second place the distinction lives, and
-        the day the two disagreed nothing would say which was authoritative."""
+    def test_it_names_the_side_rather_than_carrying_a_flag(self) -> None:
+        """The remedies differ by side -- a corridor in, or one out -- and a row count shows
+        neither."""
         connects = {field.name for field in dataclasses.fields(rec.NothingConnects)}
-        needs = {field.name for field in dataclasses.fields(rec.NothingNeedsToConnect)}
         assert connects == {"side", "reason"}
-        assert needs == {"refusal"}
 
 
 class TestTheTwoRefusalUnions:

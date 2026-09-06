@@ -30,6 +30,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DATA_ROOT = data_roots.with_fixtures()
 GROUPS = DATA_ROOT / "groups.toml"
 
+CASH = "cash"
 OVDP = "ovdp"
 INZHUR = "inzhur"
 
@@ -48,10 +49,11 @@ ids for one security (016 FR-027a).
 """
 
 DECLARED_MEMBERSHIP: dict[str, frozenset[str]] = {
+    CASH: frozenset({"cash_uah_monobank"}),
     OVDP: FIXTURES_IN_OVDP | frozenset(obs.declared_isins()),
     INZHUR: frozenset({"inzhur_reit", "inzhur_miltech"}),
 }
-"""What the owner's two words resolve to over the composed registry.
+"""What the owner's three declared words resolve to over the composed registry.
 
 The real half is **derived** from the two observation files rather than listed, which is the
 whole argument for a group: an issue joins by carrying the label and nothing here changes.
