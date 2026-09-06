@@ -27,9 +27,11 @@ import pytest
 
 from terezy.core.decision import answer as verb
 from terezy.core.decision.answer import section_evaluated
+from terezy.core.inflation.series import deflation_window
 from terezy.core.instruments.interface import DateRange
 from terezy.core.primitives import provenance as prov
-from terezy.core.primitives.rates import RealRate, RealTermsUnavailable
+from terezy.core.primitives.periods import months_in
+from terezy.core.primitives.rates import NominalRate, RealRate, RealTermsUnavailable
 from terezy.core.results import answer as records
 from terezy.core.results import question as question_records
 from terezy.core.results.answer import Answer, Direction, Exclusion
@@ -180,21 +182,34 @@ def test_the_answer_wide_exclusion_is_always_stated() -> None:
     assert stated == ANSWER_WIDE
 
 
-def test_every_evaluated_outcome_carries_a_real_terms_figure() -> None:
+def test_every_outcome_the_answer_holds_carries_a_computed_real_terms_figure() -> None:
     """024 SC-006: the same walk, the opposite claim.
 
     015 asserted that no real figure appeared anywhere in the answer, which is what its
-    `NO_REAL_TERMS_FIGURE` exclusion said in words. 024 fills the slot, so what the walk now
-    proves is that no evaluated outcome was left without one -- neither a blank nor an omitted
-    field, which is the shape a partially-filled slot would take.
+    `NO_REAL_TERMS_FIGURE` exclusion said in words. The walk rather than `section_evaluated`,
+    because it reaches every outcome the answer holds anywhere -- the ranked, the withheld and
+    the not-comparable alike -- and the claim is about all of them.
+
+    **That the slot is a union arm is the type's job, so this asserts what the type cannot:**
+    an outcome with a rate and an elapsed month in its window carries a *computed* assumed
+    figure. Filling the field with `hurdle.NOT_DEFLATED` would satisfy every structural check
+    and report two absences the run did not have.
     """
     result = fixtures.answered()
     outcomes = [item for item in _walk(result) if isinstance(item, TupleOutcome)]
+    computed = 0
 
     assert outcomes
     for outcome in outcomes:
-        for figure in (outcome.real.realized, outcome.real.assumed):
-            assert isinstance(figure, RealRate | RealTermsUnavailable), outcome.key.instrument_id
+        assert isinstance(outcome.real.realized, RealTermsUnavailable), outcome.key.instrument_id
+        if not isinstance(outcome.implied_rate, NominalRate):
+            continue
+        if not months_in(deflation_window(outcome.span.start, outcome.span.end)):
+            continue
+        assert isinstance(outcome.real.assumed, RealRate), outcome.key.instrument_id
+        computed += 1
+
+    assert computed
 
 
 def test_every_figure_the_shipped_answer_reports_carries_the_marks_of_its_registry() -> None:
