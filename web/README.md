@@ -39,5 +39,9 @@ it cannot read instead of coming up and answering 500 to everything.
 - **A refusal with a reason, on the screen** — that is the API working. A refusal is a result:
   read what it names.
 
-The API answers on loopback only, and refuses any other address until authentication exists
-(constitution Principle VII).
+**What keeps it off the network differs between the two shapes above.** Run on the host, the
+entry point refuses to bind a non-loopback address and the service refuses a client that is not
+on loopback. In the container every client address is the bridge, so that per-request check is
+relaxed by `TEREZY_BIND_CONTEXT` and the guarantee is the `127.0.0.1:8000:8000` publication in
+`docker-compose.yml` instead — publish it as `8000:8000` and the service answers the network.
+Both hold only until authentication exists (constitution Principle VII).
