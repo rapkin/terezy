@@ -47,6 +47,7 @@ import terezy.core.routes
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
+from terezy.core.results.answer import BenchmarkYieldsNoCandidate, StatedExclusion
 from terezy.core.results.coverage import SpendableEndpoint
 from terezy.core.results.ramp import (
     CostComponent,
@@ -75,6 +76,18 @@ would satisfy its own exit requirement by identity (003 FR-002) and quietly acqu
 round-trip figure, turning "nobody costed the way out" into "there was nothing to do" --
 which is a different claim and is exercised where it belongs, in the composed suites and in
 ``tests/invariants/test_coverage_costing_agreement.py``.
+"""
+
+UNDER_TYPE_CHECKING = {
+    "StatedExclusion": StatedExclusion,
+    "BenchmarkYieldsNoCandidate": BenchmarkYieldsNoCandidate,
+}
+"""Names a record annotates with but does not import at run time, so the walk can resolve them.
+
+``core.results.dominance`` imports both from ``core.results.answer`` under ``TYPE_CHECKING``,
+because ``answer`` imports *it* for ``HorizonSection.dominance``. Same mechanism, same reason as
+``terezy.api.http.shapes._FALLBACK``: layered under each record's own module globals, never over
+them, so a module's own name always wins.
 """
 
 LABELS = ("one_way", "round_trip")
@@ -342,7 +355,7 @@ class TestACostFigureLivesOnlyInALabelledRecord:
         offenders = [
             f"{name}.{field}"
             for name, record in _records()
-            for field, annotation in get_type_hints(record).items()
+            for field, annotation in get_type_hints(record, localns=UNDER_TYPE_CHECKING).items()
             if "OneWayCost" in str(annotation) and field != "one_way"
         ]
         assert not offenders, (
@@ -354,7 +367,7 @@ class TestACostFigureLivesOnlyInALabelledRecord:
         offenders = [
             f"{name}.{field}"
             for name, record in _records()
-            for field, annotation in get_type_hints(record).items()
+            for field, annotation in get_type_hints(record, localns=UNDER_TYPE_CHECKING).items()
             if "RoundTripCost" in str(annotation) and field != "round_trip"
         ]
         assert not offenders, (

@@ -26,17 +26,32 @@ import pytest
 
 from terezy.api.answer import AnsweredQuestion, answer_question
 from terezy.cli import main as cli
-from terezy.core.decision.answer import benchmark_unavailable, section_ranking
+from terezy.core.decision.answer import (
+    benchmark_unavailable,
+    section_beats_benchmark,
+    section_ranking,
+    section_ties,
+)
 from terezy.core.instruments.groups import InstrumentGroup
+from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
+from terezy.core.primitives.money import Money
 from terezy.core.results import canonical
+from terezy.core.results import dominance as dominance_records
 from terezy.core.results.answer import Answer, HorizonSection
 from terezy.core.results.candidates import CandidateSurvey
+from terezy.core.results.dominance import DominanceRefused, DominanceResult
 from terezy.core.results.fund import FundAssumptions
+from terezy.core.results.objectives import (
+    AbsoluteBand,
+    Criterion,
+    DaysBand,
+    FractionOfTheQuestionAmount,
+)
 from terezy.core.results.tuple import Comparison, InstrumentPlan, Tuple, TupleOutcome
 from terezy.data.declarations import loader
 from tests import answer_registries as fixtures
-from tests import synthetic
+from tests import dominance_sections, synthetic
 
 pytestmark = pytest.mark.contract
 
@@ -272,7 +287,7 @@ def test_a_ranking_holding_only_the_hurdle_says_so_rather_than_claiming_a_result
     hurdle = comparison.ranked[comparison.benchmark]
 
     alone = replace(comparison, ranked=(hurdle,), benchmark=0, ties=(), beats_benchmark=())
-    line = cli._beats_line(alone, (hurdle,))
+    line = cli._beats_line(alone, (hurdle,), (), ())
     assert f"THE BENCHMARK {fixtures.BENCHMARK} IS THE ONLY ROW HERE" in line
     assert "nothing was measured against it" in line
     assert "BEATS" not in line, "a verdict about beating needs something to beat"
@@ -294,7 +309,9 @@ def test_a_verdict_over_a_ranking_without_its_hurdle_is_refused() -> None:
     without = tuple(item for item in section_ranking(section) if item.key != hurdle.key)
 
     with pytest.raises(AssertionError, match="does not show its own hurdle"):
-        cli._beats_line(comparison, without)
+        cli._beats_line(
+            comparison, without, section_beats_benchmark(section), section_ties(section)
+        )
 
 
 def test_the_caveat_is_silent_when_every_row_runs_to_the_window() -> None:
@@ -328,15 +345,17 @@ def test_the_caveat_is_silent_when_every_row_runs_to_the_window() -> None:
     assert len({(i.span.end - i.span.start).days for i in to_the_end}) == 1, (
         "the fixture must actually square every span, or the silence proves nothing"
     )
-    assert "RATES HERE SPAN DIFFERENT PERIODS" not in cli._beats_line(squared, to_the_end)
+    assert "RATES HERE SPAN DIFFERENT PERIODS" not in cli._beats_line(squared, to_the_end, (), ())
 
 
 def test_a_tie_with_the_hurdle_is_claimed_only_when_a_printed_row_ties() -> None:
     """A tie group whose only other member is withheld is not a tie the reader can see.
 
-    The same two index spaces as the count beside it: ``ties`` addresses ``comparison.ranked``,
-    the rows come from ``section_ranking``. Asserted by construction rather than by the shipped
-    data, which has no such group today -- so the guard would be unreachable and untested.
+    The same two index spaces as the count beside it: ``Comparison.ties`` addresses
+    ``comparison.ranked``, the rows come from ``section_ranking``. The resolution is
+    ``section_ties``' since 019, so the group is planted on a **section** and read back through
+    it -- asserted by construction rather than by the shipped data, which has no tie today, so
+    the guard would otherwise be unreachable and untested.
     """
     section = next(
         section for section in _answered().sections if isinstance(section.outcome, CandidateSurvey)
@@ -350,16 +369,33 @@ def test_a_tie_with_the_hurdle_is_claimed_only_when_a_printed_row_ties() -> None
         for index, item in enumerate(comparison.ranked)
         if item.key not in {shown.key for shown in ranked}
     )
-    tied_only_with_a_withheld_row = replace(comparison, ties=((comparison.benchmark, withheld),))
-    assert "ties with it" not in cli._beats_line(tied_only_with_a_withheld_row, ranked)
+    only_withheld = _with_ties(section, ((comparison.benchmark, withheld),))
+    assert section_ties(only_withheld) == ()
+    assert "ties with it" not in cli._beats_line(
+        comparison, ranked, section_beats_benchmark(only_withheld), section_ties(only_withheld)
+    )
 
     shown = next(
         index
         for index, item in enumerate(comparison.ranked)
         if index != comparison.benchmark and item.key in {row.key for row in ranked}
     )
-    tied_with_a_printed_row = replace(comparison, ties=((comparison.benchmark, shown),))
-    assert "ties with it" in cli._beats_line(tied_with_a_printed_row, ranked)
+    printed = _with_ties(section, ((comparison.benchmark, shown),))
+    assert len(section_ties(printed)) == 1
+    assert "ties with it" in cli._beats_line(
+        comparison, ranked, section_beats_benchmark(printed), section_ties(printed)
+    )
+
+
+def _with_ties(section: HorizonSection, ties: tuple[tuple[int, ...], ...]) -> HorizonSection:
+    """The same section with a planted tie group, indices and all."""
+    assert isinstance(section.outcome, CandidateSurvey)
+    comparison = section.outcome.comparison
+    assert isinstance(comparison, Comparison)
+    return replace(
+        section,
+        outcome=replace(section.outcome, comparison=replace(comparison, ties=ties)),
+    )
 
 
 BELOW_A_WITHHELD_CANDIDATE = "UA4000238281"
@@ -771,3 +807,226 @@ def test_a_question_naming_an_undeclared_stream_is_refused_before_the_verb_sees_
     printed = capsys.readouterr().out
     assert "salary_eur" in printed, printed
     assert cli.LOAD_FAILED != cli.REFUSED
+
+
+# ---------------------------------------------------------------------------
+# 019 SC-016: the surface renders every population the core computes
+# ---------------------------------------------------------------------------
+#
+# The last two items are the regression this criterion exists for: `Comparison.ties` and
+# `Comparison.beats_benchmark` are computed by the core and, until 019, appeared nowhere in
+# `src/terezy/cli/`. A ranking rendered without its tie groups is the machinery that stops the
+# head of a tied group reading as a winner, computed and withheld from the only person who
+# reads it.
+
+
+def _dominance_block(section: HorizonSection) -> str:
+    return "\n".join(cli._dominance_lines(section))
+
+
+def test_all_three_populations_reach_the_reader() -> None:
+    """FR-029. Two of three would make *every other is dominated* and *every other is not
+    placed* indistinguishable to the one person who reads the output, which is this feature's
+    own defect one level down."""
+    output = "\n".join(_run()[0])
+    for population in ("NON-DOMINATED ", "DOMINATED ", "not placed"):
+        assert population in output, population
+
+
+def test_every_line_names_candidates_rather_than_positions() -> None:
+    """FR-029a. Both of 010's index fields address ``Comparison.ranked``, which 015 FR-030
+    narrows afterwards, so rendering an index would put a withheld figure in front of a reader.
+    """
+    for section in _answered().sections:
+        block = _dominance_block(section)
+        assert block
+        assert fixtures.MILTECH not in block, "a withheld candidate reaches the reader"
+        for key in section.dominance.non_dominated:  # type: ignore[union-attr]
+            assert key.instrument_id in block
+
+
+def test_each_dominated_candidates_dominator_is_named() -> None:
+    output = "\n".join(_run()[0])
+    section = _answered().sections[0]
+    beaten = section.dominance.dominated[0]  # type: ignore[union-attr]
+    assert f"DOMINATED {beaten.key.instrument_id}" in output
+    assert beaten.dominated_by[0].dominates.instrument_id in output
+    assert beaten.dominated_by[0].strictly_better_on[0].value in output
+
+
+def test_the_benchmarks_standing_and_the_objectives_behind_it_are_rendered() -> None:
+    output = "\n".join(_run()[0])
+    assert "THE HURDLE IS DOMINATED" in output
+    assert f"{fixtures.BENCHMARK} from salary_uah" in output
+    assert "objective money_at_the_endpoint more_is_better, band 0.0001" in output
+    assert "objective all_money_back_on less_is_better, band 7 day(s)" in output
+
+
+def test_each_candidates_indistinguishable_neighbours_are_named() -> None:
+    output = "\n".join(_run()[0])
+    close = _answered().sections[0].dominance.indistinguishable  # type: ignore[union-attr]
+    assert close, "nothing is indistinguishable here, so this asserts nothing"
+    for item in close:
+        assert f"INDISTINGUISHABLE {item.key.instrument_id} from salary_uah" in output
+        for neighbour in item.neighbours:
+            assert f"      from {neighbour.instrument_id} from salary_uah" in output
+    assert "never a group" in output, "a relation rendered as a partition"
+
+
+def test_a_tie_group_is_rendered_by_candidate() -> None:
+    """The shipped registry has no tie today, so the group is planted -- and the rendering has
+    to name candidates, because a group of indices says nothing to a reader."""
+    section = _answered().sections[0]
+    assert isinstance(section.outcome, CandidateSurvey)
+    comparison = section.outcome.comparison
+    assert isinstance(comparison, Comparison)
+    assert section_ties(section) == (), "the registry has a tie now; drop the plant"
+    shown = [
+        index
+        for index, item in enumerate(comparison.ranked)
+        if item.key in {row.key for row in section_ranking(section)}
+    ]
+    planted = _with_ties(section, (tuple(shown[:2]),))
+    lines = cli._tie_lines(section_ties(planted))
+    assert lines[0].strip() == "TIED within the project tolerance, in no order:"
+    named = "\n".join(lines[1:])
+    assert len(lines) == 3
+    for index in shown[:2]:
+        assert cli._candidate(comparison.ranked[index].key) in named
+
+
+def test_an_incomparable_pair_and_a_not_placed_candidate_render_differently() -> None:
+    """SC-016's last clause: two sections differing only in whether the rest of the population
+    is dominated or *not placed* must render differently, which is FR-029's requirement rather
+    than FR-014's."""
+    section = _answered().sections[0]
+    planted = dominance_sections.with_no_arrivals(section, "UA4000239016")
+    rebuilt = replace(planted, dominance=dominance_sections.run(planted))
+    block = _dominance_block(rebuilt)
+    assert "NOT PLACED UA4000239016" in block
+    assert "INCOMPARABLE " in block
+    assert "no figure at TupleOutcome.arrivals" in block, (
+        "the pair's own reason is where the missing figure is named, and the NOT PLACED line "
+        "points at those pairs rather than repeating one of them"
+    )
+    assert block != _dominance_block(section)
+
+    crossing = dominance_sections.delivering_dollars(section, ["UA4000239016"])
+    printed = _dominance_block(replace(crossing, dominance=dominance_sections.run(crossing)))
+    assert "delivered in UAH against USD" in printed
+    assert "no exchange rate is consulted" in printed
+
+
+def test_a_refused_pass_says_so_instead_of_printing_an_empty_set() -> None:
+    """FR-026 at the surface: an empty set standing for a failure is what a reader would take
+    as *nothing survived*."""
+    document = _rebenchmarked(fixtures.MILTECH)
+    answered = cli._from_flags(fixtures.SHIPPED_ROOT, [document], as_of=fixtures.AS_OF)
+    assert isinstance(answered.answer, Answer)
+    output = "\n".join(cli.render(answered))
+    assert "NO DOMINANCE SET: BenchmarkWasWithheld" in output
+    assert "NON-DOMINATED" not in output
+
+
+def test_every_refusal_this_pass_can_produce_names_its_reason_in_the_output() -> None:
+    """FR-026 at the surface: *every degraded outcome is a typed result carrying its reason, and
+    the reason surfaces in the output*.
+
+    Asserted over **every** arm of the union rather than over the one the shipped registry
+    happens to reach. The gap this catches shipped once: a refusal whose fields are all `Enum`
+    members rendered as its type name and nothing else, because the field walk read only
+    `str | int | float | date` and an enum is none of them.
+    """
+    for refusal in _every_dominance_refusal():
+        section = replace(_answered().sections[0], dominance=refusal)
+        printed = "\n".join(cli._dominance_lines(section))
+        assert f"NO DOMINANCE SET: {type(refusal).__name__}" in printed
+        fields = [item.name for item in dataclasses.fields(refusal)]
+        assert fields, type(refusal).__name__
+        for name in fields:
+            assert f"    {name} = " in printed, (
+                f"{type(refusal).__name__}.{name} reaches no reader: {printed}"
+            )
+
+
+def _every_dominance_refusal() -> list[DominanceRefused]:
+    """One of each arm, built here because no single registry reaches them all.
+
+    ``NoBenchmarkToStandAgainst`` and ``NoSurveyToRunOver`` are excluded: the first carries a
+    ``reason`` string that is rendered wholesale, and the second carries another record whose
+    own fields a `repr` would flood the reader with -- which is the case `_named_scalars` exists
+    to skip.
+    """
+    hurdle = _answered().sections[0].dominance
+    assert isinstance(hurdle, DominanceResult)
+    return [
+        dominance_records.BenchmarkWasWithheld(
+            key=hurdle.benchmark_standing.key, arrives_on=date(2028, 1, 20)
+        ),
+        dominance_records.BandBelowTheAcyclicityFloor(
+            criterion=Criterion.MONEY_AT_THE_ENDPOINT,
+            declared=FractionOfTheQuestionAmount(proportion=1e-13),
+            resolved=Money(5e-9, Currency.UAH, prov.EMPTY),
+            slack=5e-5,
+            floor=5e-5,
+            objective_count=2,
+        ),
+        dominance_records.NoQuestionAmountInTheCurrencyCompared(
+            criterion=Criterion.MONEY_AT_THE_ENDPOINT, currency=Currency.USD
+        ),
+        dominance_records.SeveralQuestionAmountsInTheCurrencyCompared(
+            criterion=Criterion.MONEY_AT_THE_ENDPOINT,
+            currency=Currency.UAH,
+            stream_ids=("salary_uah", "a_second_uah_stream"),
+            amounts=(
+                Money(50_000.0, Currency.UAH, prov.EMPTY),
+                Money(20_000.0, Currency.UAH, prov.EMPTY),
+            ),
+        ),
+        dominance_records.BandInAnotherCurrency(
+            criterion=Criterion.MONEY_AT_THE_ENDPOINT,
+            declared_in=Currency.UAH,
+            compared_in=Currency.USD,
+        ),
+    ]
+
+
+def test_each_reading_of_why_the_set_holds_what_it_holds_reads_differently() -> None:
+    """FR-014 requires the cases distinguishable **without reading prose** on the record, and
+    FR-029 requires the surface not to collapse them again. Every arm is rendered here because
+    each is a sentence the owner will actually read, and one of them -- ``EveryOtherIsNotPlaced``
+    -- names a state the pass cannot reach and would otherwise never be rendered at all.
+    """
+    sentences = {
+        cli._one_member_line(reading)
+        for reading in (
+            dominance_records.TheSetDoesNotHaveOneMember(members=0),
+            dominance_records.TheSetDoesNotHaveOneMember(members=3),
+            dominance_records.OnlyOneEvaluated(),
+            dominance_records.EveryOtherIsDominated(),
+            dominance_records.EveryOtherIsNotPlaced(),
+            dominance_records.Mixed(dominated=2, not_placed=1),
+        )
+    }
+    assert len(sentences) == 6
+    assert any("THE SET IS EMPTY" in line for line in sentences)
+    assert not any(
+        "best" in line or "winner" in line.replace("not a win", "") for line in sentences
+    )
+
+
+def test_a_set_whose_members_share_every_assumption_says_so_rather_than_listing_nothing() -> None:
+    """FR-020: an empty list is what a reader takes as *nothing separates them*."""
+    printed = cli._separating_lines(dominance_records.NoStatedAssumptionSeparatesThem())
+    assert printed == ["the members rest on the same stated assumptions; none separates them"]
+
+
+def test_a_band_is_rendered_in_the_shape_it_was_declared_in() -> None:
+    """FR-023: *every band, of either criterion, in the form it was declared*. A fraction
+    printed as its resolved width, or an absolute band as a fraction, would be a number the
+    owner did not write."""
+    assert cli._band_words(FractionOfTheQuestionAmount(proportion=0.0001)) == (
+        "0.0001 of the question's amount"
+    )
+    assert cli._band_words(AbsoluteBand(amount=Money(5.0, Currency.UAH, prov.EMPTY))) == "5.0 UAH"
+    assert cli._band_words(DaysBand(days=7)) == "7 day(s)"

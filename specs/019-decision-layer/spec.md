@@ -55,148 +55,109 @@ exists at all, and decides nothing about any figure in it.
 
 ## The measurement
 
-Every count and figure below was read on **2026-09-02** by loading `data/` and answering the
-declared question `fifty-thousand-hryvnia` at `as_of` 2026-09-02, through
-`terezy.api.answer.answer_question` and `terezy.core.decision.answer.section_evaluated`. It is
-reproducible from the repository and from nothing else. Each item was read in **both** states —
-the tree as it stands today, and the tree after the owner's decision, reproduced by deleting the
-four fixture declarations with their access entries and the seed lots that name them, and naming
-`UA4000231195` as the benchmark — and where the two differ the item says so. The registry's own
-counts — instruments, streams, routes, pairs, candidates — are 014's and 015's measurements and
-are **cited rather than copied**.
+**Re-read on 2026-09-06 while implementing, and this section is the only one that moved.** The
+figures below were first measured on 2026-09-02 and 2026-09-03, before two branches landed on
+`main`: the real-only registry, and 022's accrued interest. Both moved the tree this section
+describes, so its counts are re-derived here rather than left standing; every requirement and
+criterion below is unchanged, and the argument they rest on survived the re-measurement. The
+readings are reproducible from the repository and from nothing else, by loading `data/` and
+answering `fifty-thousand-hryvnia` through `terezy.api.answer.answer_question`.
 
-**Items 2, 2a and 6 were re-read on 2026-09-03**, by the same route over the same reproduced
-tree, once the owner's answers made the first reading rest on choices that were not his: items 2
-and 2a now name the benchmark he chose (CL-4) rather than the one they were first measured under,
-and item 6 reports its first row at the bands he declared (CL-2) as well as at none. No figure
-below is carried over from a state an answer changed.
+**What moved, in one line each.** The evaluated population is **21** at every horizon rather
+than 24, because three of the 24 issues were placed too recently for the 2026-08-24 quotation to
+sit in any of their declared coupon periods and refuse by name (022 FR-001). Accrual on both
+legs moved every early-exit figure, so item 3's row changed and items 4 and 4a moved with it.
+**The non-dominated sets did not move at all**: 2, 3 and 10 at one, three and twelve months,
+member for member at his declared bands and at none.
 
-**Two of those readings step outside the two states above, and say so here rather than nowhere.**
-Item 2's tie-swap is a **third** state — the same tree with `UA4000239016` named instead — because
-a claim about what naming an issue moves cannot be measured from one naming. And every Pareto
-count in item 6, at a band or at none, comes from a **hand-written pass over `section_evaluated`**
-and not from the engine: nothing in `src/` computes a non-dominated set, which is the whole of
-why this feature exists. That pass implements FR-007 — the band in the **strict** half only, the
-project comparison in the weak one. Measured 2026-09-03, **the definition FR-007 rejects produces
-every count in item 6 unchanged**, at a band and at none, so the table cannot be read as evidence
-for FR-007's choice: what separates the two definitions is FR-007's own 400 000-draw battery, and
-a registry of 24 candidates two objectives apart is exactly the case that battery found they
-agree on.
+**1. What the fixtures' departure cost.** Nothing, on the tree as it now stands: the four ОВДП
+fixtures are in `tests/fixtures/data/` and the shipped registry declares 24 real issues and two
+funds. Of the 26 candidates each section enumerates, **21** produce an evaluated outcome the
+section reports, at every horizon — 24 issues less the three that refuse, plus `inzhur_reit`,
+which refuses because it sizes its payouts in USD and pays them in UAH, plus `inzhur_miltech`,
+which is evaluated and then withheld under 015 FR-030.
 
-**1. What the fixtures' departure costs.** Of the four ОВДП fixtures carrying the `ovdp` label,
-exactly **one** — `ovdp_enumerated_a` — ever produces an evaluated outcome for this question,
-and only at the twelve-month horizon. So the evaluated population goes from **24, 24, 25** to
-**24, 24, 24** across the three horizons, and at one and three months it does not move at all.
-
-**2. What the benchmark's departure costs: almost nothing, and the exception is worth naming.**
-Answering the same question with a declared issue named as the benchmark turns each section's
-`BenchmarkUnavailable` into a `Comparison` over **the same outcomes**: every candidate's amount
-and rate is unchanged. Which issue is named decides `beats_benchmark` and, for one issue in this
-registry, the order of two rows: `compare` prepends the benchmark and the rate sort is stable, so
-naming a candidate whose rate is **bitwise equal** to another's moves it ahead of that other.
-Bitwise, not tied: `tied_groups` groups by `is_close`, so most tie-group members would not move,
-and this pair happens to carry the identical float. Measured 2026-09-03: with
-`UA4000239016` named, it and `UA4000238281` exchange the 0-based **positions** 7 and 8 of `ranked`
-at one month and 15 and 16 at three, and nothing moves at twelve, where nothing ties. Those are
-indices, not the counts above them. The owner's
-`UA4000231195` is in no tie group (item 4), so for his choice no figure and no order moves. **That
-an arbitrary naming decides an order is a defect in 010's ranking rule, which this feature carries
-unchanged and therefore does not fix**; it is recorded as the
-`naming-the-benchmark-reorders-a-bitwise-tie` future entry, with the remedy that is not this
-feature's to make.
-
-With `UA4000231195` named (CL-4), **14, 19 and 24** entries of `Comparison.ranked` beat the
-hurdle at one, three and twelve months — the last of which is **every other entry of `ranked`**,
-`ranked` holding 25. Of the section's own candidates it is 23, which is item 2a's whole point and
-is not the same number.
+**2. What the benchmark's departure cost: still almost nothing.** With `UA4000231195` named
+(CL-4) every section produces a `Comparison`, and **11, 5 and 12** entries of
+`Comparison.ranked` beat the hurdle at one, three and twelve months.
 
 **2a. And one of those entries is a candidate the section refuses to report.** `beats_benchmark`
-and `ties` are **indices into `Comparison.ranked`**, and `ranked` is the population 014 handed to
-`compare` — which 015 FR-030 then narrows, withholding a candidate whose money arrives after the
-window. Measured: `inzhur_miltech` is inside `beats_benchmark` at **all three** horizons, so of
-the candidates the section actually reports, **13, 18 and 23** beat the hurdle. An index into a
-sequence somebody else narrowed is the defect FR-029a exists to stop reaching a reader.
+is an **index into `Comparison.ranked`**, which 015 FR-030 narrows afterwards. Measured,
+`inzhur_miltech` is inside it at **all three** horizons, so of the candidates the section
+actually reports, **10, 4 and 11** beat the hurdle. An index into a sequence somebody else
+narrowed is the defect FR-029a exists to stop reaching a reader.
 
 **3. Ordering by the rate is not ordering by the money, at any of the three horizons.** The
-sharpest case is twelve months, and it is the whole argument of this feature in one row:
+sharpest case is still twelve months:
 
 | At 2026-09-01 → 2027-09-01 | reaches the endpoint | rate | money all back on |
 |---|---|---|---|
-| the rate's **first** place, `UA4000235865` | **49 760.50 UAH** — the least of them all | +19.79% | 2026-09-19 |
-| the money's first place, `UA4000237556` | 57 846.38 UAH | +17.30% | 2027-09-04 |
+| the rate's **first** place, `UA4000236475` | 56 728.04 UAH | +17.69% | 2027-09-04 |
+| the money's first place, `UA4000235782` | **57 756.27 UAH** | +17.37% | 2027-09-04 |
 
-Every other evaluated candidate in that section reaches at least **50 842.25 UAH**, so the
-candidate the rate ranks first is last by the money that comes back. The rate is not wrong: it is
-a money-weighted return over the days the money was actually invested (010 FR-015), and
-`UA4000235865` matures **fifteen** days after the window opens — its final coupon and principal
-both fall on 2026-09-16 — with the proceeds reaching a spendable endpoint three days later, so
-the rate is measured over an eighteen-day span and a small gain over eighteen days annualises
-high. What it is not is an answer to *which of these leaves
-me best off in a year*: the proceeds then sit as cash to 2027-09-01 under the question's own
-declared continuation assumption, earning nothing, and a further **680.64 UAH** never left the
-buying venue as undeployed cash. **A ranking by that one figure puts the option that comes back
-with the least money at the head of the list.**
+**The row is weaker than it was and the argument is not.** Before the accrual fix the rate's
+first place was `UA4000235865`, which came back with the **least** money of them all; it is now
+last by the money at three and twelve months and no longer heads the ranking, so the gap the
+table shows is 1 028.23 UAH rather than the whole spread. What has not changed is that the two
+orderings disagree at every horizon, that the disagreement is systematic rather than accidental
+— a rate is measured over the days the money was actually invested, and a candidate whose terms
+end inside the window is annualised over a shorter span while its proceeds sit as cash under the
+question's own continuation assumption — and that **a ranking by that one figure does not put
+the option that leaves him best off at the head of the list.**
 
-**4. Ties are computed and never reach a reader.** At one month exactly two candidates —
-`UA4000238281` and `UA4000239016` — carry rates equal within the project tolerance, and
-`Comparison.ties` reports them as one tied group; the same two tie at three months, and no two
-tie at twelve. **On the tree as it stands today not even that is computed**, because a section
-with no benchmark produces a `BenchmarkUnavailable`, which has no tie field at all — so the tie
-rule arrives with the owner's decision. And it arrives invisible: `Comparison.ties` and
-`Comparison.beats_benchmark` appear **nowhere** in `src/terezy/cli/`, so the machinery that keeps
-the head of a tied group from reading as a winner is computed by the core and never rendered at
-the only surface a person reads.
+**4. There are no ties left to report, and that is a finding rather than a relief.** At the
+first measurement two candidates carried rates equal within the project tolerance at one and
+three months. After the accrual fix **no two rates tie at any horizon**, so
+`Comparison.ties` is empty in every section. The machinery is unchanged and unrendered until
+FR-029 lands; what the shipped registry no longer supplies is an example of it, which is why
+SC-016's tie-group case is asserted on a planted group rather than on the data.
 
-**4a. And the only notion of closeness in the engine is the width of float rounding.** The
-project tolerance is `1e-9`, defined once, and it exists so a hand-computed schedule and a
-machine-computed one can agree (Principle IV). **Nothing anywhere says two figures are too close
+**4a. And the only notion of closeness in the engine is still the width of float rounding.**
+The project tolerance is `1e-9`, defined once. **Nothing anywhere says two figures are too close
 to distinguish**, so any real difference separates two candidates: the closest pair by what
-reaches the endpoint is **6.39 UAH** apart at one month on an outlay of 50 000, and the closest
-non-tied pair by rate is **0.003 percentage points** apart at twelve months. Both differences are
-smaller than anything these inputs look able to support, and both would decide a dominance
-verdict — CL-2 is where that judgement stops being this document's and becomes the owner's. In the
-other direction, at three and twelve months `UA4000236624` and `UA4000237416` reach **exactly**
-the same amount and are separated only by the date the money is back — 2026-10-17 against
-2026-11-21.
+reaches the endpoint is now **2.13 UAH** apart at one month on an outlay of 50 000, and **0.21
+UAH** at three. Both are *narrower* than the 5.00 UAH his own band resolves to (CL-2), which the
+first measurement's 6.39 UAH was not — so his band now does something on this registry: measured,
+it makes two pairs at one month indistinguishable (`UA4000234413` with `UA4000237416`, and
+`UA4000235782` with `UA4000237804`) and **still leaves the non-dominated sets exactly where they
+were**. In the other direction, at three and twelve months two candidates reach **exactly** the
+same amount and are separated only by the date the money is back.
 
 **5. The candidates in one section do not all account for the same things.** At one month,
-**23** of the 24 evaluated candidates are sold at the window's end and **one** — `UA4000235865` —
-matures inside it. The section carries **69** stated exclusions, three per early-exit candidate
-(015 FR-033), and **none** for that one. `TupleOutcome.accounts_for` and `TupleOutcome.excludes`
-are identical across all 24, so the asymmetry is visible only in the section's exclusion
-records — and the one candidate carrying no early-exit exclusion is a member of every
-non-dominated set computed below.
+**20** of the 21 evaluated candidates are sold at the window's end and **one** —
+`UA4000235865` — matures inside it. The section carries **81** stated exclusions: three per
+early-exit candidate (015 FR-033) and one per candidate whose price was carried from a dated
+quotation (022 FR-018), which is every one of the 21. `TupleOutcome.accounts_for` and
+`TupleOutcome.excludes` are identical across all 21, so the asymmetry is visible only in the
+section's exclusion records — and the one candidate carrying no early-exit exclusion is a member
+of every non-dominated set computed below.
 
-**6. What a Pareto pass over the record would produce today**, computed from `section_evaluated`
-over the shipped registry — a measurement of the record, not a shipped behaviour, because nothing
-in `src/` computes this yet — on two objective pairs, of which the **first** is the one the owner
-went on to declare (CL-1) and the second is the alternative a reader is most likely to propose:
+**6. What a Pareto pass over the record produces**, on two objective pairs, of which the
+**first** is the one the owner declared (CL-1) and the second is the alternative a reader is
+most likely to propose:
 
 | Objectives | 1 month | 3 months | 12 months |
 |---|---|---|---|
 | money at the endpoint (max), money all back (min) | 2 | 3 | 10 |
-| the rate (max), money all back (min) | 2 | 2 | **1** |
+| the rate (max), money all back (min) | 2 | 4 | 8 |
 
-Every one of those six counts is the same in both states: the fixtures' departure removes
-`ovdp_enumerated_a` from the twelve-month population and it was in neither front. The second pair
-produces, at twelve months, a **single dominating candidate** — and it is `UA4000235865`, the one
-from item 3 that comes back with the least money. A one-member
-non-dominated set is a winner by another name, arrived at without a weight and without anyone
-choosing one. **Which objectives the pass runs over is therefore not a detail of the
-implementation; it is the decision** — and CL-1 takes the **first** row, so those three counts are
-the owner's own sets rather than an illustration.
+The first row is **unchanged** from the first measurement, member for member, and is unchanged
+again when re-run at the bands he declared — 5.00 UAH on the money and 7 days on the date. It is
+no longer a hand-written pass: it is `HorizonSection.dominance`, which is what this feature
+built.
 
-The table is computed at **no** indifference band. Re-run at the ones he declared — 5.00 UAH on
-the money, 7 days on the date (CL-2) — the first row is **unchanged at 2, 3 and 10**, member for
-member. His bands move nothing on this registry, which is the honest thing to know about them:
-they are the floor under a *later* registry whose candidates sit closer together, not a
-correction to this one.
+The second row moved (it was 2, 2 and 1) and the argument it carried moved with it. **At the
+first measurement it produced a single dominating candidate at twelve months, and that candidate
+was the one that came back with the least money** — a one-member non-dominated set is a winner by
+another name, arrived at without a weight and without anyone choosing one. It now produces eight,
+so the illustration is gone; **the decision it illustrated is not**, and CL-1 was taken before
+the accrual fix landed. Which objectives the pass runs over is still not a detail of the
+implementation, and the first row is still the owner's own set rather than an illustration.
 
-**7. Every figure in every one of these sections is marked.** The answer reports the count of
-unverified sources behind its figures — **137** on the tree as it stands, **129** once the four
-fixtures leave — and 016 settled why the mark itself cannot be cleared: the price is a seller's
-quotation and nobody can verify it. A dominance verdict computed over marked figures is a marked
-verdict.
+**7. Every figure in every one of these sections is marked.** The answer reports **148**
+unverified sources behind its figures, and 016 settled why the mark itself cannot be cleared: the
+price is a seller's quotation and nobody can verify it. A dominance verdict computed over marked
+figures is a marked verdict, and measured, every verdict this feature produces is marked.
 
 ## What dominance is here, and the trap inside it
 

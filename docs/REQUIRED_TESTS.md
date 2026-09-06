@@ -142,7 +142,7 @@ Compliance tests for Principle II. May not be skipped without an amendment.
 | # | Example | Test |
 |---|---|---|
 | I1 | Feasibility pruning drops infeasible candidates with a recorded reason, and the count of dropped candidates is reported. **Closed at the tuple level**, which is the level `SIMULATOR_SPEC.md` §4.3.4's feasibility list is written at. §4.10.2's *allocation* candidates are a second population, pruned again under a rule feature 014 does not build (its *The one place the framing genuinely breaks*): monthly capacity is a shared rail resource, so two candidates each feasible alone can be jointly infeasible the moment a strategy holds both. Do not read this row as covering that. | `[x]` `tests/unit/test_seventeen_refusals_through_the_loop.py`, `tests/worked_examples/test_candidate_accounting.py`, `tests/unit/test_drop_tally.py` |
-| I2 | Two objectives over the same candidate set produce different rankings, and each run's manifest records which objective was used. | `[ ]` |
+| I2 | Two objectives over the same candidate set produce different rankings, and each run's manifest records which objective was used. **Closed by feature 019.** The row's word *rankings* is read as *the answers the objectives produce*: this feature's answer is a partial order rather than a list, and the two halves are asserted together because an objective that changes the answer without being recorded is a run nobody can reproduce. The pair of objective sets is a **chosen** one — the money alone is a total order and picks one member where the money and the date pick several — because two sets may honestly agree and any pair would prove nothing. | `[x]` `tests/worked_examples/test_two_objective_sets_disagree.py` |
 | I3 | A binding constraint reports a non-zero shadow cost; a non-binding one reports zero. | `[ ]` |
 | I4 | The naive baseline (100% OVDP; 50/50 OVDP + VWCE) is always scored and always shown, and a synthetic case where nothing beats it produces the honest verdict. | `[ ]` |
 | I5 | Stability: perturbing one assumed input by 1% must not silently change the top recommendation; if the ranking flips, the run is labelled unstable. | `[ ]` |
@@ -336,6 +336,21 @@ Four rows it presses on without closing:
 | **J4** | Touched on 014's terms, unchanged. What moved is the *other* horizon interaction: a bond outliving its window is now sold at the window's end rather than refused, so `CannotSpanHorizon` narrows to the fund arm. A declared `lock_up_months` term compared against a horizon still does not exist. |
 | **E5** | Pressed on one layer up: an answer carries the union of the marks on every declaration behind every figure it reports, walked over the whole result rather than sampled (`tests/contract/test_the_answer_says_only_what_it_computed.py`). Every figure computed through the early-exit belief names it by id. The per-drop half is still open — 010's refusal records carry no provenance — and is still the `provenance-on-a-refusal` future entry. |
 | **B12** | The shape again, one layer above 014's: an answer adds no feasibility rule, no objective and no scoring weight. Its two own rules withhold and report rather than prune, and a scan asserts its modules derive no rate and read none from a series. |
+
+**019-decision-layer** closes **I2** — see its row — and moves Section I from 1 of 7 to **2 of
+7**. The dominance step itself closes no row and none was invented for it: no lettered behaviour
+in this file names a non-dominated set, because the sources it is derived from predate the
+framing, and a row written by the feature that flips it proves nothing (013's precedent). What is
+worth recording instead is that Section I's remaining rows are now blocked on **named things**
+rather than on the decision layer not existing:
+
+| Row | What it is blocked on now |
+| --- | --- |
+| **I3** | There are **no constraints**. A shadow cost is *what the best feasible strategy gave up*, which needs an optimum and a feasible region, and 019 computes neither: its verdicts remove no option, which is the whole of FR-009. |
+| **I4** | Half is structural already — the hurdle is inside the population and its standing is reported, including *nothing dominates the hurdle* — and the two things still missing are 015's: the cash instrument does not exist and is an owner verification task, and `50/50 OVDP + VWCE` is an **allocation** over candidates, which nothing here can represent. |
+| **I5** | Deliberately not attempted, and 019 FR-021 is where the boundary bites: naming the assumption that *decides* between two members is the same computation as re-ranking under a perturbed input, and needs a per-assumption perturbation policy nobody has declared. What 019 supplies is the input — the assumptions the members do not share. |
+| **I6** | **The nearest miss, and the box does not move.** I6's own words are *a range of allocations scores within noise* and *no allocation is ever reported to sub-percent precision*: it is written over **allocations**, and there are none. 019 builds the same rule one level down, over candidates, and this row is **reinforced rather than covered** — do not later read it as closed. |
+| **I7** | Needs a candidate scored under several **scenarios**, and a question declares one regime. What 019 contributes is the shape: dominance inside a scenario is what *sometimes best* and *never bad* are computed over. |
 
 **018-nbu-rate-series** closes **no** row and moves two notes. It lands data, not behaviour:
 the National Bank's published UAH/USD rate for every calendar day from 2019-12-28, plus the

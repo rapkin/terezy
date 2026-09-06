@@ -65,6 +65,7 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.results.composed import SegmentBound
     from terezy.core.results.coverage import SpendableEndpoint
     from terezy.core.results.goal import Goal
+    from terezy.core.results.objectives import ObjectiveSet
     from terezy.core.results.question import Question
     from terezy.core.routes.channels import FxChannel
     from terezy.core.routes.legs import Leg, Route
@@ -3253,6 +3254,80 @@ def _check_treatment(
 
 
 # ---------------------------------------------------------------------------
+# 019-decision-layer: the objectives a dominance pass runs over
+# ---------------------------------------------------------------------------
+#
+# `candidates/`'s reading of a per-owner policy directory, with one difference: there may be
+# SEVERAL objective sets, because required test I2 needs two of them to exist at once and be
+# named by two questions. So an empty directory refuses and a duplicate id refuses, but more
+# than one file does not.
+
+OBJECTIVES_DIR = "objectives"
+"""Where the owner's declared objective sets live under a data root. Per-owner, beside
+`questions/`: what he compares on is a statement about him (Principle VII, FR-004)."""
+
+
+def _check_objectives_owner(
+    declared: ObjectiveSet,
+    streams: Mapping[str, IncomeStream],
+    *,
+    path: Path,
+) -> None:
+    """The set must belong to the owner whose streams it is resolved with (Principle VII)."""
+    owners = sorted({stream.owner_id for stream in streams.values()})
+    if declared.owner_id not in owners:
+        raise DeclarationError(
+            path,
+            f"{loader.OWNER_TABLE}.id",
+            f"declares owner {declared.owner_id!r}, but the income streams this objective set "
+            f"is resolved with belong to {owners}. How much precision a person believes his "
+            "inputs support is a statement about him, and answering under somebody else's "
+            "bands would report one man's indifference over another man's money.",
+            f"name one of {owners}, or resolve this set against that owner's streams",
+        )
+
+
+def resolve_objective_sets(
+    root: Path, streams: Mapping[str, IncomeStream]
+) -> tuple[dict[str, ObjectiveSet], dict[str, Path]]:
+    """Every declared objective set under one data root, by its own id.
+
+    **An empty directory is an error, not an absent policy** (FR-001). There is no default set:
+    reading the absence of the file as *compare on everything* or *compare on the money* would
+    make a forgotten line a chosen criterion, which is the one thing this declaration exists to
+    prevent.
+    """
+    declared = sorted((root / OBJECTIVES_DIR).glob("*.toml"))
+    if not declared:
+        raise DeclarationError(
+            root / OBJECTIVES_DIR,
+            "",
+            f"contains no *.toml declarations. An empty {OBJECTIVES_DIR} directory is reported "
+            "rather than read as a default set of criteria: FR-001 refuses a default, and which "
+            "criteria a comparison is taken over is the decision itself rather than a detail of "
+            "it. A run that quietly compared on one figure would present the ranked head of a "
+            "list as a winner, which is what the dominance pass exists to refuse.",
+            "declare the criteria, directions and indifference bands one answer is taken over",
+        )
+    resolved: dict[str, ObjectiveSet] = {}
+    declaring: dict[str, Path] = {}
+    for path in declared:
+        objectives = loader.objectives_from_file(path)
+        if objectives.id in resolved:
+            raise _refuse_duplicate(
+                "objective set",
+                objectives.id,
+                f"{loader.OBJECTIVES_TABLE}.id",
+                declaring[objectives.id],
+                path,
+            )
+        _check_objectives_owner(objectives, streams, path=path)
+        resolved[objectives.id] = objectives
+        declaring[objectives.id] = path
+    return resolved, declaring
+
+
+# ---------------------------------------------------------------------------
 # 015-the-question: the questions, and the bundle one verb takes
 # ---------------------------------------------------------------------------
 #
@@ -3293,12 +3368,20 @@ class AnswerDeclarations:
     question_files: Mapping[str, Path]
     """Which file declared each question, so the manifest can name it after the TOML is gone."""
 
+    objective_sets: Mapping[str, ObjectiveSet]
+    """Every declared objective set by its own id (019 FR-001). Several, because I2 needs two
+    to exist at once and be named by two questions."""
+
+    objective_set_files: Mapping[str, Path]
+    """Which file declared each set, so the manifest records which one produced an answer."""
+
 
 def check_question(
     question: Question,
     streams: Mapping[str, IncomeStream],
     *,
     path: Path,
+    objective_sets: Mapping[str, ObjectiveSet],
 ) -> None:
     """One question against the streams it names and the streams it does not.
 
@@ -3310,6 +3393,16 @@ def check_question(
     A question that reached here through a file is checked twice, once at load and once at the
     verb, and that is the cost of the guarantee: the second call cannot know which it got.
     """
+    if question.objective_set_id not in objective_sets:
+        raise DeclarationError(
+            path,
+            f"{loader.QUESTION_TABLE}.objectives",
+            f"names the objective set {question.objective_set_id!r}, which no declaration under "
+            f"{OBJECTIVES_DIR}/ declares. Declared sets: {sorted(objective_sets)}. A question "
+            "answered under criteria nobody declared would take its dominance verdicts over a "
+            "set the file does not name, and there is no default (019 FR-001a).",
+            f"name one of {sorted(objective_sets)}, or declare the set you meant",
+        )
     owners = sorted({stream.owner_id for stream in streams.values()})
     if question.owner_id not in owners:
         raise DeclarationError(
@@ -3373,6 +3466,7 @@ def answer_from_data_root(
     candidates = candidates_from_data_root(
         root, base_currency=base_currency, scenario_id=scenario_id
     )
+    objective_sets, objective_files = resolve_objective_sets(root, tuples.registries.streams)
     questions: dict[str, Question] = {}
     declaring: dict[str, Path] = {}
     for path in files:
@@ -3385,7 +3479,12 @@ def answer_from_data_root(
                 declaring[declared.id],
                 path,
             )
-        check_question(declared, tuples.registries.streams, path=path)
+        check_question(
+            declared,
+            tuples.registries.streams,
+            path=path,
+            objective_sets=objective_sets,
+        )
         questions[declared.id] = declared
         declaring[declared.id] = path
     return AnswerDeclarations(
@@ -3393,6 +3492,8 @@ def answer_from_data_root(
         candidates=candidates,
         questions=questions,
         question_files=declaring,
+        objective_sets=objective_sets,
+        objective_set_files=objective_files,
     )
 
 

@@ -193,12 +193,18 @@ def test_the_route_set_is_the_one_the_named_regime_declares(tmp_path: Path) -> N
         root, base_currency=Currency.UAH, scenario_id="war_end"
     )
     for regime_id in ("wartime", "normalized"):
-        supplied = inputs_of(declarations, regime_id=regime_id)
+        supplied = inputs_of(
+            declarations, regime_id=regime_id, objective_set_id=fixtures.OBJECTIVE_SET
+        )
         assert set(supplied.routes) == set(
             declarations.candidates.composition.coverage.regimes[regime_id].route_ids
         )
-    assert set(inputs_of(declarations, regime_id="wartime").routes) < set(
-        inputs_of(declarations, regime_id="normalized").routes
+    assert set(
+        inputs_of(declarations, regime_id="wartime", objective_set_id=fixtures.OBJECTIVE_SET).routes
+    ) < set(
+        inputs_of(
+            declarations, regime_id="normalized", objective_set_id=fixtures.OBJECTIVE_SET
+        ).routes
     ), "the fixture must use two regimes that actually differ"
 
 

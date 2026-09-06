@@ -1,0 +1,25 @@
+# A second objective set, and the ONLY reason it exists is required test I2: two objectives over
+# one candidate set must produce different answers, and each run's manifest must record which
+# was used. One declared set cannot show that.
+#
+# It is the money and nothing else, which is the option the owner declined (CL-1, option C).
+# That is what makes it a *disagreeing* pair rather than any pair: the money alone is a TOTAL
+# order over the candidates, so its non-dominated set has one member at every horizon, while the
+# money and the date together pick several. Two sets that honestly agreed would satisfy the
+# letter of I2 and prove nothing.
+#
+# The band is his own, in his own shape, so the difference between the two answers is the
+# criterion set and not the width.
+
+[owner]
+id = "owner-001"
+
+[objective_set]
+id = "money-alone"
+
+  [[objective_set.objective]]
+  criterion = "money_at_the_endpoint"
+  direction = "more_is_better"
+
+    [objective_set.objective.band]
+    fraction_of_the_question_amount = 0.0001

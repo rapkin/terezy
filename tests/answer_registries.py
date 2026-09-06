@@ -46,6 +46,17 @@ AS_OF: Final = date(2026, 8, 30)
 """The day the owner asked. Decides staleness and nothing else."""
 
 OWNERS_QUESTION: Final = "fifty-thousand-hryvnia"
+MONEY_ALONE: Final = "money-alone"
+"""The fixture-only second set: the money and nothing else, which is a total order. It exists
+so required test I2 has two objective sets that DISAGREE rather than merely two."""
+
+BY_THE_MONEY: Final = "fifty-thousand-hryvnia-by-the-money"
+"""The fixture-only question that names it, differing from his in that one field."""
+
+OBJECTIVE_SET: Final = "money-and-when"
+"""The set his question names: the money that reaches an endpoint, and the date all of it is
+back (019 CL-1), at his declared bands (CL-2)."""
+
 BENCHMARK: Final = "UA4000231195"
 OVDP: Final = "ovdp"
 INZHUR: Final = "inzhur"
@@ -71,6 +82,7 @@ def inputs(declared: resolver.AnswerDeclarations | None = None) -> AnswerInputs:
         groups=resolved.tuples.instruments.groups,
         bound=resolved.candidates.composition.bound,
         ceiling=resolved.candidates.ceiling,
+        objectives=resolved.objective_sets[OBJECTIVE_SET],
     )
 
 
