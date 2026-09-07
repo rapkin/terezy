@@ -1046,11 +1046,25 @@ def test_a_band_is_rendered_in_the_shape_it_was_declared_in() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _held_answer() -> Answer:
-    """The composed root, which is the only one carrying a held asset with a lot and a price."""
+HELD_FIXTURE = "synthetic_held_x"
+"""The only held asset with both a lot and a fetched price. His own `btc` ships no observation
+file, so a suite about what a PRICED position renders has to name this one."""
+
+
+def _held_answer(root: Path = fixtures.DATA_ROOT) -> Answer:
+    """The composed root, which is the only one carrying a held asset with a lot and a price.
+
+    Asking about the fixture asset by name, because a position is reported only for an asset
+    the question named (025 FR-030).
+    """
+    question = fixtures.owners_question()
+    named = (fixtures.OVDP, HELD_FIXTURE)
     run: Any = answer_declared(
-        fixtures.owners_question(),
-        fixtures.DATA_ROOT,
+        fixtures.with_plans(
+            fixtures.with_subjects(question, *named),
+            {word: plan for word, plan in question.plans.items() if word in named},
+        ),
+        root,
         as_of=fixtures.AS_OF,
         base_currency=Currency.UAH,
         declared_in=fixtures.QUESTION_FILE,
@@ -1066,7 +1080,7 @@ def test_the_held_section_prints_every_figure_and_every_refusal() -> None:
     no fact (015 FR-020a), so every reason below is carried verbatim from the core.
     """
     result = _held_answer()
-    position = next(item for item in result.held if item.instrument_id == "synthetic_held_x")
+    position = next(item for item in result.held if item.instrument_id == HELD_FIXTURE)
     assert isinstance(position.valuation, Valued)
     printed = "\n".join(cli._held_lines(result))
 
@@ -1082,7 +1096,7 @@ def test_the_held_section_prints_every_figure_and_every_refusal() -> None:
 def test_the_belief_every_dollar_figure_rests_on_is_printed_beside_it() -> None:
     """FR-023: the assumption is visible wherever it acted, in its own declared words."""
     result = _held_answer()
-    position = next(item for item in result.held if item.instrument_id == "synthetic_held_x")
+    position = next(item for item in result.held if item.instrument_id == HELD_FIXTURE)
     assert isinstance(position.valuation, Valued)
     assert position.valuation.assumption is not None
     printed = "\n".join(cli._held_lines(result))
@@ -1095,16 +1109,10 @@ def test_a_refused_valuation_prints_the_refusal_and_never_a_blank(tmp_path: Path
     root = tmp_path / "data"
     shutil.copytree(fixtures.DATA_ROOT, root)
     (root / "observations" / "binance_synthusdt.toml").unlink()
-    run: Any = answer_declared(
-        fixtures.owners_question(),
-        root,
-        as_of=fixtures.AS_OF,
-        base_currency=Currency.UAH,
-        declared_in=fixtures.QUESTION_FILE,
-    )
-    position = next(item for item in run.answer.held if item.instrument_id == "synthetic_held_x")
+    answer = _held_answer(root)
+    position = next(item for item in answer.held if item.instrument_id == HELD_FIXTURE)
     assert isinstance(position.valuation, NoQuotationOnDate)
-    printed = "\n".join(cli._held_lines(run.answer))
+    printed = "\n".join(cli._held_lines(answer))
     assert f"value: REFUSED -- {position.valuation.reason}" in printed
     assert "cost:" in printed, "the refusal on one figure suppresses none of the others"
 

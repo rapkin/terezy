@@ -3252,9 +3252,39 @@ def held_asset_from_file(path: Path) -> HeldAssetDeclaration:
             "the venue's own ticker is what the fetched price series is written under, and "
             "deriving it from the id would make a second venue's ticker an engine edit",
         ),
+        quote_asset=_quote_asset(path, table, field_prefix=prefix),
         is_synthetic=table.is_synthetic,
         tax_classes=_held_tax_classes(path, table.tax_classes, field_prefix=f"{prefix}"),
         groups=_group_labels(path, f"{prefix}.groups", table.groups),
+    )
+
+
+def _quote_asset(path: Path, table: schema.HeldAssetTable, *, field_prefix: str) -> str:
+    """What the declared symbol is priced in, checked against the symbol rather than read off it.
+
+    The check is the point. Nothing may infer the split -- a ticker publishes none -- so the
+    declaration states it; but a declaration that states a quote asset its own symbol does not
+    end in has one of the two fields wrong, and that is visible from this file alone. Left
+    unchecked, ``symbol = "BTCUSDT"`` beside ``quote_asset = "USD"`` would price the position
+    in dollars against a token quotation and never say so.
+    """
+    declared = _require_text(
+        path,
+        f"{field_prefix}.quote_asset",
+        table.quote_asset,
+        "what a symbol is priced in cannot be read off the symbol -- a ticker publishes no "
+        "split -- so the declaration states it (025 FR-023)",
+    )
+    symbol = _require_text(path, f"{field_prefix}.symbol", table.symbol, "a ticker is required")
+    if symbol.casefold().endswith(declared.casefold()):
+        return declared
+    raise DeclarationError(
+        path,
+        f"{field_prefix}.quote_asset",
+        f"declares {declared!r}, and the symbol {symbol!r} does not end in it. One of the two "
+        "is wrong, and which cannot be settled from outside this file: nothing may split a "
+        "ticker, so the pair is checked against itself instead.",
+        f"correct whichever of symbol and quote_asset is wrong for {symbol!r}",
     )
 
 

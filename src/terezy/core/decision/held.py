@@ -241,29 +241,29 @@ class _Priced:
 def _speaks_for(asset: HeldAssetDeclaration, belief: QuoteAssetIsWorth | None) -> _Priced | None:
     """Whether this asset's close may be read as money, and on whose say-so (025 FR-023).
 
-    Two ways it may. The symbol may already be quoted **in the asset's own currency**, in which
-    case there is no token between the two and no belief is leaned on -- a close in ``XAUUAH``
-    for an asset declaring ``UAH`` needs nobody's permission to be hryvnia. Or a declared
-    belief may say that the token the symbol ends in equals that currency.
+    Two ways it may, and both are settled by **exact equality against the declared quote
+    asset** rather than by looking at the symbol. The asset may be quoted in its own currency
+    already, in which case no token stands between the two and no belief is leaned on; or a
+    declared belief may say that its quote asset equals that currency.
+
+    **Nothing here matches a tail.** ``endswith`` on the currency code says yes to ``FDUSD``,
+    ``TUSD``, ``BUSD`` and ``USD1`` -- all of them things Binance quotes in -- so an asset
+    priced against one of those would be read as dollar-quoted, valued in dollars, and reported
+    as leaning on no peg at all while resting entirely on that token's. The split is declared
+    and checked at load instead, which is the same rule that keeps the fetcher from splitting a
+    ticker.
 
     **The belief is checked against this asset rather than applied to every one.** There is one
     belief per root and there may be many held assets; applying it unconditionally would tag a
     hryvnia-priced asset's value in dollars and then subtract a hryvnia basis from it, which is
-    wrong by the whole exchange rate and reads as a labelled figure. That is the silent
-    equality FR-023 refuses, arriving through the asset instead of through an absent belief.
-
-    Matching is on the symbol's **tail** because that is all a symbol says: klines publishes no
-    base and no quote asset, and this engine may not split ``BTCUSDT`` -- but it can ask
-    whether the symbol ends in the token a belief is about, which is a question the declaration
-    answers rather than a judgement.
+    wrong by the whole exchange rate and reads as a labelled figure.
     """
-    symbol = asset.symbol.casefold()
-    if symbol.endswith(asset.price_currency.value.casefold()):
+    if asset.quote_asset.casefold() == asset.price_currency.value.casefold():
         return _Priced(belief=None)
     if (
         belief is not None
         and belief.currency == asset.price_currency.value
-        and symbol.endswith(belief.quote_asset.casefold())
+        and belief.quote_asset.casefold() == asset.quote_asset.casefold()
     ):
         return _Priced(belief=belief)
     return None

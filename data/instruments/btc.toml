@@ -21,9 +21,14 @@
 # — and until he does, this position reports its quantity and its cost and REFUSES its value by
 # name, naming the date it had no row for.
 #
-# **`symbol` is declared and never derived from the id.** An instrument id is the owner's word
-# for a thing and a ticker is the venue's; inferring one from the other would make a second
-# venue's different ticker an engine edit rather than a data change.
+# **`symbol` and `quote_asset` are both declared, and neither is derived.** An instrument id is
+# the owner's word for a thing and a ticker is the venue's, so inferring one from the other
+# would make a second venue's ticker an engine edit. And a ticker publishes no SPLIT: `BTCUSDT`
+# could be BTC/USDT or BTCU/SDT and klines says nothing either way, so what it is priced in is
+# stated here rather than read off its tail. Reading the tail is not merely imprecise — Binance
+# also quotes in FDUSD, TUSD, BUSD and USD1, every one of which ends in the dollar's own code,
+# so a symbol priced against one of those would read as dollar-quoted and the whole figure
+# would silently rest on a peg nobody named. The loader checks the two against each other.
 #
 # **THE TAX CLASS IS DELIBERATELY UNDECLARED, and the load accepts it.** No jurisdiction pack
 # declares `ua_virtual_asset_disposal`, because nobody has entered a cited primary source for
@@ -48,6 +53,7 @@ quantity_unit  = "BTC"
 price_currency = "USD"
 venue_id       = "binance"
 symbol         = "BTCUSDT"
+quote_asset    = "USDT"
 is_synthetic   = false
 
 # A DECLARED label, never inferred (015 FR-007a). `btc` is the word the owner wrote in his own

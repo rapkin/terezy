@@ -37,6 +37,7 @@ from terezy.core.results.held import (
 from terezy.core.results.question import Question
 from terezy.core.tax.official_rate import observation_for
 from terezy.data.declarations import loader, resolver
+from terezy.data.declarations.errors import DeclarationError
 from tests import answer_registries as fixtures
 
 ASSET: Final = "synthetic_held_x"
@@ -349,6 +350,7 @@ quantity_unit  = "SXU"
 price_currency = "UAH"
 venue_id       = "binance"
 symbol         = "SYNTHUSDT"
+quote_asset    = "USDT"
 is_synthetic   = true
 groups         = []
 
@@ -425,3 +427,115 @@ def test_a_group_naming_a_held_asset_and_a_bond_still_reports_the_bond_as_reache
     )
     assert OTHER in standing.ids
     assert OTHER not in standing.with_candidates
+
+
+DOLLARISH: Final = "synthetic_held_fdusd"
+"""A held asset quoted against a token that merely **ends** in the dollar's own code.
+
+Binance quotes in ``FDUSD``, ``TUSD``, ``BUSD`` and ``USD1`` as well as ``USD``. Any rule that
+decided *already dollar-quoted* by looking at the symbol's tail would read this one as needing
+no belief at all, tag its value USD, and report that no peg was leaned on -- while the whole
+figure rested on FDUSD's. Its own fixture because the defect is reachable by exactly the
+data-only addition SC-008 promises.
+"""
+
+DOLLARISH_DECLARATION: Final = f"""\
+# SYNTHETIC FIXTURE, written by a test. Every term invented, the token included.
+[instrument]
+id             = "{DOLLARISH}"
+name           = "Synthetic held asset quoted in a dollar-ish token -- TEST FIXTURE"
+class          = "held_asset"
+quantity_unit  = "SXF"
+price_currency = "USD"
+venue_id       = "binance"
+symbol         = "SYNTHFDUSD"
+quote_asset    = "FDUSD"
+is_synthetic   = true
+groups         = []
+
+[instrument.tax_classes]
+disposal_gain = "no_pack_declares_this_class"
+"""
+
+
+def test_a_token_that_merely_ends_in_the_currency_code_is_not_that_currency(
+    tmp_path: Path,
+) -> None:
+    """025 FR-023. The split is declared and compared exactly, never read off the symbol.
+
+    `SYNTHFDUSD` ends in the dollar's own code, so under any `endswith` rule this asset reads
+    as *already dollar-quoted*: it would be valued in USD with `assumption=None`, a figure
+    resting entirely on that token's peg and reporting that it rests on none. The close it is
+    valued from is real, so the wrong number is reachable rather than theoretical.
+    """
+    root = tmp_path / "data"
+    shutil.copytree(fixtures.DATA_ROOT, root)
+    (root / "instruments" / f"{DOLLARISH}.toml").write_text(DOLLARISH_DECLARATION, encoding="utf-8")
+    fetched = root / "observations" / "binance_synthusdt.toml"
+    (root / "observations" / "binance_synthfdusd.toml").write_text(
+        fetched.read_text(encoding="utf-8").replace('"SYNTHUSDT"', '"SYNTHFDUSD"'),
+        encoding="utf-8",
+    )
+    overlay = root / resolver.USER_DIR / resolver.SEEDS_DIR / "owner-001.toml"
+    overlay.write_text(
+        overlay.read_text(encoding="utf-8") + "\n[[seed]]\n"
+        "is_synthetic  = true\n"
+        f'instrument_id = "{DOLLARISH}"\n'
+        "quantity      = 2.0\n"
+        'acquired_on   = "2025-04-07"\n'
+        "cost          = 500.0\n"
+        'basis         = "known"\n',
+        encoding="utf-8",
+    )
+    question = fixtures.owners_question()
+    named = (fixtures.OVDP, DOLLARISH)
+    result = _answered(
+        root,
+        question=fixtures.with_plans(
+            fixtures.with_subjects(question, *named),
+            {word: plan for word, plan in question.plans.items() if word in named},
+        ),
+    )
+    valuation = _position(result, DOLLARISH).valuation
+    assert isinstance(valuation, QuoteAssetUndeclared), (
+        "the one declared belief is about USDT, and this asset is quoted in something else"
+    )
+    assert valuation.declared == "USDT = USD"
+
+
+def test_a_declaration_whose_symbol_does_not_end_in_its_quote_asset_refuses(
+    tmp_path: Path,
+) -> None:
+    """The pair is checked against itself, because nothing outside the file can settle it."""
+    root = tmp_path / "data"
+    shutil.copytree(fixtures.DATA_ROOT, root)
+    (root / "instruments" / f"{DOLLARISH}.toml").write_text(
+        DOLLARISH_DECLARATION.replace('quote_asset    = "FDUSD"', 'quote_asset    = "EUR"'),
+        encoding="utf-8",
+    )
+    with pytest.raises(DeclarationError) as raised:
+        resolver.from_data_root(root)
+    assert "quote_asset" in str(raised.value)
+    assert "SYNTHFDUSD" in str(raised.value)
+
+
+def test_a_question_naming_no_held_asset_reports_none_and_inherits_no_mark() -> None:
+    """FR-030: `Answer.held` is the assets the question NAMED, not every one declared.
+
+    The marks matter as much as the section: every position's provenance and staleness are
+    merged into the answer-wide verdicts, so an OVDP-only question that reported a BTC position
+    would announce itself as resting on a quotation no figure of its own came from.
+    """
+    question = fixtures.owners_question()
+    result = _answered(
+        question=fixtures.with_plans(
+            fixtures.with_subjects(question, fixtures.OVDP),
+            {fixtures.OVDP: question.plans[fixtures.OVDP]},
+        ),
+    )
+    assert result.held == ()
+    with_held = _answered()
+    assert with_held.held, "the control: the same root does report one when asked"
+    assert prov.unverified_sources(with_held.provenance) - prov.unverified_sources(
+        result.provenance
+    ), "the held position's marks reach the answer only when it is reported"

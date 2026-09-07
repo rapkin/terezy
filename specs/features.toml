@@ -176,6 +176,16 @@ needs  = ["008-seed-and-goals", "011-official-rate", "015-the-question", "018-nb
 why    = "008 declares the seed lots this position is made of and the estimated basis it carries; 011 strikes the dollar cost into hryvnia at the acquisition date and 018 is the series it strikes from -- both, because 011 shipped the machinery empty; 015 is where `btc` resolves to nothing and the verification task that says what would close it; 020 publishes the schema this feature edits, since a fifth subject standing regenerates the OpenAPI document. NOT parallel with 019 in practice: both regenerate tests/golden/the_answer.golden.txt and whichever lands second re-measures"
 note   = "Owner 2026-09-02/03 -- he holds BTC and wants it counted, not bought. Both clarifications answered 2026-09-07 in specs/decisions/2026-09-07-clarify-025.toml -- USDT taken equal to USD as a declared belief, and a held section of its own."
 
+[[future]]
+id    = "a-mixed-group-holding-one-asset-reads-as-wholly-held"
+after = ["025-btc-holdings"]
+note  = "A group naming a held asset AND instruments that reached no candidate collapses to one SubjectHeld printing `already held (0 of N)`, naming no remedy for the rest; same in a section that refused before enumerating. Reached-first fixed only the reported case. Recorded 2026-09-07 by 025's review round two; a per-id standing is the fix and it is a record change."
+
+[[future]]
+id    = "a-quote-asset-sharing-a-tail-with-a-currency"
+after = ["025-btc-holdings"]
+note  = "`_quote_asset` checks a declared symbol ENDS in its declared quote asset, so a venue quoting in a token whose own name ends in another declared token (USDT inside a hypothetical XUSDT) satisfies the check for both. Exact equality on the declared pair is what the valuation uses, so no figure is wrong today; what is unguarded is a self-contradicting declaration the check cannot see. Recorded 2026-09-07."
+
 [[feature]]
 id     = "026-answer-screen"
 status = "planned"

@@ -50,7 +50,25 @@ run time, a branch out of the engine — and a prohibition has to name what it a
 The owner's actual quantities, prices and dates are **not in this specification**, by
 `data/README.md` rule 5. The record shape is shown with placeholders.
 
-## Residue after two review rounds
+## Residue after the implementation's two review rounds
+
+The implementation's cap is spent (rounds on `main...feat/025-btc-holdings`, 2026-09-07). Eight
+findings in round one and two more in round two are fixed; what is left is recorded rather than
+fixed, and both are `[[future]]` entries in `specs/features.toml`.
+
+- **A group naming a held asset and instruments that reached nothing reads as wholly held.**
+  Deciding *reached* before *held* fixed the case where the rest of the group reached
+  candidates; where it did not, the subject still prints `already held (0 of N)` and names no
+  remedy for the rest. A per-id standing is the fix and it changes a record.
+- **A declared quote asset whose name ends in another declared token satisfies the loader's
+  consistency check for both.** The valuation compares the declared pair exactly, so no figure
+  is wrong; what is unguarded is a declaration that contradicts itself in a way this check
+  cannot see.
+- **Round two’s own fixes were read back at the site rather than by a third round**, which is
+  the cap's rule. Both are mutation-checked: reintroducing either defect turns a named test
+  red.
+
+## Residue after the specification's two review rounds
 
 The cap is two rounds and both are spent. Round two's own fixes were read before it closed —
 the round's last act, not a third round — and nothing below is a wrong number, a lost

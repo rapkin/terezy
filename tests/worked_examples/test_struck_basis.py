@@ -51,6 +51,7 @@ quantity_unit  = "XBT"
 price_currency = "USD"
 venue_id       = "binance"
 symbol         = "SYNTHXUSDT"
+quote_asset    = "USDT"
 is_synthetic   = true
 groups         = []
 

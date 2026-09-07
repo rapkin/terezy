@@ -62,6 +62,18 @@ class HeldAssetDeclaration:
     an instrument id is the owner's word for a thing and a symbol is the venue's, and inferring
     one from the other would make a second venue's different ticker an engine edit."""
 
+    quote_asset: str
+    """What that symbol is priced **in** -- ``USDT``. Declared, and never read off the symbol.
+
+    A ticker publishes no split: ``BTCUSDT`` could be BTC/USDT or BTCU/SDT, and klines says
+    nothing either way (025 FR-023). Guessing by the tail is worse than it looks rather than
+    merely imprecise -- Binance quotes in ``FDUSD``, ``TUSD``, ``BUSD`` and ``USD1`` as well as
+    ``USD``, so a symbol ending ``FDUSD`` reads as dollar-quoted under any endswith rule and
+    the whole figure silently rests on a peg nobody named. The loader checks this against the
+    symbol rather than deriving it, which turns a wrong split into a load error instead of a
+    plausible number.
+    """
+
     is_synthetic: bool
     """``True`` for a fixture whose declaration is invented. Required with no default, so a
     real asset cannot be mistaken for a fixture through omission."""

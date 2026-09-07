@@ -143,13 +143,19 @@ def answer(question: Question, inputs: AnswerInputs, as_of: date) -> Answer | Re
         return unused
     plans = _expanded_plans(question, subjects)
     positions = held_positions.positions(
-        declared=inputs.registries.held,
+        declared={
+            name: asset for name, asset in inputs.registries.held.items() if name in considered
+        },
         supplied=inputs.held,
         tax_classes=inputs.registries.tax_classes,
         base_currency=inputs.registries.base_currency,
         as_of=as_of,
     )
-    declared_held = frozenset(inputs.registries.held)
+    # Only what the question named, on the rule the candidate population already follows: a
+    # position nobody asked about would still merge its marks into the answer-wide provenance
+    # and staleness, so an OVDP-only question would report itself as resting on a BTC
+    # quotation it never read a figure from (025 FR-030).
+    declared_held = frozenset(inputs.registries.held) & considered
     holds = frozenset(position.instrument_id for position in positions)
     sections: list[HorizonSection] = []
     for horizon in question.horizons:

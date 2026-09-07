@@ -42,6 +42,7 @@ quantity_unit  = "{quantity_unit}"
 price_currency = "{currency}"
 venue_id       = "{venue}"
 symbol         = "{asset_id.upper()}USDT"
+quote_asset    = "USDT"
 is_synthetic   = true
 groups         = ["{GROUP}"]
 

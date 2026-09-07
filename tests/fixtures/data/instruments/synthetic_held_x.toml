@@ -17,6 +17,7 @@ quantity_unit  = "SXT"
 price_currency = "USD"
 venue_id       = "binance"
 symbol         = "SYNTHUSDT"
+quote_asset    = "USDT"
 is_synthetic   = true
 groups         = []
 

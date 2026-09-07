@@ -1521,6 +1521,7 @@ class HeldAssetTable(BaseModel):
     price_currency: str
     venue_id: str
     symbol: str
+    quote_asset: str
     is_synthetic: bool
     tax_classes: dict[str, str]
     groups: list[str]
