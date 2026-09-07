@@ -24,7 +24,7 @@ from typing import Any, cast
 
 import pytest
 
-from terezy.api.answer import AnsweredQuestion, answer_question
+from terezy.api.answer import AnsweredQuestion, answer_declared, answer_question
 from terezy.cli import main as cli
 from terezy.core.decision.answer import (
     benchmark_unavailable,
@@ -33,6 +33,7 @@ from terezy.core.decision.answer import (
     section_ties,
 )
 from terezy.core.instruments.groups import InstrumentGroup
+from terezy.core.instruments.quotations import NoQuotationOnDate
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
@@ -42,6 +43,7 @@ from terezy.core.results.answer import Answer, HorizonSection
 from terezy.core.results.candidates import CandidateSurvey
 from terezy.core.results.dominance import DominanceRefused, DominanceResult
 from terezy.core.results.fund import FundAssumptions
+from terezy.core.results.held import Valued
 from terezy.core.results.objectives import (
     AbsoluteBand,
     Criterion,
@@ -1037,3 +1039,83 @@ def test_a_band_is_rendered_in_the_shape_it_was_declared_in() -> None:
     )
     assert cli._band_words(AbsoluteBand(amount=Money(5.0, Currency.UAH, prov.EMPTY))) == "5.0 UAH"
     assert cli._band_words(DaysBand(days=7)) == "7 day(s)"
+
+
+# ---------------------------------------------------------------------------
+# The held section, rendered
+# ---------------------------------------------------------------------------
+
+
+def _held_answer() -> Answer:
+    """The composed root, which is the only one carrying a held asset with a lot and a price."""
+    run: Any = answer_declared(
+        fixtures.owners_question(),
+        fixtures.DATA_ROOT,
+        as_of=fixtures.AS_OF,
+        base_currency=Currency.UAH,
+        declared_in=fixtures.QUESTION_FILE,
+    )
+    assert isinstance(run.answer, Answer), run.answer
+    return run.answer
+
+
+def test_the_held_section_prints_every_figure_and_every_refusal() -> None:
+    """025 FR-030 at the one surface a reader actually sees.
+
+    Asserted on the record's own words rather than on sentences this test writes: the CLI adds
+    no fact (015 FR-020a), so every reason below is carried verbatim from the core.
+    """
+    result = _held_answer()
+    position = next(item for item in result.held if item.instrument_id == "synthetic_held_x")
+    assert isinstance(position.valuation, Valued)
+    printed = "\n".join(cli._held_lines(result))
+
+    assert "held (not candidates -- reported, never ranked):" in printed
+    assert "synthetic_held_x: 0.25 SXT at binance, over 1 lot(s)" in printed
+    assert f"cost: {cli._readable(position.basis)}" in printed
+    assert f"value: {cli._readable(position.valuation.value)}" in printed
+    assert position.tax.reason in printed
+    assert position.yields.reason in printed
+    assert position.rank.reason in printed
+
+
+def test_the_belief_every_dollar_figure_rests_on_is_printed_beside_it() -> None:
+    """FR-023: the assumption is visible wherever it acted, in its own declared words."""
+    result = _held_answer()
+    position = next(item for item in result.held if item.instrument_id == "synthetic_held_x")
+    assert isinstance(position.valuation, Valued)
+    printed = "\n".join(cli._held_lines(result))
+    assert position.valuation.assumption.rationale in printed
+    assert position.valuation.assumption.id in printed
+
+
+def test_a_refused_valuation_prints_the_refusal_and_never_a_blank(tmp_path: Path) -> None:
+    """A refusal reaches the reader as a refusal with its reason, never as a dash or a zero."""
+    root = tmp_path / "data"
+    shutil.copytree(fixtures.DATA_ROOT, root)
+    (root / "observations" / "binance_synthusdt.toml").unlink()
+    run: Any = answer_declared(
+        fixtures.owners_question(),
+        root,
+        as_of=fixtures.AS_OF,
+        base_currency=Currency.UAH,
+        declared_in=fixtures.QUESTION_FILE,
+    )
+    position = next(item for item in run.answer.held if item.instrument_id == "synthetic_held_x")
+    assert isinstance(position.valuation, NoQuotationOnDate)
+    printed = "\n".join(cli._held_lines(run.answer))
+    assert f"value: REFUSED -- {position.valuation.reason}" in printed
+    assert "cost:" in printed, "the refusal on one figure suppresses none of the others"
+
+
+def test_an_answer_with_no_held_position_prints_no_held_section() -> None:
+    """`data/README.md` rule 5: *held: nothing* would be a claim about what he actually holds."""
+    run: Any = answer_declared(
+        fixtures.owners_question(),
+        fixtures.SHIPPED_ROOT,
+        as_of=fixtures.AS_OF,
+        base_currency=Currency.UAH,
+        declared_in=fixtures.QUESTION_FILE,
+    )
+    assert run.answer.held == ()
+    assert cli._held_lines(run.answer) == []
