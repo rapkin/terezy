@@ -1,5 +1,5 @@
 import type { TupleOutcome } from "@/api/shapes";
-import { allMoneyBackOn } from "@/answer/all-money-back";
+import { AllMoneyBackFigure, allMoneyBackOn } from "@/answer/all-money-back";
 import { notServed } from "@/answer/missing";
 import { day, money } from "@/design/format";
 import { assertNever } from "@/lib/exhaustive";
@@ -113,27 +113,15 @@ function AllOfItBy({ outcome }: { outcome: TupleOutcome }) {
       return (
         <p className="text-xs" data-all-money-back="on">
           <span className="text-[var(--ink-muted)]">all of it by </span>
-          <FigureSlot state={{ kind: "value", figure: day(back.date) }} />
+          <AllMoneyBackFigure outcome={outcome} />
         </p>
       );
     case "not-all-of-it":
-      return (
-        <div className="text-xs" data-all-money-back="not-all-of-it">
-          <FieldMissing
-            state={notServed(
-              "all of it by",
-              `there is no date on which every hryvnia is back — ${back.reason}. Most of it is ` +
-                `back on ${day(back.mostOfItOn)}.`,
-            )}
-          />
-        </div>
-      );
     case "nothing-arrived":
       return (
-        <div className="text-xs" data-all-money-back="nothing-arrived">
-          <FieldMissing
-            state={notServed("all of it by", "the outcome records no arrival at all")}
-          />
+        <div className="text-xs" data-all-money-back={back.tag}>
+          <span className="text-[var(--ink-muted)]">all of it by </span>
+          <AllMoneyBackFigure outcome={outcome} />
         </div>
       );
   }

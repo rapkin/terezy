@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { join } from "node:path";
+import { AllMoneyBackFigure } from "@/answer/all-money-back";
 import { AnswerHeader } from "@/answer/components/AnswerHeader";
 import { CandidateCard } from "@/answer/components/CandidateCard";
 import { FullRanking } from "@/answer/components/FullRanking";
@@ -31,6 +32,7 @@ const READ = { tag: "read" as const, kind: "bond" as const, declaredClass: "enum
 const MARKED = outcome({ instrumentId: "A", reaches: UNVERIFIED });
 
 const CASES: Readonly<Record<string, ReactElement>> = {
+  "answer/all-money-back.tsx": <AllMoneyBackFigure outcome={MARKED} />,
   "answer/components/AnswerHeader.tsx": (
     <AnswerHeader
       answer={{

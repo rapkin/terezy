@@ -1,6 +1,7 @@
 import type { Comparison } from "@/api/shapes";
+import { AllMoneyBackFigure } from "@/answer/all-money-back";
 import { listKey } from "@/answer/keys";
-import { count, day, money, rate } from "@/design/format";
+import { count, money, rate } from "@/design/format";
 import { marksOf } from "@/lib/provenance";
 import { FigureSlot } from "@/components/figure/FigureSlot";
 import { Disclosure } from "./Disclosure";
@@ -55,7 +56,7 @@ export function FullRanking({ comparison }: { comparison: Comparison }) {
                     marks: marksOf(outcome.reaches.provenance, outcome.staleness),
                   }}
                 />{" "}
-                by <FigureSlot state={{ kind: "value", figure: day(outcome.span.end) }} />
+                by <AllMoneyBackFigure outcome={outcome} />
                 {outcome.implied_rate.tag === "rates.NominalRate" ? (
                   <>
                     {" at "}
