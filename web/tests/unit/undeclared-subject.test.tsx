@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { render } from "@testing-library/react";
-import { AnswerHeader } from "@/answer/components/AnswerHeader";
+import { AnswerHeader, SubjectState } from "@/answer/components/AnswerHeader";
 import { remedyFor } from "@/answer/remedies";
 import { GROUP } from "@/design/format";
 import { answer } from "../answer-fixtures";
@@ -65,6 +65,20 @@ describe("the answer header", () => {
       "names no subject",
     );
     expect(container.querySelector("ul[data-subjects]")).toBeNull();
+  });
+
+  it("names the feature that supplies the declaration where one is recorded", () => {
+    // Unreachable through `remedyFor` while nothing is undeclared, and reachable here — the arm
+    // that names a feature is the one FR-021 exists for, and it was asserted by nothing.
+    const { container } = render(
+      <SubjectState
+        subject={{ tag: "answer.UndeclaredSubject", named: "gold" }}
+        remedy={{ remedy: "a declaration", suppliedBy: "029-a-feature-that-would-declare-it" }}
+      />,
+    );
+    const held = container.querySelector("[data-remedy-feature]");
+    expect(held?.getAttribute("data-remedy-feature")).toBe("029-a-feature-that-would-declare-it");
+    expect(container.textContent).toContain("a declaration");
   });
 
   it("still states the remedy for a subject the map has no feature for", () => {

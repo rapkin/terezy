@@ -1,7 +1,8 @@
 import type { AnsweredQuestion, HorizonSection, Separating, TupleOutcome } from "@/api/shapes";
 import { sharedAcross, sharedFor } from "@/answer/assumptions";
+import type { Belief } from "@/answer/beliefs";
 import { joinToOutcome, placeable } from "@/answer/join";
-import { beliefsAcross, sentencesNaming, withoutBeliefs } from "@/answer/beliefs";
+import { beliefsAcross, beliefsHeldOn, sentencesNaming, withoutBeliefs } from "@/answer/beliefs";
 import type { KindReading } from "@/answer/instrument-kind";
 import { AnswerHeader } from "./AnswerHeader";
 import { HeldPositions } from "./HeldPositions";
@@ -29,7 +30,10 @@ export function AnswerScreen({
   }
   const shown = membersShown(answer.sections);
   const outcomes = shown.map((member) => member.outcome);
-  const beliefs = beliefsAcross(outcomes);
+  const beliefs = distinctById([
+    ...beliefsAcross(outcomes),
+    ...answer.held.flatMap(beliefsHeldOn),
+  ]);
   const shared = withoutBeliefs(
     sharedAcross(shown.map((member) => sharedFor(member.outcome, member.separating))),
     beliefs,
@@ -55,6 +59,11 @@ export function AnswerScreen({
       </div>
     </div>
   );
+}
+
+function distinctById(beliefs: readonly Belief[]): readonly Belief[] {
+  const seen = new Map(beliefs.map((belief) => [belief.id, belief]));
+  return [...seen.values()];
 }
 
 /** One member shown on a card, beside its section's own statement of what separates it. */

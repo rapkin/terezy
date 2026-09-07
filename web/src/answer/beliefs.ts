@@ -7,7 +7,7 @@
  * **ranked** population is not the front: measured 2026-09-07, 21 of 23 rows carry it, so the two
  * that do not carry no mark.
  */
-import type { TupleOutcome } from "@/api/shapes";
+import type { HeldPosition, TupleOutcome } from "@/api/shapes";
 
 export type Belief = { readonly id: string; readonly rationale: string };
 
@@ -15,6 +15,19 @@ export type Belief = { readonly id: string; readonly rationale: string };
 export function beliefsOf(outcome: TupleOutcome): readonly Belief[] {
   const held = [outcome.carried_quotation, outcome.sold_early?.assumption ?? null];
   return distinct(held.filter((one) => one !== null));
+}
+
+/**
+ * The belief a held position's value rests on: the peg its quote asset is taken at.
+ *
+ * 025 declares `QuoteAssetIsWorth` required-without-a-default precisely so a dollar figure
+ * cannot rest on an unstated peg, so a screen that renders the figure and not the belief has
+ * dropped the mark the field exists to carry.
+ */
+export function beliefsHeldOn(position: HeldPosition): readonly Belief[] {
+  const valuation = position.valuation;
+  if (valuation.tag !== "held.Valued" || valuation.assumption === null) return [];
+  return [valuation.assumption];
 }
 
 /** The distinct beliefs across every member the screen shows, in first-seen order. */

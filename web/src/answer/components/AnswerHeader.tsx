@@ -1,5 +1,5 @@
 import type { Answer, Subject } from "@/api/shapes";
-import { remedyFor } from "@/answer/remedies";
+import { remedyFor, type Remedy } from "@/answer/remedies";
 import { day, money } from "@/design/format";
 import { assertNever } from "@/lib/exhaustive";
 import { marksOf } from "@/lib/provenance";
@@ -51,7 +51,7 @@ export function AnswerHeader({ answer }: { answer: Answer }) {
         <ul className="flex flex-wrap gap-2" data-subjects={String(answer.subjects.length)}>
           {answer.subjects.map((subject) => (
             <li key={subject.named}>
-              <SubjectState subject={subject} />
+                <SubjectState subject={subject} remedy={remedyFor(subject.named)} />
             </li>
           ))}
         </ul>
@@ -60,8 +60,14 @@ export function AnswerHeader({ answer }: { answer: Answer }) {
   );
 }
 
-/** FR-021: a subject the registry declares nothing by is a refusal carrying its remedy. */
-function SubjectState({ subject }: { subject: Subject }) {
+/**
+ * FR-021: a subject the registry declares nothing by is a refusal carrying its remedy.
+ *
+ * The remedy is passed in rather than looked up here, so both of its arms are reachable from a
+ * test: the shipped answer reports no undeclared subject since 025 landed, which would otherwise
+ * leave the arm that names a feature dead and unasserted until the next one appears.
+ */
+export function SubjectState({ subject, remedy }: { subject: Subject; remedy: Remedy }) {
   switch (subject.tag) {
     case "answer.DeclaredSubject":
       return (
@@ -70,7 +76,6 @@ function SubjectState({ subject }: { subject: Subject }) {
         </Badge>
       );
     case "answer.UndeclaredSubject": {
-      const remedy = remedyFor(subject.named);
       return (
         <Badge tone="refuse" data-undeclared-subject={subject.named}>
           {subject.named}: nothing is declared, so it was not assessed. The remedy is{" "}

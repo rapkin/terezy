@@ -281,13 +281,16 @@ export const HELD: HeldPosition = {
       struck_from: null,
     },
   ],
+  // As the API produces one: the value struck in the **price** currency, the base-currency
+  // restatement beside it, and the peg the dollar figure rests on. A fixture in one currency
+  // throughout is a shape no declared held asset has, and a test over it compares nothing.
   valuation: {
     tag: "held.Valued",
-    value: money(128000, [source()]),
+    value: { ...money(3120, [source()]), currency: "USD" },
     quotation: {
       tag: "quotations.Quotation",
       on_date: "2026-09-05",
-      close: 3200000,
+      close: 78000,
       provenance: provenance([source()]),
     },
     in_base: {
@@ -296,7 +299,14 @@ export const HELD: HeldPosition = {
       nominal_change: money(32000, [source()]),
       struck: null,
     },
-    assumption: null,
+    assumption: {
+      tag: "quote_asset.QuoteAssetIsWorth",
+      id: "usdt_is_a_dollar",
+      quote_asset: "USDT",
+      currency: "USD",
+      is_assumption: true,
+      rationale: "OWNER'S BELIEF: one USDT is taken as one dollar, and no peg break is modelled.",
+    },
   },
   rank: {
     tag: "held.NotRankedAgainstTheBenchmark",

@@ -1,8 +1,10 @@
 import type { HeldPosition } from "@/api/shapes";
-import { money, quantity } from "@/design/format";
+import { day, money, plain, quantity } from "@/design/format";
 import { KindTile } from "@/design/KindTile";
 import { marksOf } from "@/lib/provenance";
 import { FigureSlot } from "@/components/figure/FigureSlot";
+import { beliefsHeldOn } from "@/answer/beliefs";
+import { Badge } from "@/components/ui/badge";
 import { Disclosure } from "./Disclosure";
 import { TypedState } from "./NamedState";
 import { Population } from "./Population";
@@ -62,6 +64,11 @@ function Held({
         <span className="text-[var(--ink-muted)]">what it is worth </span>
         <Worth valuation={position.valuation} staleness={staleness} />
       </div>
+      {beliefsHeldOn(position).map((belief) => (
+        <Badge key={belief.id} tone="assume" data-belief-mark={belief.id}>
+          rests on {belief.id}
+        </Badge>
+      ))}
       <Disclosure name="held-verdicts" summary="what else the registry says about it">
         <TypedState state={position.rank} label="against the benchmark" />
         <TypedState state={position.tax} label="tax" />
@@ -87,7 +94,16 @@ function Held({
   );
 }
 
-/** FR-010: a valuation the registry could not strike is its own reason, never an empty slot. */
+/**
+ * What the position is worth, in **both** currencies the record carries.
+ *
+ * `valuation.value` is struck in the price currency — measured 2026-09-07 every declared held
+ * asset states one other than the base — and `basis` is in the base. Rendering the first alone
+ * beside the second showed a reader −97 % where the engine had computed +32 %, so the
+ * base-currency restatement and the nominal change the engine already produced are the figures
+ * this leads with (025 FR-030). Neither is composed here: `in_base` is a served record, and
+ * where the rate it needs is undeclared it is a served refusal instead.
+ */
 function Worth({
   valuation,
   staleness,
@@ -102,13 +118,49 @@ function Worth({
       />
     );
   }
+  const inBase = valuation.in_base;
   return (
-    <FigureSlot
-      state={{
-        kind: "marked",
-        figure: money(valuation.value),
-        marks: marksOf(valuation.value.provenance, staleness),
-      }}
-    />
+    <span>
+      {inBase.tag === "held.InBaseCurrency" ? (
+        <>
+          <FigureSlot
+            state={{
+              kind: "marked",
+              figure: money(inBase.value),
+              marks: marksOf(inBase.value.provenance, staleness),
+            }}
+          />
+          <span className="text-[var(--ink-muted)]"> — a nominal change of </span>
+          <FigureSlot
+            state={{
+              kind: "marked",
+              figure: money(inBase.nominal_change),
+              marks: marksOf(inBase.nominal_change.provenance, staleness),
+            }}
+          />
+          <span className="text-[var(--ink-muted)]">
+            {" "}
+            against what it cost, before inflation, tax and any cost of getting out
+          </span>
+        </>
+      ) : (
+        <FigureSlot
+          state={{ kind: "refused-in-answer", tag: inBase.tag, reason: inBase.reason }}
+        />
+      )}
+      <span className="text-[var(--ink-muted)]"> · struck in its own currency as </span>
+      <FigureSlot
+        state={{
+          kind: "marked",
+          figure: money(valuation.value),
+          marks: marksOf(valuation.value.provenance, staleness),
+        }}
+      />
+      <span className="text-[var(--ink-muted)]" data-quotation={valuation.quotation.on_date}>
+        {" "}
+        from a close of {plain(valuation.quotation.close)} observed{" "}
+        {day(valuation.quotation.on_date)}
+      </span>
+    </span>
   );
 }

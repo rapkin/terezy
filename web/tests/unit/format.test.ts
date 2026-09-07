@@ -81,6 +81,9 @@ describe("a quantity", () => {
 
   it("states a bound rather than zero for a value finer than the last place", () => {
     expect(quantity(1e-12)).toBe("< 0.00000001");
+    // The bound points the way the value does. Unreachable on a holding, which is a ledger
+    // invariant rather than a property of this module, and asserted so the sign is not free.
+    expect(quantity(-1e-12)).toBe("> -0.00000001");
     expect(quantity(0)).toBe("0");
   });
 

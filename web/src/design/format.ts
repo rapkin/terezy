@@ -93,8 +93,9 @@ const QUANTITY_DECIMALS = 8;
 export function quantity(value: number): string {
   const fixed = Math.abs(value).toFixed(QUANTITY_DECIMALS);
   const trimmed = fixed.replace(/\.?0+$/, "");
+  const finest = `0.${"0".repeat(QUANTITY_DECIMALS - 1)}1`;
   if (trimmed === "0" && value !== 0) {
-    return `${value < 0 ? "-" : ""}< 0.${"0".repeat(QUANTITY_DECIMALS - 1)}1`;
+    return value < 0 ? `> -${finest}` : `< ${finest}`;
   }
   const [whole = "0", fraction = ""] = trimmed.split(".");
   const sign = value < 0 ? "-" : "";
