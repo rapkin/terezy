@@ -2,9 +2,11 @@
  * FR-019: the badge that says what separates a member from its neighbours, from **typed** facts.
  *
  * Never from `separating.per_member[].rests_on`, which is a tuple of composed sentences and is
- * **empty on exactly the member that most needs a badge** — measured 2026-09-06, the one-month
- * front's `UA4000239016` is the one sold at the window's end and carries no sentence at all,
- * because what separates it is the *absence* of the continuation assumption its neighbour has.
+ * **empty on exactly the members that most need a badge**: measured 2026-09-07 across all three
+ * fronts, every member sold at the window's end carries zero sentences and every member that ran
+ * to its own end carries one — because what separates the first is the *absence* of the
+ * continuation assumption the second has. A badge read off that list would be blank on four of
+ * the twenty cards, and blank on the four the reader most needs told apart.
  */
 import type { TupleOutcome } from "@/api/shapes";
 

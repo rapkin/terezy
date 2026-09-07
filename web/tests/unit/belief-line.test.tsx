@@ -58,12 +58,7 @@ describe("the belief line", () => {
   });
 });
 
-/**
- * FR-024's other half, and the defect it prevents: measured 2026-09-07 the core's `rests_on`
- * sentence for a belief is the belief's own rationale with a preamble and the id in brackets in
- * front of it — so a card listing its `rests_on` in full carries the whole statement beside a
- * mark that says the same thing.
- */
+/** The shape the core composes: a preamble, the id in brackets, then the rationale itself. */
 const AS_THE_CORE_WROTE_IT =
   `the clean price implied by the observed quotation is assumed to hold ` +
   `(${CLEAN_PRICE.id}): ${CLEAN_PRICE.rationale}`;

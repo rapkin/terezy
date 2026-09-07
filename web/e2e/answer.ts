@@ -7,7 +7,6 @@ export type ServedAnswer = {
     readonly nonDominated: readonly string[];
     readonly ranked: number;
     readonly noCandidate: number;
-    readonly beats: number;
   }[];
 };
 
@@ -28,7 +27,7 @@ export async function servedAnswer(page: Page): Promise<ServedAnswer> {
           sections: {
             dominance: { non_dominated?: { instrument_id: string }[] };
             outcome: {
-              comparison: { ranked?: unknown[]; beats_benchmark?: unknown[] };
+              comparison: { ranked?: unknown[] };
               enumerated: { no_candidate: unknown[] };
             };
           }[];
@@ -42,7 +41,6 @@ export async function servedAnswer(page: Page): Promise<ServedAnswer> {
         nonDominated: (section.dominance.non_dominated ?? []).map((held) => held.instrument_id),
         ranked: (section.outcome.comparison.ranked ?? []).length,
         noCandidate: section.outcome.enumerated.no_candidate.length,
-        beats: (section.outcome.comparison.beats_benchmark ?? []).length,
       })),
     };
   }, AS_OF);

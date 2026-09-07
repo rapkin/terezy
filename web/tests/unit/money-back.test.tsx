@@ -17,11 +17,7 @@ import { arrival, cameHome, outcome, stayed } from "../answer-fixtures";
 const REACHES = money(50529.090769230774, [source()]);
 const REMAINDER = money(494.68120879120397, [source()]);
 
-function remainder(journey: Parameters<typeof cash>[0]) {
-  return cash(journey);
-}
-
-function cash(journey: ReturnType<typeof cameHome>) {
+function remainder(journey: ReturnType<typeof cameHome>) {
   return {
     tag: "tuple.UndeployedCash" as const,
     amount: REMAINDER,

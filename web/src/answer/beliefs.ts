@@ -4,8 +4,8 @@
  * Measured 2026-09-06 every member of every front carries `the_clean_price_holds`, so it
  * separates nothing and is a line rather than a badge — but the rule is *per distinct id*, not
  * *once*, because a registry whose members differ on it turns the line back into a badge. The
- * **ranked** population is not the front: 21 of 22 rows carry it and one does not, so the row
- * that does not carries no mark.
+ * **ranked** population is not the front: measured 2026-09-07, 21 of 23 rows carry it, so the two
+ * that do not carry no mark.
  */
 import type { TupleOutcome } from "@/api/shapes";
 

@@ -14,10 +14,6 @@ function withoutStyle(html: string): string {
 }
 
 describe("a kind tile", () => {
-  it("enumerates the same kinds the map declares", () => {
-    expect([...EVERY_KIND].sort()).toEqual(Object.keys(KINDS).sort());
-  });
-
   for (const kind of EVERY_KIND) {
     it(`says "${KINDS[kind].word}" with every style declaration stripped`, () => {
       const { container } = render(<KindTile kind={kind} />);

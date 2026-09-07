@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import type { Group } from "@/answer/grouping";
-import { count } from "@/design/format";
 import { Disclosure } from "./Disclosure";
 
 /**
@@ -28,9 +27,6 @@ export function RefusalGroup<Member>({
           </span>
         }
       >
-        <p className="text-[var(--ink-muted)]" data-group-count>
-          {count(group.members.length)} of them
-        </p>
         <ul className="ml-4 list-disc space-y-2" data-group-members>
           {group.members.map((member, at) => (
             <li key={at}>{render(member)}</li>

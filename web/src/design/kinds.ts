@@ -93,25 +93,12 @@ export const KINDS: { readonly [K in Kind]: KindStyle } = {
   },
 };
 
-/**
- * Every drawn kind as a value, so a test can render each one.
- *
- * Checked against `KINDS`' own keys rather than trusted: this list and the map are two places
- * one fact is written, and the assertion is what stops them parting.
- */
-export const EVERY_KIND: readonly Kind[] = [
-  "bond",
-  "fund",
-  "cash",
-  "held_asset",
-  "income_stream",
-  "spendable_endpoint",
-  "bank",
-  "exchange",
-  "broker",
-  "platform",
-  "payroll",
-];
+/** Every drawn kind as a value, read off the map so the two cannot part. */
+export const EVERY_KIND: readonly Kind[] = Object.keys(KINDS).filter(isKind);
+
+function isKind(key: string): key is Kind {
+  return Object.hasOwn(KINDS, key);
+}
 
 /**
  * FR-006: which kind an instrument is drawn as comes from the **tag** of its read.

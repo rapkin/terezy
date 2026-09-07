@@ -3,12 +3,8 @@ import { separatingBadge } from "@/answer/separating";
 import { SOLD_EARLY, outcome, range, servedOutcome } from "../answer-fixtures";
 
 /**
- * FR-019, one case per row of plan Finding 2's table.
- *
- * The third case is the one that would have been missed: the member sold at the window's end
- * carries **no** separating sentence, because what separates it is the *absence* of the
- * continuation assumption its neighbour has. A badge read off `per_member[].rests_on` would be
- * blank on exactly the member that most needs one.
+ * FR-019, one case per row of plan Finding 2's table, and the case that would have been missed:
+ * the sold-early member whose `per_member` list is empty (`separating.ts` measures how many).
  */
 describe("the separating badge", () => {
   it("says sold at the end where the outcome carries a sale", () => {

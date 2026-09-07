@@ -12,13 +12,10 @@ import { FieldMissing } from "./NamedState";
  * FR-016: *money back* is **one** served figure, `reaches`, and the client neither adds to it
  * nor subtracts from it.
  *
- * Measured 2026-09-06, before the engine fix, a one-month member reached 49 760.50 ₴ against
- * 50 000 ₴ asked while reporting +10.99 %, because `reaches` was measured on what was deployed
- * and the remainder was a separate field nothing brought home. The remedy was the engine's: the
- * remainder rides the declared exit route and arrives inside `reaches`. What is left for the
- * card is to show the served record beside the figure and to say, in the engine's own verdict,
- * whether the remainder came home — computing the deployed part here would be `reaches` less
- * the remainder, a figure the API does not send.
+ * The remainder rides the declared exit route and arrives inside `reaches`, so what is left for
+ * the card is to show the served record beside the figure and to say, in the engine's own
+ * verdict, whether it came home. Computing the deployed part here would be `reaches` less the
+ * remainder, a figure the API does not send.
  */
 export function MoneyBack({ outcome }: { outcome: TupleOutcome }) {
   const remainder = outcome.undeployed;
