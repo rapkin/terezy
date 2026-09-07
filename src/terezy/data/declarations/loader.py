@@ -102,7 +102,7 @@ from terezy.core.instruments.interface import (
     ScheduledPayment,
 )
 from terezy.core.ledger import lots, seeds
-from terezy.core.ledger.seeds import SeedLot
+from terezy.core.ledger.seeds import Basis
 from terezy.core.primitives import conventions, periods
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
@@ -3440,18 +3440,38 @@ def _basis(
     )
 
 
-def seeds_from_file(path: Path, *, base_currency: Currency) -> tuple[str, tuple[SeedLot, ...]]:
+@dataclass(frozen=True, slots=True, kw_only=True)
+class DeclaredLot:
+    """One ``[[seed]]`` entry as the file states it, with the cost still a bare number.
+
+    025 FR-025 narrows 008 FR-010: a declared cost is in the base currency **unless the
+    instrument it names declares a different price currency**, and this loader holds no
+    instrument declaration. Tagging the amount here would put a dollar figure in hryvnia and
+    make the position wrong by the exchange rate while every number stayed plausible, so the
+    currency is attached where both facts are in hand -- ``resolver.resolve_seeds_and_goals``,
+    which also holds the rate series a foreign cost is struck at.
+    """
+
+    owner_id: str
+    lot_id: str
+    declared_at: str
+    is_synthetic: bool
+    instrument_id: str
+    quantity: float
+    acquired_on: date
+    cost: float
+    """The declared amount, in whatever currency the named instrument turns out to state."""
+
+    basis: Basis
+
+
+def seeds_from_file(path: Path) -> tuple[str, tuple[DeclaredLot, ...]]:
     """One ``data/seeds/<owner>.toml`` as its owner id and the lots it declares.
 
     Returns the owner beside the lots rather than folding him into the file record, on
     ``spendable_from_file``'s precedent -- though each lot *does* carry him, because a lot
     outlives the file it was read from and "whose holding is this" must still be answerable
     when it does.
-
-    ``base_currency`` is required and keyword-only because the file states no currency and
-    must not: a declared cost is in the base currency by FR-010, and the base currency is a
-    property of the run rather than of the holding. Passing it in is what keeps this loader
-    from hard-wiring hryvnia into the one place a second jurisdiction would have to change.
 
     Lot ids come from the entry's position -- ``seed-0``, ``seed-1`` -- rather than being
     declared. Two purchases of one instrument on one date are legitimate and must be two lots,
@@ -3461,13 +3481,13 @@ def seeds_from_file(path: Path, *, base_currency: Currency) -> tuple[str, tuple[
     document = read_document(path)
     file = _validate(schema.SeedFile, document, path)
     owner_id = _owner_of(path, file.owner, what="a declaration of what he already holds")
-    declared: list[SeedLot] = []
+    declared: list[DeclaredLot] = []
     for position, entry in enumerate(file.seed):
         field_prefix = f"{SEED_TABLE}[{position}]"
         declared_at = source_id(path, field_prefix)
         basis = _basis(path, entry, field_prefix=field_prefix, declared_at=declared_at)
         declared.append(
-            SeedLot(
+            DeclaredLot(
                 owner_id=owner_id,
                 lot_id=f"{SEED_TABLE}-{position}",
                 declared_at=declared_at,
@@ -3488,24 +3508,14 @@ def seeds_from_file(path: Path, *, base_currency: Currency) -> tuple[str, tuple[
                     "consumption order",
                 ),
                 acquired_on=_parse_date(path, f"{field_prefix}.acquired_on", entry.acquired_on),
-                cost=Money(
-                    _non_negative(
-                        path,
-                        f"{field_prefix}.cost",
-                        entry.cost,
-                        "a rebate is not a basis. Zero is a real declaration -- a holding that "
-                        "genuinely cost nothing -- and is accepted; what is refused is the "
-                        "field being absent, because a zero nobody wrote would make every "
-                        "later disposal compute the wrong gain (FR-006)",
-                    ),
-                    base_currency,
-                    # The declared amount rests on no cited source: an owner's own record is
-                    # not an observation, the reading `data/streams/` already takes for a
-                    # salary. Where the cost is a *guess*, the mark that says so travels on
-                    # `basis` and `core.ledger.seeds.seed_cost` joins the two -- so a lot the
-                    # loader never saw carries it too, and this boundary is not the only thing
-                    # standing between a guessed cost and an unmarked tax (008 FR-007).
-                    prov.EMPTY,
+                cost=_non_negative(
+                    path,
+                    f"{field_prefix}.cost",
+                    entry.cost,
+                    "a rebate is not a basis. Zero is a real declaration -- a holding that "
+                    "genuinely cost nothing -- and is accepted; what is refused is the "
+                    "field being absent, because a zero nobody wrote would make every "
+                    "later disposal compute the wrong gain (FR-006)",
                 ),
                 basis=basis,
             )

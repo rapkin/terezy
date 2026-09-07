@@ -61,6 +61,7 @@ def _lot(**overrides: Any) -> SeedLot:
         acquired_on=date(2025, 3, 14),
         cost=Money(9_800.0, UAH, prov.EMPTY),
         basis=seeds.KNOWN,
+        struck_from=None,
     )
     return replace(base, **overrides)
 

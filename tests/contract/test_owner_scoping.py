@@ -72,7 +72,7 @@ def test_every_seed_lot_carries_the_owner() -> None:
     what makes a lot self-describing after the TOML has been discarded, which is the point of
     having the field before there is a second owner to need it.
     """
-    owner_id, declared = loader.seeds_from_file(SEEDS, base_currency=Currency.UAH)
+    owner_id, declared = loader.seeds_from_file(SEEDS)
     assert owner_id == OWNER
     assert declared
     assert all(lot.owner_id == OWNER for lot in declared)
@@ -93,7 +93,9 @@ def test_the_events_a_seed_opens_carry_the_owner_too() -> None:
     from.
     """
     declarations = resolver.from_data_root(DATA_ROOT)
-    _, declared = loader.seeds_from_file(SEEDS, base_currency=Currency.UAH)
+    declared = resolver.seeds_and_goals_from_data_roots(
+        resolver.data_roots_of(DATA_ROOT), base_currency=Currency.UAH
+    ).seeds
     opened = seeds.opening_events(declared, declarations.instruments, opens_on=date(2026, 8, 23))
     assert isinstance(opened, tuple), opened
     assert opened
@@ -158,7 +160,7 @@ def test_every_declared_per_owner_record_is_labelled_synthetic() -> None:
     only as a comment is lost the moment the TOML is discarded, and every downstream figure is
     computed from the records.
     """
-    _, declared_seeds = loader.seeds_from_file(SEEDS, base_currency=Currency.UAH)
+    _, declared_seeds = loader.seeds_from_file(SEEDS)
     _, declared_goals = loader.goals_from_file(GOALS)
     assert declared_seeds
     assert declared_goals
@@ -184,5 +186,5 @@ def test_the_label_is_required_rather_than_defaulted(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     with pytest.raises(DeclarationError) as caught:
-        loader.seeds_from_file(target, base_currency=Currency.UAH)
+        loader.seeds_from_file(target)
     assert "is_synthetic" in caught.value.field_path

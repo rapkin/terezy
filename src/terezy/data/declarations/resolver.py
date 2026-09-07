@@ -41,8 +41,12 @@ from typing import TYPE_CHECKING, Final
 
 from terezy.core.decision.tuple_outcome import Registries
 from terezy.core.instruments import registry as instrument_registry
+from terezy.core.ledger.seeds import SeedLot
 from terezy.core.primitives import money
+from terezy.core.primitives import provenance as prov
+from terezy.core.primitives.money import Money
 from terezy.core.routes.venues import can_hold
+from terezy.core.tax import official_rate
 from terezy.core.tax.scheme import Verdict
 from terezy.core.tax.year import AssessmentRules
 from terezy.data.declarations import loader
@@ -58,9 +62,7 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.instruments.groups import InstrumentGroup
     from terezy.core.instruments.held import HeldAssetDeclaration
     from terezy.core.instruments.interface import InstrumentDeclaration
-    from terezy.core.ledger.seeds import SeedLot
     from terezy.core.primitives.currency import Currency
-    from terezy.core.primitives.money import Money
     from terezy.core.primitives.staleness import ObservationKind
     from terezy.core.results.candidates import CandidateCeiling
     from terezy.core.results.composed import SegmentBound
@@ -76,7 +78,7 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.streams.streams import IncomeStream
     from terezy.core.tax import year as tax_year
     from terezy.core.tax.interface import TaxClass
-    from terezy.core.tax.official_rate import OfficialRateSeries
+    from terezy.core.tax.official_rate import OfficialRateSeries, TaxCurrencyConversion
     from terezy.core.tax.scheme import CreditingDestination, TaxationScheme
     from terezy.data.declarations.loader import ScenarioDeclaration
 
@@ -2247,6 +2249,143 @@ def _check_one_owner(
     )
 
 
+def _declared_currency(
+    lot: loader.DeclaredLot,
+    *,
+    instruments: Mapping[str, InstrumentDeclaration],
+    held: Mapping[str, HeldAssetDeclaration],
+    base_currency: Currency,
+) -> Currency:
+    """What currency a lot's declared cost is in (025 FR-025).
+
+    The base currency **unless the instrument it names declares a different one**. The fact
+    lives on the instrument rather than on the seed, which is where it belongs and where a
+    second lot of the same thing cannot contradict it -- 008 FR-010's "no ``currency`` key"
+    survives, and what changes is the reading of *base currency*.
+
+    A lot naming nothing declared falls through to the base currency and is refused a moment
+    later by :func:`_check_seed_instruments`, which can say what is wrong.
+    """
+    instrument = instruments.get(lot.instrument_id)
+    if instrument is not None:
+        return instrument.currency
+    asset = held.get(lot.instrument_id)
+    if asset is not None:
+        return asset.price_currency
+    return base_currency
+
+
+def _base_currency_series(root: Path, *, base_currency: Currency) -> OfficialRateSeries | None:
+    """The official-rate series the jurisdiction assessing in ``base_currency`` declares.
+
+    Selected by tax currency rather than picked, which is what makes a struck basis the
+    *jurisdiction's* legal figure rather than one this loader chose: ``_official_rate_for``
+    already refuses a series that quotes the tax currency the wrong way round.
+
+    ``None`` where no such jurisdiction declares one, or where none is declared at all. It is
+    a declared absence rather than an oversight, and the lot that needed a rate refuses saying
+    so -- an empty ``tax/timing/`` is not this loader's business to complain about, because a
+    run whose every cost is already in the base currency needs no series at all.
+
+    **Two jurisdictions assessing in the base currency and naming different series is
+    refused**, not resolved by directory order: which of them the owner files under is a fact
+    nothing here declares, and picking one would strike every basis at a rate chosen by
+    filename.
+    """
+    named = {
+        declared.official_rate_series: (declared, path)
+        for _, (declared, path) in sorted(_timing_by_jurisdiction(root).items())
+        if declared.tax_currency is base_currency and declared.official_rate_series is not None
+    }
+    if not named:
+        return None
+    if len(named) > 1:
+        raise DeclarationError(
+            root / TAX_TIMING_DIR,
+            f"{loader.TIMING_TABLE}.official_rate_series",
+            f"holds jurisdictions assessing in {base_currency.value} that name different "
+            f"official-rate series ({', '.join(sorted(named))}). A declared cost in another "
+            "currency would be struck at whichever file sorted first, which is a legal figure "
+            "chosen by filename.",
+            "name one series across the jurisdictions that assess in this currency",
+        )
+    declared, path = next(iter(named.values()))
+    rates = official_rates_from_data_root(root, _resolved_kinds(root / KINDS_FILE)[0])
+    return _official_rate_for(path, declared, rates)
+
+
+def _struck(
+    lot: loader.DeclaredLot,
+    *,
+    currency: Currency,
+    base_currency: Currency,
+    series: OfficialRateSeries | None,
+    path: Path,
+    position: int,
+) -> SeedLot:
+    """One declared lot with its cost tagged, striking a foreign one at the acquisition date.
+
+    025 FR-026: ``base = cost x rate / quotation_unit`` at the rate declared for the lot's own
+    acquisition date, through 011's existing conversion. Struck **before** the cost is tagged,
+    because ``strike_base`` raises on an amount already in the tax currency and by the time a
+    lot reaches ``core.ledger.seeds.seed_cost`` it is one.
+
+    The estimated-basis mark is **not** merged here: it rides on ``basis`` and ``seed_cost``
+    joins the two, so a lot this function never saw carries it too (008 FR-007). What the
+    struck base carries is the rate observation's own provenance, and the union of the two is
+    what reaches every derived figure (FR-027).
+    """
+    if currency is base_currency:
+        # The declared amount rests on no cited source: an owner's own record is not an
+        # observation, the reading `data/streams/` already takes for a salary.
+        return _lot(lot, cost=Money(lot.cost, base_currency, prov.EMPTY), struck_from=None)
+    if series is None:
+        raise DeclarationError(
+            path,
+            f"{loader.SEED_TABLE}[{position}].cost",
+            f"is declared in {currency.value}, which {lot.instrument_id!r} states as its "
+            f"currency, and no jurisdiction assessing in {base_currency.value} declares an "
+            "official-rate series to strike it at. The cost is refused rather than carried "
+            f"across as though it were {base_currency.value}: that would be wrong by the "
+            "whole exchange rate and every figure derived from it would look plausible.",
+            f"declare a series under data/{OFFICIAL_RATES_DIR} and name it in "
+            f"data/{TAX_TIMING_DIR}",
+        )
+    struck = official_rate.strike_base(
+        Money(lot.cost, currency, prov.EMPTY),
+        series,
+        tax_currency=base_currency,
+        on_date=lot.acquired_on,
+    )
+    if not isinstance(struck, official_rate.TaxCurrencyConversion):
+        raise DeclarationError(
+            path,
+            f"{loader.SEED_TABLE}[{position}].acquired_on",
+            f"names {lot.acquired_on.isoformat()}, and no base could be struck for this lot's "
+            f"{currency.value} cost. {struck.reason}",
+            "declare the observation, or correct the acquisition date",
+        )
+    return _lot(lot, cost=struck.base, struck_from=struck)
+
+
+def _lot(
+    declared: loader.DeclaredLot, *, cost: Money, struck_from: TaxCurrencyConversion | None
+) -> SeedLot:
+    """One declared entry as the ledger's record, once its cost has a currency."""
+    return SeedLot(
+        owner_id=declared.owner_id,
+        lot_id=declared.lot_id,
+        declared_at=declared.declared_at,
+        is_synthetic=declared.is_synthetic,
+        instrument_id=declared.instrument_id,
+        quantity=declared.quantity,
+        acquired_on=declared.acquired_on,
+        cost=cost,
+        basis=declared.basis,
+        struck_from=struck_from,
+    )
+
+
 def _check_committable(declared: Sequence[SeedLot], *, path: Path) -> None:
     """FR-005: a lot describing what the owner really holds may not live under a committed root.
 
@@ -2326,6 +2465,7 @@ def resolve_seeds_and_goals(
     goal_file: Path | None,
     instruments: Mapping[str, InstrumentDeclaration],
     held: Mapping[str, HeldAssetDeclaration],
+    series: OfficialRateSeries | None,
     base_currency: Currency,
 ) -> SeedAndGoalDeclarations:
     """The owner's declared holdings and targets, checked against the curated set and the run.
@@ -2343,13 +2483,28 @@ def resolve_seeds_and_goals(
     private_seeds: tuple[SeedLot, ...] = ()
     declared_goals: tuple[Goal, ...] = ()
 
+    def strike(declared: Sequence[loader.DeclaredLot], path: Path) -> tuple[SeedLot, ...]:
+        return tuple(
+            _struck(
+                lot,
+                currency=_declared_currency(
+                    lot, instruments=instruments, held=held, base_currency=base_currency
+                ),
+                base_currency=base_currency,
+                series=series,
+                path=path,
+                position=position,
+            )
+            for position, lot in enumerate(declared)
+        )
+
     if seed_file is not None:
-        seed_owner, shipped_seeds = loader.seeds_from_file(seed_file, base_currency=base_currency)
+        seed_owner, declared_shipped = loader.seeds_from_file(seed_file)
+        shipped_seeds = strike(declared_shipped, seed_file)
         _check_committable(shipped_seeds, path=seed_file)
     if overlay_seed_file is not None:
-        private_owner, private_seeds = loader.seeds_from_file(
-            overlay_seed_file, base_currency=base_currency
-        )
+        private_owner, declared_private = loader.seeds_from_file(overlay_seed_file)
+        private_seeds = strike(declared_private, overlay_seed_file)
         seed_owner = _check_one_owner_across_roots(
             seed_owner, private_owner, overlay_path=overlay_seed_file
         )
@@ -2430,6 +2585,7 @@ def seeds_and_goals_from_data_roots(
         goal_file=_at_most_one(roots.shipped, GOALS_DIR),
         instruments=curated.instruments,
         held=curated.held,
+        series=_base_currency_series(roots.shipped, base_currency=base_currency),
         base_currency=base_currency,
     )
 
