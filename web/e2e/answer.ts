@@ -5,6 +5,7 @@ import { AS_OF } from "./offline";
 export type ServedAnswer = {
   readonly sections: {
     readonly nonDominated: readonly string[];
+    readonly beatsBenchmark: readonly string[];
     readonly dominated: number;
     readonly notPlaced: number;
     readonly ranked: number;
@@ -33,7 +34,10 @@ export async function servedAnswer(page: Page): Promise<ServedAnswer> {
               not_placed?: unknown[];
             };
             outcome: {
-              comparison: { ranked?: unknown[] };
+              comparison: {
+                ranked?: { key: { instrument_id: string } }[];
+                beats_benchmark?: number[];
+              };
               enumerated: { no_candidate: unknown[] };
             };
           }[];
@@ -45,6 +49,11 @@ export async function servedAnswer(page: Page): Promise<ServedAnswer> {
     return {
       sections: body.result.answer.sections.map((section) => ({
         nonDominated: (section.dominance.non_dominated ?? []).map((held) => held.instrument_id),
+        // Resolved here rather than counted: `beats_benchmark` is a list of indices into
+        // `ranked`, and a count is green whatever member each index lands on.
+        beatsBenchmark: (section.outcome.comparison.beats_benchmark ?? []).map(
+          (at) => (section.outcome.comparison.ranked ?? [])[at]?.key.instrument_id ?? "?",
+        ),
         dominated: (section.dominance.dominated ?? []).length,
         notPlaced: (section.dominance.not_placed ?? []).length,
         ranked: (section.outcome.comparison.ranked ?? []).length,

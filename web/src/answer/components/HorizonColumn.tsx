@@ -255,12 +255,23 @@ function Refusals({ refused }: { refused: readonly RefusedTuple[] }) {
   );
 }
 
+/**
+ * One row named by an index into `ranked`.
+ *
+ * The id goes on the element, so a test can assert the lookup landed on the member the index
+ * names: `benchmark`, `beats_benchmark` and `ties` are all indices, and a count alone is green
+ * when every one of them resolves to the same row.
+ */
 function RankedRow({ comparison, at }: { comparison: Comparison; at: number }) {
   const outcome = comparison.ranked[at];
   if (outcome === undefined) {
     return <TypedState state={{ tag: "index-out-of-range", at }} label="the API sent an index" />;
   }
-  return <TupleTerms term={outcome.key} />;
+  return (
+    <div data-ranked-member={outcome.key.instrument_id}>
+      <TupleTerms term={outcome.key} />
+    </div>
+  );
 }
 
 function BenchmarkStanding({ standing }: { standing: Standing }) {

@@ -119,18 +119,20 @@ describe("a candidate card", () => {
     );
   });
 
-  it("states the span it was measured over, in days", () => {
+  it("states the span as the two dates the API sent, and composes no length from them", () => {
+    // A length is a figure the API does not send (FR-008), and FR-009's permitted lookups do
+    // not cover subtracting one served date from another. OB-16 is what would put it here.
     const { container } = card({ instrumentId: "A", span: range("2026-09-01", "2026-10-04") });
-    expect(container.querySelector("[data-span]")?.getAttribute("data-span")).toBe("33");
+    const held = container.querySelector("[data-span]");
+    expect(held?.textContent).toContain(day("2026-09-01"));
+    expect(held?.textContent).toContain(day("2026-10-04"));
+    expect(held?.textContent).not.toMatch(/\bdays\b/);
+    expect(held?.textContent).not.toContain("33");
   });
 
-  it("names the state rather than saying zero days where it cannot read the span", () => {
-    // `spanDays` returns null to say this client could not read the date. Zero is a claim, and
-    // it is the silent clamp the constitution names.
+  it("passes a span date it cannot read through unchanged, never as a plausible day", () => {
     const { container } = card({ instrumentId: "A", span: range("not a date", "2026-10-04") });
-    expect(container.querySelector("[data-span='unreadable']")).not.toBeNull();
-    expect(container.textContent).not.toContain("0 days");
-    expect(container.textContent).toContain("not an ISO date");
+    expect(container.querySelector("[data-span]")?.textContent).toContain("not a date");
   });
 
   it("lets no unrounded float reach the output", () => {

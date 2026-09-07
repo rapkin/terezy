@@ -1,19 +1,16 @@
 import type { Indistinguishable, TupleOutcome } from "@/api/shapes";
 import { beliefsOf, withoutBeliefs } from "@/answer/beliefs";
-import { spanDays } from "@/answer/comparability";
 import { sameTuple } from "@/answer/keys";
 import { separatingBadge } from "@/answer/separating";
-import { notServed } from "@/answer/missing";
 import { beyondShared } from "@/answer/assumptions";
 import type { KindReading } from "@/answer/instrument-kind";
 import { classLabel } from "@/answer/instrument-kind";
-import { count, day, rate } from "@/design/format";
+import { day, rate } from "@/design/format";
 import { KindTile } from "@/design/KindTile";
 import { marksOf } from "@/lib/provenance";
 import { Badge } from "@/components/ui/badge";
 import { FigureSlot } from "@/components/figure/FigureSlot";
 import { Disclosure } from "./Disclosure";
-import { FieldMissing } from "./NamedState";
 import { MoneyBack } from "./MoneyBack";
 import { SeparatingBadge } from "./SeparatingBadge";
 
@@ -94,24 +91,19 @@ export function CandidateCard({
   );
 }
 
-/** The span the rate was measured over, or the state saying this client could not read it. */
+/**
+ * The span the rate was measured over, as the two dates the API sent.
+ *
+ * **Not** their difference in days. A length is a figure the API does not send, and FR-009's
+ * permitted lookups — a key-equality join, a count of a served population, a grouping by typed
+ * fields — do not cover subtracting one served date from another. The comparability predicate
+ * computes the same difference and is allowed to, because it yields a boolean and never reaches
+ * the page. OB-16 is what would put the length here.
+ */
 function Span({ span }: { span: TupleOutcome["span"] }) {
-  const days = spanDays(span);
-  if (days === null) {
-    return (
-      <div className="text-xs" data-span="unreadable">
-        <FieldMissing
-          state={notServed(
-            "a span this client can read",
-            `the served range is ${span.start} to ${span.end}, and one of those is not an ISO date`,
-          )}
-        />
-      </div>
-    );
-  }
   return (
-    <p className="text-xs text-[var(--ink-muted)]" data-span={count(days)}>
-      measured over {count(days)} days, {day(span.start)} to {day(span.end)}
+    <p className="text-xs text-[var(--ink-muted)]" data-span={`${span.start}/${span.end}`}>
+      measured over {day(span.start)} to {day(span.end)}
     </p>
   );
 }

@@ -41,6 +41,10 @@ test("the three columns hold exactly the members the API placed on each front", 
         String(many),
       );
     }
+    const beating = await column
+      .locator("[data-population='beating the benchmark'] [data-ranked-member]")
+      .evaluateAll((held) => held.map((one) => one.getAttribute("data-ranked-member") ?? ""));
+    expect(beating).toEqual([...section.beatsBenchmark]);
     await expect(column.locator("[data-benchmark-standing]")).toBeVisible();
   }
 });

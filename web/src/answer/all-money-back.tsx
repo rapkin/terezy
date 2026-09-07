@@ -11,6 +11,8 @@ import type { TupleOutcome } from "@/api/shapes";
 import { day } from "@/design/format";
 import { marksOf } from "@/lib/provenance";
 import { FigureSlot } from "@/components/figure/FigureSlot";
+import { notServed } from "./missing";
+import { FieldMissing } from "./components/NamedState";
 
 export type AllMoneyBack =
   | { readonly tag: "on"; readonly date: string }
@@ -37,16 +39,27 @@ export function AllMoneyBackFigure({ outcome }: { outcome: TupleOutcome }) {
       />
     );
   }
+  if (back.tag === "nothing-arrived") {
+    // No served reason exists: the outcome simply records no arrival, so the state is this
+    // client's own and never wears `data-served-text`.
+    return (
+      <FieldMissing
+        state={notServed("all of it by", "the outcome records no arrival at all")}
+      />
+    );
+  }
   return (
     <FigureSlot
       state={{
         kind: "refused-in-answer",
         tag: "all money back on",
-        reason:
-          back.tag === "nothing-arrived"
-            ? "the outcome records no arrival at all."
-            : `there is no date on which every hryvnia is back — ${back.reason}. Most of it is ` +
-              `back on ${day(back.mostOfItOn)}.`,
+        reason: back.reason,
+        detail: (
+          <p className="mt-1 text-xs">
+            so there is no date on which every hryvnia is back. Most of it is back on{" "}
+            {day(back.mostOfItOn)}.
+          </p>
+        ),
       }}
     />
   );

@@ -94,6 +94,23 @@ describe("a horizon column", () => {
     }
   });
 
+  it("resolves an index into ranked to the member it names, not merely to a member", () => {
+    // `benchmark`, `beats_benchmark` and `ties` are indices. A population that counted its
+    // members and never identified them stayed green with every index resolving to row zero.
+    const named = (beats: readonly number[]) =>
+      [
+        ...column({
+          ...WHOLE,
+          outcome: survey({ comparison: comparison({ ranked: RANKED, beats }) }),
+        }).container.querySelectorAll(
+          "[data-population='beating the benchmark'] [data-ranked-member]",
+        ),
+      ].map((held) => held.getAttribute("data-ranked-member"));
+    expect(named([1])).toEqual(["B"]);
+    expect(named([0])).toEqual(["A"]);
+    expect(named([1, 0])).toEqual(["B", "A"]);
+  });
+
   it("states the front's own count and no ratio over a set the pass did not place", () => {
     // The pass places `ranked` less `arrives_after_horizon`, so "N of M ranked" invited a
     // subtraction that attributed a verdict to a row nobody assessed. Every count the section
