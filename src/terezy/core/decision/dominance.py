@@ -93,7 +93,14 @@ from terezy.core.results.objectives import (
     ObjectiveDirection,
     ObjectiveSet,
 )
-from terezy.core.results.tuple import BenchmarkUnavailable, Comparison, Tuple, TupleOutcome
+from terezy.core.results.tuple import (
+    BenchmarkUnavailable,
+    Comparison,
+    RemainderStayed,
+    Tuple,
+    TupleOutcome,
+    UndeployedCash,
+)
 
 if TYPE_CHECKING:  # pragma: no cover -- typing only
     from collections.abc import Iterable, Mapping, Sequence
@@ -101,6 +108,10 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
 NO_ARRIVALS: Final = "TupleOutcome.arrivals"
 """What a criterion reading the last arrival finds when there is none: the record field that
 carried nothing, named as an identifier rather than as a sentence (FR-028)."""
+
+MONEY_LEFT_BEHIND: Final = "TupleOutcome.undeployed.journey"
+"""What the same criterion finds where part of the outlay never came home at all: the field
+that says so, on the same rule (FR-028)."""
 
 
 def relates(
@@ -326,6 +337,15 @@ def _figure(item: TupleOutcome, criterion: Criterion) -> Figure:
         case Criterion.ALL_MONEY_BACK_ON:
             if not item.arrivals:
                 return FigureUnavailable(what=NO_ARRIVALS)
+            # *All* the money, so a remainder the declared way out would not carry has to be
+            # read: there is then no date on which every hryvnia is back, and the last arrival
+            # is a date on which most of it is. The remainder that *did* come home needs no
+            # arm -- it leaves on the purchase date and every release leaves later along the
+            # same chain, so it is never the last thing home.
+            if isinstance(item.undeployed, UndeployedCash) and isinstance(
+                item.undeployed.journey, RemainderStayed
+            ):
+                return FigureUnavailable(what=MONEY_LEFT_BEHIND)
             return DateFigure(on=item.arrivals[-1].arrived_on)
         case _:  # pragma: no cover -- mypy proves this unreachable
             assert_never(criterion)

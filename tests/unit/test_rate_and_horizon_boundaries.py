@@ -256,7 +256,7 @@ class TestASeriesWithNoRateToFind:
         undeployed = outcome.undeployed
         assert undeployed is not None
         assert isinstance(undeployed.journey, RemainderStayed), undeployed.journey
-        assert "the whole of it or more" in undeployed.journey.reason
+        assert "the whole of the remainder or more" in undeployed.journey.reason
         rate = outcome.implied_rate
         assert isinstance(rate, RateNotComparable)
         assert "never came home" in rate.reason

@@ -1109,10 +1109,9 @@ def _undeployed(
         reason=(
             f"{prepared.declared.id!r} is bought in increments of {increment!r} "
             f"unit(s) at {price.amount!r} {price.currency.value} each, so "
-            f"{remainder.amount!r} of what arrived bought nothing. It never became a "
-            "position, so it leaves the purchase venue on the purchase date along the "
-            "tuple's own declared way out, is charged what that chain charges, and is "
-            "taxed nothing -- there was no disposal and no gain."
+            f"{remainder.amount!r} of what arrived bought nothing. What became of it is "
+            "the journey beside this: it is the same sentence whether the remainder came "
+            "home or was left where it is."
         ),
     )
 
@@ -1596,10 +1595,13 @@ def _send_the_remainder_home(
         return _stayed(
             prepared,
             remainder,
-            f"the way out charges {money.sub(remainder.amount, way_out.arrived).amount!r} "
-            f"{remainder.amount.currency.value} to carry it, which is the whole of it or more. "
-            "A release has to come home and is reported arriving at a loss; a remainder does "
-            "not, and moving it would leave the owner with less than leaving it there.",
+            f"the way out would deliver {way_out.arrived.amount!r} "
+            f"{way_out.arrived.currency.value} of it, which is nothing or less: its charge is "
+            "the whole of the remainder or more. A release has to come home and is reported "
+            "arriving at a loss; a remainder does not, and moving it would leave the owner "
+            "with less than leaving it there. The two figures are stated rather than "
+            "subtracted: an exit chain that converts delivers in a currency this amount is "
+            "not in.",
         ), None
     capped = _over_the_way_out_cap(way_out, remainder.amount, purchased_on)
     if capped is not None:
