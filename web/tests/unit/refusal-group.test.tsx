@@ -8,7 +8,7 @@ import { noCandidate } from "../answer-fixtures";
  * FR-023: one line carrying the group's typed reason, expandable to each member — never a count
  * alone, and never a blank.
  */
-const ROWS = Array.from({ length: 26 }, (_, at) => noCandidate(`UA400020${String(at)}`));
+const ROWS = Array.from({ length: 27 }, (_, at) => noCandidate(`UA400020${String(at)}`));
 
 describe("a refusal group", () => {
   const [group] = groupNoCandidates(ROWS);
@@ -22,7 +22,7 @@ describe("a refusal group", () => {
     expect(summary?.textContent).toContain("candidates.NothingConnects");
     expect(summary?.textContent).toContain("route_in");
     expect(summary?.textContent).toContain("contract_usd");
-    expect(summary?.textContent).toContain("26");
+    expect(summary?.textContent).toContain("27");
   });
 
   it("expands to every member the count counted", () => {
@@ -31,7 +31,7 @@ describe("a refusal group", () => {
       <RefusalGroup group={group} render={(member) => <span>{member.instrument_id}</span>} />,
     );
     const members = container.querySelectorAll("[data-group-members] > li");
-    expect(members).toHaveLength(26);
+    expect(members).toHaveLength(27);
     expect(members[0]?.textContent).toBe("UA4000200");
   });
 

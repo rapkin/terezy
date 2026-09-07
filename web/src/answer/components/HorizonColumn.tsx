@@ -2,7 +2,6 @@ import type {
   BenchmarkStanding as Standing,
   Comparison,
   HorizonSection,
-  PairYieldedNoCandidate,
   TupleOutcome,
 } from "@/api/shapes";
 import type { KindReading } from "@/answer/instrument-kind";
@@ -158,7 +157,7 @@ export function HorizonColumn({
                   <p className="font-mono">
                     {member.instrument_id} from {member.stream_id}
                   </p>
-                  <p data-served-text="no-candidate">{reasonOf(member.why)}</p>
+                  <p data-served-text="no-candidate">{member.why.reason}</p>
                 </div>
               )}
             />
@@ -241,16 +240,6 @@ function RankedRow({ comparison, at }: { comparison: Comparison; at: number }) {
     return <TypedState state={{ tag: "index-out-of-range", at }} label="the API sent an index" />;
   }
   return <TupleTerms term={outcome.key} />;
-}
-
-function reasonOf(why: PairYieldedNoCandidate["why"]): string {
-  switch (why.tag) {
-    case "candidates.NothingConnects":
-      return why.reason;
-    case "candidates.NothingNeedsToConnect":
-      return why.refusal.reason;
-  }
-  assertNever(why);
 }
 
 function BenchmarkStanding({ standing }: { standing: Standing }) {

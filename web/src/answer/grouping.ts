@@ -2,13 +2,12 @@
  * FR-022: refusals, withheld candidates and no-candidate pairs group by the **typed
  * discriminants their members carry**, never by matching reason text.
  *
- * Measured 2026-09-06, 26 `PairYieldedNoCandidate` rows share `(NothingConnects, route_in,
+ * Measured 2026-09-07, 27 `PairYieldedNoCandidate` rows share `(NothingConnects, route_in,
  * contract_usd)` and differ only in the instrument id inside each reason's own sentence — so a
- * grouping by text would put 26 lines on the screen and a grouping by reason **prefix** would be
+ * grouping by text would put 27 lines on the screen and a grouping by reason **prefix** would be
  * a string match by another name.
  */
 import type { PairYieldedNoCandidate, RefusedTuple } from "@/api/shapes";
-import { assertNever } from "@/lib/exhaustive";
 
 /** One field of the typed reason, and what it says. Rendered as the group's line. */
 export type Discriminant = { readonly field: string; readonly value: string };
@@ -35,25 +34,18 @@ function collect<Member>(
 }
 
 /**
- * The pair's own discriminants, narrowed on `why.tag` **first**.
+ * The pair's own discriminants: the tag **first**, then the fields that member carries.
  *
- * `side` is read only inside the arm that has one: reading it before narrowing would put a
- * `NothingNeedsToConnect` row — which carries no side — in the same group as the connects one.
+ * The tag leads so that a second member added upstream forms its own groups rather than being
+ * folded in with these; `side` is read after it, and a member that carries none turns this red
+ * at the field rather than merging two reasons under one line.
  */
 function noCandidateOn(row: PairYieldedNoCandidate): readonly Discriminant[] {
-  const why = row.why;
-  const stream: Discriminant = { field: "stream", value: row.stream_id };
-  switch (why.tag) {
-    case "candidates.NothingConnects":
-      return [{ field: "why", value: why.tag }, { field: "side", value: why.side }, stream];
-    case "candidates.NothingNeedsToConnect":
-      return [
-        { field: "why", value: why.tag },
-        { field: "refused", value: why.refusal.tag },
-        stream,
-      ];
-  }
-  assertNever(why);
+  return [
+    { field: "why", value: row.why.tag },
+    { field: "side", value: row.why.side },
+    { field: "stream", value: row.stream_id },
+  ];
 }
 
 export function groupNoCandidates(

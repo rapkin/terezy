@@ -14,7 +14,6 @@ export type Remedy = {
 const DECLARATION = "a declaration";
 
 const SUPPLIED_BY: Readonly<Record<string, string>> = {
-  cash: "023-cash-instrument",
   btc: "025-btc-holdings",
 };
 

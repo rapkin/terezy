@@ -7,6 +7,7 @@
  * map (`tests/unit/kinds.test.ts`).
  */
 import type { InstrumentDeclared } from "@/api/shapes";
+import { assertNever } from "@/lib/exhaustive";
 import type { IconComponent } from "./icons/outline";
 import {
   BankIcon,
@@ -123,12 +124,13 @@ export const EVERY_KIND: readonly Kind[] = [
 export const INSTRUMENT_KIND: { readonly [Tag in InstrumentDeclared["tag"]]: Kind } = {
   "interface.InstrumentDeclaration": "bond",
   "fund.FundDeclaration": "fund",
+  "cash.CashDeclaration": "cash",
 };
 
 const CLASS_WORDS: Readonly<Record<string, string>> = {
   enumerated_schedule: "payments enumerated",
   fixed_income: "terms declared",
-  collective_investment_fund: "collective investment fund",
+  cash_balance: "a balance, released at what it was opened with",
 };
 
 /** The declared class in words where this client has one for it, and the raw class where not. */
@@ -136,7 +138,21 @@ export function classWord(instrumentClass: string): string {
   return CLASS_WORDS[instrumentClass] ?? instrumentClass;
 }
 
-/** The class an instrument read declares, for the two reads that differ on carrying one. */
+/**
+ * The class an instrument read declares, where its read carries one.
+ *
+ * A switch and not a field test: a fund's declaration consumes the class at load and answers
+ * without it, so which reads carry one is a fact about the document — and a fourth read arriving
+ * should turn this red rather than silently answer `null`.
+ */
 export function declaredClass(read: InstrumentDeclared): string | null {
-  return read.tag === "interface.InstrumentDeclaration" ? read.instrument_class : null;
+  switch (read.tag) {
+    case "interface.InstrumentDeclaration":
+      return read.instrument_class;
+    case "cash.CashDeclaration":
+      return read.instrument_class;
+    case "fund.FundDeclaration":
+      return null;
+  }
+  assertNever(read);
 }

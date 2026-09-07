@@ -32,5 +32,6 @@ export function sameTuple(left: Tuple, right: Tuple): boolean {
  * why `sameTuple` and not this is what the join compares on.
  */
 export function keyLabel(key: Tuple): string {
-  return [key.instrument_id, key.stream_id, key.route_in.destination_id].join(" · ");
+  const into = key.route_in === "entry_by_identity" ? "here" : key.route_in.destination_id;
+  return [key.instrument_id, key.stream_id, into].join(" · ");
 }

@@ -34,7 +34,11 @@ describe("the kind vocabulary", () => {
 
   it("maps every instrument read the document declares to one of them", () => {
     const tags = Object.keys(INSTRUMENT_KIND);
-    expect(tags).toEqual(["interface.InstrumentDeclaration", "fund.FundDeclaration"]);
+    expect(tags.sort()).toEqual([
+      "cash.CashDeclaration",
+      "fund.FundDeclaration",
+      "interface.InstrumentDeclaration",
+    ]);
     for (const kind of Object.values(INSTRUMENT_KIND)) {
       expect(Object.keys(KINDS)).toContain(kind);
     }
@@ -42,7 +46,7 @@ describe("the kind vocabulary", () => {
 
   it("names the declared classes in words, and renders an unnamed one raw", () => {
     expect(classWord("enumerated_schedule")).toBe("payments enumerated");
-    expect(classWord("collective_investment_fund")).toBe("collective investment fund");
+    expect(classWord("cash_balance")).toBe("a balance, released at what it was opened with");
     // FR-006: `instrument_class` is `string` in the document, so a class this client has no
     // word for is shown as it arrived. Never blank, never a guess.
     expect(classWord("a_class_nobody_named")).toBe("a_class_nobody_named");

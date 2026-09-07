@@ -3,22 +3,22 @@ import { groupNoCandidates, groupRefusals } from "@/answer/grouping";
 import { noCandidate, refusedTuple } from "../answer-fixtures";
 
 /**
- * FR-022, over the population it was measured on: 26 rows sharing `(NothingConnects, route_in,
+ * FR-022, over the population it was measured on: 27 rows sharing `(NothingConnects, route_in,
  * contract_usd)` and differing only in the instrument id inside each reason's own sentence.
  */
-const TWENTY_SIX = Array.from({ length: 26 }, (_, at) => noCandidate(`UA400020${String(at)}`));
+const MEASURED = Array.from({ length: 27 }, (_, at) => noCandidate(`UA400020${String(at)}`));
 
 describe("grouping the no-candidate pairs", () => {
-  it("collapses the measured population to one group holding all 26", () => {
-    const groups = groupNoCandidates(TWENTY_SIX);
+  it("collapses the measured population to one group holding all 27", () => {
+    const groups = groupNoCandidates(MEASURED);
     expect(groups).toHaveLength(1);
-    expect(groups[0]?.members).toHaveLength(26);
+    expect(groups[0]?.members).toHaveLength(27);
   });
 
   it("keeps every id it counted reachable", () => {
-    const groups = groupNoCandidates(TWENTY_SIX);
+    const groups = groupNoCandidates(MEASURED);
     const reachable = groups.flatMap((group) => group.members.map((held) => held.instrument_id));
-    expect(reachable.sort()).toEqual(TWENTY_SIX.map((held) => held.instrument_id).sort());
+    expect(reachable.sort()).toEqual(MEASURED.map((held) => held.instrument_id).sort());
   });
 
   it("groups on the typed fields and not on the reason text", () => {
@@ -36,23 +36,6 @@ describe("grouping the no-candidate pairs", () => {
       noCandidate("C", { streamId: "salary_uah" }),
     ]);
     expect(groups).toHaveLength(3);
-  });
-
-  it("does not merge a pair carrying no side with one that has one", () => {
-    const needsNothing = {
-      ...noCandidate("D"),
-      why: {
-        tag: "candidates.NothingNeedsToConnect" as const,
-        refusal: {
-          tag: "composed.CompositionRefused" as const,
-          case: "no_spendable_endpoint" as const,
-          reason: "nothing composes",
-          destination_id: "inzhur",
-          stream_id: "contract_usd",
-        },
-      },
-    };
-    expect(groupNoCandidates([noCandidate("A"), needsNothing])).toHaveLength(2);
   });
 });
 

@@ -31,7 +31,7 @@ function answerWith(subjects: Parameters<typeof AnswerHeader>[0]["answer"]["subj
   };
 }
 
-const UNDECLARED = { tag: "answer.UndeclaredSubject" as const, named: "cash" };
+const UNDECLARED = { tag: "answer.UndeclaredSubject" as const, named: "btc" };
 
 describe("the answer header", () => {
   it("states every amount the question carries, with the stream it leaves", () => {
@@ -56,13 +56,13 @@ describe("the answer header", () => {
 
   it("renders an undeclared subject as a refusal with its remedy and the feature", () => {
     const { container } = header([UNDECLARED]);
-    const refusal = container.querySelector("[data-undeclared-subject='cash']");
+    const refusal = container.querySelector("[data-undeclared-subject='btc']");
     expect(refusal?.textContent).toContain("a declaration");
-    expect(refusal?.querySelector("[data-remedy-feature='023-cash-instrument']")).not.toBeNull();
+    expect(refusal?.querySelector("[data-remedy-feature='025-btc-holdings']")).not.toBeNull();
   });
 
-  it("names the two subjects the shipped answer reports undeclared", () => {
-    expect(remedyFor("cash").suppliedBy).toBe("023-cash-instrument");
+  it("names the subject the shipped answer still reports undeclared", () => {
+    // Measured 2026-09-07, after 023 landed: `cash` is declared and `btc` is the one left.
     expect(remedyFor("btc").suppliedBy).toBe("025-btc-holdings");
   });
 

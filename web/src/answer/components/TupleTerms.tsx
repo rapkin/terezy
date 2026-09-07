@@ -29,6 +29,7 @@ function Term({ name, value }: { name: string; value: string }) {
 }
 
 function wayIn(path: Tuple["route_in"]): string {
+  if (path === "entry_by_identity") return "entry by identity";
   switch (path.tag) {
     case "path.FundingPath":
       return `${path.route_id} → ${path.destination_id}`;
@@ -54,6 +55,8 @@ function exitTerms(terms: Tuple["exit_terms"]): string {
   switch (terms.tag) {
     case "interface.Assumptions":
       return `${terms.consumption_method}, coupons ${terms.coupon_policy}`;
+    case "cash.CashAssumptions":
+      return "the balance is released at what it was opened with";
     case "fund.FundAssumptions":
       // `exit_on` is null where the fund states no exit date, and a template would print it as
       // the word "null" — which reads as a date nobody declared.
