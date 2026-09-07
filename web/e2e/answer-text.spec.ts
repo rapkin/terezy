@@ -106,7 +106,14 @@ test("what the owner already holds is on the screen, valued or refused", async (
     return body.result.answer.held.map((one) => one.instrument_id);
   }, AS_OF);
   expect(stated).toBe(served.length);
-  if (served.length === 0) return;
+  if (served.length === 0) {
+    // Empty on the shipped tree by design: the owner's own position lives in the gitignored
+    // `data/user/` overlay, which no checkout and no test root carries. The empty case is a
+    // named state, and the rendering of a position is held by the unit suite.
+    await expect(held).toContainText("none");
+    await expect(page.locator("[data-held]")).toHaveCount(0);
+    return;
+  }
 
   await held.locator("summary").click();
   for (const id of served) {
