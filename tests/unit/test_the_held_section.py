@@ -12,7 +12,6 @@ a position of zero.
 from __future__ import annotations
 
 import shutil
-from dataclasses import replace
 from datetime import date
 from pathlib import Path
 from typing import Any, Final
@@ -27,11 +26,17 @@ from terezy.core.ledger import seeds
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.tolerance import is_close
-from terezy.core.results.answer import Answer, SubjectHeld
+from terezy.core.results.answer import Answer, SubjectHeld, SubjectReached
 from terezy.core.results.candidates import CandidateSurvey
-from terezy.core.results.held import HeldPosition, InBaseCurrency, Valued
+from terezy.core.results.held import (
+    HeldPosition,
+    InBaseCurrency,
+    QuoteAssetUndeclared,
+    Valued,
+)
+from terezy.core.results.question import Question
 from terezy.core.tax.official_rate import observation_for
-from terezy.data.declarations import resolver
+from terezy.data.declarations import loader, resolver
 from tests import answer_registries as fixtures
 
 ASSET: Final = "synthetic_held_x"
@@ -49,9 +54,29 @@ the arithmetic against by hand, and a retyped rate that drifted would make the c
 AS_OF_RATE: Final = 44.5445
 
 
-def _answered(root: Path = fixtures.DATA_ROOT, *, as_of: date = fixtures.AS_OF) -> Answer:
+def _asking_about_the_fixture() -> Question:
+    """His question with the fixture asset among the words, so the held section reaches it.
+
+    A held position is reported only for an asset the question **named** (FR-030), and his own
+    question names `btc`, which ships no observation file. The fixture asset is the only one
+    with a price, so a suite about the priced path has to ask about it.
+    """
+    question = fixtures.owners_question()
+    named = (fixtures.OVDP, "btc", ASSET)
+    return fixtures.with_plans(
+        fixtures.with_subjects(question, *named),
+        {word: plan for word, plan in question.plans.items() if word in named},
+    )
+
+
+def _answered(
+    root: Path = fixtures.DATA_ROOT,
+    *,
+    as_of: date = fixtures.AS_OF,
+    question: Question | None = None,
+) -> Answer:
     run: Any = answer_declared(
-        fixtures.owners_question(),
+        _asking_about_the_fixture() if question is None else question,
         root,
         as_of=as_of,
         base_currency=Currency.UAH,
@@ -149,6 +174,7 @@ def test_every_figure_names_the_belief_it_was_struck_through(answered: Answer) -
     dropping the belief is a type error rather than an unmarked dollar figure."""
     valuation = _position(answered).valuation
     assert isinstance(valuation, Valued)
+    assert valuation.assumption is not None, "a token-quoted asset leans on a belief"
     assert valuation.assumption.id
     assert valuation.assumption.is_assumption is True
     assert valuation.assumption.quote_asset == "USDT"
@@ -238,7 +264,9 @@ def test_no_belief_refuses_the_value_rather_than_reading_the_token_as_a_dollar(
     shutil.copytree(fixtures.DATA_ROOT, root)
     shutil.rmtree(root / resolver.QUOTE_ASSET_DIR)
     valuation = _position(_answered(root)).valuation
-    assert isinstance(valuation, NoQuotationOnDate)
+    assert isinstance(valuation, QuoteAssetUndeclared)
+    assert valuation.declared is None
+    assert valuation.wanted == Currency.USD.value
     assert "silent equality" in valuation.reason
 
 
@@ -262,7 +290,7 @@ def test_a_held_subject_reaches_its_own_standing_in_every_section(answered: Answ
         standing = next(item for item in section.standings if item.named == "btc")
         assert isinstance(standing, SubjectHeld)
         assert standing.ids == ("btc",)
-        assert subject_counts(answered, section).held == 1
+        assert subject_counts(answered, section).held == 2, "btc and the fixture asset"
 
 
 def test_btc_itself_is_held_and_declares_no_lot_in_the_committed_tree(
@@ -290,9 +318,110 @@ def test_a_run_with_no_overlay_declares_no_held_position_at_all(tmp_path: Path) 
     assert isinstance(standing, SubjectHeld)
 
 
-def test_the_question_is_the_owners_own_and_is_not_edited_here() -> None:
-    """The fixture must not have quietly changed what he asked, or every count above drifts."""
-    assert replace(fixtures.owners_question(), plans={}) == replace(
-        fixtures.owners_question(), plans={}
+def test_the_question_is_the_owners_own_and_names_btc() -> None:
+    """Every count above rests on his four words, so the fixture naming them is asserted.
+
+    Against the **file** rather than against another call to the same helper: comparing the
+    fixture to itself is a tautology that survives any edit to it, which is what this
+    assertion used to be.
+    """
+    declared = loader.question_from_file(fixtures.QUESTION_FILE)
+    assert fixtures.owners_question() == declared
+    assert declared.subjects == ("cash", "ovdp", "inzhur", "btc")
+
+
+# ---------------------------------------------------------------------------
+# The belief speaks for one asset, and a group is not collapsed by one member
+# ---------------------------------------------------------------------------
+
+OTHER: Final = "synthetic_held_uah"
+"""A second held asset quoted under the SAME symbol as the first and declaring its price is in
+the base currency. The one declared belief is about USDT and dollars, so it says nothing about
+this asset -- and the close it would otherwise have priced is right there to be misread."""
+
+OTHER_DECLARATION: Final = f"""\
+# SYNTHETIC FIXTURE, written by a test. Every term invented.
+[instrument]
+id             = "{OTHER}"
+name           = "Synthetic held asset priced in hryvnia -- TEST FIXTURE"
+class          = "held_asset"
+quantity_unit  = "SXU"
+price_currency = "UAH"
+venue_id       = "binance"
+symbol         = "SYNTHUSDT"
+is_synthetic   = true
+groups         = []
+
+[instrument.tax_classes]
+disposal_gain = "no_pack_declares_this_class"
+"""
+
+
+def _with_the_other_asset(tmp_path: Path) -> Path:
+    """A root carrying a hryvnia-priced held asset whose symbol still ends in the token.
+
+    It reads the same fetched series the dollar-priced fixture does, which is what puts a real
+    close in front of the belief and makes the mismatch reachable rather than theoretical.
+    """
+    root = tmp_path / "data"
+    shutil.copytree(fixtures.DATA_ROOT, root)
+    (root / "instruments" / f"{OTHER}.toml").write_text(OTHER_DECLARATION, encoding="utf-8")
+    overlay = root / resolver.USER_DIR / resolver.SEEDS_DIR / "owner-001.toml"
+    overlay.write_text(
+        overlay.read_text(encoding="utf-8") + "\n[[seed]]\n"
+        "is_synthetic  = true\n"
+        f'instrument_id = "{OTHER}"\n'
+        "quantity      = 3.0\n"
+        'acquired_on   = "2025-04-07"\n'
+        "cost          = 900.0\n"
+        'basis         = "known"\n',
+        encoding="utf-8",
     )
-    assert "btc" in fixtures.owners_question().subjects
+    return root
+
+
+def test_a_belief_about_another_token_does_not_price_this_asset(tmp_path: Path) -> None:
+    """FR-023, and the wrong number it prevents.
+
+    The one declared belief says a USDT is a USD. This asset declares its price is in UAH, so
+    the belief says nothing about it -- and applying it anyway would tag the value USD, strike
+    it through UAH/USD, and subtract a hryvnia basis from the result. That is wrong by the
+    whole exchange rate with a plausible *assumes: one USDT is one USD* line beside it.
+    """
+    question = fixtures.owners_question()
+    named = (fixtures.OVDP, OTHER)
+    result = _answered(
+        _with_the_other_asset(tmp_path),
+        question=fixtures.with_plans(
+            fixtures.with_subjects(question, *named),
+            {word: plan for word, plan in question.plans.items() if word in named},
+        ),
+    )
+    valuation = _position(result, OTHER).valuation
+    assert isinstance(valuation, QuoteAssetUndeclared)
+    assert valuation.wanted == Currency.UAH.value
+    assert valuation.declared == "USDT = USD"
+    assert _position(result, OTHER).basis.currency is Currency.UAH
+
+
+def test_a_group_naming_a_held_asset_and_a_bond_still_reports_the_bond_as_reached(
+    tmp_path: Path,
+) -> None:
+    """FR-029's limit. A group is a label and a label is data, so one word can name both.
+
+    Deciding *held* first would hide every candidate the bonds reached and print
+    *already held (0 of N)* over a ranking two of them are in -- a remedy that is wrong for
+    the majority of the subject.
+    """
+    root = _with_the_other_asset(tmp_path)
+    labelled = (root / "instruments" / f"{OTHER}.toml").read_text(encoding="utf-8")
+    (root / "instruments" / f"{OTHER}.toml").write_text(
+        labelled.replace("groups         = []", 'groups         = ["ovdp"]'), encoding="utf-8"
+    )
+    result = _answered(root, question=fixtures.owners_question())
+    standing = next(item for item in result.sections[0].standings if item.named == fixtures.OVDP)
+    assert isinstance(standing, SubjectReached), (
+        "a group whose bonds reached candidates is reached, whatever else carries the label"
+    )
+    assert OTHER in standing.ids
+    assert OTHER not in standing.with_candidates

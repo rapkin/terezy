@@ -77,10 +77,13 @@ class Valued:
     value: Money
     """``quantity x close``, in the currency the belief says the quote asset equals."""
 
-    assumption: QuoteAssetIsWorth
-    """The belief that made a token quotation a currency figure, named so a reader can find
-    the file (025 FR-023). Required with no default: a valued position that could omit it
-    would be a dollar figure resting on an unstated peg."""
+    assumption: QuoteAssetIsWorth | None
+    """The belief that made a token quotation a currency figure, or ``None`` where none was
+    leaned on because the symbol is already quoted in the asset's own currency (025 FR-023).
+
+    Required with no default: a valued position that could omit the field would be a dollar
+    figure resting on an unstated peg, and ``None`` is a positive claim that no peg was
+    assumed rather than a forgotten one."""
 
     in_base: InBaseCurrency | OfficialRateUnavailable
     """The base-currency restatement, or 011's typed refusal naming the series and the date.
@@ -91,9 +94,35 @@ class Valued:
     """
 
 
-Valuation = Valued | NoQuotationOnDate
-"""Whether this position has a price today. One union, so a refusal is stated once rather than
-standing in for the value, the change and the price separately."""
+@dataclass(frozen=True, slots=True, kw_only=True)
+class QuoteAssetUndeclared:
+    """A close was published, and no declared belief says what its quote asset is worth here.
+
+    **Its own record rather than a second use of** :class:`NoQuotationOnDate`, and the reason
+    is that the two send a reader to different files: one is a missing observation, cured by
+    running the fetch script, and this one is a missing belief in `data/scenarios/`. A refusal
+    whose type says *no price was published* when a price was published is a guard whose
+    message does not match what it did (025 FR-023).
+    """
+
+    symbol: str
+    wanted: str
+    """The currency the asset declares its price is in, which is what a belief would have to
+    say the symbol's quote asset equals."""
+
+    declared: str | None
+    """What the one declared belief says instead, as ``"<token> = <currency>"``, or ``None``
+    where none is declared at all. The two cases send a reader to the same file and to
+    different lines of it."""
+
+    on_date: date
+    reason: str
+
+
+Valuation = Valued | NoQuotationOnDate | QuoteAssetUndeclared
+"""Whether this position has a price today, and if not, which of the two missing declarations
+is why. One union, so a refusal is stated once rather than standing in for the value, the
+change and the price separately."""
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -173,6 +202,7 @@ __all__ = [
     "NoTaxUntilADisposal",
     "NoYieldIsDeclared",
     "NotRankedAgainstTheBenchmark",
+    "QuoteAssetUndeclared",
     "Valuation",
     "Valued",
 ]

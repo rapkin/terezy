@@ -3260,6 +3260,7 @@ def _resolved_quote_asset_belief(root: Path) -> tuple[QuoteAssetIsWorth, Path] |
 def _resolved_quotations(
     root: Path,
     held: Mapping[str, HeldAssetDeclaration],
+    held_files: Mapping[str, Path],
     venues: Mapping[str, Venue],
     kinds: Mapping[str, ObservationKind],
 ) -> tuple[dict[str, QuotationSeries], dict[str, Path]]:
@@ -3272,7 +3273,7 @@ def _resolved_quotations(
     series: dict[str, QuotationSeries] = {}
     declaring: dict[str, Path] = {}
     for instrument_id, asset in sorted(held.items()):
-        _check_held_venue(root, asset, venues)
+        _check_held_venue(held_files[instrument_id], asset, venues)
         path = root / OBSERVATIONS_DIR / f"{asset.venue_id}_{asset.symbol.casefold()}.toml"
         if not path.is_file():
             continue
@@ -3295,12 +3296,17 @@ def _resolved_quotations(
     return series, declaring
 
 
-def _check_held_venue(root: Path, asset: HeldAssetDeclaration, venues: Mapping[str, Venue]) -> None:
-    """A holding sits somewhere declared, or the load fails naming the venue it invented."""
+def _check_held_venue(path: Path, asset: HeldAssetDeclaration, venues: Mapping[str, Venue]) -> None:
+    """A holding sits somewhere declared, or the load fails naming the venue it invented.
+
+    ``path`` is the file the declaration was **read from** rather than one built from the id:
+    nothing requires a file to be named for what it declares, and an error naming a path that
+    does not exist sends a reader looking for a file nobody wrote.
+    """
     if asset.venue_id in venues:
         return
     raise DeclarationError(
-        root / INSTRUMENTS_DIR / f"{asset.id}.toml",
+        path,
         f"{loader.INSTRUMENT_TABLE}.venue_id",
         f"names the venue {asset.venue_id!r}, which {VENUES_FILE} does not declare. Declared "
         f"venues: {sorted(venues)}. A holding sitting at a venue nobody declared cannot be "
@@ -4038,6 +4044,7 @@ def answer_from_data_root(
     quotations, quotation_files = _resolved_quotations(
         root,
         tuples.instruments.held,
+        tuples.instruments.held_files,
         tuples.coverage.ramp.venues,
         tuples.registries.kinds,
     )

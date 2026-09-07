@@ -545,6 +545,9 @@ def _standing(
     """One subject's state, in the order a reader would ask the questions in."""
     if isinstance(subject, UndeclaredSubject):
         return SubjectUndeclared(named=subject.named)
+    with_candidates = tuple(name for name in subject.ids if name in reached)
+    if with_candidates:
+        return SubjectReached(named=subject.named, ids=subject.ids, with_candidates=with_candidates)
     if any(name in held_assets for name in subject.ids):
         return SubjectHeld(
             named=subject.named,
@@ -553,9 +556,6 @@ def _standing(
         )
     if not enumerated:
         return SubjectNotAssessed(named=subject.named, ids=subject.ids)
-    with_candidates = tuple(name for name in subject.ids if name in reached)
-    if with_candidates:
-        return SubjectReached(named=subject.named, ids=subject.ids, with_candidates=with_candidates)
     return SubjectUnreached(named=subject.named, ids=subject.ids)
 
 

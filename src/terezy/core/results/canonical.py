@@ -25,6 +25,7 @@ from typing import assert_never
 
 from terezy.core.instruments.cash import CashAssumptions
 from terezy.core.instruments.interface import Assumptions
+from terezy.core.instruments.quotations import NoQuotationOnDate
 from terezy.core.ledger import canonical as ledger_canonical
 from terezy.core.ledger.canonical import Canonical
 from terezy.core.primitives.conventions import AmountsAsDeclared, ConventionsApplied
@@ -50,6 +51,13 @@ from terezy.core.results.answer import (
 from terezy.core.results.candidates import CandidateSurvey
 from terezy.core.results.dominance import DominanceRefused, DominanceResult
 from terezy.core.results.fund import FundAssumptions
+from terezy.core.results.held import (
+    HeldPosition,
+    InBaseCurrency,
+    QuoteAssetUndeclared,
+    Valuation,
+    Valued,
+)
 from terezy.core.results.hurdle import HurdleRate, RealTerms
 from terezy.core.results.objectives import (
     AbsoluteBand,
@@ -73,6 +81,7 @@ from terezy.core.results.tuple import (
 )
 from terezy.core.routes.path import ExitChain, entry_id, exit_segments_of
 from terezy.core.tax.interface import TaxCharge
+from terezy.core.tax.official_rate import OfficialRateUnavailable
 
 
 def of_conventions(value: ConventionsApplied | AmountsAsDeclared) -> tuple[str, ...]:
@@ -429,8 +438,67 @@ def of_answer(value: Answer) -> tuple[Canonical, ...]:
         value.question.continuation.value,
         tuple(_of_subject(item) for item in value.subjects),
         tuple(of_section(item) for item in value.sections),
+        tuple(_of_held(item) for item in value.held),
         tuple(_of_exclusion(item) for item in value.excludes),
     )
+
+
+def _of_held(value: HeldPosition) -> tuple[Canonical, ...]:
+    """One held position: every figure it reports, and which refusal replaced the rest.
+
+    In the digest because it is a **reported figure**. Left out, a re-fetched close, a changed
+    overlay quantity and a valuation that stopped being available would all produce the same
+    hash as the run before them -- and a digest that cannot move is the green build Principle V
+    names.
+    """
+    return (
+        value.instrument_id,
+        ledger_canonical.of_number(value.quantity),
+        value.quantity_unit,
+        ledger_canonical.of_money(value.basis),
+        tuple(
+            (
+                lot.lot_id,
+                ledger_canonical.of_date(lot.acquired_on),
+                ledger_canonical.of_number(lot.quantity),
+                ledger_canonical.of_money(lot.basis),
+            )
+            for lot in value.lots
+        ),
+        _of_valuation(value.valuation),
+        type(value.tax).__name__,
+    )
+
+
+def _of_valuation(value: Valuation) -> tuple[Canonical, ...]:
+    """The price and what it made, or the name of the refusal that stood in for both."""
+    match value:
+        case Valued():
+            return (
+                "valued",
+                ledger_canonical.of_date(value.quotation.on_date),
+                ledger_canonical.of_number(value.quotation.close),
+                ledger_canonical.of_money(value.value),
+                "" if value.assumption is None else value.assumption.id,
+                _of_base_value(value.in_base),
+            )
+        case NoQuotationOnDate():
+            return ("no_quotation", ledger_canonical.of_date(value.on_date))
+        case QuoteAssetUndeclared():
+            return ("quote_asset_undeclared", ledger_canonical.of_date(value.on_date))
+        case _:  # pragma: no cover -- mypy proves this unreachable
+            assert_never(value)
+
+
+def _of_base_value(value: InBaseCurrency | OfficialRateUnavailable) -> tuple[Canonical, ...]:
+    """The base-currency restatement, or the name of the refusal that replaced it."""
+    if isinstance(value, InBaseCurrency):
+        return (
+            "in_base",
+            ledger_canonical.of_money(value.value),
+            ledger_canonical.of_money(value.nominal_change),
+        )
+    return ("rate_unavailable", type(value).__name__)
 
 
 def _of_subject(value: ResolvedSubject) -> tuple[Canonical, ...]:

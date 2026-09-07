@@ -3195,8 +3195,9 @@ def held_asset_from_file(path: Path) -> HeldAssetDeclaration:
     **The tax-class reference is required and is not resolved here or anywhere.** For a bond an
     unresolved class is refused by the resolver, because a projection would otherwise charge
     nothing; a held asset projects nothing, and the refusal is the reported figure. What is
-    still required is that a class be *named*: a holding with none would report no tax because
-    nobody said what its tax was, which reads exactly like an exemption.
+    still required is that a disposal class be *named* (:func:`_held_tax_classes`): a holding
+    with none would report no tax because nobody said what its tax was, which reads exactly
+    like an exemption.
     """
     document = read_document(path)
     table = _validate(schema.HeldAssetFile, document, path).instrument
@@ -3252,10 +3253,32 @@ def held_asset_from_file(path: Path) -> HeldAssetDeclaration:
             "deriving it from the id would make a second venue's ticker an engine edit",
         ),
         is_synthetic=table.is_synthetic,
-        tax_classes=_tax_class_references(
-            path, table.tax_classes, field_prefix=f"{prefix}.tax_classes"
-        ),
+        tax_classes=_held_tax_classes(path, table.tax_classes, field_prefix=f"{prefix}"),
         groups=_group_labels(path, f"{prefix}.groups", table.groups),
+    )
+
+
+def _held_tax_classes(
+    path: Path, table: Mapping[str, str], *, field_prefix: str
+) -> Mapping[TaxableEventKind, str]:
+    """``[instrument.tax_classes]`` for a held asset, which must name a **disposal** class.
+
+    ``_tax_class_references`` refuses only a wholly empty table, and that is not enough here:
+    disposing is the one taxable thing that can happen to a thing held for its price, so a
+    declaration naming a coupon class and no disposal class would reach the reader as a refusal
+    citing the empty string. A refusal naming ``''`` tells nobody which class to go and declare.
+    """
+    declared = _tax_class_references(path, table, field_prefix=f"{field_prefix}.tax_classes")
+    if TaxableEventKind.DISPOSAL_GAIN in declared:
+        return declared
+    raise DeclarationError(
+        path,
+        f"{field_prefix}.tax_classes.{TaxableEventKind.DISPOSAL_GAIN.value}",
+        "is missing, and it is the one a held asset needs: nothing else can happen to a thing "
+        "held for its price, so a declaration without it would report its tax as a refusal "
+        "citing no class at all. The class need not resolve -- an unsettled treatment is what "
+        "the refusal exists to say -- but it has to be named.",
+        f'declare {TaxableEventKind.DISPOSAL_GAIN.value} = "<the class that would govern>"',
     )
 
 

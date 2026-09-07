@@ -30,6 +30,7 @@ from terezy.core.results.held import (
     NoTaxUntilADisposal,
     NotRankedAgainstTheBenchmark,
     NoYieldIsDeclared,
+    QuoteAssetUndeclared,
     Valuation,
     Valued,
 )
@@ -197,33 +198,75 @@ def _valued(
     quotation = close_on(series, as_of)
     if isinstance(quotation, NoQuotationOnDate):
         return quotation
-    if belief is None:
-        return NoQuotationOnDate(
+    speaks = _speaks_for(asset, belief)
+    if speaks is None:
+        return QuoteAssetUndeclared(
             symbol=series.symbol,
+            wanted=asset.price_currency.value,
+            declared=None if belief is None else f"{belief.quote_asset} = {belief.currency}",
             on_date=as_of,
-            covers=None,
             reason=(
                 f"{series.symbol} closed at a published figure on {as_of.isoformat()}, and "
-                "nothing declares what the token it is quoted in is worth. The figure is "
-                "refused rather than read as a currency amount: taking a dollar-referenced "
-                "token for a dollar without the owner having said so is a silent equality, "
+                f"nothing declares that its quote asset is worth "
+                f"{asset.price_currency.value}, which is what {asset.id!r} says its price is "
+                "in. The figure is refused rather than read as a currency amount: taking a "
+                "token for a currency without the owner having said so is a silent equality, "
                 "and it would put the whole peg under a figure carrying no mark. Declare the "
-                "belief in data/scenarios/."
+                "belief in data/scenarios/quote_asset/."
             ),
         )
-    # A token quotation becomes money only here, and only because the owner declared a belief.
+    # A token quotation becomes money only here, and only in the currency the ASSET declares
+    # its price is in -- never in whatever the one global belief happens to name.
     value = money.from_quoted_token(
         quantity,
         close=quotation.close,
-        taken_as=Currency(belief.currency),
+        taken_as=asset.price_currency,
         sources=quotation.provenance,
     )
     return Valued(
         quotation=quotation,
         value=value,
-        assumption=belief,
+        assumption=speaks.belief,
         in_base=_in_base(value, basis=basis, rates=rates, base_currency=base_currency, as_of=as_of),
     )
+
+
+@dataclass(frozen=True, slots=True)
+class _Priced:
+    """The quotation may be read as money, and the belief (if any) that permits it."""
+
+    belief: QuoteAssetIsWorth | None
+
+
+def _speaks_for(asset: HeldAssetDeclaration, belief: QuoteAssetIsWorth | None) -> _Priced | None:
+    """Whether this asset's close may be read as money, and on whose say-so (025 FR-023).
+
+    Two ways it may. The symbol may already be quoted **in the asset's own currency**, in which
+    case there is no token between the two and no belief is leaned on -- a close in ``XAUUAH``
+    for an asset declaring ``UAH`` needs nobody's permission to be hryvnia. Or a declared
+    belief may say that the token the symbol ends in equals that currency.
+
+    **The belief is checked against this asset rather than applied to every one.** There is one
+    belief per root and there may be many held assets; applying it unconditionally would tag a
+    hryvnia-priced asset's value in dollars and then subtract a hryvnia basis from it, which is
+    wrong by the whole exchange rate and reads as a labelled figure. That is the silent
+    equality FR-023 refuses, arriving through the asset instead of through an absent belief.
+
+    Matching is on the symbol's **tail** because that is all a symbol says: klines publishes no
+    base and no quote asset, and this engine may not split ``BTCUSDT`` -- but it can ask
+    whether the symbol ends in the token a belief is about, which is a question the declaration
+    answers rather than a judgement.
+    """
+    symbol = asset.symbol.casefold()
+    if symbol.endswith(asset.price_currency.value.casefold()):
+        return _Priced(belief=None)
+    if (
+        belief is not None
+        and belief.currency == asset.price_currency.value
+        and symbol.endswith(belief.quote_asset.casefold())
+    ):
+        return _Priced(belief=belief)
+    return None
 
 
 def _in_base(

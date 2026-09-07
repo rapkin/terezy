@@ -136,11 +136,12 @@ def _render(result: Answer) -> str:
         )
         lines.append(f"  valuation {type(position.valuation).__name__}")
         if isinstance(position.valuation, Valued):
+            assumed = position.valuation.assumption
             lines.append(
                 f"  priced {position.valuation.quotation.on_date.isoformat()} "
                 f"{position.valuation.value.amount.hex()} "
                 f"{position.valuation.value.currency.value}  "
-                f"assumes {position.valuation.assumption.id}"
+                f"assumes {'none' if assumed is None else assumed.id}"
             )
             lines.append(f"  in_base {type(position.valuation.in_base).__name__}")
             if isinstance(position.valuation.in_base, InBaseCurrency):

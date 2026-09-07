@@ -256,8 +256,9 @@ def _valuation_lines(valuation: Valuation) -> list[str]:
         f"    price: {valuation.quotation.close:g} per unit, closed "
         f"{valuation.quotation.on_date.isoformat()}",
         f"    value: {_readable(valuation.value)}",
-        f"    assumes: {quote_asset.rests_on(valuation.assumption)}",
     ]
+    if valuation.assumption is not None:
+        lines.append(f"    assumes: {quote_asset.rests_on(valuation.assumption)}")
     if isinstance(valuation.in_base, InBaseCurrency):
         struck = valuation.in_base.struck
         lines.append(f"    value in base: {_readable(valuation.in_base.value)}")

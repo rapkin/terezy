@@ -1084,6 +1084,7 @@ def test_the_belief_every_dollar_figure_rests_on_is_printed_beside_it() -> None:
     result = _held_answer()
     position = next(item for item in result.held if item.instrument_id == "synthetic_held_x")
     assert isinstance(position.valuation, Valued)
+    assert position.valuation.assumption is not None
     printed = "\n".join(cli._held_lines(result))
     assert position.valuation.assumption.rationale in printed
     assert position.valuation.assumption.id in printed
