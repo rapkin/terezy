@@ -1,5 +1,5 @@
-import type { AnsweredQuestion, HorizonSection, TupleOutcome } from "@/api/shapes";
-import { sharedAcross } from "@/answer/assumptions";
+import type { AnsweredQuestion, HorizonSection, Separating, TupleOutcome } from "@/api/shapes";
+import { sharedAcross, sharedFor } from "@/answer/assumptions";
 import { joinToOutcome } from "@/answer/join";
 import { beliefsAcross, sentencesNaming, withoutBeliefs } from "@/answer/beliefs";
 import type { KindReading } from "@/answer/instrument-kind";
@@ -27,9 +27,10 @@ export function AnswerScreen({
     return <TypedState state={answer} label="the question was not answered" />;
   }
   const shown = membersShown(answer.sections);
-  const beliefs = beliefsAcross(shown);
+  const outcomes = shown.map((member) => member.outcome);
+  const beliefs = beliefsAcross(outcomes);
   const shared = withoutBeliefs(
-    sharedAcross(shown.map((outcome) => outcome.rests_on)),
+    sharedAcross(shown.map((member) => sharedFor(member.outcome, member.separating))),
     beliefs,
   );
   return (
@@ -38,7 +39,7 @@ export function AnswerScreen({
       <SharedAssumptions
         shared={shared}
         beliefs={beliefs}
-        statedAs={(belief) => sentencesNaming(belief, shown)}
+        statedAs={(belief) => sentencesNaming(belief, outcomes)}
       />
       <div className="grid gap-4 lg:grid-cols-3" data-columns>
         {answer.sections.map((section) => (
@@ -54,6 +55,9 @@ export function AnswerScreen({
   );
 }
 
+/** One member shown on a card, beside its section's own statement of what separates it. */
+export type Shown = { readonly outcome: TupleOutcome; readonly separating: Separating };
+
 /**
  * Every member shown on a card, across every section.
  *
@@ -61,8 +65,8 @@ export function AnswerScreen({
  * rests on is what goes once at the top, and folding one that only the dominated rows carry
  * would state it above cards that do not rest on it.
  */
-export function membersShown(sections: readonly HorizonSection[]): readonly TupleOutcome[] {
-  const shown: TupleOutcome[] = [];
+export function membersShown(sections: readonly HorizonSection[]): readonly Shown[] {
+  const shown: Shown[] = [];
   for (const section of sections) {
     if (section.outcome.tag !== "candidates.CandidateSurvey") continue;
     const comparison = section.outcome.comparison;
@@ -70,7 +74,9 @@ export function membersShown(sections: readonly HorizonSection[]): readonly Tupl
     if (section.dominance.tag !== "dominance.DominanceResult") continue;
     for (const key of section.dominance.non_dominated) {
       const joined = joinToOutcome(key, comparison.ranked);
-      if (joined.tag === "joined") shown.push(joined.outcome);
+      if (joined.tag === "joined") {
+        shown.push({ outcome: joined.outcome, separating: section.dominance.separating });
+      }
     }
   }
   return shown;
@@ -81,5 +87,5 @@ export function membersShown(sections: readonly HorizonSection[]): readonly Tupl
  * request rather than two (plan Finding 1 counts ten across the three fronts).
  */
 export function memberIds(sections: readonly HorizonSection[]): readonly string[] {
-  return [...new Set(membersShown(sections).map((held) => held.key.instrument_id))];
+  return [...new Set(membersShown(sections).map((held) => held.outcome.key.instrument_id))];
 }
