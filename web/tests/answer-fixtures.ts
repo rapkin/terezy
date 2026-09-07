@@ -16,6 +16,7 @@ import type {
   RefusedTuple,
   Tuple,
   TupleOutcome,
+  UndeployedCash,
 } from "@/api/shapes";
 import { tagOf } from "@/lib/narrow";
 import { money, provenance, source, verdict } from "./fixtures";
@@ -59,13 +60,14 @@ export function outcome(over: {
   readonly restsOn?: readonly string[];
   readonly undeployed?: TupleOutcome["undeployed"];
   readonly quotation?: TupleOutcome["carried_quotation"];
+  readonly arrivals?: TupleOutcome["arrivals"];
 }): TupleOutcome {
   return {
     tag: "tuple.TupleOutcome",
     key: tuple(over.instrumentId),
     outlay: money(50000, []),
     parts: [],
-    arrivals: [],
+    arrivals: [...(over.arrivals ?? [arrival("2026-10-04")])],
     reaches: over.reaches ?? money(50529.090769230774, [source()]),
     implied_rate: over.rate ?? { tag: "rates.NominalRate", value: 0.18112850290026622 },
     real: {
@@ -91,6 +93,32 @@ export function outcome(over: {
     provenance: provenance([source()]),
     staleness: verdict([]),
   };
+}
+
+/** One arrival: money released at the far end and landing at a spendable endpoint. */
+export function arrival(on: string): TupleOutcome["arrivals"][number] {
+  return {
+    tag: "tuple.Arrival",
+    released_on: on,
+    released: money(50000, [source()]),
+    arrived_on: on,
+    amount: money(50000, [source()]),
+  };
+}
+
+/** The remainder rode the declared way out and arrived inside `reaches` (026 FR-016). */
+export function cameHome(on = "2026-10-04"): UndeployedCash["journey"] {
+  return {
+    tag: "tuple.RemainderCameHome",
+    left_on: "2026-09-01",
+    arrived_on: on,
+    reached: money(494.68, [source()]),
+  };
+}
+
+/** The remainder the way out would not carry (026 FR-017). */
+export function stayed(reason: string): UndeployedCash["journey"] {
+  return { tag: "tuple.RemainderStayed", reason };
 }
 
 export const SOLD_EARLY: NonNullable<TupleOutcome["sold_early"]> = {

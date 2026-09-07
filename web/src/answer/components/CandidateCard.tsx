@@ -54,13 +54,9 @@ export function CandidateCard({
 
       <MoneyBack outcome={outcome} />
 
-      <p className="text-xs">
-        <span className="text-[var(--ink-muted)]">all of it by </span>
-        <FigureSlot state={{ kind: "value", figure: day(outcome.span.end) }} />
-        <span className="text-[var(--ink-muted)]">
-          {" "}
-          — measured over {count(spanDays(outcome.span) ?? 0)} days
-        </span>
+      <p className="text-xs text-[var(--ink-muted)]" data-span>
+        measured over {count(spanDays(outcome.span) ?? 0)} days, {day(outcome.span.start)} to{" "}
+        {day(outcome.span.end)}
       </p>
 
       <div className="text-xs">
