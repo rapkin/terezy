@@ -94,10 +94,14 @@ describe("a horizon column", () => {
     }
   });
 
-  it("counts the front against the ranked population the API sent", () => {
-    expect(column(WHOLE).container.querySelector("[data-front-count]")?.textContent).toContain(
-      "1 of 2 ranked",
-    );
+  it("states the front's own count and no ratio over a set the pass did not place", () => {
+    // The pass places `ranked` less `arrives_after_horizon`, so "N of M ranked" invited a
+    // subtraction that attributed a verdict to a row nobody assessed. Every count the section
+    // reports stands beside its own members instead.
+    const held = column(WHOLE).container.querySelector("[data-front-count]");
+    expect(held?.getAttribute("data-front-count")).toBe("1");
+    expect(held?.textContent).toBe("1 dominated by nothing");
+    expect(held?.textContent).not.toContain("of");
   });
 
   it("renders a survey that did not run as its own reason, and no card", () => {
@@ -140,6 +144,36 @@ describe("a horizon column", () => {
       container.querySelector("[data-typed-state='tuple.BenchmarkUnavailable']")?.textContent,
     ).toContain("yielded no candidate");
     expect(container.querySelectorAll("[data-candidate]")).toHaveLength(0);
+  });
+
+  it("gives that member's own populations their members, not a count inside a state", () => {
+    const { container } = column({
+      outcome: {
+        tag: "candidates.CandidateSurvey",
+        comparison: {
+          tag: "tuple.BenchmarkUnavailable",
+          reason: "the benchmark instrument yielded no candidate for this horizon.",
+          refusal: {
+            tag: "tuple.InstrumentRefused",
+            instrument_id: "UA4000231195",
+            reason: "the benchmark instrument yielded no candidate for this horizon.",
+          },
+          scored: RANKED,
+          refused: [refusedTuple("Z", "no terms")],
+          not_comparable: [],
+        },
+        enumerated: surveyEnumerated(),
+      },
+      dominance: dominance({ nonDominated: [] }),
+    });
+    const scored = container.querySelector(
+      "[data-population='scored, with no benchmark to compare against']",
+    );
+    expect(scored?.getAttribute("data-count")).toBe("2");
+    expect(scored?.querySelectorAll("[data-population-members] > li")).toHaveLength(2);
+    const refused = container.querySelector("[data-population='refused']");
+    expect(refused?.getAttribute("data-count")).toBe("1");
+    expect(refused?.querySelectorAll("[data-group-members] > li")).toHaveLength(1);
   });
 
   it("renders a dominance pass that did not run as its own reason, and no card", () => {

@@ -144,6 +144,7 @@ export function comparison(over: {
   readonly beats?: readonly number[];
   readonly ties?: readonly (readonly number[])[];
   readonly refused?: readonly RefusedTuple[];
+  readonly notComparable?: readonly TupleOutcome[];
 }): Comparison {
   return {
     tag: "tuple.Comparison",
@@ -152,7 +153,7 @@ export function comparison(over: {
     beats_benchmark: [...(over.beats ?? [])],
     ties: (over.ties ?? []).map((held) => [...held]),
     refused: [...(over.refused ?? [])],
-    not_comparable: [],
+    not_comparable: [...(over.notComparable ?? [])],
     continuation: "hold_as_cash",
     horizon: HORIZON,
   };

@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { EVERY_KIND, INSTRUMENT_KIND, KINDS, VENUE_KIND, classWord } from "@/design/kinds";
+import {
+  DECLARED_HUE_COLLISIONS,
+  EVERY_KIND,
+  INSTRUMENT_KIND,
+  KINDS,
+  VENUE_KIND,
+  classWord,
+} from "@/design/kinds";
 import { SRC } from "../source";
 
 /**
@@ -16,6 +23,18 @@ import { SRC } from "../source";
 const STYLES = readFileSync(join(SRC, "styles.css"), "utf8");
 
 const TOKEN = /^var\(--[a-z-]+\)$/;
+
+/** The hue a kind's ink token resolves to, read out of the stylesheet rather than restated. */
+function hueOf(reference: string): string {
+  const name = reference.slice("var(".length, -1);
+  const declaration = new RegExp(`${name}:([^;]*);`).exec(STYLES);
+  const hue = /var\((--hue-[a-z-]+)\)/.exec(declaration?.[1] ?? "");
+  // An achromatic kind has no hue variable; cash is the only one, and it is chroma 0.
+  if (hue === null) return name;
+  const value = new RegExp(`${hue[1] ?? ""}:\\s*([0-9.]+)\\s*;`).exec(STYLES);
+  if (value === null) throw new Error(`styles.css declares no ${hue[1] ?? "hue"}`);
+  return value[1] ?? "";
+}
 
 describe("the kind vocabulary", () => {
   it("gives every drawn kind a word, an icon and two declared tokens", () => {
@@ -63,6 +82,23 @@ describe("the kind vocabulary", () => {
       "platform",
     ]);
     for (const kind of Object.values(VENUE_KIND)) expect(Object.keys(KINDS)).toContain(kind);
+  });
+
+  it("gives each kind its own hue, or records why two share one", () => {
+    // FR-001's actual requirement, which the icon check below does not reach: two kinds at one
+    // hue render in identical ink and tint, and the reader is left counting corners.
+    const declared = new Set(DECLARED_HUE_COLLISIONS.map((pair) => [...pair].sort().join("+")));
+    const byHue = new Map<string, string[]>();
+    for (const kind of EVERY_KIND) {
+      const hue = hueOf(KINDS[kind].ink);
+      byHue.set(hue, [...(byHue.get(hue) ?? []), kind]);
+    }
+    const sharing = [...byHue.values()]
+      .filter((kinds) => kinds.length > 1)
+      .map((kinds) => [...kinds].sort().join("+"));
+    expect(sharing.filter((pair) => !declared.has(pair))).toEqual([]);
+    // And a collision recorded but no longer real is a stale exception.
+    expect([...declared].filter((pair) => !sharing.includes(pair))).toEqual([]);
   });
 
   it("has one icon per kind and no icon shared between two", () => {

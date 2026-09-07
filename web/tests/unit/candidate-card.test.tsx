@@ -119,6 +119,20 @@ describe("a candidate card", () => {
     );
   });
 
+  it("states the span it was measured over, in days", () => {
+    const { container } = card({ instrumentId: "A", span: range("2026-09-01", "2026-10-04") });
+    expect(container.querySelector("[data-span]")?.getAttribute("data-span")).toBe("33");
+  });
+
+  it("names the state rather than saying zero days where it cannot read the span", () => {
+    // `spanDays` returns null to say this client could not read the date. Zero is a claim, and
+    // it is the silent clamp the constitution names.
+    const { container } = card({ instrumentId: "A", span: range("not a date", "2026-10-04") });
+    expect(container.querySelector("[data-span='unreadable']")).not.toBeNull();
+    expect(container.textContent).not.toContain("0 days");
+    expect(container.textContent).toContain("not an ISO date");
+  });
+
   it("lets no unrounded float reach the output", () => {
     const { container } = card({ instrumentId: "A", reaches: REACHES });
     const text = container.textContent ?? "";

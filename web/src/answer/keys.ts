@@ -26,12 +26,13 @@ export function sameTuple(left: Tuple, right: Tuple): boolean {
 }
 
 /**
- * A key rendered as a React list key, and as nothing else.
+ * A list key, and nothing a reader sees.
  *
- * Not an identity: two keys that differ only in a field left out here would collide, which is
- * why `sameTuple` and not this is what the join compares on.
+ * The **whole** record, because identity is all five terms and `candidates.py::_ordered` is a
+ * cross product over ways in, ways out and plans: a key built from three of them gives two rows
+ * one React key the day a second route lands at a venue, which is a data-only change, and React
+ * then carries one row's open disclosure onto the other.
  */
-export function keyLabel(key: Tuple): string {
-  const into = key.route_in === "entry_by_identity" ? "here" : key.route_in.destination_id;
-  return [key.instrument_id, key.stream_id, into].join(" · ");
+export function listKey(key: Tuple): string {
+  return JSON.stringify(key);
 }

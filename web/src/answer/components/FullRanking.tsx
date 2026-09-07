@@ -1,5 +1,5 @@
 import type { Comparison } from "@/api/shapes";
-import { keyLabel } from "@/answer/keys";
+import { listKey } from "@/answer/keys";
 import { count, day, money, rate } from "@/design/format";
 import { marksOf } from "@/lib/provenance";
 import { FigureSlot } from "@/components/figure/FigureSlot";
@@ -29,7 +29,7 @@ export function FullRanking({ comparison }: { comparison: Comparison }) {
           const tie = ties.get(at);
           return (
             <li
-              key={keyLabel(outcome.key)}
+              key={listKey(outcome.key)}
               data-ranked-at={String(at)}
               data-benchmark-row={at === comparison.benchmark ? "yes" : undefined}
               className={

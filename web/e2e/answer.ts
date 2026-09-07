@@ -5,6 +5,8 @@ import { AS_OF } from "./offline";
 export type ServedAnswer = {
   readonly sections: {
     readonly nonDominated: readonly string[];
+    readonly dominated: number;
+    readonly notPlaced: number;
     readonly ranked: number;
     readonly noCandidate: number;
   }[];
@@ -25,7 +27,11 @@ export async function servedAnswer(page: Page): Promise<ServedAnswer> {
       result: {
         answer: {
           sections: {
-            dominance: { non_dominated?: { instrument_id: string }[] };
+            dominance: {
+              non_dominated?: { instrument_id: string }[];
+              dominated?: unknown[];
+              not_placed?: unknown[];
+            };
             outcome: {
               comparison: { ranked?: unknown[] };
               enumerated: { no_candidate: unknown[] };
@@ -39,6 +45,8 @@ export async function servedAnswer(page: Page): Promise<ServedAnswer> {
     return {
       sections: body.result.answer.sections.map((section) => ({
         nonDominated: (section.dominance.non_dominated ?? []).map((held) => held.instrument_id),
+        dominated: (section.dominance.dominated ?? []).length,
+        notPlaced: (section.dominance.not_placed ?? []).length,
         ranked: (section.outcome.comparison.ranked ?? []).length,
         noCandidate: section.outcome.enumerated.no_candidate.length,
       })),

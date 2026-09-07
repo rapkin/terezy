@@ -1,6 +1,6 @@
 import type { AnsweredQuestion, HorizonSection, Separating, TupleOutcome } from "@/api/shapes";
 import { sharedAcross, sharedFor } from "@/answer/assumptions";
-import { joinToOutcome } from "@/answer/join";
+import { joinToOutcome, placeable } from "@/answer/join";
 import { beliefsAcross, sentencesNaming, withoutBeliefs } from "@/answer/beliefs";
 import type { KindReading } from "@/answer/instrument-kind";
 import { AnswerHeader } from "./AnswerHeader";
@@ -73,7 +73,7 @@ export function membersShown(sections: readonly HorizonSection[]): readonly Show
     if (comparison.tag !== "tuple.Comparison") continue;
     if (section.dominance.tag !== "dominance.DominanceResult") continue;
     for (const key of section.dominance.non_dominated) {
-      const joined = joinToOutcome(key, comparison.ranked);
+      const joined = joinToOutcome(key, placeable(comparison));
       if (joined.tag === "joined") {
         shown.push({ outcome: joined.outcome, separating: section.dominance.separating });
       }

@@ -26,9 +26,21 @@ test("the three columns hold exactly the members the API placed on each front", 
       .locator("[data-candidate]")
       .evaluateAll((cards) => cards.map((card) => card.getAttribute("data-candidate") ?? ""));
     expect(drawn).toEqual([...section.nonDominated]);
-    await expect(column.locator("[data-front-count]")).toContainText(
-      `of ${String(section.ranked)} ranked`,
+    // Read off the **dominance** record, not off `comparison.ranked`: a count taken from the
+    // field the component renders is green whatever the pass placed.
+    await expect(column.locator("[data-front-count]")).toHaveAttribute(
+      "data-front-count",
+      String(section.nonDominated.length),
     );
+    for (const [name, many] of [
+      ["dominated", section.dominated],
+      ["not placed", section.notPlaced],
+    ] as const) {
+      await expect(column.locator(`[data-population='${name}']`)).toHaveAttribute(
+        "data-count",
+        String(many),
+      );
+    }
     await expect(column.locator("[data-benchmark-standing]")).toBeVisible();
   }
 });

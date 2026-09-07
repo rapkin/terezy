@@ -2,13 +2,14 @@ import type {
   BenchmarkStanding as Standing,
   Comparison,
   HorizonSection,
+  RefusedTuple,
   TupleOutcome,
 } from "@/api/shapes";
 import type { KindReading } from "@/answer/instrument-kind";
 import { spansDiffer } from "@/answer/comparability";
 import { groupNoCandidates, groupRefusals } from "@/answer/grouping";
-import { joinToOutcome } from "@/answer/join";
-import { keyLabel } from "@/answer/keys";
+import { joinToOutcome, placeable } from "@/answer/join";
+import { listKey } from "@/answer/keys";
 import { count, day } from "@/design/format";
 import { assertNever } from "@/lib/exhaustive";
 import { CandidateCard, indistinguishableFor } from "./CandidateCard";
@@ -42,7 +43,7 @@ export function HorizonColumn({
     survey !== null && survey.comparison.tag === "tuple.Comparison" ? survey.comparison : null;
   const dominance =
     section.dominance.tag === "dominance.DominanceResult" ? section.dominance : null;
-  const ranked: readonly TupleOutcome[] = comparison?.ranked ?? [];
+  const placed: readonly TupleOutcome[] = comparison === null ? [] : placeable(comparison);
 
   return (
     <section
@@ -54,7 +55,7 @@ export function HorizonColumn({
         {day(section.horizon.start)} – {day(section.horizon.end)}
       </h3>
 
-      {comparison !== null && spansDiffer(ranked.map((held) => held.span)) ? (
+      {comparison !== null && spansDiffer(placed.map((held) => held.span)) ? (
         <ComparabilityBanner />
       ) : null}
 
@@ -72,15 +73,14 @@ export function HorizonColumn({
 
       {dominance !== null && comparison !== null ? (
         <>
-          <p className="text-xs text-[var(--ink-muted)]" data-front-count>
-            {count(dominance.non_dominated.length)} of {count(comparison.ranked.length)} ranked are
-            dominated by nothing
+          <p className="text-xs text-[var(--ink-muted)]" data-front-count={count(dominance.non_dominated.length)}>
+            {count(dominance.non_dominated.length)} dominated by nothing
           </p>
           <ul className="space-y-3" data-front>
             {dominance.non_dominated.map((key) => {
-              const joined = joinToOutcome(key, comparison.ranked);
+              const joined = joinToOutcome(key, placed);
               return (
-                <li key={keyLabel(key)}>
+                <li key={listKey(key)}>
                   {joined.tag === "no-ranked-outcome" ? (
                     <TypedState
                       state={joined.key}
@@ -106,6 +106,22 @@ export function HorizonColumn({
         </>
       ) : null}
 
+      {survey !== null && survey.comparison.tag === "tuple.BenchmarkUnavailable" ? (
+        <>
+          <Population
+            name="scored, with no benchmark to compare against"
+            members={survey.comparison.scored}
+            render={(outcome) => <TupleTerms term={outcome.key} />}
+          />
+          <Population
+            name="not comparable"
+            members={survey.comparison.not_comparable}
+            render={(outcome) => <TupleTerms term={outcome.key} />}
+          />
+          <Refusals refused={survey.comparison.refused} />
+        </>
+      ) : null}
+
       {comparison === null ? null : (
         <>
           <FullRanking comparison={comparison} />
@@ -119,23 +135,7 @@ export function HorizonColumn({
             members={comparison.not_comparable}
             render={(outcome) => <TupleTerms term={outcome.key} />}
           />
-          <div data-population="refused" data-count={count(comparison.refused.length)}>
-            <p className="text-xs text-[var(--ink-muted)]">
-              refused: {count(comparison.refused.length)}
-            </p>
-            {groupRefusals(comparison.refused).map((group) => (
-              <RefusalGroup
-                key={group.id}
-                group={group}
-                render={(member) => (
-                  <div>
-                    <TupleTerms term={member.key} />
-                    <p data-served-text="refusal">{member.refusal.reason}</p>
-                  </div>
-                )}
-              />
-            ))}
-          </div>
+          <Refusals refused={comparison.refused} />
         </>
       )}
 
@@ -231,6 +231,27 @@ export function HorizonColumn({
         )}
       />
     </section>
+  );
+}
+
+/** FR-022 and FR-023: the refused tuples of either comparison member, grouped by their tag. */
+function Refusals({ refused }: { refused: readonly RefusedTuple[] }) {
+  return (
+    <div data-population="refused" data-count={count(refused.length)}>
+      <p className="text-xs text-[var(--ink-muted)]">refused: {count(refused.length)}</p>
+      {groupRefusals(refused).map((group) => (
+        <RefusalGroup
+          key={group.id}
+          group={group}
+          render={(member) => (
+            <div>
+              <TupleTerms term={member.key} />
+              <p data-served-text="refusal">{member.refusal.reason}</p>
+            </div>
+          )}
+        />
+      ))}
+    </div>
   );
 }
 

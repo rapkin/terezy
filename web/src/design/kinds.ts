@@ -36,6 +36,20 @@ export type Kind =
   | "platform"
   | "payroll";
 
+/**
+ * Two kinds the owner's palette gives one hue, listed so a third is a failing test rather than a
+ * discovery (`kinds.test.ts`).
+ *
+ * `bank` and `spendable_endpoint` are both hue 250 in the list he chose on 2026-09-06, where the
+ * endpoint is drawn as a pill rather than a tile — so shape carries the difference and the hue
+ * does not, which is the one place FR-001's *one hue per kind* is spent rather than broken. The
+ * other recorded collision is FR-003's: the assumption badge's violet is the broker kind's hue,
+ * and this screen draws no venue.
+ */
+export const DECLARED_HUE_COLLISIONS: readonly (readonly [Kind, Kind])[] = [
+  ["bank", "spendable_endpoint"],
+];
+
 export type KindStyle = {
   /** FR-002: the kind carried in text, so hue is never the only thing saying what this is. */
   readonly word: string;

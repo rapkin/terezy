@@ -3,6 +3,7 @@ import { beliefsOf, withoutBeliefs } from "@/answer/beliefs";
 import { spanDays } from "@/answer/comparability";
 import { sameTuple } from "@/answer/keys";
 import { separatingBadge } from "@/answer/separating";
+import { notServed } from "@/answer/missing";
 import { beyondShared } from "@/answer/assumptions";
 import type { KindReading } from "@/answer/instrument-kind";
 import { classLabel } from "@/answer/instrument-kind";
@@ -12,6 +13,7 @@ import { marksOf } from "@/lib/provenance";
 import { Badge } from "@/components/ui/badge";
 import { FigureSlot } from "@/components/figure/FigureSlot";
 import { Disclosure } from "./Disclosure";
+import { FieldMissing } from "./NamedState";
 import { MoneyBack } from "./MoneyBack";
 import { SeparatingBadge } from "./SeparatingBadge";
 
@@ -54,10 +56,7 @@ export function CandidateCard({
 
       <MoneyBack outcome={outcome} />
 
-      <p className="text-xs text-[var(--ink-muted)]" data-span>
-        measured over {count(spanDays(outcome.span) ?? 0)} days, {day(outcome.span.start)} to{" "}
-        {day(outcome.span.end)}
-      </p>
+      <Span span={outcome.span} />
 
       <div className="text-xs">
         <span className="text-[var(--ink-muted)]">rate </span>
@@ -92,6 +91,28 @@ export function CandidateCard({
         </Disclosure>
       )}
     </article>
+  );
+}
+
+/** The span the rate was measured over, or the state saying this client could not read it. */
+function Span({ span }: { span: TupleOutcome["span"] }) {
+  const days = spanDays(span);
+  if (days === null) {
+    return (
+      <div className="text-xs" data-span="unreadable">
+        <FieldMissing
+          state={notServed(
+            "a span this client can read",
+            `the served range is ${span.start} to ${span.end}, and one of those is not an ISO date`,
+          )}
+        />
+      </div>
+    );
+  }
+  return (
+    <p className="text-xs text-[var(--ink-muted)]" data-span={count(days)}>
+      measured over {count(days)} days, {day(span.start)} to {day(span.end)}
+    </p>
   );
 }
 
