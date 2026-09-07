@@ -45,6 +45,7 @@ from terezy.core.results.tuple import (
     InstrumentRefused,
     NoExitRouteDeclared,
     RateNotComparable,
+    RemainderStayed,
     RouteInUnusable,
     TaxCurrencyConversionUnavailable,
     Tuple,
@@ -224,15 +225,41 @@ class TestASeriesWithNoRateToFind:
         # An exit charging 20 000.00 a movement takes more than every release, so the arrivals
         # are negative and the series is not one payment out followed by receipts. Reported as
         # it stands: the money did not vanish, and there is no single rate for it.
+        #
+        # `fixtures.HORIZON` rather than the module's default, for the reason the test above
+        # gives: it buys ten whole units and leaves nothing over, so what refuses is the series
+        # and not the remainder the test below is about.
+        outcome = _evaluated(
+            _expensive_way_out(),
+            fixtures.hurdle_tuple(route_out=DeclaredExit(route_id="test_ruinous_out")),
+            horizon=fixtures.HORIZON,
+        )
+        assert isinstance(outcome, TupleOutcome), outcome
+        assert outcome.undeployed is None
+        assert all(arrival.amount.amount < 0.0 for arrival in outcome.arrivals)
+        rate = outcome.implied_rate
+        assert isinstance(rate, RateNotComparable)
+        assert "conventional series" in rate.missing
+
+    def test_the_same_exit_leaves_a_remainder_where_it_is_rather_than_moving_it_at_a_loss(
+        self,
+    ) -> None:
+        # 20 000.00 to move 996.18 would deliver a negative amount. A release has to come home
+        # and is reported arriving at a loss; a remainder does not, so it stays -- and then
+        # part of the outlay never came home, which is its own refusal and reaches the rate
+        # before the series does.
         outcome = _evaluated(
             _expensive_way_out(),
             fixtures.hurdle_tuple(route_out=DeclaredExit(route_id="test_ruinous_out")),
         )
         assert isinstance(outcome, TupleOutcome), outcome
-        assert all(arrival.amount.amount < 0.0 for arrival in outcome.arrivals)
+        undeployed = outcome.undeployed
+        assert undeployed is not None
+        assert isinstance(undeployed.journey, RemainderStayed), undeployed.journey
+        assert "the whole of the remainder or more" in undeployed.journey.reason
         rate = outcome.implied_rate
         assert isinstance(rate, RateNotComparable)
-        assert "conventional series" in rate.missing
+        assert "never came home" in rate.reason
 
 
 class TestAnInstrumentThatCannotSpanTheHorizon:
@@ -384,17 +411,13 @@ class TestTheOtherWaysAPartRefuses:
 
 
 class TestAForeignInstrumentIsClosedByTwoGuardsAndNotByTheShippedData:
-    """Why the rate's three-currency case has no test: it has no way in.
+    """A foreign-currency bond is closed twice over, and both halves are asserted here.
 
-    The rate is refused where what left, what stayed behind undeployed and what came back are
-    not all in one currency. The third amount is reachable only from a *bond* -- nothing else
-    declares a ``min_unit``, so nothing else leaves a remainder -- and a foreign-currency bond
-    is closed twice over. Both halves are asserted here rather than described, because "this
-    branch is unreachable" is precisely the claim that quietly stops being true: a later
-    feature that lets a projection hold a position and its tax in two currencies, or that lets
-    an instrument declare an exempt kind without a class, opens it, and it should fail a test
-    on the way rather than surface as a rate that appears at one amount and vanishes at
-    another.
+    Described rather than left implicit because "this branch is unreachable" is precisely the
+    claim that quietly stops being true: a later feature that lets a projection hold a position
+    and its tax in two currencies, or that lets an instrument declare an exempt kind without a
+    class, opens it, and it should fail a test on the way rather than surface as a figure
+    nobody expected.
     """
 
     def _foreign(self, *, declares_tax: bool) -> Registries:

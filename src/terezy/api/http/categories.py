@@ -22,6 +22,7 @@ from terezy.core.instruments.access import InstrumentAccess
 from terezy.core.instruments.cash import CashDeclaration
 from terezy.core.instruments.fund import FundDeclaration
 from terezy.core.instruments.groups import InstrumentGroup
+from terezy.core.instruments.held import HeldAssetDeclaration
 from terezy.core.instruments.interface import InstrumentDeclaration
 from terezy.core.instruments.quotations import QuotationSeries
 from terezy.core.ledger.seeds import SeedLot
@@ -151,8 +152,13 @@ class Category:
 def _instruments(ask: Ask) -> KeyedRecords:
     declared = resolver.from_data_root(ask.root)
     return KeyedRecords(
-        records={**declared.instruments, **declared.funds, **declared.cash},
-        files={**declared.instrument_files, **declared.fund_files, **declared.cash_files},
+        records={**declared.instruments, **declared.funds, **declared.cash, **declared.held},
+        files={
+            **declared.instrument_files,
+            **declared.fund_files,
+            **declared.cash_files,
+            **declared.held_files,
+        },
     )
 
 
@@ -397,7 +403,10 @@ CATEGORIES: Final[tuple[Category, ...]] = (
         "instruments",
         "INSTRUMENTS_DIR",
         False,
-        Keyed(_instruments, InstrumentDeclaration | FundDeclaration | CashDeclaration),
+        Keyed(
+            _instruments,
+            InstrumentDeclaration | FundDeclaration | CashDeclaration | HeldAssetDeclaration,
+        ),
     ),
     Category("groups", "GROUPS_FILE", False, Keyed(_groups, InstrumentGroup)),
     Category("tax-classes", "TAX_DIR", False, Keyed(_tax_classes, TaxClass)),

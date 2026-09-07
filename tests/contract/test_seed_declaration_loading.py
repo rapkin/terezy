@@ -101,14 +101,17 @@ def _scratch_root(tmp_path: Path) -> Path:
 
 
 def _resolved(root: Path = DATA_ROOT) -> tuple[SeedLot, ...]:
-    """The lots as they leave the *resolver*, where a declared cost gains its currency.
+    """The **shipped root's** lots as they leave the resolver, where a cost gains its currency.
 
     ``seeds_from_file`` returns the entry as written (025 FR-025): the currency is the named
-    instrument's, which the loader does not hold.
+    instrument's, which the loader does not hold. The private overlay's lots are excluded here
+    because this module is about the shipped file's own two.
     """
-    return resolver.seeds_and_goals_from_data_roots(
+    resolved = resolver.seeds_and_goals_from_data_roots(
         resolver.data_roots_of(root), base_currency=Currency.UAH
-    ).seeds
+    )
+    private = set(resolved.overlay_seeds)
+    return tuple(lot for lot in resolved.seeds if lot not in private)
 
 
 def _assert_names_file_and_field(exc: DeclarationError, file: Path, contains: str) -> None:
@@ -398,7 +401,8 @@ def test_the_composed_data_root_resolves() -> None:
         resolver.data_roots_of(DATA_ROOT), base_currency=Currency.UAH
     )
     assert declared.owner_id == "owner-001"
-    assert len(declared.seeds) == 2
+    assert len(declared.seeds) == 3, "the shipped file's two lots, and the overlay's one"
+    assert len(declared.overlay_seeds) == 1
     assert declared.seed_file == SEEDS
 
 

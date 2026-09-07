@@ -23,6 +23,10 @@ from tests import answer_registries as fixtures
 from tests import dominance_sections as sections
 
 HORIZONS = [sections.ONE_MONTH, sections.THREE_MONTHS, sections.TWELVE_MONTHS]
+DOMINATED_AT = [sections.ONE_MONTH, sections.THREE_MONTHS]
+"""Where the owner's own benchmark is dominated, measured over the shipped registry. At twelve
+months it is a member of the non-dominated set instead, which the pair of tests below is what
+keeps apart from *the hurdle is best*."""
 
 
 @pytest.mark.parametrize("index", HORIZONS)
@@ -35,15 +39,26 @@ def test_the_benchmark_appears_exactly_once_in_the_population(index: int) -> Non
     assert hurdle.instrument_id == fixtures.BENCHMARK
 
 
-@pytest.mark.parametrize("index", HORIZONS)
+@pytest.mark.parametrize("index", DOMINATED_AT)
 def test_the_hurdle_the_owner_named_is_dominated_and_the_members_are_named(index: int) -> None:
-    """Measured over the shipped registry: his own benchmark is dominated at every horizon."""
+    """Measured over the shipped registry: his own benchmark is dominated at his two shorter
+    horizons."""
     standing = sections.result(sections.section(index)).benchmark_standing
     assert isinstance(standing, HurdleIsDominated)
     assert standing.by
     for verdict in standing.by:
         assert verdict.over == standing.key
         assert verdict.strictly_better_on
+
+
+def test_at_twelve_months_his_benchmark_is_in_the_set_rather_than_under_it() -> None:
+    """The other measured half, and the one his choice of benchmark was made for: over the
+    longest horizon UA4000231195 runs very nearly to its own terms and nothing dominates it."""
+    result = sections.result(sections.section(sections.TWELVE_MONTHS))
+    standing = result.benchmark_standing
+    assert isinstance(standing, NothingDominatesTheHurdle), standing
+    assert standing.key in result.non_dominated
+    assert len(result.non_dominated) > 1, "nothing dominates it is not it dominates everything"
 
 
 def test_a_benchmark_nothing_dominates_produces_the_statement_rather_than_a_bare_set() -> None:
@@ -74,8 +89,10 @@ def test_the_standing_is_not_derived_from_010s_one_dimensional_verdict() -> None
 
     010's ``beats_benchmark`` is strict, one-dimensional, on the **rate**, at the **project
     tolerance**; this one is a partial order over the declared objectives at the declared bands.
-    Measured, they disagree in both directions on the owner's own question -- which is the
-    ordinary state rather than an edge case, because the rate is not a declared objective.
+    Measured on the owner's own question they disagree -- which is the ordinary state rather
+    than an edge case, because the rate is not a declared objective. The inclusion runs one
+    way here: everything that dominates the hurdle also out-rates it, and things out-rate it
+    that come home later and so dominate nothing.
     """
     section = sections.section(sections.ONE_MONTH)
     standing = sections.result(section).benchmark_standing
@@ -84,19 +101,28 @@ def test_the_standing_is_not_derived_from_010s_one_dimensional_verdict() -> None
     assert isinstance(comparison, Comparison)
     beats = {comparison.ranked[index].key for index in comparison.beats_benchmark}
     dominators = {verdict.dominates for verdict in standing.by}
-    assert dominators - beats, "every dominator also beats the hurdle on the rate"
     assert beats - dominators, "every rate-beater also dominates the hurdle"
+    assert not dominators - beats
 
 
 @pytest.mark.parametrize("index", HORIZONS)
 def test_neither_verdict_is_the_other_at_any_horizon(index: int) -> None:
     """And the disagreement is on the record rather than resolved, because resolving it needs a
-    weight (FR-005). At twelve months every dominator happens to beat the hurdle too and the
-    inclusion is one-way, which is why the pair above is asserted where both directions hold."""
+    weight (FR-005). At twelve months it is at its sharpest: candidates out-rate the hurdle and
+    none of them dominates it.
+
+    The expected standing is asserted per horizon rather than read off the result. Without it
+    the twelve-month case degenerates -- ``dominators`` is empty there, so ``beats !=
+    dominators`` follows from ``beats`` alone and would survive the two verdicts becoming one.
+    """
     section = sections.section(index)
     standing = sections.result(section).benchmark_standing
-    assert isinstance(standing, HurdleIsDominated)
     comparison = section.outcome.comparison  # type: ignore[union-attr]
     assert isinstance(comparison, Comparison)
     beats = {comparison.ranked[position].key for position in comparison.beats_benchmark}
-    assert beats != {verdict.dominates for verdict in standing.by}
+    assert beats
+    if index in DOMINATED_AT:
+        assert isinstance(standing, HurdleIsDominated), standing
+        assert beats != {verdict.dominates for verdict in standing.by}
+    else:
+        assert isinstance(standing, NothingDominatesTheHurdle), standing

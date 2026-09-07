@@ -68,7 +68,14 @@ from terezy.core.results.answer import (
     UndeclaredSubject,
 )
 from terezy.core.results.candidates import CandidateSet, CandidateSurvey
-from terezy.core.results.tuple import BenchmarkUnavailable, Comparison, Tuple, TupleOutcome
+from terezy.core.results.tuple import (
+    BenchmarkUnavailable,
+    Comparison,
+    RemainderCameHome,
+    Tuple,
+    TupleOutcome,
+    money_home,
+)
 
 if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.instruments.groups import InstrumentGroup
@@ -142,6 +149,7 @@ def answer(question: Question, inputs: AnswerInputs, as_of: date) -> Answer | Re
         base_currency=inputs.registries.base_currency,
         as_of=as_of,
     )
+    declared_held = frozenset(inputs.registries.held)
     holds = frozenset(position.instrument_id for position in positions)
     sections: list[HorizonSection] = []
     for horizon in question.horizons:
@@ -151,7 +159,15 @@ def answer(question: Question, inputs: AnswerInputs, as_of: date) -> Answer | Re
         if isinstance(outcome, BenchmarkYieldsSeveralCandidates):
             return outcome
         sections.append(
-            _section(question, subjects, horizon, outcome, inputs.objectives, holds=holds)
+            _section(
+                question,
+                subjects,
+                horizon,
+                outcome,
+                inputs.objectives,
+                held_assets=declared_held,
+                holds=holds,
+            )
         )
     return Answer(
         question=question,
@@ -409,6 +425,7 @@ def _section(
     outcome: SectionOutcome,
     objectives: ObjectiveSet,
     *,
+    held_assets: frozenset[str],
     holds: frozenset[str],
 ) -> HorizonSection:
     """One section: the survey whole, plus what this feature withholds and what it verdicts.
@@ -430,7 +447,7 @@ def _section(
     return HorizonSection(
         horizon=horizon,
         outcome=outcome,
-        standings=_standings(subjects, outcome, holds),
+        standings=_standings(subjects, outcome, held_assets, holds),
         arrives_after_horizon=late,
         reserves=tuple(
             verdict
@@ -479,6 +496,7 @@ def _arrives_after_horizon(
 def _standings(
     subjects: Sequence[ResolvedSubject],
     outcome: SectionOutcome,
+    held_assets: frozenset[str],
     holds: frozenset[str],
 ) -> tuple[SubjectStanding, ...]:
     """Where each named subject stands here, in one of the five states FR-010 distinguishes.
@@ -489,8 +507,14 @@ def _standings(
 
     **Held is decided before the enumeration is consulted**, and even before *not assessed*: a
     holding is a fact about the owner rather than about this window, so a section that refused
-    to enumerate still knows he holds the thing. Naming a corridor, or a ceiling, as the remedy
-    for something he already owns is the false guard 025 FR-029 exists to prevent.
+    to enumerate still knows what kind of thing he named. Naming a corridor, or a ceiling, as
+    the remedy for something that can never be a candidate is the false guard 025 FR-029 exists
+    to prevent.
+
+    **A held asset he has declared no lot of is still held, not unreached.** It reaches no
+    candidate and never will -- a tuple needs a corridor the money came in through -- so the
+    remedy is a lot under the private overlay, and ``SubjectHeld.held`` being empty is what
+    says he has not declared one.
     """
     enumerated = _enumerated_of(outcome)
     reached = (
@@ -499,7 +523,13 @@ def _standings(
         else frozenset(item.key.instrument_id for item in enumerated.candidates)
     )
     return tuple(
-        _standing(subject, reached=reached, holds=holds, enumerated=enumerated is not None)
+        _standing(
+            subject,
+            reached=reached,
+            held_assets=held_assets,
+            holds=holds,
+            enumerated=enumerated is not None,
+        )
         for subject in subjects
     )
 
@@ -508,15 +538,19 @@ def _standing(
     subject: ResolvedSubject,
     *,
     reached: frozenset[str],
+    held_assets: frozenset[str],
     holds: frozenset[str],
     enumerated: bool,
 ) -> SubjectStanding:
     """One subject's state, in the order a reader would ask the questions in."""
     if isinstance(subject, UndeclaredSubject):
         return SubjectUndeclared(named=subject.named)
-    held = tuple(name for name in subject.ids if name in holds)
-    if held:
-        return SubjectHeld(named=subject.named, ids=subject.ids, held=held)
+    if any(name in held_assets for name in subject.ids):
+        return SubjectHeld(
+            named=subject.named,
+            ids=subject.ids,
+            held=tuple(name for name in subject.ids if name in holds),
+        )
     if not enumerated:
         return SubjectNotAssessed(named=subject.named, ids=subject.ids)
     with_candidates = tuple(name for name in subject.ids if name in reached)
@@ -558,20 +592,20 @@ def _verdict(item: TupleOutcome, reserve: Reserve) -> ReserveVerdict:
     **No rate is consulted** (FR-021). Only arrivals in the reserve's own currency count, so a
     reserve in a currency the arrivals do not deliver is short by the whole of it -- which is
     *a partial exit would be needed* rather than a conversion at a rate nobody declared.
+
+    Over the same series ``reaches`` is the sum of, so the undeployed remainder counts here
+    exactly where it counts there.
     """
-    read: list[Arrival] = []
+    read: list[Arrival | RemainderCameHome] = []
     running = money.zero(reserve.amount.currency)
     covered_on: date | None = None
-    for arrival in item.arrivals:
-        if (
-            arrival.arrived_on > reserve.by
-            or arrival.amount.currency is not reserve.amount.currency
-        ):
+    for arrived_on, amount, record in money_home(item.arrivals, item.undeployed):
+        if arrived_on > reserve.by or amount.currency is not reserve.amount.currency:
             continue
-        read.append(arrival)
-        running = money.add(running, arrival.amount)
+        read.append(record)
+        running = money.add(running, amount)
         if covered_on is None and running.amount >= reserve.amount.amount:
-            covered_on = arrival.arrived_on
+            covered_on = arrived_on
     if covered_on is not None:
         return CoveredByThePlan(
             key=item.key,

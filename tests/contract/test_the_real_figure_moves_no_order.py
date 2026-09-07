@@ -35,7 +35,7 @@ from tests import answer_registries as fixtures
 pytestmark = pytest.mark.contract
 
 GOLDEN_FILE: Final = Path(__file__).parents[1] / "golden" / "candidate_set.golden.txt"
-RECORDED_DIGEST: Final = "73090729a50440c1130e93560735828a"
+RECORDED_DIGEST: Final = "85abd2c226d7690be92c47a902e7435a"
 """The digest recorded in `candidate_set.golden.txt`, retyped here so that a regeneration of
 that artefact does not carry this assertion along with it. It covers the key, the amount and
 the nominal rate; FR-018 is that this feature moves none of the three.

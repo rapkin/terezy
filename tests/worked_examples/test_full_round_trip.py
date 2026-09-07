@@ -44,15 +44,17 @@ Buying with the departing 10 000.00 would have acquired **ten** units, which is 
 this example exists to catch: a plausible schedule, one unit too large, and every figure
 downstream of it wrong by eleven percent.
 
-**What the rate is measured against**, which is not the same number::
+**The remainder comes straight back out** (owner decision, 2026-09-06). It never became a
+position, so it leaves `inzhur` on the purchase date, pays the way out's fee like any other
+movement, and pays no tax -- there was no disposal::
 
-    invested     10 000 - 850             =  9 150.00
+    remainder    850 - 0.5% - 10          =    835.75   home on 2026-01-15
 
-The 850.00 is cash at `inzhur`, not money lost. Discounting the arrivals back to the whole
-10 000.00 would price it as a **total loss** and report this bond at 8.96%; discounting them
-back to the 9 000.00 of paper would forget the 150.00 ramp entirely and report 15.50%. Both
-are outside the band asserted below. What the netting assumes — that the 850.00 is recoverable
-at par — is not free and is stated in the outcome's own `excludes`.
+So the rate is measured against the **whole 10 000.00** that left the stream, with that
+835.75 as its first receipt. Discounting the four coupon arrivals back to 10 000.00 with the
+remainder dropped would price it as a **total loss** and report this bond at 8.96%;
+discounting them back to the 9 000.00 of paper would forget the 150.00 ramp entirely and
+report 15.50%. Both are outside the band asserted below.
 
 **The lifecycle.** Nine units of 1 000.00 face at 15.5% is 1 395.00 of interest a year, and
 each coupon is ``1 395 x days / 365`` on the accrual periods issue A's own worked example
@@ -72,26 +74,27 @@ Total released: 2 790.00 of interest -- exactly two years of it -- plus 9 000.00
 date and its declared terms name no exit commission. That zero is a **recorded line**, not an
 assumption (FR-009).
 
-**The way out**, charged once on each amount the instrument released, on the date it released
-it. The final coupon and the redemption fall on one date and travel as one movement, because
-what goes home is what the owner has that day::
+**The way out**, charged once on each amount that travels it, on the date it travels. The
+final coupon and the redemption fall on one date and travel as one movement, because what
+goes home is what the owner has that day::
 
-    2026-07-15     691.7671232876712 - 0.5% - 10  =    678.3082876712328
-    2027-01-15     703.2328767123288 - 0.5% - 10  =    689.7167123287671
-    2027-07-15     691.7671232876712 - 0.5% - 10  =    678.3082876712328
-    2028-01-17   9 703.2328767123290 - 0.5% - 10  =  9 644.7167123287670
-                                                     -------------------
-    reaches                                          11 691.05
+    2026-01-15       850.0000000000000 - 0.5% - 10  =    835.7500000000000  (the remainder)
+    2026-07-15       691.7671232876712 - 0.5% - 10  =    678.3082876712328
+    2027-01-15       703.2328767123288 - 0.5% - 10  =    689.7167123287671
+    2027-07-15       691.7671232876712 - 0.5% - 10  =    678.3082876712328
+    2028-01-17     9 703.2328767123290 - 0.5% - 10  =  9 644.7167123287670
+                                                       -------------------
+    reaches                                            12 526.80
 
-The four flat fees are 40.00 and the four percentage fees 58.95, so the way out took 98.95 of
-the 11 790.00 released -- and **the same 10.00 flat fee is 1.45% of the first coupon and 0.10%
-of the final movement**, fourteen times heavier on the small one. That is exactly why a
-round-trip *fraction* measured on the arriving amount may not be applied to a coupon.
+The five flat fees are 50.00 and the five percentage fees 63.20, so the way out took 113.20 of
+the 12 640.00 that travelled it -- and **the same 10.00 flat fee is 1.45% of the first coupon
+and 0.10% of the final movement**, fourteen times heavier on the small one. That is exactly
+why a round-trip *fraction* measured on the arriving amount may not be applied to a coupon.
 
 **The conservation check**, which is what makes the whole example checkable at a glance::
 
     10 000.00  =  9 000.00 (bought) + 150.00 (way in) + 850.00 (undeployed)
-    11 790.00  =  11 691.05 (reached) + 98.95 (way out)
+    12 640.00  =  12 526.80 (reached) + 113.20 (way out)
 """
 
 from __future__ import annotations
@@ -105,7 +108,7 @@ from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.rates import NominalRate
 from terezy.core.primitives.tolerance import assert_money_close, is_close
-from terezy.core.results.tuple import Part, Tuple, TupleOutcome
+from terezy.core.results.tuple import Part, RemainderCameHome, Tuple, TupleOutcome
 from terezy.core.routes.path import DeclaredExit, FundingPath
 from tests import tuple_registries as fixtures
 
@@ -127,19 +130,13 @@ PRICE: Final = 1_000.0
 UNITS: Final = 9.0
 COST: Final = UNITS * PRICE
 UNDEPLOYED: Final = ARRIVED - COST
-INVESTED: Final = SENT - UNDEPLOYED
-"""9 150.00 -- what left the stream, less the remainder that made the trip and bought nothing.
 
-The denominator of the rate. It is **not** ``COST``: the 150.00 the way in took is money the
-owner spent to hold 9 000.00 of paper, and it belongs in the rate.
-"""
-
-RATE: Final = 0.14442645895184436
-"""The internal rate of return of the four arrivals against ``INVESTED``, on act/365.
+RATE: Final = 0.1434395693940692
+"""The internal rate of return of the five arrivals against the whole ``SENT``, on act/365.
 
 A root has no closed form, so it is recorded rather than derived -- and it is checkable by
-hand at the assertion site, where discounting the four hand-listed arrivals at this rate is
-shown to come back to 9 150.00 and not to 10 000.00.
+hand at the assertion site, where discounting the five hand-listed arrivals at this rate is
+shown to come back to 10 000.00 and not to 9 000.00.
 """
 
 ANNUAL_INTEREST: Final = UNITS * PRICE * 0.155
@@ -225,13 +222,23 @@ class TestTheWayInAndThePurchase:
         assert_money_close(_part(_outcome(), "entry"), Money(-COST, UAH, prov.EMPTY))
         assert_money_close(_part(_outcome(), "entry"), Money(-9_000.0, UAH, prov.EMPTY))
 
-    def test_the_remainder_is_reported_as_undeployed_cash_where_it_is_sitting(self) -> None:
-        #   9 850 - 9 000 = 850.00, at `inzhur`, having made the trip and bought nothing.
+    def test_the_remainder_is_reported_as_undeployed_cash_and_comes_straight_back_out(
+        self,
+    ) -> None:
+        #   9 850 - 9 000 = 850.00 at `inzhur`, having made the trip and bought nothing, and
+        #   850 - 0.5% - 10 = 835.75 home again the same day: neither route declares a
+        #   latency here, and nothing was disposed of, so no tax touches it.
         undeployed = _outcome().undeployed
         assert undeployed is not None
         assert_money_close(undeployed.amount, Money(UNDEPLOYED, UAH, prov.EMPTY))
         assert_money_close(undeployed.amount, Money(850.0, UAH, prov.EMPTY))
         assert undeployed.venue_id == "inzhur"
+        journey = undeployed.journey
+        assert isinstance(journey, RemainderCameHome), journey
+        assert_money_close(journey.reached, Money(_repatriated(UNDEPLOYED), UAH, prov.EMPTY))
+        assert_money_close(journey.reached, Money(835.75, UAH, prov.EMPTY))
+        assert journey.left_on == fixtures.ISSUE_DATE
+        assert journey.arrived_on == fixtures.ISSUE_DATE
 
     def test_what_left_the_stream_is_what_was_bought_plus_the_ramp_plus_the_remainder(
         self,
@@ -299,72 +306,87 @@ class TestTheWayOutIsChargedOnceOnEachRelease:
         assert is_close(flat_share, 0.014455731796669242)
         assert flat_share > 14.0 * (OUT_FLAT / last.released.amount)
 
-    def test_the_way_out_took_ninety_eight_ninety_five_in_total(self) -> None:
-        #   percentage 58.95 + flat 4 x 10.00 = 98.95
-        charged = sum(released * OUT_PCT + OUT_FLAT for _, released in RELEASES)
-        assert is_close(charged, 98.95)
+    def test_the_way_out_took_a_hundred_and_thirteen_twenty_in_total(self) -> None:
+        #   percentage 63.20 + flat 5 x 10.00 = 113.20, over four releases and the remainder.
+        charged = sum(
+            travelled * OUT_PCT + OUT_FLAT for travelled in [UNDEPLOYED, *(v for _, v in RELEASES)]
+        )
+        assert is_close(charged, 113.2)
         assert_money_close(_part(_outcome(), "ramp_out"), Money(-charged, UAH, prov.EMPTY))
 
-    def test_what_the_holding_released_is_what_reached_the_endpoint_plus_the_way_out(
+    def test_what_travelled_the_way_out_is_what_reached_the_endpoint_plus_what_it_charged(
         self,
     ) -> None:
-        # The second conservation identity. 11 790.00 released, 98.95 charged, 11 691.05 home.
+        # The second conservation identity. 11 790.00 released plus the 850.00 remainder,
+        # 113.20 charged, 12 526.80 home.
         outcome = _outcome()
+        undeployed = outcome.undeployed
+        assert undeployed is not None
         assert is_close(
             outcome.reaches.amount - _part(outcome, "ramp_out").amount,
-            _part(outcome, "lifecycle").amount,
+            _part(outcome, "lifecycle").amount + undeployed.amount.amount,
         )
 
 
 class TestTheTwoFigures:
     """FR-015 and research.md D8: the amount, and the rate, each labelled."""
 
-    def test_eleven_thousand_six_hundred_and_ninety_one_reaches_the_endpoint(self) -> None:
-        expected = sum(_repatriated(released) for _, released in RELEASES)
-        assert is_close(expected, 11_691.049999999999)
+    def test_twelve_thousand_five_hundred_and_twenty_six_reaches_the_endpoint(self) -> None:
+        expected = _repatriated(UNDEPLOYED) + sum(
+            _repatriated(released) for _, released in RELEASES
+        )
+        assert is_close(expected, 12_526.8)
         assert_money_close(_outcome().reaches, Money(expected, UAH, prov.EMPTY))
         assert _outcome().reaches.currency is UAH
 
-    def test_the_rate_discounts_the_arrivals_back_to_what_was_actually_invested(self) -> None:
+    def test_the_rate_discounts_every_arrival_back_to_the_whole_outlay(self) -> None:
         # The identity that defines the rate, and -- because the denominator is the thing that
-        # can be wrong -- the two wrong denominators, named and excluded.
+        # can be wrong -- the wrong denominator, named and excluded.
         #
-        # At the returned rate the present value of the four arrivals listed above is the
-        # 9 150.00 that was actually invested. It is *not* the 10 000.00 that left the stream:
-        # discounting back to that would be pricing the 850.00 sitting at `inzhur` as a total
-        # loss, and this assertion is what fails if it ever does again.
+        # At the returned rate the present value of the five arrivals listed above is the
+        # 10 000.00 that left the stream. Dropping the remainder's own arrival would leave the
+        # four coupon arrivals discounting back to 9 164.25 rather than to 10 000.00: that is
+        # pricing the 850.00 as a total loss, and this assertion is what fails if it happens
+        # again.
         #
         # Times are act/365 -- the instrument's own convention, so the tuple's rate and
         # feature 001's hurdle are measured on the same clock -- from the outlay on
         # 2026-01-15 to each arrival:
-        #   2026-07-15 -> 181 days     2027-01-15 -> 365 days
+        #   2026-01-15 ->   0 days     2026-07-15 -> 181 days     2027-01-15 -> 365 days
         #   2027-07-15 -> 546 days     2028-01-17 -> 732 days
         rate = _outcome().implied_rate
         assert isinstance(rate, NominalRate)
         assert is_close(rate.value, RATE)
-        days = (181, 365, 546, 732)
+        arrivals = [
+            (0, UNDEPLOYED),
+            *(
+                (day, released)
+                for day, (_, released) in zip((181, 365, 546, 732), RELEASES, strict=True)
+            ),
+        ]
         present_value = sum(
-            _repatriated(released) / (1.0 + rate.value) ** (day / 365)
-            for day, (_, released) in zip(days, RELEASES, strict=True)
+            _repatriated(travelled) / (1.0 + rate.value) ** (day / 365)
+            for day, travelled in arrivals
         )
-        assert is_close(INVESTED, 9_150.0)
-        assert is_close(present_value, INVESTED)
-        assert not is_close(present_value, SENT)
+        assert is_close(present_value, SENT)
+        assert not is_close(present_value - _repatriated(UNDEPLOYED), SENT)
         assert not is_close(present_value, COST)
 
     def test_the_rate_is_the_coupon_less_the_ramp_and_the_way_out(self) -> None:
         # A sanity band, stated as loose rather than dressed up as the project tolerance
         # (docs/METHODOLOGY.md §11.3), and its arithmetic is the three terms that move it:
         #
-        #   coupons      1 395.00 a year on 9 150.00 invested        =  15.25%
-        #   way out         98.95 over two years, ~49.48 a year      =  -0.54%
-        #   the ramp     9 000.00 comes back against 9 150.00 out,
-        #                a 150.00 shortfall over two years           =  -0.82%
+        #   coupons      1 395.00 a year on 9 164.25 at work        =  15.22%
+        #   way out        113.20 over two years, ~56.60 a year      =  -0.62%
+        #   the ramp     9 000.00 comes back against 9 164.25 out,
+        #                a 164.25 shortfall over two years           =  -0.90%
         #                                                               -------
-        #                                                               ~13.9%, and
-        # compounding lifts it to 14.44%. The band is what rules out the two ways the
-        # denominator can be wrong: charging the 850.00 remainder as a loss lands at 8.96%,
-        # and measuring against the 9 000.00 of paper forgets the ramp and lands at 15.50%.
+        #                                                               ~13.7%, and
+        # compounding lifts it to 14.34%. The 9 164.25 is the whole 10 000.00 less the 835.75
+        # that came straight home, which is what the money at work actually was. The band is
+        # what rules out the two ways the denominator can be wrong: dropping the remainder's
+        # arrival charges the 850.00 as a loss and lands at 8.96%, and measuring against the
+        # 9 000.00 of paper forgets the ramp and lands at 15.50%.
         rate = _outcome().implied_rate
         assert isinstance(rate, NominalRate)
         assert 0.14 < rate.value < 0.15

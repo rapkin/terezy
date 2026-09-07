@@ -3039,10 +3039,30 @@ The increment is declared or it does not exist. A bond declares `min_unit` and i
 whole increments of it; a fund declares none, so its arriving amount buys exactly what it
 buys. Rounding a fund's purchase to whole certificates would be inventing a term.
 
+**The 850.00 then comes straight back out** (owner decision, 2026-09-06,
+`specs/decisions/2026-09-06-undeployed-remainder-returns.toml`). It never became a position,
+and that fixes every term of its journey: it leaves the purchase venue on the **purchase
+date**, because there is nothing for it to wait for; it pays the **declared way out's cost**,
+like any other movement along that chain; it waits that chain's **declared latency**; and it
+pays **no tax**, because nothing was disposed of and there is no gain. So it is part of what
+reaches a spendable endpoint, and the rate is measured against the whole amount that left the
+stream rather than against the outlay less the remainder.
+
+Where the declared way out will not carry it, the remainder stays where it was left and the
+outcome says so. The usual cause is that the remainder is at the venue the purchase was made at
+while the chain departs from where the instrument releases its **proceeds** — two declarations,
+and crossing them would be §29.2's invented leg. The amount is then outside what reaches the
+endpoint and the **rate is refused**: on the whole outlay the stranded amount is priced at
+zero, netted off it is priced at par, nothing declares which it is worth, and both read as a
+rate. That is a report and not a refusal of the tuple: a release that cannot come home means
+the holding cannot be liquidated, and a remainder that cannot come home is the change from the
+purchase, with the position beside it unaffected.
+
 A **declared monthly ceiling refuses, on both sides of the round trip** (FR-016: the rules
 apply on the way in *and the way out*). On the way in the ceiling is compared against the
-amount sent; on the way out against each dated amount the instrument released, so a cap that
-carries every coupon and refuses the redemption says which release bound. Not deployed or
+amount sent; on the way out against each dated amount that travels it — every release, and
+the remainder — so a cap that carries every coupon and refuses the redemption says which
+movement bound. Not deployed or
 repatriated up to the cap: reporting what the rail would not carry needs the owner's declared
 fallback policy and the month's consumed capacity, neither of which a tuple carries, and
 partial deployment is deferred (FR-018, owner decision 2026-08-22). A per-transaction
@@ -3056,17 +3076,18 @@ job (FR-012, FR-015) and a tuple carries no accumulator, so the check fires only
 single movement alone exceeds the cap. Stated because a check that reports less than
 everything is honest and a check that pretends otherwise is not.
 
-The remainder is **reported with its amount and its venue**, and it is outside the amount that
-reaches the endpoint: bringing it home would need a date nobody declared, and sweeping it into
-the purchase would spend money the owner did not agree to spend.
+The remainder is **reported with its amount and its venue** as well as coming home, because
+sweeping it into the purchase would spend money the owner did not agree to spend and money the
+purchase could not deploy is a different fact from money a holding paid out.
 
-It is also **netted off the outlay the rate is measured against** — 10 000 − 850 = 9 150 here —
-rather than left in the series. The remainder is cash at the purchase venue, not money lost,
-and discounting the arrivals back to the whole 10 000 would price it as a total loss: on the
-shipped registry that is the difference between a 16% sovereign bond and a reported −7%,
-produced by nothing more than a unit price that does not divide the arriving amount. The
-netting assumes the remainder is recoverable at par, which is not free — it sits behind the
-same exit the holding does — and that assumption is one of the outcome's own `excludes`.
+Leaving it out of the amount that reaches the endpoint is what makes a 16% sovereign bond read
+as a loss: on the shipped registry a card said `49 760.50 back` against 50 000.00 asked,
+produced by nothing more than a unit price that does not divide the arriving amount. Until
+2026-09-06 the answer to that was to net the remainder off the outlay the rate was measured
+against, which kept the *rate* honest and left the *amount* wrong — and assumed the remainder
+was recoverable at par and free. It is neither assumed nor free now: it is a costed movement
+along the declared way out, and `reaches − outlay` is the answer to the question that was
+asked.
 
 ### 29.4 What goes home, and when
 
@@ -3121,26 +3142,30 @@ Every outcome carries **both**: the amount that reaches a spendable endpoint, an
 implies. Reporting one invites a reader to derive the other under an assumption the tool never
 made, and the assumption available here is reinvestment.
 
-The rate is the internal rate of return of the arrivals **on their own dates** against the
-money actually invested (§29.3), measured with the instrument's declared day-count convention — the same convention that sized
-its flows, and the same root find that produces feature 001's benchmark (§3.2). Ramp latency
+The rate is the internal rate of return of every arrival **on its own date** — the releases,
+and the remainder coming back (§29.3) — against the whole amount that left the stream, measured
+with the instrument's declared day-count convention: the same convention that sized its flows,
+and the same root find that produces feature 001's benchmark (§3.2). Ramp latency
 and settlement latency sit **inside** the span, because waiting is a cost (owner decision,
 2026-08-22). The consequence is worth stating: the shipped domestic pair costs exactly nothing
 and still returns a little less than 001's contractual yield, because it declares one day in
 and three days out.
 
-The rate is a **typed absence** rather than a figure in three cases, and the amount is
-unaffected in all three:
+The rate is a **typed absence** rather than a figure wherever the series it needs does not
+exist, and the amount is unaffected every time:
 
-* the amounts the series is built from — what left, what stayed behind undeployed, what came
-  back — are **not all in one currency**. A dollar outflow against hryvnia inflows is not a
+* the two amounts the series is built from — what left and what came back — are **not in one
+  currency**. A dollar outflow against hryvnia inflows is not a
   rate of anything, and valuing one in the other needs a reference rate on a date, which is
   feature 011. A channel rate is not one: a channel is a market you transact in, and the rate
   that values an outlay against a return is a reference;
+* part of the outlay never came home, because the declared way out would not carry the
+  undeployed remainder (§29.3);
 * the round trip returned nothing;
 * an arrival is negative, because the repatriation charges exceeded what was released. A
   series that is not one payment out followed by receipts has no single internal rate of
-  return, and extrapolating past the bracket would invent one.
+  return, and extrapolating past the bracket would invent one;
+* everything came back on the day it left, so there is no period for a return to be over.
 
 Such a tuple is **not comparison-ready**: it is reported, and kept out of the ranking, exactly
 as 002 keeps a candidate with no round-trip figure out of one.
@@ -3266,13 +3291,15 @@ repatriations, with both conservation identities checked.
 
 ```
 10 000.00  =  9 000.00 (bought) + 150.00 (way in) + 850.00 (undeployed)
-11 790.00  =  11 691.05 (reached) + 98.95 (way out)
+12 640.00  =  12 526.80 (reached) + 113.20 (way out)
 ```
 
-The rate is 14.44%, measured against the 9 150.00 actually invested. The two wrong
-denominators are worth naming because each looks reasonable: the whole 10 000.00 gives 8.96%
-and prices the stranded 850.00 as a loss, and the 9 000.00 of paper gives 15.50% and forgets
-the ramp.
+The second identity counts the remainder on both sides: 11 790.00 released plus the 850.00 that
+bought nothing is what travelled the way out, and the way out charged five movements rather
+than four. The rate is 14.34%, measured against the whole 10 000.00 with the remainder's own
+835.75 arriving on the purchase date. The two wrong figures are worth naming because each looks
+reasonable: dropping that arrival prices the 850.00 as a loss and gives 8.96%, and measuring
+against the 9 000.00 of paper forgets the ramp and gives 15.50%.
 
 ---
 

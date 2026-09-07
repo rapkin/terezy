@@ -148,6 +148,7 @@ InputKind = Literal[
     "fund",
     "goal",
     "group_vocabulary",
+    "held_asset",
     "inflation_assumption",
     "instrument",
     "objective_set",
@@ -155,6 +156,8 @@ InputKind = Literal[
     "official_rate",
     "question",
     "route",
+    "quotation_series",
+    "quote_asset_assumption",
     "scenario",
     "seed",
     "spendable",
@@ -475,8 +478,23 @@ def input_refs(declarations: Declarations) -> tuple[InputRef, ...]:
         )
         for identifier, declared in declarations.cash.items()
     ]
+    held = [
+        InputRef(
+            kind="held_asset",
+            id=identifier,
+            file=file_name(declarations.held_files[identifier]),
+            version=file_version(declarations.held_files[identifier]),
+            # A held asset declares no observed value at all: its price is a dated observation
+            # elsewhere, recorded as its own input, and everything in the file is a reference.
+            unverified_sources=(),
+        )
+        for identifier in declarations.held
+    ]
     return tuple(
-        sorted([*instruments, *tax_classes, *funds, *cash], key=lambda ref: (ref.kind, ref.id))
+        sorted(
+            [*instruments, *tax_classes, *funds, *cash, *held],
+            key=lambda ref: (ref.kind, ref.id),
+        )
     )
 
 
@@ -808,7 +826,28 @@ def answer_input_refs(declarations: resolver.AnswerDeclarations) -> tuple[InputR
             prov.EMPTY,
         ),
         *_holdings_refs(declarations.holdings),
+        *(
+            _ref(
+                "quotation_series",
+                identifier,
+                declarations.quotation_files[identifier],
+                prov.merge_all(
+                    quotation.provenance
+                    for quotation in declarations.held_inputs.quotations[identifier].quotations
+                ),
+            )
+            for identifier in sorted(declarations.quotation_files)
+        ),
     ]
+    if declarations.quote_asset_file is not None and declarations.held_inputs.quote_asset:
+        refs.append(
+            _ref(
+                "quote_asset_assumption",
+                declarations.held_inputs.quote_asset.id,
+                declarations.quote_asset_file,
+                prov.EMPTY,
+            )
+        )
     return tuple(sorted(refs, key=lambda ref: (ref.kind, ref.id)))
 
 

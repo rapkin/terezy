@@ -449,10 +449,18 @@ def test_the_hurdle_is_marked_by_identity_and_not_by_position() -> None:
         )
 
 
-def test_the_undeclared_subjects_are_named_by_the_words_he_wrote() -> None:
+def test_a_held_subject_is_printed_as_held_and_never_as_a_missing_corridor() -> None:
+    """025 FR-029. Every word of his question now resolves, and `btc` resolves to a holding.
+
+    The sentence a corridor would be the remedy for is the one this asserts is absent: `btc`
+    reaches no candidate and never will, so printing *declared but unreached* would send him
+    to `data/routes/` for a thing he already owns.
+    """
     lines, _ = _run()
     output = "\n".join(lines)
-    assert "  btc: NOTHING IS DECLARED BY THAT NAME" in output
+    assert "NOTHING IS DECLARED BY THAT NAME" not in output
+    assert "btc: a held asset, and no lot of it is declared here" in output
+    assert "btc: declared but unreached" not in output
 
 
 def test_main_returns_zero_for_an_answer_and_one_for_a_refusal(
@@ -554,14 +562,14 @@ def test_a_declared_group_nobody_labelled_is_not_printed_as_undeclared() -> None
     question = fixtures.owners_question()
     result = fixtures.answered(
         fixtures.with_plans(
-            fixtures.with_subjects(question, fixtures.OVDP, "unlabelled", "btc"),
+            fixtures.with_subjects(question, fixtures.OVDP, "unlabelled", "nothing_declares_this"),
             {fixtures.OVDP: question.plans[fixtures.OVDP]},
         ),
         widened,
     )
     printed = "\n".join(cli._subject_lines(result))
     assert "  unlabelled: 0 instrument(s) --" in printed
-    assert "  btc: NOTHING IS DECLARED BY THAT NAME" in printed
+    assert "  nothing_declares_this: NOTHING IS DECLARED BY THAT NAME" in printed
 
 
 def test_flags_answer_a_question_against_a_root_that_declares_none(tmp_path: Path) -> None:

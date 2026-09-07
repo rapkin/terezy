@@ -8,9 +8,10 @@ that changes the answer without being recorded is a run nobody can reproduce:
 * each answer's manifest names its own objective file, with its own digest.
 
 **A chosen pair rather than any pair.** Two objective sets may honestly agree, so the criterion
-is that a *disagreeing* pair exists and is pinned. The money alone is a total order over the
-candidates -- it picks exactly one -- while the money and the date pick several, which is the
-option the owner declined (CL-1, option C) and the reason the fixture set exists at all.
+is that a *disagreeing* pair exists and is pinned. The money alone orders the candidates on one
+axis and picks a strictly smaller set than the money and the date do -- one member, or the
+handful the declared band cannot separate -- while the money and the date pick several, which is
+the option the owner declined (CL-1, option C) and the reason the fixture set exists at all.
 
 The row's word *rankings* is read as *the answers the objectives produce*: this feature's answer
 is a partial order rather than a list.
@@ -26,7 +27,11 @@ from terezy.api.answer import answer_question
 from terezy.core.decision.dominance import why_one_member
 from terezy.core.primitives.currency import Currency
 from terezy.core.results.answer import Answer
-from terezy.core.results.dominance import DominanceResult, EveryOtherIsDominated
+from terezy.core.results.dominance import (
+    DominanceResult,
+    EveryOtherIsDominated,
+    TheSetDoesNotHaveOneMember,
+)
 from tests import answer_registries as fixtures
 
 pytestmark = pytest.mark.worked_example
@@ -68,14 +73,23 @@ def test_the_two_objective_sets_produce_different_non_dominated_sets() -> None:
     his = _sets(_answered(fixtures.OWNERS_QUESTION))
     money_alone = _sets(_answered(fixtures.BY_THE_MONEY))
     assert his != money_alone
+    for narrow, wide in zip(money_alone, his, strict=True):
+        assert len(narrow) < len(wide), (
+            "one criterion cannot separate more candidates than two do, and if it separated "
+            "the same number the pair would not be disagreeing about anything"
+        )
     for section in _answered(fixtures.BY_THE_MONEY).sections:
         assert isinstance(section.dominance, DominanceResult)
-        assert len(section.dominance.non_dominated) == 1, (
-            "the money alone is a total order, so its set has exactly one member -- which is "
-            "the winner this feature exists to refuse to present, arrived at by declaring one "
-            "criterion rather than by any calibration"
-        )
-        assert isinstance(why_one_member(section.dominance), EveryOtherIsDominated)
+        members = section.dominance.non_dominated
+        why = why_one_member(section.dominance)
+        if len(members) == 1:
+            assert isinstance(why, EveryOtherIsDominated)
+        else:
+            # One criterion still does not force one winner: at the owner's month the two best
+            # are 2.33 apart on a declared band of 5.00 (0.01% of the 50 000 he asked about),
+            # so they are indistinguishable and Principle I reports the pair. Presenting the
+            # larger figure as the answer is the false optimum this feature exists to refuse.
+            assert isinstance(why, TheSetDoesNotHaveOneMember)
 
 
 def test_the_member_the_money_alone_picks_is_in_his_own_set_too() -> None:

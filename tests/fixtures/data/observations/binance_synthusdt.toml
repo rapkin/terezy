@@ -1,0 +1,70 @@
+# SYNTHETIC FIXTURE. Every close below is invented and no venue published one.
+#
+# It stands where scripts/fetch_binance.py would write, in the shape it writes, so that a held
+# position with a PRICE is reachable by a test. The shipped tree carries no observation file at
+# all -- a committed price is a price nobody re-fetched -- so without this the only held path a
+# suite could walk would be the refusal.
+#
+# Every `verified_on` is empty, as a fetched one's is and must stay: a downloaded number is not
+# a checked number, and here there is nothing to check it against.
+
+retrieved_on = "2026-08-31"
+endpoint     = "https://data-api.binance.vision/api/v3/klines"
+symbol       = "SYNTHUSDT"
+interval     = "1d"
+
+[[observation]]
+on_date      = "2026-08-25"
+close        = 60000.0
+kind         = "market_quotation"
+source       = "SYNTHETIC FIXTURE — an invented daily close. No venue published this figure and no endpoint returned it; it exists so the priced path of a held position is reachable by a test. Written by hand in the shape scripts/fetch_binance.py writes."
+retrieved_on = "2026-08-31"
+verified_on  = ""
+
+[[observation]]
+on_date      = "2026-08-26"
+close        = 60250.0
+kind         = "market_quotation"
+source       = "SYNTHETIC FIXTURE — an invented daily close. No venue published this figure and no endpoint returned it; it exists so the priced path of a held position is reachable by a test. Written by hand in the shape scripts/fetch_binance.py writes."
+retrieved_on = "2026-08-31"
+verified_on  = ""
+
+[[observation]]
+on_date      = "2026-08-27"
+close        = 60500.0
+kind         = "market_quotation"
+source       = "SYNTHETIC FIXTURE — an invented daily close. No venue published this figure and no endpoint returned it; it exists so the priced path of a held position is reachable by a test. Written by hand in the shape scripts/fetch_binance.py writes."
+retrieved_on = "2026-08-31"
+verified_on  = ""
+
+[[observation]]
+on_date      = "2026-08-28"
+close        = 60750.0
+kind         = "market_quotation"
+source       = "SYNTHETIC FIXTURE — an invented daily close. No venue published this figure and no endpoint returned it; it exists so the priced path of a held position is reachable by a test. Written by hand in the shape scripts/fetch_binance.py writes."
+retrieved_on = "2026-08-31"
+verified_on  = ""
+
+[[observation]]
+on_date      = "2026-08-29"
+close        = 61000.0
+kind         = "market_quotation"
+source       = "SYNTHETIC FIXTURE — an invented daily close. No venue published this figure and no endpoint returned it; it exists so the priced path of a held position is reachable by a test. Written by hand in the shape scripts/fetch_binance.py writes."
+retrieved_on = "2026-08-31"
+verified_on  = ""
+
+[[observation]]
+on_date      = "2026-08-30"
+close        = 61250.0
+kind         = "market_quotation"
+source       = "SYNTHETIC FIXTURE — an invented daily close. No venue published this figure and no endpoint returned it; it exists so the priced path of a held position is reachable by a test. Written by hand in the shape scripts/fetch_binance.py writes."
+retrieved_on = "2026-08-31"
+verified_on  = ""
+
+[[observation]]
+on_date      = "2026-08-31"
+close        = 61500.0
+kind         = "market_quotation"
+source       = "SYNTHETIC FIXTURE — an invented daily close. No venue published this figure and no endpoint returned it; it exists so the priced path of a held position is reachable by a test. Written by hand in the shape scripts/fetch_binance.py writes."
+retrieved_on = "2026-08-31"
+verified_on  = ""

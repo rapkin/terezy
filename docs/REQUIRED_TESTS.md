@@ -46,7 +46,7 @@ recur. Severity is the predecessor's: **H** wrong numbers or crash, **M** mislea
 | # | Sev | Regression to assert | Test |
 |---|---|---|---|
 | B1 | H | Price index vs total-return series are never ranked in one table without labelling. Prices and distributions are separate series. | `[ ]` |
-| B2 | H | A provider outage never writes to cache and never silently reuses synthetic data. Cache entries carry provenance and a synthetic flag. | `[ ]` |
+| B2 | H | A provider outage never writes to cache and never silently reuses synthetic data. Cache entries carry provenance and a synthetic flag. | `[~]` `tests/unit/test_fetch_binance.py` — the first half only. Every refusal writes nothing and leaves the previous file byte-identical (025 FR-021, FR-024). The second half is **untested because this feature ships no cache**: the declared file *is* the store, it is in git and diffable, and cache entries carrying provenance is `provider-automation`'s to build. |
 | B3 | H | Non-integer year offsets either work or are rejected at parse time — never crash mid-run. | `[ ]` |
 | B4 | H | Exit/liquidation taxes only unrealised gains, never gains already taxed at a rebalance. | `[ ]` |
 | B5 | H | Tax is assessed to a tax year and paid from cash on the due date, not deducted from the position at trade time. Per-disposal basis, loss offset, and carryforward all modelled. | `[ ]` |

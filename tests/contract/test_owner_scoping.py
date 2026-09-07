@@ -93,9 +93,12 @@ def test_the_events_a_seed_opens_carry_the_owner_too() -> None:
     from.
     """
     declarations = resolver.from_data_root(DATA_ROOT)
-    declared = resolver.seeds_and_goals_from_data_roots(
+    resolved = resolver.seeds_and_goals_from_data_roots(
         resolver.data_roots_of(DATA_ROOT), base_currency=Currency.UAH
-    ).seeds
+    )
+    # A held asset projects no event stream at all (025 FR-010), so a lot of one has nothing
+    # to open and never reaches the ledger. This asserts the boundary, not the filter.
+    declared = [lot for lot in resolved.seeds if lot.instrument_id in declarations.instruments]
     opened = seeds.opening_events(declared, declarations.instruments, opens_on=date(2026, 8, 23))
     assert isinstance(opened, tuple), opened
     assert opened

@@ -251,7 +251,11 @@ def test_a_section_that_refused_before_enumerating_says_so_rather_than_naming_a_
         counts = subject_counts(result, section)
         assert counts.not_assessed == 3
         assert counts.declared_but_unreached == 0
-        assert counts.undeclared == 1
+        assert counts.undeclared == 0
+        # `btc` is held rather than unassessed, and deliberately so: a section that refused
+        # before enumerating still knows what kind of thing he named, and a holding could not
+        # have been enumerated by a section that did look (025 FR-029).
+        assert counts.held == 1
         assert not [item for item in section.standings if isinstance(item, SubjectUnreached)]
 
 

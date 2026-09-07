@@ -86,12 +86,18 @@ def test_an_empty_overlay_is_identical_to_an_absent_one(tmp_path: Path) -> None:
 
 
 def test_the_overlay_moves_nothing_it_does_not_declare(tmp_path: Path) -> None:
-    """SC-001: the shipped lots resolve identically with and without a private root."""
+    """SC-001: the shipped lots resolve identically with and without a private root.
+
+    What the overlay adds is its own lots and nothing else -- no shipped lot's quantity, cost,
+    basis or struck rate moves because a second root exists beside it.
+    """
     root = _scratch(tmp_path)
     with_overlay = _resolve(root)
+    private = set(with_overlay.overlay_seeds)
     shutil.rmtree(root / resolver.USER_DIR)
     without = _resolve(root)
-    assert with_overlay.seeds == without.seeds
+    assert [lot for lot in with_overlay.seeds if lot not in private] == list(without.seeds)
+    assert private, "the fixture overlay declares nothing, so this asserts nothing"
 
 
 # ---------------------------------------------------------------------------
@@ -217,6 +223,27 @@ def test_the_admitted_set_is_what_this_feature_declared() -> None:
 # ---------------------------------------------------------------------------
 # SC-003: nothing in the committed tree describes a real position
 # ---------------------------------------------------------------------------
+
+
+def test_no_root_this_suite_runs_against_can_reach_the_real_overlay() -> None:
+    """025 FR-007: his own position must not reach a golden, and a digest is not a file.
+
+    ``data_roots_of`` derives the overlay from whatever root it is handed, so a suite pointed
+    at the working tree's ``data/`` would fold his quantities into every golden taken over it
+    -- and gitignoring the file does not stop the *digest* encoding them. The exclusion is
+    therefore in the roots the suite is built from rather than in a reviewer's attention.
+
+    Asserted over the roots rather than over the filesystem, so it holds whether or not the
+    file happens to exist on the machine running this.
+    """
+    for root in (data_roots.SHIPPED, DATA_ROOT):
+        derived = resolver.data_roots_of(root)
+        assert derived.shipped != data_roots.COMMITTED, (
+            f"{root} is the working tree's own data root, so a test reading it reads whatever "
+            "the owner has declared under data/user/"
+        )
+        if derived.overlay is not None:
+            assert data_roots.COMMITTED not in derived.overlay.parents
 
 
 def test_no_committed_seed_declares_a_real_holding() -> None:
