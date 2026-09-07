@@ -1,5 +1,5 @@
 import type { Indistinguishable, TupleOutcome } from "@/api/shapes";
-import { beliefsOf } from "@/answer/beliefs";
+import { beliefsOf, withoutBeliefs } from "@/answer/beliefs";
 import { spanDays } from "@/answer/comparability";
 import { sameTuple } from "@/answer/keys";
 import { separatingBadge } from "@/answer/separating";
@@ -33,7 +33,9 @@ export function CandidateCard({
   shared: readonly string[];
   indistinguishable: Indistinguishable | undefined;
 }) {
-  const own = beyondShared(outcome, shared);
+  // The belief's own sentence is folded into the once-per-screen line, so what is left here is
+  // what this member rests on and nothing else (FR-024).
+  const own = withoutBeliefs(beyondShared(outcome, shared), beliefsOf(outcome));
   const className = classLabel(reading);
   return (
     <article

@@ -7,3 +7,10 @@ src/routes/series-map.ts
 # has a date axis and a numeric axis, and which series it is drawing -- so the two ids are
 # written down here, in one file, and a third per-category screen is a decision taken in review
 # rather than a file somebody adds.
+
+src/answer/endpoints.ts
+# 026 FR-006 and FR-008: the answer screen names `questions` and `instruments` because it reads
+# two endpoints rather than browsing two categories -- the declared question it answers, and the
+# instrument behind each member, whose read is where a kind may come from. The module holds the
+# two literals and nothing else, so this exception covers them and not every query the client
+# makes.

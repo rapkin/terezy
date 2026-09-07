@@ -68,6 +68,7 @@ test("a screen of every kind renders without an error, a 4xx, or an empty slot",
   }
 
   await visit(`/?as_of=${AS_OF}`);
+  await visit(`/data?as_of=${AS_OF}`);
   // Asked of the API rather than read off the page, so a category the overview failed to render
   // is a screen this crawl still opens.
   const categories: string[] = await page.evaluate(async (asOf: string) => {

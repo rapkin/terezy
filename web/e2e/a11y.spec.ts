@@ -12,6 +12,7 @@ import { AS_OF, offline } from "./offline";
  */
 const ROUTES = [
   `/?as_of=${AS_OF}`,
+  `/data?as_of=${AS_OF}`,
   `/data/goals?as_of=${AS_OF}`,
   `/data/goals/flat_deposit?as_of=${AS_OF}`,
   `/series/cpi?as_of=${AS_OF}&from=2025-01&to=2025-10`,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { render } from "@testing-library/react";
-import { beliefsAcross } from "@/answer/beliefs";
+import { beliefsAcross, beliefsOf, sentencesNaming, withoutBeliefs } from "@/answer/beliefs";
 import { SharedAssumptions } from "@/answer/components/SharedAssumptions";
 import { SOLD_EARLY, outcome } from "../answer-fixtures";
 
@@ -55,5 +55,46 @@ describe("the belief line", () => {
   it("says so plainly where the members share nothing, rather than rendering an empty list", () => {
     const { container } = render(<SharedAssumptions shared={[]} beliefs={[]} />);
     expect(container.querySelector("[data-shared-none]")?.textContent).toContain("nothing is shared");
+  });
+});
+
+/**
+ * FR-024's other half, and the defect it prevents: measured 2026-09-07 the core's `rests_on`
+ * sentence for a belief is the belief's own rationale with a preamble and the id in brackets in
+ * front of it — so a card listing its `rests_on` in full carries the whole statement beside a
+ * mark that says the same thing.
+ */
+const AS_THE_CORE_WROTE_IT =
+  `the clean price implied by the observed quotation is assumed to hold ` +
+  `(${CLEAN_PRICE.id}): ${CLEAN_PRICE.rationale}`;
+
+describe("the belief's own sentence", () => {
+  const held = outcome({
+    instrumentId: "A",
+    quotation: CLEAN_PRICE,
+    restsOn: [AS_THE_CORE_WROTE_IT, "something else entirely"],
+  });
+
+  it("is folded out of what a member rests on", () => {
+    expect(withoutBeliefs(held.rests_on, beliefsOf(held))).toEqual(["something else entirely"]);
+  });
+
+  it("is what the once-per-screen line states, framing and all", () => {
+    expect(sentencesNaming(CLEAN_PRICE, [held])).toEqual([AS_THE_CORE_WROTE_IT]);
+    const { container } = render(
+      <SharedAssumptions
+        shared={[]}
+        beliefs={[CLEAN_PRICE]}
+        statedAs={() => [AS_THE_CORE_WROTE_IT]}
+      />,
+    );
+    expect(container.textContent).toContain(AS_THE_CORE_WROTE_IT);
+  });
+
+  it("falls back to the rationale where the answer composed no sentence for it", () => {
+    const { container } = render(
+      <SharedAssumptions shared={[]} beliefs={[CLEAN_PRICE]} statedAs={() => []} />,
+    );
+    expect(container.textContent).toContain(CLEAN_PRICE.rationale);
   });
 });

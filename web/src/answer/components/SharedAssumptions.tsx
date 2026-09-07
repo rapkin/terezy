@@ -13,9 +13,11 @@ import { Disclosure } from "./Disclosure";
 export function SharedAssumptions({
   shared,
   beliefs,
+  statedAs,
 }: {
   shared: readonly string[];
   beliefs: readonly Belief[];
+  statedAs?: (belief: Belief) => readonly string[];
 }) {
   return (
     <section className="space-y-2 rounded border border-[var(--border)] p-3" data-shared>
@@ -24,7 +26,7 @@ export function SharedAssumptions({
         a rate is measured on the money actually invested, not on the whole amount asked about.
       </p>
       {beliefs.map((belief) => (
-        <BeliefLine key={belief.id} belief={belief} />
+        <BeliefLine key={belief.id} belief={belief} sentences={statedAs?.(belief) ?? []} />
       ))}
       {shared.length === 0 ? (
         <p className="text-xs text-[var(--ink-muted)]" data-shared-none>
@@ -43,12 +45,29 @@ export function SharedAssumptions({
   );
 }
 
-/** FR-024: once per screen per distinct belief id, with the full statement one interaction away. */
-export function BeliefLine({ belief }: { belief: Belief }) {
+/**
+ * FR-024: once per screen per distinct belief id, with the full statement one interaction away.
+ *
+ * The statement is the served sentence where the answer composed one — that sentence carries the
+ * rationale plus the core's own framing of it, so rendering the rationale alone here would drop
+ * the framing while the cards no longer carry it.
+ */
+export function BeliefLine({
+  belief,
+  sentences,
+}: {
+  belief: Belief;
+  sentences: readonly string[];
+}) {
+  const stated = sentences.length === 0 ? [belief.rationale] : sentences;
   return (
     <div data-belief={belief.id}>
       <Disclosure name="belief" summary={<span>this rests on the belief {belief.id}</span>}>
-        <p data-served-text="belief">{belief.rationale}</p>
+        {stated.map((sentence) => (
+          <p key={sentence} data-served-text="belief">
+            {sentence}
+          </p>
+        ))}
       </Disclosure>
     </div>
   );

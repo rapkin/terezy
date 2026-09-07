@@ -22,6 +22,35 @@ export function beliefsAcross(outcomes: readonly TupleOutcome[]): readonly Belie
   return distinct(outcomes.flatMap(beliefsOf));
 }
 
+/**
+ * The served `rests_on` sentences that name this belief, across the members the screen shows.
+ *
+ * Measured 2026-09-07 the sentence the core composes is the belief's own rationale with a
+ * preamble and the id in brackets in front of it — so a card that listed its `rests_on` in full
+ * would carry the whole statement beside a mark that says the same thing, which is the copy
+ * FR-024 forbids. The id is a **typed field** and it is looked for inside prose the core wrote;
+ * nothing typed is derived from the match, only which line is a duplicate of which.
+ */
+export function sentencesNaming(
+  belief: Belief,
+  outcomes: readonly TupleOutcome[],
+): readonly string[] {
+  const found = outcomes.flatMap((outcome) => outcome.rests_on).filter(names(belief));
+  return [...new Set(found)];
+}
+
+/** The sentences left once the ones stated with a belief are folded into that belief's line. */
+export function withoutBeliefs(
+  sentences: readonly string[],
+  beliefs: readonly Belief[],
+): readonly string[] {
+  return sentences.filter((sentence) => !beliefs.some((belief) => names(belief)(sentence)));
+}
+
+function names(belief: Belief): (sentence: string) => boolean {
+  return (sentence) => sentence.includes(`(${belief.id})`);
+}
+
 function distinct(beliefs: readonly Belief[]): readonly Belief[] {
   const seen = new Map<string, Belief>();
   for (const belief of beliefs) if (!seen.has(belief.id)) seen.set(belief.id, belief);

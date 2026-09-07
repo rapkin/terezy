@@ -1,7 +1,7 @@
 import type { AnsweredQuestion, HorizonSection, TupleOutcome } from "@/api/shapes";
 import { sharedAcross } from "@/answer/assumptions";
 import { joinToOutcome } from "@/answer/join";
-import { beliefsAcross } from "@/answer/beliefs";
+import { beliefsAcross, sentencesNaming, withoutBeliefs } from "@/answer/beliefs";
 import type { KindReading } from "@/answer/instrument-kind";
 import { AnswerHeader } from "./AnswerHeader";
 import { HorizonColumn } from "./HorizonColumn";
@@ -27,11 +27,19 @@ export function AnswerScreen({
     return <TypedState state={answer} label="the question was not answered" />;
   }
   const shown = membersShown(answer.sections);
-  const shared = sharedAcross(shown.map((outcome) => outcome.rests_on));
+  const beliefs = beliefsAcross(shown);
+  const shared = withoutBeliefs(
+    sharedAcross(shown.map((outcome) => outcome.rests_on)),
+    beliefs,
+  );
   return (
     <div className="space-y-4" data-answer>
       <AnswerHeader answer={answer} />
-      <SharedAssumptions shared={shared} beliefs={beliefsAcross(shown)} />
+      <SharedAssumptions
+        shared={shared}
+        beliefs={beliefs}
+        statedAs={(belief) => sentencesNaming(belief, shown)}
+      />
       <div className="grid gap-4 lg:grid-cols-3" data-columns>
         {answer.sections.map((section) => (
           <HorizonColumn

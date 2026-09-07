@@ -12,8 +12,8 @@ test.beforeEach(async ({ page }) => {
   await offline(page);
 });
 
-test("the overview lists what the API indexes, and nothing else", async ({ page }) => {
-  await page.goto(`/?as_of=${AS_OF}`);
+test("the data index lists what the API indexes, and nothing else", async ({ page }) => {
+  await page.goto(`/data?as_of=${AS_OF}`);
   const cards = page.locator("[data-shape]");
   await expect(cards.first()).toBeVisible();
   const indexed = await page.evaluate(async (asOf: string) => {
@@ -25,7 +25,7 @@ test("the overview lists what the API indexes, and nothing else", async ({ page 
 });
 
 test("a keyed category states a count and a singleton states whether it resolved", async ({ page }) => {
-  await page.goto(`/?as_of=${AS_OF}`);
+  await page.goto(`/data?as_of=${AS_OF}`);
   await expect(page.locator("[data-shape='keyed']").first()).toContainText("declared");
   const singleton = page.locator("[data-shape='singleton']").first();
   await expect(singleton).toContainText("a single document");
@@ -58,7 +58,7 @@ test("a refusal from the real API is rendered as its reason, never as an empty c
 });
 
 test("an as_of the router cannot validate is a visible error naming the parameter", async ({ page }) => {
-  await page.goto("/?as_of=yesterday");
+  await page.goto("/data?as_of=yesterday");
   const alert = page.locator("[data-parameter-error='as_of']");
   await expect(alert).toBeVisible();
   await expect(alert).toContainText("as_of");
@@ -68,7 +68,7 @@ test("an as_of the router cannot validate is a visible error naming the paramete
 test("an as_of the router's parser coerced is refused, never replaced with today", async ({ page }) => {
   // `20260905` reaches the route as a number, and a route that read it as absent would redirect
   // with the clock read instead — the silent default FR-020 forbids.
-  await page.goto("/?as_of=20260905");
+  await page.goto("/data?as_of=20260905");
   const alert = page.locator("[data-parameter-error='as_of']");
   await expect(alert).toBeVisible();
   await expect(alert).toContainText("20260905");
@@ -79,7 +79,7 @@ test("an as_of the router's parser coerced is refused, never replaced with today
 });
 
 test("an as_of written and left blank is a visible error, not a blank page", async ({ page }) => {
-  await page.goto("/?as_of=");
+  await page.goto("/data?as_of=");
   await expect(page.locator("[data-parameter-error='as_of']")).toBeVisible();
 });
 

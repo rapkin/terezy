@@ -1,7 +1,7 @@
 import type { Answered } from "@/api/client";
 import { createRoute } from "@tanstack/react-router";
 import { useQueries, useQuery } from "@tanstack/react-query";
-import { answerQuery, categoryQuery, instrumentQuery } from "@/api/queries";
+import { answerQuery, declaredQuestionsQuery, instrumentQuery } from "@/api/queries";
 import { isListing, isTheAnswer } from "@/lib/narrow";
 import { kindOf, type KindReading } from "@/answer/instrument-kind";
 import { memberIds } from "@/answer/components/AnswerScreen";
@@ -29,7 +29,7 @@ function TheAnswer() {
   const enabled = asOf !== undefined;
   // The question's id is read off the declared ids rather than written here: an id in the client
   // is a declaration in two places, and the one in `data/` is the one that is reviewed.
-  const declared = useQuery({ ...categoryQuery("questions", asOf ?? ""), enabled });
+  const declared = useQuery({ ...declaredQuestionsQuery(asOf ?? ""), enabled });
   const questionId = firstDeclared(declared.data);
   const answered = useQuery({
     ...answerQuery(questionId ?? "", asOf ?? ""),
@@ -44,6 +44,12 @@ function TheAnswer() {
   if (!enabled) return null;
   if (declared.isError) return <AnswerQueryFailed query={declared} />;
   if (declared.data === undefined) return <LoadingState />;
+  // Read before the id: `request` answers an unreachable API with a typed value rather than by
+  // rejecting, so a route that went straight to the id would report a service that is down as a
+  // registry that declares no question.
+  if (declared.data.tag !== "body" || !isListing(declared.data.body)) {
+    return <AnswerUnavailable answered={declared.data} />;
+  }
   if (questionId === undefined) {
     return (
       <p role="note" data-nothing-declared className="text-sm">

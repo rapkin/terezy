@@ -7,6 +7,7 @@
  * renders that statement instead of choosing a world.
  */
 import { queryOptions } from "@tanstack/react-query";
+import { INSTRUMENTS, QUESTIONS } from "@/answer/endpoints";
 import { API_PREFIX, request, type Answered } from "./client";
 
 const STABLE = { staleTime: 30_000, retry: false } as const;
@@ -66,9 +67,14 @@ export function observationsQuery(
 export function answerQuery(questionId: string, asOf: string) {
   return queryOptions<Answered>({
     queryKey: ["answer", questionId, asOf],
-    queryFn: () => request(path("questions", questionId, "answer"), { as_of: asOf }),
+    queryFn: () => request(path(QUESTIONS, questionId, "answer"), { as_of: asOf }),
     ...STABLE,
   });
+}
+
+/** The declared question ids, so the screen reads which question it answers rather than naming one. */
+export function declaredQuestionsQuery(asOf: string) {
+  return categoryQuery(QUESTIONS, asOf);
 }
 
 /**
@@ -81,7 +87,7 @@ export function answerQuery(questionId: string, asOf: string) {
 export function instrumentQuery(instrumentId: string, asOf: string) {
   return queryOptions<Answered>({
     queryKey: ["instrument-kind", instrumentId, asOf],
-    queryFn: () => request(path("instruments", instrumentId), { as_of: asOf }),
+    queryFn: () => request(path(INSTRUMENTS, instrumentId), { as_of: asOf }),
     ...STABLE,
   });
 }
