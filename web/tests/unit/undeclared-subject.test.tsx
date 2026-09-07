@@ -3,8 +3,7 @@ import { render } from "@testing-library/react";
 import { AnswerHeader } from "@/answer/components/AnswerHeader";
 import { remedyFor } from "@/answer/remedies";
 import { GROUP } from "@/design/format";
-import { provenance, source, verdict } from "../fixtures";
-import { question } from "../answer-fixtures";
+import { answer } from "../answer-fixtures";
 
 /**
  * FR-021: a subject the registry declares nothing by is a refusal carrying its remedy and the
@@ -19,16 +18,7 @@ function header(subjects: Parameters<typeof answerWith>[0]) {
 }
 
 function answerWith(subjects: Parameters<typeof AnswerHeader>[0]["answer"]["subjects"]) {
-  return {
-    tag: "answer.Answer" as const,
-    as_of: "2026-09-05",
-    question: question(),
-    subjects: [...subjects],
-    sections: [],
-    excludes: [],
-    provenance: provenance([source()]),
-    staleness: verdict([]),
-  };
+  return answer({ subjects });
 }
 
 const UNDECLARED = { tag: "answer.UndeclaredSubject" as const, named: "btc" };
@@ -54,16 +44,27 @@ describe("the answer header", () => {
     expect(container.textContent).not.toContain("dominat");
   });
 
-  it("renders an undeclared subject as a refusal with its remedy and the feature", () => {
+  it("renders an undeclared subject as a refusal with its remedy, never blank", () => {
     const { container } = header([UNDECLARED]);
     const refusal = container.querySelector("[data-undeclared-subject='btc']");
     expect(refusal?.textContent).toContain("a declaration");
-    expect(refusal?.querySelector("[data-remedy-feature='025-btc-holdings']")).not.toBeNull();
+    expect(refusal?.querySelector("[data-remedy-feature]")).not.toBeNull();
+    expect((refusal?.textContent ?? "").trim()).not.toBe("");
   });
 
-  it("names the subject the shipped answer still reports undeclared", () => {
-    // Measured 2026-09-07, after 023 landed: `cash` is declared and `btc` is the one left.
-    expect(remedyFor("btc").suppliedBy).toBe("025-btc-holdings");
+  it("states the remedy for a subject no feature is recorded against", () => {
+    // Measured 2026-09-07: 023 and 025 landed, so the shipped answer reports no undeclared
+    // subject at all and the feature map is empty. The remedy itself is not.
+    expect(remedyFor("btc").remedy).toBe("a declaration");
+    expect(remedyFor("btc").suppliedBy).toBeNull();
+  });
+
+  it("says so plainly where the question names no subject, rather than an empty list", () => {
+    const { container } = header([]);
+    expect(container.querySelector("[data-subjects='none']")?.textContent).toContain(
+      "names no subject",
+    );
+    expect(container.querySelector("ul[data-subjects]")).toBeNull();
   });
 
   it("still states the remedy for a subject the map has no feature for", () => {

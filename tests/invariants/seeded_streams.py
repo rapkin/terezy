@@ -128,6 +128,7 @@ def seeded_event_streams(draw: st.DrawFn, currency: Currency = Currency.UAH) -> 
                 acquired_on=acquired_on,
                 cost=_cost(amount, currency, sources),
                 basis=basis,
+                struck_from=None,
             )
         )
 

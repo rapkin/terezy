@@ -4,6 +4,7 @@ import { joinToOutcome, placeable } from "@/answer/join";
 import { beliefsAcross, sentencesNaming, withoutBeliefs } from "@/answer/beliefs";
 import type { KindReading } from "@/answer/instrument-kind";
 import { AnswerHeader } from "./AnswerHeader";
+import { HeldPositions } from "./HeldPositions";
 import { HorizonColumn } from "./HorizonColumn";
 import { TypedState } from "./NamedState";
 import { SharedAssumptions } from "./SharedAssumptions";
@@ -36,6 +37,7 @@ export function AnswerScreen({
   return (
     <div className="space-y-4" data-answer>
       <AnswerHeader answer={answer} />
+      <HeldPositions held={answer.held} staleness={answer.staleness} />
       <SharedAssumptions
         shared={shared}
         beliefs={beliefs}

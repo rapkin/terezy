@@ -72,6 +72,7 @@ def _registries() -> Registries:
     return Registries(
         instruments={},
         funds={},
+        held={},
         cash={
             CASH: CashDeclaration(
                 id=CASH,

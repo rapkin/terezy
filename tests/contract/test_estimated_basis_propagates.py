@@ -104,6 +104,7 @@ def _seed(*, estimated: bool) -> SeedLot:
         acquired_on=ACQUIRED_ON,
         cost=Money(98_000.0, UAH, prov.EMPTY),
         basis=basis,
+        struck_from=None,
     )
 
 

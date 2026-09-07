@@ -4297,7 +4297,49 @@ carries.
   other is dominated; or every other is not placed; or a mixture, with the counts saying which.
   Only *every other is dominated* is a finding.
 
-## 37. Where to look next
+## 37. A held position: what it cost, in hryvnia
+
+### 37.1 The currency a declared cost is in
+
+A seed lot's cost carries no `currency` key, and 008 FR-010 read that as *always the base
+currency*. 025 FR-025 **narrows** it: a cost is in the base currency **unless the instrument
+the lot names declares a different price currency**, in which case it is in that one.
+
+The fact stays off the seed file. The currency lives on the instrument, which is where it
+belongs and where a second lot of the same thing cannot contradict it; what changed is the
+reading of *base currency*, not the shape of the declaration. A dollar cost read as hryvnia is
+wrong by the whole exchange rate and every figure derived from it stays plausible, which is why
+this is a narrowing rather than a convention.
+
+### 37.2 The strike
+
+Where that currency is not the base currency, the hryvnia basis is
+
+```
+basis = cost × rate / quotation_unit
+```
+
+at the official rate declared **for the lot's own acquisition date** — §30.2's formula and
+§30.2's series, applied to an acquisition cost rather than to an income event. The series is
+the one the jurisdiction assessing in the base currency names; two such jurisdictions naming
+different series is refused rather than resolved by filename.
+
+**A date the series does not declare refuses by name**, carrying §30.2's own reason: nothing is
+interpolated, extrapolated, carried forward or taken from the nearest date. The basis is what
+every later gain and every tax charged on it is measured from, so a rate a day out is a wrong
+number that nothing downstream could detect.
+
+**Two marks, and both propagate.** The struck basis rests on the owner's estimate *and* on the
+rate observation, and every figure derived from it carries both — the first because the cure is
+his finding the receipt, the second because the cure is checking the published value. A figure
+showing one is a top-severity defect (008 FR-007, 011 FR-015).
+
+The strike happens at the one place holding both the instrument declaration and the rate series
+— the resolver — and **before** the cost is tagged with a currency: by the time a lot reaches
+the ledger its cost is already in the base currency, and §30.2 refuses to consult a rate for an
+amount already in the tax currency.
+
+## 38. Where to look next
 
 | question | file |
 | --- | --- |
@@ -4312,6 +4354,7 @@ carries.
 | What happens if the cash is not there? | `tests/unit/test_insufficient_cash.py` |
 | Can a figure hide which method produced it? | `tests/contract/test_method_is_never_implicit.py` |
 | Is an unsettled reading of the law visible on the figure? | `tests/contract/test_unsettled_is_labelled.py` |
+| Is a dollar cost basis struck right? | `tests/worked_examples/test_struck_basis.py` |
 | What does the owner's own question actually answer? | `tests/golden/the_answer.golden.txt` |
 | Is the arithmetic of a sale at the window's end right? | `tests/worked_examples/test_early_exit_sale.py` |
 | Can a group be inferred rather than declared? | `tests/contract/test_group_membership_is_declared.py` |

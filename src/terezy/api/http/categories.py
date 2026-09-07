@@ -22,7 +22,9 @@ from terezy.core.instruments.access import InstrumentAccess
 from terezy.core.instruments.cash import CashDeclaration
 from terezy.core.instruments.fund import FundDeclaration
 from terezy.core.instruments.groups import InstrumentGroup
+from terezy.core.instruments.held import HeldAssetDeclaration
 from terezy.core.instruments.interface import InstrumentDeclaration
+from terezy.core.instruments.quotations import QuotationSeries
 from terezy.core.ledger.seeds import SeedLot
 from terezy.core.primitives.staleness import ObservationKind
 from terezy.core.results.candidates import CandidateCeiling
@@ -35,6 +37,7 @@ from terezy.core.routes.channels import FxChannel
 from terezy.core.routes.legs import Route
 from terezy.core.routes.venues import Venue
 from terezy.core.scenarios.quotation import QuotationHolds
+from terezy.core.scenarios.quote_asset import QuoteAssetIsWorth
 from terezy.core.streams.streams import IncomeStream
 from terezy.core.tax.interface import TaxClass
 from terezy.core.tax.official_rate import OfficialRateSeries
@@ -57,12 +60,6 @@ composes one itself.
 """
 
 EXEMPT_DIRECTORIES: Final[Mapping[str, str]] = {
-    "observations": (
-        "no loader exists anywhere in src/terezy/. These are a fetch script's raw retrievals, "
-        "read by a human promoting them into a declaration and by nothing at run time; serving "
-        "them would make the API the first consumer of data the engine deliberately does not "
-        "consume"
-    ),
     "instruments/nav": (
         "deliberately not globbed by the resolver, which states at its own glob that a "
         "subdirectory holds a different shape of file. Empty today, and a category for it would "
@@ -155,8 +152,13 @@ class Category:
 def _instruments(ask: Ask) -> KeyedRecords:
     declared = resolver.from_data_root(ask.root)
     return KeyedRecords(
-        records={**declared.instruments, **declared.funds, **declared.cash},
-        files={**declared.instrument_files, **declared.fund_files, **declared.cash_files},
+        records={**declared.instruments, **declared.funds, **declared.cash, **declared.held},
+        files={
+            **declared.instrument_files,
+            **declared.fund_files,
+            **declared.cash_files,
+            **declared.held_files,
+        },
     )
 
 
@@ -247,13 +249,54 @@ def _quotation_belief(ask: Ask) -> SingleRecord:
     )
 
 
+def _quote_asset_belief(ask: Ask) -> SingleRecord:
+    """The owner's belief about what a quote asset is worth, or nothing where none is declared.
+
+    Unlike the quotation belief, an absent one is an ordinary state: a registry declaring no
+    held asset needs none (025 FR-023).
+    """
+    declared = resolver.answer_from_data_root(
+        ask.root, base_currency=ask.base_currency, scenario_id=ask.scenario_id
+    )
+    return SingleRecord(record=declared.held_inputs.quote_asset, file=declared.quote_asset_file)
+
+
+def _quotations(ask: Ask) -> KeyedRecords:
+    """The fetched daily-close series, by the instrument id that reads each (025 FR-011)."""
+    declared = resolver.answer_from_data_root(
+        ask.root, base_currency=ask.base_currency, scenario_id=ask.scenario_id
+    )
+    return KeyedRecords(records=declared.held_inputs.quotations, files=declared.quotation_files)
+
+
 def _seeds_and_goals(ask: Ask) -> resolver.SeedAndGoalDeclarations:
-    return resolver.seeds_and_goals_from_data_root(ask.root, base_currency=ask.base_currency)
+    return resolver.seeds_and_goals_from_data_roots(
+        resolver.data_roots_of(ask.root), base_currency=ask.base_currency
+    )
 
 
 def _seeds(ask: Ask) -> ManyRecords:
-    declared = _seeds_and_goals(ask)
+    """The lots the **shipped** root declares, and the file that declared them.
+
+    Not the union: ``ManyRecords`` names one file, and a lot the overlay declared served under
+    the shipped file's name would attribute a private figure to a committed artefact. The
+    overlay's lots are :func:`_private_seeds`.
+    """
+    declared = resolver.seeds_and_goals_from_data_roots(
+        resolver.DataRoots(shipped=ask.root, overlay=None), base_currency=ask.base_currency
+    )
     return ManyRecords(records=declared.seeds, file=declared.seed_file)
+
+
+def _private_seeds(ask: Ask) -> ManyRecords:
+    """The lots the gitignored overlay declares (025 FR-001).
+
+    Its own row rather than an exemption: the overlay has a loader, and this category set is
+    fail-closed precisely so that a directory the loader reads cannot be invisible here. An
+    absent overlay declares nothing and names no file, which is FR-002's ordinary state.
+    """
+    declared = _seeds_and_goals(ask)
+    return ManyRecords(records=declared.overlay_seeds, file=declared.overlay_seed_file)
 
 
 def _goals(ask: Ask) -> KeyedRecords:
@@ -360,7 +403,10 @@ CATEGORIES: Final[tuple[Category, ...]] = (
         "instruments",
         "INSTRUMENTS_DIR",
         False,
-        Keyed(_instruments, InstrumentDeclaration | FundDeclaration | CashDeclaration),
+        Keyed(
+            _instruments,
+            InstrumentDeclaration | FundDeclaration | CashDeclaration | HeldAssetDeclaration,
+        ),
     ),
     Category("groups", "GROUPS_FILE", False, Keyed(_groups, InstrumentGroup)),
     Category("tax-classes", "TAX_DIR", False, Keyed(_tax_classes, TaxClass)),
@@ -377,6 +423,7 @@ CATEGORIES: Final[tuple[Category, ...]] = (
     ),
     Category("access", "ACCESS_DIR", True, Keyed(_access, InstrumentAccess)),
     Category("seeds", "SEEDS_DIR", False, Collection(_seeds, SeedLot)),
+    Category("private-seeds", "USER_DIR", True, Collection(_private_seeds, SeedLot)),
     Category("goals", "GOALS_DIR", False, Keyed(_goals, Goal)),
     Category("cpi", "CPI_DIR", False, Keyed(_cpi, CpiSeries)),
     Category(
@@ -400,6 +447,13 @@ CATEGORIES: Final[tuple[Category, ...]] = (
     Category(
         "quotation-belief", "QUOTATION_DIR", True, Document(_quotation_belief, QuotationHolds)
     ),
+    Category(
+        "quote-asset-belief",
+        "QUOTE_ASSET_DIR",
+        True,
+        Document(_quote_asset_belief, QuoteAssetIsWorth),
+    ),
+    Category("quotations", "OBSERVATIONS_DIR", False, Keyed(_quotations, QuotationSeries)),
     Category("questions", "QUESTIONS_DIR", True, Keyed(_questions, Question)),
     Category("objectives", "OBJECTIVES_DIR", True, Keyed(_objective_sets, ObjectiveSet)),
     Category("calendars", "CALENDARS_DIR", False, Keyed(_calendars, WorkingDayCalendar)),

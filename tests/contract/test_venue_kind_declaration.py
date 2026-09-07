@@ -25,10 +25,14 @@ from terezy.core.primitives.currency import Currency
 from terezy.core.routes import venues
 from terezy.data.declarations import loader, resolver
 from terezy.data.declarations.errors import DeclarationError
+from tests.data_roots import SHIPPED
 
 pytestmark = pytest.mark.contract
 
-DATA_ROOT = Path(__file__).resolve().parents[2] / "data"
+DATA_ROOT = SHIPPED
+"""The shipped root, user-stripped: a whole-root resolve must never fold in the owner's own
+position, and `data_roots` derives the overlay from whatever root it is handed."""
+
 VENUES = DATA_ROOT / "venues.toml"
 
 

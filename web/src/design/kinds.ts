@@ -126,6 +126,7 @@ export const INSTRUMENT_KIND: { readonly [Tag in InstrumentDeclared["tag"]]: Kin
   "interface.InstrumentDeclaration": "bond",
   "fund.FundDeclaration": "fund",
   "cash.CashDeclaration": "cash",
+  "held.HeldAssetDeclaration": "held_asset",
 };
 
 /**
@@ -169,6 +170,8 @@ export function declaredClass(read: InstrumentDeclared): string | null {
     case "cash.CashDeclaration":
       return read.instrument_class;
     case "fund.FundDeclaration":
+      return null;
+    case "held.HeldAssetDeclaration":
       return null;
   }
   assertNever(read);

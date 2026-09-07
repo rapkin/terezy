@@ -56,6 +56,7 @@ describe("the kind vocabulary", () => {
     expect(tags.sort()).toEqual([
       "cash.CashDeclaration",
       "fund.FundDeclaration",
+      "held.HeldAssetDeclaration",
       "interface.InstrumentDeclaration",
     ]);
     for (const kind of Object.values(INSTRUMENT_KIND)) {

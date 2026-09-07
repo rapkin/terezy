@@ -13,9 +13,10 @@ export type Remedy = {
 
 const DECLARATION = "a declaration";
 
-const SUPPLIED_BY: Readonly<Record<string, string>> = {
-  btc: "025-btc-holdings",
-};
+const SUPPLIED_BY: Readonly<Record<string, string>> = {};
+/* Empty since 2026-09-07, when 025 declared the last undeclared subject the shipped answer
+   reported. The map stays because the next subject the owner names before he declares it goes
+   here rather than rendering with no feature behind its remedy. */
 
 export function remedyFor(named: string): Remedy {
   return { remedy: DECLARATION, suppliedBy: SUPPLIED_BY[named] ?? null };

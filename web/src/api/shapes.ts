@@ -128,6 +128,9 @@ export type Subject = Answer["subjects"][number];
 export type UndeclaredSubject = Tagged<Subject, "answer.UndeclaredSubject">;
 export type StatedExclusion = Answer["excludes"][number];
 
+export type HeldPosition = Answer["held"][number];
+export type Valuation = HeldPosition["valuation"];
+
 export type HorizonSection = Answer["sections"][number];
 export type DateRange = HorizonSection["horizon"];
 export type Standing = HorizonSection["standings"][number];

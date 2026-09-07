@@ -42,6 +42,7 @@ def _lot(instrument_id: str, acquired_on: date) -> SeedLot:
         acquired_on=acquired_on,
         cost=Money(1000.0, Currency.UAH, prov.EMPTY),
         basis=seeds.KNOWN,
+        struck_from=None,
     )
 
 

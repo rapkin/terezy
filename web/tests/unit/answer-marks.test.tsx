@@ -5,11 +5,12 @@ import { join } from "node:path";
 import { AllMoneyBackFigure } from "@/answer/all-money-back";
 import { AnswerHeader } from "@/answer/components/AnswerHeader";
 import { CandidateCard } from "@/answer/components/CandidateCard";
+import { HeldPositions } from "@/answer/components/HeldPositions";
 import { FullRanking } from "@/answer/components/FullRanking";
 import { MoneyBack } from "@/answer/components/MoneyBack";
 import { code, modulesUnder, relativeToSrc, SRC } from "../source";
-import { money, provenance, source, verdict } from "../fixtures";
-import { cameHome, comparison, outcome, question } from "../answer-fixtures";
+import { money, source, verdict } from "../fixtures";
+import { HELD, answer, cameHome, comparison, outcome, question } from "../answer-fixtures";
 
 /**
  * Principle I, enumerated rather than reviewed: a figure this screen renders wears its parents'
@@ -51,18 +52,10 @@ const MARKED = outcome({
 const CASES: Readonly<Record<string, ReactElement>> = {
   "answer/all-money-back.tsx": <AllMoneyBackFigure outcome={MARKED} />,
   "answer/components/AnswerHeader.tsx": (
-    <AnswerHeader
-      answer={{
-        tag: "answer.Answer",
-        as_of: "2026-09-05",
-        question: question({ amounts: { salary_uah: UNVERIFIED } }),
-        subjects: [],
-        sections: [],
-        excludes: [],
-        provenance: provenance([source()]),
-        staleness: verdict([]),
-      }}
-    />
+    <AnswerHeader answer={answer({ question: question({ amounts: { salary_uah: UNVERIFIED } }) })} />
+  ),
+  "answer/components/HeldPositions.tsx": (
+    <HeldPositions held={[HELD]} staleness={verdict([])} />
   ),
   "answer/components/CandidateCard.tsx": (
     <CandidateCard outcome={MARKED} reading={READ} shared={[]} indistinguishable={undefined} />

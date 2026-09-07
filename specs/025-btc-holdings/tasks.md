@@ -6,10 +6,9 @@
 behaviour is implemented before a test that would fail without it, and a test written before its
 module — failing with `ImportError` — counts. Every phase opens with its checks.
 
-**The gate is by artefact, not by phase.** The two clarifications in spec.md block the shipped
-files that would have to state one — the instrument's price currency and the answer's shape. They
-block no code. Phases 1–4 build the mechanism against fixtures and commit it; Phase 5 does not
-start until the owner has answered both.
+**Both clarifications are answered** (2026-09-07,
+`specs/decisions/2026-09-07-clarify-025.toml`), so no phase below is gated. Phases 1–4 build the
+mechanism against fixtures; Phase 5 lands the shipped files that state the answers.
 
 **No task may use the owner's real quantities, prices or dates.** Every fixture is invented and
 labelled, and `data/user/` is never read by a test.
@@ -86,14 +85,11 @@ both marks.
 
 ---
 
-## Phase 5: What the answer shows — BLOCKED on the three clarifications
+## Phase 5: What the answer shows
 
-**Do not start until the owner has answered all three.** Each task below names which answer it
-depends on; guessing one is the failure this phase exists to prevent.
-
-- [ ] T027 **[Clarification 1]** Declare the USDT/USD treatment as the owner settled it — a labelled belief in `data/scenarios/`, a refusal, or a cited observation — write `data/instruments/btc.toml` with the price currency that answer implies and no `data/access/` entry, and propagate the mark through every dollar and hryvnia figure (FR-009, FR-014, FR-023).
+- [ ] T027 Declare the USDT/USD belief as the owner settled it — a labelled assumption in `data/scenarios/` that one USDT is one USD — write `data/instruments/btc.toml` with the price currency that answer implies and no `data/access/` entry, and propagate the mark through every dollar and hryvnia figure (FR-009, FR-014, FR-023).
 - [ ] T028 Re-run `scripts/fetch_binance.py` so the shipped observation covers the run's `as_of`, and confirm `market-quotation-staleness-kind` stays **open** in `specs/features.toml` with FR-024's reason recorded against it.
-- [ ] T029 **[Clarification 2]** Write the answer test first, then build the shape the owner chose: the held standing distinguishable from the other four (FR-029), and the reported quantity, price with its date, value, basis, nominal change, and the typed refusals for tax, yield and rank (FR-030).
+- [ ] T029 Write the answer test first, then build the held section the owner chose: the held standing distinguishable from the other four (FR-029), and the reported quantity, price with its date, value, basis, nominal change, and the typed refusals for tax, yield and rank (FR-030).
 - [ ] T030 Assert what a held position is **not**: it is never enumerated as a candidate and never ranked against the benchmark, and `btc` leaves the undeclared population (FR-030). Re-measure 015 SC-002, which pins that population at two words and becomes one, `cash`.
 - [ ] T031 Regenerate `tests/golden/the_answer.golden.txt` and `tests/golden/candidate_set.golden.txt` deliberately, reading the diff and quoting the changed lines in the commit message. Regenerate the OpenAPI document and re-run its golden.
 - [ ] T032 Mark `docs/REQUIRED_TESTS.md` row **B2** `[~]`, not `[x]`: the fetch test covers *a provider outage never writes*, and the row's other half — cache entries carrying provenance and a synthetic flag — is untested because this feature ships no cache. Flip `025-btc-holdings` to `done` in `specs/features.toml`; record anything still open as a `[[future]]`.
@@ -108,7 +104,7 @@ depends on; guessing one is the failure this phase exists to prevent.
 - Phase 2 blocks Phase 3 (the observation is read for a declared instrument) and Phase 4.
 - Phase 3 blocks Phase 5 (a value needs a price).
 - Phases 1, 2 and 3 are otherwise independent after their first task and may be worked in parallel by separate lanes.
-- Phase 5 is blocked by the owner, not by code — and it holds every `data/` file that states an answer.
+- Phase 5 holds every `data/` file that states a settled answer.
 - **025 and 019 are declared parallelisable and are not**: both regenerate `tests/golden/the_answer.golden.txt` and both change the answer record. Whichever lands second re-measures.
 
 ## What is deliberately not here

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { offline } from "./offline";
+import { AS_OF, offline } from "./offline";
 import { openTheAnswer } from "./answer";
 
 /**
@@ -73,22 +73,48 @@ test("no unrounded float reaches the document", async ({ page }) => {
   expect(found, "the page composed these").toBeNull();
 });
 
-test("every undeclared subject carries its remedy and the feature that supplies it", async ({
-  page,
-}) => {
+test("every subject is a state, declared or not, and none of them is blank", async ({ page }) => {
   test.setTimeout(300_000);
   await offline(page);
   await openTheAnswer(page);
 
-  const subjects = page.locator("[data-undeclared-subject]");
+  // 023 and 025 declared the last two, so the shipped answer reports no undeclared subject at
+  // all — the assertion is over whichever the API sends rather than over a count measured once.
+  const subjects = page.locator("[data-subjects] li");
   const many = await subjects.count();
   expect(many).toBeGreaterThan(0);
   for (let at = 0; at < many; at += 1) {
-    const subject = subjects.nth(at);
-    await expect(subject).toContainText("a declaration");
-    // FR-021: a third undeclared subject with no entry renders `unrecorded`, which fails here
-    // rather than rendering blank.
-    const feature = await subject.locator("[data-remedy-feature]").getAttribute("data-remedy-feature");
-    expect(feature).not.toBe("unrecorded");
+    expect(((await subjects.nth(at).textContent()) ?? "").trim()).not.toBe("");
+  }
+  for (const text of await page.locator("[data-undeclared-subject]").allTextContents()) {
+    expect(text).toContain("a declaration");
+  }
+});
+
+test("what the owner already holds is on the screen, valued or refused", async ({ page }) => {
+  test.setTimeout(300_000);
+  await offline(page);
+  await openTheAnswer(page);
+
+  const held = page.locator("[data-population='what the owner already holds']");
+  const stated = Number((await held.getAttribute("data-count")) ?? "0");
+  const served = await page.evaluate(async (asOf: string) => {
+    const declared: { ids: string[] } = await (await fetch(`/api/questions?as_of=${asOf}`)).json();
+    const body: { result: { answer: { held: { instrument_id: string }[] } } } = await (
+      await fetch(`/api/questions/${String(declared.ids[0])}/answer?as_of=${asOf}`)
+    ).json();
+    return body.result.answer.held.map((one) => one.instrument_id);
+  }, AS_OF);
+  expect(stated).toBe(served.length);
+  if (served.length === 0) return;
+
+  await held.locator("summary").click();
+  for (const id of served) {
+    const position = held.locator(`[data-held='${id}']`);
+    await expect(position).toHaveCount(1);
+    // A valuation the registry could not strike is a refusal with its reason, never a blank.
+    const worth = position.locator("[data-figure='marked'], [data-figure='refused']");
+    expect(await worth.count()).toBeGreaterThan(0);
+    expect(((await position.textContent()) ?? "").trim()).not.toBe("");
   }
 });

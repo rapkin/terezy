@@ -79,6 +79,28 @@ export function count(value: number): string {
   return grouped(Math.trunc(value).toString());
 }
 
+/** The finest subdivision any declared holding states: one satoshi. */
+const QUANTITY_DECIMALS = 8;
+
+/**
+ * How much of a thing is held.
+ *
+ * Not `count`, which truncates — a holding of 0.04 BTC through it reads as 0, which is the
+ * silent clamp the constitution names. Trailing zeros are trimmed so a whole quantity does not
+ * read as eight decimals of false precision, and a value finer than the last place renders as a
+ * bound rather than as zero.
+ */
+export function quantity(value: number): string {
+  const fixed = Math.abs(value).toFixed(QUANTITY_DECIMALS);
+  const trimmed = fixed.replace(/\.?0+$/, "");
+  if (trimmed === "0" && value !== 0) {
+    return `${value < 0 ? "-" : ""}< 0.${"0".repeat(QUANTITY_DECIMALS - 1)}1`;
+  }
+  const [whole = "0", fraction = ""] = trimmed.split(".");
+  const sign = value < 0 ? "-" : "";
+  return `${sign}${grouped(whole)}${fraction === "" ? "" : `.${fraction}`}`;
+}
+
 /**
  * A bare number a served state carries — a ceiling, a segment bound — which is not a figure a
  * decision rests on and has no unit of its own.

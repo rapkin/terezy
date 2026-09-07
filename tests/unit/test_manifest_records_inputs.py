@@ -102,6 +102,15 @@ because a tax base struck at an official rate is only reproducible if the manife
 series, at which version, struck it."""
 
 INFLATION_BELIEF = "owner_placeholder_inflation"
+
+CITES_NOTHING = frozenset({"inflation_assumption", "held_asset", "quote_asset_assumption"})
+"""Input kinds whose declarations carry no observed value, so an empty list is honest there.
+
+A belief about next year's prices has no publisher; a belief about what a quote asset is worth
+would be replaced rather than vouched for by a source; and a held asset declares an identity, a
+venue and a ticker and nothing else -- its one observed value is the daily close, which is its
+own input under its own kind. Every other kind carries a figure somebody published, so an empty
+list there is a claim that it has been checked."""
 """The declared future-inflation belief this data root holds (007). A placeholder, and the
 manifest records it by id and by file version so a run made before the owner replaces it is
 distinguishable from one made after."""
@@ -242,7 +251,10 @@ class TestEveryDeclarationAndVersionThatFedTheRun:
         record = _manifest()
         declared = resolver.from_data_root(DATA_ROOT)
         assert set(_declared_files()) == (
-            set(declared.instruments) | set(declared.funds) | set(declared.cash)
+            set(declared.instruments)
+            | set(declared.funds)
+            | set(declared.cash)
+            | set(declared.held)
         )
         # FR-015 requires the record to say which price series and which declared belief were
         # in force: two runs differing only in the belief are two results, and nothing else in
@@ -261,6 +273,7 @@ class TestEveryDeclarationAndVersionThatFedTheRun:
             *(("instrument", name) for name in declared.instruments),
             *(("fund", name) for name in declared.funds),
             *(("cash_balance", name) for name in declared.cash),
+            *(("held_asset", name) for name in declared.held),
         }
 
     def test_the_second_issue_is_named_although_this_run_did_not_project_it(self) -> None:
@@ -408,12 +421,12 @@ class TestTheManifestCarriesTheProvenanceOfWhatFedIt:
         (007). It carries no citation at all -- a belief about next year's prices has no
         publisher -- so there is nothing that *could* be verified and nothing to mark. That is
         a different claim from "checked and clean", and what distinguishes the two here is the
-        input's ``kind``, not an empty tuple.
+        input's ``kind``, not an empty tuple. :data:`CITES_NOTHING` is that list.
         """
         for ref in _manifest().inputs:
-            if ref.kind == "inflation_assumption":
+            if ref.kind in CITES_NOTHING:
                 assert ref.unverified_sources == (), (
-                    f"{ref.id} is a belief and cites nothing; a source here would be invented"
+                    f"{ref.id} carries no observed value; a source here would be invented"
                 )
                 continue
             assert ref.unverified_sources, f"{ref.id} claims to be fully verified"

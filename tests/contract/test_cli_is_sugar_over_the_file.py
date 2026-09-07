@@ -24,7 +24,7 @@ from typing import Any, cast
 
 import pytest
 
-from terezy.api.answer import AnsweredQuestion, answer_question
+from terezy.api.answer import AnsweredQuestion, answer_declared, answer_question
 from terezy.cli import main as cli
 from terezy.core.decision.answer import (
     benchmark_unavailable,
@@ -33,6 +33,7 @@ from terezy.core.decision.answer import (
     section_ties,
 )
 from terezy.core.instruments.groups import InstrumentGroup
+from terezy.core.instruments.quotations import NoQuotationOnDate
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
@@ -42,6 +43,7 @@ from terezy.core.results.answer import Answer, HorizonSection
 from terezy.core.results.candidates import CandidateSurvey
 from terezy.core.results.dominance import DominanceRefused, DominanceResult
 from terezy.core.results.fund import FundAssumptions
+from terezy.core.results.held import Valued
 from terezy.core.results.objectives import (
     AbsoluteBand,
     Criterion,
@@ -449,10 +451,18 @@ def test_the_hurdle_is_marked_by_identity_and_not_by_position() -> None:
         )
 
 
-def test_the_undeclared_subjects_are_named_by_the_words_he_wrote() -> None:
+def test_a_held_subject_is_printed_as_held_and_never_as_a_missing_corridor() -> None:
+    """025 FR-029. Every word of his question now resolves, and `btc` resolves to a holding.
+
+    The sentence a corridor would be the remedy for is the one this asserts is absent: `btc`
+    reaches no candidate and never will, so printing *declared but unreached* would send him
+    to `data/routes/` for a thing he already owns.
+    """
     lines, _ = _run()
     output = "\n".join(lines)
-    assert "  btc: NOTHING IS DECLARED BY THAT NAME" in output
+    assert "NOTHING IS DECLARED BY THAT NAME" not in output
+    assert "btc: a held asset, and no lot of it is declared here" in output
+    assert "btc: declared but unreached" not in output
 
 
 def test_main_returns_zero_for_an_answer_and_one_for_a_refusal(
@@ -554,14 +564,14 @@ def test_a_declared_group_nobody_labelled_is_not_printed_as_undeclared() -> None
     question = fixtures.owners_question()
     result = fixtures.answered(
         fixtures.with_plans(
-            fixtures.with_subjects(question, fixtures.OVDP, "unlabelled", "btc"),
+            fixtures.with_subjects(question, fixtures.OVDP, "unlabelled", "nothing_declares_this"),
             {fixtures.OVDP: question.plans[fixtures.OVDP]},
         ),
         widened,
     )
     printed = "\n".join(cli._subject_lines(result))
     assert "  unlabelled: 0 instrument(s) --" in printed
-    assert "  btc: NOTHING IS DECLARED BY THAT NAME" in printed
+    assert "  nothing_declares_this: NOTHING IS DECLARED BY THAT NAME" in printed
 
 
 def test_flags_answer_a_question_against_a_root_that_declares_none(tmp_path: Path) -> None:
@@ -1029,3 +1039,92 @@ def test_a_band_is_rendered_in_the_shape_it_was_declared_in() -> None:
     )
     assert cli._band_words(AbsoluteBand(amount=Money(5.0, Currency.UAH, prov.EMPTY))) == "5.0 UAH"
     assert cli._band_words(DaysBand(days=7)) == "7 day(s)"
+
+
+# ---------------------------------------------------------------------------
+# The held section, rendered
+# ---------------------------------------------------------------------------
+
+
+HELD_FIXTURE = "synthetic_held_x"
+"""The only held asset with both a lot and a fetched price. His own `btc` ships no observation
+file, so a suite about what a PRICED position renders has to name this one."""
+
+
+def _held_answer(root: Path = fixtures.DATA_ROOT) -> Answer:
+    """The composed root, which is the only one carrying a held asset with a lot and a price.
+
+    Asking about the fixture asset by name, because a position is reported only for an asset
+    the question named (025 FR-030).
+    """
+    question = fixtures.owners_question()
+    named = (fixtures.OVDP, HELD_FIXTURE)
+    run: Any = answer_declared(
+        fixtures.with_plans(
+            fixtures.with_subjects(question, *named),
+            {word: plan for word, plan in question.plans.items() if word in named},
+        ),
+        root,
+        as_of=fixtures.AS_OF,
+        base_currency=Currency.UAH,
+        declared_in=fixtures.QUESTION_FILE,
+    )
+    assert isinstance(run.answer, Answer), run.answer
+    return run.answer
+
+
+def test_the_held_section_prints_every_figure_and_every_refusal() -> None:
+    """025 FR-030 at the one surface a reader actually sees.
+
+    Asserted on the record's own words rather than on sentences this test writes: the CLI adds
+    no fact (015 FR-020a), so every reason below is carried verbatim from the core.
+    """
+    result = _held_answer()
+    position = next(item for item in result.held if item.instrument_id == HELD_FIXTURE)
+    assert isinstance(position.valuation, Valued)
+    printed = "\n".join(cli._held_lines(result))
+
+    assert "held (not candidates -- reported, never ranked):" in printed
+    assert "synthetic_held_x: 0.25 SXT at binance, over 1 lot(s)" in printed
+    assert f"cost: {cli._readable(position.basis)}" in printed
+    assert f"value: {cli._readable(position.valuation.value)}" in printed
+    assert position.tax.reason in printed
+    assert position.yields.reason in printed
+    assert position.rank.reason in printed
+
+
+def test_the_belief_every_dollar_figure_rests_on_is_printed_beside_it() -> None:
+    """FR-023: the assumption is visible wherever it acted, in its own declared words."""
+    result = _held_answer()
+    position = next(item for item in result.held if item.instrument_id == HELD_FIXTURE)
+    assert isinstance(position.valuation, Valued)
+    assert position.valuation.assumption is not None
+    printed = "\n".join(cli._held_lines(result))
+    assert position.valuation.assumption.rationale in printed
+    assert position.valuation.assumption.id in printed
+
+
+def test_a_refused_valuation_prints_the_refusal_and_never_a_blank(tmp_path: Path) -> None:
+    """A refusal reaches the reader as a refusal with its reason, never as a dash or a zero."""
+    root = tmp_path / "data"
+    shutil.copytree(fixtures.DATA_ROOT, root)
+    (root / "observations" / "binance_synthusdt.toml").unlink()
+    answer = _held_answer(root)
+    position = next(item for item in answer.held if item.instrument_id == HELD_FIXTURE)
+    assert isinstance(position.valuation, NoQuotationOnDate)
+    printed = "\n".join(cli._held_lines(answer))
+    assert f"value: REFUSED -- {position.valuation.reason}" in printed
+    assert "cost:" in printed, "the refusal on one figure suppresses none of the others"
+
+
+def test_an_answer_with_no_held_position_prints_no_held_section() -> None:
+    """`data/README.md` rule 5: *held: nothing* would be a claim about what he actually holds."""
+    run: Any = answer_declared(
+        fixtures.owners_question(),
+        fixtures.SHIPPED_ROOT,
+        as_of=fixtures.AS_OF,
+        base_currency=Currency.UAH,
+        declared_in=fixtures.QUESTION_FILE,
+    )
+    assert run.answer.held == ()
+    assert cli._held_lines(run.answer) == []

@@ -6,7 +6,9 @@
  * that has drifted from the contract fails to **compile** rather than passing.
  */
 import type {
+  Answer,
   Comparison,
+  HeldPosition,
   DateRange,
   DominanceResult,
   HorizonSection,
@@ -256,6 +258,82 @@ export function survey(over: {
       provenance: provenance([source()]),
       staleness: verdict([]),
     },
+  };
+}
+
+/** One held position, valued, with the marks its parents carry. */
+export const HELD: HeldPosition = {
+  tag: "held.HeldPosition",
+  instrument_id: "btc",
+  name: "Bitcoin",
+  venue_id: "binance",
+  quantity: 0.04,
+  quantity_unit: "BTC",
+  basis: money(96000, [source()]),
+  lots: [
+    {
+      tag: "held.HeldLot",
+      lot_id: "btc-1",
+      quantity: 0.04,
+      acquired_on: "2025-03-11",
+      declared_at: "2026-09-02",
+      basis: money(96000, [source()]),
+      struck_from: null,
+    },
+  ],
+  valuation: {
+    tag: "held.Valued",
+    value: money(128000, [source()]),
+    quotation: {
+      tag: "quotations.Quotation",
+      on_date: "2026-09-05",
+      close: 3200000,
+      provenance: provenance([source()]),
+    },
+    in_base: {
+      tag: "held.InBaseCurrency",
+      value: money(128000, [source()]),
+      nominal_change: money(32000, [source()]),
+      struck: null,
+    },
+    assumption: null,
+  },
+  rank: {
+    tag: "held.NotRankedAgainstTheBenchmark",
+    instrument_id: "btc",
+    reason: "the question is what to do with money not yet spent.",
+  },
+  tax: {
+    tag: "held.NoTaxUntilADisposal",
+    instrument_id: "btc",
+    tax_class_id: "ua_investment_income",
+    reason: "nothing is owed until a disposal.",
+  },
+  yields: {
+    tag: "held.NoYieldIsDeclared",
+    instrument_id: "btc",
+    reason: "no yield is declared for a held asset.",
+  },
+  provenance: provenance([source()]),
+};
+
+/** A whole answer, for the components that take one. */
+export function answer(over: {
+  readonly subjects?: Answer["subjects"];
+  readonly sections?: readonly HorizonSection[];
+  readonly held?: Answer["held"];
+  readonly question?: Question;
+} = {}): Answer {
+  return {
+    tag: "answer.Answer",
+    as_of: "2026-09-05",
+    question: over.question ?? question(),
+    subjects: [...(over.subjects ?? [])],
+    sections: [...(over.sections ?? [])],
+    held: [...(over.held ?? [])],
+    excludes: [],
+    provenance: provenance([source()]),
+    staleness: verdict([]),
   };
 }
 

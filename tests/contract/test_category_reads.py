@@ -17,6 +17,17 @@ from tests.data_roots import SHIPPED
 from tests.http_client import served
 
 DATA_ROOT = SHIPPED
+
+EMPTY_IN_THE_SHIPPED_TREE = frozenset({"quotations"})
+"""The one category the shipped tree declares nothing in, and the reason it does not.
+
+A fetched daily close is the owner's own dated retrieval, and a committed one is a price
+nobody re-fetched: it would go stale in git while looking exactly like a current one. So
+`scripts/fetch_binance.py` writes into a working tree and no observation file ships, which
+makes every held position report its quantity and its cost and refuse its value by name until
+he runs it (025 FR-024). Asserted **empty** rather than skipped, so shipping one is a red test
+and a deliberate edit here rather than a silent change of policy.
+"""
 AS_OF = {"as_of": "2026-09-03"}
 
 
@@ -61,6 +72,9 @@ def test_every_declared_id_reads_back(client: Any, category: categories.Category
     shape = category.shape
     assert isinstance(shape, categories.Keyed)
     declared = sorted(shape.resolve(_ask()).records)
+    if category.id in EMPTY_IN_THE_SHIPPED_TREE:
+        assert not declared, f"{category.id} now declares something; drop it from the exception"
+        return
     assert declared, f"{category.id} declares nothing, so the read is untested"
     for record_id in declared:
         body = _get(client, f"/{category.id}/{record_id}")
@@ -141,6 +155,8 @@ def test_a_read_states_the_file_that_declared_it(
 ) -> None:
     shape = category.shape
     assert isinstance(shape, categories.Keyed)
+    if category.id in EMPTY_IN_THE_SHIPPED_TREE:
+        return
     first = sorted(shape.resolve(_ask()).records)[0]
     declared_in = _get(client, f"/{category.id}/{first}")["declared_in"]
     if isinstance(declared_in, dict):

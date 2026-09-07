@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GROUP, count, currencySymbol, day, money, rate } from "@/design/format";
+import { GROUP, count, currencySymbol, day, money, quantity, rate } from "@/design/format";
 import { money as moneyFixture, source } from "../fixtures";
 
 /**
@@ -60,6 +60,32 @@ describe("a date", () => {
   it("returns a string that is not an ISO date unchanged, never a plausible wrong day", () => {
     expect(day("2026-13-01")).toBe("2026-13-01");
     expect(day("not a date")).toBe("not a date");
+  });
+});
+
+describe("a quantity", () => {
+  it("keeps a fraction a count would have truncated to zero", () => {
+    expect(quantity(0.04)).toBe("0.04");
+    expect(count(0.04)).toBe("0");
+  });
+
+  it("trims trailing zeros rather than claiming eight decimals of precision", () => {
+    expect(quantity(2)).toBe("2");
+    expect(quantity(1.5)).toBe("1.5");
+    expect(quantity(12345.678)).toBe(`12${THIN}345.678`);
+  });
+
+  it("drops the float artefact without inventing a figure", () => {
+    expect(quantity(0.1 + 0.2)).toBe("0.3");
+  });
+
+  it("states a bound rather than zero for a value finer than the last place", () => {
+    expect(quantity(1e-12)).toBe("< 0.00000001");
+    expect(quantity(0)).toBe("0");
+  });
+
+  it("keeps a negative quantity negative", () => {
+    expect(quantity(-0.04)).toBe("-0.04");
   });
 });
 

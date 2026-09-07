@@ -43,13 +43,19 @@ export function AnswerHeader({ answer }: { answer: Answer }) {
         The benchmark is <span className="font-mono">{question.benchmark_instrument_id}</span>; the
         continuation assumption is {question.continuation}.
       </p>
-      <ul className="flex flex-wrap gap-2" data-subjects>
-        {answer.subjects.map((subject) => (
-          <li key={subject.named}>
-            <SubjectState subject={subject} />
-          </li>
-        ))}
-      </ul>
+      {answer.subjects.length === 0 ? (
+        <p className="text-xs text-[var(--ink-muted)]" data-subjects="none">
+          the question names no subject, so nothing was assessed.
+        </p>
+      ) : (
+        <ul className="flex flex-wrap gap-2" data-subjects={String(answer.subjects.length)}>
+          {answer.subjects.map((subject) => (
+            <li key={subject.named}>
+              <SubjectState subject={subject} />
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

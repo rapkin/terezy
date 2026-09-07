@@ -283,7 +283,9 @@ def test_a_non_base_currency_goal_is_refused_as_not_yet_modelled(tmp_path: Path)
         encoding="utf-8",
     )
     with pytest.raises(DeclarationError) as caught:
-        resolver.seeds_and_goals_from_data_root(root, base_currency=Currency.UAH)
+        resolver.seeds_and_goals_from_data_roots(
+            resolver.data_roots_of(root), base_currency=Currency.UAH
+        )
     _assert_names_file_and_field(caught.value, target, "currency")
     rendered = str(caught.value).lower()
     assert "not yet" in rendered
@@ -305,7 +307,9 @@ def test_the_two_owner_files_must_name_the_same_owner(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     with pytest.raises(DeclarationError) as caught:
-        resolver.seeds_and_goals_from_data_root(root, base_currency=Currency.UAH)
+        resolver.seeds_and_goals_from_data_roots(
+            resolver.data_roots_of(root), base_currency=Currency.UAH
+        )
     _assert_names_file_and_field(caught.value, target, "owner.id")
     assert "owner-001" in caught.value.problem
 
@@ -316,5 +320,7 @@ def test_a_second_file_in_one_directory_is_refused(tmp_path: Path) -> None:
     root = _scratch_root(tmp_path)
     shutil.copy(root / "goals" / "owner-001.toml", root / "goals" / "owner-002.toml")
     with pytest.raises(DeclarationError) as caught:
-        resolver.seeds_and_goals_from_data_root(root, base_currency=Currency.UAH)
+        resolver.seeds_and_goals_from_data_roots(
+            resolver.data_roots_of(root), base_currency=Currency.UAH
+        )
     assert caught.value.file == root / "goals"

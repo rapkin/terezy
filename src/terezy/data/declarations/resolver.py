@@ -37,12 +37,17 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Final, Literal
 
+from terezy.core.decision.held import HeldInputs
 from terezy.core.decision.tuple_outcome import Registries
 from terezy.core.instruments import registry as instrument_registry
+from terezy.core.ledger.seeds import SeedLot
 from terezy.core.primitives import money
+from terezy.core.primitives import provenance as prov
+from terezy.core.primitives.money import Money
 from terezy.core.routes.venues import can_hold
+from terezy.core.tax import official_rate
 from terezy.core.tax.scheme import Verdict
 from terezy.core.tax.year import AssessmentRules
 from terezy.data.declarations import loader
@@ -57,10 +62,10 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.instruments.cash import CashDeclaration
     from terezy.core.instruments.fund import FundDeclaration
     from terezy.core.instruments.groups import InstrumentGroup
+    from terezy.core.instruments.held import HeldAssetDeclaration
     from terezy.core.instruments.interface import InstrumentDeclaration
-    from terezy.core.ledger.seeds import SeedLot
+    from terezy.core.instruments.quotations import QuotationSeries
     from terezy.core.primitives.currency import Currency
-    from terezy.core.primitives.money import Money
     from terezy.core.primitives.staleness import ObservationKind
     from terezy.core.results.candidates import CandidateCeiling
     from terezy.core.results.composed import SegmentBound
@@ -72,11 +77,12 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.routes.legs import Leg, Route
     from terezy.core.routes.venues import Venue
     from terezy.core.scenarios.quotation import QuotationHolds
+    from terezy.core.scenarios.quote_asset import QuoteAssetIsWorth
     from terezy.core.scenarios.regimes import Regime
     from terezy.core.streams.streams import IncomeStream
     from terezy.core.tax import year as tax_year
     from terezy.core.tax.interface import TaxClass
-    from terezy.core.tax.official_rate import OfficialRateSeries
+    from terezy.core.tax.official_rate import OfficialRateSeries, TaxCurrencyConversion
     from terezy.core.tax.scheme import CreditingDestination, TaxationScheme
     from terezy.data.declarations.loader import ScenarioDeclaration
 
@@ -145,6 +151,12 @@ class Declarations:
     cash_files: Mapping[str, Path]
     """Which file declared each balance."""
 
+    held: Mapping[str, HeldAssetDeclaration]
+    """Declared held assets by id (025 FR-009). A fourth map, on the same argument."""
+
+    held_files: Mapping[str, Path]
+    """Which file declared each held asset."""
+
     groups: Mapping[str, InstrumentGroup]
     """The declared group vocabulary by id (015 FR-007a).
 
@@ -177,6 +189,20 @@ def _refuse_duplicate(
         "and every figure would silently describe the wrong one.",
         f"rename one of the two {kind}s, or delete the file that is a duplicate",
     )
+
+
+def _claim(identifier: str, path: Path, files_by_id: dict[str, Path]) -> None:
+    """Record which file declared an id, refusing a second claim on it naming both.
+
+    One id space over every declaration kind in ``data/instruments/``: a holding names an
+    instrument by id, so a bond, a fund, a balance and a held asset sharing one would resolve
+    to whichever map was searched first.
+    """
+    if identifier in files_by_id:
+        raise _refuse_duplicate(
+            "instrument", identifier, "instrument.id", files_by_id[identifier], path
+        )
+    files_by_id[identifier] = path
 
 
 def resolve(
@@ -212,59 +238,44 @@ def resolve(
     fund_files_by_id: dict[str, Path] = {}
     cash: dict[str, CashDeclaration] = {}
     cash_files_by_id: dict[str, Path] = {}
+    held: dict[str, HeldAssetDeclaration] = {}
+    held_files_by_id: dict[str, Path] = {}
     files_by_id: dict[str, Path] = {}
     for path in instrument_files:
         # ⚙ feature 006: one directory, several kinds of declaration, told apart by the one
         # key they share and dispatched through a declared mapping rather than a branch
         # naming a class. See ``loader.declared_class_of`` and ``LOADERS_BY_KIND``.
+        #
+        # ⚙ feature 013: both bond forms produce an ``InstrumentDeclaration``, so the id space,
+        # the duplicate check and the tax-class resolution below are shared. A duplicate id
+        # therefore collides across the forms as well as within one -- which is what
+        # `files_by_id` is: the whole directory's id space, one entry per declaration of any
+        # kind.
         read = LOADERS_BY_KIND[_kind_of(path)]
         if read is loader.fund_from_file:
             declared_fund = loader.fund_from_file(path)
-            if declared_fund.id in files_by_id:
-                raise _refuse_duplicate(
-                    "instrument",
-                    declared_fund.id,
-                    "instrument.id",
-                    files_by_id[declared_fund.id],
-                    path,
-                )
+            _claim(declared_fund.id, path, files_by_id)
             funds[declared_fund.id] = declared_fund
             fund_files_by_id[declared_fund.id] = path
-            files_by_id[declared_fund.id] = path
-            continue
-        if read is loader.cash_from_file:
+        elif read is loader.cash_from_file:
             declared_cash = loader.cash_from_file(path)
-            if declared_cash.id in files_by_id:
-                raise _refuse_duplicate(
-                    "instrument",
-                    declared_cash.id,
-                    "instrument.id",
-                    files_by_id[declared_cash.id],
-                    path,
-                )
+            _claim(declared_cash.id, path, files_by_id)
             cash[declared_cash.id] = declared_cash
             cash_files_by_id[declared_cash.id] = path
-            files_by_id[declared_cash.id] = path
-            continue
-        # ⚙ feature 013: both bond forms produce an ``InstrumentDeclaration``, so the id
-        # space, the duplicate check and the tax-class resolution below are shared. A
-        # duplicate id therefore collides across the forms as well as within one.
-        declaration = (
-            loader.enumerated_instrument_from_file(path)
-            if read is loader.enumerated_instrument_from_file
-            else loader.instrument_from_file(path)
-        )
-        if declaration.id in files_by_id:
-            raise _refuse_duplicate(
-                "instrument",
-                declaration.id,
-                "instrument.id",
-                files_by_id[declaration.id],
-                path,
+        elif read is loader.held_asset_from_file:
+            declared_held = loader.held_asset_from_file(path)
+            _claim(declared_held.id, path, files_by_id)
+            held[declared_held.id] = declared_held
+            held_files_by_id[declared_held.id] = path
+        else:
+            declaration = (
+                loader.enumerated_instrument_from_file(path)
+                if read is loader.enumerated_instrument_from_file
+                else loader.instrument_from_file(path)
             )
-        instruments[declaration.id] = declaration
-        instrument_files_by_id[declaration.id] = path
-        files_by_id[declaration.id] = path
+            _claim(declaration.id, path, files_by_id)
+            instruments[declaration.id] = declaration
+            instrument_files_by_id[declaration.id] = path
 
     groups = {group.id: group for group in loader.groups_from_file(groups_file)}
     for identifier, declaration in instruments.items():
@@ -285,6 +296,10 @@ def resolve(
     # returns the basis, so no gain and no income arise (023 FR-009).
     for identifier, declared_cash in cash.items():
         _check_groups(declared_cash.groups, groups, path=cash_files_by_id[identifier])
+    # A held asset's tax-class reference is deliberately NOT resolved: nothing is projected,
+    # so the unresolved class is the reported figure rather than a charge of zero (025 FR-014).
+    for identifier, declared_held in held.items():
+        _check_groups(declared_held.groups, groups, path=held_files_by_id[identifier])
 
     return Declarations(
         instruments=instruments,
@@ -295,6 +310,8 @@ def resolve(
         fund_files=fund_files_by_id,
         cash=cash,
         cash_files=cash_files_by_id,
+        held=held,
+        held_files=held_files_by_id,
         groups=groups,
         groups_file=groups_file,
     )
@@ -1952,6 +1969,7 @@ LOADERS_BY_KIND: Mapping[str, Callable[[Path], object]] = {
     instrument_registry.ENUMERATED_SCHEDULE: loader.enumerated_instrument_from_file,
     instrument_registry.COLLECTIVE_INVESTMENT_FUND: loader.fund_from_file,
     instrument_registry.CASH_BALANCE: loader.cash_from_file,
+    instrument_registry.HELD_ASSET: loader.held_asset_from_file,
 }
 """Which loader parses each declared ``[instrument] class``.
 
@@ -2033,6 +2051,69 @@ curated `venues.toml` -- the Principle VII boundary made structural (008 researc
 GOALS_DIR = "goals"
 """Where the owner's declared targets live under a data root."""
 
+USER_DIR = "user"
+"""The private overlay under a data root: gitignored, and the only place a real figure may live.
+
+025 FR-001. `data/README.md` rule 5 forbids committing a figure that describes the owner's
+actual position, and until this feature the rule was kept by a reviewer noticing.
+:func:`_check_committable` is that rule made mechanical.
+"""
+
+OVERLAY_DIRS: Final[frozenset[str]] = frozenset({SEEDS_DIR})
+"""What the overlay may contain. **Fail-closed**, on `scripts/check_provenance.py`'s rule:
+:func:`_check_overlay_directories` refuses anything else and says why."""
+
+
+@dataclass(frozen=True, slots=True)
+class DataRoots:
+    """The shipped root and the owner's private overlay, composed **in memory**.
+
+    Not on disk: composing by copying one tree over another would put the owner's real figures
+    in a temporary directory nobody gitignored.
+    """
+
+    shipped: Path
+    """What the tool ships: curated, committed, reviewed in git like code."""
+
+    overlay: Path | None
+    """The private root, or ``None`` where there is none.
+
+    ``None`` is an ordinary state and not a missing value (FR-002): a checkout with no private
+    declarations is what CI runs on, and the whole suite therefore exercises this branch.
+    """
+
+
+def data_roots_of(root: Path) -> DataRoots:
+    """One data root read as a pair: itself, and its ``user/`` overlay if it has one.
+
+    Where the overlay lives is a fact about the layout rather than a caller's choice, so every
+    entry point above this module keeps taking one path. A test wanting a different overlay
+    builds the record directly -- which is the only way to point at one that is not a
+    subdirectory of the root it overlays.
+    """
+    overlay = root / USER_DIR
+    return DataRoots(shipped=root, overlay=overlay if overlay.is_dir() else None)
+
+
+def _check_overlay_directories(overlay: Path) -> None:
+    """FR-006: the overlay holds what this feature declared, or the load fails naming what else.
+
+    Dot-entries are the filesystem's own -- ``.DS_Store``, an editor's swap file -- and are the
+    one thing skipped rather than refused.
+    """
+    for entry in sorted(overlay.iterdir()):
+        if entry.name.startswith(".") or entry.name in OVERLAY_DIRS:
+            continue
+        raise DeclarationError(
+            entry,
+            "",
+            f"is under the private overlay {overlay}, which holds "
+            f"{sorted(OVERLAY_DIRS)} and nothing else. It is refused rather than ignored: a "
+            "declaration nobody reads is indistinguishable from one that was read, and this "
+            "is the one root no reviewer ever sees.",
+            f"move it under one of {sorted(OVERLAY_DIRS)}, or delete it",
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class SeedAndGoalDeclarations:
@@ -2053,16 +2134,35 @@ class SeedAndGoalDeclarations:
     """
 
     seeds: tuple[SeedLot, ...]
-    """The declared opening lots, in file order. Empty is ordinary."""
+    """Every declared opening lot over both roots, shipped first then overlay. Empty is
+    ordinary, and it is what the ledger and the held section are computed from."""
+
+    overlay_seeds: tuple[SeedLot, ...]
+    """Which of them the private overlay declared (025 FR-003).
+
+    Stored rather than derived because it cannot be recovered: ``loader.source_id`` and
+    ``manifest.file_name`` both render a path as ``<parent>/<name>``, and the two roots'
+    seeds files are ``seeds/owner-001.toml`` under either -- so a lot carries nothing that
+    says which root it came from.
+    """
 
     goals: tuple[Goal, ...]
     """The declared targets, in file order. Empty is ordinary."""
 
     seed_file: Path | None
-    """Which file declared the lots, or ``None`` if none did.
+    """Which file under the **shipped** root declared lots, or ``None`` if none did.
 
     Not decoration: it is what lets a later failure name the file after the TOML has been
     discarded -- and what a test asserting the Principle VII boundary points at.
+    """
+
+    overlay_seed_file: Path | None
+    """Which file under the **overlay** declared lots, or ``None`` if none did (025 FR-008).
+
+    Kept apart from :attr:`seed_file` because ``manifest.file_name`` renders both as
+    ``seeds/owner-001.toml``: a manifest holding one field could not say which root a lot came
+    from, and *a private declaration was involved* is exactly what a reader of a result needs
+    to be told.
     """
 
     goal_file: Path | None
@@ -2072,24 +2172,29 @@ class SeedAndGoalDeclarations:
 def _check_seed_instruments(
     declared: Sequence[SeedLot],
     instruments: Mapping[str, InstrumentDeclaration],
+    held: Mapping[str, HeldAssetDeclaration],
     *,
     path: Path,
 ) -> None:
-    """FR-005: every seed names a curated instrument, or the load fails naming both.
+    """FR-005: every seed names a curated declaration, or the load fails naming both.
+
+    Held assets join the set a lot may name (025 FR-012): a holding of one is exactly what the
+    owner declares, and it is the only way a quantity ever enters the system.
 
     ``core.ledger.seeds.opening_events`` refuses the same thing as a typed
     ``SeedInstrumentUndeclared``, for a caller that assembles lots without a file. Both exist
     on :class:`UnresolvedTaxClass`'s precedent, and for its reason: the core cannot name a file
     it never saw, and FR-005 asks for the file.
     """
+    declarable = {**instruments, **held}
     for position, lot in enumerate(declared):
-        if lot.instrument_id in instruments:
+        if lot.instrument_id in declarable:
             continue
         raise DeclarationError(
             path,
             f"{loader.SEED_TABLE}[{position}].instrument_id",
             f"names the instrument {lot.instrument_id!r}, which no curated declaration "
-            f"defines. Declared instruments: {sorted(instruments)}. No placeholder is created "
+            f"defines. Declared instruments: {sorted(declarable)}. No placeholder is created "
             "for it: every figure derived from a holding of an invented instrument would be a "
             "confident answer about something that does not exist.",
             "correct the id, or declare the instrument under data/instruments/",
@@ -2153,26 +2258,274 @@ def _check_one_owner(
     )
 
 
+def _declared_currency(
+    lot: loader.DeclaredLot,
+    *,
+    instruments: Mapping[str, InstrumentDeclaration],
+    held: Mapping[str, HeldAssetDeclaration],
+    base_currency: Currency,
+) -> Currency:
+    """What currency a lot's declared cost is in (025 FR-025).
+
+    The base currency **unless the instrument it names declares a different one**. The fact
+    lives on the instrument rather than on the seed, which is where it belongs and where a
+    second lot of the same thing cannot contradict it -- 008 FR-010's "no ``currency`` key"
+    survives, and what changes is the reading of *base currency*.
+
+    A lot naming nothing declared falls through to the base currency and is refused a moment
+    later by :func:`_check_seed_instruments`, which can say what is wrong.
+    """
+    instrument = instruments.get(lot.instrument_id)
+    if instrument is not None:
+        return instrument.currency
+    asset = held.get(lot.instrument_id)
+    if asset is not None:
+        return asset.price_currency
+    return base_currency
+
+
+def _base_currency_series(root: Path, *, base_currency: Currency) -> OfficialRateSeries | None:
+    """The official-rate series the jurisdiction assessing in ``base_currency`` declares.
+
+    Selected by tax currency rather than picked, which is what makes a struck basis the
+    *jurisdiction's* legal figure rather than one this loader chose: ``_official_rate_for``
+    already refuses a series that quotes the tax currency the wrong way round.
+
+    ``None`` where no such jurisdiction declares one, or where none is declared at all. It is
+    a declared absence rather than an oversight, and the lot that needed a rate refuses saying
+    so -- an empty ``tax/timing/`` is not this loader's business to complain about, because a
+    run whose every cost is already in the base currency needs no series at all.
+
+    Two of them naming different series is refused rather than resolved by directory order:
+    which the owner files under is a fact nothing here declares.
+    """
+    named = {
+        declared.official_rate_series: (declared, path)
+        for _, (declared, path) in sorted(_timing_by_jurisdiction(root).items())
+        if declared.tax_currency is base_currency and declared.official_rate_series is not None
+    }
+    if not named:
+        return None
+    if len(named) > 1:
+        raise DeclarationError(
+            root / TAX_TIMING_DIR,
+            f"{loader.TIMING_TABLE}.official_rate_series",
+            f"holds jurisdictions assessing in {base_currency.value} that name different "
+            f"official-rate series ({', '.join(sorted(named))}). A declared cost in another "
+            "currency would be struck at whichever file sorted first, which is a legal figure "
+            "chosen by filename.",
+            "name one series across the jurisdictions that assess in this currency",
+        )
+    declared, path = next(iter(named.values()))
+    rates = official_rates_from_data_root(root, _resolved_kinds(root / KINDS_FILE)[0])
+    return _official_rate_for(path, declared, rates)
+
+
+def _struck(
+    lot: loader.DeclaredLot,
+    *,
+    currency: Currency,
+    base_currency: Currency,
+    series: OfficialRateSeries | None,
+    path: Path,
+    position: int,
+) -> SeedLot:
+    """One declared lot with its cost tagged, striking a foreign one at the acquisition date.
+
+    025 FR-026: ``base = cost x rate / quotation_unit`` at the rate declared for the lot's own
+    acquisition date, through 011's existing conversion. Struck **before** the cost is tagged,
+    because ``strike_base`` raises on an amount already in the tax currency and by the time a
+    lot reaches ``core.ledger.seeds.seed_cost`` it is one.
+
+    The estimated-basis mark is **not** merged here: it rides on ``basis`` and ``seed_cost``
+    joins the two, so a lot this function never saw carries it too (008 FR-007). What the
+    struck base carries is the rate observation's own provenance, and the union of the two is
+    what reaches every derived figure (FR-027).
+    """
+    if currency is base_currency:
+        # The declared amount rests on no cited source: an owner's own record is not an
+        # observation, the reading `data/streams/` already takes for a salary.
+        return _lot(lot, cost=Money(lot.cost, base_currency, prov.EMPTY), struck_from=None)
+    if series is None:
+        raise DeclarationError(
+            path,
+            f"{loader.SEED_TABLE}[{position}].cost",
+            f"is declared in {currency.value}, which {lot.instrument_id!r} states as its "
+            f"currency, and no jurisdiction assessing in {base_currency.value} declares an "
+            "official-rate series to strike it at. The cost is refused rather than carried "
+            f"across as though it were {base_currency.value}: that would be wrong by the "
+            "whole exchange rate and every figure derived from it would look plausible.",
+            f"declare a series under data/{OFFICIAL_RATES_DIR} and name it in "
+            f"data/{TAX_TIMING_DIR}",
+        )
+    struck = official_rate.strike_base(
+        Money(lot.cost, currency, prov.EMPTY),
+        series,
+        tax_currency=base_currency,
+        on_date=lot.acquired_on,
+    )
+    if not isinstance(struck, official_rate.TaxCurrencyConversion):
+        raise DeclarationError(
+            path,
+            f"{loader.SEED_TABLE}[{position}].acquired_on",
+            f"names {lot.acquired_on.isoformat()}, and no base could be struck for this lot's "
+            f"{currency.value} cost. {struck.reason}",
+            "declare the observation, or correct the acquisition date",
+        )
+    return _lot(lot, cost=struck.base, struck_from=struck)
+
+
+def _lot(
+    declared: loader.DeclaredLot, *, cost: Money, struck_from: TaxCurrencyConversion | None
+) -> SeedLot:
+    """One declared entry as the ledger's record, once its cost has a currency."""
+    return SeedLot(
+        owner_id=declared.owner_id,
+        lot_id=declared.lot_id,
+        declared_at=declared.declared_at,
+        is_synthetic=declared.is_synthetic,
+        instrument_id=declared.instrument_id,
+        quantity=declared.quantity,
+        acquired_on=declared.acquired_on,
+        cost=cost,
+        basis=declared.basis,
+        struck_from=struck_from,
+    )
+
+
+def _check_committable(declared: Sequence[SeedLot], *, path: Path) -> None:
+    """FR-005: a lot describing what the owner really holds may not live under a committed root.
+
+    `data/README.md` rule 5 made mechanical. What ships is a public fact or a *labelled*
+    fixture, and a label only a human can read is a rule kept by whoever happens to look.
+    """
+    for position, lot in enumerate(declared):
+        if lot.is_synthetic:
+            continue
+        raise DeclarationError(
+            path,
+            f"{loader.SEED_TABLE}[{position}].is_synthetic",
+            "is false, so this lot describes a real holding -- and this file is under the "
+            "shipped data root, which is committed and reviewed in git. A real position may "
+            "only be declared under the private overlay, which is gitignored and outside "
+            "every gate (data/README.md rule 5, Principle VII).",
+            f"move the lot to {USER_DIR}/{SEEDS_DIR}/, or label it is_synthetic = true if it "
+            "is an invented fixture",
+        )
+
+
+def _check_one_owner_across_roots(
+    shipped_owner: str | None, overlay_owner: str, *, overlay_path: Path
+) -> str:
+    """One run holds one person's life (Principle VII), across both roots as within one.
+
+    Raised against the overlay because the shipped file is resolved first and is the one
+    already in force, which is ``_check_one_owner``'s reasoning for naming the second file.
+    """
+    if shipped_owner is None or shipped_owner == overlay_owner:
+        return overlay_owner
+    raise DeclarationError(
+        overlay_path,
+        f"{loader.OWNER_TABLE}.id",
+        f"declares owner {overlay_owner!r} in the private overlay, and the shipped root "
+        f"declares lots belonging to {shipped_owner!r}. One run holds one person's holdings: "
+        "unioning two people's lots would put two portfolios in one ledger, and every figure "
+        "would describe a position nobody has.",
+        f"name {shipped_owner!r}, or move the other owner's lots out of this root",
+    )
+
+
+def _check_no_collision(
+    shipped: Sequence[SeedLot],
+    overlay: Sequence[SeedLot],
+    *,
+    shipped_path: Path,
+    overlay_path: Path,
+) -> None:
+    """FR-003: two roots may not declare lots of **one** instrument for one owner.
+
+    A seed carries no declared id, so the identity that can collide is the holding itself.
+    Lots of *different* instruments are two halves of one portfolio and are unioned; lots of
+    the same instrument in two roots cannot both be his position, and the overlay does not get
+    to silently replace or double what a reviewed file said.
+    """
+    private = {lot.instrument_id for lot in overlay}
+    for lot in shipped:
+        if lot.instrument_id not in private:
+            continue
+        raise DeclarationError(
+            overlay_path,
+            f"{loader.SEED_TABLE}.instrument_id",
+            f"declares lots of {lot.instrument_id!r}, and {shipped_path} declares lots of it "
+            "too. Both roots hold this owner's position in one instrument, and there is no "
+            "reading of that which is not a mistake: unioning them would double the holding, "
+            "and letting the overlay win would let an uncommitted file silently change what a "
+            "reviewed one said.",
+            f"declare {lot.instrument_id!r} in one root only",
+        )
+
+
 def resolve_seeds_and_goals(
     *,
     seed_file: Path | None,
+    overlay_seed_file: Path | None,
     goal_file: Path | None,
     instruments: Mapping[str, InstrumentDeclaration],
+    held: Mapping[str, HeldAssetDeclaration],
+    series: OfficialRateSeries | None,
     base_currency: Currency,
 ) -> SeedAndGoalDeclarations:
     """The owner's declared holdings and targets, checked against the curated set and the run.
 
-    Either file may be ``None``, and both may be: that is a person who holds nothing and wants
+    Every file may be ``None``, and all may be: that is a person who holds nothing and wants
     nothing in particular, which is an ordinary state rather than a refusal (FR-024).
+
+    The two seed files are **unioned** into one sequence of lots in shipped-then-overlay order,
+    after the collision check has ruled out the reading under which the union would double a
+    holding.
     """
     seed_owner: str | None = None
     goal_owner: str | None = None
-    declared_seeds: tuple[SeedLot, ...] = ()
+    shipped_seeds: tuple[SeedLot, ...] = ()
+    private_seeds: tuple[SeedLot, ...] = ()
     declared_goals: tuple[Goal, ...] = ()
 
+    def strike(declared: Sequence[loader.DeclaredLot], path: Path) -> tuple[SeedLot, ...]:
+        return tuple(
+            _struck(
+                lot,
+                currency=_declared_currency(
+                    lot, instruments=instruments, held=held, base_currency=base_currency
+                ),
+                base_currency=base_currency,
+                series=series,
+                path=path,
+                position=position,
+            )
+            for position, lot in enumerate(declared)
+        )
+
     if seed_file is not None:
-        seed_owner, declared_seeds = loader.seeds_from_file(seed_file, base_currency=base_currency)
-        _check_seed_instruments(declared_seeds, instruments, path=seed_file)
+        seed_owner, declared_shipped = loader.seeds_from_file(seed_file)
+        shipped_seeds = strike(declared_shipped, seed_file)
+        _check_committable(shipped_seeds, path=seed_file)
+    if overlay_seed_file is not None:
+        private_owner, declared_private = loader.seeds_from_file(overlay_seed_file)
+        private_seeds = strike(declared_private, overlay_seed_file)
+        seed_owner = _check_one_owner_across_roots(
+            seed_owner, private_owner, overlay_path=overlay_seed_file
+        )
+        if seed_file is not None:
+            _check_no_collision(
+                shipped_seeds,
+                private_seeds,
+                shipped_path=seed_file,
+                overlay_path=overlay_seed_file,
+            )
+    declared_seeds = shipped_seeds + private_seeds
+    for path, lots in ((seed_file, shipped_seeds), (overlay_seed_file, private_seeds)):
+        if path is not None:
+            _check_seed_instruments(lots, instruments, held, path=path)
     if goal_file is not None:
         goal_owner, declared_goals = loader.goals_from_file(goal_file)
         _check_goal_currencies(declared_goals, base_currency=base_currency, path=goal_file)
@@ -2180,8 +2533,10 @@ def resolve_seeds_and_goals(
     return SeedAndGoalDeclarations(
         owner_id=_check_one_owner(seed_owner, goal_owner, goal_path=goal_file),
         seeds=declared_seeds,
+        overlay_seeds=private_seeds,
         goals=declared_goals,
         seed_file=seed_file,
+        overlay_seed_file=overlay_seed_file,
         goal_file=goal_file,
     )
 
@@ -2212,22 +2567,32 @@ def _at_most_one(root: Path, directory: str) -> Path | None:
     return declared[0]
 
 
-def seeds_and_goals_from_data_root(
-    root: Path, *, base_currency: Currency
+def seeds_and_goals_from_data_roots(
+    roots: DataRoots, *, base_currency: Currency
 ) -> SeedAndGoalDeclarations:
-    """One owner's holdings and targets under a data root, resolved against its instruments.
+    """One owner's holdings and targets over both roots, resolved against the curated set.
 
-    The instrument set comes from :func:`from_data_root`, so a seed is checked against exactly
-    the declarations a projection would run with rather than against a set assembled twice.
+    The instrument set comes from :func:`from_data_root` over the **shipped** root, so a seed
+    is checked against exactly the declarations a projection would run with rather than
+    against a set assembled twice. The overlay declares no instrument: `data/user/` holds what
+    the owner has, and what a thing *is* stays curated and reviewed (FR-006).
 
     **A missing ``seeds/`` or ``goals/`` directory is not an error** (FR-024), unlike every
-    other family. See this section's banner for why the two cases are different rather than
-    inconsistent.
+    other family, and an absent overlay is the same ordinary state (FR-002). See this
+    section's banner for why the two cases are different rather than inconsistent.
     """
+    overlay_seed_file: Path | None = None
+    if roots.overlay is not None:
+        _check_overlay_directories(roots.overlay)
+        overlay_seed_file = _at_most_one(roots.overlay, SEEDS_DIR)
+    curated = from_data_root(roots.shipped)
     return resolve_seeds_and_goals(
-        seed_file=_at_most_one(root, SEEDS_DIR),
-        goal_file=_at_most_one(root, GOALS_DIR),
-        instruments=from_data_root(root).instruments,
+        seed_file=_at_most_one(roots.shipped, SEEDS_DIR),
+        overlay_seed_file=overlay_seed_file,
+        goal_file=_at_most_one(roots.shipped, GOALS_DIR),
+        instruments=curated.instruments,
+        held=curated.held,
+        series=_base_currency_series(roots.shipped, base_currency=base_currency),
         base_currency=base_currency,
     )
 
@@ -2849,6 +3214,107 @@ as scenario documents, and ``glob`` does not recurse.
 """
 
 
+QUOTE_ASSET_DIR = "scenarios/quote_asset"
+"""Where the owner's belief about what a quote asset is worth lives (025 FR-023).
+
+A subdirectory of ``scenarios/``, on ``QUOTATION_DIR``'s reading: the directory's citation
+exemption is what a belief needs, and ``scenarios/*.toml`` is globbed non-recursively as
+scenario documents.
+"""
+
+OBSERVATIONS_DIR = "observations"
+"""Where a fetch script's dated retrievals live.
+
+Read at run time for the first time by this feature: a fund's NAV has a judgement in it between
+two readings of one number and is promoted into a declaration by a human, while a daily close
+has none -- the publisher emits one value per day, and promoting it by hand would be
+transcription, which is where a wrong number enters.
+"""
+
+
+def _resolved_quote_asset_belief(root: Path) -> tuple[QuoteAssetIsWorth, Path] | None:
+    """The one declared quote-asset belief under a data root, or ``None`` where none is.
+
+    An absent directory is **not** an error here, unlike the quotation belief's: a registry
+    declaring no held asset needs no belief about a quote asset, and demanding one would make
+    every existing root fail to load for a figure it never computes. The absence is reported by
+    the position that wanted a price, which is where it can name the asset.
+    """
+    declared = sorted((root / QUOTE_ASSET_DIR).glob("*.toml"))
+    if not declared:
+        return None
+    if len(declared) > 1:
+        raise DeclarationError(
+            root / QUOTE_ASSET_DIR,
+            "",
+            f"holds {len(declared)} quote-asset beliefs "
+            f"({', '.join(path.name for path in declared)}), and this engine resolves one. Two "
+            "beliefs cannot both be in force, and taking either would be choosing one by file "
+            "order.",
+            "keep one file per data root until multi-owner support lands",
+        )
+    _, belief = loader.quote_asset_belief_from_file(declared[0])
+    return belief, declared[0]
+
+
+def _resolved_quotations(
+    root: Path,
+    held: Mapping[str, HeldAssetDeclaration],
+    held_files: Mapping[str, Path],
+    venues: Mapping[str, Venue],
+    kinds: Mapping[str, ObservationKind],
+) -> tuple[dict[str, QuotationSeries], dict[str, Path]]:
+    """The fetched close series each declared held asset has one of, keyed by instrument id.
+
+    **Matched by ``<venue>_<symbol>.toml``**, which is what the fetch script writes: the venue
+    is the one the asset declares and the symbol is the one it was fetched under. An asset with
+    no file yields no entry, which is ordinary: the position reports the absence by name.
+    """
+    series: dict[str, QuotationSeries] = {}
+    declaring: dict[str, Path] = {}
+    for instrument_id, asset in sorted(held.items()):
+        _check_held_venue(held_files[instrument_id], asset, venues)
+        path = root / OBSERVATIONS_DIR / f"{asset.venue_id}_{asset.symbol.casefold()}.toml"
+        if not path.is_file():
+            continue
+        declared = loader.quotation_series_from_file(path, venue_id=asset.venue_id)
+        if declared.symbol.casefold() != asset.symbol.casefold():
+            raise DeclarationError(
+                path,
+                "symbol",
+                f"records the symbol {declared.symbol!r}, and {instrument_id!r} declares "
+                f"{asset.symbol!r}. The file name is how a series is matched to the asset that "
+                "reads it, so the two disagreeing means a run would read one venue's series "
+                "under another symbol's name.",
+                "re-run the fetch script rather than renaming or editing the file",
+            )
+        for quotation in declared.quotations:
+            for source in sorted(quotation.provenance.sources, key=lambda ref: ref.id):
+                _check_kind(source.kind, kinds, path=path, field_path="observation[].kind")
+        series[instrument_id] = declared
+        declaring[instrument_id] = path
+    return series, declaring
+
+
+def _check_held_venue(path: Path, asset: HeldAssetDeclaration, venues: Mapping[str, Venue]) -> None:
+    """A holding sits somewhere declared, or the load fails naming the venue it invented.
+
+    ``path`` is the file the declaration was **read from** rather than one built from the id:
+    nothing requires a file to be named for what it declares, and an error naming a path that
+    does not exist sends a reader looking for a file nobody wrote.
+    """
+    if asset.venue_id in venues:
+        return
+    raise DeclarationError(
+        path,
+        f"{loader.INSTRUMENT_TABLE}.venue_id",
+        f"names the venue {asset.venue_id!r}, which {VENUES_FILE} does not declare. Declared "
+        f"venues: {sorted(venues)}. A holding sitting at a venue nobody declared cannot be "
+        "reported anywhere a venue's currencies are checked.",
+        f"declare {asset.venue_id!r} in {VENUES_FILE}, or name one of {sorted(venues)}",
+    )
+
+
 def _resolved_quotation_belief(
     root: Path, streams: Mapping[str, IncomeStream]
 ) -> tuple[QuotationHolds, Path]:
@@ -2943,6 +3409,7 @@ def tuple_from_data_root(
             instruments=instruments.instruments,
             funds=instruments.funds,
             cash=instruments.cash,
+            held=instruments.held,
             tax_classes=instruments.tax_classes,
             access=access,
             routes=covered.ramp.routes,
@@ -3460,6 +3927,28 @@ class AnswerDeclarations:
     objective_set_files: Mapping[str, Path]
     """Which file declared each set, so the manifest records which one produced an answer."""
 
+    holdings: SeedAndGoalDeclarations
+    """What the owner already holds, over both roots (025 FR-001).
+
+    An answer reports a held position beside the candidates it ranks, so the lots are part of
+    what the verb reads rather than a separate load. The goals in this record are resolved with
+    them and are not read here; they arrive because one file pair declares both.
+    """
+
+    held_inputs: HeldInputs
+    """Everything a held position is built from, assembled here rather than by a caller.
+
+    The API layer receives it whole and passes it on: assembling it there would make
+    orchestration know which declarations a held position needs, and would put the name of the
+    rate it is struck at in a module 015 SC-004 scans for exactly that word.
+    """
+
+    quotation_files: Mapping[str, Path]
+    """Which file each fetched series came from, so the manifest can name it (025 FR-011)."""
+
+    quote_asset_file: Path | None
+    """Which file declared the quote-asset belief, or ``None`` where none did."""
+
 
 def check_question(
     question: Question,
@@ -3552,6 +4041,15 @@ def answer_from_data_root(
         root, base_currency=base_currency, scenario_id=scenario_id
     )
     objective_sets, objective_files = resolve_objective_sets(root, tuples.registries.streams)
+    quotations, quotation_files = _resolved_quotations(
+        root,
+        tuples.instruments.held,
+        tuples.instruments.held_files,
+        tuples.coverage.ramp.venues,
+        tuples.registries.kinds,
+    )
+    belief = _resolved_quote_asset_belief(root)
+    holdings = seeds_and_goals_from_data_roots(data_roots_of(root), base_currency=base_currency)
     questions: dict[str, Question] = {}
     declaring: dict[str, Path] = {}
     for path in files:
@@ -3579,6 +4077,15 @@ def answer_from_data_root(
         question_files=declaring,
         objective_sets=objective_sets,
         objective_set_files=objective_files,
+        held_inputs=HeldInputs(
+            lots=holdings.seeds,
+            quotations=quotations,
+            official_rate=_base_currency_series(root, base_currency=base_currency),
+            quote_asset=None if belief is None else belief[0],
+        ),
+        quotation_files=quotation_files,
+        quote_asset_file=None if belief is None else belief[1],
+        holdings=holdings,
     )
 
 

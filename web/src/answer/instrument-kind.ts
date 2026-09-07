@@ -18,6 +18,7 @@ const DECLARED_TAGS: { readonly [Tag in InstrumentDeclared["tag"]]: true } = {
   "interface.InstrumentDeclaration": true,
   "fund.FundDeclaration": true,
   "cash.CashDeclaration": true,
+  "held.HeldAssetDeclaration": true,
 };
 
 function isDeclared(value: unknown): value is InstrumentDeclared {

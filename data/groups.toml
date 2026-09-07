@@ -38,3 +38,7 @@ name = "Inzhur funds"
 [[group]]
 id   = "cash"
 name = "Hryvnia balances held at a venue"
+
+[[group]]
+id   = "btc"
+name = "Bitcoin"

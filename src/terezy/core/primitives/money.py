@@ -290,6 +290,34 @@ def from_pegged_term(
     return Money(quantity * rate, paid_in, sources)
 
 
+def from_quoted_token(
+    quantity: float,
+    *,
+    close: float,
+    taken_as: Currency,
+    sources: Provenance,
+) -> Money:
+    """Value a holding at a quotation the owner has declared a currency for (025 FR-023).
+
+    A venue's close is a bare number in a token -- ``BTCUSDT`` quotes in a dollar-referenced
+    thing that is not a member of :class:`Currency` -- so it is carried untagged and becomes
+    money only where a declared belief says what the token equals. This is that one place, and
+    it lives here for :func:`from_pegged_term`'s reason: this module is the only place a
+    currency can appear, so demanding ``sources`` in the signature is what stops the
+    quotation's own mark being forgotten on the way in.
+
+    ``taken_as`` is the belief's currency, and naming it that rather than ``currency`` is the
+    point: nothing observed says the token is worth one of these, and the caller is passing on
+    an assumption somebody declared.
+    """
+    if close <= 0.0:
+        raise ValueError(
+            f"a close of {close!r} is not a price. A non-positive quotation is refused at the "
+            "data boundary, so reaching here means that check was bypassed."
+        )
+    return Money(quantity * close, taken_as, sources)
+
+
 def total(items: Iterable[Money], currency: Currency) -> Money:
     """Sum an iterable of amounts, resting on the union of all their sources.
 

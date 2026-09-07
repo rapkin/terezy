@@ -55,6 +55,7 @@ from terezy.core.primitives import money
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance, SourceRef
+from terezy.core.tax.official_rate import TaxCurrencyConversion
 
 if TYPE_CHECKING:  # pragma: no cover -- typing only, and it keeps the import graph flat
     from terezy.core.instruments.interface import InstrumentDeclaration
@@ -184,6 +185,18 @@ class SeedLot:
 
     basis: Basis
     """Known or estimated, declared explicitly. Never inferred, never defaulted (FR-006)."""
+
+    struck_from: TaxCurrencyConversion | None
+    """How :attr:`cost` became a base-currency amount, or ``None`` where it was declared in one.
+
+    025 FR-026. A hryvnia figure gives no hint which dollar amount and which date produced it,
+    so the whole conversion is carried rather than left for a reader to find in a rate file --
+    :class:`TaxCurrencyConversion`'s own reason, at the one place a lot can hold it.
+
+    ``None`` is a statement and not a gap: no rate was consulted, because the declared cost was
+    already in the base currency. Required with no default, so a lot that *was* struck cannot
+    reach a reader claiming it was not.
+    """
 
 
 def basis_estimated(*, declared_at: str, reason: str, estimated_for: date) -> BasisEstimated:

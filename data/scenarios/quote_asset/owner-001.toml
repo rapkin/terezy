@@ -1,0 +1,33 @@
+# The owner's declared belief about what the token a venue quotes in is worth.
+#
+# **Everything in this file is an assumption, and that is what it carries instead of a
+# citation.** `data/scenarios/` is exempt from the provenance requirement by design (see
+# `data/README.md`), and this file is one of the stronger cases: the peg holds by the issuer's
+# own practice rather than by an obligation anybody published, so there is nothing for a source
+# to vouch for. An issuer that COMMITTED to redeem at par would have published a term, and a
+# rate somebody quotes would be an observation under `data/observations/` — a different
+# declaration, with a source and a retrieval date.
+#
+# **A subdirectory, and the nesting is deliberate.** `data/scenarios/*.toml` is globbed and
+# validated as scenario documents and `glob` does not recurse, so this file keeps the
+# directory's citation exemption without pretending to be a scenario. The same reading
+# `data/scenarios/quotation/` and `data/scenarios/inflation/` already carry.
+#
+# **The absence of the file is the absence of the belief, and it is NOT a silent equality.**
+# A run with none declared reports the quantity a position holds and REFUSES its value by name,
+# rather than reading a dollar-referenced token as a dollar because nobody said otherwise
+# (025 FR-023). That refusal is what makes swapping this file for a cited USDT/USD observation
+# a change to data and nothing else.
+#
+# **Every dollar and hryvnia figure of a held position names it.** A valued position carries
+# this record, so the assumption is visible wherever it acted — the shape the quotation belief
+# already uses.
+
+[quote_asset]
+id            = "usdt_is_a_dollar"
+owner_id      = "owner-001"
+quote_asset   = "USDT"
+currency      = "USD"
+is_assumption = true
+
+rationale     = "OWNER'S BELIEF, not an observation. Asked on 2026-09-07 what stands between a BTCUSDT quotation and a dollar, and answered «прирівнюй до долара» — take it as equal to the dollar. It is what he actually believes and it is what nobody can verify: Tether publishes attestations rather than an audited redemption right, redemption at par is available to direct customers under its own terms rather than to a holder on an exchange, and the token has traded below one dollar for days at a time. What is assumed is therefore the PEG AND NOTHING ELSE — that one USDT is one USD on the day a close is read — and the assumption is worth exactly the difference between the peg and whatever the market would have paid that day. It errs in no stated direction: a break is far more likely downward than upward, but a token trading a fraction above par is ordinary too, and asserting a sign without a warrant is a number more confident than its inputs. The honest alternative is a cited USDT/USD rate as a dated observation, which needs a publisher nobody has picked; until then this is the belief, and it is marked on every figure struck through it."
