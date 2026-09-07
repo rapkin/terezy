@@ -38,6 +38,10 @@ released it**, and each release travels the declared way out and is charged what
 charges. A fixed fee does not scale, so applying a round-trip *fraction* to a coupon would be
 a fabricated figure that looks exactly like a real one.
 
+The remainder the purchase could not deploy travels the same way out, on the purchase date
+(owner decision, 2026-09-06). It never became a position, which is what fixes its date and
+makes it untaxed: nothing was disposed of, so there is no gain.
+
 This is also what makes "no reinvestment" (FR-025) structural rather than a rule to remember:
 money that reaches a spendable endpoint has left the model, so there is nothing sitting
 anywhere for an undeclared reinvestment assumption to be applied to.
@@ -47,11 +51,10 @@ anywhere for an undeclared reinvestment assumption to be applied to.
 The comparable figure is a money-weighted return over the tuple's **actual span**, from the
 first outlay to the last arrival, with ramp and settlement latency inside it because waiting
 is a cost (FR-015, owner decision 2026-08-22). It is
-:func:`terezy.core.results.hurdle.internal_rate_of_return` over the arrivals on their own
-dates, against the money that was **actually invested** -- what left the stream, less any
-remainder the purchase could not deploy. That is the same root find that produces feature
-001's benchmark, which is what makes hurdle-versus-tuple one kind of number against the same
-kind.
+:func:`terezy.core.results.hurdle.internal_rate_of_return` over every arrival on its own
+date -- the releases, and the remainder coming back -- against the whole outlay. That is the
+same root find that produces feature 001's benchmark, which is what makes hurdle-versus-tuple
+one kind of number against the same kind.
 
 **It refuses where those amounts are not all in one currency**, and that is reachable in the
 shipped registry rather than a theoretical case: the dollar contract income reaching a hryvnia
@@ -140,6 +143,8 @@ from terezy.core.results.tuple import (
     PartContribution,
     PlanDoesNotFitInstrument,
     RateNotComparable,
+    RemainderCameHome,
+    RemainderStayed,
     RouteInCapExceeded,
     RouteInUnusable,
     RouteStanding,
@@ -152,6 +157,7 @@ from terezy.core.results.tuple import (
     UndeployedCash,
     WayOutCapExceeded,
     WayOutUnusable,
+    money_home,
 )
 from terezy.core.routes import cost
 from terezy.core.routes.cost import Junction
@@ -531,6 +537,15 @@ def _hold(
     )
     if not isinstance(repatriated, tuple):
         return repatriated
+    undeployed, remainder_cost = _send_the_remainder_home(
+        tuple_,
+        prepared,
+        bought.remainder,
+        routed=routed,
+        purchased_on=purchased_on,
+        as_of=as_of,
+        registries=registries,
+    )
     return _assemble(
         tuple_,
         prepared,
@@ -538,9 +553,10 @@ def _hold(
         outlay=amount,
         one_way=routed.one_way,
         arrivals=tuple(arrival for arrival, _ in repatriated),
-        way_out_costs=tuple(charged for _, charged in repatriated),
+        way_out_costs=tuple(charged for _, charged in repatriated)
+        + ((remainder_cost,) if remainder_cost is not None else ()),
         endpoint_currency=_endpoint_currency(routed.chain, prepared, registries),
-        undeployed=bought.undeployed,
+        undeployed=undeployed,
         routed=routed,
         horizon=horizon,
         purchased_on=purchased_on,
@@ -978,7 +994,20 @@ class _Acquisition:
     quantity: float
     price: Money
     cost: Money
-    undeployed: UndeployedCash | None
+    remainder: _Remainder | None
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class _Remainder:
+    """What the purchase could not deploy, before its way home has been costed.
+
+    Distinct from :class:`~terezy.core.results.tuple.UndeployedCash`, which carries that
+    journey: the exit chain is resolved and the purchase date is known one level up from the
+    purchase, so the two halves cannot be built in one place.
+    """
+
+    amount: Money
+    reason: str
 
 
 def _acquire(
@@ -1046,13 +1075,13 @@ def _acquire(
         quantity=quantity,
         price=price,
         cost=spent,
-        undeployed=_undeployed(prepared, price, increment, money.sub(arrived, spent)),
+        remainder=_undeployed(prepared, price, increment, money.sub(arrived, spent)),
     )
 
 
 def _undeployed(
     prepared: _Prepared, price: Money, increment: float, remainder: Money
-) -> UndeployedCash | None:
+) -> _Remainder | None:
     """What the purchase could not deploy, or ``None`` where there is no such thing.
 
     **A declaration with no increment leaves no remainder, by construction.** ``increment ==
@@ -1062,28 +1091,27 @@ def _undeployed(
     leaves behind in binary floating point is not money: the shipped MilTech fund at a net
     asset value of 1006.97 and an arriving 1007.00 produced ``-1.14e-13``, a **negative**
     "money that made the trip in and bought nothing" -- a state
-    :class:`~terezy.core.results.tuple.UndeployedCash` forbids in its own words, which
-    :func:`_rate` then subtracted to make the invested amount exceed the outlay, under a
-    sentence reading "bought in increments of 0.0 unit(s)".
+    :class:`~terezy.core.results.tuple.UndeployedCash` forbids in its own words, sent home
+    along a declared exit under a sentence reading "bought in increments of 0.0 unit(s)".
 
     Where an increment **is** declared the same arithmetic can land a hair either side of
-    zero, so the comparison is the imported tolerance rather than ``== 0.0`` -- the same
-    tolerance :func:`_whole_increments` uses two lines earlier, for the same reason and now in
-    both directions.
+    zero, so the comparison is the imported tolerance rather than ``== 0.0``. **Anything at or
+    below zero is refused outright as well**, and not only what the tolerance absorbs: the two
+    tolerances are applied to different quantities -- :func:`_whole_increments` rounds a
+    *ratio* at the relative one, this tests the *money* at the absolute one -- so a residue can
+    be negative by more than this guard admits, and a negative one now reaches ``cost_exit``,
+    which raises rather than costing a movement that runs backwards.
     """
-    if increment == 0.0 or is_close(remainder.amount, 0.0):
+    if increment == 0.0 or remainder.amount <= 0.0 or is_close(remainder.amount, 0.0):
         return None
-    return UndeployedCash(
+    return _Remainder(
         amount=remainder,
-        venue_id=prepared.access.bought_at,
         reason=(
             f"{prepared.declared.id!r} is bought in increments of {increment!r} "
             f"unit(s) at {price.amount!r} {price.currency.value} each, so "
-            f"{remainder.amount!r} of what arrived bought nothing. It is money that "
-            "made the trip and is sitting where the purchase was made: it is not in "
-            "the amount that reaches a spendable endpoint, because bringing it home "
-            "would need a date nobody declared, and the rate is measured on what was "
-            "actually invested rather than charging it as a loss."
+            f"{remainder.amount!r} of what arrived bought nothing. What became of it is "
+            "the journey beside this: it is the same sentence whether the remainder came "
+            "home or was left where it is."
         ),
     )
 
@@ -1473,10 +1501,8 @@ def _repatriate(
     return tuple(charged)
 
 
-def _over_the_way_out_cap(
-    way_out: WayOutCost, released: Money, released_on: date
-) -> WayOutCapExceeded | None:
-    """Refuse a release larger than the tightest monthly cap the way out declares (FR-016).
+def _over_the_way_out_cap(way_out: WayOutCost, sent: Money, on: date) -> WayOutCapExceeded | None:
+    """Refuse a movement larger than the tightest monthly cap the way out declares (FR-016).
 
     The way in's rule (:func:`_over_the_monthly_cap`) applied where FR-016 says it also
     applies. ``cost_exit`` reports the ceiling for ``cost_one``'s reason -- a cap is a fact
@@ -1485,29 +1511,145 @@ def _over_the_way_out_cap(
     1.00 hryvnia monthly cap on the shipped exit route produced a complete outcome reporting
     13 100.00 reaching the endpoint.
 
-    Per release rather than per month, deliberately and with the gap stated on
+    Per movement rather than per month, deliberately and with the gap stated on
     :class:`~terezy.core.results.tuple.WayOutCapExceeded`.
     """
-    if way_out.ceiling is None or money.compare(released, way_out.ceiling) <= 0:
+    if way_out.ceiling is None or money.compare(sent, way_out.ceiling) <= 0:
         return None
     ceiling = way_out.ceiling
     return WayOutCapExceeded(
         path=way_out.path,
-        released_on=released_on,
+        released_on=on,
         ceiling=ceiling,
-        requested=released,
-        excess=money.sub(released, ceiling),
+        requested=sent,
+        excess=money.sub(sent, ceiling),
         reason=(
             f"the way out declares a monthly ceiling of {ceiling.amount!r} "
-            f"{ceiling.currency.value} and the holding released {released.amount!r} on "
-            f"{released_on.isoformat()}, so {money.sub(released, ceiling).amount!r} of it "
-            "cannot come home that month. The tuple is refused rather than repatriated up to "
-            "the ceiling: splitting a release across months is the same deferred partial "
+            f"{ceiling.currency.value} and {sent.amount!r} was to travel it on "
+            f"{on.isoformat()}, so {money.sub(sent, ceiling).amount!r} of it cannot come "
+            "home that month. The tuple is refused rather than repatriated up to the "
+            "ceiling: splitting a movement across months is the same deferred partial "
             "deployment as on the way in (FR-018, owner decision 2026-08-22), and reporting "
             "the remainder needs a declared fallback policy and the month's consumed "
             "capacity, neither of which a tuple carries. Declare a way out that carries it, "
-            "or exit on a date whose release fits."
+            "or exit on a date whose movement fits."
         ),
+    )
+
+
+def _send_the_remainder_home(
+    tuple_: Tuple,
+    prepared: _Prepared,
+    remainder: _Remainder | None,
+    *,
+    routed: _Routed,
+    purchased_on: date,
+    as_of: date,
+    registries: Registries,
+) -> tuple[UndeployedCash | None, WayOutCost | None]:
+    """Send what the purchase could not deploy back out along the tuple's declared way out.
+
+    The terms of that journey are :class:`~terezy.core.results.tuple.UndeployedCash`'s, and
+    the two things this function decides are here.
+
+    **The fourth seam.** The remainder is at the venue the purchase was made at while the
+    chain departs from wherever the instrument releases its **proceeds**, and those are two
+    declarations -- reachable in the shipped shapes rather than theoretical. Where they
+    differ, walking the chain with this money would be the free transfer between venues
+    feature 004 shipped.
+
+    **A way out that will not carry it leaves it where it is** rather than refusing the
+    tuple, which is where this parts company with :func:`_repatriate`. See
+    :class:`~terezy.core.results.tuple.RemainderStayed`.
+    """
+    if remainder is None:
+        return None, None
+    at: Junction = (prepared.access.bought_at, prepared.currency.value)
+    if at != routed.proceeds_at:
+        return _stayed(
+            prepared,
+            remainder,
+            f"it is at {at[0]!r} in {at[1]}, and the declared way out departs from "
+            f"{routed.proceeds_at[0]!r} in {routed.proceeds_at[1]}, where "
+            f"{prepared.declared.id!r} releases its proceeds. Nothing declares how it reaches "
+            "the start of that chain, so carrying it there would be a leg nobody declared at "
+            "a rate nobody declared.",
+        ), None
+    way_out = cost.cost_exit(
+        routed.chain,
+        remainder.amount,
+        stream_id=tuple_.stream_id,
+        departing_from=routed.proceeds_at,
+        routes=registries.routes,
+        channels=registries.channels,
+        kinds=registries.kinds,
+        on_date=purchased_on,
+        as_of=as_of,
+        spendable=registries.spendable,
+    )
+    if isinstance(way_out, RouteUnusable):
+        return _stayed(prepared, remainder, way_out.reason), None
+    # The ceiling rule lives in `_over_the_way_out_cap` and is read here rather than restated;
+    # its own reason is not, because that one says the tuple was refused and this one is not.
+    if way_out.arrived.amount <= 0.0:
+        return _stayed(
+            prepared,
+            remainder,
+            f"the way out would deliver {way_out.arrived.amount!r} "
+            f"{way_out.arrived.currency.value} of it, which is nothing or less: its charge is "
+            "the whole of the remainder or more. A release has to come home and is reported "
+            "arriving at a loss; a remainder does not, and moving it would leave the owner "
+            "with less than leaving it there. The two figures are stated rather than "
+            "subtracted: an exit chain that converts delivers in a currency this amount is "
+            "not in.",
+        ), None
+    capped = _over_the_way_out_cap(way_out, remainder.amount, purchased_on)
+    if capped is not None:
+        return _stayed(
+            prepared,
+            remainder,
+            f"the way out declares a monthly ceiling of {capped.ceiling.amount!r} "
+            f"{capped.ceiling.currency.value}, and {capped.excess.amount!r} of the remainder "
+            "is over it. Splitting a movement across months needs a declared fallback policy "
+            "and the month's consumed capacity, neither of which a tuple carries.",
+        ), None
+    return (
+        UndeployedCash(
+            amount=remainder.amount,
+            venue_id=prepared.access.bought_at,
+            journey=RemainderCameHome(
+                left_on=purchased_on,
+                arrived_on=purchased_on + timedelta(days=way_out.latency_days),
+                reached=way_out.arrived,
+            ),
+            reason=remainder.reason,
+        ),
+        way_out,
+    )
+
+
+def _stranded(undeployed: UndeployedCash | None) -> Money | None:
+    """The part of the outlay that never came home, or ``None`` where none is."""
+    match undeployed:
+        case UndeployedCash(journey=RemainderStayed(), amount=amount):
+            return amount
+    return None
+
+
+def _stayed(prepared: _Prepared, remainder: _Remainder, why: str) -> UndeployedCash:
+    """The remainder, left where the purchase left it, with the reason it could not travel."""
+    return UndeployedCash(
+        amount=remainder.amount,
+        venue_id=prepared.access.bought_at,
+        journey=RemainderStayed(
+            reason=(
+                f"{remainder.amount.amount!r} {remainder.amount.currency.value} could not "
+                f"leave {prepared.access.bought_at!r} along this tuple's declared way out: "
+                f"{why} It is out of what reaches a spendable endpoint, and the rate is "
+                "refused rather than measured, because part of the outlay never came home."
+            )
+        ),
+        reason=remainder.reason,
     )
 
 
@@ -1661,7 +1803,8 @@ def _assemble(
     carried = _carried_quotation(
         prepared, projected, purchased_on=purchased_on, quotation_holds=quotation_holds
     )
-    reaches = money.total([arrival.amount for arrival in arrivals], endpoint_currency)
+    home = money_home(arrivals, undeployed)
+    reaches = money.total([amount for _, amount, _ in home], endpoint_currency)
     provenance = prov.merge_all(
         [
             one_way.provenance,
@@ -1670,15 +1813,12 @@ def _assemble(
             _declaration_provenance(prepared),
         ]
     )
-    span = DateRange(
-        start=horizon.start,
-        end=max((arrival.arrived_on for arrival in arrivals), default=horizon.start),
-    )
+    span = DateRange(start=horizon.start, end=max((on for on, _, _ in home), default=horizon.start))
     rate = _rate(
         prepared,
         outlay=outlay,
-        undeployed=undeployed,
-        arrivals=arrivals,
+        arriving=tuple((on, amount) for on, amount, _ in home),
+        stranded=_stranded(undeployed),
         endpoint_currency=endpoint_currency,
         span=span,
     )
@@ -1738,8 +1878,8 @@ def _standing(routed: _Routed, way_out_costs: tuple[WayOutCost, ...]) -> RouteSt
     number is a round trip is the half-truth ``RampCost.status`` records about itself.
 
     A holding that released nothing has no way-out cost to read, and then the way out's
-    standing is genuinely unknown rather than open -- but such a tuple has no rate either and
-    is reported as not comparable, so there is no figure here for a reader to over-trust.
+    standing is genuinely unknown rather than open. Unreachable today: a position is closed at
+    the window's end if its own terms have not closed it, so every tuple releases something.
     """
     out_status = {charged.status for charged in way_out_costs}
     constrained: list[Literal["route_in", "route_out"]] = []
@@ -1856,7 +1996,8 @@ def _parts(
         (
             "ramp_out",
             money.scale(charged_out, -1.0),
-            "core.routes.cost.cost_exit -- charged once on each amount the instrument released",
+            "core.routes.cost.cost_exit -- charged once on each amount that travelled the way "
+            "out: every release, and the remainder the purchase could not deploy",
         ),
     )
     return tuple(
@@ -1971,23 +2112,23 @@ def _rate(
     prepared: _Prepared,
     *,
     outlay: Money,
-    undeployed: UndeployedCash | None,
-    arrivals: tuple[Arrival, ...],
+    arriving: tuple[tuple[date, Money], ...],
+    stranded: Money | None,
     endpoint_currency: Currency,
     span: DateRange,
 ) -> NominalRate | RateNotComparable:
     """The money-weighted return over the span, or a typed statement of why there is none.
 
-    **The payment out at ``t=0`` is the money that was actually invested**: what left the
-    stream, less any remainder the purchase could not deploy. The remainder is not lost -- it
-    is cash sitting at the purchase venue -- and leaving it in the series would price it as a
-    total loss, which is a figure more confident than its inputs in the mirror image of the
-    flattering direction. On the shipped registry the difference is a 16% sovereign bond
-    reported at -7% because 500.00 could not buy an eleventh unit.
+    **The payment out at ``t=0`` is the whole outlay**, and every dated amount that reached the
+    endpoint is a receipt against it -- including the remainder the purchase could not deploy,
+    which comes home along the declared way out with its own cost and its own arrival date.
+    Netting it off the denominator instead would assume it recoverable at par and free, and it
+    is neither: it is a costed movement like any other.
 
-    Netting it off assumes the remainder is recoverable at par, and it is not: it sits behind
-    the same exit the holding does. That assumption is not buried here -- it is one of the
-    outcome's own scope statements, in :data:`~terezy.core.results.tuple.EXCLUDES`.
+    **Where the way out would not carry it there is no figure at all**, and that is Principle I
+    rather than caution: measuring on the whole outlay prices the stranded amount at zero and
+    netting it off prices it at par, nothing declares which it is worth, and both look like a
+    real rate. The amount is unaffected and is reported.
 
     Time is measured with the **instrument's declared day-count convention**, from the first
     outlay -- the same convention that sized the instrument's own flows, so this rate and
@@ -2000,52 +2141,38 @@ def _rate(
     against the same kind rather than two figures that resemble each other.
 
     Its precondition is a **conventional series** -- one payment out at the start, receipts
-    afterwards -- and that precondition is checked here rather than discovered as an
-    exception, because a series that fails it is a fact about this round trip (everything was
-    eaten by fees, or nothing came back) and not a caller's mistake. A round trip with no
-    arrivals at all falls into the same check rather than into a guard of its own: a total of
-    nothing is not positive, and one statement covers both.
+    afterwards, over a period -- and it is checked here rather than discovered as an exception,
+    because a series that fails it is a fact about this round trip and not a caller's mistake.
+    Two ways it fails, and neither is the caller's fault: nothing positive came back
+    (everything was eaten by fees, or nothing came back at all), or everything came back on the
+    day it left, so there is no period for a return to be over and the present value never
+    crosses zero. ``internal_rate_of_return`` raises on both, by its own contract.
     """
     endpoint = endpoint_currency
-    stranded = None if undeployed is None else undeployed.amount
-    # One guard for one rule: the three amounts the series is built out of -- what left, what
-    # stayed behind, what came back -- have to be in one currency, because a money-weighted
-    # return over two of them is not a rate of anything.
-    #
-    # ⚙ **The third amount makes this turn on divisibility, and that is right rather than
-    # inconsistent.** A hryvnia stream buying a dollar instrument and coming home in hryvnia
-    # is a perfectly good single-currency series -- money left in UAH, money returned in UAH,
-    # and the two conversions are costs inside it -- so it has a rate and refusing it would
-    # throw away an honest figure. The moment the unit price does not divide the arriving
-    # amount, a *dollar* remainder has to be netted off a *hryvnia* outlay, and that needs a
-    # declared valuation rate, which nothing supplies. So the same tuple has a rate at one
-    # amount and not at another: the difference is a fact about what the data allows, and the
-    # refusal's own reason names the stranded amount and its currency so a reader can see
-    # which.
-    #
-    # It is unreachable today, and by construction rather than by the shipped data. A
-    # remainder needs a declared increment, and only an `InstrumentDeclaration` declares one:
-    # `_undeployed` returns nothing at all where none is (which is a rule about this engine,
-    # not about arithmetic, and is pinned in `tests/unit/test_infeasible_tuples.py`). A
-    # foreign *bond* is then closed twice over -- `_foreign_tax_currency` refuses one that
-    # declares tax classes, and the projection refuses one that does not the moment it pays
-    # income of a kind no class covers -- and both halves are pinned in
-    # `tests/unit/test_rate_and_horizon_boundaries.py`. A later feature that opens any of the
-    # three fails a test rather than discovering this branch by accident.
-    currencies = {outlay.currency, endpoint} | (set() if stranded is None else {stranded.currency})
-    if len(currencies) > 1:
-        stayed = (
-            ""
-            if stranded is None
-            else (
-                f", and {stranded.amount!r} {stranded.currency.value} stayed behind at "
-                "the purchase venue"
-            )
+    if stranded is not None:
+        return RateNotComparable(
+            reason=(
+                f"{stranded.amount!r} {stranded.currency.value} of the {outlay.amount!r} "
+                f"{outlay.currency.value} that left the stream never came home: the declared "
+                "way out will not carry the "
+                "remainder the purchase could not deploy. Measuring the return on the whole "
+                "outlay prices that amount at zero and netting it off prices it at par, "
+                "nothing declares which it is worth, and both produce a figure that looks "
+                "like a rate. The amount that reaches a spendable endpoint is unaffected and "
+                "is reported, with the remainder beside it."
+            ),
+            missing="a declared way home for the remainder, or a declared value for cash "
+            "stranded at a venue",
         )
+    # One guard for one rule: what left and what came back have to be in one currency, because
+    # a money-weighted return over two of them is not a rate of anything. Valuing one in the
+    # other needs a rate that values a currency *for a return*, and neither rate this system
+    # has is one.
+    if outlay.currency is not endpoint:
         return RateNotComparable(
             reason=(
                 f"the outlay is {outlay.currency.value} and what comes back is "
-                f"{endpoint.value}{stayed}. A money-weighted return over two currencies is "
+                f"{endpoint.value}. A money-weighted return over two currencies is "
                 "not a rate of anything, and valuing one of them in the other needs a rate "
                 "that values a currency for a return. Neither rate this system has is one: a "
                 "channel rate is a transaction price, and the official rate is what the law "
@@ -2054,13 +2181,12 @@ def _rate(
             ),
             missing="a declared valuation rate for a date",
         )
-    invested = outlay if stranded is None else money.sub(outlay, stranded)
-    received = money.total([arrival.amount for arrival in arrivals], endpoint)
-    if any(arrival.amount.amount < 0.0 for arrival in arrivals) or received.amount <= 0.0:
+    received = money.total([amount for _, amount in arriving], endpoint)
+    if any(amount.amount < 0.0 for _, amount in arriving) or received.amount <= 0.0:
         return RateNotComparable(
             reason=(
                 f"the round trip returned {received.amount!r} {endpoint.value} against an "
-                f"outlay of {outlay.amount!r}, over {len(arrivals)} arrival(s). A series that "
+                f"outlay of {outlay.amount!r}, over {len(arriving)} arrival(s). A series that "
                 "is not one payment out followed by receipts has no single internal rate of "
                 "return, and extrapolating one past the bracket would invent a figure. The "
                 "amounts are reported as they stand."
@@ -2068,7 +2194,7 @@ def _rate(
             missing="a conventional series -- one payment out at the start, receipts after it",
         )
     year_fraction = day_count(_day_count_of(prepared))
-    if all(year_fraction(span.start, arrival.arrived_on) == 0.0 for arrival in arrivals):
+    if all(year_fraction(span.start, on) == 0.0 for on, _ in arriving):
         # `internal_rate_of_return`'s precondition is one payment out at the start and receipts
         # **afterwards**: money out and the same money back on one date discounts to zero at
         # every rate, so the bracket never crosses and the root find raises. Reported as a
@@ -2077,7 +2203,7 @@ def _rate(
         # which needs both legs to be instant -- a balance over a horizon of no length.
         return RateNotComparable(
             reason=(
-                f"{invested.amount!r} {invested.currency.value} was invested on "
+                f"{outlay.amount!r} {outlay.currency.value} left the stream on "
                 f"{span.start.isoformat()} and {received.amount!r} {endpoint.value} came back "
                 f"by {span.end.isoformat()}, which {_day_count_of(prepared)!r} measures as no "
                 "time at all. A return over a span of zero length is not a rate -- every rate "
@@ -2089,11 +2215,8 @@ def _rate(
             ),
             missing="a span the declared convention measures as more than no time",
         )
-    flows: list[CashFlow] = [(0.0, -invested.amount)]
-    flows.extend(
-        (year_fraction(span.start, arrival.arrived_on), arrival.amount.amount)
-        for arrival in arrivals
-    )
+    flows: list[CashFlow] = [(0.0, -outlay.amount)]
+    flows.extend((year_fraction(span.start, on), amount.amount) for on, amount in arriving)
     return NominalRate(internal_rate_of_return(flows))
 
 

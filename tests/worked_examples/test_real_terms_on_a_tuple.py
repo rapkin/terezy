@@ -7,25 +7,25 @@ UA4000236228 over the owner's twelve-month horizon: 50 000 UAH from `salary_uah`
 | --- | --- |
 | span | 2026-09-01 .. 2027-03-13 (the issue redeems 2027-03-10; three days settle) |
 | deflation window | 2026-10 .. 2027-03 -- six months |
-| nominal `implied_rate` | `0.14949567241454964` |
+| nominal `implied_rate` | `0.14943820648570882` |
 | declared belief | 10.0% per annum, `owner_placeholder_inflation` |
 
 **The assumed half**, both rates per annum. The numerator is written as the sum it is computed
-from, because the decimal literal `1.14949567241454964` is a *different* double from
-`1 + 0.14949567241454964` and this check does not reproduce from it::
+from, because the decimal literal `1.14943820648570882` is a *different* double from
+`1 + 0.14943820648570882` and this check does not reproduce from it::
 
-    1 + nominal = 1.1494956724145498
-    real        = 1.1494956724145498 / 1.10 - 1 = 0.044996065831408805
+    1 + nominal = 1.149438206485709
+    real        = 1.149438206485709 / 1.10 - 1 = 0.044943824077917194
 
-Checkable by multiplying back: `1.10 * 1.044996065831408805 = 1.1494956724145498`, the
+Checkable by multiplying back: `1.10 * 1.044943824077917194 = 1.149438206485709`, the
 numerator exactly.
 
 **The realized half refuses**, because `data/cpi/ua.toml` covers 1991-08 .. 2025-10 and all six
 months of this window are undeclared.
 
-**And why the approximation is refused.** `0.14949567... - 0.10 = 0.04949567...`, which is
+**And why the approximation is refused.** `0.14943820... - 0.10 = 0.04943820...`, which is
 `1.10 x` the exact figure -- the approximation overstates the real return by exactly the
-inflation rate, here 0.45 percentage points on a 4.50% figure, a tenth of the number itself.
+inflation rate, here 0.45 percentage points on a 4.49% figure, a tenth of the number itself.
 Both look like plausible real returns, which is what makes the wrong one dangerous rather than
 merely inaccurate.
 """
@@ -54,10 +54,10 @@ SPAN_START = date(2026, 9, 1)
 SPAN_END = date(2027, 3, 13)
 WINDOW = Window(first="2026-10", last="2027-03")
 
-NOMINAL = 0.14949567241454964
+NOMINAL = 0.14943820648570882
 BELIEF = 1.10
 NUMERATOR = 1 + NOMINAL
-REAL = 0.044996065831408805
+REAL = 0.044943824077917194
 
 BELIEF_ID = "owner_placeholder_inflation"
 SERIES_ID = "ua_cpi_monthly"
@@ -85,7 +85,7 @@ def test_the_span_and_the_nominal_rate_are_what_the_arithmetic_below_deflates() 
 
 
 def test_the_assumed_real_rate_is_the_nominal_one_deflated_by_the_declared_belief() -> None:
-    """`(1 + 0.14949567241454964) / 1.10 - 1 = 0.044996065831408805`, at the imported tolerance."""
+    """`(1 + 0.14943820648570882) / 1.10 - 1 = 0.044943824077917194`, at the imported tolerance."""
     figure = _outcome().real.assumed
 
     assert isinstance(figure, RealRate), figure
@@ -94,10 +94,10 @@ def test_the_assumed_real_rate_is_the_nominal_one_deflated_by_the_declared_belie
 
 
 def test_multiplying_the_real_rate_back_by_the_belief_returns_the_numerator() -> None:
-    """The check a reader performs on paper: `1.10 * 1.044996065831408805 = 1.1494956724145498`.
+    """The check a reader performs on paper: `1.10 * 1.044943824077917194 = 1.149438206485709`.
 
     It is the exact Fisher relation stated the other way round, so it fails on the subtraction
-    approximation -- `1.10 * 1.049495672414549635` is `1.1544452396560046`, off in the third
+    approximation -- `1.10 * 1.04943820648570882` is `1.1543820271342797`, off in the third
     decimal place.
     """
     figure = _outcome().real.assumed
@@ -107,7 +107,7 @@ def test_multiplying_the_real_rate_back_by_the_belief_returns_the_numerator() ->
 
 
 def test_the_subtraction_approximation_is_further_out_than_the_tolerance_admits() -> None:
-    """0.4950% against 0.4500%: a tenth of the figure, and both look like plausible answers."""
+    """4.944% against 4.494%: the gap is a tenth of the figure, and both look plausible."""
     figure = _outcome().real.assumed
 
     assert isinstance(figure, RealRate)

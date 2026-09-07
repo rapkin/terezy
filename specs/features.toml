@@ -199,10 +199,24 @@ id    = "regime-declared-by-two-scenarios-resolves-by-the-first-id"
 after = ["028-scenario-comparison"]
 note  = "READ IN THE CODE 2026-09-07 while specifying 028: `api/answer.py::_scenario_of` walks `sorted(ramp.scenarios.items())` -- sorted by the SCENARIO ID the declaration states, which the filename need not match -- and returns the first whose regimes include the question's id, while duplicate regime ids are refused only WITHIN one scenario -- so two scenarios naming one regime load, the run silently takes the alphabetically first, and `RunManifest` records the regime and not the scenario. Unreachable in the shipped registry, which declares one scenario. The remedy is the owner's shape to choose -- refuse the ambiguity at load, or record the scenario on the manifest -- and 028 FR-015 states the ambiguity on screen rather than resolving it. Deliberately not built."
 
+[[feature]]
+id     = "027-candidate-card"
+status = "drafted"
+needs  = ["010-full-tuple", "020-http-api", "022-accrued-interest", "023-cash-instrument", "026-answer-screen"]
+why    = "010 is the join that builds the projection and drops it, and owns `reaches`, `parts` and `arrivals` the card reads beside it; 020 publishes the schema the one new endpoint joins and owns the wire contracts it must satisfy; 022 is why a purchase price has a clean/accrued split to carry at all; 023 landed a third projection arm the card must draw, which is what makes the served projection a union rather than one record; 026 owns the screen the card opens from, its badge vocabulary and its one formatting module. Transitively covers 019, 021, 016, 015 and 014."
+note   = """
+The join builds a projection per candidate and discards every one; this serves them per candidate so a waterfall and a timeline can say why a figure is that figure. Closes required test E11.
+Two clarifications are open -- a rate on the tax bar, and the six-part attribution beside the waterfall -- so tasks.md quarantines Phase 6; see specs/027-candidate-card/spec.md."""
+
 [[future]]
 id    = "the-graph-has-no-word-for-drafted-and-planned"
 after = ["025-btc-holdings"]
 note  = "`drafted` says planning may not start; `planned` says plan.md and tasks.md exist. 025 is both TODAY, so the graph asserts something false about it right now rather than later. Recorded 2026-09-06 by 025's review."
+
+[[future]]
+id    = "a-one-day-horizon-raises"
+after = ["015-the-question"]
+note  = "A horizon whose start and end are the same day raises `ValueError` out of `results.project` for a BOND: the contractual series it builds for `hurdle.of_flows` is all on one date, so the present value never crosses zero and `internal_rate_of_return` refuses it -- by its own contract, which says reaching that state is the caller's error. It is a raise out of the PURE CORE where every other statement about a round trip is a typed refusal, and a one-day horizon is a thing an owner can ask for. `_rate` states the same fact as a typed refusal one layer up (023 built it, measured by the declared convention rather than by comparing dates), and a cash balance reaches that refusal because it builds no contractual series; a bond raises here before reaching it. Recorded 2026-09-07, verified against a fixture bond. Pre-existing."
 
 [[feature]]
 id     = "024-real-terms-tuple"
