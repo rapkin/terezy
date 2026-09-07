@@ -31,7 +31,7 @@ test("a proxy that cannot reach the API names it, and says how to start it", asy
   const alert = page.locator("[data-api-error='not-answered']");
   await expect(alert).toBeVisible();
   await expect(alert).toContainText(START_COMMAND);
-  await expect(page.locator("[data-shape]")).toHaveCount(0);
+  await expect(page.locator("[data-answer]")).toHaveCount(0);
   await expect(page.locator("[data-awaiting]")).toHaveCount(0);
 });
 

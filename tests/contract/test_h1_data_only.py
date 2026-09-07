@@ -210,6 +210,7 @@ _VENUE = f"""
 [[venue]]
 id         = "{VENUE}"
 name       = "H1 FIXTURE desk, hryvnia only"
+kind       = "exchange"
 currencies = ["UAH"]
 """
 

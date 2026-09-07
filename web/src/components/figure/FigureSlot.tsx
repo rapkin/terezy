@@ -3,7 +3,7 @@ import type { Refusal as RefusalValue } from "@/api/shapes";
 import type { Mark as MarkValue } from "@/lib/provenance";
 import { assertNever } from "@/lib/exhaustive";
 import { Marks } from "./Mark";
-import { Refusal } from "./Refusal";
+import { Refusal, RefusalChrome } from "./Refusal";
 
 /**
  * FR-007: the three states any place a figure appears can be in.
@@ -14,7 +14,17 @@ import { Refusal } from "./Refusal";
 export type FigureState =
   | { readonly kind: "value"; readonly figure: ReactNode }
   | { readonly kind: "marked"; readonly figure: ReactNode; readonly marks: readonly MarkValue[] }
-  | { readonly kind: "refused"; readonly refusal: RefusalValue };
+  | { readonly kind: "refused"; readonly refusal: RefusalValue }
+  /**
+   * A refusal the **answer** carries in a figure's place, rather than one of the envelope's.
+   * `RefusalChrome` says why the two cannot be one union.
+   */
+  | {
+      readonly kind: "refused-in-answer";
+      readonly tag: string;
+      readonly reason: string;
+      readonly detail?: ReactNode;
+    };
 
 export function FigureSlot({ state }: { state: FigureState }) {
   switch (state.kind) {
@@ -29,6 +39,12 @@ export function FigureSlot({ state }: { state: FigureState }) {
       );
     case "refused":
       return <Refusal refusal={state.refusal} />;
+    case "refused-in-answer":
+      return (
+        <RefusalChrome tag={state.tag} reason={state.reason}>
+          {state.detail}
+        </RefusalChrome>
+      );
   }
   assertNever(state);
 }

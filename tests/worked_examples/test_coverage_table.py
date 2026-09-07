@@ -115,6 +115,7 @@ VENUES = {
     venue_id: Venue(
         id=venue_id,
         name=f"{venue_id} (SYNTHETIC FIXTURE)",
+        kind="bank",
         currencies=frozenset({currency}),
     )
     for venue_id, currency in (

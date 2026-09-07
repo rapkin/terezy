@@ -129,10 +129,10 @@ from terezy.core.results.objectives import (
 )
 from terezy.core.results.question import Question, Reserve
 from terezy.core.results.tuple import ContinuationAssumption, InstrumentPlan
-from terezy.core.routes import capacity, legs
+from terezy.core.routes import capacity, legs, venues
 from terezy.core.routes.channels import ChannelSide, FxChannel, Side, effective_rate
 from terezy.core.routes.legs import Leg, Route
-from terezy.core.routes.venues import Venue
+from terezy.core.routes.venues import Venue, VenueKind
 from terezy.core.scenarios.quotation import QuotationHolds
 from terezy.core.scenarios.quote_asset import QuoteAssetIsWorth
 from terezy.core.scenarios.regimes import Regime, RegimeTransition
@@ -1269,6 +1269,13 @@ one."""
 VENUE_TABLE: Final = "venue"
 """Root array of ``data/venues.toml``."""
 
+_VENUE_KINDS: Final[Mapping[str, VenueKind]] = {kind: kind for kind in venues.VENUE_KINDS}
+"""Declared venue kind to the core's closed set, built from the core's own tuple.
+
+Built rather than restated so the data layer cannot come to accept a kind the language has no
+hue for, or refuse one it has.
+"""
+
 CHANNEL_TABLE: Final = "channel"
 """Root array of a channel file."""
 
@@ -1525,6 +1532,15 @@ def venues_from_file(path: Path) -> tuple[Venue, ...]:
                 entry.name,
                 "a venue a reader cannot recognise by name is one they cannot check",
             ),
+            kind=_VENUE_KINDS[
+                _known(
+                    path,
+                    f"{VENUE_TABLE}[{entry.id}].kind",
+                    entry.kind,
+                    _VENUE_KINDS,
+                    "venue kind",
+                )
+            ],
             currencies=frozenset(
                 _currency(path, f"{VENUE_TABLE}[{entry.id}].currencies", code)
                 for code in _non_empty_list(

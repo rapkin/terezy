@@ -24,26 +24,31 @@
 [[venue]]
 id         = "monobank_uah"
 name       = "Monobank multi-currency card — the UAH salary rail (SYNTHETIC FIXTURE)"
+kind       = "bank"
 currencies = ["UAH", "USD"]
 
 [[venue]]
 id         = "binance"
 name       = "Binance account, including its UAH peer-to-peer book (SYNTHETIC FIXTURE)"
+kind       = "exchange"
 currencies = ["UAH", "USD"]
 
 [[venue]]
 id         = "coinbase"
 name       = "Coinbase account — one of the two places Deel can send the contract income (SYNTHETIC FIXTURE)"
+kind       = "exchange"
 currencies = ["USD"]
 
 [[venue]]
 id         = "ibkr_usd"
 name       = "Interactive Brokers, USD cash account (SYNTHETIC FIXTURE)"
+kind       = "broker"
 currencies = ["USD"]
 
 [[venue]]
 id         = "inzhur"
 name       = "Inzhur fund platform, hryvnia only (SYNTHETIC FIXTURE)"
+kind       = "platform"
 currencies = ["UAH"]
 
 # --- Added 2026-08-23, from the owner's description of his actual flow ---
@@ -51,6 +56,7 @@ currencies = ["UAH"]
 [[venue]]
 id         = "deel"
 name       = "Deel — where the contract income lands and where the owner first controls it"
+kind       = "payroll"
 currencies = ["USD"]
 # The first point of control in the whole chain: the Deel cabinet is where the owner
 # chooses what happens next, and that choice is exactly a declared route out of here.
@@ -59,6 +65,7 @@ currencies = ["USD"]
 [[venue]]
 id         = "fop"
 name       = "ФОП account — the sole-proprietor account, currency and hryvnia sides"
+kind       = "bank"
 currencies = ["USD", "UAH"]
 # Both currencies at one venue on purpose. Dollars arrive here and, under Ukrainian
 # currency rules, must be sold before they can be spent domestically -- so (fop, USD)
@@ -82,6 +89,7 @@ currencies = ["USD", "UAH"]
 [[venue]]
 id         = "payoneer"
 name       = "Payoneer — an international payment system, dollars only"
+kind       = "platform"
 currencies = ["USD"]
 # ДПС treats it as a «небанківська установа», which is the whole of why the treatment of
 # income credited here is disputed. The dispute is in the destinations table; this row only
@@ -90,6 +98,7 @@ currencies = ["USD"]
 [[venue]]
 id         = "foreign_bank_usd"
 name       = "A bank account outside Ukraine, dollars"
+kind       = "bank"
 currencies = ["USD"]
 # A category rather than a named bank, because the two ДПС documents that reach it are about
 # «рахунок, відкритий у іноземному банку» in general and name no institution. Declaring a

@@ -26,6 +26,52 @@
     --refuse-ink: light-dark(oklch(40% 0.15 25), oklch(88% 0.10 25));
     --refuse-surface: light-dark(oklch(96% 0.03 25), oklch(28% 0.06 25));
     --refuse-border: light-dark(oklch(75% 0.11 25), oklch(52% 0.11 25));
+
+    /* 026 FR-001: one hue per kind, at one lightness and one chroma, so no kind shouts louder
+       than another. The hue is written once per kind and both roles read it; the light/dark
+       pair follows `--warn-*` above rather than inventing a second convention. */
+    --hue-bond: 145;
+    --hue-fund: 200;
+    --hue-held-asset: 50;
+    --hue-income-stream: 280;
+    --hue-spendable-endpoint: 250;
+    --hue-bank: 250;
+    --hue-exchange: 60;
+    --hue-broker: 300;
+    --hue-platform: 170;
+    --hue-payroll: 340;
+
+    --kind-bond-ink: light-dark(oklch(40% 0.11 var(--hue-bond)), oklch(88% 0.10 var(--hue-bond)));
+    --kind-bond-tint: light-dark(oklch(94% 0.03 var(--hue-bond)), oklch(28% 0.05 var(--hue-bond)));
+    --kind-fund-ink: light-dark(oklch(40% 0.11 var(--hue-fund)), oklch(88% 0.10 var(--hue-fund)));
+    --kind-fund-tint: light-dark(oklch(94% 0.03 var(--hue-fund)), oklch(28% 0.05 var(--hue-fund)));
+    --kind-held-asset-ink: light-dark(oklch(40% 0.11 var(--hue-held-asset)), oklch(88% 0.10 var(--hue-held-asset)));
+    --kind-held-asset-tint: light-dark(oklch(94% 0.03 var(--hue-held-asset)), oklch(28% 0.05 var(--hue-held-asset)));
+    --kind-income-stream-ink: light-dark(oklch(40% 0.11 var(--hue-income-stream)), oklch(88% 0.10 var(--hue-income-stream)));
+    --kind-income-stream-tint: light-dark(oklch(94% 0.03 var(--hue-income-stream)), oklch(28% 0.05 var(--hue-income-stream)));
+    --kind-spendable-endpoint-ink: light-dark(oklch(40% 0.11 var(--hue-spendable-endpoint)), oklch(88% 0.10 var(--hue-spendable-endpoint)));
+    --kind-spendable-endpoint-tint: light-dark(oklch(94% 0.03 var(--hue-spendable-endpoint)), oklch(28% 0.05 var(--hue-spendable-endpoint)));
+    --kind-bank-ink: light-dark(oklch(40% 0.11 var(--hue-bank)), oklch(88% 0.10 var(--hue-bank)));
+    --kind-bank-tint: light-dark(oklch(94% 0.03 var(--hue-bank)), oklch(28% 0.05 var(--hue-bank)));
+    --kind-exchange-ink: light-dark(oklch(40% 0.11 var(--hue-exchange)), oklch(88% 0.10 var(--hue-exchange)));
+    --kind-exchange-tint: light-dark(oklch(94% 0.03 var(--hue-exchange)), oklch(28% 0.05 var(--hue-exchange)));
+    --kind-broker-ink: light-dark(oklch(40% 0.11 var(--hue-broker)), oklch(88% 0.10 var(--hue-broker)));
+    --kind-broker-tint: light-dark(oklch(94% 0.03 var(--hue-broker)), oklch(28% 0.05 var(--hue-broker)));
+    --kind-platform-ink: light-dark(oklch(40% 0.11 var(--hue-platform)), oklch(88% 0.10 var(--hue-platform)));
+    --kind-platform-tint: light-dark(oklch(94% 0.03 var(--hue-platform)), oklch(28% 0.05 var(--hue-platform)));
+    --kind-payroll-ink: light-dark(oklch(40% 0.11 var(--hue-payroll)), oklch(88% 0.10 var(--hue-payroll)));
+    --kind-payroll-tint: light-dark(oklch(94% 0.03 var(--hue-payroll)), oklch(28% 0.05 var(--hue-payroll)));
+
+    /* Cash is achromatic on purpose: it is the do-nothing baseline, and a colour would make it
+       look like a choice among the others (owner, 2026-09-06). */
+    --kind-cash-ink: light-dark(oklch(40% 0 0), oklch(88% 0 0));
+    --kind-cash-tint: light-dark(oklch(94% 0 0), oklch(28% 0 0));
+
+    /* FR-003's fourth badge tone. Hue 300 is also the broker kind's; this screen draws no venue,
+       and which of the two moves is the graph feature's to settle (spec FR-003). */
+    --assume-ink: light-dark(oklch(38% 0.12 300), oklch(88% 0.10 300));
+    --assume-surface: light-dark(oklch(96% 0.03 300), oklch(28% 0.06 300));
+    --assume-border: light-dark(oklch(75% 0.10 300), oklch(52% 0.10 300));
   }
 
   :root[data-theme="light"] {

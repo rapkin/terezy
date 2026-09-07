@@ -75,6 +75,7 @@ def _scratch_data_root(tmp_path: Path) -> Path:
 [[venue]]
 id         = "{NEW_VENUE}"
 name       = "A venue added purely as data (SYNTHETIC FIXTURE)"
+kind       = "bank"
 currencies = ["UAH", "USD"]
 ''',
         encoding="utf-8",

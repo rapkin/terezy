@@ -7,6 +7,7 @@
  * renders that statement instead of choosing a world.
  */
 import { queryOptions } from "@tanstack/react-query";
+import { INSTRUMENTS, QUESTIONS } from "@/answer/endpoints";
 import { API_PREFIX, request, type Answered } from "./client";
 
 const STABLE = { staleTime: 30_000, retry: false } as const;
@@ -53,6 +54,40 @@ export function observationsQuery(
         from: window.from,
         to: window.to,
       }),
+    ...STABLE,
+  });
+}
+
+/**
+ * The answer to one declared question (026 FR-008).
+ *
+ * `/api/registry` is deliberately **not** read on this page: it is 2.6 MB and nothing on the
+ * answer screen looks at a category index.
+ */
+export function answerQuery(questionId: string, asOf: string) {
+  return queryOptions<Answered>({
+    queryKey: ["answer", questionId, asOf],
+    queryFn: () => request(path(QUESTIONS, questionId, "answer"), { as_of: asOf }),
+    ...STABLE,
+  });
+}
+
+/** The declared question ids, so the screen reads which question it answers rather than naming one. */
+export function declaredQuestionsQuery(asOf: string) {
+  return categoryQuery(QUESTIONS, asOf);
+}
+
+/**
+ * One instrument read, for the kind its tile is drawn from (026 FR-006).
+ *
+ * The same shape as `recordQuery` and a separate key on purpose: the answer screen asks for one
+ * read per **distinct** member id, and sharing a key with the browser's record screen would make
+ * a page that opened one instrument look like a page that had read them all.
+ */
+export function instrumentQuery(instrumentId: string, asOf: string) {
+  return queryOptions<Answered>({
+    queryKey: ["instrument-kind", instrumentId, asOf],
+    queryFn: () => request(path(INSTRUMENTS, instrumentId), { as_of: asOf }),
     ...STABLE,
   });
 }

@@ -20,7 +20,7 @@ export function AppShell({
       <SkipLink />
       <header className="mb-4 space-y-2 border-b border-[var(--border)] pb-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h1 className="text-lg font-semibold">terezy — the declared data</h1>
+          <h1 className="text-lg font-semibold">terezy</h1>
           <ThemeToggle />
         </div>
         <nav aria-label="sections" className="flex flex-wrap gap-3 text-sm">

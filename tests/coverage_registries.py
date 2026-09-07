@@ -64,6 +64,7 @@ def venue(venue_id: str, *currencies: Currency) -> Venue:
     return Venue(
         id=venue_id,
         name=f"{venue_id} (SYNTHETIC FIXTURE)",
+        kind="bank",
         currencies=frozenset(currencies),
     )
 

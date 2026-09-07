@@ -118,7 +118,7 @@ def test_a_new_venue_with_no_routes_appears_as_named_no_inbound_deficits(tmp_pat
     venues_file.write_text(
         venues_file.read_text(encoding="utf-8")
         + '\n[[venue]]\nid         = "wise"\nname       = "Wise account (SYNTHETIC FIXTURE)"\n'
-        'currencies = ["UAH", "USD"]\n',
+        'kind       = "platform"\ncurrencies = ["UAH", "USD"]\n',
         encoding="utf-8",
     )
 
@@ -187,7 +187,7 @@ def test_adding_a_venue_to_the_spendable_list_flips_a_deficit_three_pair(
     venues_file.write_text(
         venues_file.read_text(encoding="utf-8")
         + '\n[[venue]]\nid         = "wise"\nname       = "Wise (SYNTHETIC FIXTURE)"\n'
-        'currencies = ["UAH"]\n',
+        'kind       = "platform"\ncurrencies = ["UAH"]\n',
         encoding="utf-8",
     )
     (root / "routes" / "monobank_to_wise.toml").write_text(
