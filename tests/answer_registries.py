@@ -83,6 +83,7 @@ def inputs(declared: resolver.AnswerDeclarations | None = None) -> AnswerInputs:
         bound=resolved.candidates.composition.bound,
         ceiling=resolved.candidates.ceiling,
         objectives=resolved.objective_sets[OBJECTIVE_SET],
+        held=resolved.held_inputs,
     )
 
 

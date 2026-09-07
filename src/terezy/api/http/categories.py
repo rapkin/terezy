@@ -23,6 +23,7 @@ from terezy.core.instruments.cash import CashDeclaration
 from terezy.core.instruments.fund import FundDeclaration
 from terezy.core.instruments.groups import InstrumentGroup
 from terezy.core.instruments.interface import InstrumentDeclaration
+from terezy.core.instruments.quotations import QuotationSeries
 from terezy.core.ledger.seeds import SeedLot
 from terezy.core.primitives.staleness import ObservationKind
 from terezy.core.results.candidates import CandidateCeiling
@@ -35,6 +36,7 @@ from terezy.core.routes.channels import FxChannel
 from terezy.core.routes.legs import Route
 from terezy.core.routes.venues import Venue
 from terezy.core.scenarios.quotation import QuotationHolds
+from terezy.core.scenarios.quote_asset import QuoteAssetIsWorth
 from terezy.core.streams.streams import IncomeStream
 from terezy.core.tax.interface import TaxClass
 from terezy.core.tax.official_rate import OfficialRateSeries
@@ -57,12 +59,6 @@ composes one itself.
 """
 
 EXEMPT_DIRECTORIES: Final[Mapping[str, str]] = {
-    "observations": (
-        "no loader exists anywhere in src/terezy/. These are a fetch script's raw retrievals, "
-        "read by a human promoting them into a declaration and by nothing at run time; serving "
-        "them would make the API the first consumer of data the engine deliberately does not "
-        "consume"
-    ),
     "instruments/nav": (
         "deliberately not globbed by the resolver, which states at its own glob that a "
         "subdirectory holds a different shape of file. Empty today, and a category for it would "
@@ -247,6 +243,26 @@ def _quotation_belief(ask: Ask) -> SingleRecord:
     )
 
 
+def _quote_asset_belief(ask: Ask) -> SingleRecord:
+    """The owner's belief about what a quote asset is worth, or nothing where none is declared.
+
+    Unlike the quotation belief, an absent one is an ordinary state: a registry declaring no
+    held asset needs none (025 FR-023).
+    """
+    declared = resolver.answer_from_data_root(
+        ask.root, base_currency=ask.base_currency, scenario_id=ask.scenario_id
+    )
+    return SingleRecord(record=declared.held_inputs.quote_asset, file=declared.quote_asset_file)
+
+
+def _quotations(ask: Ask) -> KeyedRecords:
+    """The fetched daily-close series, by the instrument id that reads each (025 FR-011)."""
+    declared = resolver.answer_from_data_root(
+        ask.root, base_currency=ask.base_currency, scenario_id=ask.scenario_id
+    )
+    return KeyedRecords(records=declared.held_inputs.quotations, files=declared.quotation_files)
+
+
 def _seeds_and_goals(ask: Ask) -> resolver.SeedAndGoalDeclarations:
     return resolver.seeds_and_goals_from_data_roots(
         resolver.data_roots_of(ask.root), base_currency=ask.base_currency
@@ -422,6 +438,13 @@ CATEGORIES: Final[tuple[Category, ...]] = (
     Category(
         "quotation-belief", "QUOTATION_DIR", True, Document(_quotation_belief, QuotationHolds)
     ),
+    Category(
+        "quote-asset-belief",
+        "QUOTE_ASSET_DIR",
+        True,
+        Document(_quote_asset_belief, QuoteAssetIsWorth),
+    ),
+    Category("quotations", "OBSERVATIONS_DIR", False, Keyed(_quotations, QuotationSeries)),
     Category("questions", "QUESTIONS_DIR", True, Keyed(_questions, Question)),
     Category("objectives", "OBJECTIVES_DIR", True, Keyed(_objective_sets, ObjectiveSet)),
     Category("calendars", "CALENDARS_DIR", False, Keyed(_calendars, WorkingDayCalendar)),

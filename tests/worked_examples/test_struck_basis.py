@@ -50,6 +50,7 @@ class          = "held_asset"
 quantity_unit  = "XBT"
 price_currency = "USD"
 venue_id       = "binance"
+symbol         = "SYNTHXUSDT"
 is_synthetic   = true
 groups         = []
 

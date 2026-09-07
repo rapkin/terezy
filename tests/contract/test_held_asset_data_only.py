@@ -41,6 +41,7 @@ class          = "{instrument_registry.HELD_ASSET}"
 quantity_unit  = "{quantity_unit}"
 price_currency = "{currency}"
 venue_id       = "{venue}"
+symbol         = "{asset_id.upper()}USDT"
 is_synthetic   = true
 groups         = ["{GROUP}"]
 

@@ -24,6 +24,7 @@ from datetime import date
 from typing import TYPE_CHECKING
 
 from terezy.core.decision import candidates as enumeration
+from terezy.core.decision import held as held_positions
 from terezy.core.decision.dominance import dominance
 from terezy.core.decision.tuple_outcome import Registries
 from terezy.core.primitives import money, staleness
@@ -57,6 +58,7 @@ from terezy.core.results.answer import (
     StatedExclusion,
     StreamWithNoAmount,
     SubjectCounts,
+    SubjectHeld,
     SubjectNotAssessed,
     SubjectReached,
     SubjectStanding,
@@ -107,6 +109,13 @@ class AnswerInputs:
     because the question names an **id** and resolving it is the data layer's, exactly as the
     ceiling and the bound are."""
 
+    held: held_positions.HeldInputs
+    """What the owner already holds, the prices fetched for it, and the beliefs behind both.
+
+    One record rather than four fields, so the module that strikes a rate is the one that names
+    it: 015 SC-004 reads this file's source and refuses the word.
+    """
+
 
 def answer(question: Question, inputs: AnswerInputs, as_of: date) -> Answer | Refused:
     """Answer one declared question over one registry, at one as-of date.
@@ -126,6 +135,14 @@ def answer(question: Question, inputs: AnswerInputs, as_of: date) -> Answer | Re
     if unused is not None:
         return unused
     plans = _expanded_plans(question, subjects)
+    positions = held_positions.positions(
+        declared=inputs.registries.held,
+        supplied=inputs.held,
+        tax_classes=inputs.registries.tax_classes,
+        base_currency=inputs.registries.base_currency,
+        as_of=as_of,
+    )
+    holds = frozenset(position.instrument_id for position in positions)
     sections: list[HorizonSection] = []
     for horizon in question.horizons:
         outcome = _section_outcome(
@@ -133,15 +150,30 @@ def answer(question: Question, inputs: AnswerInputs, as_of: date) -> Answer | Re
         )
         if isinstance(outcome, BenchmarkYieldsSeveralCandidates):
             return outcome
-        sections.append(_section(question, subjects, horizon, outcome, inputs.objectives))
+        sections.append(
+            _section(question, subjects, horizon, outcome, inputs.objectives, holds=holds)
+        )
     return Answer(
         question=question,
         as_of=as_of,
         subjects=subjects,
         sections=tuple(sections),
+        held=positions,
         excludes=_answer_wide_excludes(),
-        provenance=prov.merge_all(_reported_provenance(sections)),
-        staleness=staleness.merge_all(_reported_staleness(sections)),
+        provenance=prov.merge_all(
+            [*_reported_provenance(sections), *(item.provenance for item in positions)]
+        ),
+        staleness=staleness.merge_all(
+            [
+                *_reported_staleness(sections),
+                *(
+                    staleness.staleness_of_sources(
+                        item.provenance, inputs.registries.kinds, as_of=as_of
+                    )
+                    for item in positions
+                ),
+            ]
+        ),
     )
 
 
@@ -376,6 +408,8 @@ def _section(
     horizon: DateRange,
     outcome: SectionOutcome,
     objectives: ObjectiveSet,
+    *,
+    holds: frozenset[str],
 ) -> HorizonSection:
     """One section: the survey whole, plus what this feature withholds and what it verdicts.
 
@@ -396,7 +430,7 @@ def _section(
     return HorizonSection(
         horizon=horizon,
         outcome=outcome,
-        standings=_standings(subjects, outcome),
+        standings=_standings(subjects, outcome, holds),
         arrives_after_horizon=late,
         reserves=tuple(
             verdict
@@ -443,37 +477,52 @@ def _arrives_after_horizon(
 
 
 def _standings(
-    subjects: Sequence[ResolvedSubject], outcome: SectionOutcome
+    subjects: Sequence[ResolvedSubject],
+    outcome: SectionOutcome,
+    holds: frozenset[str],
 ) -> tuple[SubjectStanding, ...]:
-    """Where each named subject stands here, in one of the four states FR-010 distinguishes.
+    """Where each named subject stands here, in one of the five states FR-010 distinguishes.
 
     **A section that refused before enumerating knows nothing about any subject**, and saying
     *declared but unreached* there would name a remedy -- declare a corridor -- for a cause that
     is a ceiling or a bound. That is a guard whose message is false, one layer up.
+
+    **Held is decided before the enumeration is consulted**, and even before *not assessed*: a
+    holding is a fact about the owner rather than about this window, so a section that refused
+    to enumerate still knows he holds the thing. Naming a corridor, or a ceiling, as the remedy
+    for something he already owns is the false guard 025 FR-029 exists to prevent.
     """
     enumerated = _enumerated_of(outcome)
-    if enumerated is None:
-        return tuple(
-            SubjectUndeclared(named=subject.named)
-            if isinstance(subject, UndeclaredSubject)
-            else SubjectNotAssessed(named=subject.named, ids=subject.ids)
-            for subject in subjects
-        )
-    reached = frozenset(item.key.instrument_id for item in enumerated.candidates)
+    reached = (
+        frozenset()
+        if enumerated is None
+        else frozenset(item.key.instrument_id for item in enumerated.candidates)
+    )
     return tuple(
-        SubjectUndeclared(named=subject.named)
-        if isinstance(subject, UndeclaredSubject)
-        else (
-            SubjectReached(
-                named=subject.named,
-                ids=subject.ids,
-                with_candidates=tuple(name for name in subject.ids if name in reached),
-            )
-            if any(name in reached for name in subject.ids)
-            else SubjectUnreached(named=subject.named, ids=subject.ids)
-        )
+        _standing(subject, reached=reached, holds=holds, enumerated=enumerated is not None)
         for subject in subjects
     )
+
+
+def _standing(
+    subject: ResolvedSubject,
+    *,
+    reached: frozenset[str],
+    holds: frozenset[str],
+    enumerated: bool,
+) -> SubjectStanding:
+    """One subject's state, in the order a reader would ask the questions in."""
+    if isinstance(subject, UndeclaredSubject):
+        return SubjectUndeclared(named=subject.named)
+    held = tuple(name for name in subject.ids if name in holds)
+    if held:
+        return SubjectHeld(named=subject.named, ids=subject.ids, held=held)
+    if not enumerated:
+        return SubjectNotAssessed(named=subject.named, ids=subject.ids)
+    with_candidates = tuple(name for name in subject.ids if name in reached)
+    if with_candidates:
+        return SubjectReached(named=subject.named, ids=subject.ids, with_candidates=with_candidates)
+    return SubjectUnreached(named=subject.named, ids=subject.ids)
 
 
 def _enumerated_of(outcome: SectionOutcome) -> CandidateSet | None:
@@ -675,6 +724,7 @@ def subject_counts(answer_: Answer, section: HorizonSection) -> SubjectCounts:
         ),
         undeclared=sum(1 for item in section.standings if isinstance(item, SubjectUndeclared)),
         not_assessed=sum(1 for item in section.standings if isinstance(item, SubjectNotAssessed)),
+        held=sum(1 for item in section.standings if isinstance(item, SubjectHeld)),
         ids_considered=len(_considered_ids(answer_.subjects)),
     )
 

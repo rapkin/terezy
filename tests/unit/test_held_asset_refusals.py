@@ -31,6 +31,7 @@ class         = "{instrument_registry.HELD_ASSET}"
 quantity_unit = "XBT"
 price_currency = "USD"
 venue_id      = "binance"
+symbol        = "SYNTHXUSDT"
 is_synthetic  = true
 groups        = []
 

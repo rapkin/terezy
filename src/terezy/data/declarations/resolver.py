@@ -39,6 +39,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Final, Literal
 
+from terezy.core.decision.held import HeldInputs
 from terezy.core.decision.tuple_outcome import Registries
 from terezy.core.instruments import registry as instrument_registry
 from terezy.core.ledger.seeds import SeedLot
@@ -63,6 +64,7 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.instruments.groups import InstrumentGroup
     from terezy.core.instruments.held import HeldAssetDeclaration
     from terezy.core.instruments.interface import InstrumentDeclaration
+    from terezy.core.instruments.quotations import QuotationSeries
     from terezy.core.primitives.currency import Currency
     from terezy.core.primitives.staleness import ObservationKind
     from terezy.core.results.candidates import CandidateCeiling
@@ -75,6 +77,7 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.routes.legs import Leg, Route
     from terezy.core.routes.venues import Venue
     from terezy.core.scenarios.quotation import QuotationHolds
+    from terezy.core.scenarios.quote_asset import QuoteAssetIsWorth
     from terezy.core.scenarios.regimes import Regime
     from terezy.core.streams.streams import IncomeStream
     from terezy.core.tax import year as tax_year
@@ -3221,6 +3224,102 @@ as scenario documents, and ``glob`` does not recurse.
 """
 
 
+QUOTE_ASSET_DIR = "scenarios/quote_asset"
+"""Where the owner's belief about what a quote asset is worth lives (025 FR-023).
+
+A subdirectory of ``scenarios/``, on ``QUOTATION_DIR``'s reading: the directory's citation
+exemption is what a belief needs, and ``scenarios/*.toml`` is globbed non-recursively as
+scenario documents.
+"""
+
+OBSERVATIONS_DIR = "observations"
+"""Where a fetch script's dated retrievals live.
+
+Read at run time for the first time by this feature: a fund's NAV has a judgement in it between
+two readings of one number and is promoted into a declaration by a human, while a daily close
+has none -- the publisher emits one value per day, and promoting it by hand would be
+transcription, which is where a wrong number enters.
+"""
+
+
+def _resolved_quote_asset_belief(root: Path) -> tuple[QuoteAssetIsWorth, Path] | None:
+    """The one declared quote-asset belief under a data root, or ``None`` where none is.
+
+    An absent directory is **not** an error here, unlike the quotation belief's: a registry
+    declaring no held asset needs no belief about a quote asset, and demanding one would make
+    every existing root fail to load for a figure it never computes. The absence is reported by
+    the position that wanted a price, which is where it can name the asset.
+    """
+    declared = sorted((root / QUOTE_ASSET_DIR).glob("*.toml"))
+    if not declared:
+        return None
+    if len(declared) > 1:
+        raise DeclarationError(
+            root / QUOTE_ASSET_DIR,
+            "",
+            f"holds {len(declared)} quote-asset beliefs "
+            f"({', '.join(path.name for path in declared)}), and this engine resolves one. Two "
+            "beliefs cannot both be in force, and taking either would be choosing one by file "
+            "order.",
+            "keep one file per data root until multi-owner support lands",
+        )
+    _, belief = loader.quote_asset_belief_from_file(declared[0])
+    return belief, declared[0]
+
+
+def _resolved_quotations(
+    root: Path,
+    held: Mapping[str, HeldAssetDeclaration],
+    venues: Mapping[str, Venue],
+    kinds: Mapping[str, ObservationKind],
+) -> tuple[dict[str, QuotationSeries], dict[str, Path]]:
+    """The fetched close series each declared held asset has one of, keyed by instrument id.
+
+    **Matched by ``<venue>_<symbol>.toml``**, which is what the fetch script writes: the venue
+    is the one the asset declares and the symbol is the one it was fetched under. An asset with
+    no file yields no entry, which is ordinary -- the shipped tree carries none, because the
+    fetch writes the owner's own dated retrieval and until he runs it there is nothing to read.
+    """
+    series: dict[str, QuotationSeries] = {}
+    declaring: dict[str, Path] = {}
+    for instrument_id, asset in sorted(held.items()):
+        _check_held_venue(root, asset, venues)
+        path = root / OBSERVATIONS_DIR / f"{asset.venue_id}_{asset.symbol.casefold()}.toml"
+        if not path.is_file():
+            continue
+        declared = loader.quotation_series_from_file(path, venue_id=asset.venue_id)
+        if declared.symbol.casefold() != asset.symbol.casefold():
+            raise DeclarationError(
+                path,
+                "symbol",
+                f"records the symbol {declared.symbol!r}, and {instrument_id!r} declares "
+                f"{asset.symbol!r}. The file name is how a series is matched to the asset that "
+                "reads it, so the two disagreeing means a run would read one venue's series "
+                "under another symbol's name.",
+                "re-run the fetch script rather than renaming or editing the file",
+            )
+        for quotation in declared.quotations:
+            for source in sorted(quotation.provenance.sources, key=lambda ref: ref.id):
+                _check_kind(source.kind, kinds, path=path, field_path="observation[].kind")
+        series[instrument_id] = declared
+        declaring[instrument_id] = path
+    return series, declaring
+
+
+def _check_held_venue(root: Path, asset: HeldAssetDeclaration, venues: Mapping[str, Venue]) -> None:
+    """A holding sits somewhere declared, or the load fails naming the venue it invented."""
+    if asset.venue_id in venues:
+        return
+    raise DeclarationError(
+        root / INSTRUMENTS_DIR / f"{asset.id}.toml",
+        f"{loader.INSTRUMENT_TABLE}.venue_id",
+        f"names the venue {asset.venue_id!r}, which {VENUES_FILE} does not declare. Declared "
+        f"venues: {sorted(venues)}. A holding sitting at a venue nobody declared cannot be "
+        "reported anywhere a venue's currencies are checked.",
+        f"declare {asset.venue_id!r} in {VENUES_FILE}, or name one of {sorted(venues)}",
+    )
+
+
 def _resolved_quotation_belief(
     root: Path, streams: Mapping[str, IncomeStream]
 ) -> tuple[QuotationHolds, Path]:
@@ -3841,6 +3940,20 @@ class AnswerDeclarations:
     them and are not read here; they arrive because one file pair declares both.
     """
 
+    held_inputs: HeldInputs
+    """Everything a held position is built from, assembled here rather than by a caller.
+
+    The API layer receives it whole and passes it on: assembling it there would make
+    orchestration know which declarations a held position needs, and would put the name of the
+    rate it is struck at in a module 015 SC-004 scans for exactly that word.
+    """
+
+    quotation_files: Mapping[str, Path]
+    """Which file each fetched series came from, so the manifest can name it (025 FR-011)."""
+
+    quote_asset_file: Path | None
+    """Which file declared the quote-asset belief, or ``None`` where none did."""
+
 
 def check_question(
     question: Question,
@@ -3933,6 +4046,14 @@ def answer_from_data_root(
         root, base_currency=base_currency, scenario_id=scenario_id
     )
     objective_sets, objective_files = resolve_objective_sets(root, tuples.registries.streams)
+    quotations, quotation_files = _resolved_quotations(
+        root,
+        tuples.instruments.held,
+        tuples.coverage.ramp.venues,
+        tuples.registries.kinds,
+    )
+    belief = _resolved_quote_asset_belief(root)
+    holdings = seeds_and_goals_from_data_roots(data_roots_of(root), base_currency=base_currency)
     questions: dict[str, Question] = {}
     declaring: dict[str, Path] = {}
     for path in files:
@@ -3960,7 +4081,15 @@ def answer_from_data_root(
         question_files=declaring,
         objective_sets=objective_sets,
         objective_set_files=objective_files,
-        holdings=seeds_and_goals_from_data_roots(data_roots_of(root), base_currency=base_currency),
+        held_inputs=HeldInputs(
+            lots=holdings.seeds,
+            quotations=quotations,
+            official_rate=_base_currency_series(root, base_currency=base_currency),
+            quote_asset=None if belief is None else belief[0],
+        ),
+        quotation_files=quotation_files,
+        quote_asset_file=None if belief is None else belief[1],
+        holdings=holdings,
     )
 
 

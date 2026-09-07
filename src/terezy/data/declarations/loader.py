@@ -102,6 +102,7 @@ from terezy.core.instruments.interface import (
     PaymentKind,
     ScheduledPayment,
 )
+from terezy.core.instruments.quotations import Quotation, QuotationSeries
 from terezy.core.ledger import lots, seeds
 from terezy.core.ledger.seeds import Basis
 from terezy.core.primitives import conventions, periods
@@ -133,6 +134,7 @@ from terezy.core.routes.channels import ChannelSide, FxChannel, Side, effective_
 from terezy.core.routes.legs import Leg, Route
 from terezy.core.routes.venues import Venue
 from terezy.core.scenarios.quotation import QuotationHolds
+from terezy.core.scenarios.quote_asset import QuoteAssetIsWorth
 from terezy.core.scenarios.regimes import Regime, RegimeTransition
 from terezy.core.streams import streams
 from terezy.core.streams.streams import IncomeStream, Indexation
@@ -3242,6 +3244,13 @@ def held_asset_from_file(path: Path) -> HeldAssetDeclaration:
             table.venue_id,
             "where the units sit is checked against the declared venues (025 FR-009)",
         ),
+        symbol=_require_text(
+            path,
+            f"{prefix}.symbol",
+            table.symbol,
+            "the venue's own ticker is what the fetched price series is written under, and "
+            "deriving it from the id would make a second venue's ticker an engine edit",
+        ),
         is_synthetic=table.is_synthetic,
         tax_classes=_tax_class_references(
             path, table.tax_classes, field_prefix=f"{prefix}.tax_classes"
@@ -4071,6 +4080,139 @@ def inflation_assumption_from_file(path: Path) -> tuple[str, InflationAssumption
 
 QUOTATION_TABLE: Final = "quotation"
 """Root table of a quotation-belief file, and the prefix of every field path in one."""
+
+
+QUOTE_ASSET_TABLE: Final = "quote_asset"
+"""The root table of a quote-asset belief document."""
+
+QUOTATION_SERIES_OBSERVATION: Final = "observation"
+"""The repeated table of a fetched daily-close series."""
+
+
+def quote_asset_belief_from_file(path: Path) -> tuple[str, QuoteAssetIsWorth]:
+    """One ``data/scenarios/quote_asset/<owner>.toml`` as its owner id and the declared belief.
+
+    ``quotation_belief_from_file``'s shape, with **no citation read and none expected**: the
+    peg holds by the issuer's practice rather than by an obligation anybody published, so a
+    source here would replace the belief rather than vouch for it.
+    """
+    document = read_document(path)
+    table = _validate(schema.QuoteAssetBeliefFile, document, path).quote_asset
+    if not table.is_assumption:
+        raise DeclarationError(
+            path,
+            f"{QUOTE_ASSET_TABLE}.is_assumption",
+            "is declared false. What a dollar-referenced token is worth in dollars is nobody's "
+            "observation here: an issuer that committed to the peg would have published a "
+            "term, and a cited rate would be an observation under data/observations/ rather "
+            "than a belief. The field exists to make the assumption unmissable on every figure "
+            "it touches, not to be switched off -- the core types it as a Literal admitting "
+            "one value.",
+            "write is_assumption = true, or declare a cited rate as an observation",
+        )
+    return (
+        _require_text(
+            path,
+            f"{QUOTE_ASSET_TABLE}.owner_id",
+            table.owner_id,
+            "a belief is one person's, and every declaration carries its owner from the first "
+            "commit (Principle VII)",
+        ),
+        QuoteAssetIsWorth(
+            id=_require_text(
+                path,
+                f"{QUOTE_ASSET_TABLE}.id",
+                table.id,
+                "every figure struck through the belief names it, so a reader can find the "
+                "file the assumption is stated in",
+            ),
+            quote_asset=_require_text(
+                path,
+                f"{QUOTE_ASSET_TABLE}.quote_asset",
+                table.quote_asset,
+                "the belief is about one named token, and one that names none says nothing",
+            ),
+            currency=_currency(path, f"{QUOTE_ASSET_TABLE}.currency", table.currency).value,
+            is_assumption=True,
+            rationale=_require_text(
+                path,
+                f"{QUOTE_ASSET_TABLE}.rationale",
+                table.rationale,
+                "an assumption without a stated reason is indistinguishable from an oversight, "
+                "and a reader cannot weigh it",
+            ),
+        ),
+    )
+
+
+def quotation_series_from_file(path: Path, *, venue_id: str) -> QuotationSeries:
+    """One ``data/observations/<venue>_<symbol>.toml`` as a dated close series (025 FR-011).
+
+    **Strictly ascending, without duplicates**, checked here where the file can be named:
+    ``close_on`` finds a date by bisection, so an unsorted file would silently answer the wrong
+    day, and a duplicate would make which of two closes is used depend on the search.
+
+    **The close is left untagged**: ``Quotation.close`` is a bare number, because what the
+    symbol's quote asset is worth in a currency is the owner's declared belief and never this
+    file's business.
+    """
+    document = read_document(path)
+    file = _validate(schema.QuotationSeriesFile, document, path)
+    symbol = _require_text(
+        path,
+        "symbol",
+        file.symbol,
+        "a series with no symbol names nothing, and the symbol is what a declaration points at",
+    )
+    quotations: list[Quotation] = []
+    for position, entry in enumerate(file.observation):
+        prefix = f"{QUOTATION_SERIES_OBSERVATION}[{position}]"
+        on_date = _parse_date(path, f"{prefix}.on_date", entry.on_date)
+        if quotations and on_date <= quotations[-1].on_date:
+            raise DeclarationError(
+                path,
+                f"{prefix}.on_date",
+                f"declares {on_date.isoformat()} after "
+                f"{quotations[-1].on_date.isoformat()}, and the series is read as strictly "
+                "ascending: a price is found by bisection, so an out-of-order or repeated day "
+                "makes the search answer a day nobody asked about.",
+                "re-run the fetch script rather than editing the file by hand",
+            )
+        quotations.append(
+            Quotation(
+                on_date=on_date,
+                close=_positive(
+                    path,
+                    f"{prefix}.close",
+                    entry.close,
+                    "a published close is a strictly positive price; zero or below is a value "
+                    "that merely looks like money",
+                ),
+                provenance=prov.of(
+                    [
+                        _source_ref(
+                            path,
+                            prefix,
+                            source=entry.source,
+                            retrieved_on=entry.retrieved_on,
+                            verified_on=entry.verified_on,
+                            kind=entry.kind,
+                        )
+                    ]
+                ),
+            )
+        )
+    return QuotationSeries(
+        symbol=symbol,
+        venue_id=venue_id,
+        endpoint=_require_text(
+            path,
+            "endpoint",
+            file.endpoint,
+            "a fetched figure states where it came from, so a reader can go and look",
+        ),
+        quotations=tuple(quotations),
+    )
 
 
 def quotation_belief_from_file(path: Path) -> tuple[str, QuotationHolds]:

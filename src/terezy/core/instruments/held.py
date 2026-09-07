@@ -57,6 +57,11 @@ class HeldAssetDeclaration:
     """Where it sits, resolved against the declared venues. A reference, not an access entry:
     it says which venue holds the units, never what buying one there would cost."""
 
+    symbol: str
+    """What the venue quotes it under -- ``BTCUSDT``. **Declared, never derived from the id**:
+    an instrument id is the owner's word for a thing and a symbol is the venue's, and inferring
+    one from the other would make a second venue's different ticker an engine edit."""
+
     is_synthetic: bool
     """``True`` for a fixture whose declaration is invented. Required with no default, so a
     real asset cannot be mistaken for a fixture through omission."""

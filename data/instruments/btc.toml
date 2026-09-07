@@ -1,0 +1,62 @@
+# Bitcoin, held for its price alone. NOT a synthetic fixture: it is the asset itself.
+#
+# **This declaration says almost nothing, and that is the whole of it.** A bond declares a rate,
+# a maturity and a schedule; a fund declares a NAV, a spread and a distribution policy; a
+# bitcoin declares none of those, because it has none. What is left is an identity, the venue it
+# sits at, the ticker that venue quotes it under, and the currency that ticker's quote asset is
+# taken to be. It has no `data/access/` entry: that directory says what a unit costs to buy, and
+# the owner is not buying (025, out of scope).
+#
+# **NO PRICE IS DECLARED HERE, and stating one is refused by name.** The price is a dated
+# observation written by `scripts/fetch_binance.py` into `data/observations/binance_btcusdt.toml`
+# and read for the run's own `as_of`. One fact in two files is two facts the day either moves,
+# with nothing in the output to say which the figures used.
+#
+# **THE SHIPPED TREE CARRIES NO OBSERVATION FILE**, and that is deliberate rather than an
+# omission. A committed price is a price nobody re-fetched: it would go stale in git while
+# looking exactly like a current one. The owner runs the fetcher himself —
+#
+#     uv run python scripts/fetch_binance.py --symbol BTCUSDT
+#
+# — and until he does, this position reports its quantity and its cost and REFUSES its value by
+# name, naming the date it had no row for.
+#
+# **`symbol` is declared and never derived from the id.** An instrument id is the owner's word
+# for a thing and a ticker is the venue's; inferring one from the other would make a second
+# venue's different ticker an engine edit rather than a data change.
+#
+# **THE TAX CLASS IS DELIBERATELY UNDECLARED, and the load accepts it.** No jurisdiction pack
+# declares `ua_virtual_asset_disposal`, because nobody has entered a cited primary source for
+# how Ukraine taxes the disposal of a held virtual asset — the ПКУ, a ДПС роз'яснення, or the
+# virtual-assets law, entered as a declared class with its citation and `effective_from`. The
+# crypto row already in `data/tax/destinations/ua.toml` is about ФОП income credited to an
+# exchange, which is a different proposition entirely. Until the source is entered, every tax
+# figure for this position is the typed refusal naming this class, and it REACHES THE READER:
+# reporting zero would be the single most expensive silent default available in this domain,
+# because the exempt case is the desirable one (025 FR-014).
+#
+# **No citation keys, and their absence is the design.** There is no observed value in this
+# file — an id, a name, a unit, a currency, a venue and a ticker are references and statements,
+# the same reading `[instrument.tax_classes]` and `data/venues.toml` already carry. Every
+# observed number about this asset lives in `data/observations/`, cited and dated.
+
+[instrument]
+id             = "btc"
+name           = "Bitcoin"
+class          = "held_asset"
+quantity_unit  = "BTC"
+price_currency = "USD"
+venue_id       = "binance"
+symbol         = "BTCUSDT"
+is_synthetic   = false
+
+# A DECLARED label, never inferred (015 FR-007a). `btc` is the word the owner wrote in his own
+# question, and this is what makes it resolve to something.
+groups         = ["btc"]
+
+# The quote asset is USDT and USDT is not USD. `price_currency` above is what the owner's
+# declared belief in `data/scenarios/quote_asset/` says one USDT equals, and the belief is named
+# on every figure struck through it.
+
+[instrument.tax_classes]
+disposal_gain = "ua_virtual_asset_disposal"
