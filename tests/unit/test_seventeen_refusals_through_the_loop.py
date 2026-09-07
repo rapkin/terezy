@@ -34,10 +34,11 @@ from terezy.core.results.tuple import TupleRefused
 from terezy.core.routes import cost
 from terezy.core.routes.legs import Route
 from terezy.core.routes.path import (
+    ENTRY_BY_IDENTITY,
     EXIT_BY_IDENTITY,
     ExitChain,
+    entry_segments_of,
     exit_segments_of,
-    segments_of,
 )
 from terezy.core.tax.schedule import RateEntry
 from tests import candidate_registries as fixtures
@@ -307,7 +308,7 @@ def test_the_baseline_puts_one_pair_per_declared_instrument_in_the_third_column(
     registries = fixtures.declared()
     enumerated = fixtures.enumerated(registries)
     assert isinstance(enumerated, CandidateSet), enumerated
-    declared = len(registries.instruments) + len(registries.funds)
+    declared = len(registries.instruments) + len(registries.funds) + len(registries.cash)
     assert len(enumerated.no_candidate) == declared
     assert {pair.stream_id for pair in enumerated.no_candidate} == {"contract_usd"}
 
@@ -397,20 +398,30 @@ class TestTheThreeNoLoopCanReach:
         """
         currencies: set[str] = set()
         identity_exits = 0
+        identity_entries = 0
         for world in self._worlds():
             for key in self._keys(world):
-                _, arrives = cost.junctions_of(world.routes[segments_of(key.route_in)[-1]])
-                currencies.add(arrives[1])
+                way_in = entry_segments_of(key.route_in)
+                if not way_in:
+                    identity_entries += 1
+                else:
+                    _, arrives = cost.junctions_of(world.routes[way_in[-1]])
+                    currencies.add(arrives[1])
                 if key.route_out is EXIT_BY_IDENTITY:
                     identity_exits += 1
         assert len(currencies) > 1, currencies
         assert identity_exits > 0
+        assert identity_entries > 0
         assert len({len(self._keys(world)) for world in self._worlds()}) > 1
 
     def test_a_way_in_is_always_costed_from_the_stream_the_key_names(self) -> None:
         """``FundedFromAnotherStream`` compares exactly these two ids."""
         for world in self._worlds():
             for key in self._keys(world):
+                # An entry by identity names no stream, so it cannot name another one: the money
+                # that funds the purchase is the money that already arrived (023 FR-012).
+                if key.route_in is ENTRY_BY_IDENTITY:
+                    continue
                 assert key.route_in.stream_id == key.stream_id
 
     def test_both_seams_meet_as_junctions_and_not_merely_as_venues(self) -> None:
@@ -420,13 +431,19 @@ class TestTheThreeNoLoopCanReach:
             for key in self._keys(world):
                 access = world.access[key.instrument_id]
                 declared = (
-                    world.funds.get(key.instrument_id) or world.instruments[key.instrument_id]
+                    world.funds.get(key.instrument_id)
+                    or world.cash.get(key.instrument_id)
+                    or world.instruments[key.instrument_id]
                 )
                 purchase = (access.bought_at, currency_of(declared).value)
                 proceeds = (access.proceeds_to, currency_of(declared).value)
-                way_in = segments_of(key.route_in)
-                _, arrives = cost.junctions_of(world.routes[way_in[-1]])
-                assert arrives == purchase
+                way_in = entry_segments_of(key.route_in)
+                if not way_in:
+                    stream = world.streams[key.stream_id]
+                    assert (stream.arrives_at, stream.amount.currency.value) == purchase
+                else:
+                    _, arrives = cost.junctions_of(world.routes[way_in[-1]])
+                    assert arrives == purchase
                 way_out = key.route_out
                 if way_out is EXIT_BY_IDENTITY:
                     assert proceeds in cost.spendable_junctions(world.spendable)

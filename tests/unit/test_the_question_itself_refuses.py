@@ -102,7 +102,7 @@ def test_the_every_instrument_token_asks_about_the_whole_registry() -> None:
     """FR-007's third form, which the owner's own question deliberately does not use."""
     question = fixtures.owners_question()
     registries = fixtures.declarations().tuples.registries
-    declared = set(registries.instruments) | set(registries.funds)
+    declared = set(registries.instruments) | set(registries.funds) | set(registries.cash)
     result = fixtures.answered(
         replace(
             question,

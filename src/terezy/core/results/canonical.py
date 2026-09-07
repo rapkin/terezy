@@ -23,6 +23,7 @@ from __future__ import annotations
 
 from typing import assert_never
 
+from terezy.core.instruments.cash import CashAssumptions
 from terezy.core.instruments.interface import Assumptions
 from terezy.core.ledger import canonical as ledger_canonical
 from terezy.core.ledger.canonical import Canonical
@@ -69,7 +70,7 @@ from terezy.core.results.tuple import (
     Tuple,
     TupleOutcome,
 )
-from terezy.core.routes.path import ExitChain, candidate_id, exit_segments_of
+from terezy.core.routes.path import ExitChain, entry_id, exit_segments_of
 from terezy.core.tax.interface import TaxCharge
 
 
@@ -296,6 +297,10 @@ def of_plan(value: InstrumentPlan) -> tuple[Canonical, ...]:
                 None if point is None else ledger_canonical.of_number(point.rate),
                 None if rate is None else ledger_canonical.of_number(rate.uah_per_unit),
             )
+        case CashAssumptions():
+            # The record's name and nothing else: it carries no field, so there is nothing a
+            # second cash plan could differ in and no collision the five-term key must prevent.
+            return (type(value).__name__,)
         case _:
             assert_never(value)
 
@@ -306,13 +311,14 @@ def of_tuple_key(value: Tuple) -> tuple[Canonical, ...]:
     ``FROM_THE_DECLARATION`` renders under its **own** name. It is an instruction to read the
     inbound route's partner, not a way out, and rendering it as ``EXIT_BY_IDENTITY`` -- *the
     destination is already spendable* -- would put one member of the union under another's name
-    in the record a digest is taken over.
+    in the record a digest is taken over. ``ENTRY_BY_IDENTITY`` is the same rule on the way in:
+    joined route ids would render it as the empty string, which reads as a chain of nothing.
     """
     way_out = value.route_out
     return (
         value.instrument_id,
         value.stream_id,
-        candidate_id(value.route_in),
+        entry_id(value.route_in),
         exit_segments_of(way_out) if isinstance(way_out, ExitChain) else (way_out.value,),
         of_plan(value.exit_terms),
     )

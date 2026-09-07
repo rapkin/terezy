@@ -134,6 +134,7 @@ from terezy.core.routes.path import (
     ComposedExit,
     ComposedPath,
     DeclaredExit,
+    EntryByIdentity,
     ExitByIdentity,
     ExitChain,
     ExitChoice,
@@ -1450,6 +1451,51 @@ def _way_out(
         status=status,
         disruption_probability=walk.disruption,
     )
+
+
+def cost_entry(entry: EntryByIdentity, amount: Money, *, stream: IncomeStream) -> OneWayCost:
+    """*There is nothing to do* on the way in, costed: nothing charged, nothing converted.
+
+    :data:`~terezy.core.routes.path.ENTRY_BY_IDENTITY`'s figure, and the mirror of the branch
+    :func:`cost_exit` takes for the far end. It walks no leg, so every component is a
+    **recorded zero** rather than an omitted part and the arriving amount is the amount sent.
+
+    **``entry`` is the sentinel type and not the whole union, and that is the parameter's
+    whole job.** It is what makes this function unable to price a corridor: a
+    ``FundingPath`` or a ``ComposedPath`` names legs, and handing one to a function that
+    charges nothing would be a free journey with a declared-looking key. There is
+    correspondingly no ``FundingPath`` here to key the figure by -- inventing a route id for a
+    corridor nobody declared is the thing FR-008's key exists to make impossible, and
+    ``tests/contract/test_per_destination_cost_unrepresentable.py`` admits the absence on
+    exactly that argument.
+
+    That the money really is where the purchase happens is a claim about a **declaration** --
+    the stream's arrival venue against the instrument's buying venue -- and it is checked at
+    the join, which holds both (023 FR-013).
+
+    What is checked here is :func:`cost_one`'s own rule, and it has to be: the amount must be
+    in the currency the named stream delivers. Costing money the stream never delivered would
+    attribute a real figure to the wrong income, and on this branch there is no walk to raise
+    it -- the identity entry converts nothing, so a currency it silently accepted would be an
+    undeclared conversion charged at nothing.
+
+    A negative amount raises, on :func:`cost_one`'s reasoning.
+    """
+    if amount.currency is not stream.amount.currency:
+        raise ValueError(
+            f"an amount of {amount.amount!r} {amount.currency.value} cannot be funded from "
+            f"stream {stream.id!r}, which delivers {stream.amount.currency.value}: the stream "
+            "is part of what a cost *is* (FR-008). An entry by identity moves nothing and "
+            "converts nothing, so an amount in another currency is not a free conversion -- "
+            "it is a caller's error, and it raises rather than returning a cost."
+        )
+    if amount.amount < 0.0:
+        raise ValueError(
+            f"an amount of {amount.amount!r} {amount.currency.value} cannot be placed by "
+            f"{entry.value!r}: a negative movement is not this one in reverse, so it is an "
+            "arithmetic error in the caller rather than a fact about the money"
+        )
+    return _one_way(amount, _initial(amount))
 
 
 def cost_exit(

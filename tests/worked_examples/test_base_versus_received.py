@@ -214,6 +214,7 @@ class TestTheSaleUsesOnlyMachineryThatAlreadyExisted:
         """There is no second costing function to have used instead."""
         assert cost.cost_one.__module__ == "terezy.core.routes.cost"
         assert [name for name in dir(cost) if name.startswith("cost_")] == [
+            "cost_entry",
             "cost_exit",
             "cost_one",
         ]

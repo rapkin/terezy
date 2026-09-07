@@ -140,6 +140,7 @@ compared against one taken with a different algorithm by accident.
 InputKind = Literal[
     "access",
     "candidate_ceiling",
+    "cash_balance",
     "channel",
     "composition",
     "cpi_series",
@@ -177,6 +178,10 @@ version.
 ``"official_rate"`` is kept distinct from ``"cpi_series"`` although both are dated observation
 series: a tax base struck at an official rate is only reproducible if the manifest says which
 *legal* series struck it, and a manifest that called the two one thing could not.
+
+``"cash_balance"`` joined with feature 023, distinct from ``"instrument"`` on ``"fund"``'s
+argument: a third kind of file in one directory, and a run that read one is not a run that read
+a bond.
 
 Listed alphabetically because :func:`input_refs` sorts by ``(kind, id)``, so the order here is
 the order a manifest reads in.
@@ -460,7 +465,19 @@ def input_refs(declarations: Declarations) -> tuple[InputRef, ...]:
         )
         for identifier, declared in declarations.funds.items()
     ]
-    return tuple(sorted([*instruments, *tax_classes, *funds], key=lambda ref: (ref.kind, ref.id)))
+    cash = [
+        InputRef(
+            kind="cash_balance",
+            id=identifier,
+            file=file_name(declarations.cash_files[identifier]),
+            version=file_version(declarations.cash_files[identifier]),
+            unverified_sources=_unverified_ids(declared.rate_provenance),
+        )
+        for identifier, declared in declarations.cash.items()
+    ]
+    return tuple(
+        sorted([*instruments, *tax_classes, *funds, *cash], key=lambda ref: (ref.kind, ref.id))
+    )
 
 
 def _fund_provenance(declared: FundDeclaration) -> Provenance:

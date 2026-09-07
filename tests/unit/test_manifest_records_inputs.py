@@ -241,7 +241,9 @@ class TestEveryDeclarationAndVersionThatFedTheRun:
     def test_every_declaration_in_the_set_is_named(self) -> None:
         record = _manifest()
         declared = resolver.from_data_root(DATA_ROOT)
-        assert set(_declared_files()) == set(declared.instruments) | set(declared.funds)
+        assert set(_declared_files()) == (
+            set(declared.instruments) | set(declared.funds) | set(declared.cash)
+        )
         # FR-015 requires the record to say which price series and which declared belief were
         # in force: two runs differing only in the belief are two results, and nothing else in
         # the manifest tells them apart.
@@ -258,6 +260,7 @@ class TestEveryDeclarationAndVersionThatFedTheRun:
             ("tax_class", FIXTURE_ENUMERATED_DISPOSAL_CLASS),
             *(("instrument", name) for name in declared.instruments),
             *(("fund", name) for name in declared.funds),
+            *(("cash_balance", name) for name in declared.cash),
         }
 
     def test_the_second_issue_is_named_although_this_run_did_not_project_it(self) -> None:

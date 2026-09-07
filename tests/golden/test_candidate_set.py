@@ -31,7 +31,7 @@ from __future__ import annotations
 import hashlib
 import os
 from pathlib import Path
-from typing import Final, assert_never
+from typing import Final
 
 import pytest
 
@@ -42,10 +42,13 @@ from terezy.core.results.candidates import (
     CandidateSurvey,
     NoCandidateReason,
     NothingConnects,
-    NothingNeedsToConnect,
 )
 from terezy.core.results.tuple import Comparison
-from terezy.core.routes.path import ExitChain, candidate_id, exit_segments_of
+from terezy.core.routes.path import (
+    ExitChain,
+    entry_id,
+    exit_segments_of,
+)
 from tests import candidate_registries as fixtures
 from tests import data_roots
 
@@ -123,7 +126,7 @@ def _render(result: CandidateSurvey) -> str:
     lines += ["", "[candidates]  instrument | stream | way in | way out | plan"]
     lines += [
         f"{candidate.key.instrument_id} | {candidate.key.stream_id} | "
-        f"{candidate_id(candidate.key.route_in)} | {_way_out(candidate)} | "
+        f"{entry_id(candidate.key.route_in)} | {_way_out(candidate)} | "
         f"{candidate.plan_position}"
         for candidate in enumerated.candidates
     ]
@@ -157,15 +160,11 @@ def _render(result: CandidateSurvey) -> str:
 
 
 def _why(reason: NoCandidateReason) -> str:
-    """The typed reason as one rendered word, matched exhaustively so a third member shows up
+    """The typed reason as one rendered word, matched exhaustively so a second member shows up
     here as a type error rather than as a blank cell."""
     match reason:
         case NothingConnects():
             return f"nothing connects ({reason.side})"
-        case NothingNeedsToConnect():
-            return "nothing needs to connect"
-        case _:  # pragma: no cover -- mypy proves this unreachable
-            assert_never(reason)
 
 
 def _digest(result: CandidateSurvey) -> str:
@@ -178,7 +177,7 @@ def _digest(result: CandidateSurvey) -> str:
     for candidate in result.enumerated.candidates:
         shape.append(
             f"{candidate.key.instrument_id}|{candidate.key.stream_id}|"
-            f"{candidate_id(candidate.key.route_in)}|{_way_out(candidate)}|"
+            f"{entry_id(candidate.key.route_in)}|{_way_out(candidate)}|"
             f"{candidate.plan_position}"
         )
     for outcome in sorted(evaluated(result.comparison), key=lambda item: item.key.instrument_id):
@@ -231,7 +230,7 @@ class TestTheArtefactCannotBeGreenAndWrong:
         declared = [
             instrument_id
             for instrument_id in registries.access
-            if instrument_id in registries.instruments or instrument_id in registries.funds
+            if instrument_id in {*registries.instruments, *registries.funds, *registries.cash}
         ]
         result = _surveyed()
         assert result.enumerated.pairs_considered == len(declared) * len(registries.streams)

@@ -35,6 +35,7 @@ from datetime import date
 from enum import Enum
 from typing import Final, Literal
 
+from terezy.core.instruments.cash import CashAssumptions
 from terezy.core.instruments.interface import Assumptions, DateRange
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance
@@ -44,23 +45,24 @@ from terezy.core.results.fund import FundAssumptions
 from terezy.core.results.hurdle import RealTerms
 from terezy.core.results.ramp import ExitCostUnknown, RouteUnusable
 from terezy.core.routes.legs import RouteStatus
-from terezy.core.routes.path import Candidate, ExitChoice
+from terezy.core.routes.path import Candidate, EntryPath, ExitChoice
 from terezy.core.scenarios.early_exit import SoldEarly
 from terezy.core.scenarios.quotation import QuotationHolds
 
-InstrumentPlan = Assumptions | FundAssumptions
+InstrumentPlan = Assumptions | FundAssumptions | CashAssumptions
 """How the holding is run, and therefore **which declared way out this tuple takes**.
 
 Matched with ``match``, never distinguished by a flag, and deliberately not a new record
-wrapping the two: they are already the two per-kind assumption records, each required in full
-with no default anywhere in the stack, and a wrapper would be a third place for a run's
-choices to live.
+wrapping them: they are already the per-kind assumption records, each required in full with no
+default anywhere in the stack, and a wrapper would be a further place for a run's choices to
+live.
 
-The fund half carries the term that makes this the tuple's *exit terms* and not merely its
+The fund member carries the term that makes this the tuple's *exit terms* and not merely its
 run settings: ``FundAssumptions.exit_on`` and ``liquidity_mode`` choose between the fund's
 declared ways out -- a requested buyback at a discount settled in so many business days, or
 the termination payout -- each with its own terms (spec.md, Key Entities). A bond has one
-declared way out, redemption at maturity, so ``Assumptions`` names none.
+declared way out, redemption at maturity, so ``Assumptions`` names none; a balance has one and
+nothing to choose about it, so ``CashAssumptions`` carries no field at all.
 """
 
 
@@ -84,8 +86,9 @@ class Tuple:
     stream_id: str
     """Which declared income stream funds it. The term that carries §4.3.1's finding."""
 
-    route_in: Candidate
-    """The way in: one declared route, or a chain of them composed at query time."""
+    route_in: EntryPath
+    """The way in: one declared route, a chain of them composed at query time, or
+    :data:`~terezy.core.routes.path.ENTRY_BY_IDENTITY` where there is nothing to do."""
 
     exit_terms: InstrumentPlan
     """Which declared way out of the *instrument* this tuple takes, and how the holding is
@@ -755,7 +758,7 @@ class BelowMinimumTicket:
     """
 
     instrument_id: str
-    path: Candidate
+    path: EntryPath
     """Which way in delivered :attr:`actual`, and from which stream (FR-008).
 
     Carried because the figure it refuses is a *post-ramp* amount: "1 000 short of the minimum"
@@ -786,7 +789,7 @@ class BuysNoWholeUnit:
     """
 
     instrument_id: str
-    path: Candidate
+    path: EntryPath
     """Which way in delivered :attr:`actual`, and from which stream. See
     :attr:`BelowMinimumTicket.path`."""
 

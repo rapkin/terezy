@@ -1447,6 +1447,62 @@ class FundFile(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# 023-cash-instrument: a balance held at a venue
+# ---------------------------------------------------------------------------
+#
+# The smallest instrument declaration in the project, and its smallness is the design. Every
+# field a bond or a fund states about what the paper *does* is absent because a balance does
+# none of it: no face value, no maturity, no periodicity, no NAV, no spread, no liquidity
+# terms, no constraints table and no tax classes. What is left is an identity and one observed
+# value.
+#
+# `rate_pct` is REQUIRED and has no default. `= 0.0` would make a forgotten line read as a
+# stated zero, which is exactly the substitution `extra="forbid"` and the absent defaults exist
+# together to prevent -- and here the forgotten line would be the whole content of the file.
+
+
+class CashBalanceTable(BaseModel):
+    """``[instrument.balance]`` -- what the balance pays, and where that was read."""
+
+    model_config = STRICT
+
+    rate_pct: float
+    """Annual rate as a **percentage**, on ``BondTermsTable.coupon_rate_pct``'s naming rule.
+    The loader refuses anything but exactly zero."""
+
+    kind: str
+    source: str
+    retrieved_on: str
+    verified_on: str
+
+
+class CashTable(BaseModel):
+    """``[instrument]`` for a cash balance."""
+
+    model_config = STRICT
+
+    id: str
+    name: str
+    instrument_class: str = Field(alias="class")
+    """``cash_balance``. Aliased for the same reason a bond's is."""
+
+    currency: str
+    is_synthetic: bool
+    balance: CashBalanceTable
+    groups: list[str]
+    """``[instrument] groups`` -- ``InstrumentTable.groups``' key, on a balance, for its
+    reason."""
+
+
+class CashFile(BaseModel):
+    """A whole cash declaration document: exactly one balance."""
+
+    model_config = STRICT
+
+    instrument: CashTable
+
+
+# ---------------------------------------------------------------------------
 # 025-btc-holdings: an asset held for its price alone
 # ---------------------------------------------------------------------------
 
@@ -1587,13 +1643,17 @@ class QuestionPlanTable(BaseModel):
     label reaches, which is what stops the file growing an entry per issue when 016 lands."""
 
     kind: str
-    """``bond`` or ``fund``. Declared rather than inferred from which fields are present, so a
-    typo is refused instead of quietly selecting the other kind's plan."""
+    """Which declaration kind this plan is for, from ``loader.PLAN_KINDS``. Declared rather
+    than inferred from which fields are present, so a typo is refused instead of quietly
+    selecting another kind's plan."""
 
-    consumption_method: str
+    consumption_method: str | None = None
+    """Bond and fund plans only, and **required** on each: which lots a disposal consumes has
+    no default anywhere in the stack. A cash plan declaring one is refused -- one purchase
+    opens one lot and one release closes it, so there is no choice between lots to make."""
 
     coupon_policy: str | None = None
-    """Bond plans only. A fund declaring one is refused."""
+    """Bond plans only. A fund or a balance declaring one is refused."""
 
     liquidity_mode: str | None = None
     buyback: str | None = None

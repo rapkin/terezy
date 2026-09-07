@@ -150,23 +150,30 @@ COLLECTIVE_INVESTMENT_FUND: Final = "collective_investment_fund"
 """A collective-investment fund: `core.instruments.fund`, projected by
 `core.results.fund.project_fund`."""
 
+CASH_BALANCE: Final = "cash_balance"
+"""A balance held at a venue, in one currency, paying a declared zero:
+`core.instruments.cash`, projected by `core.results.cash.project_cash`.
+
+Out of :data:`REGISTRY` on the argument the section above makes for a fund, and the plainest
+instance of it: a balance produces no event stream at all.
+"""
+
 HELD_ASSET: Final = "held_asset"
 """An asset held for its price alone: `core.instruments.held`.
 
-**Out of :data:`REGISTRY` for a stronger reason than the fund's**, and it is the same ruling.
-The fund is absent because its inputs, its failures and the arity of its answer differ from
-`InstrumentOps`'; a held asset is absent because it projects **no event stream at all**. There
-is no schedule to compute, so there is no part of the interface it could satisfy and nothing to
-put in a second record. No fifth plugin interface is added and none is needed.
+Out of :data:`REGISTRY` for the reason a balance is, and one step further: a balance at least
+has a currency and a declared zero rate, while a held asset declares no rate, no schedule and
+no price -- the price is a dated observation. There is no part of `InstrumentOps` it could
+satisfy, so no fifth plugin interface is added and none is needed.
 """
 
 DECLARATION_KINDS: Final[frozenset[str]] = frozenset(
-    {FIXED_INCOME, ENUMERATED_SCHEDULE, COLLECTIVE_INVESTMENT_FUND, HELD_ASSET}
+    {FIXED_INCOME, ENUMERATED_SCHEDULE, COLLECTIVE_INVESTMENT_FUND, CASH_BALANCE, HELD_ASSET}
 )
 """Every ``[instrument] class`` a declaration file may name, instrument or otherwise.
 
 The vocabulary lives in `core` because it is domain knowledge; which *loader* parses each
 one is the data layer's business and lives beside the loaders. Reading the set from here
 is what lets `data.declarations.resolver` dispatch on a declared name rather than on an
-``if`` naming one class -- a branch that would have to be edited for a third kind.
+``if`` naming one class -- a branch that would have to be edited for every new kind.
 """

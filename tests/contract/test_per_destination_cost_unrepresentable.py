@@ -323,6 +323,23 @@ def _selects_rather_than_produces(target: Any) -> bool:
     )
 
 
+def _prices_a_journey_that_does_not_happen(target: Any) -> bool:
+    """Whether a callable costs a way in that walks no leg at all (023 FR-014).
+
+    ``cost_entry(ENTRY_BY_IDENTITY, amount)`` charges nothing because the money is already at
+    the venue that sells the thing. There is no route for a ``FundingPath`` to name, and
+    inventing one would put a declared-looking id on a corridor nobody declared -- which is the
+    figure FR-008's key exists to make impossible, arrived at from the other side.
+
+    Narrower than the way-out admission above rather than looser. :func:`_names_a_way_out`
+    admits three terms because a way out **is** walked, from somewhere, for somebody's income;
+    this admits none because nothing is walked at all, and the parameter's *type* is what says
+    so. A function taking a route, a channel or a chain does not qualify, whatever it returns.
+    """
+    parameters = inspect.signature(target).parameters
+    return any("EntryByIdentity" in str(item.annotation) for item in parameters.values())
+
+
 def test_no_record_carrying_a_cost_figure_is_keyed_by_a_destination_alone() -> None:
     """The record half of the same rule. A declaration may name a venue; a price may not.
 
@@ -361,7 +378,11 @@ def test_every_cost_returning_function_takes_the_whole_triple() -> None:
         annotation = str(inspect.signature(target).return_annotation)
         if not any(cost in annotation for cost in COST_RETURNS):
             continue
-        if _takes_the_triple(target) or _selects_rather_than_produces(target):
+        if (
+            _takes_the_triple(target)
+            or _selects_rather_than_produces(target)
+            or _prices_a_journey_that_does_not_happen(target)
+        ):
             continue
         offenders.append(name)
     assert not offenders, (

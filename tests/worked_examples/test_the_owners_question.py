@@ -52,6 +52,7 @@ from tests import answer_registries as fixtures
 pytestmark = pytest.mark.worked_example
 
 HORIZONS = 3
+CASH = "cash"
 EXIT_LATENCY_DAYS = 3
 """What `inzhur_to_monobank` declares. Waiting is inside the span (010 FR-015), so a
 candidate sold at the window's end has its money home this many days after it."""
@@ -59,7 +60,8 @@ candidate sold at the window's end has its money home this many days after it.""
 FINAL_PAYMENT = date(2027, 8, 25)
 """When the benchmark's own terms end: its last coupon and its principal, on one date."""
 NAMED = 4
-UNDECLARED_WORDS = ("cash", "btc")
+UNDECLARED_WORDS = ("btc",)
+DECLARED_WORDS = (CASH, "ovdp", "inzhur")
 
 
 def _answer() -> Answer:
@@ -72,28 +74,28 @@ def _labels() -> dict[str, tuple[str, ...]]:
 
 
 def _expected_ids() -> frozenset[str]:
-    """What ``ovdp`` and ``inzhur`` reach, derived from the labels rather than written out."""
-    wanted = {fixtures.OVDP, fixtures.INZHUR}
+    """What his three declared words reach, derived from the labels rather than written out."""
+    wanted = set(DECLARED_WORDS)
     return frozenset(name for name, groups in _labels().items() if wanted & set(groups))
 
 
-def test_the_question_names_four_subjects_and_two_of_them_are_declared_by_nothing() -> None:
-    """SC-002. ``cash`` and ``btc`` reach the answer by the words he wrote."""
+def test_the_question_names_four_subjects_and_one_of_them_is_declared_by_nothing() -> None:
+    """SC-002. ``btc`` reaches the answer by the word he wrote, and nothing declares it."""
     result = _answer()
     assert len(result.subjects) == NAMED
     assert tuple(item.named for item in undeclared(result)) == UNDECLARED_WORDS
 
 
-def test_the_two_declared_words_resolve_to_the_ids_their_labels_carry() -> None:
+def test_the_three_declared_words_resolve_to_the_ids_their_labels_carry() -> None:
     """Derived from the registry, which is what keeps it true after 016 adds 24 issues."""
     result = _answer()
     groups = {item.named: item.ids for item in result.subjects if isinstance(item, DeclaredSubject)}
-    assert set(groups) == {fixtures.OVDP, fixtures.INZHUR}
+    assert set(groups) == set(DECLARED_WORDS)
     assert frozenset().union(*groups.values()) == _expected_ids()
     assert all(item.is_group for item in result.subjects if isinstance(item, DeclaredSubject))
 
 
-def test_his_two_words_reach_exactly_what_their_labels_carry() -> None:
+def test_his_declared_words_reach_exactly_what_their_labels_carry() -> None:
     """Which today is everything that ships, and that is a fact about the registry.
 
     It is not the group rule going slack: an instrument in neither group is reached by neither
@@ -101,7 +103,7 @@ def test_his_two_words_reach_exactly_what_their_labels_carry() -> None:
     shipped registry simply has nothing outside the two families he asked about.
     """
     registries = fixtures.declarations(fixtures.SHIPPED_ROOT).tuples.registries
-    declared = set(registries.instruments) | set(registries.funds)
+    declared = set(registries.instruments) | set(registries.funds) | set(registries.cash)
     assert set(considered_ids(_answer())) == _expected_ids()
     assert _expected_ids() == declared
 
@@ -126,14 +128,19 @@ this is where the population that dropped is reported rather than inferred from 
 list."""
 
 
-def test_every_horizon_ranks_the_bonds_it_can_price_and_only_those() -> None:
-    """SC-001's second half. The ranked population is the ОВДП group, derived from the labels,
-    less the three the quotation cannot be carried for."""
+def test_every_horizon_ranks_the_bonds_it_can_price_and_the_baseline_beside_them() -> None:
+    """SC-001's second half, and 023 SC-003. The ranked population is the ОВДП group, derived
+    from the labels, less the three the quotation cannot be carried for -- **and** the balance
+    he named first, which Principle I requires to be scored and shown in the same list rather
+    than described beside it.
+    """
     bonds = frozenset(name for name, groups in _labels().items() if fixtures.OVDP in groups)
+    balances = frozenset(name for name, groups in _labels().items() if CASH in groups)
     assert bonds > NEWLY_PLACED
+    assert balances
     for section in _answer().sections:
         ranked = {item.key.instrument_id for item in section_ranking(section)}
-        assert ranked == bonds - NEWLY_PLACED
+        assert ranked == (bonds - NEWLY_PLACED) | balances
 
 
 def test_the_benchmark_spans_each_window_within_the_exit_latency() -> None:
@@ -244,11 +251,11 @@ def test_the_one_fund_that_evaluates_is_withheld_because_its_money_arrives_in_20
 
 
 def test_every_section_says_how_many_named_subjects_it_reached() -> None:
-    """SC-002's second half. Two of four, and the other two need a declaration."""
+    """SC-002's second half, and SC-003. Three of four; the fourth needs a declaration."""
     result = _answer()
     for section in result.sections:
         counts = subject_counts(result, section)
-        assert (counts.reached, counts.declared_but_unreached, counts.undeclared) == (2, 0, 2)
+        assert (counts.reached, counts.declared_but_unreached, counts.undeclared) == (3, 0, 1)
         assert counts.reached + counts.declared_but_unreached + counts.undeclared == NAMED
         assert counts.ids_considered == len(_expected_ids())
         assert counts.ids_considered != NAMED, "the two counts must not be able to coincide"
