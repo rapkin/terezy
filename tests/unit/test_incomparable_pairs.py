@@ -55,6 +55,28 @@ def test_a_candidate_with_no_arrivals_is_incomparable_against_every_other() -> N
         assert pair.why.what == "TupleOutcome.arrivals"
 
 
+def test_a_candidate_whose_remainder_never_came_home_reads_no_date_either() -> None:
+    """*All money back on* is a claim about all of it, so a stranded remainder unreads it.
+
+    The same criterion, a different field, and it has to be a different one: a reader shown a
+    date is being told every hryvnia is back, and part of this candidate's outlay is at the
+    broker with no declared way home. The rate is already a refusal for the same reason.
+    """
+    planted = sections.with_a_stranded_remainder(sections.section(), MISSING)
+    result = sections.result(planted)
+    involving = [
+        pair
+        for pair in result.incomparable
+        if MISSING in (pair.left.instrument_id, pair.right.instrument_id)
+    ]
+    assert involving
+    for pair in involving:
+        assert pair.criterion is Criterion.ALL_MONEY_BACK_ON
+        assert isinstance(pair.why, FigureMissing)
+        assert pair.why.what == "TupleOutcome.undeployed.journey"
+    assert MISSING not in {key.instrument_id for key in result.non_dominated}
+
+
 def test_a_candidate_every_pair_of_which_is_incomparable_is_not_placed() -> None:
     """SC-013's second half, and it is in neither of the other two populations."""
     planted = sections.with_no_arrivals(sections.section(), MISSING)

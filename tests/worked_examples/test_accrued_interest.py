@@ -35,7 +35,7 @@ that is 548.71, which is the gain the whole answer reports.
 from __future__ import annotations
 
 import functools
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 
@@ -44,7 +44,7 @@ from terezy.core.errors import InconsistentTerms
 from terezy.core.instruments import accrual, registry
 from terezy.core.instruments.interface import EnumeratedTerms, PaymentKind
 from terezy.core.primitives.tolerance import TOLERANCE
-from terezy.core.results.tuple import TupleOutcome
+from terezy.core.results.tuple import RemainderCameHome, TupleOutcome
 from tests import answer_registries as answers
 
 pytestmark = pytest.mark.worked_example
@@ -79,6 +79,9 @@ declared minimum increment allows."""
 
 DAYS_HELD = 29
 """2026-09-02 to 2026-10-01."""
+
+EXIT_LATENCY_DAYS = 3
+"""What `inzhur_to_monobank` declares, and it applies to the remainder like anything else."""
 
 
 @functools.cache
@@ -194,12 +197,16 @@ def _sold_early(horizon_index: int) -> list[TupleOutcome]:
 
 
 def test_the_whole_answer_over_the_owners_month() -> None:
-    """45 units, 49 209.66 deployed, 3 847.50 collected, 45 910.87 sold, 49 758.37 reached.
+    """45 units, 49 209.66 deployed, 3 847.50 collected, 45 910.87 sold, 50 548.71 reached.
 
-    ``reaches`` is what came home and excludes the 790.34 that never deployed, so the gain is
-    ``reaches - deployed``: 548.71 on 49 209.66, **+1.1151% over 29 days held**. Annualised
-    simple (x365/29) that is 14.03%; the engine's own ``implied_rate`` is an IRR over the whole
-    span from the horizon's start and is a different figure, measured by the golden.
+    The 790.34 the purchase could not deploy leaves `inzhur` on 2026-09-02 and is home on
+    2026-09-05 -- `inzhur_to_monobank`'s three declared days, charging nothing -- so it is in
+    ``reaches`` too (owner decision, 2026-09-06). The gain is then ``reaches - outlay`` with no
+    intermediate figure at all: 50 548.71 - 50 000.00 = **548.71**, which is the per-unit
+    identity in this module's docstring on all 45 units. On the 49 209.66 actually at work that
+    is +1.1151% over 29 days held; annualised simple (x365/29), 14.03%. The engine's own
+    ``implied_rate`` is an IRR over the whole span from the horizon's start and is a different
+    figure, measured by the golden.
     """
     outcome = _worked(0)
     assert outcome.sold_early is not None
@@ -213,12 +220,20 @@ def test_the_whole_answer_over_the_owners_month() -> None:
     assert outcome.undeployed is not None
     deployed = outcome.outlay.amount - outcome.undeployed.amount.amount
     assert deployed == pytest.approx(UNITS * PURCHASE_PRICE, abs=TOLERANCE)
+    remainder = outcome.undeployed.journey
+    assert isinstance(remainder, RemainderCameHome), remainder
+    assert remainder.left_on == PURCHASED_ON
+    assert remainder.arrived_on == PURCHASED_ON + timedelta(days=EXIT_LATENCY_DAYS)
+    assert remainder.reached.amount == pytest.approx(
+        outcome.outlay.amount - deployed, abs=TOLERANCE
+    )
     assert outcome.reaches.amount == pytest.approx(
-        UNITS * SALE_PRICE + UNITS * COUPON, abs=TOLERANCE
+        UNITS * SALE_PRICE + UNITS * COUPON + remainder.reached.amount, abs=TOLERANCE
     )
     # The gain, and the identity it reduces to: 29 days of the issue's own accrual, less the
-    # round-trip spread, on every one of the 45 units.
-    assert outcome.reaches.amount - deployed == pytest.approx(
+    # round-trip spread, on every one of the 45 units. Measured against the **outlay**, because
+    # the change from the purchase came home too.
+    assert outcome.reaches.amount - outcome.outlay.amount == pytest.approx(
         UNITS * (COUPON * DAYS_HELD / PERIOD_DAYS - SPREAD), abs=TOLERANCE
     )
 

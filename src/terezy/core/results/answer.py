@@ -33,7 +33,7 @@ from terezy.core.primitives.staleness import StalenessVerdict
 from terezy.core.results.candidates import CandidateSet, CandidateSurvey, SurveyRefused
 from terezy.core.results.dominance import DominanceRefused, DominanceResult
 from terezy.core.results.question import Question, Reserve
-from terezy.core.results.tuple import Arrival, Tuple
+from terezy.core.results.tuple import Arrival, RemainderCameHome, Tuple
 
 # ---------------------------------------------------------------------------
 # What the question named, and what the registry made of it
@@ -185,9 +185,14 @@ class CoveredByThePlan:
 
     key: Tuple
     reserve: Reserve
-    arrivals_read: tuple[Arrival, ...]
+    arrivals_read: tuple[Arrival | RemainderCameHome, ...]
     """Which arrivals the verdict was computed over (FR-019), so one computed over arrivals
-    falling past the horizon's end is visible as such."""
+    falling past the horizon's end is visible as such.
+
+    The remainder's own journey is one of them where it came home: it is money at a spendable
+    endpoint on a date like any other, and usually the earliest of them, so a verdict blind to
+    it would report a reserve short while the outcome beside it counted that amount as home.
+    """
 
     covered_on: date
     """When the running total first reached the reserve."""
@@ -206,7 +211,7 @@ class PartialExitWouldBeNeeded:
 
     key: Tuple
     reserve: Reserve
-    arrivals_read: tuple[Arrival, ...]
+    arrivals_read: tuple[Arrival | RemainderCameHome, ...]
     short_by: Money
     """The reserve less what arrives in its own currency by its date. No rate is consulted: a
     reserve in a currency the arrivals do not deliver is short by the whole of it (FR-021)."""

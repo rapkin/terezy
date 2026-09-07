@@ -39,6 +39,7 @@ from terezy.core.results.tuple import (
     EXCLUDES,
     Part,
     RateNotComparable,
+    RemainderCameHome,
     Tuple,
     TupleOutcome,
 )
@@ -61,8 +62,7 @@ CLASSIFIED: Final[frozenset[str]] = frozenset(
         "horizon",
         # The attribution: what each term took, with the call that produced it named.
         "parts",
-        # Money that made the trip and bought nothing. Reported, and netted off the outlay
-        # the rate is measured against rather than discounted as a loss.
+        # Money that made the trip, bought nothing, and came home along the declared way out.
         "undeployed",
         # The scope statements this module is about.
         "accounts_for",
@@ -94,6 +94,7 @@ CLASSIFIED: Final[frozenset[str]] = frozenset(
 
 
 FLAT_FEE_ROUTE: Final = "test_flat_fee_in"
+CHARGING_OUT_ROUTE: Final = "test_charging_out"
 
 
 def _outcome(
@@ -101,16 +102,33 @@ def _outcome(
     *,
     registries: fixtures.Registries | None = None,
     flat: float | None = None,
+    out_flat: float | None = None,
 ) -> TupleOutcome:
-    """One tuple's outcome, optionally over a way in charging a flat fee and nothing else.
+    """One tuple's outcome, optionally over ways in and out charging a flat fee and nothing
+    else.
 
     ``flat`` exists so a test can tell the outlay and the arriving amount apart. Over the
     shipped domestic route they are one number, and a claim about which of them a figure rests
-    on cannot be checked against a pair that agrees.
+    on cannot be checked against a pair that agrees. ``out_flat`` is the same argument on the
+    way back: the shipped way out is free, so a claim about what it charges cannot be checked
+    over it either.
     """
     resolved = registries or fixtures.declared()
     candidate = fixtures.hurdle_tuple()
     if flat is not None:
+        out_route = fixtures.DOMESTIC_OUT
+        if out_flat is not None:
+            out_route = CHARGING_OUT_ROUTE
+            resolved = fixtures.with_new_route(
+                resolved,
+                fixtures.route(
+                    CHARGING_OUT_ROUTE,
+                    origin="inzhur",
+                    destination="monobank_uah",
+                    direction="exit",
+                    fee_fixed=out_flat,
+                ),
+            )
         resolved = fixtures.with_new_route(
             resolved,
             fixtures.route(
@@ -118,7 +136,7 @@ def _outcome(
                 origin="monobank_uah",
                 destination="inzhur",
                 direction="inbound",
-                partner=fixtures.DOMESTIC_OUT,
+                partner=out_route,
                 fee_fixed=flat,
             ),
         )
@@ -138,6 +156,10 @@ def _outcome(
     )
     assert isinstance(outcome, TupleOutcome), outcome
     return outcome
+
+
+def _part(outcome: TupleOutcome, part: Part) -> fixtures.Money:
+    return next(line.amount for line in outcome.parts if line.part == part)
 
 
 def _fund_outcome(candidate: Tuple, horizon: fixtures.DateRange) -> TupleOutcome:
@@ -296,12 +318,11 @@ class TestWhatFeatureOneExcludedThisFeatureAccountsFor:
         # nothing else in the output would tell them so.
         assert any("latency" in item for item in _outcome().accounts_for)
 
-    def test_it_states_the_five_things_it_still_leaves_out(self) -> None:
+    def test_it_states_the_four_things_it_still_leaves_out(self) -> None:
         outcome = _outcome()
-        assert len(outcome.excludes) == 5
+        assert len(outcome.excludes) == 4
         assert any("inflation" in item for item in outcome.excludes)
         assert any("risk class" in item for item in outcome.excludes)
-        assert any("undeployed" in item for item in outcome.excludes)
         assert any("holidays" in item for item in outcome.excludes)
         # The fifth arrived with feature 009, which took the cash out of a tax charge: the
         # charge is still netted where it accrued, and the deadline that would date it lives
@@ -314,38 +335,51 @@ class TestAScopeStatementIsCheckedAgainstTheBehaviourItDescribes:
     """SC-009's teeth. A scope statement asserted only against itself is a decoration.
 
     Every claim below is read **off the outcome's own words** and then checked against what
-    the pipeline actually did with the same inputs. The undeployed clause is here because it
-    was false once: the rate charged the remainder as a total loss while three statements,
-    this set among them, said it was measured on the money actually invested.
+    the pipeline actually did with the same inputs. The exit-cost clause is here because its
+    predecessor was false for a whole feature: the rate charged the remainder as a total loss
+    while three statements, this set among them, said otherwise, and every assertion about it
+    compared the code's constant against the code's constant.
     """
 
-    def test_the_undeployed_clause_is_true_of_the_rate(self) -> None:
-        # The clause says the rate is measured on **the money actually invested**. Two things
-        # have to hold for that to be more than a phrase, and the second needs a way in that
-        # charges: over the shipped free route the outlay and the arriving amount are one
-        # number, and "netted off the outlay" is then indistinguishable from "measured on what
-        # arrived". So every run below crosses a flat-fee route.
+    def test_the_exit_cost_clause_is_true_of_the_remainder_as_well(self) -> None:
+        # The clause says the way out is charged "on each amount that travelled it: every
+        # release, and the remainder the purchase could not deploy". Checking it needs ways in
+        # and out that *charge*: over the shipped free pair a charge of nothing on the
+        # remainder is indistinguishable from no charge at all.
         #
+        #   in 100.00 flat, out 25.00 flat, 10 100.00 sent -> 10 000.00 arrives, nothing over
+        #   in 100.00 flat, out 25.00 flat, 10 500.00 sent -> 10 400.00 arrives, 400.00 over
+        exact = _outcome(10_100.0, flat=100.0, out_flat=25.0)
+        stranded = _outcome(10_500.0, flat=100.0, out_flat=25.0)
+        clause = next(item for item in stranded.accounts_for if "travelled it" in item)
+        assert "exit route costs (out)" in clause
+        undeployed = stranded.undeployed
+        assert undeployed is not None
+        assert isinstance(undeployed.journey, RemainderCameHome), undeployed.journey
+        assert exact.undeployed is None
+        # It paid the way out's fee, and only the way out's fee: no tax, nothing else.
+        assert is_close(undeployed.journey.reached.amount, undeployed.amount.amount - 25.0)
+        assert is_close(
+            stranded.reaches.amount,
+            sum(arrival.amount.amount for arrival in stranded.arrivals)
+            + undeployed.journey.reached.amount,
+        )
+        # And the extra journey is in the attribution, not only in the total.
+        assert is_close(_part(stranded, "ramp_out").amount - _part(exact, "ramp_out").amount, -25.0)
+
+    def test_the_rate_rests_on_what_left_the_stream_and_not_on_what_arrived(self) -> None:
         #   100.00 flat, 10 100.00 sent -> 10 000.00 arrives -> 10 units, nothing over
-        #   100.00 flat, 10 500.00 sent -> 10 400.00 arrives -> 10 units, 400.00 over
         #   500.00 flat, 10 500.00 sent -> 10 000.00 arrives -> 10 units, nothing over
         #
-        # A remainder must move the figure by nothing (first against second: same money
-        # invested, same holding), and what left the stream must move it (first against third:
-        # same arriving amount, same holding, 400.00 more spent to get there).
-        exact = _outcome(10_100.0, flat=100.0)
-        stranded = _outcome(10_500.0, flat=100.0)
-        dearer = _outcome(10_500.0, flat=500.0)
-        clause = next(item for item in stranded.excludes if "undeployed" in item)
-        assert "money actually invested" in clause
-        assert stranded.undeployed is not None
-        assert exact.undeployed is None
+        # Same holding, same arrivals, same dates, 400.00 more spent to get there. A rate
+        # measured on what arrived would report one figure for both.
+        cheap, dearer = _outcome(10_100.0, flat=100.0), _outcome(10_500.0, flat=500.0)
+        assert cheap.undeployed is None
         assert dearer.undeployed is None
-        rates = [outcome.implied_rate for outcome in (exact, stranded, dearer)]
+        rates = [outcome.implied_rate for outcome in (cheap, dearer)]
         assert all(isinstance(rate, NominalRate) for rate in rates)
         values = [rate.value for rate in rates if isinstance(rate, NominalRate)]
-        assert values[0] == values[1]
-        assert values[2] < values[0]
+        assert values[1] < values[0]
 
     def test_a_constrained_way_names_itself_on_the_outcome(self) -> None:
         # `RampCost` says eight things about a way in; four reach the outcome and two more are

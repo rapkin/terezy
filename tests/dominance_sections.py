@@ -16,12 +16,18 @@ from dataclasses import replace
 from typing import TYPE_CHECKING, Final
 
 from terezy.core.decision.dominance import dominance
+from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.results.answer import HorizonSection
 from terezy.core.results.candidates import CandidateSurvey
 from terezy.core.results.dominance import DominanceRefused, DominanceResult
-from terezy.core.results.tuple import Comparison, TupleOutcome
+from terezy.core.results.tuple import (
+    Comparison,
+    RemainderStayed,
+    TupleOutcome,
+    UndeployedCash,
+)
 from terezy.data.declarations import loader
 from tests import answer_registries as fixtures
 
@@ -134,6 +140,32 @@ def only(subject: HorizonSection, instrument_ids: Sequence[str]) -> HorizonSecti
         outcome=replace(
             survey,
             comparison=replace(comparison, ranked=kept, benchmark=0, ties=(), beats_benchmark=()),
+        ),
+    )
+
+
+def with_a_stranded_remainder(subject: HorizonSection, instrument_id: str) -> HorizonSection:
+    """One candidate whose undeployed remainder the declared way out would not carry.
+
+    The other missing-figure case on the date criterion: *all* the money is back on no date at
+    all when part of the outlay never came home. Planted rather than declared for
+    :func:`with_no_arrivals`' reason -- every shipped instrument is bought where its proceeds
+    land, so no declaration here produces one.
+    """
+    return with_outcomes(
+        subject,
+        lambda item: (
+            replace(
+                item,
+                undeployed=UndeployedCash(
+                    amount=Money(1.0, Currency.UAH, prov.EMPTY),
+                    venue_id="inzhur",
+                    journey=RemainderStayed(reason="planted by tests.dominance_sections"),
+                    reason="planted by tests.dominance_sections",
+                ),
+            )
+            if item.key.instrument_id == instrument_id
+            else item
         ),
     )
 
