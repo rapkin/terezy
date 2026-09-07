@@ -474,3 +474,16 @@ the same list as everything else.
 | **B12** | Reinforced from the far end: the baseline joins the ranking without a rule of its own. Its entry charges nothing because it walks no leg, not because a heuristic exempted it, and it is dominated at three and twelve months by ordinary comparison. |
 | **E5** | Pressed on a figure whose only observation decides it without appearing in its arithmetic: what a balance returns is what went in **because** the declared rate is zero, so the mark reaches the amount through `money.also_resting_on` rather than through a multiplication (`tests/worked_examples/test_cash_reaches_the_amount.py`, `tests/invariants/test_cash_invariants.py`). `verified_on` is empty until the owner cites Monobank's terms, and every cash figure renders marked. |
 | **K1** | Reinforced: both goldens moved and were regenerated deliberately, with the moved figure hand-checked — `0x1.86a0000000000p+15` is 50 000.00 exactly, the outlay unchanged. |
+
+**026-answer-screen** closes **no** row. No lettered behaviour names a screen, and the rows it
+touches it touches from further out than any feature before it: the reader's end of figures the
+engine already produces. **E11** is explicitly not among them — this screen renders no tax
+waterfall, so the *exempted* / *not applicable* distinction has still never been drawn.
+
+| Row | How, and why the box does not move |
+|---|---|
+| **I1** | *No false optima.* Pressed at the last step, which is where it had never been pressed: the screen leads with the non-dominated set rather than a winner, states each section's `benchmark_standing` in the API's own vocabulary rather than one claim across three, and renders `indistinguishable` members with their neighbours named — *these score the same, and the order they appear in is not a ranking* (`web/tests/unit/candidate-card.test.tsx`, `web/e2e/answer-fronts.spec.ts`). The row is about the engine and stays with it; what is recorded is that the honest shape survived being drawn. |
+| **I4** | *The naive baseline is always scored and always shown.* **Shown** now has a surface. Cash is a ranked candidate after 023 and reaches the reader on the same card as everything else, with no rule of its own in the client. The allocation half I4's own words name is still unrepresentable, so the box does not move. |
+| **E5** | Pressed on a fourth surface and on a figure that carries **no provenance of its own**: `implied_rate` is a bare `NominalRate`, so it wears the outcome's merged provenance and staleness and the slot says which (`web/tests/unit/answer-marks.test.tsx` enumerates the figure-bearing modules from the source, so one added without a mark fails rather than passing unnoticed). |
+| **F2** | Unchanged, and for the reason 021 recorded: there is no display switch. Nothing here converts a currency — money renders in the currency the API returned it in, and the one place a conversion could have crept in, a remainder in another currency, is the engine's verdict rather than a rate this client consults. |
+| **K1** | Reinforced: `ramp_comparison.golden.txt` moved by exactly one line, the `venues` input digest, because `data/venues.toml` gained nine declared kinds. No result line moved, which is what an input digest is a witness for. |
