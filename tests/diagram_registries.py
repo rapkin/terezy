@@ -266,6 +266,7 @@ def venue(venue_id: str, *currencies: Currency) -> Venue:
     return Venue(
         id=venue_id,
         name=f"{venue_id} (SYNTHETIC FIXTURE)",
+        kind="bank",
         currencies=frozenset(currencies),
     )
 
@@ -573,7 +574,7 @@ def forged_registry() -> Registry:
     venues = {
         v.id: v
         for v in (
-            Venue(id=FORGED_VENUE, name=FORGERY, currencies=frozenset({UAH})),
+            Venue(id=FORGED_VENUE, name=FORGERY, kind="bank", currencies=frozenset({UAH})),
             venue("beta", UAH),
         )
     }

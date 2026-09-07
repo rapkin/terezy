@@ -25,11 +25,13 @@ from terezy.core.routes.venues import Venue
 MONOBANK_UAH = Venue(
     id="monobank_uah",
     name="SYNTHETIC FIXTURE -- a hryvnia-only current account",
+    kind="bank",
     currencies=frozenset({Currency.UAH}),
 )
 BINANCE = Venue(
     id="binance",
     name="SYNTHETIC FIXTURE -- an exchange account holding both",
+    kind="exchange",
     currencies=frozenset({Currency.UAH, Currency.USD}),
 )
 

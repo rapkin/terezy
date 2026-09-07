@@ -6,7 +6,7 @@
  * tile would render with no colour and no error; written out, the CSS is checkable against this
  * map (`tests/unit/kinds.test.ts`).
  */
-import type { InstrumentDeclared } from "@/api/shapes";
+import type { InstrumentDeclared, VenueKind } from "@/api/shapes";
 import { assertNever } from "@/lib/exhaustive";
 import type { IconComponent } from "./icons/outline";
 import {
@@ -125,6 +125,22 @@ export const INSTRUMENT_KIND: { readonly [Tag in InstrumentDeclared["tag"]]: Kin
   "interface.InstrumentDeclaration": "bond",
   "fund.FundDeclaration": "fund",
   "cash.CashDeclaration": "cash",
+};
+
+/**
+ * FR-007: a venue's kind is a declared field, and the five it can be are the drawn five.
+ *
+ * A mapped type over the vocabulary the document publishes, so the day a sixth is declared in
+ * `core/` the build is red here rather than a venue being drawn with no hue. Nothing on the
+ * answer screen draws a venue — this binds the language, which is what the graph feature will
+ * read.
+ */
+export const VENUE_KIND: { readonly [K in VenueKind]: Kind } = {
+  bank: "bank",
+  exchange: "exchange",
+  broker: "broker",
+  platform: "platform",
+  payroll: "payroll",
 };
 
 const CLASS_WORDS: Readonly<Record<string, string>> = {

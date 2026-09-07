@@ -1004,11 +1004,13 @@ def coverage_registries(draw: st.DrawFn) -> CoverageRegistry:
         HOME_VENUE: Venue(
             id=HOME_VENUE,
             name="Home rail (SYNTHETIC FIXTURE)",
+            kind="bank",
             currencies=frozenset({Currency.UAH}),
         ),
         CONTRACT_VENUE: Venue(
             id=CONTRACT_VENUE,
             name="Contract rail (SYNTHETIC FIXTURE)",
+            kind="payroll",
             currencies=frozenset({Currency.USD}),
         ),
     }
@@ -1019,6 +1021,7 @@ def coverage_registries(draw: st.DrawFn) -> CoverageRegistry:
         venues[venue_id] = Venue(
             id=venue_id,
             name=f"{venue_id} (SYNTHETIC FIXTURE)",
+            kind="bank",
             currencies=frozenset({currency}),
         )
         exit_id = f"out_{index}" if draw(st.booleans()) else None
@@ -1276,11 +1279,13 @@ def venues_for_agreement() -> tuple[Venue, Venue]:
         Venue(
             id=HOME_VENUE,
             name="Home rail (SYNTHETIC FIXTURE)",
+            kind="bank",
             currencies=frozenset({Currency.UAH}),
         ),
         Venue(
             id=CONTRACT_VENUE,
             name="Contract rail (SYNTHETIC FIXTURE)",
+            kind="payroll",
             currencies=frozenset({Currency.USD}),
         ),
     )

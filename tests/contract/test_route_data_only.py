@@ -416,9 +416,9 @@ class TestANewCorridorIsDataOnly:
         path.write_text(
             path.read_text(encoding="utf-8").replace(
                 'id         = "transfergo_usd"\nname       = "TransferGo balance (TEST FIXTURE)"\n'
-                'currencies = ["USD"]',
+                'kind       = "platform"\ncurrencies = ["USD"]',
                 'id         = "transfergo_usd"\nname       = "TransferGo balance (TEST FIXTURE)"\n'
-                'currencies = ["UAH"]',
+                'kind       = "platform"\ncurrencies = ["UAH"]',
             ),
             encoding="utf-8",
         )
@@ -663,7 +663,8 @@ def _new_corridor(tmp_path: Path) -> Path:
     venues = root / "venues.toml"
     venues.write_text(
         venues.read_text(encoding="utf-8") + '\n[[venue]]\nid         = "transfergo_usd"\n'
-        'name       = "TransferGo balance (TEST FIXTURE)"\ncurrencies = ["USD"]\n',
+        'name       = "TransferGo balance (TEST FIXTURE)"\nkind       = "platform"\n'
+        'currencies = ["USD"]\n',
         encoding="utf-8",
     )
 

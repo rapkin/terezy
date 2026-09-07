@@ -161,6 +161,10 @@ export type MemberRestsOn = Tagged<
   "dominance.SeparatingAssumptions"
 >["per_member"][number];
 
+/** A declared venue, and the closed vocabulary its kind is drawn from (026 FR-007). */
+export type Venue = Tagged<Body, "venues.Venue">;
+export type VenueKind = Venue["kind"];
+
 /** The envelope `/api/instruments/{id}` returns. */
 export type InstrumentRead = Tagged<Body, "envelopes.ReadOfInstruments">;
 

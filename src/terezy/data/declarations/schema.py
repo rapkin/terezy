@@ -615,6 +615,14 @@ class VenueTable(BaseModel):
     name: str
     """Human-readable and non-empty. For a fixture it says so in words."""
 
+    kind: str
+    """One of ``core.routes.venues.VENUE_KINDS``, resolved by the loader.
+
+    Typed ``str`` here and closed there, so an unknown kind is refused by the loader with the
+    file, the field and the names that would have worked, rather than by pydantic with a union
+    message that names neither.
+    """
+
     currencies: list[str]
     """The currency codes this venue can hold. Non-empty, resolved against the core's
     closed ``Currency`` enum by the loader.

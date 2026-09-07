@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { EVERY_KIND, INSTRUMENT_KIND, KINDS, classWord } from "@/design/kinds";
+import { EVERY_KIND, INSTRUMENT_KIND, KINDS, VENUE_KIND, classWord } from "@/design/kinds";
 import { SRC } from "../source";
 
 /**
@@ -50,6 +50,19 @@ describe("the kind vocabulary", () => {
     // FR-006: `instrument_class` is `string` in the document, so a class this client has no
     // word for is shown as it arrived. Never blank, never a guess.
     expect(classWord("a_class_nobody_named")).toBe("a_class_nobody_named");
+  });
+
+  it("maps every venue kind the document declares to one of them", () => {
+    // FR-007's vocabulary, closed in `core/` and refused at load. Nothing on this screen draws a
+    // venue; the map binds the language so the graph feature reads a hue rather than choosing one.
+    expect(Object.keys(VENUE_KIND).sort()).toEqual([
+      "bank",
+      "broker",
+      "exchange",
+      "payroll",
+      "platform",
+    ]);
+    for (const kind of Object.values(VENUE_KIND)) expect(Object.keys(KINDS)).toContain(kind);
   });
 
   it("has one icon per kind and no icon shared between two", () => {

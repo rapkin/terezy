@@ -1,9 +1,8 @@
-"""A venue: a place money can sit, and the currencies it can hold.
+"""A venue: a place money can sit, its kind, and the currencies it can hold.
 
-A bank account, an exchange account, a broker account, a fund platform. Declared data with
-no behaviour of its own -- the record exists so that a leg's endpoints are *named things
-with stated capabilities* rather than free strings, and so that "this leg moves dollars into
-a hryvnia-only account" is a question something can answer.
+Declared data with no behaviour of its own -- the record exists so that a leg's endpoints are
+*named things with stated capabilities* rather than free strings, and so that "this leg moves
+dollars into a hryvnia-only account" is a question something can answer.
 
 **Why the currency set is on the venue and not inferred from the legs that touch it.** A
 route declaration is written by hand, and the mistake it invites is a leg that moves a
@@ -22,8 +21,27 @@ have and must not acquire.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Final, Literal
 
 from terezy.core.primitives.currency import Currency
+
+VenueKind = Literal["bank", "exchange", "broker", "platform", "payroll"]
+"""What kind of place a venue is. Closed, and the owner's own five (2026-09-06).
+
+Declared on the record rather than inferred from the id, because every client that wants it --
+the answer screen's language today, the route diagram next -- would otherwise infer it from a
+name, which is the inference 021 FR-015 forbids for a category and forbids here for the same
+reason: an id is a handle, not a statement about what a place is.
+"""
+
+VENUE_KINDS: Final[tuple[VenueKind, ...]] = (
+    "bank",
+    "exchange",
+    "broker",
+    "platform",
+    "payroll",
+)
+"""The vocabulary as values, so the data layer can list what would have worked."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,6 +53,9 @@ class Venue:
 
     name: str
     """Human-readable, non-empty. For a synthetic fixture it says so in words."""
+
+    kind: VenueKind
+    """What kind of place this is. Declared, never inferred, and refused at load if unknown."""
 
     currencies: frozenset[Currency]
     """The currencies this venue can hold. Non-empty.

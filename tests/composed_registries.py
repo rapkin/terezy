@@ -202,14 +202,28 @@ STREAMS: Mapping[str, IncomeStream] = {SALARY.id: SALARY}
 
 VENUES: Mapping[str, Venue] = {
     SALARY_VENUE: Venue(
-        id=SALARY_VENUE, name="Salary rail (SYNTHETIC)", currencies=frozenset({UAH})
+        id=SALARY_VENUE, name="Salary rail (SYNTHETIC)", kind="bank", currencies=frozenset({UAH})
     ),
-    EXCHANGE: Venue(id=EXCHANGE, name="Exchange (SYNTHETIC)", currencies=frozenset({UAH, USD})),
-    BROKER: Venue(id=BROKER, name="Broker (SYNTHETIC)", currencies=frozenset({USD})),
-    MIRROR: Venue(id=MIRROR, name="Mirror exchange (SYNTHETIC)", currencies=frozenset({UAH, USD})),
-    WALLET: Venue(id=WALLET, name="Wallet (SYNTHETIC)", currencies=frozenset({UAH})),
-    FUND: Venue(id=FUND, name="Fund platform (SYNTHETIC)", currencies=frozenset({UAH})),
-    HOME: Venue(id=HOME, name="Home rail (SYNTHETIC)", currencies=frozenset({UAH})),
+    EXCHANGE: Venue(
+        id=EXCHANGE,
+        name="Exchange (SYNTHETIC)",
+        kind="exchange",
+        currencies=frozenset({UAH, USD}),
+    ),
+    BROKER: Venue(id=BROKER, name="Broker (SYNTHETIC)", kind="broker", currencies=frozenset({USD})),
+    MIRROR: Venue(
+        id=MIRROR,
+        name="Mirror exchange (SYNTHETIC)",
+        kind="exchange",
+        currencies=frozenset({UAH, USD}),
+    ),
+    WALLET: Venue(
+        id=WALLET, name="Wallet (SYNTHETIC)", kind="platform", currencies=frozenset({UAH})
+    ),
+    FUND: Venue(
+        id=FUND, name="Fund platform (SYNTHETIC)", kind="platform", currencies=frozenset({UAH})
+    ),
+    HOME: Venue(id=HOME, name="Home rail (SYNTHETIC)", kind="bank", currencies=frozenset({UAH})),
 }
 
 BOUND = SegmentBound(max_segments=3)
