@@ -33,7 +33,7 @@ from terezy.core.results.held import (
     Valuation,
     Valued,
 )
-from terezy.core.scenarios.quote_asset import QuoteAssetIsWorth, rests_on
+from terezy.core.scenarios.quote_asset import QuoteAssetIsWorth
 from terezy.core.tax import official_rate
 from terezy.core.tax.interface import TaxableEventKind, TaxClass
 from terezy.core.tax.official_rate import OfficialRateSeries, OfficialRateUnavailable
@@ -64,16 +64,12 @@ class HeldInputs:
     """
 
     lots: tuple[SeedLot, ...]
-    """What the owner already holds, over both data roots (025 FR-012).
-
-    A quantity enters the system here and nowhere else: nothing infers a holding from a price.
-    Empty is ordinary and produces no held section at all, which is a different statement from
-    a position of zero.
-    """
+    """What the owner already holds, over both data roots. A quantity enters the system here
+    and nowhere else: nothing infers a holding from a price (025 FR-012)."""
 
     quotations: Mapping[str, QuotationSeries]
-    """The dated closes fetched for each held asset, by instrument id. Empty is ordinary: the
-    shipped tree carries none, because the fetch writes the owner's own retrieval."""
+    """The dated closes fetched for each held asset, by instrument id. Empty is ordinary, and
+    :func:`_valued` says why when it refuses."""
 
     official_rate: OfficialRateSeries | None
     """The series a held position's value is restated in the base currency at, or ``None``
@@ -141,7 +137,7 @@ def _position(
         for lot in lots
     )
     quantity = sum(lot.quantity for lot in reported)
-    basis = _summed(reported, base_currency)
+    basis = money.total((lot.basis for lot in reported), base_currency)
     valuation = _valued(
         asset,
         quantity=quantity,
@@ -168,14 +164,6 @@ def _position(
     )
 
 
-def _summed(lots: Sequence[HeldLot], base_currency: Currency) -> Money:
-    """The basis of the whole position, resting on everything every lot rests on."""
-    total = money.zero(base_currency)
-    for lot in lots:
-        total = money.add(total, lot.basis)
-    return total
-
-
 def _valued(
     asset: HeldAssetDeclaration,
     *,
@@ -189,18 +177,14 @@ def _valued(
 ) -> Valuation:
     """The position at the close published for ``as_of``, or the refusal that replaced it.
 
-    Two things can be missing and both refuse the same way, because the remedy is the same
-    shape -- a declaration: no series was fetched for this asset, or the fetched one carries
-    no row for this day. The second is the ordinary case on the day a fetch runs, since the
-    newest closed day is the day before.
-
-    **A missing belief refuses too**, rather than taking the quotation for a currency amount:
-    a `BTCUSDT` close is in a dollar-referenced token, and reading it as dollars without the
-    owner having said so is exactly the silent equality Clarification 1 refused.
+    Three things can be missing and all three refuse the same way, because the remedy is the
+    same shape -- a declaration. Each says which in its own reason; what is worth stating here
+    is that a missing **belief** is among them, because taking the quotation for a currency
+    amount instead is the one failure that would produce a number rather than a refusal.
     """
     if series is None:
         return NoQuotationOnDate(
-            symbol=asset.id,
+            symbol=asset.symbol,
             on_date=as_of,
             covers=None,
             reason=(
@@ -328,11 +312,4 @@ def _marks(basis: Money, valuation: Valuation) -> prov.Provenance:
     return prov.merge_all(marks)
 
 
-def rests_on_the_belief(valuation: Valuation) -> str | None:
-    """The sentence naming the belief a valued position rests on, or ``None`` for a refusal."""
-    if isinstance(valuation, Valued):
-        return rests_on(valuation.assumption)
-    return None
-
-
-__all__ = ["NOT_RANKED", "NO_YIELD", "HeldInputs", "positions", "rests_on_the_belief"]
+__all__ = ["NOT_RANKED", "NO_YIELD", "HeldInputs", "positions"]

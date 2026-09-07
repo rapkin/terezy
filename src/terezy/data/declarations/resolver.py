@@ -2055,27 +2055,21 @@ USER_DIR = "user"
 """The private overlay under a data root: gitignored, and the only place a real figure may live.
 
 025 FR-001. `data/README.md` rule 5 forbids committing a figure that describes the owner's
-actual position, and until this feature the rule was kept by a reviewer noticing. The overlay is
-where such a figure goes, and :func:`_check_not_synthetic_outside_the_overlay` is the rule made
-mechanical.
+actual position, and until this feature the rule was kept by a reviewer noticing.
+:func:`_check_committable` is that rule made mechanical.
 """
 
 OVERLAY_DIRS: Final[frozenset[str]] = frozenset({SEEDS_DIR})
-"""What the overlay may contain. **Fail-closed**: anything else is refused, naming it.
-
-`scripts/check_provenance.py`'s rule, for the same reason. A directory nobody declared would be
-read by nothing while looking exactly like a declaration that was read -- and the one root whose
-contents no reviewer ever sees is the worst place for a blind spot.
-"""
+"""What the overlay may contain. **Fail-closed**, on `scripts/check_provenance.py`'s rule:
+:func:`_check_overlay_directories` refuses anything else and says why."""
 
 
 @dataclass(frozen=True, slots=True)
 class DataRoots:
     """The shipped root and the owner's private overlay, composed **in memory**.
 
-    Not on disk. `tests/data_roots.py` composes by copying one tree over another, which is right
-    for a fixture and wrong here: copying the owner's real figures into a temporary directory
-    puts them somewhere nobody gitignored.
+    Not on disk: composing by copying one tree over another would put the owner's real figures
+    in a temporary directory nobody gitignored.
     """
 
     shipped: Path
@@ -2104,10 +2098,8 @@ def data_roots_of(root: Path) -> DataRoots:
 def _check_overlay_directories(overlay: Path) -> None:
     """FR-006: the overlay holds what this feature declared, or the load fails naming what else.
 
-    Dot-entries are the filesystem's own -- ``.DS_Store``, an editor's swap file -- and are
-    skipped. Everything else is refused whether it is a directory or a file, because a
-    ``.toml`` sitting at the overlay's root would look exactly like a declaration and be read
-    by nothing at all.
+    Dot-entries are the filesystem's own -- ``.DS_Store``, an editor's swap file -- and are the
+    one thing skipped rather than refused.
     """
     for entry in sorted(overlay.iterdir()):
         if entry.name.startswith(".") or entry.name in OVERLAY_DIRS:
@@ -2304,10 +2296,8 @@ def _base_currency_series(root: Path, *, base_currency: Currency) -> OfficialRat
     so -- an empty ``tax/timing/`` is not this loader's business to complain about, because a
     run whose every cost is already in the base currency needs no series at all.
 
-    **Two jurisdictions assessing in the base currency and naming different series is
-    refused**, not resolved by directory order: which of them the owner files under is a fact
-    nothing here declares, and picking one would strike every basis at a rate chosen by
-    filename.
+    Two of them naming different series is refused rather than resolved by directory order:
+    which the owner files under is a fact nothing here declares.
     """
     named = {
         declared.official_rate_series: (declared, path)
@@ -3277,8 +3267,7 @@ def _resolved_quotations(
 
     **Matched by ``<venue>_<symbol>.toml``**, which is what the fetch script writes: the venue
     is the one the asset declares and the symbol is the one it was fetched under. An asset with
-    no file yields no entry, which is ordinary -- the shipped tree carries none, because the
-    fetch writes the owner's own dated retrieval and until he runs it there is nothing to read.
+    no file yields no entry, which is ordinary: the position reports the absence by name.
     """
     series: dict[str, QuotationSeries] = {}
     declaring: dict[str, Path] = {}

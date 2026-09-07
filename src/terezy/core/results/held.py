@@ -3,16 +3,10 @@
 025 FR-029, FR-030, answered by the owner on 2026-09-07: a held position gets the answer's own
 **held** section, beside the horizon sections, and is never a baseline row in a ranking.
 
-**It is not a candidate and cannot be made one.** ``Tuple.route_in`` is required and there is
-no zero-hop entry, so putting a holding in the ranking would need a purchase price, a funding
-corridor and an exit for a purchase that will not happen -- three invented numbers for one row.
-The ranking keeps answering one question, which is where new money should go.
-
-**Three of the four things a candidate reports are refused here, and each says so as a value.**
-No tax, because Ukraine's treatment of a virtual asset is unsettled and nobody has entered a
-cited source; no yield, because a held asset declares no rate and no schedule; no rank, for the
-reason above. A field holding a record with one inhabitant is a constant, and it is deliberate:
-an absent key reads as an oversight, and FR-030 asks for the absence to be *stated*.
+**Every absence here is a field holding a record, and a record with one inhabitant is a
+constant.** That is deliberate: an absent key reads as an oversight and a zero reads as a
+figure, while a typed absence carrying its own reason reads as what it is (FR-030). Each
+reason is written where the position is built, because it is output rather than commentary.
 """
 
 from __future__ import annotations
