@@ -72,7 +72,7 @@ def test_every_seed_lot_carries_the_owner() -> None:
     what makes a lot self-describing after the TOML has been discarded, which is the point of
     having the field before there is a second owner to need it.
     """
-    owner_id, declared = loader.seeds_from_file(SEEDS, base_currency=Currency.UAH)
+    owner_id, declared = loader.seeds_from_file(SEEDS)
     assert owner_id == OWNER
     assert declared
     assert all(lot.owner_id == OWNER for lot in declared)
@@ -93,7 +93,12 @@ def test_the_events_a_seed_opens_carry_the_owner_too() -> None:
     from.
     """
     declarations = resolver.from_data_root(DATA_ROOT)
-    _, declared = loader.seeds_from_file(SEEDS, base_currency=Currency.UAH)
+    resolved = resolver.seeds_and_goals_from_data_roots(
+        resolver.data_roots_of(DATA_ROOT), base_currency=Currency.UAH
+    )
+    # A held asset projects no event stream at all (025 FR-010), so a lot of one has nothing
+    # to open and never reaches the ledger. This asserts the boundary, not the filter.
+    declared = [lot for lot in resolved.seeds if lot.instrument_id in declarations.instruments]
     opened = seeds.opening_events(declared, declarations.instruments, opens_on=date(2026, 8, 23))
     assert isinstance(opened, tuple), opened
     assert opened
@@ -104,7 +109,9 @@ def test_resolving_seeds_and_goals_changes_no_curated_file(tmp_path: Path) -> No
     """SC-007's measurable half: compare the curated data before and after."""
     root = _scratch_root(tmp_path)
     before = _curated_digest(root)
-    resolved = resolver.seeds_and_goals_from_data_root(root, base_currency=Currency.UAH)
+    resolved = resolver.seeds_and_goals_from_data_roots(
+        resolver.data_roots_of(root), base_currency=Currency.UAH
+    )
     assert resolved.owner_id == OWNER
     assert _curated_digest(root) == before
 
@@ -116,14 +123,18 @@ def test_deleting_the_per_owner_files_removes_every_record_and_no_curated_one(
 
     Deleting his declarations must remove his holdings and his goal and nothing else -- which
     is what makes the boundary worth having: the private side can be thrown away without
-    damaging the shared side.
+    damaging the shared side. The private overlay goes with them: it is per-owner data on the
+    far side of the same boundary (025 FR-001).
     """
     root = _scratch_root(tmp_path)
     before = _curated_digest(root)
     shutil.rmtree(root / "seeds")
     shutil.rmtree(root / "goals")
+    shutil.rmtree(root / resolver.USER_DIR)
 
-    resolved = resolver.seeds_and_goals_from_data_root(root, base_currency=Currency.UAH)
+    resolved = resolver.seeds_and_goals_from_data_roots(
+        resolver.data_roots_of(root), base_currency=Currency.UAH
+    )
     assert resolved.seeds == ()
     assert resolved.goals == ()
     assert resolved.owner_id is None
@@ -152,7 +163,7 @@ def test_every_declared_per_owner_record_is_labelled_synthetic() -> None:
     only as a comment is lost the moment the TOML is discarded, and every downstream figure is
     computed from the records.
     """
-    _, declared_seeds = loader.seeds_from_file(SEEDS, base_currency=Currency.UAH)
+    _, declared_seeds = loader.seeds_from_file(SEEDS)
     _, declared_goals = loader.goals_from_file(GOALS)
     assert declared_seeds
     assert declared_goals
@@ -178,5 +189,5 @@ def test_the_label_is_required_rather_than_defaulted(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     with pytest.raises(DeclarationError) as caught:
-        loader.seeds_from_file(target, base_currency=Currency.UAH)
+        loader.seeds_from_file(target)
     assert "is_synthetic" in caught.value.field_path

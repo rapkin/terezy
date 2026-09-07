@@ -59,6 +59,7 @@ LOT_A = SeedLot(
     acquired_on=date(2024, 3, 14),
     cost=Money(98_000.0, UAH, prov.EMPTY),
     basis=seeds.KNOWN,
+    struck_from=None,
 )
 
 LOT_B = SeedLot(
@@ -71,6 +72,7 @@ LOT_B = SeedLot(
     acquired_on=date(2025, 6, 2),
     cost=Money(52_500.0, UAH, prov.EMPTY),
     basis=seeds.KNOWN,
+    struck_from=None,
 )
 
 _TERM = CausationRef(

@@ -42,6 +42,7 @@ from terezy.core.results.answer import (
     DeclaredSubject,
     HorizonSection,
     SectionsAgreeByKey,
+    SubjectHeld,
     SubjectReached,
     SubjectUndeclared,
 )
@@ -60,8 +61,22 @@ candidate sold at the window's end has its money home this many days after it.""
 FINAL_PAYMENT = date(2027, 8, 25)
 """When the benchmark's own terms end: its last coupon and its principal, on one date."""
 NAMED = 4
-UNDECLARED_WORDS = ("btc",)
-DECLARED_WORDS = (CASH, "ovdp", "inzhur")
+UNDECLARED_WORDS: tuple[str, ...] = ()
+"""None any more: 023 declared `cash` and 025 declared `btc`, so all four words resolve.
+
+Kept rather than deleted, and empty rather than absent: SC-002's claim is that a word nothing
+declares reaches the answer **as a word**, and an empty tuple is what says the shipped registry
+currently has none -- a different statement from the check having been dropped.
+"""
+
+HELD_WORDS = ("btc",)
+"""Declared, and never a candidate: a held position is reported in its own section (025
+FR-029). It reaches no corridor and reporting it *unreached* would name one as the remedy."""
+
+RANKED_WORDS = (CASH, "ovdp", "inzhur")
+"""The three whose ids can be bought with the fifty thousand."""
+
+DECLARED_WORDS = (*RANKED_WORDS, *HELD_WORDS)
 
 
 def _answer() -> Answer:
@@ -74,25 +89,36 @@ def _labels() -> dict[str, tuple[str, ...]]:
 
 
 def _expected_ids() -> frozenset[str]:
-    """What his three declared words reach, derived from the labels rather than written out."""
+    """What his four declared words reach, derived from the labels rather than written out."""
     wanted = set(DECLARED_WORDS)
     return frozenset(name for name, groups in _labels().items() if wanted & set(groups))
 
 
-def test_the_question_names_four_subjects_and_one_of_them_is_declared_by_nothing() -> None:
-    """SC-002. ``btc`` reaches the answer by the word he wrote, and nothing declares it."""
+def _rankable_ids() -> frozenset[str]:
+    """The subset a section can enumerate: a held asset has no corridor and never will."""
+    wanted = set(RANKED_WORDS)
+    return frozenset(name for name, groups in _labels().items() if wanted & set(groups))
+
+
+def test_the_question_names_four_subjects_and_every_one_of_them_now_resolves() -> None:
+    """SC-002, re-measured: `cash` closed with 023 and `btc` with 025, so none is undeclared."""
     result = _answer()
     assert len(result.subjects) == NAMED
     assert tuple(item.named for item in undeclared(result)) == UNDECLARED_WORDS
 
 
-def test_the_three_declared_words_resolve_to_the_ids_their_labels_carry() -> None:
+def test_the_declared_words_resolve_to_the_ids_their_labels_carry() -> None:
     """Derived from the registry, which is what keeps it true after 016 adds 24 issues."""
     result = _answer()
     groups = {item.named: item.ids for item in result.subjects if isinstance(item, DeclaredSubject)}
     assert set(groups) == set(DECLARED_WORDS)
     assert frozenset().union(*groups.values()) == _expected_ids()
-    assert all(item.is_group for item in result.subjects if isinstance(item, DeclaredSubject))
+    by_word = {item.named: item for item in result.subjects if isinstance(item, DeclaredSubject)}
+    assert all(by_word[word].is_group for word in RANKED_WORDS)
+    # `btc` is a declared group AND a declared instrument id, and 015's resolution takes the id
+    # first. The group still earns its place: a second held asset carrying the label is what
+    # makes his word reach two, which is SC-008's data-only claim.
+    assert not by_word["btc"].is_group
 
 
 def test_his_declared_words_reach_exactly_what_their_labels_carry() -> None:
@@ -104,6 +130,7 @@ def test_his_declared_words_reach_exactly_what_their_labels_carry() -> None:
     """
     registries = fixtures.declarations(fixtures.SHIPPED_ROOT).tuples.registries
     declared = set(registries.instruments) | set(registries.funds) | set(registries.cash)
+    declared |= set(registries.held)
     assert set(considered_ids(_answer())) == _expected_ids()
     assert _expected_ids() == declared
 
@@ -116,7 +143,7 @@ def test_there_are_three_sections_and_each_enumerates_the_same_ids() -> None:
     for section in result.sections:
         assert isinstance(section.outcome, CandidateSurvey), section.outcome
         enumerated = {item.key.instrument_id for item in section.outcome.enumerated.candidates}
-        assert enumerated == _expected_ids()
+        assert enumerated == _rankable_ids()
 
 
 NEWLY_PLACED = frozenset({"UA4000239040", "UA4000239081", "UA4000239107"})
@@ -251,12 +278,19 @@ def test_the_one_fund_that_evaluates_is_withheld_because_its_money_arrives_in_20
 
 
 def test_every_section_says_how_many_named_subjects_it_reached() -> None:
-    """SC-002's second half, and SC-003. Three of four; the fourth needs a declaration."""
+    """SC-002's second half, and SC-003. Three of four are ranked; the fourth is held."""
     result = _answer()
     for section in result.sections:
         counts = subject_counts(result, section)
-        assert (counts.reached, counts.declared_but_unreached, counts.undeclared) == (3, 0, 1)
-        assert counts.reached + counts.declared_but_unreached + counts.undeclared == NAMED
+        assert (
+            counts.reached,
+            counts.declared_but_unreached,
+            counts.undeclared,
+            counts.held,
+        ) == (len(RANKED_WORDS), 0, len(UNDECLARED_WORDS), len(HELD_WORDS))
+        assert (
+            counts.reached + counts.declared_but_unreached + counts.undeclared + counts.held
+        ) == NAMED
         assert counts.ids_considered == len(_expected_ids())
         assert counts.ids_considered != NAMED, "the two counts must not be able to coincide"
 
@@ -267,6 +301,7 @@ def test_the_three_states_are_three_types() -> None:
         by_word = {item.named: item for item in section.standings}
         assert isinstance(by_word[fixtures.OVDP], SubjectReached)
         assert all(isinstance(by_word[word], SubjectUndeclared) for word in UNDECLARED_WORDS)
+        assert all(isinstance(by_word[word], SubjectHeld) for word in HELD_WORDS)
 
 
 def test_the_three_sections_enumerate_the_same_candidates() -> None:

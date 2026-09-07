@@ -78,12 +78,15 @@ def test_a_data_root_with_no_seed_or_goal_directory_resolves(tmp_path: Path) -> 
     """FR-024: nothing is invented in their absence, and nothing refuses to run.
 
     The directories are *absent*, not empty -- the case a fresh checkout of somebody else's
-    repository would be in.
+    repository would be in, and the private overlay is absent there too (025 FR-002).
     """
     root = _scratch_root(tmp_path)
     shutil.rmtree(root / "seeds")
     shutil.rmtree(root / "goals")
-    resolved = resolver.seeds_and_goals_from_data_root(root, base_currency=Currency.UAH)
+    shutil.rmtree(root / resolver.USER_DIR)
+    resolved = resolver.seeds_and_goals_from_data_roots(
+        resolver.data_roots_of(root), base_currency=Currency.UAH
+    )
     assert resolved.seeds == ()
     assert resolved.goals == ()
     assert resolved.owner_id is None
@@ -99,10 +102,12 @@ def test_an_empty_seed_or_goal_directory_resolves(tmp_path: Path) -> None:
     without. A projection can proceed perfectly well without a holding.
     """
     root = _scratch_root(tmp_path)
-    for directory in ("seeds", "goals"):
+    for directory in ("seeds", "goals", f"{resolver.USER_DIR}/seeds"):
         for path in (root / directory).glob("*.toml"):
             path.unlink()
-    resolved = resolver.seeds_and_goals_from_data_root(root, base_currency=Currency.UAH)
+    resolved = resolver.seeds_and_goals_from_data_roots(
+        resolver.data_roots_of(root), base_currency=Currency.UAH
+    )
     assert resolved.seeds == ()
     assert resolved.goals == ()
 
@@ -111,14 +116,19 @@ def test_one_declared_and_the_other_absent_is_also_ordinary(tmp_path: Path) -> N
     """A person may hold something and want nothing in particular, or the reverse."""
     root = _scratch_root(tmp_path)
     shutil.rmtree(root / "goals")
-    holdings_only = resolver.seeds_and_goals_from_data_root(root, base_currency=Currency.UAH)
+    holdings_only = resolver.seeds_and_goals_from_data_roots(
+        resolver.data_roots_of(root), base_currency=Currency.UAH
+    )
     assert holdings_only.seeds
     assert holdings_only.goals == ()
     assert holdings_only.owner_id == "owner-001"
 
     other = _scratch_root(tmp_path / "second")
     shutil.rmtree(other / "seeds")
-    goals_only = resolver.seeds_and_goals_from_data_root(other, base_currency=Currency.UAH)
+    shutil.rmtree(other / resolver.USER_DIR)
+    goals_only = resolver.seeds_and_goals_from_data_roots(
+        resolver.data_roots_of(other), base_currency=Currency.UAH
+    )
     assert goals_only.seeds == ()
     assert goals_only.goals
     assert goals_only.owner_id == "owner-001"

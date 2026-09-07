@@ -327,6 +327,15 @@ file touched either way.
   rate; converting a foreign-currency basis at the dated official rate arrives with the
   FX features and is out of scope here.
 
+  **NARROWED by 025 FR-025.** Those FX features arrived (011, 018), and this rule now reads:
+  a cost is in the base currency **unless the instrument the lot names declares a different
+  price currency**, in which case it is in that one and is struck into hryvnia at the official
+  rate for the lot's own acquisition date. The seed file is unchanged — there is still no
+  `currency` key, because the currency lives on the instrument — and what changed is the
+  reading of *base currency*. Recorded here rather than only in 025, because two live
+  documents disagreeing about what a declared cost means is how an error the size of the
+  exchange rate gets written.
+
 **Goals — fix two, solve the third**
 
 - **FR-011**: The system MUST accept a per-owner goal declaring any two of: monthly
@@ -480,7 +489,9 @@ file touched either way.
   denominated in hryvnia (FR-016). Foreign-currency bases and the
   devaluation-sensitive currency of a goal are deliberately not modelled here; the
   declaration shapes must not preclude them, and the FR-016 refusal names the missing
-  FX modelling rather than the currency.
+  FX modelling rather than the currency. **The first half of that is no longer true**: a
+  foreign-currency basis is modelled from 025, on FR-010's narrowing above. A goal's currency
+  is unchanged and still refuses.
 - **Nominal, per the resolved clarification.** Per 001's FR-022 pattern, goal figures
   are nominal, say so, and carry a typed empty slot for the real-terms interpretation
   to be filled by the CPI feature (007) — FR-017.

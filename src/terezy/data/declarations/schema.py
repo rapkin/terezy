@@ -1503,6 +1503,48 @@ class CashFile(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# 025-btc-holdings: an asset held for its price alone
+# ---------------------------------------------------------------------------
+
+
+class HeldAssetTable(BaseModel):
+    """``[instrument]`` for an asset whose only declared property is where its price lives."""
+
+    model_config = STRICT
+
+    id: str
+    name: str
+    instrument_class: str = Field(alias="class")
+    """``held_asset``. Aliased for the same reason a bond's and a fund's are."""
+
+    quantity_unit: str
+    price_currency: str
+    venue_id: str
+    symbol: str
+    quote_asset: str
+    is_synthetic: bool
+    tax_classes: dict[str, str]
+    groups: list[str]
+
+    price: float | None = None
+    """Declared **so that stating one can be refused with its reason** (025 FR-011).
+
+    ``extra="forbid"`` would already reject the key, with a message about an unexpected field.
+    That is a true statement and the wrong one: the reason a price may not be here is that the
+    price of a held asset is a dated observation, and one fact in two files is two facts the day
+    one of them moves. The loader refuses a non-``None`` value and says so.
+    """
+
+
+class HeldAssetFile(BaseModel):
+    """A whole held-asset document: exactly one asset, as with an instrument and a fund."""
+
+    model_config = STRICT
+
+    instrument: HeldAssetTable
+
+
+# ---------------------------------------------------------------------------
 # 004-composed-paths: the segment bound
 # ---------------------------------------------------------------------------
 #
@@ -2109,6 +2151,62 @@ class QuotationBeliefFile(BaseModel):
     model_config = STRICT
 
     quotation: QuotationBeliefTable
+
+
+class QuoteAssetBeliefTable(BaseModel):
+    """``[quote_asset]`` -- what the token a venue quotes in is taken to be worth."""
+
+    model_config = STRICT
+
+    id: str
+    owner_id: str
+    quote_asset: str
+    currency: str
+    is_assumption: bool
+    """Must be ``true``; the loader refuses ``false``. A cited rate is an observation and a
+    different declaration, and the core field is ``Literal[True]``."""
+
+    rationale: str
+
+
+class QuoteAssetBeliefFile(BaseModel):
+    """A whole ``data/scenarios/quote_asset/<owner>.toml``: one owner's belief.
+
+    A subdirectory for the reason ``data/scenarios/quotation/`` is one: the resolver globs
+    ``scenarios/*.toml`` as scenario documents and does not recurse.
+    """
+
+    model_config = STRICT
+
+    quote_asset: QuoteAssetBeliefTable
+
+
+class QuotationObservationTable(BaseModel):
+    """One ``[[observation]]`` of a fetched daily-close series."""
+
+    model_config = STRICT
+
+    on_date: str
+    close: float
+    kind: str
+    source: str
+    retrieved_on: str
+    verified_on: str
+
+
+class QuotationSeriesFile(BaseModel):
+    """A whole ``data/observations/<venue>_<symbol>.toml``, as the fetch script writes it."""
+
+    model_config = STRICT
+
+    retrieved_on: str
+    endpoint: str
+    symbol: str
+    interval: str
+    observation: list[QuotationObservationTable]
+    """Required, and an empty list is a legal value: the key must be written down, on
+    ``SeedFile.seed``'s rule, so an absent one is a file that does not load rather than a
+    series that carries nothing."""
 
 
 class InflationAssumptionFile(BaseModel):

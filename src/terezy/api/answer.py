@@ -105,6 +105,7 @@ def _inputs(
         bound=declarations.candidates.composition.bound,
         ceiling=declarations.candidates.ceiling,
         objectives=objectives,
+        held=declarations.held_inputs,
     )
 
 

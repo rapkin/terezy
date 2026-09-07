@@ -36,6 +36,7 @@ from pathlib import Path
 import pytest
 
 from terezy.core.ledger import seeds
+from terezy.core.ledger.seeds import SeedLot
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.data.declarations import loader, resolver
@@ -99,6 +100,20 @@ def _scratch_root(tmp_path: Path) -> Path:
     return root
 
 
+def _resolved(root: Path = DATA_ROOT) -> tuple[SeedLot, ...]:
+    """The **shipped root's** lots as they leave the resolver, where a cost gains its currency.
+
+    ``seeds_from_file`` returns the entry as written (025 FR-025): the currency is the named
+    instrument's, which the loader does not hold. The private overlay's lots are excluded here
+    because this module is about the shipped file's own two.
+    """
+    resolved = resolver.seeds_and_goals_from_data_roots(
+        resolver.data_roots_of(root), base_currency=Currency.UAH
+    )
+    private = set(resolved.overlay_seeds)
+    return tuple(lot for lot in resolved.seeds if lot not in private)
+
+
 def _assert_names_file_and_field(exc: DeclarationError, file: Path, contains: str) -> None:
     """FR-023's two halves: which file, and where in it."""
     assert exc.file == file
@@ -111,12 +126,12 @@ def _assert_names_file_and_field(exc: DeclarationError, file: Path, contains: st
 
 
 def test_the_shipped_seed_file_loads() -> None:
-    owner_id, declared = loader.seeds_from_file(SEEDS, base_currency=Currency.UAH)
+    owner_id, declared = loader.seeds_from_file(SEEDS)
     assert owner_id == "owner-001"
     assert [lot.instrument_id for lot in declared] == ["ovdp_synthetic_a", "ovdp_synthetic_b"]
     assert declared[0].quantity == 10.0
-    assert declared[0].cost.amount == 9_800.0
-    assert declared[0].cost.currency is Currency.UAH
+    assert declared[0].cost == 9_800.0
+    assert _resolved()[0].cost.currency is Currency.UAH
 
 
 def test_the_shipped_file_says_on_its_face_that_it_is_synthetic() -> None:
@@ -131,10 +146,10 @@ def test_the_declared_basis_is_read_from_the_file_and_carries_the_owners_reason(
     stated. It deliberately does **not** join them: ``core.ledger.seeds.seed_cost`` does that,
     so the join holds for a lot this loader never saw. The next test asserts the join.
     """
-    _, declared = loader.seeds_from_file(SEEDS, base_currency=Currency.UAH)
+    _, declared = loader.seeds_from_file(SEEDS)
     known, estimated = declared
     assert known.basis == seeds.KNOWN
-    assert known.cost.provenance == prov.EMPTY
+    assert _resolved()[0].cost.provenance == prov.EMPTY
     assert isinstance(estimated.basis, seeds.BasisEstimated)
     assert estimated.basis.reason in estimated.basis.mark.citation
     assert estimated.basis.mark.verified_on is None
@@ -143,8 +158,7 @@ def test_the_declared_basis_is_read_from_the_file_and_carries_the_owners_reason(
 def test_the_cost_a_loaded_lot_enters_the_ledger_with_carries_its_basis_mark() -> None:
     """The join, over the shipped file: an estimated lot's cost is marked and a known one's is
     not, whichever route the lot took into the system."""
-    _, declared = loader.seeds_from_file(SEEDS, base_currency=Currency.UAH)
-    known, estimated = declared
+    known, estimated = _resolved()
     assert isinstance(estimated.basis, seeds.BasisEstimated)
     assert seeds.basis_estimated_sources(seeds.seed_cost(estimated).provenance) == frozenset(
         {estimated.basis.mark}
@@ -159,7 +173,7 @@ def test_every_lot_traces_to_the_entry_that_declared_it() -> None:
     ``(instrument, date)``; and a cause that cannot be resolved back to a file is the guess
     ``CausationKind`` refuses to allow.
     """
-    _, declared = loader.seeds_from_file(SEEDS, base_currency=Currency.UAH)
+    _, declared = loader.seeds_from_file(SEEDS)
     assert [lot.lot_id for lot in declared] == ["seed-0", "seed-1"]
     assert declared[0].declared_at == "seeds/owner-001.toml#seed[0]"
     assert declared[1].declared_at == "seeds/owner-001.toml#seed[1]"
@@ -175,7 +189,7 @@ def test_an_unrecognised_field_is_refused(tmp_path: Path) -> None:
     that does nothing."""
     path = _broken(tmp_path, "quantity      = 10.0", 'quantity      = 10.0\nnote          = "?"')
     with pytest.raises(DeclarationError) as caught:
-        loader.seeds_from_file(path, base_currency=Currency.UAH)
+        loader.seeds_from_file(path)
     _assert_names_file_and_field(caught.value, path, "note")
 
 
@@ -188,7 +202,7 @@ def test_a_currency_key_is_refused_because_there_is_nowhere_to_state_one(tmp_pat
     """
     path = _broken(tmp_path, "cost          = 9_800.0", 'cost          = 9_800.0\ncurrency = "USD"')
     with pytest.raises(DeclarationError) as caught:
-        loader.seeds_from_file(path, base_currency=Currency.UAH)
+        loader.seeds_from_file(path)
     _assert_names_file_and_field(caught.value, path, "currency")
 
 
@@ -196,7 +210,7 @@ def test_a_missing_cost_is_refused(tmp_path: Path) -> None:
     """FR-006: never defaulted, never zero-filled, never back-filled from a current value."""
     path = _without(tmp_path, "cost          = 9_800.0")
     with pytest.raises(DeclarationError) as caught:
-        loader.seeds_from_file(path, base_currency=Currency.UAH)
+        loader.seeds_from_file(path)
     _assert_names_file_and_field(caught.value, path, "cost")
 
 
@@ -208,7 +222,7 @@ def test_a_missing_basis_declaration_is_refused(tmp_path: Path) -> None:
     """
     path = _without(tmp_path, 'basis         = "known"')
     with pytest.raises(DeclarationError) as caught:
-        loader.seeds_from_file(path, base_currency=Currency.UAH)
+        loader.seeds_from_file(path)
     _assert_names_file_and_field(caught.value, path, "basis")
 
 
@@ -216,7 +230,7 @@ def test_an_unrecognised_basis_word_is_refused_naming_the_two_that_work(tmp_path
     """A value that is neither ``known`` nor ``estimated`` is a typo, not a third choice."""
     path = _broken(tmp_path, 'basis         = "known"', 'basis         = "guessed"')
     with pytest.raises(DeclarationError) as caught:
-        loader.seeds_from_file(path, base_currency=Currency.UAH)
+        loader.seeds_from_file(path)
     _assert_names_file_and_field(caught.value, path, "basis")
     assert "estimated" in str(caught.value)
 
@@ -225,7 +239,7 @@ def test_an_estimated_basis_without_a_reason_is_refused(tmp_path: Path) -> None:
     """FR-008: the mark must state its reason, so the declaration must carry one."""
     path = _without(tmp_path, "reason        =")
     with pytest.raises(DeclarationError) as caught:
-        loader.seeds_from_file(path, base_currency=Currency.UAH)
+        loader.seeds_from_file(path)
     _assert_names_file_and_field(caught.value, path, "reason")
 
 
@@ -233,7 +247,7 @@ def test_a_blank_reason_is_refused(tmp_path: Path) -> None:
     """Present-and-empty is not a reason. A mark that says nothing is a taint flag."""
     path = _broken(tmp_path, "reason        =", 'reason        = ""  #')
     with pytest.raises(DeclarationError) as caught:
-        loader.seeds_from_file(path, base_currency=Currency.UAH)
+        loader.seeds_from_file(path)
     _assert_names_file_and_field(caught.value, path, "reason")
 
 
@@ -249,7 +263,7 @@ def test_a_reason_on_a_known_basis_is_refused(tmp_path: Path) -> None:
         'basis         = "known"\nreason        = "not sure after all"',
     )
     with pytest.raises(DeclarationError) as caught:
-        loader.seeds_from_file(path, base_currency=Currency.UAH)
+        loader.seeds_from_file(path)
     _assert_names_file_and_field(caught.value, path, "reason")
 
 
@@ -262,7 +276,7 @@ def test_a_non_positive_quantity_is_refused(tmp_path: Path, quantity: str) -> No
     """
     path = _broken(tmp_path, "quantity      = 10.0", f"quantity      = {quantity}")
     with pytest.raises(DeclarationError) as caught:
-        loader.seeds_from_file(path, base_currency=Currency.UAH)
+        loader.seeds_from_file(path)
     _assert_names_file_and_field(caught.value, path, "quantity")
 
 
@@ -270,7 +284,7 @@ def test_a_negative_cost_is_refused(tmp_path: Path) -> None:
     """Spec, Edge Cases: a rebate is not a basis."""
     path = _broken(tmp_path, "cost          = 9_800.0", "cost          = -1.0")
     with pytest.raises(DeclarationError) as caught:
-        loader.seeds_from_file(path, base_currency=Currency.UAH)
+        loader.seeds_from_file(path)
     _assert_names_file_and_field(caught.value, path, "cost")
 
 
@@ -283,14 +297,14 @@ def test_a_cost_of_zero_is_accepted_because_it_is_a_declaration(tmp_path: Path) 
     and the load fails.
     """
     path = _broken(tmp_path, "cost          = 9_800.0", "cost          = 0.0")
-    _, declared = loader.seeds_from_file(path, base_currency=Currency.UAH)
-    assert declared[0].cost.amount == 0.0
+    _, declared = loader.seeds_from_file(path)
+    assert declared[0].cost == 0.0
 
 
 def test_a_malformed_date_is_refused(tmp_path: Path) -> None:
     path = _broken(tmp_path, 'acquired_on   = "2026-03-14"', 'acquired_on   = "14/03/2026"')
     with pytest.raises(DeclarationError) as caught:
-        loader.seeds_from_file(path, base_currency=Currency.UAH)
+        loader.seeds_from_file(path)
     _assert_names_file_and_field(caught.value, path, "acquired_on")
 
 
@@ -299,7 +313,7 @@ def test_a_quoted_number_is_refused_rather_than_coerced(tmp_path: Path) -> None:
     answer still looks right."""
     path = _broken(tmp_path, "quantity      = 10.0", 'quantity      = "10.0"')
     with pytest.raises(DeclarationError) as caught:
-        loader.seeds_from_file(path, base_currency=Currency.UAH)
+        loader.seeds_from_file(path)
     _assert_names_file_and_field(caught.value, path, "quantity")
 
 
@@ -307,14 +321,14 @@ def test_a_blank_owner_id_is_refused(tmp_path: Path) -> None:
     """Principle VII: every per-owner row carries its owner, and an empty string is not one."""
     path = _broken(tmp_path, 'id = "owner-001"', 'id = ""')
     with pytest.raises(DeclarationError) as caught:
-        loader.seeds_from_file(path, base_currency=Currency.UAH)
+        loader.seeds_from_file(path)
     _assert_names_file_and_field(caught.value, path, "owner.id")
 
 
 def test_a_blank_instrument_id_is_refused(tmp_path: Path) -> None:
     path = _broken(tmp_path, 'instrument_id = "ovdp_synthetic_a"', 'instrument_id = ""')
     with pytest.raises(DeclarationError) as caught:
-        loader.seeds_from_file(path, base_currency=Currency.UAH)
+        loader.seeds_from_file(path)
     _assert_names_file_and_field(caught.value, path, "instrument_id")
 
 
@@ -322,7 +336,7 @@ def test_a_file_that_is_not_valid_toml_is_refused_naming_the_file(tmp_path: Path
     path = tmp_path / "broken.toml"
     path.write_text('[owner\nid = "owner-001"\n', encoding="utf-8")
     with pytest.raises(DeclarationError) as caught:
-        loader.seeds_from_file(path, base_currency=Currency.UAH)
+        loader.seeds_from_file(path)
     assert caught.value.file == path
     assert "TOML" in caught.value.problem
 
@@ -333,7 +347,7 @@ def test_a_missing_file_is_reported_rather_than_read_as_empty(tmp_path: Path) ->
     loader and not found is a mistyped path."""
     path = tmp_path / "nowhere.toml"
     with pytest.raises(DeclarationError) as caught:
-        loader.seeds_from_file(path, base_currency=Currency.UAH)
+        loader.seeds_from_file(path)
     assert caught.value.file == path
 
 
@@ -345,7 +359,7 @@ def test_an_empty_seed_list_is_a_file_that_declares_nothing(tmp_path: Path) -> N
     """
     path = tmp_path / "none.toml"
     path.write_text('seed = []\n\n[owner]\nid = "owner-001"\n', encoding="utf-8")
-    owner_id, declared = loader.seeds_from_file(path, base_currency=Currency.UAH)
+    owner_id, declared = loader.seeds_from_file(path)
     assert owner_id == "owner-001"
     assert declared == ()
 
@@ -374,16 +388,21 @@ def test_a_seed_naming_an_undeclared_instrument_is_refused_at_load(tmp_path: Pat
         encoding="utf-8",
     )
     with pytest.raises(DeclarationError) as caught:
-        resolver.seeds_and_goals_from_data_root(root, base_currency=Currency.UAH)
+        resolver.seeds_and_goals_from_data_roots(
+            resolver.data_roots_of(root), base_currency=Currency.UAH
+        )
     _assert_names_file_and_field(caught.value, target, "instrument_id")
     assert "inzhur_reit" in caught.value.problem
 
 
 def test_the_composed_data_root_resolves() -> None:
     """The whole tree the battery above mutates, through the resolver a run would use."""
-    declared = resolver.seeds_and_goals_from_data_root(DATA_ROOT, base_currency=Currency.UAH)
+    declared = resolver.seeds_and_goals_from_data_roots(
+        resolver.data_roots_of(DATA_ROOT), base_currency=Currency.UAH
+    )
     assert declared.owner_id == "owner-001"
-    assert len(declared.seeds) == 2
+    assert len(declared.seeds) == 3, "the shipped file's two lots, and the overlay's one"
+    assert len(declared.overlay_seeds) == 1
     assert declared.seed_file == SEEDS
 
 
@@ -396,12 +415,12 @@ def test_what_ships_declares_an_owner_and_no_lot() -> None:
     ``seed`` key absent, and nothing in the suite loaded this root to notice.
     """
     shipped = data_roots.SHIPPED / "seeds" / "owner-001.toml"
-    owner_id, declared = loader.seeds_from_file(shipped, base_currency=Currency.UAH)
+    owner_id, declared = loader.seeds_from_file(shipped)
     assert owner_id == "owner-001"
     assert declared == ()
 
-    resolved = resolver.seeds_and_goals_from_data_root(
-        data_roots.SHIPPED, base_currency=Currency.UAH
+    resolved = resolver.seeds_and_goals_from_data_roots(
+        resolver.data_roots_of(data_roots.SHIPPED), base_currency=Currency.UAH
     )
     assert resolved.seed_file == shipped
     assert resolved.seeds == ()

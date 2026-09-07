@@ -1,0 +1,25 @@
+# SYNTHETIC FIXTURE. Every term in this file is invented, including the ticker.
+#
+# The only held asset any test can reach, and its purpose is that the mechanism is exercised
+# end to end without touching `btc`: a declared asset, a fetched close series, an overlay lot
+# whose cost is in dollars, and a tax class no pack declares. `btc` itself has no observation
+# file by design, so the shipped answer reports its refusal and nothing else -- which means the
+# PRICED path would be reachable by nothing at all without this file.
+#
+# It carries **no group label**, deliberately: `btc`'s own label is what makes the owner's word
+# resolve, and a fixture sharing it would make his answer depend on a test fixture.
+
+[instrument]
+id             = "synthetic_held_x"
+name           = "Synthetic held asset X — TEST FIXTURE, ticker and terms invented"
+class          = "held_asset"
+quantity_unit  = "SXT"
+price_currency = "USD"
+venue_id       = "binance"
+symbol         = "SYNTHUSDT"
+quote_asset    = "USDT"
+is_synthetic   = true
+groups         = []
+
+[instrument.tax_classes]
+disposal_gain = "no_pack_declares_this_class"

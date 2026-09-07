@@ -89,10 +89,12 @@ EXEMPT_DIRS: Final[dict[str, str]] = {
         "on a leg, in data/routes/, cited (003 research.md D4)"
     ),
     "user": (
-        "gitignored per-user data -- what a *run produces* rather than what a person declares: "
-        "results, caches, scratch output. Never curated, never committed, and outside this gate "
-        "by the Principle VII boundary. The owner's own declarations are committed and live in "
-        "the per-owner directories above (008 research.md D2)"
+        "the private overlay: the owner's own declarations of what he really holds, gitignored "
+        "and never committed. Exempt for the reason `seeds` is exempt -- what a person paid for "
+        "a lot is his own record rather than an observation of the world, so there is nothing "
+        "for a source to vouch for -- and additionally because this gate reads files, and this "
+        "is the one root whose files may describe his actual position (025 FR-007, "
+        "data/README.md rule 5)"
     ),
     "seeds": (
         "the owner's own opening lots -- what he already holds, what he paid, and whether he "

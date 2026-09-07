@@ -48,6 +48,7 @@ from terezy.core.results.answer import (
     HorizonSection,
     SectionsDisagreeByKey,
     StatedExclusion,
+    SubjectHeld,
     SubjectNotAssessed,
     SubjectReached,
     SubjectUndeclared,
@@ -78,6 +79,7 @@ from terezy.core.results.dominance import (
     WhyOneMember,
 )
 from terezy.core.results.fund import FundAssumptions
+from terezy.core.results.held import HeldTax, InBaseCurrency, Valuation, Valued
 from terezy.core.results.objectives import (
     AbsoluteBand,
     Band,
@@ -93,6 +95,7 @@ from terezy.core.routes.path import (
     FromTheDeclaration,
     entry_id,
 )
+from terezy.core.scenarios import quote_asset
 from terezy.data.declarations import loader
 from terezy.data.declarations.errors import DeclarationError
 
@@ -216,8 +219,63 @@ def render(run: AnsweredQuestion) -> list[str]:
     for section in result.sections:
         lines.extend(_section_lines(result, section))
         lines.append("")
+    lines.extend(_held_lines(result))
     lines.extend(_closing_lines(run, result))
     return lines
+
+
+def _held_lines(result: Answer) -> list[str]:
+    """The held section: what he already holds, beside the horizons rather than inside one.
+
+    Empty when he has declared no lot of any held asset, and then nothing is printed -- the
+    subject standing has already said he named one and declared no holding of it, and a
+    section reading *held: nothing* would be a claim about his position rather than about the
+    declarations (`data/README.md` rule 5).
+    """
+    if not result.held:
+        return []
+    lines = ["held (not candidates -- reported, never ranked):"]
+    for position in result.held:
+        lines.append(
+            f"  {position.instrument_id}: {position.quantity:g} {position.quantity_unit} "
+            f"at {position.venue_id}, over {len(position.lots)} lot(s)"
+        )
+        lines.append(f"    cost: {_readable(position.basis)}")
+        lines.extend(_valuation_lines(position.valuation))
+        lines.append(f"    tax: {_refusal(position.tax)}")
+        lines.append(f"    yield: {position.yields.reason}")
+        lines.append(f"    rank: {position.rank.reason}")
+    return [*lines, ""]
+
+
+def _valuation_lines(valuation: Valuation) -> list[str]:
+    """What the position is worth today, or the refusal that replaced every figure at once."""
+    if not isinstance(valuation, Valued):
+        return [f"    value: REFUSED -- {valuation.reason}"]
+    lines = [
+        f"    price: {valuation.quotation.close:g} per unit, closed "
+        f"{valuation.quotation.on_date.isoformat()}",
+        f"    value: {_readable(valuation.value)}",
+    ]
+    if valuation.assumption is not None:
+        lines.append(f"    assumes: {quote_asset.rests_on(valuation.assumption)}")
+    if isinstance(valuation.in_base, InBaseCurrency):
+        struck = valuation.in_base.struck
+        lines.append(f"    value in base: {_readable(valuation.in_base.value)}")
+        lines.append(f"    nominal change: {_readable(valuation.in_base.nominal_change)}")
+        if struck is not None:
+            lines.append(
+                f"      struck at {struck.rate:g} / {struck.quotation_unit:g} "
+                f"({struck.series_id}, {struck.rate_date.isoformat()})"
+            )
+    else:
+        lines.append(f"    value in base: REFUSED -- {valuation.in_base.reason}")
+    return lines
+
+
+def _refusal(refused: HeldTax) -> str:
+    """A held position's tax, which is always a reason and never a figure (025 FR-014)."""
+    return refused.reason
 
 
 def _named_scalars(record: object) -> list[str]:
@@ -292,7 +350,7 @@ def _section_lines(result: Answer, section: HorizonSection) -> list[str]:
         f"{section.horizon.start.isoformat()} to {section.horizon.end.isoformat()}",
         f"  of {len(section.standings)} named subject(s): {counts.reached} reached, "
         f"{counts.declared_but_unreached} declared but unreached, {counts.undeclared} "
-        f"undeclared, {counts.not_assessed} not assessed "
+        f"undeclared, {counts.not_assessed} not assessed, {counts.held} already held "
         f"({counts.ids_considered} instrument id(s) considered)",
         *_standing_lines(section),
     ]
@@ -782,6 +840,14 @@ def _standing_lines(section: HorizonSection) -> list[str]:
                 lines.append(
                     f"    {standing.named}: not assessed -- this section refused before it "
                     "enumerated anything."
+                )
+            case SubjectHeld():
+                lines.append(
+                    f"    {standing.named}: already held ({len(standing.held)} of "
+                    f"{len(standing.ids)}). Reported below, never ranked."
+                    if standing.held
+                    else f"    {standing.named}: a held asset, and no lot of it is declared "
+                    "here. The remedy is a lot under the private overlay."
                 )
     return lines
 

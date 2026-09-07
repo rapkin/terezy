@@ -90,6 +90,7 @@ from terezy.core.instruments.fund import (
     VerificationTask,
 )
 from terezy.core.instruments.groups import InstrumentGroup
+from terezy.core.instruments.held import HeldAssetDeclaration
 from terezy.core.instruments.interface import (
     PAYMENT_KINDS,
     Assumptions,
@@ -101,8 +102,9 @@ from terezy.core.instruments.interface import (
     PaymentKind,
     ScheduledPayment,
 )
+from terezy.core.instruments.quotations import Quotation, QuotationSeries
 from terezy.core.ledger import lots, seeds
-from terezy.core.ledger.seeds import SeedLot
+from terezy.core.ledger.seeds import Basis
 from terezy.core.primitives import conventions, periods
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
@@ -132,6 +134,7 @@ from terezy.core.routes.channels import ChannelSide, FxChannel, Side, effective_
 from terezy.core.routes.legs import Leg, Route
 from terezy.core.routes.venues import Venue
 from terezy.core.scenarios.quotation import QuotationHolds
+from terezy.core.scenarios.quote_asset import QuoteAssetIsWorth
 from terezy.core.scenarios.regimes import Regime, RegimeTransition
 from terezy.core.streams import streams
 from terezy.core.streams.streams import IncomeStream, Indexation
@@ -3186,6 +3189,129 @@ def cash_from_file(path: Path) -> CashDeclaration:
     )
 
 
+def held_asset_from_file(path: Path) -> HeldAssetDeclaration:
+    """One ``data/instruments/<id>.toml`` declaring a held asset (025 FR-009).
+
+    **The tax-class reference is required and is not resolved here or anywhere.** For a bond an
+    unresolved class is refused by the resolver, because a projection would otherwise charge
+    nothing; a held asset projects nothing, and the refusal is the reported figure. What is
+    still required is that a disposal class be *named* (:func:`_held_tax_classes`): a holding
+    with none would report no tax because nobody said what its tax was, which reads exactly
+    like an exemption.
+    """
+    document = read_document(path)
+    table = _validate(schema.HeldAssetFile, document, path).instrument
+    prefix = INSTRUMENT_TABLE
+    _known(
+        path,
+        f"{prefix}.class",
+        table.instrument_class,
+        {instrument_registry.HELD_ASSET: "an asset held for its price alone"},
+        "held-asset instrument class",
+    )
+    if table.price is not None:
+        raise DeclarationError(
+            path,
+            f"{prefix}.price",
+            f"states the price {table.price!r}. A held asset's price is a dated observation "
+            "under data/observations/, selected by the run's own as_of, and a declaration "
+            "stating one would be the same fact in two files -- which disagree the day either "
+            "moves, with nothing to say which the figures used.",
+            "delete the key; the price comes from the observation the fetch script writes",
+        )
+    return HeldAssetDeclaration(
+        id=_require_text(
+            path,
+            f"{prefix}.id",
+            table.id,
+            "a holding names its asset by id, and an unnamed one cannot be held",
+        ),
+        name=_require_text(
+            path,
+            f"{prefix}.name",
+            table.name,
+            "a reader is shown the name; an empty one names nothing",
+        ),
+        quantity_unit=_require_text(
+            path,
+            f"{prefix}.quantity_unit",
+            table.quantity_unit,
+            "a number of units means nothing without the unit, and no other field carries it",
+        ),
+        price_currency=_currency(path, f"{prefix}.price_currency", table.price_currency),
+        venue_id=_require_text(
+            path,
+            f"{prefix}.venue_id",
+            table.venue_id,
+            "where the units sit is checked against the declared venues (025 FR-009)",
+        ),
+        symbol=_require_text(
+            path,
+            f"{prefix}.symbol",
+            table.symbol,
+            "the venue's own ticker is what the fetched price series is written under, and "
+            "deriving it from the id would make a second venue's ticker an engine edit",
+        ),
+        quote_asset=_quote_asset(path, table, field_prefix=prefix),
+        is_synthetic=table.is_synthetic,
+        tax_classes=_held_tax_classes(path, table.tax_classes, field_prefix=f"{prefix}"),
+        groups=_group_labels(path, f"{prefix}.groups", table.groups),
+    )
+
+
+def _quote_asset(path: Path, table: schema.HeldAssetTable, *, field_prefix: str) -> str:
+    """What the declared symbol is priced in, checked against the symbol rather than read off it.
+
+    The check is the point. Nothing may infer the split -- a ticker publishes none -- so the
+    declaration states it; but a declaration that states a quote asset its own symbol does not
+    end in has one of the two fields wrong, and that is visible from this file alone. Left
+    unchecked, ``symbol = "BTCUSDT"`` beside ``quote_asset = "USD"`` would price the position
+    in dollars against a token quotation and never say so.
+    """
+    declared = _require_text(
+        path,
+        f"{field_prefix}.quote_asset",
+        table.quote_asset,
+        "what a symbol is priced in cannot be read off the symbol -- a ticker publishes no "
+        "split -- so the declaration states it (025 FR-023)",
+    )
+    symbol = _require_text(path, f"{field_prefix}.symbol", table.symbol, "a ticker is required")
+    if symbol.casefold().endswith(declared.casefold()):
+        return declared
+    raise DeclarationError(
+        path,
+        f"{field_prefix}.quote_asset",
+        f"declares {declared!r}, and the symbol {symbol!r} does not end in it. One of the two "
+        "is wrong, and which cannot be settled from outside this file: nothing may split a "
+        "ticker, so the pair is checked against itself instead.",
+        f"correct whichever of symbol and quote_asset is wrong for {symbol!r}",
+    )
+
+
+def _held_tax_classes(
+    path: Path, table: Mapping[str, str], *, field_prefix: str
+) -> Mapping[TaxableEventKind, str]:
+    """``[instrument.tax_classes]`` for a held asset, which must name a **disposal** class.
+
+    ``_tax_class_references`` refuses only a wholly empty table, and that is not enough here:
+    disposing is the one taxable thing that can happen to a thing held for its price, so a
+    declaration naming a coupon class and no disposal class would reach the reader as a refusal
+    citing the empty string. A refusal naming ``''`` tells nobody which class to go and declare.
+    """
+    declared = _tax_class_references(path, table, field_prefix=f"{field_prefix}.tax_classes")
+    if TaxableEventKind.DISPOSAL_GAIN in declared:
+        return declared
+    raise DeclarationError(
+        path,
+        f"{field_prefix}.tax_classes.{TaxableEventKind.DISPOSAL_GAIN.value}",
+        "is missing, and it is the one a held asset needs: nothing else can happen to a thing "
+        "held for its price, so a declaration without it would report its tax as a refusal "
+        "citing no class at all. The class need not resolve -- an unsettled treatment is what "
+        "the refusal exists to say -- but it has to be named.",
+        f'declare {TaxableEventKind.DISPOSAL_GAIN.value} = "<the class that would govern>"',
+    )
+
+
 def declared_class_of(path: Path) -> str:
     """The ``[instrument] class`` of a declaration file, read without validating the rest.
 
@@ -3445,18 +3571,38 @@ def _basis(
     )
 
 
-def seeds_from_file(path: Path, *, base_currency: Currency) -> tuple[str, tuple[SeedLot, ...]]:
+@dataclass(frozen=True, slots=True, kw_only=True)
+class DeclaredLot:
+    """One ``[[seed]]`` entry as the file states it, with the cost still a bare number.
+
+    025 FR-025 narrows 008 FR-010: a declared cost is in the base currency **unless the
+    instrument it names declares a different price currency**, and this loader holds no
+    instrument declaration. Tagging the amount here would put a dollar figure in hryvnia and
+    make the position wrong by the exchange rate while every number stayed plausible, so the
+    currency is attached where both facts are in hand -- ``resolver.resolve_seeds_and_goals``,
+    which also holds the rate series a foreign cost is struck at.
+    """
+
+    owner_id: str
+    lot_id: str
+    declared_at: str
+    is_synthetic: bool
+    instrument_id: str
+    quantity: float
+    acquired_on: date
+    cost: float
+    """The declared amount, in whatever currency the named instrument turns out to state."""
+
+    basis: Basis
+
+
+def seeds_from_file(path: Path) -> tuple[str, tuple[DeclaredLot, ...]]:
     """One ``data/seeds/<owner>.toml`` as its owner id and the lots it declares.
 
     Returns the owner beside the lots rather than folding him into the file record, on
     ``spendable_from_file``'s precedent -- though each lot *does* carry him, because a lot
     outlives the file it was read from and "whose holding is this" must still be answerable
     when it does.
-
-    ``base_currency`` is required and keyword-only because the file states no currency and
-    must not: a declared cost is in the base currency by FR-010, and the base currency is a
-    property of the run rather than of the holding. Passing it in is what keeps this loader
-    from hard-wiring hryvnia into the one place a second jurisdiction would have to change.
 
     Lot ids come from the entry's position -- ``seed-0``, ``seed-1`` -- rather than being
     declared. Two purchases of one instrument on one date are legitimate and must be two lots,
@@ -3466,13 +3612,13 @@ def seeds_from_file(path: Path, *, base_currency: Currency) -> tuple[str, tuple[
     document = read_document(path)
     file = _validate(schema.SeedFile, document, path)
     owner_id = _owner_of(path, file.owner, what="a declaration of what he already holds")
-    declared: list[SeedLot] = []
+    declared: list[DeclaredLot] = []
     for position, entry in enumerate(file.seed):
         field_prefix = f"{SEED_TABLE}[{position}]"
         declared_at = source_id(path, field_prefix)
         basis = _basis(path, entry, field_prefix=field_prefix, declared_at=declared_at)
         declared.append(
-            SeedLot(
+            DeclaredLot(
                 owner_id=owner_id,
                 lot_id=f"{SEED_TABLE}-{position}",
                 declared_at=declared_at,
@@ -3493,24 +3639,14 @@ def seeds_from_file(path: Path, *, base_currency: Currency) -> tuple[str, tuple[
                     "consumption order",
                 ),
                 acquired_on=_parse_date(path, f"{field_prefix}.acquired_on", entry.acquired_on),
-                cost=Money(
-                    _non_negative(
-                        path,
-                        f"{field_prefix}.cost",
-                        entry.cost,
-                        "a rebate is not a basis. Zero is a real declaration -- a holding that "
-                        "genuinely cost nothing -- and is accepted; what is refused is the "
-                        "field being absent, because a zero nobody wrote would make every "
-                        "later disposal compute the wrong gain (FR-006)",
-                    ),
-                    base_currency,
-                    # The declared amount rests on no cited source: an owner's own record is
-                    # not an observation, the reading `data/streams/` already takes for a
-                    # salary. Where the cost is a *guess*, the mark that says so travels on
-                    # `basis` and `core.ledger.seeds.seed_cost` joins the two -- so a lot the
-                    # loader never saw carries it too, and this boundary is not the only thing
-                    # standing between a guessed cost and an unmarked tax (008 FR-007).
-                    prov.EMPTY,
+                cost=_non_negative(
+                    path,
+                    f"{field_prefix}.cost",
+                    entry.cost,
+                    "a rebate is not a basis. Zero is a real declaration -- a holding that "
+                    "genuinely cost nothing -- and is accepted; what is refused is the "
+                    "field being absent, because a zero nobody wrote would make every "
+                    "later disposal compute the wrong gain (FR-006)",
                 ),
                 basis=basis,
             )
@@ -3997,6 +4133,139 @@ def inflation_assumption_from_file(path: Path) -> tuple[str, InflationAssumption
 
 QUOTATION_TABLE: Final = "quotation"
 """Root table of a quotation-belief file, and the prefix of every field path in one."""
+
+
+QUOTE_ASSET_TABLE: Final = "quote_asset"
+"""The root table of a quote-asset belief document."""
+
+QUOTATION_SERIES_OBSERVATION: Final = "observation"
+"""The repeated table of a fetched daily-close series."""
+
+
+def quote_asset_belief_from_file(path: Path) -> tuple[str, QuoteAssetIsWorth]:
+    """One ``data/scenarios/quote_asset/<owner>.toml`` as its owner id and the declared belief.
+
+    ``quotation_belief_from_file``'s shape, with **no citation read and none expected**: the
+    peg holds by the issuer's practice rather than by an obligation anybody published, so a
+    source here would replace the belief rather than vouch for it.
+    """
+    document = read_document(path)
+    table = _validate(schema.QuoteAssetBeliefFile, document, path).quote_asset
+    if not table.is_assumption:
+        raise DeclarationError(
+            path,
+            f"{QUOTE_ASSET_TABLE}.is_assumption",
+            "is declared false. What a dollar-referenced token is worth in dollars is nobody's "
+            "observation here: an issuer that committed to the peg would have published a "
+            "term, and a cited rate would be an observation under data/observations/ rather "
+            "than a belief. The field exists to make the assumption unmissable on every figure "
+            "it touches, not to be switched off -- the core types it as a Literal admitting "
+            "one value.",
+            "write is_assumption = true, or declare a cited rate as an observation",
+        )
+    return (
+        _require_text(
+            path,
+            f"{QUOTE_ASSET_TABLE}.owner_id",
+            table.owner_id,
+            "a belief is one person's, and every declaration carries its owner from the first "
+            "commit (Principle VII)",
+        ),
+        QuoteAssetIsWorth(
+            id=_require_text(
+                path,
+                f"{QUOTE_ASSET_TABLE}.id",
+                table.id,
+                "every figure struck through the belief names it, so a reader can find the "
+                "file the assumption is stated in",
+            ),
+            quote_asset=_require_text(
+                path,
+                f"{QUOTE_ASSET_TABLE}.quote_asset",
+                table.quote_asset,
+                "the belief is about one named token, and one that names none says nothing",
+            ),
+            currency=_currency(path, f"{QUOTE_ASSET_TABLE}.currency", table.currency).value,
+            is_assumption=True,
+            rationale=_require_text(
+                path,
+                f"{QUOTE_ASSET_TABLE}.rationale",
+                table.rationale,
+                "an assumption without a stated reason is indistinguishable from an oversight, "
+                "and a reader cannot weigh it",
+            ),
+        ),
+    )
+
+
+def quotation_series_from_file(path: Path, *, venue_id: str) -> QuotationSeries:
+    """One ``data/observations/<venue>_<symbol>.toml`` as a dated close series (025 FR-011).
+
+    **Strictly ascending, without duplicates**, checked here where the file can be named:
+    ``close_on`` finds a date by bisection, so an unsorted file would silently answer the wrong
+    day, and a duplicate would make which of two closes is used depend on the search.
+
+    **The close is left untagged**: ``Quotation.close`` is a bare number, because what the
+    symbol's quote asset is worth in a currency is the owner's declared belief and never this
+    file's business.
+    """
+    document = read_document(path)
+    file = _validate(schema.QuotationSeriesFile, document, path)
+    symbol = _require_text(
+        path,
+        "symbol",
+        file.symbol,
+        "a series with no symbol names nothing, and the symbol is what a declaration points at",
+    )
+    quotations: list[Quotation] = []
+    for position, entry in enumerate(file.observation):
+        prefix = f"{QUOTATION_SERIES_OBSERVATION}[{position}]"
+        on_date = _parse_date(path, f"{prefix}.on_date", entry.on_date)
+        if quotations and on_date <= quotations[-1].on_date:
+            raise DeclarationError(
+                path,
+                f"{prefix}.on_date",
+                f"declares {on_date.isoformat()} after "
+                f"{quotations[-1].on_date.isoformat()}, and the series is read as strictly "
+                "ascending: a price is found by bisection, so an out-of-order or repeated day "
+                "makes the search answer a day nobody asked about.",
+                "re-run the fetch script rather than editing the file by hand",
+            )
+        quotations.append(
+            Quotation(
+                on_date=on_date,
+                close=_positive(
+                    path,
+                    f"{prefix}.close",
+                    entry.close,
+                    "a published close is a strictly positive price; zero or below is a value "
+                    "that merely looks like money",
+                ),
+                provenance=prov.of(
+                    [
+                        _source_ref(
+                            path,
+                            prefix,
+                            source=entry.source,
+                            retrieved_on=entry.retrieved_on,
+                            verified_on=entry.verified_on,
+                            kind=entry.kind,
+                        )
+                    ]
+                ),
+            )
+        )
+    return QuotationSeries(
+        symbol=symbol,
+        venue_id=venue_id,
+        endpoint=_require_text(
+            path,
+            "endpoint",
+            file.endpoint,
+            "a fetched figure states where it came from, so a reader can go and look",
+        ),
+        quotations=tuple(quotations),
+    )
 
 
 def quotation_belief_from_file(path: Path) -> tuple[str, QuotationHolds]:

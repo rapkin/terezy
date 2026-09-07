@@ -1,0 +1,27 @@
+# SYNTHETIC FIXTURE, in the position the PRIVATE OVERLAY occupies: `<root>/user/seeds/`.
+#
+# The overlay is where a declaration describing what the owner REALLY holds is allowed to live
+# (025 FR-001), and the shipped `data/user/` is gitignored so no such file is ever committed.
+# This one is under `tests/fixtures/data/`, which is not that path and is not gitignored, and
+# every figure in it is invented.
+#
+# It joins the composed root's `seeds/owner-001.toml` rather than replacing it: the two roots
+# are unioned per instrument, and a lot of an instrument the other root also declares is refused
+# naming both files (FR-003). The ОВДП lots are there; the held asset is here.
+#
+# `cost` is in DOLLARS, because that is what `synthetic_held_x` declares as its price currency
+# (025 FR-025 narrowing 008 FR-010). It is struck into hryvnia at the official rate for
+# `acquired_on`, and both marks — the owner's estimate and the rate observation — reach every
+# figure derived from it.
+
+[owner]
+id = "owner-001"
+
+[[seed]]
+is_synthetic  = true
+instrument_id = "synthetic_held_x"
+quantity      = 0.25
+acquired_on   = "2025-04-07"
+cost          = 12_500.0
+basis         = "estimated"
+reason        = "AN INVENTED REASON FOR AN INVENTED LOT — bought across several days and the exchange's export shows units, not the prices paid"

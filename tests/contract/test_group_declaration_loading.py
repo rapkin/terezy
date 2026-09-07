@@ -30,6 +30,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DATA_ROOT = data_roots.with_fixtures()
 GROUPS = DATA_ROOT / "groups.toml"
 
+BTC = "btc"
 CASH = "cash"
 OVDP = "ovdp"
 INZHUR = "inzhur"
@@ -49,24 +50,34 @@ ids for one security (016 FR-027a).
 """
 
 DECLARED_MEMBERSHIP: dict[str, frozenset[str]] = {
+    BTC: frozenset({"btc"}),
     CASH: frozenset({"cash_uah_monobank"}),
     OVDP: FIXTURES_IN_OVDP | frozenset(obs.declared_isins()),
     INZHUR: frozenset({"inzhur_reit", "inzhur_miltech"}),
 }
-"""What the owner's three declared words resolve to over the composed registry.
+"""What the owner's four declared words resolve to over the composed registry.
 
 The real half is **derived** from the two observation files rather than listed, which is the
 whole argument for a group: an issue joins by carrying the label and nothing here changes.
 """
 
-IN_NO_GROUP = frozenset({"enumerated_taxable_x", "synthetic_fund_c", "enumerated_out_of_order"})
-"""The three the registry declares and the owner's question does not reach.
+IN_NO_GROUP = frozenset(
+    {
+        "enumerated_taxable_x",
+        "synthetic_fund_c",
+        "enumerated_out_of_order",
+        "synthetic_held_x",
+    }
+)
+"""The four the registry declares and the owner's question does not reach.
 
 The first is fixed income and is not an OVDP; the second's own header says its whole purpose is
 that it is different from the Inzhur funds. Both are the reason FR-007a forbids inferring a
 group from a class -- and the third is the fixture 016 FR-027a unlabelled, which is why a group
 is a label and not a rule: no rule over a class, a venue, a tax class or an id prefix could
-have excluded it.
+have excluded it. The fourth is the fixture held asset, unlabelled deliberately: `btc` carries
+the label the owner's own word resolves through, and a fixture sharing it would make his answer
+depend on a test fixture.
 """
 
 
@@ -111,7 +122,7 @@ def test_the_declared_labels_are_what_the_owners_words_resolve_to() -> None:
     assert {name: frozenset(ids) for name, ids in labelled.items()} == DECLARED_MEMBERSHIP
 
 
-def test_three_declared_instruments_are_in_no_group() -> None:
+def test_the_instruments_in_no_group_are_the_ones_pinned() -> None:
     """Their own files say what they are for, and none is what the owner asked about."""
     labels = fixtures.declared_labels()
     assert {name for name, groups in labels.items() if not groups} == IN_NO_GROUP

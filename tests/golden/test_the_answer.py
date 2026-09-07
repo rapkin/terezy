@@ -48,6 +48,7 @@ from terezy.core.primitives.currency import Currency
 from terezy.core.results.answer import Answer, DeclaredSubject, HorizonSection
 from terezy.core.results.candidates import CandidateSurvey
 from terezy.core.results.dominance import DominanceResult, NothingDominatesTheHurdle
+from terezy.core.results.held import InBaseCurrency, Valued
 from terezy.data import manifest as run_manifest
 from tests import answer_registries as fixtures
 
@@ -95,7 +96,7 @@ def _render(result: Answer) -> str:
             f"[section] {section.horizon.start.isoformat()}..{section.horizon.end.isoformat()}  "
             f"{type(section.outcome).__name__}  reached={counts.reached} "
             f"unreached={counts.declared_but_unreached} undeclared={counts.undeclared} "
-            f"ids={counts.ids_considered}"
+            f"held={counts.held} ids={counts.ids_considered}"
         )
         if isinstance(section.outcome, CandidateSurvey):
             lines.append(
@@ -126,6 +127,30 @@ def _render(result: Answer) -> str:
                 f"  withheld {withheld.key.instrument_id:24} arrives "
                 f"{withheld.arrives_on.isoformat()}"
             )
+        lines.append("")
+    for position in result.held:
+        lines.append(
+            f"[held] {position.instrument_id:24} {position.quantity.hex()} "
+            f"{position.quantity_unit}  basis {position.basis.amount.hex()} "
+            f"{position.basis.currency.value}"
+        )
+        lines.append(f"  valuation {type(position.valuation).__name__}")
+        if isinstance(position.valuation, Valued):
+            assumed = position.valuation.assumption
+            lines.append(
+                f"  priced {position.valuation.quotation.on_date.isoformat()} "
+                f"{position.valuation.value.amount.hex()} "
+                f"{position.valuation.value.currency.value}  "
+                f"assumes {'none' if assumed is None else assumed.id}"
+            )
+            lines.append(f"  in_base {type(position.valuation.in_base).__name__}")
+            if isinstance(position.valuation.in_base, InBaseCurrency):
+                lines.append(
+                    f"    value {position.valuation.in_base.value.amount.hex()}  "
+                    f"change {position.valuation.in_base.nominal_change.amount.hex()}"
+                )
+        lines.append(f"  tax {type(position.tax).__name__}")
+    if result.held:
         lines.append("")
     for item in result.excludes:
         lines.append(f"[excludes] {item.what.value}")

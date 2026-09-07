@@ -158,8 +158,17 @@ Out of :data:`REGISTRY` on the argument the section above makes for a fund, and 
 instance of it: a balance produces no event stream at all.
 """
 
+HELD_ASSET: Final = "held_asset"
+"""An asset held for its price alone: `core.instruments.held`.
+
+Out of :data:`REGISTRY` for the reason a balance is, and one step further: a balance at least
+has a currency and a declared zero rate, while a held asset declares no rate, no schedule and
+no price -- the price is a dated observation. There is no part of `InstrumentOps` it could
+satisfy, so no fifth plugin interface is added and none is needed.
+"""
+
 DECLARATION_KINDS: Final[frozenset[str]] = frozenset(
-    {FIXED_INCOME, ENUMERATED_SCHEDULE, COLLECTIVE_INVESTMENT_FUND, CASH_BALANCE}
+    {FIXED_INCOME, ENUMERATED_SCHEDULE, COLLECTIVE_INVESTMENT_FUND, CASH_BALANCE, HELD_ASSET}
 )
 """Every ``[instrument] class`` a declaration file may name, instrument or otherwise.
 

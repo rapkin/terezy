@@ -1,0 +1,57 @@
+# Owner answers — the two clarifications of 025's specification.
+#
+# Взято 2026-09-07. Обидва питання — про те, ЧИМ Є цифра, а не як вона обчислена: CL-1 каже,
+# що стоїть між USDT і доларом, CL-2 — де саме в відповіді з'являється утримувана позиція.
+#
+# `choice` несе САМУ ВІДПОВІДЬ, а не лише літеру варіанта. Власні слова власника — в `notes`.
+exported_on = "2026-09-07"
+
+[[answer]]
+q        = 1
+feature  = "025-btc-holdings"
+title    = "Що стоїть між USDT і доларом"
+question = "The price this repository can fetch is BTCUSDT; every hryvnia figure downstream needs dollars. What stands between the two?"
+options  = [
+  "A. A declared belief in data/scenarios/ that one USDT is one USD, labelled an assumption with the owner's reason",
+  "B. Refuse every dollar and hryvnia figure; report the position in USDT only",
+  "C. Declare a cited USDT/USD rate as an observation from a source",
+]
+choice   = "A — a declared belief that one USDT is one USD, in data/scenarios/, labelled an assumption and marked on every figure derived through it. Never a silent equality."
+notes    = """
+Слова власника: «прирівнюй до долара».
+
+Це переконання, а не факт, і воно записане як переконання. Файл у `data/scenarios/` — там, де
+вже живе `quotation` — несе `is_assumption = true` і `rationale` замість цитати, бо цитувати
+тут нічого: прив'язка USDT до долара тримається практикою емітента, а не зобов'язанням, яке
+хтось опублікував.
+
+Що це коштує: КОЖНА доларова й гривнева цифра позиції несе марку цього припущення, поруч із
+маркою неперевіреної котирувальної ціни та маркою оцінної бази. Три марки на одній цифрі — це
+не надлишок, це три різні речі, яких ніхто не спостерігав.
+
+Чого це НЕ означає: мовчазної рівності. Якщо переконання не оголошене, доларова цифра не
+з'являється — вона відмовляється за іменем. Варіант C лишається розширенням: підмінити
+оголошене переконання цитованим спостереженням — це зміна файла даних і нічого більше.
+"""
+
+[[answer]]
+q        = 2
+feature  = "025-btc-holdings"
+title    = "Де в відповіді з'являється утримувана позиція"
+question = "Where does a held position appear in the answer — its own section, a baseline row in each ranking, or a subject standing with no figures?"
+options  = [
+  "A. Its own held section, beside the horizon sections, with its own fields",
+  "B. A baseline row inside each horizon's ranking",
+  "C. Only a subject standing, with no figures",
+]
+choice   = "A — its own `held` section of the answer. Never a baseline row in the ranking."
+notes    = """
+Рекомендацію викладено власникові з наслідками кожного варіанта; він не заперечив. Записано як
+A.
+
+Рейтинг далі відповідає на одне питання — куди подіти 50 000. Утримувана позиція не є
+кандидатом і не може ним стати: `Tuple.route_in` обов'язковий, а нульового входу немає
+(`zero-hop-way-in`). B вимагав би ціни купівлі, маршруту входу й виходу для купівлі, якої не
+буде, — три вигадані числа заради одного рядка. C каже, що він щось тримає, і відмовляється
+сказати, скільки воно варте, тобто відмовляється відповісти на поставлене питання.
+"""

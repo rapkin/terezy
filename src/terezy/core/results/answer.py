@@ -32,6 +32,7 @@ from terezy.core.primitives.provenance import Provenance
 from terezy.core.primitives.staleness import StalenessVerdict
 from terezy.core.results.candidates import CandidateSet, CandidateSurvey, SurveyRefused
 from terezy.core.results.dominance import DominanceRefused, DominanceResult
+from terezy.core.results.held import HeldPosition
 from terezy.core.results.question import Question, Reserve
 from terezy.core.results.tuple import Arrival, RemainderCameHome, Tuple
 
@@ -133,8 +134,26 @@ class SubjectNotAssessed:
     ids: tuple[str, ...]
 
 
-SubjectStanding = SubjectReached | SubjectUnreached | SubjectUndeclared | SubjectNotAssessed
-"""One named subject's state in one section. Four records rather than one with a flag, because
+@dataclass(frozen=True, slots=True, kw_only=True)
+class SubjectHeld:
+    """Declared, and the owner already holds it -- so it is reported rather than ranked.
+
+    025 FR-029. A fifth state rather than *unreached*, because *unreached* names a corridor as
+    the remedy and the remedy here is nothing at all: he holds it, and this question is about
+    where new money should go. Its figures are in the answer's own held section.
+    """
+
+    named: str
+    ids: tuple[str, ...]
+    held: tuple[str, ...]
+    """Which of them he declares a lot of. A subset, and the difference is worth seeing: a
+    group naming three held assets he holds one of says so."""
+
+
+SubjectStanding = (
+    SubjectReached | SubjectUnreached | SubjectUndeclared | SubjectNotAssessed | SubjectHeld
+)
+"""One named subject's state in one section. Five records rather than one with a flag, because
 FR-010 requires them distinguishable without reading prose and the remedies differ."""
 
 
@@ -153,6 +172,11 @@ class SubjectCounts:
     not_assessed: int
     """Declared, and this section refused before it could look. Counted apart from
     *unreached*, whose remedy is a corridor and whose remedy this one is not."""
+
+    held: int
+    """Declared, and already held. Counted apart from *reached* for the same reason: a
+    position is reported and never ranked, so folding it in would inflate the count of
+    subjects this section could actually answer with a candidate."""
 
     ids_considered: int
     """The union of every declared subject's ids, deduplicated (FR-007b): an id named twice --
@@ -393,6 +417,14 @@ class Answer:
     where the window is part of what it says.
     """
 
+    held: tuple[HeldPosition, ...]
+    """What the owner already holds, of the assets this question named (025 FR-030).
+
+    Its own section rather than rows in the ranking, and beside the horizon sections rather
+    than inside one: a holding does not change with the window the money is compared over,
+    because nothing about it is bought, sold or held to a maturity here.
+    """
+
     provenance: Provenance
     """The union of the marks on every declaration behind every figure reported (FR-024)."""
 
@@ -578,6 +610,7 @@ __all__ = [
     "StatedExclusion",
     "StreamWithNoAmount",
     "SubjectCounts",
+    "SubjectHeld",
     "SubjectNotAssessed",
     "SubjectReached",
     "SubjectStanding",

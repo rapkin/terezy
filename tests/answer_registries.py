@@ -83,6 +83,7 @@ def inputs(declared: resolver.AnswerDeclarations | None = None) -> AnswerInputs:
         bound=resolved.candidates.composition.bound,
         ceiling=resolved.candidates.ceiling,
         objectives=resolved.objective_sets[OBJECTIVE_SET],
+        held=resolved.held_inputs,
     )
 
 
@@ -171,4 +172,5 @@ def declared_labels(
         **{name: item.groups for name, item in registries.instruments.items()},
         **{name: item.groups for name, item in registries.funds.items()},
         **{name: item.groups for name, item in registries.cash.items()},
+        **{name: item.groups for name, item in registries.held.items()},
     }

@@ -145,8 +145,13 @@ def test_a_plan_keyed_by_a_word_that_runs_nothing_refuses_the_question() -> None
     assert getattr(refusal, "named", None) == "nothing_reaches_this"
 
 
-def test_a_plan_for_a_subject_the_registry_does_not_declare_is_not_refused() -> None:
-    """``btc`` is a legitimate subject with a legitimate plan and an empty answer."""
+def test_a_plan_for_a_held_subject_is_not_refused() -> None:
+    """``btc`` is a legitimate subject with a legitimate plan and no candidate of its own.
+
+    A plan the owner wrote for a word that reaches no candidate is not a refusal: 025 declared
+    `btc` as a held asset, which is reported rather than ranked, and the plan simply governs
+    nothing here.
+    """
     question = fixtures.owners_question()
     result = fixtures.answered(
         fixtures.with_plans(
@@ -154,4 +159,4 @@ def test_a_plan_for_a_subject_the_registry_does_not_declare_is_not_refused() -> 
             {fixtures.OVDP: question.plans[fixtures.OVDP], "btc": question.plans[fixtures.OVDP]},
         )
     )
-    assert subject_counts(result, result.sections[0]).undeclared == 1
+    assert subject_counts(result, result.sections[0]).held == 1

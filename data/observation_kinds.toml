@@ -76,3 +76,9 @@ note           = "An official rate published for a date that has passed is a his
 id             = "bank_balance_terms"
 staleness_days = 180
 note           = "What a bank pays on a current-account balance, and — the claim that actually matters — that the product is a BALANCE rather than a deposit. Its own kind because none of the others covers it: bank_fee_schedule is a tariff the bank CHARGES and venue_terms is a condition of DEALING, and a kind with no threshold fails at load, so borrowing either would put this figure's expiry under an interval set for something else. Half the tariff interval, because a bank restructures what an account pays more readily than it reprices its fees — and because the day it starts paying something the declaration must be refused rather than quietly kept."
+
+[[kind]]
+id             = "market_quotation"
+staleness_days = 1
+note           = "A venue's own closing quotation for a day that has already ended. THE THRESHOLD IS INERT, and 1 is the smallest positive number this file admits rather than a claim about how long a market price stays good -- nobody has made that claim, and a larger number here would read as one. Nothing this threshold governs can ever fire: a fetch writes only days that closed BEFORE its own retrieval date (025 FR-024), and a price is read for the run's own as_of alone (025 FR-011), so a run that finds a row is reading one whose age is negative, and a run that would find an aged one finds no row and refuses by name instead. The kind exists because a sourced table naming no declared kind is a load error, not because anything here ages. Its own kind rather than venue_terms: a minimum ticket is a condition of dealing that changes on the venue's own schedule, while a quotation is a fact about one day that the next day replaces."
+

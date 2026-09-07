@@ -16,7 +16,7 @@ import pytest
 
 from terezy.api.http import bind, roots, serve, service
 from terezy.data.declarations import resolver
-from tests.data_roots import SHIPPED
+from tests.data_roots import COMMITTED, SHIPPED
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -82,7 +82,9 @@ def test_the_built_client_is_found_from_the_same_directory(
 
     assert located is not None
     assert located.is_absolute()
-    assert located.parent.parent == SHIPPED.parent
+    # COMMITTED rather than SHIPPED: the client is found beside the repository's own
+    # data root, and SHIPPED is a temporary copy of it with the private overlay left out.
+    assert located.parent.parent == COMMITTED.parent
 
 
 def test_a_root_the_variable_names_and_that_does_not_exist_is_named(tmp_path: Path) -> None:

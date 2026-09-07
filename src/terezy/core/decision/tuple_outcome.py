@@ -92,6 +92,7 @@ from terezy.core.instruments import registry as instrument_registry
 from terezy.core.instruments import terms as instrument_terms
 from terezy.core.instruments.cash import CashAssumptions, CashDeclaration
 from terezy.core.instruments.fund import FundDeclaration
+from terezy.core.instruments.held import HeldAssetDeclaration
 from terezy.core.instruments.interface import (
     Assumptions,
     DateRange,
@@ -223,6 +224,15 @@ class Registries:
     wherever the other two are, and the reason is Principle IV's: an id in neither existing map
     was skipped by enumeration with **no refusal at all**, so a declared balance would have
     disappeared from the comparison silently (023 FR-008a).
+    """
+
+    held: Mapping[str, HeldAssetDeclaration]
+    """Assets held for their price alone (025 FR-009). Empty is ordinary.
+
+    Never a candidate, unlike a balance: a tuple requires a way in, and a held position was not
+    funded through a declared corridor. It is here because the group vocabulary and the subject
+    resolution read every declared id, and a held asset a question names must not resolve to
+    nothing.
     """
 
     tax_classes: Mapping[str, TaxClass]
