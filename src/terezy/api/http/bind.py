@@ -123,9 +123,14 @@ def context_in_force(value: str | None, *, marker: str | None) -> BindContext | 
             return ContainerClaimUnverified(
                 value=declared.value,
                 reason=(
-                    f"{CONTEXT_VARIABLE} declares {declared.value}, and this process is not "
-                    f"inside a container: no {DOCKER_MARKER} and no container runtime named in "
-                    f"{CGROUP_PATH}. {RELEASE_GATE}"
+                    f"{CONTEXT_VARIABLE} declares {declared.value}, and nothing this process can "
+                    f"see says it is inside a container: {DOCKER_MARKER} does not exist, and "
+                    f"{CGROUP_PATH} names none of {', '.join(CGROUP_RUNTIMES)}. A runtime that "
+                    "leaves neither is refused rather than believed -- podman under cgroup v2 "
+                    "publishes 0::/ for its own init and writes /run/.containerenv, so it lands "
+                    f"here. The value this machine admits is {CONTEXT_VARIABLE}="
+                    f"{BindContext.LOOPBACK.value} (or unset), which binds a loopback address "
+                    f"only. {RELEASE_GATE}"
                 ),
             )
         case _:
