@@ -39,7 +39,6 @@ from functools import cache
 
 import pytest
 
-from terezy.core.decision import tuple_outcome
 from terezy.core.decision.compare import compare
 from terezy.core.instruments.interface import DateRange, Holding
 from terezy.core.ledger.canonical import of_causation
@@ -55,6 +54,7 @@ from terezy.core.results.schedule import CashFlowSchedule
 from terezy.core.results.tuple import Comparison, TupleOutcome
 from terezy.data.declarations import resolver
 from tests import tuple_registries as fixtures
+from tests.outcomes import evaluated_outcome
 
 pytestmark = pytest.mark.golden
 
@@ -89,7 +89,7 @@ def _rate(outcome: TupleOutcome) -> float:
 
 
 def _outcome(instrument_id: str) -> TupleOutcome:
-    outcome = tuple_outcome.evaluate(
+    outcome = evaluated_outcome(
         replace(fixtures.hurdle_tuple(), instrument_id=instrument_id),
         amount=fixtures.AMOUNT,
         horizon=HORIZON,
@@ -229,7 +229,9 @@ class TestTheOnlyDifferencesArePermittedOnes:
         so a field added to the outcome later cannot differ between the forms without
         somebody deciding that it may -- an added field falls to the ``else`` arm and is
         compared for equality."""
-        permitted = {"key", "excludes", "provenance", "rests_on", "staleness"}
+        # `projection_key` joins `key`: it renders the same five terms, so two declarations of
+        # one paper differ in it for exactly the reason they differ in the key.
+        permitted = {"key", "projection_key", "excludes", "provenance", "rests_on", "staleness"}
         for field in TupleOutcome.__dataclass_fields__:
             if field in permitted:
                 continue

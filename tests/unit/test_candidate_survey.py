@@ -23,7 +23,6 @@ from typing import TYPE_CHECKING
 import pytest
 
 from terezy.core.decision.candidates import evaluated, survey
-from terezy.core.decision.tuple_outcome import evaluate
 from terezy.core.results.candidates import (
     BenchmarkNotACandidate,
     CandidateSet,
@@ -36,6 +35,7 @@ from terezy.core.results.tuple import Comparison, TupleOutcome
 from terezy.core.routes.path import FROM_THE_DECLARATION, FundingPath
 from tests import candidate_registries as fixtures
 from tests import tuple_registries as tuples
+from tests.outcomes import evaluated_outcome
 
 if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.decision.tuple_outcome import Registries
@@ -114,7 +114,7 @@ class TestTheLoopIsALoop:
         outcomes = evaluated(result.comparison)
         assert outcomes
         for outcome in outcomes:
-            direct = evaluate(
+            direct = evaluated_outcome(
                 outcome.key,
                 amount=question.amounts[outcome.key.stream_id],
                 horizon=question.horizon,
@@ -130,7 +130,7 @@ class TestTheLoopIsALoop:
         question = fixtures.question(registries)
         result = _declared_survey()
         for refused in result.comparison.refused:
-            direct = evaluate(
+            direct = evaluated_outcome(
                 refused.key,
                 amount=question.amounts[refused.key.stream_id],
                 horizon=question.horizon,

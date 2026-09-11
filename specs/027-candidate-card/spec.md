@@ -219,9 +219,10 @@ statement's occurrences on the screen.
   either: measured 2026-09-07, `inzhur_miltech` is a ranked candidate in every section and its
   projection is real. It states no cash-flow schedule and, in this window, no distribution — it
   states an exit line — which is what FR-003's union and this absence exist to keep honest.
-- **FR-008**: `docs/METHODOLOGY.md` §29 MUST state what the served projection carries and what it
+- **FR-008**: `docs/METHODOLOGY.md` MUST state what the served projection carries and what it
   still does not — the ledger, which is unserialisable, and every term the way-out charge is netted
-  against out of order.
+  against out of order. It lands as **§38**; the §29 this requirement first named is 010's own
+  section and was already taken when the spec was written.
 
 ### Over HTTP
 

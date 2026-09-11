@@ -27,7 +27,7 @@ from typing import Final
 import pytest
 
 from terezy.core.decision.answer import section_evaluated
-from terezy.core.decision.tuple_outcome import Registries, evaluate
+from terezy.core.decision.tuple_outcome import Registries
 from terezy.core.instruments.interface import DateRange
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
@@ -37,6 +37,7 @@ from terezy.core.results.tuple import RateNotComparable, Tuple, TupleOutcome
 from terezy.core.routes.path import DeclaredExit, FundingPath
 from tests import answer_registries as answers
 from tests import tuple_registries as fixtures
+from tests.outcomes import evaluated_outcome
 
 HORIZON: Final = DateRange(start=fixtures.ISSUE_DATE, end=fixtures.HORIZON_END)
 SECOND_SERIES: Final = "pl_cpi_monthly"
@@ -45,7 +46,7 @@ a data-only addition, and what this suite is about is the engine refusing to *ch
 
 
 def _evaluated(registries: Registries, candidate: Tuple | None = None) -> TupleOutcome:
-    outcome = evaluate(
+    outcome = evaluated_outcome(
         candidate or fixtures.hurdle_tuple(),
         amount=fixtures.AMOUNT,
         horizon=HORIZON,
@@ -124,7 +125,7 @@ def test_a_tuple_with_no_comparable_rate_says_there_is_nothing_to_deflate_on_bot
         fixtures.declared(),
         fixtures.fx_route("test_deel_to_inzhur", origin="deel", destination="inzhur"),
     )
-    outcome = evaluate(
+    outcome = evaluated_outcome(
         Tuple(
             instrument_id=fixtures.OVDP,
             stream_id="contract_usd",

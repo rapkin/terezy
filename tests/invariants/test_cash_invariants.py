@@ -24,7 +24,7 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from terezy.core.decision.tuple_outcome import Registries, evaluate
+from terezy.core.decision.tuple_outcome import Registries
 from terezy.core.instruments.access import InstrumentAccess
 from terezy.core.instruments.cash import CashAssumptions, CashDeclaration
 from terezy.core.instruments.interface import DateRange
@@ -42,6 +42,7 @@ from terezy.core.results.tuple import HOLD_AS_CASH, Tuple, TupleOutcome
 from terezy.core.routes.path import ENTRY_BY_IDENTITY, EXIT_BY_IDENTITY
 from terezy.core.scenarios.quotation import QuotationHolds
 from terezy.core.streams.streams import IncomeStream, Indexation
+from tests.outcomes import evaluated_outcome
 
 pytestmark = pytest.mark.invariant
 
@@ -141,7 +142,7 @@ TUPLE: Final = Tuple(
 def test_what_reaches_the_endpoint_is_what_left_the_stream(amount: float, days: int) -> None:
     """FR-018 and FR-011. No increment, so no fraction of any amount is ever stranded."""
     outlay = Money(amount, UAH, prov.EMPTY)
-    outcome = evaluate(
+    outcome = evaluated_outcome(
         TUPLE,
         amount=outlay,
         horizon=DateRange(start=STARTS_ON, end=STARTS_ON + timedelta(days=days)),
@@ -161,7 +162,7 @@ def test_what_reaches_the_endpoint_is_what_left_the_stream(amount: float, days: 
 )
 def test_the_implied_rate_is_zero_and_the_mark_survives(amount: float, days: int) -> None:
     """FR-019 and FR-004. A rate rather than `RateNotComparable`, and it carries the mark."""
-    outcome = evaluate(
+    outcome = evaluated_outcome(
         TUPLE,
         amount=Money(amount, UAH, prov.EMPTY),
         horizon=DateRange(start=STARTS_ON, end=STARTS_ON + timedelta(days=days)),

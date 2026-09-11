@@ -90,6 +90,7 @@ from terezy.core.instruments import cash as cash_terms
 from terezy.core.instruments import fund as fund_terms
 from terezy.core.instruments import registry as instrument_registry
 from terezy.core.instruments import terms as instrument_terms
+from terezy.core.instruments.accrual import Carried
 from terezy.core.instruments.cash import CashAssumptions, CashDeclaration
 from terezy.core.instruments.fund import FundDeclaration
 from terezy.core.instruments.held import HeldAssetDeclaration
@@ -111,10 +112,12 @@ from terezy.core.primitives.provenance import Provenance
 from terezy.core.primitives.rates import NominalRate
 from terezy.core.primitives.staleness import Ageing
 from terezy.core.primitives.tolerance import is_close
+from terezy.core.results import canonical, card
 from terezy.core.results import cash as cash_results
 from terezy.core.results import fund as fund_results
 from terezy.core.results import hurdle as hurdle_figures
 from terezy.core.results import project as bond_results
+from terezy.core.results.card import CandidateProjection
 from terezy.core.results.cash import CashProjection
 from terezy.core.results.fund import FundAssumptions, FundProjection, RangeProjection
 from terezy.core.results.hurdle import CashFlow, internal_rate_of_return
@@ -278,6 +281,30 @@ class Registries:
     """
 
 
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Evaluated:
+    """One tuple's outcome and the projection it was read off (027 FR-001).
+
+    Both halves, always. The projection was built and dropped inside the join until this
+    record existed, so every intermediate a reader would check a figure against -- the dated
+    flows, the charges with their bases, the premium struck at purchase -- was unreachable by
+    the time the outcome reached him. It is a **return value** rather than a field on the
+    outcome because a field on that record is on the wire in every response carrying one.
+    """
+
+    outcome: TupleOutcome
+    projection: CandidateProjection
+
+
+def outcome_of(result: Evaluated | TupleRefused) -> TupleOutcome | TupleRefused:
+    """The half a caller that does not want the projection reads.
+
+    One named place, so *the projection is discarded here* is a fact about the call rather
+    than a line a reader has to notice in each caller.
+    """
+    return result.outcome if isinstance(result, Evaluated) else result
+
+
 def evaluate(
     tuple_: Tuple,
     *,
@@ -286,7 +313,7 @@ def evaluate(
     as_of: date,
     continuation: ContinuationAssumption,
     registries: Registries,
-) -> TupleOutcome | TupleRefused:
+) -> Evaluated | TupleRefused:
     """Evaluate one tuple end to end, or say precisely why there is no outcome.
 
     Pure: no clock, no I/O, no state. ``amount`` leaves the stream on ``horizon.start`` and
@@ -526,7 +553,7 @@ def _hold(
     as_of: date,
     continuation: ContinuationAssumption,
     registries: Registries,
-) -> TupleOutcome | TupleRefused:
+) -> Evaluated | TupleRefused:
     """Buy with what arrived, live the declared lifecycle, and send every release home."""
     purchased_on = horizon.start + timedelta(days=routed.latency_days)
     bought = _acquire(prepared, tuple_.route_in, routed.one_way.arrived, purchased_on=purchased_on)
@@ -556,10 +583,29 @@ def _hold(
         as_of=as_of,
         registries=registries,
     )
+    charges = _charges_of(projected)
     return _assemble(
         tuple_,
         prepared,
         projected,
+        projection=CandidateProjection(
+            projection_key=canonical.candidate_key(tuple_, horizon),
+            instrument_id=prepared.declared.id,
+            arm=card.arm_of(projected),
+            flows=card.flows_of(
+                projected.ledger, charges, conventions=card.conventions_of(projected)
+            ),
+            charges=charges,
+            purchase=card.Purchase(
+                purchased_on=purchased_on,
+                quantity=bought.quantity,
+                price_per_unit=bought.price,
+                paid=bought.cost,
+                carried=bought.carried if bought.carried is not None else _NO_CARRY,
+            ),
+            way_in=card.WayIn(one_way=routed.one_way, latency_days=routed.latency_days),
+            releases=card.releases_of(repatriated),
+        ),
         outlay=amount,
         one_way=routed.one_way,
         arrivals=tuple(arrival for arrival, _ in repatriated),
@@ -1003,6 +1049,11 @@ class _Acquisition:
 
     quantity: float
     price: Money
+    carried: Carried | None
+    """The clean/accrued split the price was assembled from, or ``None`` where the arm buys at
+    no quotation. Carried rather than summed away: the accrual paid **into** a purchase is a
+    real term the sell leg already reports and the buy leg did not (027 FR-005)."""
+
     cost: Money
     remainder: _Remainder | None
 
@@ -1061,9 +1112,10 @@ def _acquire(
     # **Priced after the ticket check, not before.** What a unit costs cannot decide whether
     # the amount was large enough to trade at all, and a refusal that could not price the paper
     # would otherwise mask the plainer one a reader needs first.
-    price = _price_for(prepared, purchased_on=purchased_on)
-    if isinstance(price, InstrumentRefused):
-        return price
+    priced = _price_for(prepared, purchased_on=purchased_on)
+    if isinstance(priced, InstrumentRefused):
+        return priced
+    price = priced.price
     increment = _min_unit(prepared)
     quantity = _whole_increments(arrived, price, increment)
     if quantity <= 0.0:
@@ -1084,6 +1136,7 @@ def _acquire(
     return _Acquisition(
         quantity=quantity,
         price=price,
+        carried=priced.carried,
         cost=spent,
         remainder=_undeployed(prepared, price, increment, money.sub(arrived, spent)),
     )
@@ -1126,7 +1179,27 @@ def _undeployed(
     )
 
 
-def _price_for(prepared: _Prepared, *, purchased_on: date) -> Money | InstrumentRefused:
+_NO_CARRY: Final = card.NotStated(
+    what="carried",
+    arm="fund or cash",
+    reason=(
+        "this arm is not bought at a quotation: a fund is priced at its declared net asset "
+        "value plus the mode's markup, and a balance at par. There is no clean price and no "
+        "accrual to separate out of one."
+    ),
+)
+"""What a purchase states where no quotation was carried to the settlement date."""
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class _Priced:
+    """One unit's cost, and the clean/accrued split it was assembled from where there is one."""
+
+    price: Money
+    carried: Carried | None
+
+
+def _price_for(prepared: _Prepared, *, purchased_on: date) -> _Priced | InstrumentRefused:
     """What one unit costs, from whichever declaration states it.
 
     A fund prices itself -- its declared net asset value plus the entry markup the assumed
@@ -1144,12 +1217,15 @@ def _price_for(prepared: _Prepared, *, purchased_on: date) -> Money | Instrument
     """
     match prepared.declared, prepared.plan:
         case FundDeclaration(), FundAssumptions():
-            return fund_terms.entry_price_for(prepared.declared, prepared.plan.liquidity_mode)
+            return _Priced(
+                price=fund_terms.entry_price_for(prepared.declared, prepared.plan.liquidity_mode),
+                carried=None,
+            )
         case CashDeclaration(), _:
             # Sizing is identity: an amount of the declared currency buys that amount of
             # balance (FR-005). What the declaration DOES observe is the rate, and its mark
             # reaches every figure through `_projection_provenance`.
-            return money.unit(prepared.currency)
+            return _Priced(price=money.unit(prepared.currency), carried=None)
         case InstrumentDeclaration(), _:
             quoted = prepared.access.quote
             if quoted is None:  # pragma: no cover -- the resolver refuses this at load
@@ -1191,7 +1267,7 @@ def _price_for(prepared: _Prepared, *, purchased_on: date) -> Money | Instrument
                         "a holding nobody could buy."
                     ),
                 )
-            return price
+            return _Priced(price=price, carried=carried)
         case _:  # pragma: no cover -- `_plan_for` has already refused a mismatched pair
             raise ValueError(
                 f"{prepared.declared.id!r} reached pricing with run settings of type "
@@ -1785,6 +1861,7 @@ def _assemble(
     prepared: _Prepared,
     projected: Projected,
     *,
+    projection: CandidateProjection,
     outlay: Money,
     one_way: OneWayCost,
     arrivals: tuple[Arrival, ...],
@@ -1800,7 +1877,7 @@ def _assemble(
     cpi: Mapping[str, CpiSeries],
     inflation: InflationAssumption | None,
     as_of: date,
-) -> TupleOutcome:
+) -> Evaluated:
     """Everything the owning calls returned, summed and chained. No new arithmetic here.
 
     Every amount below is a sum of figures a named call produced, and every part carries the
@@ -1839,45 +1916,49 @@ def _assemble(
             stale.staleness_of_sources(provenance, kinds, as_of=as_of),
         ]
     )
-    return TupleOutcome(
-        key=tuple_,
-        outlay=outlay,
-        parts=_parts(prepared, projected, one_way=one_way, way_out_costs=way_out_costs),
-        arrivals=arrivals,
-        reaches=reaches,
-        implied_rate=rate,
-        # `nominal=None` is how FR-002's "there is nothing to deflate" is reached, rather than
-        # by a branch here: no refusal is decided at this site.
-        real=hurdle_figures.real_terms(
-            nominal=rate if isinstance(rate, NominalRate) else None,
-            nominal_provenance=provenance,
-            nominal_staleness=staleness,
-            deflation=hurdle_figures.Deflation(
-                window=cpi_series.deflation_window(span.start, span.end),
-                series=cpi,
-                assumption=inflation,
-                ageing=Ageing(kinds=kinds, as_of=as_of),
+    return Evaluated(
+        projection=projection,
+        outcome=TupleOutcome(
+            key=tuple_,
+            projection_key=projection.projection_key,
+            outlay=outlay,
+            parts=_parts(prepared, projected, one_way=one_way, way_out_costs=way_out_costs),
+            arrivals=arrivals,
+            reaches=reaches,
+            implied_rate=rate,
+            # `nominal=None` is how FR-002's "there is nothing to deflate" is reached, rather than
+            # by a branch here: no refusal is decided at this site.
+            real=hurdle_figures.real_terms(
+                nominal=rate if isinstance(rate, NominalRate) else None,
+                nominal_provenance=provenance,
+                nominal_staleness=staleness,
+                deflation=hurdle_figures.Deflation(
+                    window=cpi_series.deflation_window(span.start, span.end),
+                    series=cpi,
+                    assumption=inflation,
+                    ageing=Ageing(kinds=kinds, as_of=as_of),
+                ),
             ),
-        ),
-        span=span,
-        horizon=horizon,
-        undeployed=undeployed,
-        routes=_standing(routed, way_out_costs),
-        risk_class=prepared.access.risk_class,
-        sold_early=projected.sold_early if isinstance(projected, Projection) else None,
-        carried_quotation=carried,
-        rests_on=_rests_on(
-            prepared,
-            projected,
             span=span,
             horizon=horizon,
-            continuation=continuation,
-            carried=carried,
+            undeployed=undeployed,
+            routes=_standing(routed, way_out_costs),
+            risk_class=prepared.access.risk_class,
+            sold_early=projected.sold_early if isinstance(projected, Projection) else None,
+            carried_quotation=carried,
+            rests_on=_rests_on(
+                prepared,
+                projected,
+                span=span,
+                horizon=horizon,
+                continuation=continuation,
+                carried=carried,
+            ),
+            accounts_for=ACCOUNTS_FOR,
+            excludes=_excludes_of(prepared),
+            provenance=provenance,
+            staleness=staleness,
         ),
-        accounts_for=ACCOUNTS_FOR,
-        excludes=_excludes_of(prepared),
-        provenance=provenance,
-        staleness=staleness,
     )
 
 

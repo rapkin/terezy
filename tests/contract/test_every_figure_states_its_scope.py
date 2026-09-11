@@ -27,7 +27,6 @@ from typing import Final, get_args
 
 import pytest
 
-from terezy.core.decision.tuple_outcome import evaluate
 from terezy.core.instruments.fund import ExchangeRateAssumption
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.rates import NominalRate
@@ -44,6 +43,7 @@ from terezy.core.results.tuple import (
     TupleOutcome,
 )
 from tests import tuple_registries as fixtures
+from tests.outcomes import evaluated_outcome
 
 pytestmark = pytest.mark.contract
 
@@ -70,6 +70,9 @@ CLASSIFIED: Final[frozenset[str]] = frozenset(
         "rests_on",
         # The key, all five terms of it.
         "key",
+        # Where this candidate's projection is served from (027 FR-006). An address rather than
+        # a figure: the horizon and the same five terms, rendered once in `results.canonical`.
+        "projection_key",
         "risk_class",
         # How usable the declared ways are -- the field a reader scans to decide whether to
         # trust the figures beside it.
@@ -146,7 +149,7 @@ def _outcome(
                 destination_id="inzhur", stream_id=fixtures.SALARY, route_id=FLAT_FEE_ROUTE
             ),
         )
-    outcome = evaluate(
+    outcome = evaluated_outcome(
         candidate,
         amount=fixtures.AMOUNT if sent is None else fixtures.Money(sent, fixtures.UAH, prov.EMPTY),
         horizon=fixtures.DateRange(start=fixtures.ISSUE_DATE, end=fixtures.HORIZON_END),
@@ -164,7 +167,7 @@ def _part(outcome: TupleOutcome, part: Part) -> fixtures.Money:
 
 def _fund_outcome(candidate: Tuple, horizon: fixtures.DateRange) -> TupleOutcome:
     """One shipped fund's outcome: the other projection kind the join has to handle."""
-    outcome = evaluate(
+    outcome = evaluated_outcome(
         candidate,
         amount=fixtures.AMOUNT,
         horizon=horizon,
@@ -478,7 +481,7 @@ class TestNoFigureIsReportedWithoutItsScope:
         # A `rests_on` that is always the same is one a reader stops reading, so the
         # continuation statement appears only where the instrument really does terminate
         # early. Here the horizon ends the day the money arrives.
-        outcome = evaluate(
+        outcome = evaluated_outcome(
             fixtures.hurdle_tuple(),
             amount=fixtures.AMOUNT,
             horizon=fixtures.DateRange(start=fixtures.ISSUE_DATE, end=fixtures.date(2028, 1, 20)),

@@ -25,7 +25,7 @@ from typing import Final, get_args
 
 import pytest
 
-from terezy.core.decision.tuple_outcome import Registries, evaluate
+from terezy.core.decision.tuple_outcome import Registries
 from terezy.core.results.tuple import (
     DeclarationMissing,
     NoExitRouteDeclared,
@@ -36,6 +36,7 @@ from terezy.core.results.tuple import (
     TwoFiguresNotOne,
 )
 from tests import tuple_registries as fixtures
+from tests.outcomes import evaluated_outcome
 
 DEAD_END: Final = "test_dead_end_in"
 """A way in to a venue nobody has declared a way out of. Its `partner_route` is omitted, which
@@ -43,7 +44,7 @@ is the declared statement that nobody has costed the exit."""
 
 
 def _evaluated(registries: Registries, candidate: object | None = None) -> object:
-    return evaluate(
+    return evaluated_outcome(
         candidate if candidate is not None else fixtures.hurdle_tuple(),  # type: ignore[arg-type]
         amount=fixtures.AMOUNT,
         horizon=fixtures.DateRange(start=fixtures.ISSUE_DATE, end=fixtures.HORIZON_END),

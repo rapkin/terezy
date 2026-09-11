@@ -38,7 +38,7 @@ from __future__ import annotations
 
 import pytest
 
-from terezy.core.decision.tuple_outcome import Registries, evaluate
+from terezy.core.decision.tuple_outcome import Registries
 from terezy.core.primitives.money import Money
 from terezy.core.results.tuple import (
     FundedFromAnotherStream,
@@ -48,12 +48,13 @@ from terezy.core.results.tuple import (
 )
 from terezy.core.routes.path import ComposedExit, DeclaredExit, FundingPath
 from tests import tuple_registries as fixtures
+from tests.outcomes import evaluated_outcome
 
 
 def _evaluated(
     registries: Registries, candidate: Tuple | None = None, *, amount: Money | None = None
 ) -> object:
-    return evaluate(
+    return evaluated_outcome(
         candidate if candidate is not None else fixtures.hurdle_tuple(),
         amount=fixtures.AMOUNT if amount is None else amount,
         horizon=fixtures.HORIZON,

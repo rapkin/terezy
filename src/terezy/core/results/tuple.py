@@ -342,6 +342,19 @@ class TupleOutcome:
     """All five terms. An outcome cannot exist without one, which is how FR-010's
     "unrepresentable" is a property of the type rather than a rule to remember."""
 
+    projection_key: str
+    """Where this candidate's projection is served from (027 FR-006).
+
+    The horizon and the five terms, rendered by
+    :func:`terezy.core.results.canonical.candidate_key`. A **string** rather than the pair,
+    because it is an address a client echoes back and never composes -- the five terms alone
+    name the same candidate in all three sections, whose projections differ.
+
+    The projection itself is not here. A field on this record is on the wire in every response
+    that carries one, and the 69 the shipped question evaluates come to about a third again of
+    the answer document; a reader who opens one card pays for one.
+    """
+
     outlay: Money
     """What left the income stream, in the stream's currency, on :attr:`span`'s first day.
 

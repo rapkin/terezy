@@ -30,12 +30,13 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Final
 
-from terezy.core.decision.tuple_outcome import Registries, evaluate
+from terezy.core.decision.tuple_outcome import Registries
 from terezy.core.primitives.rates import NominalRate
 from terezy.core.primitives.tolerance import is_close
 from terezy.core.results.tuple import Tuple, TupleOutcome, WayOutUnusable
 from terezy.core.routes.path import FundingPath
 from tests import tuple_registries as fixtures
+from tests.outcomes import evaluated_outcome
 
 FREE_ROUTE: Final = "test_free_in"
 COSTLY_ROUTE: Final = "test_one_percent_in"
@@ -82,7 +83,7 @@ def _tuple(stream_id: str, route_id: str) -> Tuple:
 
 
 def _outcome(candidate: Tuple) -> TupleOutcome:
-    outcome = evaluate(
+    outcome = evaluated_outcome(
         candidate,
         amount=fixtures.AMOUNT,
         horizon=fixtures.DateRange(start=fixtures.ISSUE_DATE, end=fixtures.HORIZON_END),
@@ -189,7 +190,7 @@ class TestTheStreamIsTheTermAndNotTheRouteWearingItsName:
         )
         keyed = {}
         for stream in (fixtures.SALARY, SECOND_STREAM):
-            refusal = evaluate(
+            refusal = evaluated_outcome(
                 _tuple(stream, FREE_ROUTE),
                 amount=fixtures.AMOUNT,
                 horizon=fixtures.DateRange(start=fixtures.ISSUE_DATE, end=fixtures.HORIZON_END),
