@@ -22,7 +22,7 @@ from typing import Final
 import pytest
 
 from terezy.core.decision.compare import compare
-from terezy.core.decision.tuple_outcome import Registries, evaluate
+from terezy.core.decision.tuple_outcome import Registries
 from terezy.core.instruments.fund import FundDeclaration
 from terezy.core.instruments.interface import InstrumentDeclaration
 from terezy.core.primitives import provenance as prov
@@ -34,6 +34,7 @@ from terezy.core.results import canonical
 from terezy.core.results.tuple import Comparison, Tuple, TupleOutcome
 from terezy.core.routes.legs import Leg, Route
 from tests import tuple_registries as fixtures
+from tests.outcomes import evaluated_outcome
 
 pytestmark = pytest.mark.contract
 
@@ -231,7 +232,7 @@ def _fund() -> Tuple:
 
 
 def _outcome(registries: Registries, candidate: Tuple | None = None) -> TupleOutcome:
-    outcome = evaluate(
+    outcome = evaluated_outcome(
         candidate if candidate is not None else fixtures.hurdle_tuple(),
         amount=fixtures.AMOUNT,
         horizon=fixtures.DateRange(start=fixtures.ISSUE_DATE, end=fixtures.HORIZON_END),

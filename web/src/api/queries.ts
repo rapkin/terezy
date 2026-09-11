@@ -91,3 +91,19 @@ export function instrumentQuery(instrumentId: string, asOf: string) {
     ...STABLE,
   });
 }
+
+/**
+ * One evaluated candidate's projection (027 FR-009, SC-006).
+ *
+ * Keyed by the three things in the URL, so opening a second card is a second request and
+ * reopening the first is none. The key is the one the answer **published**: this client never
+ * composes one, because a key it built would address a candidate the answer never evaluated.
+ */
+export function projectionQuery(questionId: string, candidateKey: string, asOf: string) {
+  return queryOptions<Answered>({
+    queryKey: ["projection", questionId, candidateKey, asOf],
+    queryFn: () =>
+      request(path(QUESTIONS, questionId, "candidates", candidateKey), { as_of: asOf }),
+    ...STABLE,
+  });
+}

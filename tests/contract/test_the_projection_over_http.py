@@ -1,0 +1,171 @@
+"""One candidate's projection over HTTP: the route, its two refusals, and what it costs the answer.
+
+027 FR-009 to FR-012. The refusals are **two** and distinguishable because the remedies differ --
+a wrong URL against a client holding a key from another answer -- and there is deliberately no
+third: a candidate whose projection could not be produced never became an outcome, so it carries
+no key and has no address here.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+from typing import Any, Final
+from urllib.parse import quote
+
+import pytest
+
+from terezy.api.http import document
+from tests.data_roots import SHIPPED
+from tests.http_client import served
+from tests.served_projections import AS_OF as ASKED_AS_OF
+from tests.served_projections import QUESTION, published_keys
+
+pytestmark = pytest.mark.contract
+
+AS_OF: Final = ASKED_AS_OF.isoformat()
+
+
+def _read(question: str, key: str, *, as_of: str = AS_OF) -> dict[str, Any]:
+    response = served(SHIPPED).get(
+        f"{document.PREFIX}/questions/{quote(question, safe='')}/candidates/{quote(key, safe='')}",
+        params={"as_of": as_of},
+    )
+    assert response.status_code == 200, response.text
+    body: dict[str, Any] = response.json()
+    return body
+
+
+def test_a_published_key_answers_that_candidates_projection() -> None:
+    key = published_keys()[0]
+    body = _read(QUESTION, key)
+    assert body["question_id"] == QUESTION
+    assert body["candidate_key"] == key
+    result = body["result"]
+    assert result["tag"] == "projection.ProjectedCandidate"
+    assert result["projection"]["projection_key"] == key
+    assert result["projection"]["flows"], "a projection with no flow draws no bar"
+    assert result["manifest"]["tag"] == "manifest.RunManifest"
+
+
+def test_one_key_of_each_arm_resolves_over_the_wire() -> None:
+    """The wire, per arm. *Every* published key is resolved by
+    ``tests/contract/test_the_card_accounts_for_what_came_back.py``, at the layer that decides
+    which candidates were evaluated and without paying for 69 manifests to say it."""
+    keys = published_keys()
+    assert len(keys) == 69, "the evaluated population moved; re-take the figure and say so"
+    per_arm = {
+        arm: next(key for key in keys if key.split("|")[1] == arm)
+        for arm in ("inzhur_miltech", "cash_uah_monobank", "UA4000231195")
+    }
+    for arm, key in per_arm.items():
+        body = _read(QUESTION, key)["result"]
+        assert body["tag"] == "projection.ProjectedCandidate", arm
+        assert body["projection"]["arm"]["tag"].startswith("card."), arm
+
+
+def test_every_record_in_the_body_carries_its_tag() -> None:
+    """FR-010, over the body rather than over the types: a client narrows on the tag.
+
+    The wire contracts sweep the response **types**; this walks what one request actually
+    answered, so a record served through a path the walk does not reach would be caught here.
+    """
+    untagged: list[str] = []
+
+    def walk(value: object, path: str) -> None:
+        if isinstance(value, dict):
+            # A record carries a tag; the one other object the encoder emits is a **mapping**,
+            # whose own values are the records. Anything untagged that is neither is a record
+            # served with nothing for a client to narrow on.
+            if "tag" not in value and not _is_a_map_of_records(value):
+                untagged.append(path)
+            for name, held in value.items():
+                walk(held, f"{path}.{name}")
+        elif isinstance(value, list):
+            for at, held in enumerate(value):
+                walk(held, f"{path}[{at}]")
+
+    body = _read(QUESTION, published_keys()[0])
+    walk(body["result"], "result")
+    assert not untagged, untagged
+
+
+def _is_a_map_of_records(value: dict[str, Any]) -> bool:
+    return bool(value) and all(isinstance(held, dict) and "tag" in held for held in value.values())
+
+
+def test_an_unknown_question_and_an_unknown_key_are_two_distinguishable_refusals() -> None:
+    unknown_question = _read("no-such-question", published_keys()[0])["result"]
+    unknown_key = _read(QUESTION, "no-such-candidate")["result"]
+    assert unknown_question["tag"] == "envelopes.CategoryHasNoSuchId"
+    assert unknown_key["tag"] == "card.NoSuchCandidate"
+    assert unknown_question["tag"] != unknown_key["tag"]
+    assert unknown_key["evaluated_keys"], "a stale client is told what this answer did publish"
+    assert unknown_question["declared_ids"], "a wrong URL is told which questions exist"
+
+
+def test_the_key_of_one_section_does_not_answer_from_another() -> None:
+    """The horizon is in the key because the same candidate is evaluated once per section."""
+    by_instrument: dict[str, list[str]] = {}
+    for key in published_keys():
+        by_instrument.setdefault(key.split("|")[1], []).append(key)
+    repeated = next(keys for keys in by_instrument.values() if len(keys) > 1)
+    served_keys = {
+        _read(QUESTION, key)["result"]["projection"]["projection_key"] for key in repeated
+    }
+    assert served_keys == set(repeated)
+
+
+def test_as_of_is_required() -> None:
+    response = served(SHIPPED).get(
+        f"{document.PREFIX}/questions/{QUESTION}/candidates/{quote(published_keys()[0], safe='')}"
+    )
+    assert response.status_code == 422
+    assert response.json()["tag"] == "envelopes.RequestMalformed"
+
+
+def test_the_route_is_in_the_published_table_and_is_a_get() -> None:
+    body = served(SHIPPED).get(f"{document.PREFIX}/openapi.json")
+    paths = json.loads(body.text)["paths"]
+    route = f"{document.PREFIX}/questions/{{question_id}}/candidates/{{candidate_key}}"
+    assert route in paths
+    assert set(paths[route]) == {"get"}
+
+
+def test_the_document_version_moved_with_the_wire_change() -> None:
+    """A client is generated from the document; a shape that changed under a fixed version
+    drifts with no diff to read."""
+    assert document.VERSION != "1.0.0"
+    assert (
+        json.loads(served(SHIPPED).get(f"{document.PREFIX}/openapi.json").text)["info"]["version"]
+        == document.VERSION
+    )
+
+
+def test_the_answer_document_grows_only_by_the_published_key() -> None:
+    """SC-005, measured on the response body against this branch's own baseline.
+
+    The bytes of the keys are **subtracted** rather than allowed for: what is asserted is that
+    the rest of the document is the one merged ``main`` serves, so a second field added to
+    ``TupleOutcome`` fails here even though it is small. The baseline moves with the registry
+    and with whatever else `main` serves, which is why it carries the date it was taken on:
+    8 540 527 bytes, re-taken 2026-09-12 after `fix/served-hygiene` landed.
+    """
+    body = served(SHIPPED).get(
+        f"{document.PREFIX}/questions/{QUESTION}/answer", params={"as_of": AS_OF}
+    )
+    assert body.status_code == 200
+    published = re.findall(rb'"projection_key":"[^"]*",', body.content)
+    assert len(published) == len(published_keys())
+    assert len(body.content) - sum(len(held) for held in published) == 8_540_527
+
+
+def test_the_route_takes_no_scenario_parameter() -> None:
+    """The answer resolves its own regime from the question's declared one, and so does this."""
+    document_paths = json.loads(served(SHIPPED).get(f"{document.PREFIX}/openapi.json").text)[
+        "paths"
+    ]
+    route = f"{document.PREFIX}/questions/{{question_id}}/candidates/{{candidate_key}}"
+    named = {held["name"] for held in document_paths[route]["get"].get("parameters", [])}
+    assert "scenario_id" not in named
+    assert {"question_id", "candidate_key", "as_of"} <= named

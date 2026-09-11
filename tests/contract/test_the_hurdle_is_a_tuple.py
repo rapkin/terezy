@@ -31,7 +31,7 @@ from typing import Final
 import pytest
 
 from terezy.core.decision.compare import compare
-from terezy.core.decision.tuple_outcome import Registries, evaluate
+from terezy.core.decision.tuple_outcome import Registries
 from terezy.core.instruments.interface import DateRange, Holding
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.money import Money
@@ -46,6 +46,7 @@ from terezy.core.results.tuple import (
     TupleOutcome,
 )
 from tests import tuple_registries as fixtures
+from tests.outcomes import evaluated_outcome
 
 pytestmark = pytest.mark.contract
 
@@ -54,7 +55,7 @@ AT_ISSUE: Final = DateRange(start=fixtures.ISSUE_DATE, end=fixtures.HORIZON_END)
 
 
 def _outcome(registries: Registries, candidate: Tuple, horizon: DateRange) -> TupleOutcome:
-    outcome = evaluate(
+    outcome = evaluated_outcome(
         candidate,
         amount=fixtures.AMOUNT,
         horizon=horizon,

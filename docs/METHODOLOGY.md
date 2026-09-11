@@ -4339,7 +4339,71 @@ The strike happens at the one place holding both the instrument declaration and 
 the ledger its cost is already in the base currency, and §30.2 refuses to consult a rate for an
 amount already in the tax currency.
 
-## 38. Where to look next
+## 38. The candidate card: what one projection carries, and what it still does not
+
+The join builds a projection for every candidate it evaluates and, until feature 027, dropped
+every one of them. What reached a reader was the conclusion — what came back, and at what rate —
+with every intermediate the engine passed through on the way to it gone. This section says what
+is now served in its place, and, as importantly, what is not.
+
+**What is served, per evaluated candidate.** One record, addressed by a key the answer publishes
+on each outcome: the horizon and the same five terms the candidate is already identified by. The
+record carries
+
+- the **dated flows** of the folded ledger: date, kind, quantity where units moved, gross, the
+  tax struck on that line, the net, the declaration that caused it, and — where the arm builds a
+  schedule — the conventions that shaped the date and sized the amount;
+- the **tax charges**: both lines, their total, the taxable base, the class that struck them, the
+  year they accrue to, and each charge's own sources;
+- the **purchase**: its date, the quantity, the price per unit, what was paid, and the
+  clean/accrued split of the quotation carried to the settlement date;
+- the **way in** as the costing struck it, with the declared latency in days;
+- the **way out per dated release**: the charge is struck once on what a date nets, because a flat
+  fee is charged per movement, so two payments on one date travel home once and share one charge;
+- and the **arm's own records**: a premium against the principal for an instrument that repays
+  one, dated distributions and an exit line for a fund, what it released for a balance. An arm
+  that states none of a thing says so in a record naming what it does not state, never with an
+  empty list and never with a zero.
+
+**What is not served, and why each.**
+
+*The ledger.* `LedgerState.capacity` is keyed by a compound key with no JSON object-key form, so
+the record cannot be serialised at all. The traceability a reader needs travels instead as each
+flow's own `caused_by`, which names the declaration or the tax rule that produced the event —
+rather than pointing at an event nobody can fetch.
+
+*The tax rate.* The engine has never recorded one. A charge carries its base, its two lines and
+the citation of the dated entry that supplied the rates, and the rate itself is not a figure it
+holds. Reading the declared class and rendering its dated rates beside the bar would be deciding
+which entry applied on the event's date — a conclusion with no owning call.
+
+*What the outcome already carries.* `reaches`, the rate, the span, the horizon, the remainder and
+its journey are on the outcome a reader already holds. Carrying them twice is where two copies of
+one fact come to disagree.
+
+**The bars do not sum to what came back, and the card says so.** Three terms sit outside the
+addition a reader would try:
+
+1. the tax is netted on the date the income accrued and **before** a percentage exit fee is
+   struck, so an arrival is `(gross − tax) × (1 − pct)` rather than `gross × (1 − pct) − tax`;
+2. a date on which the payment and its own tax net to exactly zero leaves the release series
+   entirely — there is nothing to send home, and sending nothing would still be charged a flat
+   fee by a chain that declares one;
+3. the purchase is not a release: it is the arriving amount turned into units, and it is
+   accounted for on the way in.
+
+What does hold is a chain of two links, and it is asserted over every evaluated candidate of the
+owner's question rather than described here: each release's `sent` is the flows of that date net
+of their tax, the purchase excluded; and `reaches` is the sum of the releases' `arrived` plus the
+remainder's own arrival where it came home
+(`tests/contract/test_the_card_accounts_for_what_came_back.py`).
+
+**Two zeros, and they are different claims.** A tax of `0.00` on a line means either that an
+exempt class charged nothing — a charge, with the exemption's citation on it — or that no rule ran
+on that line at all, whose zero rests on no source. Both are real on the shipped registry, and the
+provenance is what tells them apart. That distinction is required test E11.
+
+## 39. Where to look next
 
 | question | file |
 | --- | --- |

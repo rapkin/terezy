@@ -33,6 +33,9 @@ MONEY = re.compile(r"\bMoney\s*\(|\bmoney\.(add|sub|scale|total|convert|zero|fro
 CANONICAL = re.compile(r"results\.canonical|from terezy\.core\.results import canonical")
 STALENESS = re.compile(r"staleness_of_\w+|\bstaleness\.\w*\(")
 SERVER = re.compile(r"uvicorn\.run|\.serve\(\)|socket\.socket\(|\.listen\(|\.bind\(")
+CANDIDATE_KEY = re.compile(
+    r"candidate_key\s*\(|CANDIDATE_KEY_SEPARATOR|\.instrument_id\b|\.stream_id\b"
+)
 
 
 def _sources() -> list[Path]:
@@ -62,6 +65,26 @@ def test_the_scan_would_catch_a_construction() -> None:
     assert MONEY.search("    return Money(1.0, Currency.UAH, provenance.EMPTY)")
     assert MONEY.search("    total = money.add(left, right)")
     assert not MONEY.search("def _figure(amount: Money) -> Money:")
+
+
+@pytest.mark.contract
+def test_no_module_composes_a_candidate_key() -> None:
+    """027 FR-006. A scan, because the typecheck cannot see a string built from the five terms.
+
+    The key is rendered once in ``core.results.canonical`` and echoed by a client; a second
+    spelling anywhere would address a candidate the answer never published, and the endpoint
+    would answer *no such candidate* for a key that is really there.
+    """
+    assert not _hits(CANDIDATE_KEY, _sources())
+
+
+@pytest.mark.contract
+def test_the_key_scan_would_catch_a_composition() -> None:
+    assert CANDIDATE_KEY.search('    return f"{key.instrument_id}|{key.stream_id}"')
+    assert CANDIDATE_KEY.search("    return canonical.candidate_key(key, horizon)")
+    # The parameter and the path placeholder are the key **echoed**, which is the whole point.
+    assert not CANDIDATE_KEY.search("def read(question_id: str, candidate_key: str) -> Json:")
+    assert not CANDIDATE_KEY.search("        candidate_key=candidate_key,")
 
 
 @pytest.mark.contract

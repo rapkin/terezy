@@ -179,3 +179,51 @@ export type InstrumentRead = Tagged<Body, "envelopes.ReadOfInstruments">;
  * the class is `string` in the document and can carry no exhaustiveness guard.
  */
 export type InstrumentDeclared = Exclude<InstrumentRead["result"], Refusal>;
+
+// ---------------------------------------------------------------------------
+// 027: one candidate's projection, and the arms it can be
+// ---------------------------------------------------------------------------
+
+/** The envelope `/api/questions/{id}/candidates/{key}` returns. */
+export type TheCandidateProjection = Tagged<Body, "envelopes.TheCandidateProjection">;
+
+/** The projection and the manifest of the run that produced it. */
+export type ProjectedCandidate = Tagged<
+  TheCandidateProjection["result"],
+  "projection.ProjectedCandidate"
+>;
+
+/** The two refusals this read has: a wrong URL, and a key from another answer. */
+export type ProjectionRefused = Exclude<TheCandidateProjection["result"], ProjectedCandidate>;
+
+export type CandidateProjection = ProjectedCandidate["projection"];
+
+export type ProjectionArm = CandidateProjection["arm"];
+export type BondArm = Tagged<ProjectionArm, "card.BondArm">;
+export type FundArm = Tagged<ProjectionArm, "card.FundArm">;
+export type CashArm = Tagged<ProjectionArm, "card.CashArm">;
+
+/** A record an arm does not state, named rather than absent (027 FR-007). */
+export type NotStated = BondArm["distributions"];
+
+export type FlowLine = CandidateProjection["flows"][number];
+export type FlowKind = FlowLine["kind"];
+export type TaxCharge = CandidateProjection["charges"][number];
+export type Release = CandidateProjection["releases"][number];
+export type WayIn = CandidateProjection["way_in"];
+export type Purchase = CandidateProjection["purchase"];
+
+/** The charge split by the three terms that can charge anything, every member present. */
+export type CostComponents = WayIn["one_way"]["components"];
+
+/**
+ * The closed vocabulary those terms are drawn from.
+ *
+ * Read off the document's own enum rather than off `keyof CostComponents`: an enum-keyed mapping
+ * serialises as an open string map, so the key type would be `string` and a term the API added
+ * would reach the card unlabelled with nothing red.
+ */
+export type CostComponent = Schemas["CostComponent"];
+
+/** One of the six parts of `TupleOutcome.parts` — an attribution, never an addition. */
+export type PartContribution = TupleOutcome["parts"][number];

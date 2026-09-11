@@ -87,5 +87,18 @@ test("a screen of every kind renders without an error, a 4xx, or an empty slot",
   }
   for (const series of SERIES) await visit(`${series.to}?as_of=${AS_OF}`);
 
+  // 027 FR-029: a card is a screen of its own kind, so it joins the crawl. One is enough — every
+  // card is the same components over a different candidate — and the key is read off the answer
+  // rather than composed, because a key this test built would address a candidate nobody ranked.
+  await page.goto(`/?as_of=${AS_OF}`, { waitUntil: "networkidle" });
+  const card = await page
+    .locator("[data-open-card]")
+    .first()
+    .getAttribute("data-open-card");
+  expect(card, "the answer screen offered no card to open").not.toBeNull();
+  await visit(
+    `/questions/fifty-thousand-hryvnia/candidates/${encodeURIComponent(card ?? "")}?as_of=${AS_OF}`,
+  );
+
   expect(faults, "the crawl saw these").toEqual([]);
 });

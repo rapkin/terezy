@@ -32,7 +32,7 @@ from datetime import date
 from typing import Final
 
 from terezy.core.decision.compare import compare
-from terezy.core.decision.tuple_outcome import Registries, evaluate
+from terezy.core.decision.tuple_outcome import Registries
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
@@ -56,6 +56,7 @@ from terezy.core.routes.legs import Route
 from terezy.core.routes.path import DeclaredExit, FundingPath
 from terezy.core.tax.schedule import RateEntry
 from tests import tuple_registries as fixtures
+from tests.outcomes import evaluated_outcome
 
 UAH: Final = fixtures.UAH
 BOND_CLASS: Final = "ua_government_bond"
@@ -69,7 +70,7 @@ def _evaluated(
     amount: Money | None = None,
     horizon: fixtures.DateRange = FULL_HORIZON,
 ) -> object:
-    return evaluate(
+    return evaluated_outcome(
         candidate or fixtures.hurdle_tuple(),
         amount=amount or fixtures.AMOUNT,
         horizon=horizon,

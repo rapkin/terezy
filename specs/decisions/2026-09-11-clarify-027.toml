@@ -1,0 +1,67 @@
+# The two clarifications of 027's specification — answered by the CONDUCTOR, provisionally.
+#
+# УВАГА: це НЕ відповіді власника. Власник не відповів; щоб не блокувати Phase 6, застосовано
+# рекомендації самої специфікації, записані як PROVISIONAL. Кожна скасовується зміною ДАНИХ
+# або ТЕКСТУ — жодна не вросла в форму записів на дроті, і саме тому їх можна було взяти
+# провізорно. Шлях скасування названий у кожній відповіді полем `overruled_by`.
+#
+# `choice` несе саму відповідь, а не літеру варіанта — літера сама по собі не відтворює рішення.
+exported_on = "2026-09-11"
+provisional = true
+
+[[answer]]
+q           = 1
+feature     = "027-candidate-card"
+decided_by  = "conductor, provisional"
+title       = "Чи називає податковий стовпчик ставку, якою його нарахували"
+question    = "Does a tax bar name the rate that struck it?"
+options     = [
+  "A. The bar shows the base and the charge and names the class; no rate is shown",
+  "B. The client reads the declared class and renders its dated rates beside the bar",
+  "C. The charge carries the entry it applied — a wire-visible engine change beyond *stop discarding*",
+]
+choice      = "A — the bar shows the taxable BASE and the CHARGE and names the class that struck it. No rate is shown, and none is carried on the wire."
+overruled_by = "a change to `web/src/card/components/TaxBar.tsx` alone for (B), or to `TaxCharge` and the served charge for (C). Neither needs this file re-exported; both need FR-004 restated."
+notes       = """
+Рекомендація специфікації, застосована як є.
+
+Двигун записує базу, дві лінії, id класу та цитату датованого запису — і НІКОЛИ ставку.
+Виміряно 2026-09-11 на `data/`, питання `fifty-thousand-hryvnia`, `as_of` 2026-09-06:
+122 нарахування, з них 119 — нулі, і кожен з цих 119 несе цитату свого звільнення. Ставка на
+такому стовпчику читалася б як `0 % + 0 %` на кожному з них.
+
+Три нарахування НЕ нульові — фондові, 3876.84 UAH кожне під `ua_investment_profit`. Саме на них
+питання стає живим, і саме тому (C) записано як майбутнє, а не як відмову: коли щось оподатковане
+стоятиме в ранжуванні на видному місці, база і сума без ставки перестануть бути повною відповіддю.
+
+Чому не B: клієнт, який читає оголошений клас і сам малює його датовані ставки, обчислює, яка
+ставка діяла на дату події — це висновок без власника виклику, тобто рівно те, що FR-013 забороняє
+для сум і що Принцип I забороняє для будь-якої цифри.
+"""
+
+[[answer]]
+q           = 2
+feature     = "027-candidate-card"
+decided_by  = "conductor, provisional"
+title       = "Чи стоїть шестичастинна атрибуція поруч із водоспадом"
+question    = "Does the six-part attribution appear beside the waterfall?"
+options     = [
+  "A. The waterfall alone",
+  "B. Both, each labelled as its own reading",
+  "C. The attribution alone, and no waterfall",
+]
+choice      = "B — both, each labelled as its own reading, BUT the attribution is folded by default behind a disclosure while the waterfall is open."
+overruled_by = "the `open` attribute on the attribution's `<details>` in `web/src/card/components/CandidateCard.tsx` — one line, no wire change."
+notes       = """
+Рекомендація специфікації (B), зі згорненням за замовчуванням, якого в жодному варіанті не було.
+
+Водоспад відповідає на «куди пішли гроші», атрибуція — на «який доданок переважає». Це два різні
+читання одного кандидата, і FR-014 забороняє їх зливати саме тому, що шість частин стоять у трьох
+валютах і двоє з них описують ті самі гроші з двох боків. 010 FR-005 існує заради першого речення,
+яке інструмент мав написати — «більшість розриву — це рампа, а не актив» — і жодна поверхня його
+досі не показала.
+
+Проти B стояло одне: власник назвав 021 «перевантаженим текстом», і друга діаграма на картку — це
+рівно той ризик. Згорнення розв'язує обидва боки: атрибуція є, вона названа своїм читанням, і вона
+не з'їдає першого екрана. Водоспад лишається розгорненим, бо він і є фіча.
+"""

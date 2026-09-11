@@ -33,10 +33,12 @@ export function HorizonColumn({
   section,
   readings,
   shared,
+  questionId,
 }: {
   section: HorizonSection;
   readings: ReadonlyMap<string, KindReading>;
   shared: readonly string[];
+  questionId: string;
 }) {
   const survey = section.outcome.tag === "candidates.CandidateSurvey" ? section.outcome : null;
   const comparison =
@@ -98,6 +100,7 @@ export function HorizonColumn({
                         readings.get(joined.outcome.key.instrument_id) ?? { tag: "reading" }
                       }
                       shared={shared}
+                      questionId={questionId}
                       indistinguishable={indistinguishableFor(
                         joined.outcome,
                         dominance.indistinguishable,
@@ -129,7 +132,7 @@ export function HorizonColumn({
 
       {comparison === null ? null : (
         <>
-          <FullRanking comparison={comparison} />
+          <FullRanking comparison={comparison} questionId={questionId} />
           <Population
             name="beating the benchmark"
             members={comparison.beats_benchmark}

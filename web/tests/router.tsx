@@ -16,7 +16,12 @@ import {
  */
 export async function renderInRouter(node: ReactNode) {
   const rootRoute = createRootRoute({ component: () => node });
-  const children = ["/", "/data/$category", "/data/$category/$recordId"].map((path) =>
+  const children = [
+    "/",
+    "/data/$category",
+    "/data/$category/$recordId",
+    "/questions/$questionId/candidates/$candidateKey",
+  ].map((path) =>
     createRoute({ getParentRoute: () => rootRoute, path, component: () => null }),
   );
   const router = createRouter({

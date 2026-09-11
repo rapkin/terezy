@@ -21,7 +21,8 @@ unverified *mark* is a separate claim, asserted separately by E5.
 
 from __future__ import annotations
 
-from typing import assert_never
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Final, assert_never
 
 from terezy.core.instruments.cash import CashAssumptions
 from terezy.core.instruments.interface import Assumptions
@@ -82,6 +83,9 @@ from terezy.core.results.tuple import (
 from terezy.core.routes.path import ExitChain, entry_id, exit_segments_of
 from terezy.core.tax.interface import TaxCharge
 from terezy.core.tax.official_rate import OfficialRateUnavailable
+
+if TYPE_CHECKING:  # pragma: no cover -- typing only
+    from terezy.core.instruments.interface import DateRange
 
 
 def of_conventions(value: ConventionsApplied | AmountsAsDeclared) -> tuple[str, ...]:
@@ -590,3 +594,60 @@ def _evaluated_of(value: Comparison | BenchmarkUnavailable) -> tuple[TupleOutcom
             return (*value.scored, *value.not_comparable)
         case _:  # pragma: no cover -- mypy proves this unreachable
             assert_never(value)
+
+
+CANDIDATE_KEY_SEPARATOR: Final[str] = "|"
+"""How the six parts of a candidate key become one path segment.
+
+``categories.DESTINATION_SEPARATOR``'s shape, one layer down. Neither separator can appear
+inside a part: :func:`_rendered` escapes both, so the flattening is injective for **any**
+declared id rather than for the ones that happen to avoid a character today.
+"""
+
+_NESTED_SEPARATOR: Final[str] = ","
+"""Inside one part: the joined route ids of a chain, and a plan's stated choices."""
+
+_ESCAPE: Final[str] = "%"
+"""What an escaped separator begins with, and the one character that escapes itself.
+
+Escaped rather than refused. ``candidate_key`` runs on every evaluated tuple, so a raise here
+would turn a declared id containing a comma -- which nothing at the data boundary forbids --
+into an unhandled failure of the whole answer, where before this feature it answered fine.
+A separator that cannot appear is a property of the rendering, not a constraint on `data/`.
+"""
+
+_ESCAPES: Final[Mapping[str, str]] = {
+    _ESCAPE: "%25",
+    CANDIDATE_KEY_SEPARATOR: "%7C",
+    _NESTED_SEPARATOR: "%2C",
+}
+
+
+def candidate_key(value: Tuple, horizon: DateRange) -> str:
+    """One **evaluated** candidate's address: the horizon, then the five declared terms.
+
+    The horizon is in it because the same candidate is evaluated once per section and the three
+    evaluations have three different projections, so the five terms alone name all three
+    (027 FR-006). Rendered here rather than in ``api/http`` because
+    ``tests/contract/test_the_http_layer_computes_nothing.py`` keeps that layer out of this
+    module, which is where the five-term identity already lives -- and because a key a client
+    composed would be a client deciding what a candidate is.
+
+    Not added to :func:`of_outcome`'s digest: it is derived from the identity that digest
+    already encodes, so digesting it too would be one fact in two places.
+    """
+    parts = (
+        f"{horizon.start.isoformat()}..{horizon.end.isoformat()}",
+        *(_rendered(part) for part in of_tuple_key(value)),
+    )
+    return CANDIDATE_KEY_SEPARATOR.join(parts)
+
+
+def _rendered(part: Canonical) -> str:
+    """One part of a key, flattened, with both separators escaped inside every leaf."""
+    if isinstance(part, tuple):
+        return _NESTED_SEPARATOR.join(_rendered(item) for item in part)
+    text = "" if part is None else str(part)
+    for character, escaped in _ESCAPES.items():
+        text = text.replace(character, escaped)
+    return text

@@ -111,6 +111,13 @@ function RefusalDetail({ refusal }: { refusal: RefusalValue }) {
       return <Detail>the client address was {refusal.client_address ?? "not recorded"}</Detail>;
     case "service.PathNotServed":
       return <Detail>no route serves {refusal.path}</Detail>;
+    case "card.NoSuchCandidate":
+      return (
+        <Detail>
+          no candidate of this answer is addressed by {refusal.wanted_key}; it published{" "}
+          {refusal.evaluated_keys.length} key(s)
+        </Detail>
+      );
   }
   assertNever(refusal);
 }

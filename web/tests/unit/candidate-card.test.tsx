@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { render } from "@testing-library/react";
+import { renderInRouter } from "../router";
 import { CandidateCard } from "@/answer/components/CandidateCard";
 import { GROUP, day, money as rendered, rate } from "@/design/format";
 import { money, source } from "../fixtures";
@@ -12,9 +12,9 @@ import { SOLD_EARLY, outcome, range, tuple } from "../answer-fixtures";
 const READ = { tag: "read" as const, kind: "bond" as const, declaredClass: "enumerated_schedule" };
 const REACHES = money(50529.090769230774, [source()]);
 
-function card(over: Parameters<typeof outcome>[0], extra: Partial<Parameters<typeof CandidateCard>[0]> = {}) {
-  return render(
-    <CandidateCard
+async function card(over: Parameters<typeof outcome>[0], extra: Partial<Parameters<typeof CandidateCard>[0]> = {}) {
+  return await renderInRouter(
+    <CandidateCard questionId="fifty-thousand-hryvnia"
       outcome={outcome(over)}
       reading={READ}
       shared={[]}
@@ -25,8 +25,8 @@ function card(over: Parameters<typeof outcome>[0], extra: Partial<Parameters<typ
 }
 
 describe("a candidate card", () => {
-  it("carries the kind as text, the id, money back, the date and the rate", () => {
-    const { container } = card({
+  it("carries the kind as text, the id, money back, the date and the rate", async () => {
+    const { container } = await card({
       instrumentId: "UA4000239016",
       reaches: REACHES,
       span: range("2026-09-01", "2026-10-04"),
@@ -40,14 +40,14 @@ describe("a candidate card", () => {
     expect(text).toContain(rate({ tag: "rates.NominalRate", value: 0.18112850290026622 }));
   });
 
-  it("marks every figure whose provenance marks it", () => {
-    const { container } = card({ instrumentId: "A", reaches: REACHES });
+  it("marks every figure whose provenance marks it", async () => {
+    const { container } = await card({ instrumentId: "A", reaches: REACHES });
     expect(container.querySelectorAll("[data-figure='marked']").length).toBeGreaterThan(1);
     expect(container.textContent).toContain("unverified");
   });
 
-  it("renders a refused rate as the typed refusal, and keeps the card", () => {
-    const { container } = card({
+  it("renders a refused rate as the typed refusal, and keeps the card", async () => {
+    const { container } = await card({
       instrumentId: "A",
       rate: {
         tag: "tuple.RateNotComparable",
@@ -61,19 +61,19 @@ describe("a candidate card", () => {
     expect(container.querySelector("[data-candidate='A']")).not.toBeNull();
   });
 
-  it("carries exactly one separating badge, and the badge says which condition", () => {
-    const sold = card({ instrumentId: "A", soldEarly: SOLD_EARLY });
+  it("carries exactly one separating badge, and the badge says which condition", async () => {
+    const sold = await card({ instrumentId: "A", soldEarly: SOLD_EARLY });
     expect(sold.container.querySelectorAll("[data-separating]")).toHaveLength(1);
     expect(sold.container.querySelector("[data-separating]")?.textContent).toContain("sold at");
 
-    const closed = card({ instrumentId: "B" });
+    const closed = await card({ instrumentId: "B" });
     expect(closed.container.querySelector("[data-separating]")?.textContent).toContain(
       "its own terms closed it",
     );
   });
 
-  it("names its indistinguishable neighbours rather than reading as an ordering", () => {
-    const { container } = card(
+  it("names its indistinguishable neighbours rather than reading as an ordering", async () => {
+    const { container } = await card(
       { instrumentId: "A" },
       {
         indistinguishable: {
@@ -88,15 +88,15 @@ describe("a candidate card", () => {
     expect(line?.textContent).toContain("not a ranking");
   });
 
-  it("marks the belief it leans on rather than copying its statement", () => {
-    const { container } = card({ instrumentId: "A", quotation: SOLD_EARLY.assumption });
+  it("marks the belief it leans on rather than copying its statement", async () => {
+    const { container } = await card({ instrumentId: "A", quotation: SOLD_EARLY.assumption });
     const mark = container.querySelector(`[data-belief-mark='${SOLD_EARLY.assumption.id}']`);
     expect(mark).not.toBeNull();
     expect(container.textContent).not.toContain(SOLD_EARLY.assumption.rationale);
   });
 
-  it("shows only what this member rests on beyond the shared set", () => {
-    const { container } = card(
+  it("shows only what this member rests on beyond the shared set", async () => {
+    const { container } = await card(
       { instrumentId: "A", restsOn: ["everyone rests on this", "only this one does"] },
       { shared: ["everyone rests on this"] },
     );
@@ -105,9 +105,9 @@ describe("a candidate card", () => {
     expect(own?.textContent).not.toContain("everyone rests on this");
   });
 
-  it("says the kind is unread rather than drawing nothing when the read did not answer", () => {
-    const { container } = render(
-      <CandidateCard
+  it("says the kind is unread rather than drawing nothing when the read did not answer", async () => {
+    const { container } = await renderInRouter(
+      <CandidateCard questionId="fifty-thousand-hryvnia"
         outcome={outcome({ instrumentId: "A" })}
         reading={{ tag: "not-read", why: "the instruments read answered a refusal" }}
         shared={[]}
@@ -119,10 +119,10 @@ describe("a candidate card", () => {
     );
   });
 
-  it("states the span as the two dates the API sent, and composes no length from them", () => {
+  it("states the span as the two dates the API sent, and composes no length from them", async () => {
     // A length is a figure the API does not send (FR-008), and FR-009's permitted lookups do
     // not cover subtracting one served date from another. OB-16 is what would put it here.
-    const { container } = card({ instrumentId: "A", span: range("2026-09-01", "2026-10-04") });
+    const { container } = await card({ instrumentId: "A", span: range("2026-09-01", "2026-10-04") });
     const held = container.querySelector("[data-span]");
     expect(held?.textContent).toContain(day("2026-09-01"));
     expect(held?.textContent).toContain(day("2026-10-04"));
@@ -130,13 +130,13 @@ describe("a candidate card", () => {
     expect(held?.textContent).not.toContain("33");
   });
 
-  it("passes a span date it cannot read through unchanged, never as a plausible day", () => {
-    const { container } = card({ instrumentId: "A", span: range("not a date", "2026-10-04") });
+  it("passes a span date it cannot read through unchanged, never as a plausible day", async () => {
+    const { container } = await card({ instrumentId: "A", span: range("not a date", "2026-10-04") });
     expect(container.querySelector("[data-span]")?.textContent).toContain("not a date");
   });
 
-  it("lets no unrounded float reach the output", () => {
-    const { container } = card({ instrumentId: "A", reaches: REACHES });
+  it("lets no unrounded float reach the output", async () => {
+    const { container } = await card({ instrumentId: "A", reaches: REACHES });
     const text = container.textContent ?? "";
     expect(text).toContain(`50${GROUP}529.09`);
     expect(text).not.toMatch(/\d\.\d{3,}/);

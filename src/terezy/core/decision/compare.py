@@ -53,7 +53,7 @@ from __future__ import annotations
 from datetime import date
 from typing import TYPE_CHECKING
 
-from terezy.core.decision.tuple_outcome import Registries, evaluate
+from terezy.core.decision.tuple_outcome import Registries, evaluate, outcome_of
 from terezy.core.instruments.interface import DateRange
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.rates import NominalRate
@@ -103,13 +103,17 @@ def compare(
     unrated: list[TupleOutcome] = []
     refused: list[RefusedTuple] = []
     for candidate in candidates:
-        outcome = evaluate(
-            candidate,
-            amount=amount,
-            horizon=horizon,
-            as_of=as_of,
-            continuation=continuation,
-            registries=registries,
+        # The projection half is discarded here, as it always was: a ranking needs the figures
+        # and not the intermediates, and a reader who wants one asks for that candidate's.
+        outcome = outcome_of(
+            evaluate(
+                candidate,
+                amount=amount,
+                horizon=horizon,
+                as_of=as_of,
+                continuation=continuation,
+                registries=registries,
+            )
         )
         if not isinstance(outcome, TupleOutcome):
             refused.append(RefusedTuple(key=candidate, refusal=outcome))

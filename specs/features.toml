@@ -211,12 +211,12 @@ note  = "READ IN THE CODE 2026-09-07 while specifying 028: `api/answer.py::_scen
 
 [[feature]]
 id     = "027-candidate-card"
-status = "drafted"
+status = "in-progress"
 needs  = ["010-full-tuple", "020-http-api", "022-accrued-interest", "023-cash-instrument", "026-answer-screen"]
 why    = "010 is the join that builds the projection and drops it, and owns `reaches`, `parts` and `arrivals` the card reads beside it; 020 publishes the schema the one new endpoint joins and owns the wire contracts it must satisfy; 022 is why a purchase price has a clean/accrued split to carry at all; 023 landed a third projection arm the card must draw, which is what makes the served projection a union rather than one record; 026 owns the screen the card opens from, its badge vocabulary and its one formatting module. Transitively covers 019, 021, 016, 015 and 014."
 note   = """
 The join builds a projection per candidate and discards every one; this serves them per candidate so a waterfall and a timeline can say why a figure is that figure. Closes required test E11.
-Two clarifications are open -- a rate on the tax bar, and the six-part attribution beside the waterfall -- so tasks.md quarantines Phase 6; see specs/027-candidate-card/spec.md."""
+Both clarifications are answered -- by the CONDUCTOR and PROVISIONALLY, applying the spec's own recommendations, in specs/decisions/2026-09-11-clarify-027.toml. Neither reaches the wire, so the owner overrules either with the one-line text change that file names."""
 
 [[future]]
 id    = "a-one-day-horizon-raises"
@@ -421,3 +421,13 @@ note  = "Entities as nodes, routes as edges, a candidate's path lit on selection
 id    = "the-answer-document-is-too-big-for-a-screen"
 after = ["026-answer-screen"]
 note  = "MEASURED 2026-09-06: /api/questions/fifty-thousand-hryvnia/answer is 8.0 MB on the wire, 4.6 MB of it dominance.dominated, because every verdict carries both candidates' merged provenance and staleness. 026 fetches it whole behind a named loading state; the remedy is OB-10 in its spec and never a client-side trim, which would be the truncation its FR-008 forbids."
+
+[[future]]
+id    = "a-rate-on-the-tax-bar"
+after = ["027-candidate-card"]
+note  = "CL-1 was answered (a) -- the tax bar shows the base and the charge and names the class, and no rate -- because the engine records no rate and every charge the shipped registry produces under an exempt class is a cited zero, so a rate would read `0 % + 0 %`. Option (c) is what becomes live the day something taxed stands where a reader looks: the CHARGE carries the dated entry it applied, which is a wire-visible engine change beyond *stop discarding* and is deliberately not built. Measured 2026-09-11: 3 of the 122 charges the owner's question strikes are not zero -- the fund's, 3 876.84 UAH each under `ua_investment_profit` -- so the case exists already and is simply not the one the front of the answer shows. Option (b), a client reading the declared class and rendering its dated rates, is refused rather than deferred: deciding which entry applied on the event's date is a conclusion with no owning call."
+
+[[future]]
+id    = "a-purchase-row-claims-the-coupon-schedule-s-conventions"
+after = ["027-candidate-card"]
+note  = "FOUND BY THE MERGE ROUND of 027, 2026-09-12, and DELIBERATELY NOT FIXED THERE. `results.schedule.of_ledger` stamps ONE `ConventionsApplied` onto every row of a bond's schedule, the PURCHASE row included -- and a purchase is dated `horizon.start + latency_days` and sized `price x quantity`, so no periodicity generated it, no business-day rule moved it and no day count sized it. `ConventionsApplied`'s own docstring is the claim being broken: a row carries its conventions so that a row lifted out of the table keeps saying which convention placed it. Behaviour is feature 001's and predates 027; what 027 changes is that it is now SERVED (`card.FlowLine.conventions`) and so reaches a reader. Not fixed on that branch because the fix is in `results.schedule` rather than in the card, and because `tests/unit/test_the_served_projection.py` asserts the card's flows equal the schedule's rows field for field -- a card that said something different would be a SECOND answer to what shaped a row, which is the drift that test exists to prevent. The remedy is one change in `results.schedule._row`: a row no periodicity placed states so, and the card follows it. Nothing in `web/src` renders the field today."
