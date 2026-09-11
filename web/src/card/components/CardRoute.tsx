@@ -10,7 +10,7 @@
  * came from the screen, and the projection is the one read this route adds.
  */
 import { Link, createRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import type { Answered } from "@/api/client";
 import { answerQuery, projectionQuery } from "@/api/queries";
 import { outcomeFor } from "@/card/lookup";
@@ -36,17 +36,25 @@ function CardScreen() {
     ...projectionQuery(questionId, candidateKey, asOf ?? ""),
     enabled,
   });
-  const answered = useQuery({ ...answerQuery(questionId, asOf ?? ""), enabled });
+  // Never stale for this observer: the answer is keyed by `as_of`, so the cached one is the
+  // answer this key belongs to however long the reader took to click. The shared 30-second
+  // staleness would refetch 8.5 MB and make SC-006's *one request* a claim about how fast he is.
+  const answered = useQuery({
+    ...answerQuery(questionId, asOf ?? ""),
+    enabled,
+    staleTime: Number.POSITIVE_INFINITY,
+  });
 
   if (!enabled) return null;
   return (
     <div className="space-y-4">
       <Close asOf={asOf} />
-      <Body served={served.data} answered={answered.data} candidateKey={candidateKey} />
-      {served.data === undefined ? <Awaiting what="this candidate's flows" query={served} /> : null}
-      {served.data !== undefined && answered.data === undefined ? (
-        <Awaiting what="the answer this candidate belongs to" query={answered} />
-      ) : null}
+      <Body
+        served={served.data}
+        answered={answered.data}
+        candidateKey={candidateKey}
+        waiting={{ flows: served, answer: answered }}
+      />
     </div>
   );
 }
@@ -63,16 +71,23 @@ function Body({
   served,
   answered,
   candidateKey,
+  waiting,
 }: {
   served: Answered | undefined;
   answered: Answered | undefined;
   candidateKey: string;
+  waiting: {
+    readonly flows: UseQueryResult<Answered>;
+    readonly answer: UseQueryResult<Answered>;
+  };
 }) {
-  if (served === undefined || answered === undefined) return null;
+  if (served === undefined) return <Awaiting what="this candidate's flows" query={waiting.flows} />;
   if (served.tag !== "body" || !isTheCandidateProjection(served.body)) {
     return <ApiErrorState answered={served} what="this candidate's flows" />;
   }
   const result = served.body.result;
+  // Before the answer, deliberately: a refused key reads nothing from it, and the one reader who
+  // is certainly not going to see a card should not wait out an 8.5 MB fetch to be told so.
   if (result.tag !== "projection.ProjectedCandidate") {
     return (
       <TypedState
@@ -80,6 +95,9 @@ function Body({
         label="this candidate has no card"
       />
     );
+  }
+  if (answered === undefined) {
+    return <Awaiting what="the answer this candidate belongs to" query={waiting.answer} />;
   }
   if (answered.tag !== "body" || !isTheAnswer(answered.body)) {
     return <ApiErrorState answered={answered} what="the answer this candidate belongs to" />;

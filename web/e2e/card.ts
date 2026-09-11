@@ -40,7 +40,12 @@ async function servedCard(page: Page, key: string): Promise<ServedCard> {
         result: {
           projection: {
             projection_key: string;
-            flows: { occurred_on: string; kind: string; gross: { amount: number } }[];
+            flows: {
+          sequence: number;
+          occurred_on: string;
+          kind: string;
+          gross: { amount: number };
+        }[];
             purchase: { purchased_on: string; paid: { amount: number } };
             way_in: { latency_days: number; one_way: { arrived: { amount: number } } };
             releases: {
@@ -89,9 +94,15 @@ async function servedCard(page: Page, key: string): Promise<ServedCard> {
         bars: [
           { id: "arrived", amount: projection.way_in.one_way.arrived.amount },
           { id: "purchase", amount: projection.purchase.paid.amount },
+          // Keyed by the **ledger sequence**, which is what `bars.ts` builds the id from. Keyed
+          // by the array index instead, every released bar missed its match and the loop that
+          // compares them skipped all of them — green whatever amount the card drew.
           ...projection.flows
             .filter((flow) => flow.kind !== "purchase")
-            .map((flow, at) => ({ id: `released:${String(at)}`, amount: flow.gross.amount })),
+            .map((flow) => ({
+              id: `released:${String(flow.sequence)}`,
+              amount: flow.gross.amount,
+            })),
         ],
         dates: [
           projection.purchase.purchased_on,

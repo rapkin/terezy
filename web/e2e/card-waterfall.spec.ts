@@ -20,12 +20,15 @@ test("each bar is the figure the API sent, and money back is `reaches`", async (
   expect(shown.length).toBeGreaterThan(4);
 
   // The relation rather than a pinned figure: what the bar reads must be the served amount, to
-  // the precision the one formatting module renders money at.
+  // the precision the one formatting module renders money at. Every served bar must be found —
+  // a `continue` here made the whole loop vacuous once already.
+  expect(served.bars.length).toBeGreaterThan(2);
   for (const bar of served.bars) {
     const drawn = shown.find((held) => held.id === bar.id);
-    if (drawn === undefined) continue;
-    expect(drawn.text, `${bar.id} does not carry its served amount`).toContain(
-      bar.amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ""),
+    expect(drawn, `the card drew no bar ${bar.id}`).toBeDefined();
+    // The grouping mark is stripped above, so the served amount reads as plain digits.
+    expect(drawn?.text, `${bar.id} does not carry its served amount`).toContain(
+      bar.amount.toFixed(2),
     );
   }
 

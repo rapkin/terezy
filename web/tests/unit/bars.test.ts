@@ -36,10 +36,21 @@ describe("the waterfall's bars", () => {
     expect(amountOf("arrived")).toBe(49982.5);
   });
 
-  it("draws the purchase, and the clean and accrued halves of the price it paid", () => {
+  it("draws the purchase total, the price per unit, and the split of that price", () => {
+    // The split is struck on the quotation and is therefore **per unit**: 970.12 + 15.86 is
+    // 985.98, the price, and not the 49 299.21 the purchase paid. Drawing it under the total
+    // would report an accrual fifty times smaller than the one actually paid.
     expect(amountOf("purchase")).toBe(49299.21);
-    expect(amountOf("accrued:clean")).toBe(970.12);
-    expect(amountOf("accrued:accrued")).toBe(15.86);
+    expect(amountOf("price")).toBe(985.98);
+    expect(amountOf("accrued:clean") + amountOf("accrued:accrued")).toBe(amountOf("price"));
+  });
+
+  it("says on the bars themselves that the split is per unit, and how many were bought", () => {
+    const bars = barsOf(projection(), HELD);
+    const labels = Object.fromEntries(bars.map((bar) => [bar.id, bar.label]));
+    expect(labels["purchase"]).toContain("50 unit(s)");
+    expect(labels["accrued:accrued"]).toContain("per unit");
+    expect(labels["accrued:clean"]).toContain("per unit");
   });
 
   it("refuses the accrued bar where the arm carried no quotation", () => {

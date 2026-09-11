@@ -18,6 +18,7 @@ import type {
   NotStated,
   TupleOutcome,
 } from "@/api/shapes";
+import { quantity } from "@/design/format";
 
 /** Where in the journey a bar sits. A closed vocabulary, rendered exhaustively. */
 export type BarKind =
@@ -181,35 +182,55 @@ function entriesOf(
   return [...inOrder, ...rest];
 }
 
+/**
+ * What the purchase paid, at what price, and the split of that **price**.
+ *
+ * `Carried.clean` and `Carried.accrued` are struck on the **quotation**, so they are per unit —
+ * `accrual.carried_to` is handed one unit's quote and `_acquire` multiplies afterwards. Drawing
+ * them as parts of the total would report an accrual of 15.86 on a purchase that paid about 793
+ * of it, so the price per unit is drawn between them and the total, the labels say *per unit*,
+ * and the quantity is on the purchase bar. Scaling them here is not available: the total accrual
+ * is a figure the engine never computed, and this client computes none.
+ */
 function purchaseBars(projection: CandidateProjection): readonly Bar[] {
   const purchase = projection.purchase;
   const bought: Bar = {
     tag: "amount",
     id: "purchase",
     kind: "purchase",
-    label: "bought units",
+    label: `bought ${quantity(purchase.quantity)} unit(s)`,
     amount: purchase.paid,
+    on: purchase.purchased_on,
+  };
+  const priced: Bar = {
+    tag: "amount",
+    id: "price",
+    kind: "purchase",
+    label: "at a price per unit of",
+    amount: purchase.price_per_unit,
     on: purchase.purchased_on,
   };
   if (purchase.carried.tag === "card.NotStated") {
     return [
       bought,
+      priced,
       {
         tag: "refused",
         id: "accrued",
         kind: "accrued",
-        label: "accrued interest inside the price",
+        label: "accrued interest inside the price per unit",
         state: purchase.carried,
       },
     ];
   }
   return [
     bought,
+    priced,
     {
       tag: "amount",
       id: "accrued:clean",
       kind: "accrued",
-      label: "of which the clean price",
+      label: "of which, per unit, the clean price",
       amount: purchase.carried.clean,
       on: purchase.purchased_on,
     },
@@ -217,7 +238,7 @@ function purchaseBars(projection: CandidateProjection): readonly Bar[] {
       tag: "amount",
       id: "accrued:accrued",
       kind: "accrued",
-      label: "of which accrued interest paid to the seller",
+      label: "of which, per unit, accrued interest paid to the seller",
       amount: purchase.carried.accrued,
       on: purchase.purchased_on,
     },

@@ -21,6 +21,7 @@ unverified *mark* is a separate claim, asserted separately by E5.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Final, assert_never
 
 from terezy.core.instruments.cash import CashAssumptions
@@ -598,21 +599,35 @@ def _evaluated_of(value: Comparison | BenchmarkUnavailable) -> tuple[TupleOutcom
 CANDIDATE_KEY_SEPARATOR: Final[str] = "|"
 """How the six parts of a candidate key become one path segment.
 
-``categories.DESTINATION_SEPARATOR``'s shape, one layer down. A vertical bar appears in no
-declared id, no route id and no plan field, which :func:`candidate_key` asserts rather than
-assumes -- a term carrying one would make two candidates share an address, and the endpoint
-would serve the wrong projection with nothing on its face saying so.
+``categories.DESTINATION_SEPARATOR``'s shape, one layer down. Neither separator can appear
+inside a part: :func:`_rendered` escapes both, so the flattening is injective for **any**
+declared id rather than for the ones that happen to avoid a character today.
 """
 
 _NESTED_SEPARATOR: Final[str] = ","
 """Inside one part: the joined route ids of a chain, and a plan's stated choices."""
+
+_ESCAPE: Final[str] = "%"
+"""What an escaped separator begins with, and the one character that escapes itself.
+
+Escaped rather than refused. ``candidate_key`` runs on every evaluated tuple, so a raise here
+would turn a declared id containing a comma -- which nothing at the data boundary forbids --
+into an unhandled failure of the whole answer, where before this feature it answered fine.
+A separator that cannot appear is a property of the rendering, not a constraint on `data/`.
+"""
+
+_ESCAPES: Final[Mapping[str, str]] = {
+    _ESCAPE: "%25",
+    CANDIDATE_KEY_SEPARATOR: "%7C",
+    _NESTED_SEPARATOR: "%2C",
+}
 
 
 def candidate_key(value: Tuple, horizon: DateRange) -> str:
     """One **evaluated** candidate's address: the horizon, then the five declared terms.
 
     The horizon is in it because the same candidate is evaluated once per section and the three
-    evaluations have three different projections; the five terms alone name all three
+    evaluations have three different projections, so the five terms alone name all three
     (027 FR-006). Rendered here rather than in ``api/http`` because
     ``tests/contract/test_the_http_layer_computes_nothing.py`` keeps that layer out of this
     module, which is where the five-term identity already lives -- and because a key a client
@@ -629,14 +644,10 @@ def candidate_key(value: Tuple, horizon: DateRange) -> str:
 
 
 def _rendered(part: Canonical) -> str:
-    """One part of a key, flattened, with the two separators refused inside a leaf."""
+    """One part of a key, flattened, with both separators escaped inside every leaf."""
     if isinstance(part, tuple):
         return _NESTED_SEPARATOR.join(_rendered(item) for item in part)
     text = "" if part is None else str(part)
-    if CANDIDATE_KEY_SEPARATOR in text or _NESTED_SEPARATOR in text:
-        raise ValueError(
-            f"the declared term {text!r} contains a candidate-key separator, so two candidates "
-            "differing in this term would render one key and one would be served the other's "
-            "projection. Rename the declaration, or change the separators here."
-        )
+    for character, escaped in _ESCAPES.items():
+        text = text.replace(character, escaped)
     return text

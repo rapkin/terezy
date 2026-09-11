@@ -7,8 +7,6 @@ a reader to whichever section the endpoint happened to find first.
 
 from __future__ import annotations
 
-import pytest
-
 from terezy.core.results.canonical import CANDIDATE_KEY_SEPARATOR, candidate_key
 from tests.served_projections import answered, evaluated_outcomes
 
@@ -37,19 +35,34 @@ def test_the_key_is_the_horizon_and_the_five_terms_and_nothing_else() -> None:
         assert outcome.key.instrument_id in outcome.projection_key.split(CANDIDATE_KEY_SEPARATOR)
 
 
-def test_a_term_carrying_a_separator_is_refused_rather_than_rendered() -> None:
-    """The mutation this guard exists for: two candidates differing in one term, one key.
+def test_two_terms_that_differ_only_in_a_separator_get_different_keys() -> None:
+    """The collision the rendering has to survive, and the reason it escapes rather than refuses.
 
-    Reached by planting the separator in a declared id, because nothing else can: every shipped
-    term is free of both, which is what makes the flat rendering injective today.
+    ``a|b`` beside ``a`` and ``b`` as two terms is the flattening's one failure mode, and it is
+    reachable from **data**: nothing at the boundary forbids a declared id containing a comma.
+    Refusing it would turn such a declaration into an unhandled failure of the whole answer,
+    since this runs on every evaluated tuple.
     """
     outcome, horizon = evaluated_outcomes()[0]
-    broken = type(outcome.key)(
-        instrument_id=f"a{CANDIDATE_KEY_SEPARATOR}b",
-        stream_id=outcome.key.stream_id,
-        route_in=outcome.key.route_in,
-        exit_terms=outcome.key.exit_terms,
-        route_out=outcome.key.route_out,
-    )
-    with pytest.raises(ValueError, match="candidate-key separator"):
-        candidate_key(broken, horizon)
+
+    def keyed(instrument_id: str) -> str:
+        planted = type(outcome.key)(
+            instrument_id=instrument_id,
+            stream_id=outcome.key.stream_id,
+            route_in=outcome.key.route_in,
+            exit_terms=outcome.key.exit_terms,
+            route_out=outcome.key.route_out,
+        )
+        return candidate_key(planted, horizon)
+
+    for separator in (CANDIDATE_KEY_SEPARATOR, ","):
+        planted = keyed(f"a{separator}b")
+        assert (
+            separator
+            not in planted.removeprefix(
+                f"{horizon.start.isoformat()}..{horizon.end.isoformat()}{CANDIDATE_KEY_SEPARATOR}"
+            ).split(CANDIDATE_KEY_SEPARATOR)[0]
+        )
+        assert planted != keyed("ab")
+    # The escape character escapes itself, so the two below do not render as one key either.
+    assert keyed("a%7Cb") != keyed(f"a{CANDIDATE_KEY_SEPARATOR}b")
