@@ -63,12 +63,14 @@ export function outcome(over: {
   readonly undeployed?: TupleOutcome["undeployed"];
   readonly quotation?: TupleOutcome["carried_quotation"];
   readonly arrivals?: TupleOutcome["arrivals"];
+  readonly parts?: TupleOutcome["parts"];
 }): TupleOutcome {
   return {
     tag: "tuple.TupleOutcome",
     key: tuple(over.instrumentId),
+    projection_key: `2026-09-01..2026-10-01|${over.instrumentId}|salary_uah`,
     outlay: money(50000, []),
-    parts: [],
+    parts: [...(over.parts ?? [])],
     arrivals: [...(over.arrivals ?? [arrival("2026-10-04")])],
     reaches: over.reaches ?? money(50529.090769230774, [source()]),
     implied_rate: over.rate ?? { tag: "rates.NominalRate", value: 0.18112850290026622 },
@@ -383,4 +385,17 @@ export function servedOutcome(body: object): TupleOutcome {
 
 function isOutcomeShaped(value: unknown): value is TupleOutcome {
   return tagOf(value) === "tuple.TupleOutcome";
+}
+
+/** One of the six attribution lines, each naming the call that produced it. */
+export function part(
+  which: TupleOutcome["parts"][number]["part"],
+  amount: Money,
+): TupleOutcome["parts"][number] {
+  return {
+    tag: "tuple.PartContribution",
+    part: which,
+    amount,
+    source: "routes.cost.cost_one",
+  };
 }

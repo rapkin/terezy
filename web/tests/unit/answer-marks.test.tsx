@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { render } from "@testing-library/react";
+import { renderInRouter } from "../router";
 import type { ReactElement } from "react";
 import { join } from "node:path";
 import { AllMoneyBackFigure } from "@/answer/all-money-back";
@@ -58,10 +58,10 @@ const CASES: Readonly<Record<string, ReactElement>> = {
     <HeldPositions held={[HELD]} staleness={verdict([])} />
   ),
   "answer/components/CandidateCard.tsx": (
-    <CandidateCard outcome={MARKED} reading={READ} shared={[]} indistinguishable={undefined} />
+    <CandidateCard questionId="fifty-thousand-hryvnia" outcome={MARKED} reading={READ} shared={[]} indistinguishable={undefined} />
   ),
   "answer/components/FullRanking.tsx": (
-    <FullRanking comparison={comparison({ ranked: [MARKED] })} />
+    <FullRanking questionId="fifty-thousand-hryvnia" comparison={comparison({ ranked: [MARKED] })} />
   ),
   "answer/components/MoneyBack.tsx": <MoneyBack outcome={MARKED} />,
 };
@@ -73,8 +73,8 @@ describe("every figure this screen renders carries its marks", () => {
   });
 
   for (const [module, element] of Object.entries(CASES)) {
-    it(`${module} marks every figure it renders`, () => {
-      const { container } = render(element);
+    it(`${module} marks every figure it renders`, async () => {
+      const { container } = await renderInRouter(element);
       const marked = [...container.querySelectorAll("[data-figure='marked']")];
       expect(marked.length).toBeGreaterThan(0);
       expect(container.querySelectorAll("[data-figure='value']")).toHaveLength(0);

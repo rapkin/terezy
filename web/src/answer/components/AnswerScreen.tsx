@@ -20,9 +20,11 @@ import { SharedAssumptions } from "./SharedAssumptions";
 export function AnswerScreen({
   answered,
   readings,
+  questionId,
 }: {
   answered: AnsweredQuestion;
   readings: ReadonlyMap<string, KindReading>;
+  questionId: string;
 }) {
   const answer = answered.answer;
   if (answer.tag !== "answer.Answer") {
@@ -54,6 +56,7 @@ export function AnswerScreen({
             section={section}
             readings={readings}
             shared={shared}
+            questionId={questionId}
           />
         ))}
       </div>

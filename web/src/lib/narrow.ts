@@ -13,6 +13,7 @@ import type {
   SeriesListing,
   SeriesWindow,
   TheAnswer,
+  TheCandidateProjection,
 } from "@/api/shapes";
 
 export function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
@@ -91,6 +92,21 @@ export function isTheAnswer(body: unknown): body is TheAnswer {
     tagOf(body) === "envelopes.TheAnswer" &&
     isRecord(body) &&
     typeof body["question_id"] === "string" &&
+    tagOf(body["result"]) !== null
+  );
+}
+
+/**
+ * The candidate-projection envelope, keyed on the two fields the card reads.
+ *
+ * `candidate_key` is in the predicate for `isTheAnswer`'s reason: `result` and `as_of` alone
+ * also describe a category read, and narrowing on those would be a claim this screen cannot keep.
+ */
+export function isTheCandidateProjection(body: unknown): body is TheCandidateProjection {
+  return (
+    tagOf(body) === "envelopes.TheCandidateProjection" &&
+    isRecord(body) &&
+    typeof body["candidate_key"] === "string" &&
     tagOf(body["result"]) !== null
   );
 }

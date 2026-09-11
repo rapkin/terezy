@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { render } from "@testing-library/react";
+import { renderInRouter } from "../router";
 import { HorizonColumn } from "@/answer/components/HorizonColumn";
 import { GROUP, count } from "@/design/format";
 import {
@@ -27,9 +27,9 @@ const RANKED = [
   outcome({ instrumentId: "B", span: range("2026-09-01", "2026-09-19") }),
 ];
 
-function column(over: Parameters<typeof section>[0]) {
-  return render(
-    <HorizonColumn section={section(over)} readings={new Map()} shared={[]} />,
+async function column(over: Parameters<typeof section>[0]) {
+  return await renderInRouter(
+    <HorizonColumn questionId="fifty-thousand-hryvnia" section={section(over)} readings={new Map()} shared={[]} />,
   );
 }
 
@@ -42,31 +42,31 @@ const WHOLE = {
 };
 
 describe("a horizon column", () => {
-  it("shows a card for exactly the non-dominated members the API sent", () => {
-    const { container } = column(WHOLE);
+  it("shows a card for exactly the non-dominated members the API sent", async () => {
+    const { container } = await column(WHOLE);
     const cards = container.querySelectorAll("[data-candidate]");
     expect(cards).toHaveLength(1);
     expect(cards[0]?.getAttribute("data-candidate")).toBe("A");
   });
 
-  it("heads the column with the banner where the rows' spans differ", () => {
-    expect(column(WHOLE).container.querySelector("[data-comparability-banner]")).not.toBeNull();
+  it("heads the column with the banner where the rows' spans differ", async () => {
+    expect((await column(WHOLE)).container.querySelector("[data-comparability-banner]")).not.toBeNull();
   });
 
-  it("shows no banner where every row was measured over the same length", () => {
+  it("shows no banner where every row was measured over the same length", async () => {
     const equal = [
       outcome({ instrumentId: "A", span: range("2026-09-01", "2026-10-01") }),
       outcome({ instrumentId: "B", span: range("2026-10-01", "2026-10-31") }),
     ];
-    const { container } = column({
+    const { container } = await column({
       outcome: survey({ comparison: comparison({ ranked: equal }) }),
       dominance: dominance({ nonDominated: [] }),
     });
     expect(container.querySelector("[data-comparability-banner]")).toBeNull();
   });
 
-  it("states its own benchmark standing and asserts none across sections", () => {
-    const { container } = column({
+  it("states its own benchmark standing and asserts none across sections", async () => {
+    const { container } = await column({
       ...WHOLE,
       dominance: dominance({
         nonDominated: [],
@@ -78,8 +78,8 @@ describe("a horizon column", () => {
     expect(standing?.textContent).toContain("is dominated");
   });
 
-  it("gives every population a count, and each count its own members", () => {
-    const { container } = column(WHOLE);
+  it("gives every population a count, and each count its own members", async () => {
+    const { container } = await column(WHOLE);
     const populations = container.querySelectorAll("[data-population]");
     expect(populations.length).toBeGreaterThan(5);
     for (const held of populations) {
@@ -94,35 +94,37 @@ describe("a horizon column", () => {
     }
   });
 
-  it("resolves an index into ranked to the member it names, not merely to a member", () => {
+  it("resolves an index into ranked to the member it names, not merely to a member", async () => {
     // `benchmark`, `beats_benchmark` and `ties` are indices. A population that counted its
     // members and never identified them stayed green with every index resolving to row zero.
-    const named = (beats: readonly number[]) =>
+    const named = async (beats: readonly number[]) =>
       [
-        ...column({
-          ...WHOLE,
-          outcome: survey({ comparison: comparison({ ranked: RANKED, beats }) }),
-        }).container.querySelectorAll(
+        ...(
+          await column({
+            ...WHOLE,
+            outcome: survey({ comparison: comparison({ ranked: RANKED, beats }) }),
+          })
+        ).container.querySelectorAll(
           "[data-population='beating the benchmark'] [data-ranked-member]",
         ),
       ].map((held) => held.getAttribute("data-ranked-member"));
-    expect(named([1])).toEqual(["B"]);
-    expect(named([0])).toEqual(["A"]);
-    expect(named([1, 0])).toEqual(["B", "A"]);
+    expect(await named([1])).toEqual(["B"]);
+    expect(await named([0])).toEqual(["A"]);
+    expect(await named([1, 0])).toEqual(["B", "A"]);
   });
 
-  it("states the front's own count and no ratio over a set the pass did not place", () => {
+  it("states the front's own count and no ratio over a set the pass did not place", async () => {
     // The pass places `ranked` less `arrives_after_horizon`, so "N of M ranked" invited a
     // subtraction that attributed a verdict to a row nobody assessed. Every count the section
     // reports stands beside its own members instead.
-    const held = column(WHOLE).container.querySelector("[data-front-count]");
+    const held = (await column(WHOLE)).container.querySelector("[data-front-count]");
     expect(held?.getAttribute("data-front-count")).toBe("1");
     expect(held?.textContent).toBe("1 dominated by nothing");
     expect(held?.textContent).not.toContain("of");
   });
 
-  it("renders a survey that did not run as its own reason, and no card", () => {
-    const { container } = column({
+  it("renders a survey that did not run as its own reason, and no card", async () => {
+    const { container } = await column({
       outcome: {
         tag: "candidates.CeilingExceeded",
         ceiling: 6000,
@@ -137,8 +139,8 @@ describe("a horizon column", () => {
     expect(container.querySelectorAll("[data-candidate]")).toHaveLength(0);
   });
 
-  it("renders a comparison with no benchmark as its own reason, and no card", () => {
-    const { container } = column({
+  it("renders a comparison with no benchmark as its own reason, and no card", async () => {
+    const { container } = await column({
       outcome: {
         tag: "candidates.CandidateSurvey",
         comparison: {
@@ -163,8 +165,8 @@ describe("a horizon column", () => {
     expect(container.querySelectorAll("[data-candidate]")).toHaveLength(0);
   });
 
-  it("gives that member's own populations their members, not a count inside a state", () => {
-    const { container } = column({
+  it("gives that member's own populations their members, not a count inside a state", async () => {
+    const { container } = await column({
       outcome: {
         tag: "candidates.CandidateSurvey",
         comparison: {
@@ -193,8 +195,8 @@ describe("a horizon column", () => {
     expect(refused?.querySelectorAll("[data-group-members] > li")).toHaveLength(1);
   });
 
-  it("renders a dominance pass that did not run as its own reason, and no card", () => {
-    const { container } = column({
+  it("renders a dominance pass that did not run as its own reason, and no card", async () => {
+    const { container } = await column({
       outcome: survey({ comparison: comparison({ ranked: RANKED }) }),
       dominance: {
         tag: "dominance.NoSurveyToRunOver",
@@ -213,8 +215,8 @@ describe("a horizon column", () => {
     expect(container.querySelectorAll("[data-candidate]")).toHaveLength(0);
   });
 
-  it("folds the no-candidate pairs into groups and states how many pairs were considered", () => {
-    const { container } = column(WHOLE);
+  it("folds the no-candidate pairs into groups and states how many pairs were considered", async () => {
+    const { container } = await column(WHOLE);
     const held = container.querySelector("[data-population='no candidate']");
     expect(held?.getAttribute("data-count")).toBe("2");
     expect(held?.textContent).toContain("of 26 considered");

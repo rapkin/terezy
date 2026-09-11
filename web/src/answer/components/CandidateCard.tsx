@@ -10,6 +10,7 @@ import { KindTile } from "@/design/KindTile";
 import { marksOf } from "@/lib/provenance";
 import { Badge } from "@/components/ui/badge";
 import { FigureSlot } from "@/components/figure/FigureSlot";
+import { WhyLink } from "@/card/components/WhyLink";
 import { Disclosure } from "./Disclosure";
 import { MoneyBack } from "./MoneyBack";
 import { SeparatingBadge } from "./SeparatingBadge";
@@ -26,11 +27,13 @@ export function CandidateCard({
   reading,
   shared,
   indistinguishable,
+  questionId,
 }: {
   outcome: TupleOutcome;
   reading: KindReading;
   shared: readonly string[];
   indistinguishable: Indistinguishable | undefined;
+  questionId: string;
 }) {
   // The belief's own sentence is folded into the once-per-screen line, so what is left here is
   // what this member rests on and nothing else (FR-024).
@@ -52,6 +55,8 @@ export function CandidateCard({
       </header>
 
       <MoneyBack outcome={outcome} />
+
+      <WhyLink outcome={outcome} questionId={questionId} />
 
       <Span span={outcome.span} />
 
