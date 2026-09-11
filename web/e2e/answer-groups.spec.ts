@@ -45,12 +45,21 @@ test("every population the API reports is one interaction from its own members",
     for (const held of document.querySelectorAll("[data-population]")) {
       const name = held.getAttribute("data-population") ?? "";
       const stated = Number((held.getAttribute("data-count") ?? "").replace(/\D/g, ""));
-      const members = held.querySelectorAll(
-        "[data-population-members] > li, [data-group-members] > li",
-      ).length;
+      // Its OWN members: `querySelectorAll` matches every descendant, so a population drawn
+      // inside another one had its members counted twice — once for itself and once for its
+      // host, whose stated count had never counted them.
+      const members = [
+        ...held.querySelectorAll("[data-population-members] > li, [data-group-members] > li"),
+      ].filter((member) => member.closest("[data-population]") === held).length;
       if (stated !== members) wrong.push(`${name}: says ${String(stated)}, holds ${String(members)}`);
     }
     return wrong;
   });
   expect(mismatched).toEqual([]);
+  // The held population is why this is scoped, and it is on the screen everywhere: the API is
+  // started over a root that declares a holding.
+  await expect(page.locator("[data-population='what the owner already holds']")).toHaveAttribute(
+    "data-count",
+    /[1-9]/,
+  );
 });

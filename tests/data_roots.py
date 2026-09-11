@@ -1,7 +1,8 @@
 """The two data roots a test may run against, and the one that composes them.
 
-Not a test module -- ``pytest`` collects only ``test_*.py``, so this file is imported, never
-run.
+``pytest`` collects only ``test_*.py``, so this file is imported rather than collected. It is
+also an entry point: ``python -m tests.data_roots --materialise <dir>`` writes the composed root
+where a process outside pytest -- the API the Playwright suite starts -- can be pointed at it.
 
 **The shipped root carries only real instruments** (owner decision, 2026-09-02). The invented
 ones a test needs live in ``tests/fixtures/data/``, and :func:`with_fixtures` is the composed
@@ -16,9 +17,11 @@ it was given, so the composed root produces the same input ids as the shipped on
 
 from __future__ import annotations
 
+import argparse
 import atexit
 import shutil
 import tempfile
+from collections.abc import Sequence
 from functools import cache
 from pathlib import Path
 from typing import Final
@@ -69,3 +72,34 @@ def with_fixtures() -> Path:
     root = _without_the_private_overlay(SHIPPED, "terezy-composed-root-")
     shutil.copytree(FIXTURES, root, dirs_exist_ok=True, ignore=shutil.ignore_patterns("README.md"))
     return root
+
+
+def materialise(destination: Path) -> Path:
+    """The composed root copied where a process outside pytest can be pointed at it.
+
+    :func:`with_fixtures` builds under ``tempfile`` and unlinks at interpreter exit, so a root
+    handed to another process would be gone before it read it. An existing destination is
+    replaced rather than merged: a stale file left from a previous run is a declaration nobody
+    wrote.
+    """
+    if destination.exists():
+        shutil.rmtree(destination)
+    shutil.copytree(with_fixtures(), destination)
+    return destination
+
+
+def _main(argv: Sequence[str] | None = None) -> int:
+    parsed = argparse.ArgumentParser(
+        prog="python -m tests.data_roots",
+        description=(
+            "Write the composed data root -- the shipped tree without the private overlay, "
+            "plus tests/fixtures/data/ -- to the given directory."
+        ),
+    )
+    parsed.add_argument("--materialise", required=True, type=Path, metavar="DIRECTORY")
+    materialise(parsed.parse_args(argv).materialise)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(_main())

@@ -124,4 +124,44 @@ describe("a held position", () => {
     );
     expect(container.querySelector("[data-lot='btc-1']")?.textContent).toContain("2025-03-11");
   });
+
+  it("is one disclosure whatever its lots number, and the population counts positions", () => {
+    // The owner holds his BTC in two lots. A second lot drawn as a population of its own put a
+    // second disclosure inside the position and its members inside the held population, where
+    // the count-matches-members guard read them as the population's own.
+    const lot = HELD.lots[0];
+    if (lot === undefined) throw new Error("the fixture declares no lot");
+    const two = {
+      ...HELD,
+      quantity: 0.3,
+      lots: [lot, { ...lot, lot_id: "btc-2", quantity: 0.2, acquired_on: "2025-06-02" }],
+    };
+    const { container } = render(<HeldPositions held={[two]} staleness={verdict([])} />);
+    const population = container.querySelector("[data-population='what the owner already holds']");
+    expect(population?.getAttribute("data-count")).toBe("1");
+    const position = container.querySelector("[data-held='btc']");
+    expect(position?.querySelectorAll("details")).toHaveLength(1);
+    expect(position?.querySelectorAll("[data-lot]")).toHaveLength(2);
+    expect(container.querySelectorAll("[data-population]")).toHaveLength(1);
+  });
+
+  it("routes every quantity through the formatting module, position and lot alike", () => {
+    // A holding is summed from its lots in float64, so it arrives carrying the artefact —
+    // 0.1 + 0.2 is 0.30000000000000004 — and that is what `String(n)` would put on the screen.
+    const lot = HELD.lots[0];
+    if (lot === undefined) throw new Error("the fixture declares no lot");
+    const summed = {
+      ...HELD,
+      quantity: 0.1 + 0.2,
+      lots: [
+        { ...lot, quantity: 0.1 },
+        { ...lot, lot_id: "btc-2", quantity: 0.2 },
+      ],
+    };
+    const { container } = render(<HeldPositions held={[summed]} staleness={verdict([])} />);
+    const marked = [...container.querySelectorAll("[data-quantity]")].map(
+      (held) => held.textContent,
+    );
+    expect(marked).toEqual(["0.3", "0.1", "0.2"]);
+  });
 });

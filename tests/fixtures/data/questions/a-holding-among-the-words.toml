@@ -1,0 +1,98 @@
+# SYNTHETIC FIXTURE. The owner's question with ONE extra word: the fixture held asset.
+#
+# The only declared question that names a held asset, and therefore the only one whose answer
+# carries a held section over HTTP at all. His own names `btc`, which ships no observation file
+# and no committed lot, so every served answer reported `held: []` and every test of the held
+# block over the API — the Playwright suite included — was green over nothing.
+#
+# **Its id sorts first on purpose.** `GET /api/questions` lists ids in order and the web client
+# answers the first, so this file's name is what decides which question the screen shows. A
+# rename that sorted after `fifty-thousand-hryvnia` would make the held block vacuous again
+# without failing anything else.
+#
+# Everything but `subjects` and `id` is a copy of `data/questions/fifty-thousand.toml`,
+# deliberately: a fixture that also changed the amount, the horizons or the benchmark would
+# leave which difference produced the different answer unsettled. What each field means, and
+# why `as_of` is not among them, is stated once in the file it copies.
+
+[owner]
+id = "owner-001"
+
+[question]
+id           = "a-holding-among-the-words"
+asked_on     = "2026-08-30"
+
+regime       = "(no regime declared)"
+
+continuation = "hold_as_cash"
+
+benchmark    = "UA4000231195"
+
+objectives   = "money-and-when"
+
+# His four words, and `synthetic_held_x` — an instrument id rather than a group label, which
+# `_resolve_one` reads first. The fixture asset declares no group precisely so that it cannot
+# be reached by his own word.
+subjects     = ["cash", "ovdp", "inzhur", "btc", "synthetic_held_x"]
+
+reserve      = []
+
+  [[question.amount]]
+  stream   = "salary_uah"
+  amount   = 50000.0
+  currency = "UAH"
+
+  [[question.amount]]
+  stream   = "contract_usd"
+  amount   = 1.0
+  currency = "USD"
+
+  [[question.horizon]]
+  start = "2026-09-01"
+  end   = "2026-10-01"
+
+  [[question.horizon]]
+  start = "2026-09-01"
+  end   = "2026-12-01"
+
+  [[question.horizon]]
+  start = "2026-09-01"
+  end   = "2027-09-01"
+
+  # No plan for `btc` or `synthetic_held_x`: a held position runs nothing, and 014 FR-003's
+  # refusal is over candidates.
+  [[question.plan]]
+  subject            = "cash"
+  kind               = "cash"
+
+  [[question.plan]]
+  subject            = "ovdp"
+  kind               = "bond"
+  consumption_method = "fifo"
+  coupon_policy      = "hold_cash"
+
+  [[question.plan]]
+  subject            = "inzhur_reit"
+  kind               = "fund"
+  consumption_method = "fifo"
+  liquidity_mode     = "practice"
+  buyback            = "available"
+  exit_on            = "2028-01-17"
+
+    [question.plan.yield_point]
+    rate_pct      = 9.5
+    is_assumption = true
+    rationale     = "OWNER'S CHOICE inside the range this fund itself states — the low end, so the figure is the least flattering one the range admits rather than a midpoint nobody stated. Not observed and not a forecast."
+
+  [[question.plan]]
+  subject            = "inzhur_miltech"
+  kind               = "fund"
+  consumption_method = "fifo"
+  liquidity_mode     = "practice"
+  buyback            = "available"
+  exit_on            = "2028-01-17"
+
+    [question.plan.yield_point]
+    rate_pct      = 25.0
+    is_assumption = true
+    rationale     = "OWNER'S CHOICE inside the range this fund itself states — the low end, so the figure is the least flattering one the range admits rather than a midpoint nobody stated. Not observed and not a forecast."
