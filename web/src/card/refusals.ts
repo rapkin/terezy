@@ -14,7 +14,11 @@ export function remedyFor(refusal: ProjectionRefused): string {
     case "envelopes.CategoryHasNoSuchId":
       return "the URL names a question nobody declares — open one of the declared ones";
     case "card.NoSuchCandidate":
-      return "this key is from another answer, another date or another question — reopen the answer";
+      // An empty list is the endpoint saying the **answer** refused, so it published no key at
+      // all: telling that reader to reopen the answer sends him back to the same refusal.
+      return refusal.evaluated_keys.length === 0
+        ? "the question itself was not answered as of this date — the reason beside this is the answer's, and no candidate was evaluated to have a card"
+        : "this key is from another answer, another date or another question — reopen the answer";
   }
   assertNever(refusal);
 }

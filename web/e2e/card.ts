@@ -53,6 +53,7 @@ async function servedCard(page: Page, key: string): Promise<ServedCard> {
               arrived_on: string;
               way_out: { latency_days: number };
             }[];
+            remainder_way_out: { tag: string; latency_days?: number };
           };
         };
       } = await (
@@ -69,7 +70,11 @@ async function servedCard(page: Page, key: string): Promise<ServedCard> {
               horizon: { start: string; end: string };
               outcome: {
                 comparison: {
-                  ranked?: { projection_key: string; reaches: { amount: number } }[];
+                  ranked?: {
+                    projection_key: string;
+                    reaches: { amount: number };
+                    undeployed: { journey: { tag: string; arrived_on?: string } } | null;
+                  }[];
                 };
               };
             }[];
@@ -108,11 +113,20 @@ async function servedCard(page: Page, key: string): Promise<ServedCard> {
           projection.purchase.purchased_on,
           ...projection.flows.map((flow) => flow.occurred_on),
           ...projection.releases.map((release) => release.arrived_on),
+          ...(outcome?.undeployed?.journey.arrived_on === undefined
+            ? []
+            : [outcome.undeployed.journey.arrived_on]),
         ],
         window: section?.horizon ?? { start: "", end: "" },
+        // The remainder's own leg is one more declared wait, on its own dates: it leaves on the
+        // purchase date with no position behind it, so it is on none of the releases above.
         latencies: [
           projection.way_in.latency_days,
           ...projection.releases.map((release) => release.way_out.latency_days),
+          ...(outcome?.undeployed?.journey.tag === "tuple.RemainderCameHome" &&
+          projection.remainder_way_out.latency_days !== undefined
+            ? [projection.remainder_way_out.latency_days]
+            : []),
         ],
       };
     },

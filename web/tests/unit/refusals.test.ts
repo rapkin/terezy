@@ -23,7 +23,20 @@ describe("the named states this card can be in", () => {
     });
     expect(wrongUrl).not.toBe(staleClient);
     expect(wrongUrl).toContain("question");
-    expect(staleClient).toContain("answer");
+    expect(staleClient).toContain("reopen the answer");
+  });
+
+  it("does not call an answer that refused a stale key", () => {
+    // The endpoint answers `NoSuchCandidate` with **no** keys when the answer itself refused, so
+    // a remedy telling that reader to reopen it sends him back to the same refusal.
+    const unanswered = remedyFor({
+      tag: "card.NoSuchCandidate",
+      wanted_key: "a perfectly good key",
+      evaluated_keys: [],
+      reason: "the question was not answered as of that date",
+    });
+    expect(unanswered).not.toContain("reopen the answer");
+    expect(unanswered).toContain("not answered");
   });
 
   it("calls a record the arm does not state an absence, and a zero not one", () => {

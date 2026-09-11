@@ -124,8 +124,10 @@ export function barsOf(
     remainderBar(outcome),
     ...lifecycleBars(projection),
     ...taxBars(projection),
-    ...exitBars(projection),
+    // Before the releases: the remainder leaves on the **purchase** date, and a section that
+    // claims to be in the order the money moved cannot end with an earlier date than its middle.
     ...remainderExitBars(projection, outcome),
+    ...exitBars(projection),
     {
       tag: "amount",
       id: "home",
@@ -347,13 +349,6 @@ function taxBars(projection: CandidateProjection): readonly Bar[] {
 }
 
 /**
- * The way out's charge, **per dated release rather than per flow** (FR-013's last clause).
- *
- * A flat fee is charged per movement, so two lifecycle flows on one date travel home once and
- * share one charge. Splitting it between them would be a figure with no owning call; drawing one
- * bar per flow would report the fee twice.
- */
-/**
  * What the way out charged the **remainder**, where it made the trip.
  *
  * Its own leg and its own charge: it leaves on the purchase date rather than on a release date,
@@ -374,6 +369,13 @@ function remainderExitBars(
   );
 }
 
+/**
+ * The way out's charge, **per dated release rather than per flow** (FR-013's last clause).
+ *
+ * A flat fee is charged per movement, so two lifecycle flows on one date travel home once and
+ * share one charge. Splitting it between them would be a figure with no owning call; drawing one
+ * bar per flow would report the fee twice.
+ */
 function exitBars(projection: CandidateProjection): readonly Bar[] {
   return projection.releases.flatMap((release) =>
     chargeBars(

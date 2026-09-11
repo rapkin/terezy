@@ -31,9 +31,13 @@ describe("whether one connected waterfall is drawable", () => {
     const dollars = inCurrency(bars, "USD");
     expect(dollars.some((bar) => bar.id === "arrived")).toBe(true);
     expect(dollars.some((bar) => bar.id === "home")).toBe(false);
-    // A bar with no amount belongs to no currency, so it stays in every group rather than
-    // disappearing from the one a reader happens to open.
-    expect(dollars.some((bar) => bar.tag === "none" || bar.tag === "refused")).toBe(true);
+    // A bar with no amount belongs to no currency, so it goes in the **first** group and only
+    // there: in every group it appeared twice under one id and the reader met it twice.
+    const hryvnia = inCurrency(bars, "UAH");
+    expect(hryvnia.some((bar) => bar.tag === "none" || bar.tag === "refused")).toBe(true);
+    expect(dollars.some((bar) => bar.tag === "none" || bar.tag === "refused")).toBe(false);
+    const ids = [...hryvnia, ...dollars].map((bar) => bar.id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 
   it("consults no rate: the return types carry neither a figure nor one", () => {

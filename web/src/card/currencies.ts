@@ -24,9 +24,18 @@ export function sharesOneCurrency(bars: readonly Bar[]): boolean {
   return currenciesOf(bars).length <= 1;
 }
 
-/** The bars of one currency, for the grouped rendering. Still no amount read and no rate. */
+/**
+ * The bars of one currency, for the grouped rendering. Still no amount read and no rate.
+ *
+ * A bar with no amount — a refusal, or the API saying there was nothing — belongs to no currency,
+ * so it goes in the **first** group rather than in each: rendered in every group it appeared
+ * twice under one `data-bar` id, and a reader met the same absence once per currency.
+ */
 export function inCurrency(bars: readonly Bar[], currency: Currency): readonly Bar[] {
-  return bars.filter(
-    (bar) => bar.tag === "refused" || bar.tag === "none" || bar.amount.currency === currency,
+  const first = currenciesOf(bars)[0];
+  return bars.filter((bar) =>
+    bar.tag === "refused" || bar.tag === "none"
+      ? currency === first
+      : bar.amount.currency === currency,
   );
 }
