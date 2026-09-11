@@ -6,7 +6,8 @@
 
 **Created**: 2026-09-07
 
-**Status**: **Drafted** — two clarifications open (below). Planning may not start until both are answered.
+**Status**: **Planned** — both clarifications answered 2026-09-11 by the conductor, **provisionally**
+(`specs/decisions/2026-09-11-clarify-027.toml`). Each is overruled by a text or data change named there.
 
 **Input**: Owner roadmap, 2026-09-06, step 2 after the answer screen. A card behind a candidate that
 says where the money went: a **waterfall** from the amount that left the income stream to the money
@@ -22,9 +23,11 @@ back* and a rate. A reader who does not already trust the engine has no way to c
 figures the card shows are conclusions, and every intermediate the engine passed through on the way
 to them is thrown away inside the join.
 
-**Measured 2026-09-07** (`answer_question` over the shipped `data/`, question
-`fifty-thousand-hryvnia`, `as_of` 2026-09-06): **66 projections are built and discarded** in one
-answer, one per ranked outcome — 63 from the bond arm and 3 from the fund. A bond's holds the dated
+**Re-measured 2026-09-11** on the tree this implementation starts from — `023-cash-instrument`,
+`fix/undeployed-remainder` and 025 and 026 have all landed since the figures below were first taken
+(`answer_question` over the shipped `data/`, question `fifty-thousand-hryvnia`, `as_of` 2026-09-06):
+**69 projections are built and discarded** in one answer, one per ranked outcome — 63 from the bond
+arm, 3 from the fund and 3 from the cash arm, which is the member 023 added. A bond's holds the dated
 cash-flow rows with gross, tax and net, the tax charges with their bases and their citations, and
 the premium or discount struck at purchase. `_hold` holds one in a
 local variable, reads a few totals off it, and returns a `TupleOutcome` that has nowhere to put it —
@@ -32,10 +35,12 @@ local variable, reads a few totals off it, and returns a `TupleOutcome` that has
 
 Required test **E11** has been open since feature 001 for exactly this reason: a reader looking at a
 schedule sees `0.00` on every tax row and cannot tell *exempted* from *not applicable*. The engine
-has always kept them apart. Measured on the shipped registry: **119 tax charges, every one zero and
-every one carrying its exemption's citation**, beside **63 schedule rows whose tax rests on no
-source because no rule ran**. 182 rows of `0.00`, two different claims, and no surface has ever
-drawn them. 026's own `tasks.md` records that it does not close E11 because it renders no waterfall.
+has always kept them apart. Re-measured 2026-09-11 on the shipped registry: **122 tax charges, of
+which 119 are zero and every one of those 119 carries its exemption's citation**, beside **63
+schedule rows whose tax rests on no source because no rule ran**. 182 rows of `0.00`, two different
+claims, and no surface has ever drawn them. The other three charges are the fund's — 3 876.84 UAH
+each under `ua_investment_profit` — and they are why the two zeros are a distinction the card has to
+draw rather than the only thing it will ever draw. 026's own `tasks.md` records that it does not close E11 because it renders no waterfall.
 This is that surface.
 
 ## What the join drops today
@@ -78,7 +83,7 @@ projection on `TupleOutcome` — was measured and costs the following.
 | | Carried on the record | A per-candidate endpoint |
 |---|---|---|
 | the answer document | **8 492 187 → 11 707 171 bytes** (+38%): the 63 bond projections encode to 36 407 / 47 249 / 69 857 bytes (min / median / max) and 3 120 700 in total, and the 3 fund projections to 31 428 each and 94 284 in total. The baseline is the served response body; the projections are encoded through the same fold | unchanged |
-| what a reader pays for | 66 projections to open one card | one |
+| what a reader pays for | 69 projections to open one card | one |
 | cost of one card | none | one answer plus one evaluation. **The two readings taken on 2026-09-07 disagree by 3×** — four warm in-process runs spanning 0.153–0.195 s, and a second reading of 0.45–0.49 s — so the figure settles this table and settles nothing about how a card feels (plan R3) |
 | feasible at all? | **no.** `tests/contract/test_tags_and_unions.py` asserts a record's served fields equal its declared fields, so a field on `TupleOutcome` is on the wire in every response that carries one. There is no serving it in one place and not another | yes |
 
@@ -195,8 +200,9 @@ statement's occurrences on the screen.
 - **FR-004**: It MUST carry each tax charge's **base**, its two lines **and their total**, the class
   that struck it, the year it accrues to, and the charge's own provenance. The total is served rather
   than left to be added, because the tax bar is that one figure and summing two lines in the client
-  is the derivation FR-013 forbids. Whether it also carries the **rate** is
-  [NEEDS CLARIFICATION: CL-1].
+  is the derivation FR-013 forbids. It MUST NOT carry a **rate**: the engine records none, and a
+  client reading the declared class to render its dated rates would decide which entry applied on
+  the event's date, which is the derivation this requirement's own last clause forbids (CL-1).
 - **FR-005**: It MUST carry, because each is computed and dropped today: the **purchase date**; the
   clean/accrued split of the price paid at purchase; the way-in charge **by component and by
   segment**; the way-out charge **per dated release**; the declared latency in and out; and the
@@ -243,8 +249,9 @@ statement's occurrences on the screen.
   requirement forbids; drawing one bar per flow would report the fee twice.
 - **FR-014**: The waterfall MUST NOT be built from `TupleOutcome.parts`. Those six are an
   attribution in up to three currencies in which two members describe the same money from two sides;
-  read as a waterfall they double-count. Whether the attribution is shown **beside** the waterfall is
-  [NEEDS CLARIFICATION: CL-2].
+  read as a waterfall they double-count. The attribution IS shown **beside** the waterfall, labelled
+  as its own reading — *which term dominates*, against the waterfall's *where the money went* — and
+  it is **folded by default** while the waterfall is open (CL-2).
 - **FR-015**: Where the bars are not all in one currency the card MUST NOT draw one connected
   waterfall. It groups per currency, states why, and consults **no** rate — the display switch is
   deferred and every declared channel's reference rate is a synthetic fixture.
@@ -285,16 +292,31 @@ statement's occurrences on the screen.
   visible focus, AA contrast in both themes, and no information carried by colour alone. A waterfall
   and a timeline MUST each be readable as text with every style declaration stripped.
 - **FR-030**: A **contract test over the shipped `data/`** MUST assert, for every ranked candidate of
-  the owner's declared question and for **both** members of FR-003's union, that the served flows
+  the owner's declared question and for **every** member of FR-003's union, that the served records
   account for `reaches` at the imported project tolerance and that every served flow carries a mark.
   Neither a local tolerance nor a second definition of a mark, and no candidate skipped — a ranked
   candidate the assertion cannot reach is FR-007's refusal and is asserted to be one.
 
+  **The identity, in the two links it actually has** (re-taken 2026-09-11; `fix/undeployed-remainder`
+  moved it, because before that fix the remainder was outside `reaches` and the second link would
+  have been false for the 63 candidates that leave one):
+
+  1. for each served dated release, its `sent` equals the sum of the served flows on that date net
+     of the tax charged on each, **excluding the purchase**; and
+  2. `reaches` equals the sum of the served releases' `arrived`, plus the remainder's `reached`
+     where the outcome's own journey says it came home.
+
+  Two links rather than one because a single `reaches == Σ flows` would be false and not by a
+  rounding: the tax is netted before the percentage exit fee, a date netting to exactly zero leaves
+  the release series, and the purchase is not a release. Measured 2026-09-11 over all **69**
+  evaluated candidates of the shipped question, both links hold at the imported tolerance with no
+  exception — which is what plan R1 asked to find out before a component existed.
+
 ## Success Criteria *(mandatory)*
 
 - **SC-001**: For every ranked candidate of the shipped question — **every** member of FR-003's
-  union, none skipped — the served flows account for `reaches` at the project tolerance, asserted,
-  not inspected.
+  union, none skipped — the served records account for `reaches` at the project tolerance by FR-030's
+  two links, asserted, not inspected.
 - **SC-002**: 100% of served flows carry a provenance mark, and no bar on a rendered card is
   unmarked while its flow is marked.
 - **SC-003**: E11 is closed: a cited zero and an uncited zero render differently, asserted over the
@@ -303,9 +325,9 @@ statement's occurrences on the screen.
   the drawing components.
 - **SC-005**: The answer document's size is unchanged **by this feature** beyond the published key —
   measured on the served response body, against a baseline re-taken on the tree the implementation
-  starts from. It is not the 8 492 187 bytes of 2026-09-07: `fix/undeployed-remainder` adds a served
-  field to every outcome with a remainder and must land first, so a constant here would be red for a
-  reason that is not this feature's.
+  starts from. Re-taken 2026-09-11 on that tree: **8 540 464 bytes**, not the 8 492 187 of 2026-09-07,
+  which `fix/undeployed-remainder` moved for its own reasons. The assertion is a bound on the growth
+  rather than a constant, because a key is 69 short strings and the baseline moves with the registry.
 - **SC-006**: Opening a card issues exactly one request, and its wait has a named state.
 - **SC-007**: Every event and boundary the API sends for a candidate is on the timeline; none is
   dropped, clamped or merged.
@@ -313,25 +335,30 @@ statement's occurrences on the screen.
 
 ## Clarifications
 
-Two open. Planning may not start until both are answered; the graph carries this feature as
-`drafted` until they are.
+Both answered **2026-09-11 by the conductor, provisionally**, applying this section's own
+recommendations: `specs/decisions/2026-09-11-clarify-027.toml`. The owner has not seen them. Each
+was takeable provisionally because neither reaches the wire: CL-1 is a bar that shows no rate and
+CL-2 is a `<details>` that starts closed, so overruling either is the one-line change that file
+names rather than a re-specification.
 
 **CL-1 — Does a tax bar name the rate that struck it?** Measured: the engine records the base, the
 two lines, the class id and the citation of the dated entry, and **never the rate**. Options: **(a)**
 the bar shows the base and the charge and names the class, and no rate is shown; **(b)** the client
 reads the declared class and renders its dated rates beside the bar; **(c)** the charge carries the
 entry it applied, which is a wire-visible engine change beyond *stop discarding*.
-**Recommendation (a)**, with (c) recorded as a future: every charge the shipped registry produces is
-a cited zero under one exempt class, measured above, so a rate renders `0% + 0%` on every bar and the
-question only becomes live the day something taxed is ranked.
+**Answered (a)**, with (c) recorded as a future: the base and the charge, and no rate. Measured
+2026-09-11 on the shipped registry, 119 of the 122 charges are cited zeros under one exempt class,
+so a rate renders `0 % + 0 %` on almost every bar; the three that are not zero are the fund's, and
+they are what makes (c) a future rather than a refusal.
 
 **CL-2 — Does the six-part attribution appear beside the waterfall?** The attribution answers *which
 term dominates* and the waterfall answers *where the money went*; they are different readings of one
 candidate and FR-014 forbids merging them. Options: **(a)** the waterfall alone; **(b)** both, each
 labelled as its own reading; **(c)** the attribution alone, and no waterfall.
-**Recommendation (b)** — 010 FR-005 exists for the first sentence the tool was built to write, *most
-of the gap is the ramp, not the asset*, and no surface has ever shown it. Against it: the owner's
-complaint about 021 was *overloaded*, and a second chart per card is exactly that risk.
+**Answered (b), folded by default** — 010 FR-005 exists for the first sentence the tool was built to
+write, *most of the gap is the ramp, not the asset*, and no surface has ever shown it. The owner's
+complaint about 021 was *overloaded*, which the fold answers without dropping the reading: the
+waterfall is open and the attribution is one disclosure below it.
 
 ## Out of scope
 
@@ -349,17 +376,12 @@ complaint about 021 was *overloaded*, and a second chart per card is exactly tha
 
 - 026 is `done` on `main` and supplies the visual language, the badge vocabulary, the formatting
   module and the figure slot.
-- **Every measurement here was taken at `e84b3b8`**, the branch point, and `023-cash-instrument`
-  landed on `main` while this spec was being written. It adds `CashProjection` — a **third**
-  projection arm — so the candidate population, the projection count and the answer's byte size all
-  move, and FR-003's union gains a member. The requirements are written per-arm and survive it; the
-  figures are dated and must be re-taken on the tree the implementation starts from, which is what
-  SC-005 already says of its own baseline.
-- **`fix/undeployed-remainder` must land first, and had not on 2026-09-07.** It is 026's blocker too,
-  and `needs` cannot name it because it is a fix rather than a feature. Until it lands `reaches` is
-  the deployed part alone, `RemainderCameHome` and `RemainderStayed` do not exist on `main`, and
-  **every measurement in this spec was taken without it** — which is why SC-005's baseline is a
-  method rather than a constant.
+- **The figures dated 2026-09-07 were taken at `e84b3b8`, the branch point, and are superseded where
+  a figure above carries the later date.** `023-cash-instrument` landed while this spec was being
+  written and adds `CashProjection`, a **third** projection arm, so FR-003's union has three members
+  rather than two; `fix/undeployed-remainder`, 025 and 026 landed after it. Everything re-measured on
+  the implementation's own tree is dated **2026-09-11** and says so at its site. The requirements are
+  written per-arm and survived the third one unchanged.
 - 019, 020 and 021 are unchanged by this feature except for the one endpoint and the published key;
   `as_of` is 021's, and the endpoint reads the clock the answer read.
 - The screen shows one declared question, as 026 assumes.

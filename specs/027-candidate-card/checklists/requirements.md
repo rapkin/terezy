@@ -17,8 +17,9 @@ requirement checkable; no framework, language or endpoint implementation is chos
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain — **two open by design** (CL-1, CL-2), each with
-      options and a recommendation. The graph carries the feature as `drafted` until answered.
+- [x] No [NEEDS CLARIFICATION] markers remain — both answered 2026-09-11 by the conductor,
+      **provisionally**, applying this spec's own recommendations
+      (`specs/decisions/2026-09-11-clarify-027.toml`).
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic
@@ -36,6 +37,7 @@ requirement checkable; no framework, language or endpoint implementation is chos
 
 ## Notes
 
-Every figure in the spec was measured on 2026-09-07 against the shipped `data/` at
-`as_of = 2026-09-06` and is reproducible by answering `fifty-thousand-hryvnia`. No measurement is
+Every figure in the spec was measured against the shipped `data/` at `as_of = 2026-09-06` and is
+reproducible by answering `fifty-thousand-hryvnia`. Each carries the date it was taken on: 2026-09-07
+at the branch point, 2026-09-11 on the tree the implementation starts from. No measurement is
 restated in `specs/features.toml`.

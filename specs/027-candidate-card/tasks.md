@@ -2,11 +2,9 @@
 
 **Feature**: `027-candidate-card` | **Plan**: [plan.md](./plan.md) | **Spec**: [spec.md](./spec.md)
 
-**Implementation may not start until `026-answer-screen` is `done` on `main`** — the card is opened
-from its screen and reuses its language, its badges and its one formatting module — until
-`fix/undeployed-remainder` is on `main`, which `needs` cannot name because it is a fix rather than a
-feature, and until the two clarifications are answered. **Phase 6 holds every artefact that turns on one and may not
-start** while either is open; Phases 1 to 5 do not turn on either.
+Every gate this depends on is met: `026-answer-screen` and `fix/undeployed-remainder` are on `main`,
+and both clarifications were answered 2026-09-11 (`specs/decisions/2026-09-11-clarify-027.toml`),
+which opens Phase 6.
 
 Tests are **not optional**. Principle V is NON-NEGOTIABLE; every implementation task is preceded by
 the test that fails before it exists.
@@ -78,12 +76,10 @@ is worth knowing before a component exists (plan R1).
 - [ ] T040 [P] Test: no module under `web/src/card/` subtracts one served figure from another to obtain a bar — a source scan beside `bars.ts`, warranted because the typecheck cannot see arithmetic over two served amounts — `web/tests/unit/no-derived-bar.test.ts` (SC-004).
 - [ ] T041 Extend 021's whole-UI crawl and the accessibility pass to the card in both themes (FR-029, SC-008).
 
-## Phase 6 — what turns on a clarification
+## Phase 6 — what turned on a clarification
 
-**May not start while CL-1 or CL-2 is open.**
-
-- [ ] T042 CL-1: whatever the owner's answer requires for a rate on the tax bar — nothing, a read of the declared class, or a field on the charge — with its test first (FR-004).
-- [ ] T043 CL-2: the six-part attribution beside the waterfall, labelled as its own reading, or nothing (FR-014).
+- [ ] T042 CL-1: **nothing is built.** The answer is that no rate is served and none is rendered, so the work is the test that the tax bar names the base, the charge and the class and carries no rate — `web/tests/unit/tax-bar.test.tsx` (FR-004).
+- [ ] T043 CL-2: the six-part attribution beside the waterfall, labelled as its own reading and folded by default — `web/src/card/components/Attribution.tsx`, with its test first (FR-014).
 
 ## Landing
 

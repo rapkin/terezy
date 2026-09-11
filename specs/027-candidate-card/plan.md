@@ -5,9 +5,10 @@
 **Branch**: written on `spec/027-candidate-card` and lands **squashed** — spec-directory work, not an
 implementation. The implementation branch is `feat/027-candidate-card` and lands by `--no-ff`.
 
-**Planning is written against two open clarifications.** CL-1 governs the tax bar's rate and CL-2 the
-six-part attribution; `tasks.md` puts every artefact that turns on one into a phase that may not
-start, on 025's precedent. Everything else is settled.
+**Both clarifications were answered 2026-09-11 by the conductor, provisionally**
+(`specs/decisions/2026-09-11-clarify-027.toml`): no rate on the tax bar, and the attribution beside
+the waterfall behind a fold. Phase 6 is therefore open, and each answer is overruled by the one-line
+change that file names rather than by a re-plan.
 
 ## Summary
 

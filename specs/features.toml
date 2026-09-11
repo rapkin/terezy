@@ -211,12 +211,12 @@ note  = "READ IN THE CODE 2026-09-07 while specifying 028: `api/answer.py::_scen
 
 [[feature]]
 id     = "027-candidate-card"
-status = "drafted"
+status = "planned"
 needs  = ["010-full-tuple", "020-http-api", "022-accrued-interest", "023-cash-instrument", "026-answer-screen"]
 why    = "010 is the join that builds the projection and drops it, and owns `reaches`, `parts` and `arrivals` the card reads beside it; 020 publishes the schema the one new endpoint joins and owns the wire contracts it must satisfy; 022 is why a purchase price has a clean/accrued split to carry at all; 023 landed a third projection arm the card must draw, which is what makes the served projection a union rather than one record; 026 owns the screen the card opens from, its badge vocabulary and its one formatting module. Transitively covers 019, 021, 016, 015 and 014."
 note   = """
 The join builds a projection per candidate and discards every one; this serves them per candidate so a waterfall and a timeline can say why a figure is that figure. Closes required test E11.
-Two clarifications are open -- a rate on the tax bar, and the six-part attribution beside the waterfall -- so tasks.md quarantines Phase 6; see specs/027-candidate-card/spec.md."""
+Both clarifications are answered -- by the CONDUCTOR and PROVISIONALLY, applying the spec's own recommendations, in specs/decisions/2026-09-11-clarify-027.toml. Neither reaches the wire, so the owner overrules either with the one-line text change that file names."""
 
 [[future]]
 id    = "a-one-day-horizon-raises"
