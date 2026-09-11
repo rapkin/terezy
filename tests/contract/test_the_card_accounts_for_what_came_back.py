@@ -23,7 +23,7 @@ from terezy.core.ledger.events import EventKind
 from terezy.core.primitives import money
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.tolerance import is_close
-from terezy.core.results.card import BondArm, CandidateProjection, CashArm, FundArm
+from terezy.core.results.card import BondArm, CandidateProjection, CashArm, FundArm, NotStated
 from terezy.core.results.ramp import OneWayCost, WayOutCost
 from terezy.core.results.tuple import RemainderCameHome, TupleOutcome, UndeployedCash
 from tests.served_projections import served
@@ -72,6 +72,27 @@ def test_reaches_is_the_releases_that_arrived_plus_the_remainder_that_came_home(
         home = _remainder(outcome)
         total = money.total(arrived if home is None else [*arrived, home], outcome.reaches.currency)
         assert is_close(total.amount, outcome.reaches.amount), outcome.projection_key
+
+
+def test_the_remainder_that_came_home_is_served_its_own_charge_and_wait() -> None:
+    """Its leg is charged and dated like any other, and it was on no served record.
+
+    63 of the 69 evaluated candidates leave a remainder that comes home (measured 2026-09-12),
+    so a timeline drawing its arrival with no declared wait beside it, and a waterfall with no
+    bar for what that journey was charged, were the live cases rather than the edge ones.
+    """
+    home = 0
+    for outcome, projection in served():
+        charged = projection.remainder_way_out
+        if _remainder(outcome) is None:
+            assert isinstance(charged, NotStated), outcome.projection_key
+            continue
+        assert not isinstance(charged, NotStated), outcome.projection_key
+        assert charged.latency_days >= 0
+        assert outcome.undeployed is not None
+        assert charged.sent == outcome.undeployed.amount
+        home += 1
+    assert home == 63
 
 
 def test_a_release_is_served_for_every_arrival_the_outcome_reports() -> None:

@@ -223,6 +223,31 @@ export function projection(over: Partial<CandidateProjection> = {}): CandidatePr
     },
     way_in: wayIn(),
     releases: [release()],
+    remainder_way_out: notStated("remainder_way_out", "this candidate"),
+    ...over,
+  };
+}
+
+/** The charge the remainder's own leg was struck, where it made the trip. */
+export function remainderWayOut(): NonNullable<CandidateProjection["remainder_way_out"]> {
+  return release().way_out;
+}
+
+/** One dated payout a fund declares: a record date, a pay date, and what it paid. */
+export function distribution(
+  over: Partial<FundArm["distributions"][number]> = {},
+): FundArm["distributions"][number] {
+  return {
+    tag: "fund.DistributionLine",
+    record_on: "2027-01-10",
+    paid_on: "2027-01-20",
+    gross: money(400, [source()]),
+    tax_class_id: "ua_investment_profit",
+    rate_effective_from: "2025-01-01",
+    tax: money(92, [source()]),
+    net: money(308, [source()]),
+    pegged: null,
+    cap_bound: false,
     ...over,
   };
 }

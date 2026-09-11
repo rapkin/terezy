@@ -138,8 +138,10 @@ function armEvents(
 ): readonly TimelineEvent[] {
   const arm = projection.arm;
   if (arm.tag !== "card.FundArm") return [];
+  // Keyed by both dates: a fund may declare two payouts with one record date and different pay
+  // dates, and an id built from the record date alone drops one marker off the timeline.
   const distributions = arm.distributions.map((line) => ({
-    id: `record-date:${line.record_on}`,
+    id: `record-date:${line.record_on}:${line.paid_on}`,
     on: line.record_on,
     kind: "flow" as const,
     detail: "the distribution's record date",
@@ -216,6 +218,31 @@ function segmentsOf(
       days: release.way_out.latency_days,
       label: "the way out's declared settlement",
     })),
+    ...remainderSegment(projection, outcome),
+  ];
+}
+
+/**
+ * The remainder's own leg: it travels the same way out, on its own dates, with its own wait.
+ *
+ * Drawn from the charge the API serves for it rather than from a release — it leaves on the
+ * purchase date with no position behind it, so it is on none of them.
+ */
+function remainderSegment(
+  projection: CandidateProjection,
+  outcome: TupleOutcome,
+): readonly LatencySegment[] {
+  const charged = projection.remainder_way_out;
+  const journey = outcome.undeployed?.journey;
+  if (charged.tag === "card.NotStated" || journey?.tag !== "tuple.RemainderCameHome") return [];
+  return [
+    {
+      id: "latency:out:remainder",
+      from: journey.left_on,
+      to: journey.arrived_on,
+      days: charged.latency_days,
+      label: "the way out's declared settlement, for what the purchase could not deploy",
+    },
   ];
 }
 

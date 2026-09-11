@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { render } from "@testing-library/react";
+import { unmarkedOutsideAnUncitedZero } from "../unmarked";
 import { Waterfall } from "@/card/components/Waterfall";
 import { GROUP } from "@/design/format";
 import { outcome } from "../answer-fixtures";
@@ -41,7 +42,7 @@ describe("the waterfall", () => {
 
   it("gives every bar with an amount a mark, and never an unmarked value slot", () => {
     const { container } = draw();
-    expect(container.querySelectorAll("[data-figure='value']")).toHaveLength(0);
+    expect(unmarkedOutsideAnUncitedZero(container)).toEqual([]);
     for (const slot of container.querySelectorAll("[data-figure='marked']")) {
       expect(slot.querySelectorAll("[data-mark]").length).toBeGreaterThan(0);
     }

@@ -253,6 +253,7 @@ DECLARATIONS_WITHOUT_A_REASON = frozenset(
         "conventions.ConventionsApplied",
         "fund.ExitLine",
         "projection.ProjectedCandidate",
+        "ramp.WayOutCost",
         "candidates.CandidateSurvey",
         "cash.CashAssumptions",
         "cash.CashDeclaration",

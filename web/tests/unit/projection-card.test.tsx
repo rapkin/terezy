@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { render } from "@testing-library/react";
+import { unmarkedOutsideAnUncitedZero } from "../unmarked";
 import { CandidateCard } from "@/card/components/CandidateCard";
 import { GROUP } from "@/design/format";
 import { outcome } from "../answer-fixtures";
@@ -67,8 +68,10 @@ describe("the candidate card", () => {
     expect(container.textContent).toContain(`50${GROUP}529.09`);
   });
 
-  it("renders no figure as an unmarked value", () => {
+  it("renders no figure as an unmarked value, but for the zero no rule ran on", () => {
     const { container } = card();
-    expect(container.querySelectorAll("[data-figure='value']")).toHaveLength(0);
+    expect(unmarkedOutsideAnUncitedZero(container)).toEqual([]);
+    // And that one is present, so the exception is not vacuous.
+    expect(container.querySelector("[data-tax-zero='no-rule-ran']")).not.toBeNull();
   });
 });

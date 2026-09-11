@@ -36,12 +36,15 @@ function CardScreen() {
     ...projectionQuery(questionId, candidateKey, asOf ?? ""),
     enabled,
   });
-  // Never stale for this observer: the answer is keyed by `as_of`, so the cached one is the
-  // answer this key belongs to however long the reader took to click. The shared 30-second
-  // staleness would refetch 8.5 MB and make SC-006's *one request* a claim about how fast he is.
+  // Asked for only once this key has resolved to a card, so a reader following a stale or
+  // hand-typed one is told so without downloading an 8.5 MB answer he will not be shown.
+  //
+  // Never stale for this observer either: the answer is keyed by `as_of`, so the cached one is
+  // the answer this key belongs to however long the reader took to click. The shared 30-second
+  // staleness would refetch it and make SC-006's *one request* a claim about how fast he is.
   const answered = useQuery({
     ...answerQuery(questionId, asOf ?? ""),
-    enabled,
+    enabled: enabled && hasACard(served.data),
     staleTime: Number.POSITIVE_INFINITY,
   });
 
@@ -57,6 +60,12 @@ function CardScreen() {
       />
     </div>
   );
+}
+
+/** Whether the projection read came back with a card to draw, rather than one of its refusals. */
+function hasACard(served: Answered | undefined): boolean {
+  if (served?.tag !== "body" || !isTheCandidateProjection(served.body)) return false;
+  return served.body.result.tag === "projection.ProjectedCandidate";
 }
 
 function Close({ asOf }: { asOf: string }) {

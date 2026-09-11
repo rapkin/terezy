@@ -72,8 +72,9 @@ export type Bar =
       readonly kind: "tax";
       readonly label: string;
       readonly amount: Money;
-      readonly base: Money;
-      readonly taxClassId: string;
+      /** What the rates were applied to, or `null` where no rule ran and there is no base. */
+      readonly base: Money | null;
+      readonly taxClassId: string | null;
       readonly on: string | null;
     };
 
@@ -121,9 +122,10 @@ export function barsOf(
     ...purchaseBars(projection),
     premiumBar(projection),
     remainderBar(outcome),
-    ...releasedBars(projection),
+    ...lifecycleBars(projection),
     ...taxBars(projection),
     ...exitBars(projection),
+    ...remainderExitBars(projection, outcome),
     {
       tag: "amount",
       id: "home",
@@ -297,36 +299,51 @@ function premiumBar(projection: CandidateProjection): Bar {
   };
 }
 
-/** One bar per dated flow the holding released, gross. The purchase is not one of them. */
-function releasedBars(projection: CandidateProjection): readonly Bar[] {
+/**
+ * One bar per dated flow of the holding's life, gross. The purchase is not one of them.
+ *
+ * The label **names the kind** rather than claiming a release. The engine keeps a closed set of
+ * the kinds that are a holding paying its owner and does not serve it, and not every other flow
+ * is one: a reinvestment is cash out, funded by the coupon beside it, so a bar reading *the
+ * holding released — reinvestment* would be false of a negative amount.
+ */
+function lifecycleBars(projection: CandidateProjection): readonly Bar[] {
   return projection.flows
     .filter((flow) => flow.kind !== "purchase")
     .map((flow) => ({
       tag: "amount" as const,
       id: `released:${String(flow.sequence)}`,
       kind: "released" as const,
-      label: `the holding released — ${flow.kind.replace(/_/g, " ")}`,
+      label: `the holding's ${flow.kind.replace(/_/g, " ")}`,
       amount: flow.gross,
       on: flow.occurred_on,
     }));
 }
 
-/** One bar per charge: its own total, with the base it was struck on beside it (FR-004). */
+/**
+ * One tax bar per **flow**, carrying that flow's own served tax (FR-004, FR-017).
+ *
+ * Per flow rather than per charge, which is what E11 turns on: a charge is always struck by a
+ * rule and therefore always cites one, so a card built from `charges` alone can draw an exempt
+ * zero and can never draw the other kind. The zero **no rule ran on** lives on a flow — a
+ * purchase, measured 2026-09-11 on 63 of the shipped question's rows — and reaches the screen
+ * only this way. `FlowLine.tax` is the charge's own total where a charge exists, so nothing is
+ * summed here; the base and the class come from that charge, and are absent where none ran.
+ */
 function taxBars(projection: CandidateProjection): readonly Bar[] {
-  return projection.charges.map((charge) => ({
-    tag: "tax" as const,
-    id: `tax:${String(charge.event_sequence)}`,
-    kind: "tax" as const,
-    label: "tax struck on it",
-    amount: charge.total,
-    base: charge.taxable_base,
-    taxClassId: charge.tax_class_id,
-    on: dateOfEvent(projection, charge.event_sequence),
-  }));
-}
-
-function dateOfEvent(projection: CandidateProjection, sequence: number): string | null {
-  return projection.flows.find((flow) => flow.sequence === sequence)?.occurred_on ?? null;
+  return projection.flows.map((flow) => {
+    const charge = projection.charges.find((held) => held.event_sequence === flow.sequence);
+    return {
+      tag: "tax" as const,
+      id: `tax:${String(flow.sequence)}`,
+      kind: "tax" as const,
+      label: `tax struck on the holding's ${flow.kind.replace(/_/g, " ")}`,
+      amount: flow.tax,
+      base: charge?.taxable_base ?? null,
+      taxClassId: charge?.tax_class_id ?? null,
+      on: flow.occurred_on,
+    };
+  });
 }
 
 /**
@@ -336,6 +353,27 @@ function dateOfEvent(projection: CandidateProjection, sequence: number): string 
  * share one charge. Splitting it between them would be a figure with no owning call; drawing one
  * bar per flow would report the fee twice.
  */
+/**
+ * What the way out charged the **remainder**, where it made the trip.
+ *
+ * Its own leg and its own charge: it leaves on the purchase date rather than on a release date,
+ * so it is in none of the dated releases above, and before this it appeared in no bar at all.
+ */
+function remainderExitBars(
+  projection: CandidateProjection,
+  outcome: TupleOutcome,
+): readonly Bar[] {
+  const charged = projection.remainder_way_out;
+  const journey = outcome.undeployed?.journey;
+  if (charged.tag === "card.NotStated" || journey?.tag !== "tuple.RemainderCameHome") return [];
+  return chargeBars(
+    "way-out",
+    "the way out charged, on what the purchase could not deploy",
+    charged.components,
+    journey.left_on,
+  );
+}
+
 function exitBars(projection: CandidateProjection): readonly Bar[] {
   return projection.releases.flatMap((release) =>
     chargeBars(

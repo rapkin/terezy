@@ -26,7 +26,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
-from typing import TYPE_CHECKING, assert_never
+from typing import TYPE_CHECKING, Final, assert_never
 
 from terezy.core.instruments.accrual import Carried
 from terezy.core.ledger.events import CausationRef, EventKind
@@ -198,6 +198,16 @@ class CandidateProjection:
     purchase: Purchase
     way_in: WayIn
     releases: tuple[Release, ...]
+    remainder_way_out: WayOutCost | NotStated
+    """What the way out charged the **remainder**, or the arm saying it charged nothing.
+
+    Its own leg, carried beside the releases rather than among them: it leaves on the purchase
+    date with no position behind it and bears no tax, so folding it into the dated releases
+    would put it on a date the holding released nothing. The dates are ``UndeployedCash.journey``
+    on the outcome and are not repeated; this is the charge and the declared wait between them,
+    which nothing else carries. ``NotStated`` where the purchase left nothing over, or where the
+    way out would not carry what it did.
+    """
 
 
 NO_DISTRIBUTIONS = "distributions"
@@ -345,6 +355,18 @@ def _silent() -> NotStated:
             "ones its own dated records state."
         ),
     )
+
+
+REMAINDER_STAYED: Final = NotStated(
+    what="remainder_way_out",
+    arm="this candidate",
+    reason=(
+        "nothing the purchase could not deploy travelled the way out: either it deployed the "
+        "whole of what arrived, or the way out would not carry what was left and the outcome's "
+        "own journey says why. There is no charge, because there was no movement."
+    ),
+)
+"""What a candidate states where its remainder was charged nothing because it never moved."""
 
 
 def releases_of(repatriated: Sequence[tuple[Arrival, WayOutCost]]) -> tuple[Release, ...]:

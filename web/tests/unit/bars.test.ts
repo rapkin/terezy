@@ -1,8 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { barsOf } from "@/card/bars";
-import { outcome, cameHome } from "../answer-fixtures";
+import { cameHome, outcome, part } from "../answer-fixtures";
 import { money, source } from "../fixtures";
-import { charge, components, flow, notStated, projection, release, usd } from "../card-fixtures";
+import {
+  charge,
+  components,
+  flow,
+  notStated,
+  projection,
+  release,
+  remainderWayOut,
+  usd,
+} from "../card-fixtures";
 
 /**
  * One case per row of the plan's mapping table: every bar's amount is a field the API sent, and
@@ -86,13 +95,24 @@ describe("the waterfall's bars", () => {
     expect(released[0]?.tag === "amount" ? released[0].amount.amount : null).toBe(500);
   });
 
-  it("draws the tax from the charge's own total, with the base beside it", () => {
-    const bar = barsOf(projection(), HELD).find((held) => held.kind === "tax");
-    expect(bar?.tag).toBe("tax");
-    if (bar?.tag !== "tax") throw new Error("no tax bar");
-    expect(bar.amount.amount).toBe(0);
-    expect(bar.base.amount).toBe(500);
-    expect(bar.taxClassId).toBe("ua_government_bond");
+  it("draws one tax bar per flow, so both zeros reach the card", () => {
+    // E11. Per **charge** the card could only ever draw the cited zero: a charge is struck by a
+    // rule and cites it. The other zero — a line no rule ran on — is on the purchase flow, and
+    // it reaches the screen only because the bars are built from the flows.
+    const bars = barsOf(projection(), HELD).filter((bar) => bar.tag === "tax");
+    expect(bars).toHaveLength(projection().flows.length);
+
+    const charged = bars.find((bar) => bar.id === "tax:2");
+    expect(charged?.amount.amount).toBe(0);
+    expect(charged?.amount.provenance.sources.length).toBeGreaterThan(0);
+    expect(charged?.base?.amount).toBe(500);
+    expect(charged?.taxClassId).toBe("ua_government_bond");
+
+    const unruled = bars.find((bar) => bar.id === "tax:1");
+    expect(unruled?.amount.amount).toBe(0);
+    expect(unruled?.amount.provenance.sources).toEqual([]);
+    expect(unruled?.base).toBeNull();
+    expect(unruled?.taxClassId).toBeNull();
   });
 
   it("draws the way out per dated release rather than per flow", () => {
@@ -108,6 +128,28 @@ describe("the waterfall's bars", () => {
     const exits = barsOf(held, HELD).filter((bar) => bar.kind === "way-out");
     expect(exits).toHaveLength(3);
     expect(exits.every((bar) => bar.id.endsWith(":2026-10-01"))).toBe(true);
+  });
+
+  it("charges the remainder's own leg, on the date it left", () => {
+    const left = outcome({
+      instrumentId: "UA4000231195",
+      undeployed: {
+        tag: "tuple.UndeployedCash",
+        amount: money(17.5, [source()]),
+        venue_id: "inzhur",
+        journey: cameHome("2026-09-05"),
+        reason: "bought in whole increments",
+      },
+    });
+    const bars = barsOf(projection({ remainder_way_out: remainderWayOut() }), left);
+    const charged = bars.filter((bar) => bar.id.endsWith(":2026-09-01"));
+    expect(charged).toHaveLength(3);
+    expect(charged.every((bar) => bar.label.includes("could not deploy"))).toBe(true);
+  });
+
+  it("charges it nothing where it never travelled", () => {
+    const bars = barsOf(projection(), HELD);
+    expect(bars.some((bar) => bar.label.includes("could not deploy"))).toBe(false);
   });
 
   it("closes with what reached home, which is `reaches` and not the sum of the bars", () => {
@@ -148,10 +190,21 @@ describe("the waterfall's bars", () => {
   });
 
   it("reads no attribution: the six parts never reach a bar", () => {
-    const withParts = outcome({ instrumentId: "UA4000231195" });
-    expect(withParts.parts).toEqual([]);
-    const ids = barsOf(projection(), withParts).map((bar) => bar.id);
-    expect(ids.some((id) => id.startsWith("part"))).toBe(false);
+    // With parts on the outcome, or the check cannot fail however `barsOf` behaves. They are an
+    // attribution in up to three currencies and two of them describe the same money from two
+    // sides, so a bar built from one would double-count (FR-014).
+    const attributed = outcome({
+      instrumentId: "UA4000231195",
+      parts: [part("entry", money(123.45, [source()])), part("ramp_in", money(67.89, [source()]))],
+    });
+    expect(attributed.parts).toHaveLength(2);
+    const drawn = barsOf(projection(), attributed);
+    expect(drawn.some((bar) => bar.id.startsWith("part"))).toBe(false);
+    for (const bar of drawn) {
+      if (bar.tag === "refused" || bar.tag === "none") continue;
+      expect(bar.amount.amount).not.toBe(123.45);
+      expect(bar.amount.amount).not.toBe(67.89);
+    }
   });
 
   it("keeps a bar in another currency as that currency, converting nothing", () => {
@@ -162,9 +215,10 @@ describe("the waterfall's bars", () => {
     expect(bar?.tag === "amount" ? bar.amount.currency : null).toBe("USD");
   });
 
-  it("sits the charge bar on the date of the flow it was struck on", () => {
-    const bar = barsOf(projection(), HELD).find((held) => held.kind === "tax");
-    expect(bar?.tag === "tax" ? bar.on : null).toBe("2026-10-01");
+  it("sits each tax bar on the date of the flow it was struck on", () => {
+    const bars = barsOf(projection(), HELD).filter((bar) => bar.tag === "tax");
+    expect(bars.find((bar) => bar.id === "tax:2")?.on).toBe("2026-10-01");
+    expect(bars.find((bar) => bar.id === "tax:1")?.on).toBe("2026-09-02");
     expect(charge().event_sequence).toBe(2);
   });
 });

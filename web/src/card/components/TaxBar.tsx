@@ -20,29 +20,35 @@ export function TaxBar({
   on,
 }: {
   amount: Money;
-  base: Money;
-  taxClassId: string;
+  base: Money | null;
+  taxClassId: string | null;
   on: string | null;
 }) {
   const zero = taxZero(amount);
   return (
     <div className="space-y-1" data-tax-zero={zero.tag}>
       <p className="text-xs">
+        {/* A zero no rule ran on cites nothing, so there is no mark for it to wear and none is
+            invented. What says so is the badge below, which is the stronger statement. */}
         <FigureSlot
-          state={{
-            kind: "marked",
-            figure: rendered(amount),
-            marks: marksOf(amount.provenance),
-          }}
+          state={
+            zero.tag === "no-rule-ran"
+              ? { kind: "value", figure: rendered(amount) }
+              : { kind: "marked", figure: rendered(amount), marks: marksOf(amount.provenance) }
+          }
         />
-        <span className="text-[var(--ink-muted)]"> struck on </span>
-        <FigureSlot
-          state={{ kind: "marked", figure: rendered(base), marks: marksOf(base.provenance) }}
-        />
-        <span className="text-[var(--ink-muted)]"> by </span>
-        <span className="font-mono" data-tax-class={taxClassId}>
-          {taxClassId}
-        </span>
+        {base === null || taxClassId === null ? null : (
+          <>
+            <span className="text-[var(--ink-muted)]"> struck on </span>
+            <FigureSlot
+              state={{ kind: "marked", figure: rendered(base), marks: marksOf(base.provenance) }}
+            />
+            <span className="text-[var(--ink-muted)]"> by </span>
+            <span className="font-mono" data-tax-class={taxClassId}>
+              {taxClassId}
+            </span>
+          </>
+        )}
         {on === null ? null : (
           <span className="text-[var(--ink-muted)]"> on {day(on)}</span>
         )}

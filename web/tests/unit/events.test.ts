@@ -2,7 +2,14 @@ import { describe, expect, it } from "vitest";
 import { positionOf, remainderOf, timelineOf } from "@/card/events";
 import { cameHome, outcome, range, stayed } from "../answer-fixtures";
 import { money, source } from "../fixtures";
-import { flow, projection, release } from "../card-fixtures";
+import {
+  distribution,
+  flow,
+  fundArm,
+  projection,
+  release,
+  remainderWayOut,
+} from "../card-fixtures";
 
 const HELD = outcome({ instrumentId: "UA4000231195" });
 
@@ -83,6 +90,20 @@ describe("the timeline", () => {
     expect(held.events.some((event) => event.kind === "remainder-arrival")).toBe(true);
   });
 
+  it("draws the remainder's own wait from the charge served for its leg", () => {
+    // Its arrival had a marker and no segment beside it: the remainder leaves on the purchase
+    // date with no position behind it, so it is on none of the dated releases.
+    const served = projection({ remainder_way_out: remainderWayOut() });
+    const held = timelineOf(served, remainder(cameHome("2026-09-05")));
+    const segment = held.segments.find((one) => one.id === "latency:out:remainder");
+    expect(segment).toMatchObject({ from: "2026-09-01", to: "2026-09-05", days: 3 });
+  });
+
+  it("draws no such wait where the remainder never travelled", () => {
+    const held = timelineOf(projection(), remainder(stayed("the way out refuses")));
+    expect(held.segments.some((one) => one.id === "latency:out:remainder")).toBe(false);
+  });
+
   it("gives it a named state and no marker where the engine says it did not", () => {
     const held = timelineOf(projection(), remainder(stayed("the way out will not carry it")));
     expect(held.remainder.tag).toBe("stayed");
@@ -91,6 +112,24 @@ describe("the timeline", () => {
 
   it("says nothing was left over where the outcome carries no remainder", () => {
     expect(remainderOf(HELD)).toEqual({ tag: "none" });
+  });
+
+  it("keeps both distributions where a fund declares two on one record date", () => {
+    // The id was the record date alone, so the two collided and one marker left the timeline.
+    const held = timelineOf(
+      projection({
+        arm: fundArm({
+          distributions: [
+            distribution({ record_on: "2027-01-10", paid_on: "2027-01-20" }),
+            distribution({ record_on: "2027-01-10", paid_on: "2027-02-20" }),
+          ],
+        }),
+      }),
+      HELD,
+    );
+    const markers = held.events.filter((event) => event.id.startsWith("record-date:"));
+    expect(markers).toHaveLength(2);
+    expect(new Set(markers.map((event) => event.id)).size).toBe(2);
   });
 
   it("renders a flow kind it has no label for raw rather than blank", () => {

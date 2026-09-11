@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { render } from "@testing-library/react";
+import { unmarkedOutsideAnUncitedZero } from "../unmarked";
 import type { ReactElement } from "react";
 import { join } from "node:path";
 import { CandidateCard } from "@/card/components/CandidateCard";
@@ -55,7 +56,7 @@ describe("every figure this card renders carries its marks", () => {
       const { container } = render(element);
       const marked = [...container.querySelectorAll("[data-figure='marked']")];
       expect(marked.length).toBeGreaterThan(0);
-      expect(container.querySelectorAll("[data-figure='value']")).toHaveLength(0);
+      expect(unmarkedOutsideAnUncitedZero(container)).toEqual([]);
       for (const slot of marked) {
         expect(slot.querySelectorAll("[data-mark]").length).toBeGreaterThan(0);
       }

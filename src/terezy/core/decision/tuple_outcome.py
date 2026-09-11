@@ -605,6 +605,9 @@ def _hold(
             ),
             way_in=card.WayIn(one_way=routed.one_way, latency_days=routed.latency_days),
             releases=card.releases_of(repatriated),
+            remainder_way_out=remainder_cost
+            if remainder_cost is not None
+            else card.REMAINDER_STAYED,
         ),
         outlay=amount,
         one_way=routed.one_way,
