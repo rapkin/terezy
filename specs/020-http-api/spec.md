@@ -942,8 +942,9 @@ layer.
   | `colorama` | 0.4.6 | None. Terminal colour, reached through `click` on Windows only. |
 
   `certifi`, `sniffio`, `tzdata` and `exceptiongroup` are **not** in this closure and are not
-  listed. `anyio` 4.14.2 no longer requires `sniffio`; `certifi` reaches the tree only through the
-  dev-only `httpx`; `tzdata` sits behind `pydantic`'s own `timezone` extra, which nothing here asks
+  listed. `anyio` 4.14.2 no longer requires `sniffio`; `certifi` reached the tree only through
+  `httpx`, which Starlette 1.6's test client does not use and which left the dev group on
+  2026-09-11; `tzdata` sits behind `pydantic`'s own `timezone` extra, which nothing here asks
   for, and is in `uv.lock` because **pandas**, a base dependency, pulls it; and `exceptiongroup`
   appears in `uv.lock` **not at all** — `anyio`'s locked dependencies are `idna` and
   `typing-extensions` only, the backport having been resolved away under this project's
