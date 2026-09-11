@@ -32,6 +32,7 @@ from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance
 from terezy.core.results.answer import BenchmarkYieldsNoCandidate, StatedExclusion
+from terezy.core.results.card import CandidateProjection
 from terezy.core.routes.channels import FxChannel
 from terezy.core.routes.legs import Route
 from terezy.core.streams.streams import IncomeStream
@@ -174,6 +175,7 @@ _FALLBACK: Final[Mapping[str, object]] = {
     "TaxClass": TaxClass,
     "TaxableEventKind": TaxableEventKind,
     "RunManifest": RunManifest,
+    "CandidateProjection": CandidateProjection,
     "StatedExclusion": StatedExclusion,
     "BenchmarkYieldsNoCandidate": BenchmarkYieldsNoCandidate,
 }

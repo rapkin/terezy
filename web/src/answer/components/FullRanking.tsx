@@ -4,6 +4,7 @@ import { listKey } from "@/answer/keys";
 import { count, money, rate } from "@/design/format";
 import { marksOf } from "@/lib/provenance";
 import { FigureSlot } from "@/components/figure/FigureSlot";
+import { WhyLink } from "@/card/components/WhyLink";
 import { Disclosure } from "./Disclosure";
 import { TupleTerms } from "./TupleTerms";
 
@@ -14,7 +15,13 @@ import { TupleTerms } from "./TupleTerms";
  * `benchmark`, `beats_benchmark` and `ties` are indices into `ranked` — the API's own ordering
  * and the API's own grouping. Nothing here sorts, and nothing here decides what ties.
  */
-export function FullRanking({ comparison }: { comparison: Comparison }) {
+export function FullRanking({
+  comparison,
+  questionId,
+}: {
+  comparison: Comparison;
+  questionId: string;
+}) {
   const ties = new Map<number, number>();
   comparison.ties.forEach((group, at) => {
     for (const member of group) ties.set(member, at);
@@ -79,6 +86,7 @@ export function FullRanking({ comparison }: { comparison: Comparison }) {
                 )}
               </div>
               <TupleTerms term={outcome.key} />
+              <WhyLink outcome={outcome} questionId={questionId} />
             </li>
           );
         })}

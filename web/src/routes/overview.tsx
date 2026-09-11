@@ -70,7 +70,7 @@ function TheAnswer() {
   const readings = new Map<string, KindReading>(
     ids.map((id, at) => [id, readingOf(reads[at])]),
   );
-  return <AnswerScreen answered={result} readings={readings} />;
+  return <AnswerScreen answered={result} readings={readings} questionId={questionId} />;
 }
 
 function bodyOf(answered: Answered | undefined): unknown {

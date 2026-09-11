@@ -18,23 +18,36 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from datetime import date
 
 
+CATEGORY = "questions"
+
+
+def declared_ids(ask: categories.Ask) -> tuple[str, ...]:
+    """The question ids this data root declares, from the same category the list read serves."""
+    category = categories.BY_ID[CATEGORY]
+    assert isinstance(category.shape, categories.Keyed)
+    return tuple(sorted(category.shape.resolve(ask).records))
+
+
+def no_such_question(question_id: str, declared: tuple[str, ...]) -> envelopes.CategoryHasNoSuchId:
+    """The typed refusal for an id nothing declares. One wording, for both reads."""
+    return envelopes.CategoryHasNoSuchId(
+        category=CATEGORY,
+        wanted_id=question_id,
+        declared_ids=declared,
+        reason=(
+            f"no question with the id {question_id!r} is declared. This is a question about "
+            "an id that does not exist, not a broken data root."
+        ),
+    )
+
+
 def answered(
     ask: categories.Ask, question_id: str, *, as_of: date
 ) -> verb.AnsweredQuestion | envelopes.CategoryHasNoSuchId:
     """One declared question's answer and its manifest, or the typed refusal for an unknown id."""
-    category = categories.BY_ID["questions"]
-    assert isinstance(category.shape, categories.Keyed)
-    declared = category.shape.resolve(ask).records
+    declared = declared_ids(ask)
     if question_id not in declared:
-        return envelopes.CategoryHasNoSuchId(
-            category=category.id,
-            wanted_id=question_id,
-            declared_ids=tuple(sorted(declared)),
-            reason=(
-                f"no question with the id {question_id!r} is declared. This is a question about "
-                "an id that does not exist, not a broken data root."
-            ),
-        )
+        return no_such_question(question_id, declared)
     return verb.answer_question(
         ask.root,
         question_id,

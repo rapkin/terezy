@@ -103,7 +103,7 @@ from typing import Final
 
 import pytest
 
-from terezy.core.decision.tuple_outcome import Registries, evaluate
+from terezy.core.decision.tuple_outcome import Registries
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.rates import NominalRate
@@ -111,6 +111,7 @@ from terezy.core.primitives.tolerance import assert_money_close, is_close
 from terezy.core.results.tuple import Part, RemainderCameHome, Tuple, TupleOutcome
 from terezy.core.routes.path import DeclaredExit, FundingPath
 from tests import tuple_registries as fixtures
+from tests.outcomes import evaluated_outcome
 
 pytestmark = pytest.mark.worked_example
 
@@ -191,7 +192,7 @@ def _outcome() -> TupleOutcome:
         exit_terms=fixtures.HOLD_TO_MATURITY,
         route_out=DeclaredExit(route_id=OUT_ROUTE),
     )
-    outcome = evaluate(
+    outcome = evaluated_outcome(
         candidate,
         amount=Money(SENT, UAH, prov.EMPTY),
         horizon=fixtures.DateRange(start=fixtures.ISSUE_DATE, end=fixtures.HORIZON_END),

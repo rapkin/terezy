@@ -23,7 +23,6 @@ from typing import TYPE_CHECKING, Final
 import pytest
 
 from terezy.core.decision import candidates as module
-from terezy.core.decision.tuple_outcome import evaluate
 from terezy.core.primitives import money
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
@@ -39,6 +38,7 @@ from terezy.core.routes.path import (
     entry_segments_of,
 )
 from tests import candidate_registries as fixtures
+from tests.outcomes import evaluated_outcome
 
 if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.core.decision.tuple_outcome import Registries
@@ -104,7 +104,7 @@ def test_asserted_where_the_money_is_not_there_it_is_refused_with_the_seam_named
     is somewhere else -- and bridging that gap would be a transfer nobody declared.
     """
     registries = fixtures.declared()
-    refusal = evaluate(
+    refusal = evaluated_outcome(
         Tuple(
             instrument_id=OVDP,
             stream_id=fixtures.SALARY,
@@ -145,7 +145,7 @@ def test_the_purchase_is_dated_the_horizons_first_day_and_ramp_in_is_a_recorded_
         for candidate in _enumerated(registries).candidates
         if candidate.key.instrument_id == OVDP and candidate.key.stream_id == fixtures.SALARY
     )
-    outcome = evaluate(
+    outcome = evaluated_outcome(
         key,
         amount=fixtures.AMOUNT_UAH,
         horizon=fixtures.HORIZON,
@@ -214,7 +214,7 @@ def test_the_seam_reads_the_streams_declared_currency_and_not_the_amount() -> No
     arithmetic error rather than as the missing corridor it is.
     """
     registries = fixtures.with_access(fixtures.declared(), OVDP, bought_at="deel")
-    refusal = evaluate(
+    refusal = evaluated_outcome(
         Tuple(
             instrument_id=OVDP,
             stream_id=fixtures.CONTRACT,

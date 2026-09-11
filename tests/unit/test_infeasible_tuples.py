@@ -22,7 +22,7 @@ from typing import Final
 
 import pytest
 
-from terezy.core.decision.tuple_outcome import Registries, evaluate
+from terezy.core.decision.tuple_outcome import Registries
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.rates import NominalRate
@@ -44,6 +44,7 @@ from terezy.core.results.tuple import (
 )
 from terezy.core.routes.path import EXIT_BY_IDENTITY
 from tests import tuple_registries as fixtures
+from tests.outcomes import evaluated_outcome
 
 UAH: Final = fixtures.UAH
 FLAT_FEE_ROUTE: Final = "test_flat_fee_in"
@@ -118,7 +119,7 @@ def _evaluate(
     instrument_id: str | None = None,
     horizon: fixtures.DateRange | None = None,
 ) -> object:
-    return evaluate(
+    return evaluated_outcome(
         candidate if instrument_id is None else replace(candidate, instrument_id=instrument_id),
         amount=Money(amount, UAH, prov.EMPTY),
         horizon=horizon or fixtures.HORIZON,
@@ -415,7 +416,7 @@ class TestADeclarationWithNoIncrementLeavesNoRemainderAtAll:
     """
 
     def _fund_outcome(self, amount: float) -> TupleOutcome:
-        outcome = evaluate(
+        outcome = evaluated_outcome(
             fixtures.fund_tuple(
                 fixtures.MILTECH,
                 exit_on=fixtures.MILTECH_EXIT,

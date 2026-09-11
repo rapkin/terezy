@@ -137,6 +137,7 @@ source_modules =
     terezy.cli
     terezy.api.answer
     terezy.api.diagrams
+    terezy.api.projection
 forbidden_modules =
     fastapi
     starlette

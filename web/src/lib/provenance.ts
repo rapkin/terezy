@@ -31,6 +31,7 @@ export type Mark =
  * to be tested at run time.
  */
 const REFUSAL_TAGS: { readonly [Tag in Refusal["tag"]]: true } = {
+  "card.NoSuchCandidate": true,
   "envelopes.CategoryHasNoSuchId": true,
   "envelopes.FileNotRecorded": true,
   "envelopes.NothingDeclared": true,
