@@ -326,6 +326,12 @@ class DominanceResult:
     count read without the objectives that produced it is meaningless."""
 
     resolved_bands: tuple[ResolvedBand, ...]
+
+    evaluated_count: int
+    """How many candidates the pass read. The three populations below partition exactly these, so
+    a reader is told *N of M* without summing three served counts -- and without reading the
+    section's `ranked`, which is this plus whatever FR-030 withheld."""
+
     non_dominated: tuple[Tuple, ...]
     dominated: tuple[Dominated, ...]
     not_placed: tuple[NotPlaced, ...]

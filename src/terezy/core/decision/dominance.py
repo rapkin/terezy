@@ -613,6 +613,7 @@ def _report(
     return DominanceResult(
         objectives=objectives,
         resolved_bands=widths.reported,
+        evaluated_count=len(population),
         non_dominated=non_dominated,
         dominated=dominated,
         not_placed=not_placed,
