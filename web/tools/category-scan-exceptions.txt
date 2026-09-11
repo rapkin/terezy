@@ -14,3 +14,11 @@ src/answer/endpoints.ts
 # instrument behind each member, whose read is where a kind may come from. The module holds the
 # two literals and nothing else, so this exception covers them and not every query the client
 # makes.
+
+src/card/components/CardRoute.tsx
+src/card/components/WhyLink.tsx
+# 027 FR-009 and FR-028: the card's route path mirrors the endpoint it reads —
+# `/questions/{id}/candidates/{key}` — so both modules name `questions` as a path segment of an
+# endpoint under the question that published the key, not as a category to browse. Same reason as
+# `endpoints.ts` above; two modules rather than one because the route declares the path and the
+# link navigates to it, and a shared constant would lose the literal the router types `to` from.

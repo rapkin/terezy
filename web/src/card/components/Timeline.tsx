@@ -91,7 +91,9 @@ function StatesNone({ projection }: { projection: CandidateProjection }) {
   return (
     <ul className="space-y-1" data-states-none>
       {absent.map((state) => (
-        <li key={state.what} role="note" data-not-stated={state.what} className="text-xs">
+        // No `role` here: a role on a list item replaces its implicit `listitem`, and the list
+        // then directly contains something that is not one. The note is the item itself.
+        <li key={state.what} data-not-stated={state.what} className="text-xs">
           no <strong>{state.what}</strong> on the {state.arm} arm — {state.reason}
         </li>
       ))}

@@ -77,6 +77,10 @@ for (const { theme, stamp } of MODES) {
     const results = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
       .analyze();
-    expect(results.violations.map((held) => `${held.id}: ${held.help}`)).toEqual([]);
+    expect(
+      results.violations.flatMap((held) =>
+        held.nodes.map((node) => `${held.id}: ${node.html.slice(0, 200)}`),
+      ),
+    ).toEqual([]);
   });
 }

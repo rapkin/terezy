@@ -26,7 +26,7 @@ export function TaxBar({
 }) {
   const zero = taxZero(amount);
   return (
-    <div className="space-y-1" data-bar-kind="tax" data-tax-zero={zero.tag}>
+    <div className="space-y-1" data-tax-zero={zero.tag}>
       <p className="text-xs">
         <FigureSlot
           state={{

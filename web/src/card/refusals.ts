@@ -6,6 +6,7 @@
  * in the body rather than in that list (FR-007, FR-016).
  */
 import type { NotStated, ProjectionRefused } from "@/api/shapes";
+import { assertNever } from "@/lib/exhaustive";
 
 /** What a reader should do about each refusal, which is the reason the two are separate. */
 export function remedyFor(refusal: ProjectionRefused): string {
@@ -15,6 +16,7 @@ export function remedyFor(refusal: ProjectionRefused): string {
     case "card.NoSuchCandidate":
       return "this key is from another answer, another date or another question — reopen the answer";
   }
+  assertNever(refusal);
 }
 
 /** Whether a bar is an absence rather than a value. A zero is a value; an absence is not. */

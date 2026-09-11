@@ -13,6 +13,7 @@
  * reads it as one.
  */
 import type { CandidateProjection, NotStated, TupleOutcome } from "@/api/shapes";
+import { isAbsence } from "./refusals";
 
 export type EventKind =
   | "money-leaves"
@@ -161,14 +162,7 @@ function armEvents(
 /** The records this arm states none of, so the timeline says which dates it cannot draw. */
 export function statesNone(projection: CandidateProjection): readonly NotStated[] {
   const arm = projection.arm;
-  const absent: NotStated[] = [];
-  if (arm.tag !== "card.FundArm") absent.push(arm.distributions);
-  if (arm.tag === "card.BondArm" || arm.tag === "card.CashArm") absent.push(arm.exit_line);
-  if (arm.tag !== "card.BondArm") absent.push(arm.at_purchase);
-  if (arm.tag === "card.FundArm" && arm.exit_line.tag === "card.NotStated") {
-    absent.push(arm.exit_line);
-  }
-  return absent;
+  return [arm.at_purchase, arm.distributions, arm.exit_line].filter(isAbsence);
 }
 
 function byDate(one: TimelineEvent, other: TimelineEvent): number {
