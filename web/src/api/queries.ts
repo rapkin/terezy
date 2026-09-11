@@ -61,8 +61,8 @@ export function observationsQuery(
 /**
  * The answer to one declared question (026 FR-008).
  *
- * `/api/registry` is deliberately **not** read on this page: it is 2.6 MB and nothing on the
- * answer screen looks at a category index.
+ * `/api/registry` is deliberately **not** read on this page: nothing on the answer screen looks at
+ * a category index.
  */
 export function answerQuery(questionId: string, asOf: string) {
   return queryOptions<Answered>({

@@ -13,6 +13,7 @@ env/
 
 # --- Tool caches ---
 .pytest_cache/
+.testmondata*
 .mypy_cache/
 .ruff_cache/
 .hypothesis/

@@ -79,6 +79,17 @@ def test_the_container_context_with_no_marker_is_never_in_force() -> None:
     assert "Principle VII" in outcome.reason
 
 
+def test_the_refusal_names_what_was_looked_for_and_the_value_that_would_start() -> None:
+    """A runtime that leaves neither marker -- podman under cgroup v2 -- refuses here, and a
+    refusal that does not say what it looked for reads as the variable being unsupported."""
+    outcome = bind.context_in_force(CONTAINER.value, marker=None)
+
+    assert isinstance(outcome, bind.ContainerClaimUnverified)
+    for runtime in bind.CGROUP_RUNTIMES:
+        assert runtime in outcome.reason, f"{runtime} is looked for and unnamed in the refusal"
+    assert f"{CONTEXT_VARIABLE}={BindContext.LOOPBACK.value}" in outcome.reason
+
+
 def test_the_context_is_in_force_once_a_marker_is_found() -> None:
     assert bind.context_in_force(CONTAINER.value, marker=DOCKER_MARKER) is CONTAINER
 

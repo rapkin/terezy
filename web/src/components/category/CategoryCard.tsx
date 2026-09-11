@@ -30,10 +30,7 @@ export function CategoryCard({ summary, asOf }: { summary: CategorySummary; asOf
         <Shape summary={summary} />
       </p>
       <p className="mt-1 text-sm">
-        <Badge tone={summary.unverified_sources === 0 ? "neutral" : "warn"} data-unverified={String(summary.unverified_sources)}>
-          {summary.unverified_sources} unverified source
-          {summary.unverified_sources === 1 ? "" : "s"} reported
-        </Badge>
+        <Mark mark={summary.mark} citations={summary.citations} />
       </p>
       <CitationPolicyNote policy={summary.citations} />
       <details className="mt-2 text-xs">
@@ -64,4 +61,64 @@ function Shape({ summary }: { summary: CategorySummary }) {
       );
   }
   assertNever(summary);
+}
+
+/**
+ * The fold's verdict, rendered as the arm the API sent.
+ *
+ * The sources themselves are at `/api/registry/sources`, which this page never asks for.
+ *
+ * **A category citing nothing is read against its own policy**, which is why the tone takes both
+ * served fields: where citations are required, nothing cited is a gap and renders marked, and
+ * where the directory is exempt it is the owner's own statement and renders calm. One tone for
+ * both would put *nothing to verify* and *everything verified* behind one colour.
+ */
+function Mark({
+  mark,
+  citations,
+}: {
+  mark: CategorySummary["mark"];
+  citations: CategorySummary["citations"];
+}) {
+  switch (mark.tag) {
+    case "summary.NoSourceCited":
+      return (
+        <Badge
+          tone={citations.tag === "citation_policy.CitationsRequired" ? "warn" : "neutral"}
+          data-category-mark="no-source-cited"
+        >
+          no cited source
+        </Badge>
+      );
+    case "summary.SourcesUnverified":
+      return (
+        <Badge tone="warn" data-category-mark="unverified">
+          {mark.unverified} of {mark.sources} source{mark.sources === 1 ? "" : "s"} unverified ·{" "}
+          <Retrieved mark={mark} />
+        </Badge>
+      );
+    case "summary.EverySourceVerified":
+      return (
+        <Badge tone="neutral" data-category-mark="verified">
+          {mark.sources} source{mark.sources === 1 ? "" : "s"}, verified since{" "}
+          {mark.earliest_verified_on} · <Retrieved mark={mark} />
+        </Badge>
+      );
+  }
+  assertNever(mark);
+}
+
+/** Both ends of the retrieval span, collapsed to one date only when they are one date. */
+function Retrieved({
+  mark,
+}: {
+  mark: Extract<CategorySummary["mark"], { latest_retrieved_on: string }>;
+}) {
+  return (
+    <span data-retrieved={`${mark.earliest_retrieved_on}..${mark.latest_retrieved_on}`}>
+      {mark.earliest_retrieved_on === mark.latest_retrieved_on
+        ? `retrieved ${mark.latest_retrieved_on}`
+        : `retrieved ${mark.earliest_retrieved_on} – ${mark.latest_retrieved_on}`}
+    </span>
+  );
 }

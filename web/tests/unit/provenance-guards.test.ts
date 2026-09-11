@@ -19,6 +19,13 @@ describe("the guards test what their renderers read", () => {
     expect(isRegistry({ ...registry([]), categories: [{ tag: "summary.KeyedSummary" }] })).toBe(false);
   });
 
+  it("refuses a mark arm the card's switch is not total over", () => {
+    // `CategoryCard`'s switch ends in `assertNever`, which throws the whole index rather than
+    // degrading one card, so an arm added to the union has to fail the guard and not pass it.
+    const unknown = { ...keyedSummary(), mark: { tag: "summary.SourcesStale" } };
+    expect(isRegistry({ ...registry([]), categories: [unknown] })).toBe(false);
+  });
+
   it("refuses a body whose tag is not the one the renderer expects", () => {
     expect(isListing(instrumentRead())).toBe(false);
     expect(isSeriesWindow(instrumentRead())).toBe(false);

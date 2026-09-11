@@ -45,7 +45,7 @@ def _with_the_corridor() -> object:
 
 def test_the_declared_registry_reaches_nothing_from_the_dollar_stream() -> None:
     """The baseline the fixture is a difference from, read off the sections themselves."""
-    for section in fixtures.answered().sections:
+    for section in fixtures.answered_over().sections:
         assert isinstance(section.outcome, CandidateSurvey)
         funded = {item.key.stream_id for item in section.outcome.enumerated.candidates}
         assert funded == {SALARY}

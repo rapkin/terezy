@@ -161,7 +161,7 @@ def test_a_span_inside_one_month_refuses_both_halves_for_holding_no_elapsed_mont
     """The edge case the shipped root actually contains, and the refusal that outranks the
     deflator ones: the belief is declared and the series is not ambiguous, and neither half
     reports either fact, because there is no elapsed month to deflate over at all."""
-    result = answers.answered(supplied=answers.shipped_inputs())
+    result = answers.answered_over(answers.SHIPPED_ROOT)
     found = [
         outcome
         for outcome in section_evaluated(result.sections[ONE_MONTH])

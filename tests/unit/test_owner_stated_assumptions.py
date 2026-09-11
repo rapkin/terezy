@@ -96,7 +96,7 @@ def _evaluated_ids(result: Answer, index: int = 0) -> set[str]:
 
 def test_without_a_declared_price_the_early_exit_refuses_by_name() -> None:
     """The shipped behaviour, and the reason this refusal is not a guard that reads as one."""
-    refusal = _refusal_for(fixtures.answered(), SUBJECT)
+    refusal = _refusal_for(fixtures.answered_over(), SUBJECT)
     assert isinstance(refusal, DeclarationMissing), refusal
     assert refusal.part == "access"
     assert "access.resale_price" in refusal.what
@@ -174,21 +174,21 @@ def test_only_the_instrument_that_declares_a_price_gets_a_figure() -> None:
 
 def test_without_a_stated_rate_the_real_fund_is_permanently_unsizable() -> None:
     """The baseline: one of the two real declarations in the registry, refusing by name."""
-    refusal = _refusal_for(fixtures.answered(), fixtures.REIT)
+    refusal = _refusal_for(fixtures.answered_over(), fixtures.REIT)
     assert isinstance(refusal, InstrumentRefused), refusal
     assert "FundAssumptions.exchange_rate" in refusal.reason or "rate" in refusal.reason
 
 
 def test_stating_one_on_the_run_plan_evaluates_it() -> None:
     """SC-028. The owner states it; nothing finds it."""
-    assert fixtures.REIT not in _evaluated_ids(fixtures.answered())
+    assert fixtures.REIT not in _evaluated_ids(fixtures.answered_over())
     assert fixtures.REIT in _evaluated_ids(_with_rate())
 
 
 def test_removing_it_returns_the_refusal_that_names_the_missing_assumption() -> None:
     """The pair, so the fixture proves the rate is what changed and not something beside it."""
     assert fixtures.REIT in _evaluated_ids(_with_rate())
-    assert isinstance(_refusal_for(fixtures.answered(), fixtures.REIT), InstrumentRefused)
+    assert isinstance(_refusal_for(fixtures.answered_over(), fixtures.REIT), InstrumentRefused)
 
 
 def test_the_figure_it_unlocks_is_still_withheld_where_its_plan_puts_the_money_in_2028() -> None:

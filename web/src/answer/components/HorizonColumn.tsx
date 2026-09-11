@@ -75,8 +75,13 @@ export function HorizonColumn({
 
       {dominance !== null && comparison !== null ? (
         <>
-          <p className="text-xs text-[var(--ink-muted)]" data-front-count={count(dominance.non_dominated.length)}>
-            {count(dominance.non_dominated.length)} dominated by nothing
+          <p
+            className="text-xs text-[var(--ink-muted)]"
+            data-front-count={count(dominance.non_dominated.length)}
+            data-evaluated-count={count(dominance.evaluated_count)}
+          >
+            {count(dominance.non_dominated.length)} of {count(dominance.evaluated_count)}{" "}
+            evaluated here are dominated by nothing
           </p>
           <ul className="space-y-3" data-front>
             {dominance.non_dominated.map((key) => {

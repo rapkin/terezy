@@ -383,6 +383,15 @@ def _register_fixed(router: APIRouter, root: Path, app: FastAPI) -> None:
         return _body(summary.RegistrySummary, summary.of(asked.ask, as_of=asked.as_of))
 
     @router.get(
+        "/registry/sources",
+        response_model=_model(summary.RegistrySources),
+        name="registry.sources",
+        responses=_scenario_refusal(True),
+    )
+    def registry_sources(asked: Annotated[Read, Depends(under_scenario)]) -> encode.Json:
+        return _body(summary.RegistrySources, summary.sources_of(asked.ask, as_of=asked.as_of))
+
+    @router.get(
         "/questions/{question_id}/answer",
         response_model=_model(answer_envelope),
         name="questions.answer",

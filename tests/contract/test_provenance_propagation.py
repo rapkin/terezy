@@ -873,7 +873,7 @@ def test_a_tuples_real_figure_carries_the_outcomes_own_marks() -> None:
     transform dropping the *nominal* half: a figure passing `prov.EMPTY` here would come back
     clean, which is the top-severity defect Principle I names.
     """
-    result = answers.answered(supplied=answers.shipped_inputs())
+    result = answers.answered_over(answers.SHIPPED_ROOT)
     figures = [
         (outcome, outcome.real.assumed)
         for section in result.sections

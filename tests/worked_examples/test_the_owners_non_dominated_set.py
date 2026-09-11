@@ -32,7 +32,7 @@ HORIZONS = [sections.ONE_MONTH, sections.THREE_MONTHS, sections.TWELVE_MONTHS]
 
 def _shipped(index: int) -> DominanceResult:
     """His answer over the **shipped** root: what he is actually offered, no fixture in it."""
-    answered = fixtures.answered(supplied=fixtures.shipped_inputs())
+    answered = fixtures.answered_over(fixtures.SHIPPED_ROOT)
     result = answered.sections[index].dominance
     assert isinstance(result, DominanceResult), result
     return result
@@ -48,7 +48,7 @@ def test_every_section_reports_a_set_rather_than_a_refusal(index: int) -> None:
 @pytest.mark.parametrize("index", HORIZONS)
 def test_the_accounting_identity_holds_over_the_section_it_was_computed_from(index: int) -> None:
     """FR-008, derived from the registry the test loads."""
-    answered = fixtures.answered(supplied=fixtures.shipped_inputs())
+    answered = fixtures.answered_over(fixtures.SHIPPED_ROOT)
     section = answered.sections[index]
     result = _shipped(index)
     evaluated = {item.key for item in section_evaluated(section)}
@@ -88,7 +88,7 @@ def test_ordering_by_the_rate_is_not_ordering_by_the_money(index: int) -> None:
     of the ranking is therefore not the candidate that leaves him best off at the horizon --
     which is the whole argument for reporting a set instead of a list.
     """
-    answered = fixtures.answered(supplied=fixtures.shipped_inputs())
+    answered = fixtures.answered_over(fixtures.SHIPPED_ROOT)
     section = answered.sections[index]
     ranked = section_ranking(section)
     assert ranked, "nothing was ranked, so the comparison this test makes does not exist"

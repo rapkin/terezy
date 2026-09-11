@@ -64,7 +64,7 @@ SERIES_ID = "ua_cpi_monthly"
 
 
 def _twelve_months() -> list[TupleOutcome]:
-    result = fixtures.answered(supplied=fixtures.shipped_inputs())
+    result = fixtures.answered_over(fixtures.SHIPPED_ROOT)
     return list(section_evaluated(result.sections[TWELVE_MONTHS]))
 
 

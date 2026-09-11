@@ -113,14 +113,18 @@ describe("a horizon column", () => {
     expect(await named([1, 0])).toEqual(["B", "A"]);
   });
 
-  it("states the front's own count and no ratio over a set the pass did not place", async () => {
-    // The pass places `ranked` less `arrives_after_horizon`, so "N of M ranked" invited a
-    // subtraction that attributed a verdict to a row nobody assessed. Every count the section
-    // reports stands beside its own members instead.
-    const held = (await column(WHOLE)).container.querySelector("[data-front-count]");
+  it("states the front's count over the denominator the pass sent, and never over `ranked`", async () => {
+    // `ranked` is the pass's population plus what FR-030 withheld, so a client dividing by it
+    // attributed a verdict to a row nobody assessed. The denominator is served instead.
+    const held = (
+      await column({
+        outcome: survey({ comparison: comparison({ ranked: RANKED }) }),
+        dominance: dominance({ nonDominated: [tuple("A")], evaluated: 7 }),
+      })
+    ).container.querySelector("[data-front-count]");
     expect(held?.getAttribute("data-front-count")).toBe("1");
-    expect(held?.textContent).toBe("1 dominated by nothing");
-    expect(held?.textContent).not.toContain("of");
+    expect(held?.getAttribute("data-evaluated-count")).toBe("7");
+    expect(held?.textContent).toBe("1 of 7 evaluated here are dominated by nothing");
   });
 
   it("renders a survey that did not run as its own reason, and no card", async () => {

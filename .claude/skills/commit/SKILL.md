@@ -32,8 +32,8 @@ work is finished and the gates are green.
    - If `$ARGUMENTS` names files, stage exactly those.
    - Otherwise stage all modified and untracked files.
 
-3. **Run the pre-commit gates** (see below). Measured on 2026-09-05: about 40 s when the
-   suite runs, a few seconds otherwise.
+3. **Run the pre-commit gates** (see below). Measured on 2026-09-12: a few seconds for a
+   typical change, about 60 s when `--testmon` is dropped and the whole suite runs.
    - All green → continue.
    - Anything red → **stop**, show the failure, and ask before committing. This repo's
      constitution requires that every change lands green, so a red commit needs an
@@ -65,14 +65,23 @@ one here means a red build. Run the cheap subset that matches what changed:
 uv run ruff check . && uv run ruff format --check .   # any Python change
 uv run mypy                                          # any Python change
 uv run lint-imports                                  # any src/ change
-uv run pytest -x -q -n auto --dist loadfile          # any src/ or tests/ change
+uv run pytest -x -q --testmon -n auto --dist loadfile  # a Python-only src/ or tests/ change
+uv run pytest -x -q -n auto --dist loadfile            # a data file, snapshot or golden moved
 uv run python scripts/check_provenance.py            # any data/ change
 ```
 
-**The coverage floor is not a checkpoint gate.** `pytest --cov` runs single-process at
-landing and in CI: it costs an order of magnitude more than the parallel run above
-(`specs/README.md` step 3 carries the measurement) and answers a question about the branch
-rather than about one commit.
+**`--testmon` follows Python imports and nothing else**, so a change to `data/`,
+`tests/fixtures/data/`, `src/terezy/data/snapshot/` or a checked-in golden selects **zero**
+tests — measured 2026-09-12: `no tests ran` for one line appended to `data/groups.toml`, and
+again for one appended to `tests/golden/candidate_set.golden.txt`. Domain knowledge here *is*
+data, so that is the commonest substantive change. Use the second line — the whole parallel
+suite — whenever a non-Python file moved, when `.testmondata` is absent, or when `uv sync`
+changed a version.
+
+**The whole suite with the coverage floor is a landing gate, not a checkpoint one.**
+`pytest --cov` runs everything at landing and in CI (`specs/README.md` step 3 carries the
+measurement). The checkpoint is the one place the suite runs — `/condense` and the review
+re-run nothing.
 
 For a docs- or spec-only change, skip straight to the guards.
 

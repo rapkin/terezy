@@ -150,7 +150,7 @@ def _vocabulary(result: Answer) -> set[str]:
 
 def test_the_answer_holds_no_string_this_feature_composed() -> None:
     """SC-003. Every string on this feature's own records is an id or a named constant."""
-    result = fixtures.answered()
+    result = fixtures.answered_over()
     composed = _strings_this_feature_holds(result) - _vocabulary(result)
     assert not composed, sorted(composed)
 
@@ -178,7 +178,7 @@ def test_no_module_of_this_feature_derives_a_rate(module: Path) -> None:
 
 def test_the_answer_wide_exclusion_is_always_stated() -> None:
     """SC-021's first half. An exclusion that is not stated is a silent default."""
-    result = fixtures.answered()
+    result = fixtures.answered_over()
     stated = {item.what for item in result.excludes if item.applies_to is None}
     assert stated == ANSWER_WIDE
 
@@ -196,7 +196,7 @@ def test_every_outcome_the_answer_holds_carries_a_computed_real_terms_figure() -
     figure. Filling the field with `hurdle.NOT_DEFLATED` would satisfy every structural check
     and report two absences the run did not have.
     """
-    result = fixtures.answered()
+    result = fixtures.answered_over()
     outcomes = [item for item in _walk(result) if isinstance(item, TupleOutcome)]
     computed = 0
 
@@ -219,7 +219,7 @@ def test_every_figure_the_shipped_answer_reports_carries_the_marks_of_its_regist
     Every declaration is unverified under either root, so a figure that came back clean would be
     reporting a fixture as an observation.
     """
-    result = fixtures.answered()
+    result = fixtures.answered_over()
     assert prov.is_unverified(result.provenance)
     for section in result.sections:
         for outcome in section_evaluated(section):
@@ -228,7 +228,7 @@ def test_every_figure_the_shipped_answer_reports_carries_the_marks_of_its_regist
 
 def test_the_answers_marks_are_the_union_of_what_its_figures_rest_on() -> None:
     """A merge that dropped one would be a top-severity defect rather than a cosmetic one."""
-    result = fixtures.answered()
+    result = fixtures.answered_over()
     for section in result.sections:
         for outcome in section_evaluated(section):
             assert outcome.provenance.sources <= result.provenance.sources
@@ -290,7 +290,7 @@ def test_an_early_exit_claim_appears_exactly_where_a_holding_was_sold_early() ->
     the owner asked about. An `if` here rather than a `not` -- the claim is the equivalence, and
     a section that carried the exclusion without selling anything would be marking a figure it
     did not earn."""
-    result = fixtures.answered()
+    result = fixtures.answered_over()
     claimed = [
         any(item.what in EARLY_EXIT_CLAIMS for item in section.excludes)
         for section in result.sections
@@ -377,7 +377,7 @@ def test_an_early_exit_states_its_claims_and_leaves_rate_risk_unsigned() -> None
 
 def test_every_exclusion_names_what_would_supply_it() -> None:
     """FR-023a: a feature or a declaration, never a search."""
-    for item in fixtures.answered().excludes:
+    for item in fixtures.answered_over().excludes:
         assert item.supplied_by.strip()
 
 
@@ -393,7 +393,7 @@ def test_no_result_record_carries_a_detached_coupon_figure() -> None:
     found = sorted(
         {
             f"{type(record).__name__}.{field.name}"
-            for record in _walk(fixtures.answered())
+            for record in _walk(fixtures.answered_over())
             if dataclasses.is_dataclass(record) and not isinstance(record, type)
             for field in dataclasses.fields(record)
             if any(word in field.name for word in RETIRED_FIELDS)

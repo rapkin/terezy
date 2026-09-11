@@ -9,6 +9,7 @@ no key and has no address here.
 from __future__ import annotations
 
 import json
+import re
 from typing import Any, Final
 from urllib.parse import quote
 
@@ -144,20 +145,19 @@ def test_the_document_version_moved_with_the_wire_change() -> None:
 def test_the_answer_document_grows_only_by_the_published_key() -> None:
     """SC-005, measured on the response body against this branch's own baseline.
 
-    8 540 464 bytes on the tree this branch started from (2026-09-11). What this feature adds
-    to it is one short string per evaluated outcome and nothing else, so the bound is the
-    published keys' own length rather than a constant -- a constant would go red the day the
-    registry declares another issue, for a reason that is not this feature's.
+    The bytes of the keys are **subtracted** rather than allowed for: what is asserted is that
+    the rest of the document is the one merged ``main`` serves, so a second field added to
+    ``TupleOutcome`` fails here even though it is small. The baseline moves with the registry
+    and with whatever else `main` serves, which is why it carries the date it was taken on:
+    8 540 527 bytes, re-taken 2026-09-12 after `fix/served-hygiene` landed.
     """
     body = served(SHIPPED).get(
         f"{document.PREFIX}/questions/{QUESTION}/answer", params={"as_of": AS_OF}
     )
     assert body.status_code == 200
-    keys = published_keys()
-    # The JSON overhead of each key: the field name, two pairs of quotes, a colon and a comma.
-    overhead = len('"projection_key":"",') * len(keys)
-    baseline = 8_540_464
-    assert len(body.content) <= baseline + sum(len(key) for key in keys) + overhead
+    published = re.findall(rb'"projection_key":"[^"]*",', body.content)
+    assert len(published) == len(published_keys())
+    assert len(body.content) - sum(len(held) for held in published) == 8_540_527
 
 
 def test_the_route_takes_no_scenario_parameter() -> None:

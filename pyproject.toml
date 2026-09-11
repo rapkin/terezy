@@ -48,11 +48,11 @@ dev = [
     "import-linter>=2.1",
     "pandas-stubs>=2.2",
     "syrupy>=4.8",
-    "httpx>=0.28",
     "httpx2>=2.12.0",
     # tests/contract/test_the_shipped_compose_file.py parses docker-compose.yml; without this
     # line yaml arrives only transitively through uvicorn[standard], an extra, not a dev dep.
     "pyyaml>=6.0",
+    "pytest-testmon>=2.1",
 ]
 
 [build-system]
@@ -142,6 +142,8 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["tests"]
+# `--testmon` is deliberately absent: it is passed on the command line at a checkpoint, and a
+# per-developer `.testmondata` deciding what CI runs is the defect it would introduce.
 addopts = [
     "-ra",
     "--strict-markers",

@@ -37,12 +37,15 @@ Every feature goes through the same seven steps. None is optional.
    sitting and its requirements start contradicting each other. Specs already landed are
    not rewritten to fit it.
 3. **Gates, by stage.** At a checkpoint commit: `ruff check` + `ruff format --check .`,
-   `mypy`, `lint-imports`, `pytest -x -q -n auto`, and `check_provenance.py` when `data/`
-   changed — all green before any commit (the `/commit` skill runs them). The coverage
-   floor is deliberately **not** a checkpoint gate: `pytest --cov` runs single-process at
-   landing and in CI, because it answers a question about the branch rather than about one
-   commit and costs an order of magnitude more — measured 2026-09-05, 297 s against 36 s for
-   the parallel run. Never loosen a gate to pass it.
+   `mypy`, `lint-imports`, `pytest -x -q --testmon -n auto --dist loadfile`, and
+   `check_provenance.py` when `data/` changed — all green before any commit. The `/commit`
+   skill runs them, and it is the **only** step that runs the suite: steps 4 and 5 read the
+   diff. `--testmon` follows Python imports, so a commit touching `data/`, a snapshot or a
+   golden drops it and runs the whole parallel suite. The whole suite and the coverage
+   floor are landing gates, because they answer a question about the branch rather than about
+   one commit — `uv run pytest --cov -n auto --dist loadfile`, measured 2026-09-12 at 120 s
+   against 705 s single-process, both reporting the same 98.46%. CI keeps its own
+   single-process run per interpreter. Never loosen a gate to pass it.
 4. **Condense.** Once the work is green, `/condense` over the branch diff: cut what does not
    earn its place, in prose and in code, on one rule — **one fact, one place**. Keep what
    prevents a named defect and what makes a wrong state unrepresentable. Before the review, not after, so the

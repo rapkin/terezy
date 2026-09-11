@@ -451,8 +451,21 @@ of addresses it may bind to.
 
 - **FR-009**: A **registry summary** endpoint MUST report, per category: its **shape**; for a keyed
   category the number of declared ids and for a singleton **whether the document was resolved at
-  all**; the files behind it with each file's digest; the merged provenance of everything in it; and
-  the count of unverified sources within it.
+  all**; the files behind it with each file's digest; and the **verdict** of the merged provenance of
+  everything in it — whether any source is unverified and how many, **both ends** of the
+  `retrieved_on` span, and the earliest `verified_on` where every source carries one.
+
+  Both ends, because one end is a figure more confident than the fold it summarises: a category
+  holding a source read six years ago beside one read today reads as fully fresh from its latest
+  alone, which is Principle I's *no number more confident than its inputs* at the one screen whose
+  job is to say what the registry rests on.
+
+  The merged provenance **itself** MUST be served, per category, at a second endpoint. Serialising
+  every `SourceRef` repeats a ~300-character citation once per declared row: measured 2026-09-11 the
+  summary was 2 646 260 bytes, for an index page that renders counts and dates. A second **route**
+  rather than a detail
+  parameter on the first, because one operation answering two body types has no discriminator for a
+  generated client to narrow on, which FR-013 forbids of every union in the document.
 
   A singleton reported as a count would say `0` for a category whose document resolved fine, which is
   the same body a caller would get for a category the loader found nothing in — the B10 distinction
@@ -466,10 +479,13 @@ of addresses it may bind to.
   fact in two places that drifts. What does not exist on 2026-09-03 is the per-category counts, the
   merged provenance and the unverified counts; those are new, and FR-010 is what keeps them honest.
 
-- **FR-010**: The summary's provenance per category MUST be the **merge** of the provenance of every
-  record in it, computed through `terezy.core.primitives.provenance.merge`, so that one unverified
-  source in a category marks the category. Recomputing the union any other way would reintroduce the
-  order-dependence that module's docstring exists to rule out.
+- **FR-010**: The provenance per category MUST be the **merge** of the provenance of every record in
+  it, computed through `terezy.core.primitives.provenance.merge`, so that one unverified source in a
+  category marks the category. Recomputing the union any other way would reintroduce the
+  order-dependence that module's docstring exists to rule out. The summary's verdict and the served
+  source list MUST come from **one** fold, and a test MUST assert that the verdict is the one the
+  list produces — a summary that is cheaper than what it summarises is only worth having while it
+  cannot disagree with it.
 
 ### Refusals, tags, and the thing a client switches on
 
@@ -931,8 +947,9 @@ layer.
   | `colorama` | 0.4.6 | None. Terminal colour, reached through `click` on Windows only. |
 
   `certifi`, `sniffio`, `tzdata` and `exceptiongroup` are **not** in this closure and are not
-  listed. `anyio` 4.14.2 no longer requires `sniffio`; `certifi` reaches the tree only through the
-  dev-only `httpx`; `tzdata` sits behind `pydantic`'s own `timezone` extra, which nothing here asks
+  listed. `anyio` 4.14.2 no longer requires `sniffio`; `certifi` reached the tree only through
+  `httpx`, which Starlette 1.6's test client does not use and which left the dev group on
+  2026-09-11; `tzdata` sits behind `pydantic`'s own `timezone` extra, which nothing here asks
   for, and is in `uv.lock` because **pandas**, a base dependency, pulls it; and `exceptiongroup`
   appears in `uv.lock` **not at all** — `anyio`'s locked dependencies are `idna` and
   `typing-extensions` only, the backport having been resolved away under this project's
@@ -1156,7 +1173,8 @@ Beside the categories:
 
 | Endpoint | Path | What it returns |
 |---|---|---|
-| registry summary | `/registry` | FR-009: per-category counts, file digests, merged provenance, unverified counts |
+| registry summary | `/registry` | FR-009: per-category counts, file digests, the merged mark's verdict |
+| the sources behind it | `/registry/sources` | FR-009: the merged provenance itself, per category |
 | the answer | `/questions/{id}/answer` | FR-042: `Answer` or `Refused`, and the run manifest |
 | the OpenAPI document | `/openapi.json` | rendered from the running application (owner decision 2026-09-05) |
 
@@ -1299,11 +1317,12 @@ to a feature about the answer's vocabulary rather than about serialising it.
   other**, and the union across categories equals the manifest's own input references for the run.
   That association is what can actually be wrong; asserting the digest *values* would compare
   `manifest.input_refs`' output with itself, since FR-009 requires the summary to use it. (FR-009)
-- **SC-003c**: A category holding one unverified source reports as unverified, and its merged
-  provenance equals the fold of its records' provenances through
+- **SC-003c**: A category holding one unverified source reports as unverified, and the merged
+  provenance `/registry/sources` serves equals the fold of its records' provenances through
   `terezy.core.primitives.provenance.merge` — asserted against that function's output rather than
-  against a union computed in the summary, so the monoid stays the single definition. Marking one
-  source verified changes the category's verdict and nothing else. (FR-010)
+  against a union computed in the summary, so the monoid stays the single definition. The summary's
+  verdict equals the one that list produces, for every category. Marking one source verified changes
+  the category's verdict and nothing else. (FR-009, FR-010)
 - **SC-004**: 100% of records reachable from a response type carry a tag, and the tags are distinct.
   Asserted over the walk, and demonstrated by introducing a colliding record name and watching the
   build go red. (FR-011, FR-012, FR-014)

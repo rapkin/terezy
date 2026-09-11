@@ -49,7 +49,7 @@ def objectives(set_id: str = fixtures.OBJECTIVE_SET) -> ObjectiveSet:
 
 def section(index: int = ONE_MONTH) -> HorizonSection:
     """One section of the owner's own answer."""
-    return fixtures.answered().sections[index]
+    return fixtures.answered_over().sections[index]
 
 
 def run(

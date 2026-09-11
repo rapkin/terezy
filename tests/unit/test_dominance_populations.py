@@ -41,6 +41,17 @@ def test_every_evaluated_candidate_lands_in_exactly_one_population(index: int) -
     assert counted == len(evaluated), "a candidate is in two populations"
 
 
+@pytest.mark.parametrize("index", HORIZONS)
+def test_the_evaluated_count_is_the_denominator_the_three_populations_sum_to(index: int) -> None:
+    """The denominator *N of M* divides by, against an independent reading of the section."""
+    section = sections.section(index)
+    result = sections.result(section)
+    assert result.evaluated_count == len(result.non_dominated) + len(result.dominated) + len(
+        result.not_placed
+    )
+    assert result.evaluated_count == len(section_evaluated(section))
+
+
 @pytest.mark.parametrize(
     "index", [sections.ONE_MONTH, sections.THREE_MONTHS, sections.TWELVE_MONTHS]
 )

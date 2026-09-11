@@ -235,7 +235,7 @@ Everything 021 built stays reachable under a secondary navigation entry.
 
 - **FR-008**: The screen MUST compute no displayed figure the API did not send, MUST NOT order a
   population the API ordered, MUST NOT derive a field to order by, and MUST NOT select which members
-  to show. `/api/registry` MUST NOT be fetched for this page: it is 2.6 MB and nothing here reads it.
+  to show. `/api/registry` MUST NOT be fetched for this page: nothing here reads a category index.
 - **FR-009**: Joining a `non_dominated` key to its outcome by key equality, counting a population the
   API sent, and grouping its members by the typed fields they carry are **lookups over served data**
   — permitted, and named so they are not mistaken for FR-008's arithmetic. Every count MUST be
@@ -249,7 +249,10 @@ Everything 021 built stays reachable under a secondary navigation entry.
   the stream every one of the folded no-candidate refusals names, so a header showing one amount hides
   the reason for the largest refusal group on the screen. Composing a **sentence** from typed values is what the CLI already does
   over the same record; composing a **figure** is not.
-- **FR-012**: Each column MUST show its section's population counts — non-dominated of ranked,
+- **FR-012**: Each column MUST show its section's population counts — non-dominated of the
+  population the pass evaluated, which the API MUST serve as a field of its own: it is `ranked` less
+  what FR-030 withheld, so a client dividing by `ranked` attributes a verdict to a row nobody
+  assessed, and one summing the three populations composes a figure the API did not send —
   beating the benchmark, refused, withheld, no-candidate, **not-placed, incomparable pairs and
   indistinguishable members** — and its own `benchmark_standing`, which is a section-level fact and
   MUST NOT be summarised into one header claim. Each expanded row MUST hold exactly the members its
