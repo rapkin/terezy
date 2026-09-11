@@ -45,7 +45,7 @@ export function isRegistry(body: unknown): body is RegistrySummary {
       isRecord(held) &&
       typeof held["category"] === "string" &&
       isRecord(held["citations"]) &&
-      isRecord(held["provenance"]) &&
+      tagOf(held["mark"]) !== null &&
       Array.isArray(held["files"])
     );
   });

@@ -4,12 +4,18 @@ A singleton reported as a count would say `0` for a document that resolved fine 
 a caller would get for one the loader found nothing for, which is the B10 distinction collapsing
 at the one endpoint whose job is to say what the registry holds (020 FR-009, FR-010, FR-054,
 SC-003b, SC-003c, SC-029).
+
+The index carries the fold's verdict and `/registry/sources` carries the fold; what these assert
+is that the two say the same thing, because a summary that is cheaper than the list it summarises
+is only worth having while it cannot disagree with it.
 """
 
 from __future__ import annotations
 
 import importlib.util
+import json
 import shutil
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +40,14 @@ PRIVATE_OVERLAY = "private-seeds"
 @pytest.fixture(scope="module")
 def registry() -> dict[str, Any]:
     response = served(DATA_ROOT).get(f"{document.PREFIX}/registry", params=AS_OF)
+    assert response.status_code == 200, response.text
+    body: dict[str, Any] = response.json()
+    return body
+
+
+@pytest.fixture(scope="module")
+def sources() -> dict[str, Any]:
+    response = served(DATA_ROOT).get(f"{document.PREFIX}/registry/sources", params=AS_OF)
     assert response.status_code == 200, response.text
     body: dict[str, Any] = response.json()
     return body
@@ -118,8 +132,75 @@ def test_a_category_with_one_unverified_source_reports_unverified(
 ) -> None:
     rows = {row["category"]: row for row in registry["categories"]}
     instruments = rows["instruments"]
-    assert instruments["provenance"]["is_unverified"] is True
-    assert instruments["unverified_sources"] > 0
+    assert instruments["mark"]["tag"] == "summary.SourcesUnverified"
+    assert instruments["mark"]["unverified"] > 0
+
+
+def test_the_index_carries_no_source_list(registry: dict[str, Any]) -> None:
+    """The whole point of the split: a ~300-character citation per declared row made this 2.6 MB,
+    and the page that reads it renders counts and dates."""
+    assert "provenance.SourceRef" not in json.dumps(registry)
+    assert len(json.dumps(registry)) < 200_000
+
+
+def test_the_summarised_mark_is_the_mark_the_full_list_produces(
+    registry: dict[str, Any], sources: dict[str, Any]
+) -> None:
+    """Every category, both endpoints: the verdict against the fold it summarises."""
+    listed = {row["category"]: row["provenance"] for row in sources["categories"]}
+    assert listed.keys() == {row["category"] for row in registry["categories"]}
+    for row in registry["categories"]:
+        held = listed[row["category"]]
+        refs = held["sources"]
+        mark = row["mark"]
+        unverified = [ref for ref in refs if ref["verified_on"] is None]
+        assert (mark["tag"] == "summary.SourcesUnverified") is held["is_unverified"], row
+        if not refs:
+            assert mark["tag"] == "summary.NoSourceCited", row
+            continue
+        assert mark["sources"] == len(refs), row
+        assert mark["latest_retrieved_on"] == max(ref["retrieved_on"] for ref in refs), row
+        if unverified:
+            assert mark["unverified"] == len(unverified), row
+        else:
+            assert mark["tag"] == "summary.EverySourceVerified", row
+            assert mark["earliest_verified_on"] == min(ref["verified_on"] for ref in refs), row
+
+
+def test_a_verified_source_moves_the_marks_arm_and_nothing_else() -> None:
+    """SC-003c's mutation on the summarised form: the arm is the verdict, so the verdict moves."""
+    unverified = prov.of(
+        (
+            prov.SourceRef(id="a", citation="c", retrieved_on=date(2026, 9, 1), verified_on=None),
+            prov.SourceRef(
+                id="b", citation="c", retrieved_on=date(2026, 9, 3), verified_on=date(2026, 9, 4)
+            ),
+        )
+    )
+    marked = summary._mark(unverified)
+    assert isinstance(marked, summary.SourcesUnverified)
+    assert (marked.unverified, marked.sources, marked.latest_retrieved_on) == (
+        1,
+        2,
+        date(2026, 9, 3),
+    )
+
+    verified = prov.of(
+        prov.SourceRef(
+            id=ref.id,
+            citation=ref.citation,
+            retrieved_on=ref.retrieved_on,
+            verified_on=ref.verified_on or date(2026, 9, 9),
+        )
+        for ref in unverified.sources
+    )
+    lifted = summary._mark(verified)
+    assert isinstance(lifted, summary.EverySourceVerified)
+    assert (lifted.sources, lifted.earliest_verified_on, lifted.latest_retrieved_on) == (
+        2,
+        date(2026, 9, 4),
+        date(2026, 9, 3),
+    )
 
 
 def test_the_merged_mark_is_the_monoids_own_fold() -> None:
@@ -133,11 +214,10 @@ def test_the_merged_mark_is_the_monoids_own_fold() -> None:
     )
     row = next(
         held
-        for held in summary.of(ask, as_of=__import__("datetime").date(2026, 9, 3)).categories
+        for held in summary.sources_of(ask, as_of=date(2026, 9, 3)).categories
         if held.category == "channels"
     )
     assert row.provenance == expected
-    assert row.unverified_sources == len(prov.unverified_sources(expected))
 
 
 def test_every_citation_verdict_is_the_gates_own(registry: dict[str, Any]) -> None:

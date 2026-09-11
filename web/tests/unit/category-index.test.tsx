@@ -37,6 +37,35 @@ describe("CategoryIndex", () => {
     expect(singleton?.textContent).not.toContain("0");
   });
 
+  it("renders the mark the API folded, in the arm it sent, and never a source list", async () => {
+    const { container } = await renderInRouter(
+      <CategoryIndex
+        registry={registry([
+          keyedSummary(),
+          singletonSummary(),
+          keyedSummary({
+            category: "official-rate",
+            mark: {
+              tag: "summary.EverySourceVerified",
+              sources: 3,
+              earliest_verified_on: "2026-08-01",
+              latest_retrieved_on: "2026-09-02",
+            },
+          }),
+        ])}
+      />,
+    );
+    expect(container.querySelector("[data-category-mark='unverified']")?.textContent).toContain(
+      "1 of 1 source unverified",
+    );
+    expect(container.querySelector("[data-category-mark='no-source-cited']")?.textContent).toContain(
+      "no cited source",
+    );
+    expect(container.querySelector("[data-category-mark='verified']")?.textContent).toContain(
+      "verified since 2026-08-01",
+    );
+  });
+
   it("renders the citation exemption on the card that carries one", async () => {
     const { container } = await renderInRouter(<CategoryIndex registry={registry([singletonSummary()])} />);
     expect(container.querySelector("[data-citations='exempt']")?.textContent).toContain(

@@ -235,7 +235,7 @@ Everything 021 built stays reachable under a secondary navigation entry.
 
 - **FR-008**: The screen MUST compute no displayed figure the API did not send, MUST NOT order a
   population the API ordered, MUST NOT derive a field to order by, and MUST NOT select which members
-  to show. `/api/registry` MUST NOT be fetched for this page: it is 2.6 MB and nothing here reads it.
+  to show. `/api/registry` MUST NOT be fetched for this page: nothing here reads a category index.
 - **FR-009**: Joining a `non_dominated` key to its outcome by key equality, counting a population the
   API sent, and grouping its members by the typed fields they carry are **lookups over served data**
   — permitted, and named so they are not mistaken for FR-008's arithmetic. Every count MUST be

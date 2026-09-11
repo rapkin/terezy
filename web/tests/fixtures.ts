@@ -152,8 +152,12 @@ export function keyedSummary(over: Partial<Extract<CategorySummary, { tag: "summ
     citations: { tag: "citation_policy.CitationsRequired" as const, path: "instruments" },
     declared_ids: 26,
     files: [{ tag: "summary.FileRef" as const, file: "instruments/UA1.toml", version: "sha256:aa" }],
-    provenance: provenance([source()]),
-    unverified_sources: 1,
+    mark: {
+      tag: "summary.SourcesUnverified" as const,
+      sources: 1,
+      unverified: 1,
+      latest_retrieved_on: "2026-09-02",
+    },
     ...over,
   };
 }
@@ -172,8 +176,7 @@ export function singletonSummary(
     },
     resolved: true,
     files: [],
-    provenance: provenance([]),
-    unverified_sources: 0,
+    mark: { tag: "summary.NoSourceCited" as const },
     ...over,
   };
 }

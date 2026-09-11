@@ -30,10 +30,7 @@ export function CategoryCard({ summary, asOf }: { summary: CategorySummary; asOf
         <Shape summary={summary} />
       </p>
       <p className="mt-1 text-sm">
-        <Badge tone={summary.unverified_sources === 0 ? "neutral" : "warn"} data-unverified={String(summary.unverified_sources)}>
-          {summary.unverified_sources} unverified source
-          {summary.unverified_sources === 1 ? "" : "s"} reported
-        </Badge>
+        <Mark mark={summary.mark} />
       </p>
       <CitationPolicyNote policy={summary.citations} />
       <details className="mt-2 text-xs">
@@ -64,4 +61,36 @@ function Shape({ summary }: { summary: CategorySummary }) {
       );
   }
   assertNever(summary);
+}
+
+/**
+ * The fold's verdict, rendered as the arm the API sent.
+ *
+ * The sources themselves are at `/api/registry/sources` and this page never asks for them: one
+ * `SourceRef` per declared row is 2.6 MB on a screen that shows a badge.
+ */
+function Mark({ mark }: { mark: CategorySummary["mark"] }) {
+  switch (mark.tag) {
+    case "summary.NoSourceCited":
+      return (
+        <Badge tone="neutral" data-category-mark="no-source-cited">
+          no cited source
+        </Badge>
+      );
+    case "summary.SourcesUnverified":
+      return (
+        <Badge tone="warn" data-category-mark="unverified" data-unverified={String(mark.unverified)}>
+          {mark.unverified} of {mark.sources} source{mark.sources === 1 ? "" : "s"} unverified ·
+          retrieved by {mark.latest_retrieved_on}
+        </Badge>
+      );
+    case "summary.EverySourceVerified":
+      return (
+        <Badge tone="neutral" data-category-mark="verified" data-unverified="0">
+          {mark.sources} source{mark.sources === 1 ? "" : "s"}, verified since{" "}
+          {mark.earliest_verified_on}
+        </Badge>
+      );
+  }
+  assertNever(mark);
 }
