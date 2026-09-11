@@ -187,12 +187,14 @@ export function noCandidate(
 
 export function dominance(over: {
   readonly nonDominated: readonly Tuple[];
+  readonly evaluated?: number;
   readonly separating?: DominanceResult["separating"];
   readonly indistinguishable?: DominanceResult["indistinguishable"];
   readonly standing?: DominanceResult["benchmark_standing"];
 }): DominanceResult {
   return {
     tag: "dominance.DominanceResult",
+    evaluated_count: over.evaluated ?? over.nonDominated.length,
     non_dominated: [...over.nonDominated],
     dominated: [],
     not_placed: [],

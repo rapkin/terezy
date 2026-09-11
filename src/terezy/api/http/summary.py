@@ -4,6 +4,10 @@ Digests are `terezy.data.manifest`'s own -- two functions hashing the same file 
 two places, and the one that drifts is whichever a reader did not open. The merged mark folds
 `terezy.core.primitives.provenance.merge` over every record in the category, so the monoid stays
 the single definition of what a union of marks is (020 FR-009, FR-010).
+
+The index carries the *verdict* of that fold and the whole list is read at a second endpoint:
+serialising every `SourceRef` repeated a ~300-character citation once per declared row, measured
+2026-09-11 at 2 646 260 bytes for a page that renders counts and dates.
 """
 
 from __future__ import annotations
@@ -31,6 +35,37 @@ class FileRef:
 
 
 @dataclass(frozen=True, slots=True)
+class NoSourceCited:
+    """A category resting on no cited source. Distinct from one whose sources are unverified:
+    :data:`terezy.core.primitives.provenance.EMPTY` is the merge's identity, not a mark."""
+
+
+@dataclass(frozen=True, slots=True)
+class SourcesUnverified:
+    """At least one source carries no verification date, so the whole category is marked. The
+    count says how many are responsible; `/registry/sources` says which."""
+
+    sources: int
+    unverified: int
+    earliest_retrieved_on: date
+    latest_retrieved_on: date
+
+
+@dataclass(frozen=True, slots=True)
+class EverySourceVerified:
+    """Every source carries a verification date. The earliest is the weakest claim the category
+    makes about itself, and the one a reader acts on."""
+
+    sources: int
+    earliest_verified_on: date
+    earliest_retrieved_on: date
+    latest_retrieved_on: date
+
+
+CategoryMark = NoSourceCited | SourcesUnverified | EverySourceVerified
+
+
+@dataclass(frozen=True, slots=True)
 class KeyedSummary:
     """A category a declared string selects from: how many ids, and what they rest on."""
 
@@ -39,8 +74,7 @@ class KeyedSummary:
     citations: citation_policy.CitationsRequired | citation_policy.CitationsExempt
     declared_ids: int
     files: tuple[FileRef, ...]
-    provenance: Provenance
-    unverified_sources: int
+    mark: CategoryMark
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,8 +90,7 @@ class SingletonSummary:
     citations: citation_policy.CitationsRequired | citation_policy.CitationsExempt
     resolved: bool
     files: tuple[FileRef, ...]
-    provenance: Provenance
-    unverified_sources: int
+    mark: CategoryMark
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,16 +100,54 @@ class RegistrySummary:
     categories: tuple[KeyedSummary | SingletonSummary, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class CategorySources:
+    """Every cited source one category rests on, folded through the monoid and not trimmed."""
+
+    category: str
+    provenance: Provenance
+
+
+@dataclass(frozen=True, slots=True)
+class RegistrySources:
+    as_of: date
+    scenario_id: str | None
+    categories: tuple[CategorySources, ...]
+
+
 def of(ask: categories.Ask, *, as_of: date) -> RegistrySummary:
     """The whole registry, one row per category, in the category table's own order."""
     return RegistrySummary(
         as_of=as_of,
         scenario_id=ask.scenario_id,
-        categories=tuple(_summary(category, ask) for category in categories.CATEGORIES),
+        categories=tuple(row for row, _ in _rows(ask)),
     )
 
 
-def _summary(category: categories.Category, ask: categories.Ask) -> KeyedSummary | SingletonSummary:
+def sources_of(ask: categories.Ask, *, as_of: date) -> RegistrySources:
+    """The same fold, unsummarised. A second route rather than a `detail` parameter on the first:
+    one operation answering two body types has no discriminator for a generated client to narrow
+    on, which is what FR-013 forbids of every union in the document."""
+    return RegistrySources(
+        as_of=as_of,
+        scenario_id=ask.scenario_id,
+        categories=tuple(
+            CategorySources(category=row.category, provenance=marks) for row, marks in _rows(ask)
+        ),
+    )
+
+
+def _rows(
+    ask: categories.Ask,
+) -> Iterable[tuple[KeyedSummary | SingletonSummary, Provenance]]:
+    """One pass, so the summarised mark and the served source list cannot disagree about the
+    fold and no category is resolved twice to produce them."""
+    return [_row(category, ask) for category in categories.CATEGORIES]
+
+
+def _row(
+    category: categories.Category, ask: categories.Ask
+) -> tuple[KeyedSummary | SingletonSummary, Provenance]:
     citations = citation_policy.verdict_for(categories.directory_of(category))
     match category.shape:
         case categories.Keyed(resolve=resolve, record=record):
@@ -87,39 +158,72 @@ def _summary(category: categories.Category, ask: categories.Ask) -> KeyedSummary
                 if isinstance(resolved.files, categories.NoFileMap)
                 else _refs(resolved.files.values(), root=ask.root)
             )
-            return KeyedSummary(
-                category=category.id,
-                directory=categories.directory_of(category),
-                citations=citations,
-                declared_ids=len(resolved.records),
-                files=files,
-                provenance=marks,
-                unverified_sources=len(prov.unverified_sources(marks)),
+            return (
+                KeyedSummary(
+                    category=category.id,
+                    directory=categories.directory_of(category),
+                    citations=citations,
+                    declared_ids=len(resolved.records),
+                    files=files,
+                    mark=_mark(marks),
+                ),
+                marks,
             )
         case categories.Document(resolve=resolve, record=record):
             single = resolve(ask)
             marks = _merged(record, () if single.record is None else (single.record,))
-            return SingletonSummary(
-                category=category.id,
-                directory=categories.directory_of(category),
-                citations=citations,
-                resolved=single.record is not None,
-                files=() if single.file is None else _refs((single.file,), root=ask.root),
-                provenance=marks,
-                unverified_sources=len(prov.unverified_sources(marks)),
+            return (
+                SingletonSummary(
+                    category=category.id,
+                    directory=categories.directory_of(category),
+                    citations=citations,
+                    resolved=single.record is not None,
+                    files=() if single.file is None else _refs((single.file,), root=ask.root),
+                    mark=_mark(marks),
+                ),
+                marks,
             )
         case categories.Collection(resolve=resolve, record=record):
             many = resolve(ask)
             marks = _merged(record, many.records)
-            return SingletonSummary(
-                category=category.id,
-                directory=categories.directory_of(category),
-                citations=citations,
-                resolved=many.file is not None,
-                files=() if many.file is None else _refs((many.file,), root=ask.root),
-                provenance=marks,
-                unverified_sources=len(prov.unverified_sources(marks)),
+            return (
+                SingletonSummary(
+                    category=category.id,
+                    directory=categories.directory_of(category),
+                    citations=citations,
+                    resolved=many.file is not None,
+                    files=() if many.file is None else _refs((many.file,), root=ask.root),
+                    mark=_mark(marks),
+                ),
+                marks,
             )
+
+
+def _mark(merged: Provenance) -> CategoryMark:
+    """The fold's verdict, in the three states a reader acts on differently.
+
+    Retrieval is reported at **both** ends. One end is a figure more confident than the fold it
+    summarises: `instruments` spans 2026-08-22..2026-09-02, and a category holding a source read
+    six years ago beside one read today would read as fully fresh from its latest alone.
+    """
+    if not merged.sources:
+        return NoSourceCited()
+    retrieved = [ref.retrieved_on for ref in merged.sources]
+    span = {"earliest_retrieved_on": min(retrieved), "latest_retrieved_on": max(retrieved)}
+    unverified = prov.unverified_sources(merged)
+    if unverified:
+        return SourcesUnverified(
+            sources=len(merged.sources),
+            unverified=len(unverified),
+            **span,
+        )
+    return EverySourceVerified(
+        sources=len(merged.sources),
+        earliest_verified_on=min(
+            ref.verified_on for ref in merged.sources if ref.verified_on is not None
+        ),
+        **span,
+    )
 
 
 def _merged(record: object, values: Iterable[object]) -> Provenance:

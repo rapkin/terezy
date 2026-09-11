@@ -244,15 +244,29 @@ class SeriesCoverage:
     last: str
 
 
+_CONTAINERS: Final[dict[tuple[str, tuple[tuple[str, object], ...]], type]] = {}
+"""Both folds over a container -- :func:`terezy.api.http.shapes.plan_of` and
+:func:`terezy.api.http.models.model_of` -- memoise by the record's **identity** and evict nothing,
+so a record minted per call missed both caches and grew them instead. The field set is in the key
+rather than the name alone: a category whose record changed would otherwise be served under the
+first application's shape.
+"""
+
+
 def container(name: str, fields: tuple[tuple[str, object], ...]) -> type:
-    """One frozen record, built at import time, named for what it holds."""
-    return dataclasses.make_dataclass(
+    """One frozen record, named for what it holds."""
+    known = _CONTAINERS.get((name, fields))
+    if known is not None:
+        return known
+    built = dataclasses.make_dataclass(
         name,
         fields,
         frozen=True,
         slots=True,
         module=_MODULE,
     )
+    _CONTAINERS[(name, fields)] = built
+    return built
 
 
 def _titled(category_id: str) -> str:

@@ -5,6 +5,7 @@ import { AS_OF } from "./offline";
 export type ServedAnswer = {
   readonly sections: {
     readonly nonDominated: readonly string[];
+    readonly evaluated: number;
     readonly beatsBenchmark: readonly string[];
     readonly dominated: number;
     readonly notPlaced: number;
@@ -30,6 +31,7 @@ export async function servedAnswer(page: Page): Promise<ServedAnswer> {
           sections: {
             dominance: {
               non_dominated?: { instrument_id: string }[];
+              evaluated_count?: number;
               dominated?: unknown[];
               not_placed?: unknown[];
             };
@@ -49,6 +51,7 @@ export async function servedAnswer(page: Page): Promise<ServedAnswer> {
     return {
       sections: body.result.answer.sections.map((section) => ({
         nonDominated: (section.dominance.non_dominated ?? []).map((held) => held.instrument_id),
+        evaluated: section.dominance.evaluated_count ?? -1,
         // Resolved here rather than counted: `beats_benchmark` is a list of indices into
         // `ranked`, and a count is green whatever member each index lands on.
         beatsBenchmark: (section.outcome.comparison.beats_benchmark ?? []).map(

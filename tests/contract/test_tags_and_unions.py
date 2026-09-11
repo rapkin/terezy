@@ -16,7 +16,7 @@ import pytest
 
 from terezy.api.answer import AnsweredQuestion
 from terezy.api.http import categories, encode, envelopes, service, shapes, tags
-from terezy.api.http.summary import RegistrySummary
+from terezy.api.http.summary import RegistrySources, RegistrySummary
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance, SourceRef
 from tests.data_roots import SHIPPED
@@ -42,6 +42,7 @@ def _built() -> list[shapes.Shape]:
     """
     roots: list[shapes.Shape] = [
         shapes.plan_of(RegistrySummary),
+        shapes.plan_of(RegistrySources),
         shapes.plan_of(envelopes.answer_of(AnsweredQuestion)),
     ]
     for category in categories.CATEGORIES:
@@ -294,8 +295,11 @@ DECLARATIONS_WITHOUT_A_REASON = frozenset(
         "series.InflationAssumption",
         "staleness.ObservationKind",
         "streams.IncomeStream",
+        "summary.EverySourceVerified",
         "summary.KeyedSummary",
+        "summary.NoSourceCited",
         "summary.SingletonSummary",
+        "summary.SourcesUnverified",
         "tuple.Arrival",
         "tuple.Comparison",
         "tuple.RemainderCameHome",

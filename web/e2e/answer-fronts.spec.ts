@@ -28,9 +28,11 @@ test("the three columns hold exactly the members the API placed on each front", 
     expect(drawn).toEqual([...section.nonDominated]);
     // Read off the **dominance** record, not off `comparison.ranked`: a count taken from the
     // field the component renders is green whatever the pass placed.
-    await expect(column.locator("[data-front-count]")).toHaveAttribute(
-      "data-front-count",
-      String(section.nonDominated.length),
+    const front = column.locator("[data-front-count]");
+    await expect(front).toHaveAttribute("data-front-count", String(section.nonDominated.length));
+    await expect(front).toHaveAttribute("data-evaluated-count", String(section.evaluated));
+    expect(section.evaluated).toBe(
+      section.nonDominated.length + section.dominated + section.notPlaced,
     );
     for (const [name, many] of [
       ["dominated", section.dominated],

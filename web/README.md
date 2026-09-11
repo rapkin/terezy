@@ -12,6 +12,12 @@ docker compose up --build          # from the repository root
 Open <http://127.0.0.1:8000>. The image builds the client and the API serves it, with `/api`
 under the same origin. Stop it with `docker compose down`.
 
+**Podman under cgroup v2 leaves neither marker the bind guard looks for** — `/proc/1/cgroup`
+reads `0::/` and the file it writes is `/run/.containerenv`, not `/.dockerenv` — so
+`TEREZY_BIND_CONTEXT=container-published-to-loopback` is refused there, naming both paths it
+checked. The guard is not relaxed for it: a claim about where the process runs is verified or it
+admits nothing.
+
 ## Development — two processes
 
 ```bash
