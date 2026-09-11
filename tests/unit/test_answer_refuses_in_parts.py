@@ -178,7 +178,7 @@ def test_sections_are_computed_independently_of_one_another() -> None:
     two cannot, so the three sections are demonstrably not copies of one another -- which is
     what an assertion about independence has to rest on.
     """
-    result = fixtures.answered()
+    result = fixtures.answered_over()
     dropped_counts = [
         len(section.outcome.comparison.refused)
         for section in result.sections
@@ -197,7 +197,7 @@ def test_adding_a_horizon_leaves_the_other_sections_untouched() -> None:
 
 def test_the_cross_horizon_reading_is_derived_and_agrees_with_the_sections() -> None:
     """SC-013. One named function over the answer, never a stored second copy."""
-    result = fixtures.answered()
+    result = fixtures.answered_over()
     placements = cross_horizon(result)
     assert len(placements) == len({item.key for item in placements})
     for placement in placements:
@@ -209,7 +209,7 @@ def test_the_cross_horizon_reading_is_derived_and_agrees_with_the_sections() -> 
 
 def test_the_sections_are_asserted_equal_by_key_rather_than_assumed() -> None:
     """FR-013 over a question whose horizons differ in length."""
-    assert isinstance(key_agreement(fixtures.answered()), SectionsAgreeByKey)
+    assert isinstance(key_agreement(fixtures.answered_over()), SectionsAgreeByKey)
 
 
 def test_a_horizon_that_starts_before_as_of_is_unremarkable() -> None:
@@ -287,7 +287,7 @@ def evaluated_of(section: HorizonSection) -> tuple[TupleOutcome, ...]:
 
 def test_the_answers_marks_describe_the_figures_it_reports() -> None:
     """A withheld candidate's figure is not reported, so its sources are not behind one."""
-    result = fixtures.answered()
+    result = fixtures.answered_over()
     reported = prov.merge_all(
         item.provenance for section in result.sections for item in section_evaluated(section)
     )

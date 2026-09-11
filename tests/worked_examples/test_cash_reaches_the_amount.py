@@ -57,7 +57,7 @@ FIRST_DAY: Final = date(2026, 9, 1)
 
 def _outcomes() -> tuple[TupleOutcome, ...]:
     """Cash's outcome in each of the owner's three sections, in section order."""
-    answered = fixtures.answered(supplied=fixtures.shipped_inputs())
+    answered = fixtures.answered_over(fixtures.SHIPPED_ROOT)
     found = []
     for section in answered.sections:
         cash = [

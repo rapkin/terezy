@@ -81,7 +81,7 @@ DECLARED_WORDS = (*RANKED_WORDS, *HELD_WORDS)
 
 def _answer() -> Answer:
     """His question over what ships, and nothing else: this is the deliverable, not a mechanism."""
-    return fixtures.answered(supplied=fixtures.shipped_inputs())
+    return fixtures.answered_over(fixtures.SHIPPED_ROOT)
 
 
 def _labels() -> dict[str, tuple[str, ...]]:
@@ -240,7 +240,7 @@ def test_nothing_that_ships_wants_a_resale_price_and_an_invented_bond_still_does
     """
     assert _wanting_a_resale_price(_answer()) == [[], [], []]
 
-    with_fixtures = fixtures.answered()
+    with_fixtures = fixtures.answered_over()
     declared = fixtures.inputs().registries
     wanting = _wanting_a_resale_price(with_fixtures)
     for names in wanting:

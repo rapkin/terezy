@@ -184,7 +184,7 @@ def _real_outcomes() -> list[TupleOutcome]:
     real = set(obs.declared_isins())
     return [
         item
-        for section in answers.answered().sections
+        for section in answers.answered_over().sections
         for item in section_evaluated(section)
         if item.key.instrument_id in real
     ]

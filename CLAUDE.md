@@ -86,8 +86,10 @@ after landing. Details: `specs/README.md`.
 
 ```bash
 uv sync --all-extras --dev
-uv run pytest -x -q -n auto --dist loadfile   # checkpoint gate: parallel, no coverage
-uv run pytest --cov                           # landing and CI gate: coverage floor
+uv run pytest -x -q --testmon -n auto --dist loadfile  # checkpoint gate: Python-only change
+uv run pytest -x -q -n auto --dist loadfile            # checkpoint gate: data or golden moved
+uv run pytest -x -q --lf -n auto --dist loadfile       # iterating: last failed, until green
+uv run pytest --cov -n auto --dist loadfile            # landing gate: whole suite + floor
 uv run pytest -m "contract or invariant"      # constitution compliance tests
 uv run ruff check . && uv run ruff format .
 uv run mypy                                   # strict
@@ -97,8 +99,12 @@ uv run python scripts/check_prose_budget.py   # prose share ratchet (not in CI)
 uv run python scripts/check_enumerations.py  # prose lists vs the sets they list (not in CI)
 ```
 
-Every one but the last two stands for a gate that is blocking in CI. At a checkpoint run
-the parallel suite; the coverage floor is a landing gate, not a per-commit one.
+Every one but the last two stands for a gate that is blocking in CI. **The coverage floor is a
+landing and CI gate, never a checkpoint one**, and a checkpoint runs its suite **once** — `/commit`
+runs it, `/condense` and the review read the diff and re-run nothing. `--testmon` follows
+Python imports out of a gitignored per-machine `.testmondata`, so a change to `data/`, a
+snapshot or a golden selects **nothing** and takes the second line instead. It stays off
+`addopts`, so CI never selects.
 
 ## Non-negotiables, in the form you will actually hit them
 

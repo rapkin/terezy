@@ -119,4 +119,4 @@ def test_a_reserve_in_a_currency_the_arrivals_do_not_deliver_consults_no_rate() 
 
 def test_a_question_with_no_reserve_produces_no_verdict() -> None:
     """Empty is a question that states no need, not a need of zero."""
-    assert fixtures.answered().sections[0].reserves == ()
+    assert fixtures.answered_over().sections[0].reserves == ()

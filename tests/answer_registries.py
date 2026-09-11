@@ -25,7 +25,7 @@ from terezy.data.declarations import loader, resolver
 from tests import data_roots
 
 if TYPE_CHECKING:  # pragma: no cover -- typing only
-    from collections.abc import Mapping
+    from collections.abc import Callable, Mapping
 
     from terezy.core.results.answer import Refused
     from terezy.core.results.question import Question
@@ -64,9 +64,35 @@ MILTECH: Final = "inzhur_miltech"
 REIT: Final = "inzhur_reit"
 
 
+_CANONICAL: Final = (SHIPPED_ROOT, DATA_ROOT)
+"""The two roots whose contents no test varies, and therefore the two worth resolving once."""
+
+_RESOLVED: Final[dict[Path, resolver.AnswerDeclarations]] = {}
+_ANSWERS: Final[dict[Path, Answer]] = {}
+
+
+def _once[T](memo: dict[Path, T], root: Path, build: Callable[[], T]) -> T:
+    """``build()`` for a canonical root once per process, and every time for any other.
+
+    On ``data_roots.with_fixtures``'s reasoning: a canonical tree is the same tree every call,
+    so a suite that rebuilt from it per test would be measuring the loader. A root a test
+    planted a file into is never memoised, because varying that tree is what the test is doing.
+    """
+    if root in memo:
+        return memo[root]
+    built = build()
+    if root in _CANONICAL:
+        memo[root] = built
+    return built
+
+
 def declarations(root: Path = DATA_ROOT) -> resolver.AnswerDeclarations:
     """Every declaration the verb reads, under a data root."""
-    return resolver.answer_from_data_root(root, base_currency=UAH, scenario_id=None)
+    return _once(
+        _RESOLVED,
+        root,
+        lambda: resolver.answer_from_data_root(root, base_currency=UAH, scenario_id=None),
+    )
 
 
 def inputs(declared: resolver.AnswerDeclarations | None = None) -> AnswerInputs:
@@ -108,6 +134,15 @@ def answered(
     )
     assert isinstance(result, Answer), result
     return result
+
+
+def answered_over(root: Path = DATA_ROOT) -> Answer:
+    """His own question over a canonical root, answered once per process.
+
+    The suites that read his answer **unedited** all want this one value, and every record in
+    it is frozen; one that edits a term builds its own inputs and calls :func:`answered`.
+    """
+    return _once(_ANSWERS, root, lambda: answered(supplied=inputs(declarations(root))))
 
 
 def refused(question: Question, supplied: AnswerInputs | None = None) -> Refused:

@@ -103,7 +103,7 @@ def test_the_answer_holds_no_string_this_feature_composed() -> None:
     a direction -- or a reason another core record already wrote, and the walk below finds them
     all rather than sampling.
     """
-    answered = fixtures.answered()
+    answered = fixtures.answered_over()
     held: set[str] = set()
     for section in answered.sections:
         held |= _strings(section.dominance)

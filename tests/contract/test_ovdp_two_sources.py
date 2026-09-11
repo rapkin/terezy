@@ -170,7 +170,7 @@ def test_the_venues_approximate_floor_is_not_the_cost_of_a_unit_on_any_issue() -
 
 def _outcomes() -> list[TupleOutcome]:
     """Every evaluated outcome for a declared ОВДП across the owner's own three horizons."""
-    answer = answers.answered()
+    answer = answers.answered_over()
     real = set(obs.declared_isins())
     return [
         item

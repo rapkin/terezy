@@ -116,8 +116,10 @@ uv run ruff check . && uv run ruff format --check .
 uv run mypy && uv run lint-imports
 uv run python scripts/check_provenance.py
 uv run python scripts/check_methodology_refs.py
-uv run pytest -x -q -n auto
 ```
+
+**This pass does not run the suite.** `/commit` runs it once for the condense commit, which is
+the checkpoint; running it here would be the same suite twice over the same tree.
 
 A red gate after condensing means a cut removed something real. Restore it and say so —
 never adjust the test to match the cut.

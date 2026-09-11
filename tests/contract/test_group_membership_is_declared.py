@@ -136,7 +136,7 @@ def test_the_same_instrument_with_the_label_joins_the_group(tmp_path: Path) -> N
 
 def test_the_declared_count_is_unchanged_by_an_unlabelled_addition(tmp_path: Path) -> None:
     """SC-033's first half, stated against the registry it is measured from."""
-    before = fixtures.answered()
+    before = fixtures.answered_over()
     without = _answered(_root_with_lookalike(tmp_path, labelled=False))
     assert _members(without, fixtures.OVDP) == _members(before, fixtures.OVDP)
 

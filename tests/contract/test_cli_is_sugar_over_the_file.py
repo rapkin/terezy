@@ -777,7 +777,7 @@ def _a_miltech_outcome() -> TupleOutcome:
 
 def _a_miltech_key() -> Tuple:
     """One real key for the fund, so the comparison above is over a key the engine built."""
-    survey = fixtures.answered().sections[0].outcome
+    survey = fixtures.answered_over().sections[0].outcome
     assert isinstance(survey, CandidateSurvey)
     return next(
         item.key
