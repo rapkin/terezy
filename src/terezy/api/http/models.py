@@ -20,12 +20,9 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from collections.abc import Mapping, Sequence
 
 _MODELS: Final[dict[type, type[BaseModel]]] = {}
-"""Keyed by the record, not by the model's name.
-
-Two applications built in one process declare distinct envelope records that happen to share a
-name; keyed by name, the second would be validated against the first one's model -- harmless
-while their fields agree and silent when they stop.
-"""
+"""Keyed by the record, not by the model's name: two records may share a name, and keyed by name
+the second would be validated against the first one's model -- harmless while their fields agree
+and silent when they stop."""
 
 CONFIG: Final[ConfigDict] = ConfigDict(extra="forbid")
 
