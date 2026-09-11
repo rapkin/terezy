@@ -43,12 +43,7 @@ def test_every_evaluated_candidate_lands_in_exactly_one_population(index: int) -
 
 @pytest.mark.parametrize("index", HORIZONS)
 def test_the_evaluated_count_is_the_denominator_the_three_populations_sum_to(index: int) -> None:
-    """The served denominator of *N of M*.
-
-    A client summing the three counts would be composing a figure the API did not send, and one
-    reading `Comparison.ranked` would over-count by whatever FR-030 withheld -- the subtraction
-    that attributed a verdict to a row nobody assessed.
-    """
+    """The denominator *N of M* divides by, against an independent reading of the section."""
     section = sections.section(index)
     result = sections.result(section)
     assert result.evaluated_count == len(result.non_dominated) + len(result.dominated) + len(

@@ -455,10 +455,10 @@ of addresses it may bind to.
   everything in it — whether any source is unverified and how many, the latest `retrieved_on`, and
   the earliest `verified_on` where every source carries one.
 
-  The merged provenance **itself** MUST be served, per category, at a second endpoint. One
-  `SourceRef` per declared row put a ~300-character citation on each of the 19 500 observation rows
-  the official-rate series declares: measured 2026-09-11 the summary was 2 646 260 bytes and the
-  index page that reads it renders counts and dates. A second **route** rather than a detail
+  The merged provenance **itself** MUST be served, per category, at a second endpoint. Serialising
+  every `SourceRef` repeats a ~300-character citation once per declared row: measured 2026-09-11 the
+  summary was 2 646 260 bytes, for an index page that renders counts and dates. A second **route**
+  rather than a detail
   parameter on the first, because one operation answering two body types has no discriminator for a
   generated client to narrow on, which FR-013 forbids of every union in the document.
 

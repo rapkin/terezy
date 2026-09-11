@@ -6,8 +6,7 @@ at the one endpoint whose job is to say what the registry holds (020 FR-009, FR-
 SC-003b, SC-003c, SC-029).
 
 The index carries the fold's verdict and `/registry/sources` carries the fold; what these assert
-is that the two say the same thing, because a summary that is cheaper than the list it summarises
-is only worth having while it cannot disagree with it.
+is that the two say the same thing.
 """
 
 from __future__ import annotations

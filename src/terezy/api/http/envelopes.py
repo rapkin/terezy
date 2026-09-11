@@ -245,9 +245,7 @@ class SeriesCoverage:
 
 
 _CONTAINERS: Final[dict[tuple[str, tuple[tuple[str, object], ...]], type]] = {}
-"""One record per name-and-field-set, for the life of the process.
-
-Both folds over a container -- :func:`terezy.api.http.shapes.plan_of` and
+"""Both folds over a container -- :func:`terezy.api.http.shapes.plan_of` and
 :func:`terezy.api.http.models.model_of` -- memoise by the record's **identity** and evict nothing,
 so a record minted per call missed both caches and grew them instead. The field set is in the key
 rather than the name alone: a category whose record changed would otherwise be served under the

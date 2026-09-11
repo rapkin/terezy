@@ -1,9 +1,7 @@
-"""Two applications in one process, and what they cost the second time.
+"""Two applications in one process, and what the second one costs.
 
-`envelopes.container` mints a frozen dataclass per category, and both folds over it -- the shape
-plan and the pydantic model -- memoise by the record's identity. A container minted per call
-therefore missed both caches and filled them instead: measured 2026-09-11, 57 records and 3.75 MB
-per `create_app`, held for the life of the process by caches with no eviction.
+A container minted per call missed both memos keyed on it and filled them instead: measured
+2026-09-11, 57 records and 3.75 MB per `create_app`, held for the life of the process.
 """
 
 from __future__ import annotations

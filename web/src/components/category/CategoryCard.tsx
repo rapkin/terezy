@@ -66,8 +66,7 @@ function Shape({ summary }: { summary: CategorySummary }) {
 /**
  * The fold's verdict, rendered as the arm the API sent.
  *
- * The sources themselves are at `/api/registry/sources` and this page never asks for them: one
- * `SourceRef` per declared row is 2.6 MB on a screen that shows a badge.
+ * The sources themselves are at `/api/registry/sources`, which this page never asks for.
  */
 function Mark({ mark }: { mark: CategorySummary["mark"] }) {
   switch (mark.tag) {
@@ -79,14 +78,14 @@ function Mark({ mark }: { mark: CategorySummary["mark"] }) {
       );
     case "summary.SourcesUnverified":
       return (
-        <Badge tone="warn" data-category-mark="unverified" data-unverified={String(mark.unverified)}>
+        <Badge tone="warn" data-category-mark="unverified">
           {mark.unverified} of {mark.sources} source{mark.sources === 1 ? "" : "s"} unverified ·
           retrieved by {mark.latest_retrieved_on}
         </Badge>
       );
     case "summary.EverySourceVerified":
       return (
-        <Badge tone="neutral" data-category-mark="verified" data-unverified="0">
+        <Badge tone="neutral" data-category-mark="verified">
           {mark.sources} source{mark.sources === 1 ? "" : "s"}, verified since{" "}
           {mark.earliest_verified_on}
         </Badge>

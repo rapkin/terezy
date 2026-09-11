@@ -5,10 +5,9 @@ two places, and the one that drifts is whichever a reader did not open. The merg
 `terezy.core.primitives.provenance.merge` over every record in the category, so the monoid stays
 the single definition of what a union of marks is (020 FR-009, FR-010).
 
-The index carries the *verdict* of that fold and the whole list is read at a second endpoint.
-Serialising every `SourceRef` behind every category put a ~300-character citation on each of the
-19 500 observation rows the official-rate series declares, and the index page that reads counts
-and dates paid 2.6 MB for them.
+The index carries the *verdict* of that fold and the whole list is read at a second endpoint:
+serialising every `SourceRef` repeated a ~300-character citation once per declared row, measured
+2026-09-11 at 2 646 260 bytes for a page that renders counts and dates.
 """
 
 from __future__ import annotations
@@ -37,20 +36,14 @@ class FileRef:
 
 @dataclass(frozen=True, slots=True)
 class NoSourceCited:
-    """A category resting on no cited source at all.
-
-    Not a mark: :data:`terezy.core.primitives.provenance.EMPTY` is the identity of the merge, and
-    reading it as unverified would make the mark universal and therefore meaningless.
-    """
+    """A category resting on no cited source. Distinct from one whose sources are unverified:
+    :data:`terezy.core.primitives.provenance.EMPTY` is the merge's identity, not a mark."""
 
 
 @dataclass(frozen=True, slots=True)
 class SourcesUnverified:
-    """At least one source carries no verification date, so the whole category is marked.
-
-    One unverified source taints the fold, which is the asymmetry the monoid states; the count is
-    how many are responsible and `/registry/sources` is which.
-    """
+    """At least one source carries no verification date, so the whole category is marked. The
+    count says how many are responsible; `/registry/sources` says which."""
 
     sources: int
     unverified: int

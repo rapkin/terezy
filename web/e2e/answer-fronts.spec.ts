@@ -30,8 +30,6 @@ test("the three columns hold exactly the members the API placed on each front", 
     // field the component renders is green whatever the pass placed.
     const front = column.locator("[data-front-count]");
     await expect(front).toHaveAttribute("data-front-count", String(section.nonDominated.length));
-    // The denominator of *N of M* is the pass's own, never `ranked`, which carries what FR-030
-    // withheld as well.
     await expect(front).toHaveAttribute("data-evaluated-count", String(section.evaluated));
     expect(section.evaluated).toBe(
       section.nonDominated.length + section.dominated + section.notPlaced,
