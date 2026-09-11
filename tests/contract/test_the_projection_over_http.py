@@ -83,6 +83,36 @@ def test_one_key_of_each_arm_resolves_over_the_wire() -> None:
         assert body["projection"]["arm"]["tag"].startswith("card."), arm
 
 
+def test_every_record_in_the_body_carries_its_tag() -> None:
+    """FR-010, over the body rather than over the types: a client narrows on the tag.
+
+    The wire contracts sweep the response **types**; this walks what one request actually
+    answered, so a record served through a path the walk does not reach would be caught here.
+    """
+    untagged: list[str] = []
+
+    def walk(value: object, path: str) -> None:
+        if isinstance(value, dict):
+            # A record carries a tag; the one other object the encoder emits is a **mapping**,
+            # whose own values are the records. Anything untagged that is neither is a record
+            # served with nothing for a client to narrow on.
+            if "tag" not in value and not _is_a_map_of_records(value):
+                untagged.append(path)
+            for name, held in value.items():
+                walk(held, f"{path}.{name}")
+        elif isinstance(value, list):
+            for at, held in enumerate(value):
+                walk(held, f"{path}[{at}]")
+
+    body = _read(QUESTION, _published_keys()[0])
+    walk(body["result"], "result")
+    assert not untagged, untagged
+
+
+def _is_a_map_of_records(value: dict[str, Any]) -> bool:
+    return bool(value) and all(isinstance(held, dict) and "tag" in held for held in value.values())
+
+
 def test_an_unknown_question_and_an_unknown_key_are_two_distinguishable_refusals() -> None:
     unknown_question = _read("no-such-question", _published_keys()[0])["result"]
     unknown_key = _read(QUESTION, "no-such-candidate")["result"]
