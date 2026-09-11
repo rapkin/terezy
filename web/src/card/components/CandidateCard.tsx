@@ -1,15 +1,14 @@
 /**
  * FR-025 to FR-027: one candidate's card — the waterfall, the timeline, and the provenance once.
  *
- * **The provenance is behind one disclosure and reachable in full.** Measured on a sample card,
- * the served flows carry 25 538 characters of citation against 43 094 bytes of body; eliding one
- * to a fixed length would put the reader back where this feature found him. Every figure goes
- * through 026's one formatting module, so no unrounded float reaches the document.
+ * **The provenance is behind one disclosure and reachable in full.** A card's citations run to
+ * more characters than its figures do, and eliding one to a fixed length would put the reader
+ * back where this feature found him — holding a conclusion he cannot check.
  */
-import type { CandidateProjection, TupleOutcome } from "@/api/shapes";
+import type { CandidateProjection, SourceRef, TupleOutcome } from "@/api/shapes";
 import { beliefsOf } from "@/answer/beliefs";
 import { day, money as rendered } from "@/design/format";
-import { marksOf, type Mark } from "@/lib/provenance";
+import { marksOf } from "@/lib/provenance";
 import { Badge } from "@/components/ui/badge";
 import { FigureSlot } from "@/components/figure/FigureSlot";
 import { Disclosure } from "@/answer/components/Disclosure";
@@ -82,19 +81,19 @@ function Sources({
   projection: CandidateProjection;
   outcome: TupleOutcome;
 }) {
-  const marks = allMarks(projection, outcome);
+  const sources = allSources(projection, outcome);
   return (
-    <Disclosure name="provenance" summary="what every figure here rests on" count={marks.length}>
+    <Disclosure name="provenance" summary="what every figure here rests on" count={sources.length}>
       <ul className="space-y-2" data-provenance-list>
-        {marks.map((mark) => (
-          <li key={mark.source.id} data-source={mark.source.id}>
-            <p className="font-mono text-xs">{mark.source.id}</p>
-            <LongValue text={mark.source.citation} />
+        {sources.map((source) => (
+          <li key={source.id} data-source={source.id}>
+            <p className="font-mono text-xs">{source.id}</p>
+            <LongValue text={source.citation} />
             <p className="text-xs text-[var(--ink-muted)]">
-              retrieved {day(mark.source.retrieved_on)},{" "}
-              {mark.source.verified_on === null
+              retrieved {day(source.retrieved_on)},{" "}
+              {source.verified_on === null
                 ? "never verified"
-                : `verified ${day(mark.source.verified_on)}`}
+                : `verified ${day(source.verified_on)}`}
             </p>
           </li>
         ))}
@@ -103,7 +102,18 @@ function Sources({
   );
 }
 
-function allMarks(projection: CandidateProjection, outcome: TupleOutcome): readonly Mark[] {
+/**
+ * Every source behind any figure on this card, each once.
+ *
+ * **Sources rather than marks.** A mark is a claim — *unverified*, *stale* — and it belongs on
+ * the figure it qualifies, where the slot renders it. A list of marks here would need one for a
+ * source carrying neither, and there is no such mark to give it; each entry states the two dates
+ * instead and lets the reader see which is missing.
+ */
+function allSources(
+  projection: CandidateProjection,
+  outcome: TupleOutcome,
+): readonly SourceRef[] {
   const provenances = [
     outcome.provenance,
     projection.way_in.one_way.provenance,
@@ -111,14 +121,9 @@ function allMarks(projection: CandidateProjection, outcome: TupleOutcome): reado
     ...projection.charges.map((charge) => charge.provenance),
     ...projection.flows.flatMap((flow) => [flow.gross.provenance, flow.tax.provenance]),
   ];
-  const seen = new Map<string, Mark>();
+  const seen = new Map<string, SourceRef>();
   for (const provenance of provenances) {
-    for (const source of provenance.sources) {
-      // Every source, marked or not: this list is what the card rests on, and a list of only the
-      // unmarked ones would read as a clean bill of health for the rest.
-      const held = marksOf({ ...provenance, sources: [source] }, outcome.staleness);
-      seen.set(source.id, held[0] ?? { tag: "unverified", source });
-    }
+    for (const source of provenance.sources) seen.set(source.id, source);
   }
-  return [...seen.values()].sort((one, other) => one.source.id.localeCompare(other.source.id));
+  return [...seen.values()].sort((one, other) => one.id.localeCompare(other.id));
 }

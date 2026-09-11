@@ -29,7 +29,7 @@ export async function openFirstCard(page: Page): Promise<ServedCard> {
   return served;
 }
 
-export async function servedCard(page: Page, key: string): Promise<ServedCard> {
+async function servedCard(page: Page, key: string): Promise<ServedCard> {
   return await page.evaluate(
     async ([asOf, candidateKey]: readonly string[]) => {
       const declared: { ids: string[] } = await (

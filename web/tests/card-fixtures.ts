@@ -15,7 +15,6 @@ import type {
   Money,
   NotStated,
   Release,
-  SourceRef,
   TaxCharge,
   WayIn,
 } from "@/api/shapes";
@@ -226,8 +225,4 @@ export function projection(over: Partial<CandidateProjection> = {}): CandidatePr
     releases: [release()],
     ...over,
   };
-}
-
-export function sourceRef(id: string): SourceRef {
-  return source({ id });
 }

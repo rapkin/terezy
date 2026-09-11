@@ -9,40 +9,20 @@ no key and has no address here.
 from __future__ import annotations
 
 import json
-from datetime import date
-from functools import cache
 from typing import Any, Final
 from urllib.parse import quote
 
 import pytest
 
-from terezy.api.answer import answer_question
 from terezy.api.http import document
-from terezy.core.decision.candidates import evaluated
-from terezy.core.primitives.currency import Currency
-from terezy.core.results.answer import Answer
-from terezy.core.results.candidates import CandidateSurvey
 from tests.data_roots import SHIPPED
 from tests.http_client import served
+from tests.served_projections import AS_OF as ASKED_AS_OF
+from tests.served_projections import QUESTION, published_keys
 
 pytestmark = pytest.mark.contract
 
-AS_OF: Final = "2026-09-06"
-QUESTION: Final = "fifty-thousand-hryvnia"
-
-
-@cache
-def _published_keys() -> tuple[str, ...]:
-    answered = answer_question(
-        SHIPPED, QUESTION, as_of=date.fromisoformat(AS_OF), base_currency=Currency.UAH
-    ).answer
-    assert isinstance(answered, Answer)
-    return tuple(
-        outcome.projection_key
-        for section in answered.sections
-        if isinstance(section.outcome, CandidateSurvey)
-        for outcome in evaluated(section.outcome.comparison)
-    )
+AS_OF: Final = ASKED_AS_OF.isoformat()
 
 
 def _read(question: str, key: str, *, as_of: str = AS_OF) -> dict[str, Any]:
@@ -56,7 +36,7 @@ def _read(question: str, key: str, *, as_of: str = AS_OF) -> dict[str, Any]:
 
 
 def test_a_published_key_answers_that_candidates_projection() -> None:
-    key = _published_keys()[0]
+    key = published_keys()[0]
     body = _read(QUESTION, key)
     assert body["question_id"] == QUESTION
     assert body["candidate_key"] == key
@@ -71,7 +51,7 @@ def test_one_key_of_each_arm_resolves_over_the_wire() -> None:
     """The wire, per arm. *Every* published key is resolved by
     ``tests/contract/test_the_card_accounts_for_what_came_back.py``, at the layer that decides
     which candidates were evaluated and without paying for 69 manifests to say it."""
-    keys = _published_keys()
+    keys = published_keys()
     assert len(keys) == 69, "the evaluated population moved; re-take the figure and say so"
     per_arm = {
         arm: next(key for key in keys if key.split("|")[1] == arm)
@@ -104,7 +84,7 @@ def test_every_record_in_the_body_carries_its_tag() -> None:
             for at, held in enumerate(value):
                 walk(held, f"{path}[{at}]")
 
-    body = _read(QUESTION, _published_keys()[0])
+    body = _read(QUESTION, published_keys()[0])
     walk(body["result"], "result")
     assert not untagged, untagged
 
@@ -114,7 +94,7 @@ def _is_a_map_of_records(value: dict[str, Any]) -> bool:
 
 
 def test_an_unknown_question_and_an_unknown_key_are_two_distinguishable_refusals() -> None:
-    unknown_question = _read("no-such-question", _published_keys()[0])["result"]
+    unknown_question = _read("no-such-question", published_keys()[0])["result"]
     unknown_key = _read(QUESTION, "no-such-candidate")["result"]
     assert unknown_question["tag"] == "envelopes.CategoryHasNoSuchId"
     assert unknown_key["tag"] == "card.NoSuchCandidate"
@@ -126,7 +106,7 @@ def test_an_unknown_question_and_an_unknown_key_are_two_distinguishable_refusals
 def test_the_key_of_one_section_does_not_answer_from_another() -> None:
     """The horizon is in the key because the same candidate is evaluated once per section."""
     by_instrument: dict[str, list[str]] = {}
-    for key in _published_keys():
+    for key in published_keys():
         by_instrument.setdefault(key.split("|")[1], []).append(key)
     repeated = next(keys for keys in by_instrument.values() if len(keys) > 1)
     served_keys = {
@@ -137,7 +117,7 @@ def test_the_key_of_one_section_does_not_answer_from_another() -> None:
 
 def test_as_of_is_required() -> None:
     response = served(SHIPPED).get(
-        f"{document.PREFIX}/questions/{QUESTION}/candidates/{quote(_published_keys()[0], safe='')}"
+        f"{document.PREFIX}/questions/{QUESTION}/candidates/{quote(published_keys()[0], safe='')}"
     )
     assert response.status_code == 422
     assert response.json()["tag"] == "envelopes.RequestMalformed"
@@ -173,7 +153,7 @@ def test_the_answer_document_grows_only_by_the_published_key() -> None:
         f"{document.PREFIX}/questions/{QUESTION}/answer", params={"as_of": AS_OF}
     )
     assert body.status_code == 200
-    keys = _published_keys()
+    keys = published_keys()
     # The JSON overhead of each key: the field name, two pairs of quotes, a colon and a comma.
     overhead = len('"projection_key":"",') * len(keys)
     baseline = 8_540_464

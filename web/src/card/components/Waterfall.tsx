@@ -52,13 +52,7 @@ function DoesNotSum() {
   );
 }
 
-/**
- * FR-015: where the bars are not all in one currency there is no connected waterfall.
- *
- * One group per currency, the reason named, and **no rate consulted**: the display switch is
- * deferred and every declared channel's reference rate is a synthetic fixture, so a joined
- * baseline would be a conversion at a number nobody declared.
- */
+/** FR-015: where the bars are not all in one currency there is no connected waterfall. */
 function SplitByCurrency({ bars, outcome }: { bars: readonly Bar[]; outcome: TupleOutcome }) {
   return (
     <div className="space-y-3" data-currencies-split>

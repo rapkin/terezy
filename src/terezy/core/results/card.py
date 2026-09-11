@@ -49,9 +49,7 @@ class NotStated:
     """A record this arm does not state, named rather than left absent or zeroed (FR-007).
 
     A bar the card cannot draw is a **refusal bar** carrying this reason, which is a different
-    thing on the screen from a bar of zero -- and on the shipped registry both are real: a fund
-    states no cash-flow schedule and no distribution in the window, and a bond's purchase row
-    carries a zero tax resting on no source.
+    thing on the screen from a bar of zero: a zero is a value and an absence is not.
     """
 
     what: str
@@ -134,11 +132,10 @@ class Release:
     them would be a figure with no owning call, and drawing one bar per flow would report the
     fee twice.
 
-    The cost's own ``sent`` and ``arrived`` restate what ``Arrival`` already carries,
-    deliberately: the charge between them is what this record exists for, and a card that had
-    the two amounts and not the charge would subtract one from the other.
-
-    The whole ``WayOutCost`` for :class:`WayIn`'s reason, and it carries its own latency.
+    The whole ``WayOutCost`` for :class:`WayIn`'s reason. It restates what ``Arrival`` already
+    carries at both ends, deliberately: the charge **between** them is what this record exists
+    for, and a card holding the two amounts and not the charge would subtract one from the
+    other.
     """
 
     released_on: date
@@ -203,7 +200,6 @@ class CandidateProjection:
     releases: tuple[Release, ...]
 
 
-NO_SCHEDULE = "cash_flow_schedule"
 NO_DISTRIBUTIONS = "distributions"
 NO_EXIT_LINE = "exit_line"
 NO_PREMIUM = "at_purchase"

@@ -27,6 +27,7 @@ from terezy.data.declarations import resolver
 from tests.data_roots import SHIPPED
 
 if TYPE_CHECKING:  # pragma: no cover -- typing only
+    from terezy.core.instruments.interface import DateRange
     from terezy.core.results.tuple import TupleOutcome
 
 QUESTION: Final = "fifty-thousand-hryvnia"
@@ -43,6 +44,23 @@ def answered() -> Answer:
 
 
 @cache
+def published_keys() -> tuple[str, ...]:
+    """Every key the shipped question publishes, in section then ranking order."""
+    return tuple(outcome.projection_key for outcome, _ in evaluated_outcomes())
+
+
+@cache
+def evaluated_outcomes() -> tuple[tuple[TupleOutcome, DateRange], ...]:
+    """Each evaluated candidate and the horizon of the section it was evaluated in."""
+    return tuple(
+        (outcome, section.horizon)
+        for section in answered().sections
+        if isinstance(section.outcome, CandidateSurvey)
+        for outcome in evaluated(section.outcome.comparison)
+    )
+
+
+@cache
 def served() -> tuple[tuple[TupleOutcome, CandidateProjection], ...]:
     """Each evaluated candidate and the projection its published key resolves to."""
     answer = answered()
@@ -55,12 +73,9 @@ def served() -> tuple[tuple[TupleOutcome, CandidateProjection], ...]:
         objective_set_id=answer.question.objective_set_id,
     )
     pairs: list[tuple[TupleOutcome, CandidateProjection]] = []
-    for section in answer.sections:
-        if not isinstance(section.outcome, CandidateSurvey):
-            continue
-        for outcome in evaluated(section.outcome.comparison):
-            projection = projection_for(outcome.projection_key, answer, inputs, AS_OF)
-            assert isinstance(projection, CandidateProjection), projection
-            pairs.append((outcome, projection))
+    for outcome, _ in evaluated_outcomes():
+        projection = projection_for(outcome.projection_key, answer, inputs, AS_OF)
+        assert isinstance(projection, CandidateProjection), projection
+        pairs.append((outcome, projection))
     assert pairs, "the shipped question evaluated nothing, so every assertion would be vacuous"
     return tuple(pairs)
