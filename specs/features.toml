@@ -421,3 +421,8 @@ note  = "Entities as nodes, routes as edges, a candidate's path lit on selection
 id    = "the-answer-document-is-too-big-for-a-screen"
 after = ["026-answer-screen"]
 note  = "MEASURED 2026-09-06: /api/questions/fifty-thousand-hryvnia/answer is 8.0 MB on the wire, 4.6 MB of it dominance.dominated, because every verdict carries both candidates' merged provenance and staleness. 026 fetches it whole behind a named loading state; the remedy is OB-10 in its spec and never a client-side trim, which would be the truncation its FR-008 forbids."
+
+[[future]]
+id    = "a-rate-on-the-tax-bar"
+after = ["027-candidate-card"]
+note  = "CL-1 was answered (a) -- the tax bar shows the base and the charge and names the class, and no rate -- because the engine records no rate and every charge the shipped registry produces under an exempt class is a cited zero, so a rate would read `0 % + 0 %`. Option (c) is what becomes live the day something taxed stands where a reader looks: the CHARGE carries the dated entry it applied, which is a wire-visible engine change beyond *stop discarding* and is deliberately not built. Measured 2026-09-11: 3 of the 122 charges the owner's question strikes are not zero -- the fund's, 3 876.84 UAH each under `ua_investment_profit` -- so the case exists already and is simply not the one the front of the answer shows. Option (b), a client reading the declared class and rendering its dated rates, is refused rather than deferred: deciding which entry applied on the event's date is a conclusion with no owning call."
