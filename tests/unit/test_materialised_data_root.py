@@ -1,8 +1,7 @@
 """The composed root written where a process outside pytest can read it.
 
 `python -m tests.data_roots --materialise` is what the Playwright suite starts the API over, so
-that the held block is drawn from an invented holding on every machine rather than from
-`data/user/`, which is gitignored and holds the owner's real position on his own.
+that the screen it drives is drawn from invented declarations on every machine.
 """
 
 from __future__ import annotations
@@ -27,9 +26,8 @@ def test_it_writes_a_root_that_outlives_the_process_that_composed_it(tmp_path: P
 def test_the_only_lots_it_carries_are_the_invented_ones(tmp_path: Path) -> None:
     """The private overlay it holds is the fixture's, and the shipped one is not copied at all.
 
-    Read as a declaration rather than compared as bytes: what must be true is that every lot in
-    the materialised root is flagged synthetic, which is the claim `data/README.md` rule 5 makes
-    about a committed file and the one a served answer would otherwise break.
+    Both halves are asserted: that it is the fixture file, and that every lot in it is flagged
+    synthetic, which is the claim `data/README.md` rule 5 makes about a committed declaration.
     """
     written = data_roots.materialise(tmp_path / "root")
     declared = tomllib.loads((written / OVERLAY_SEEDS).read_text(encoding="utf-8"))
@@ -41,7 +39,6 @@ def test_the_only_lots_it_carries_are_the_invented_ones(tmp_path: Path) -> None:
 
 
 def test_it_replaces_what_a_previous_run_left(tmp_path: Path) -> None:
-    """A stale file surviving into the next run is a declaration nobody wrote."""
     destination = tmp_path / "root"
     data_roots.materialise(destination)
     stale = destination / "questions" / "left-behind.toml"

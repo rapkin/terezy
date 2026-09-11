@@ -19,9 +19,8 @@ import { Population } from "./Population";
  * where a number should be.
  *
  * **The population counts positions, and a position is one disclosure.** Its lots are a plain
- * list inside that disclosure rather than a `Population` of their own: a nested one put its lots
- * inside the outer population's element, where the count-matches-members guard read them as the
- * outer population's members and a second lot made the held count disagree with itself.
+ * list rather than a `Population` of their own: a nested population's members sit inside its
+ * host's element, where the host's own count never counted them.
  */
 export function HeldPositions({
   held,
@@ -80,7 +79,7 @@ function Held({
         <TypedState state={position.tax} label="tax" />
         <TypedState state={position.yields} label="yield" />
         <p className="text-[var(--ink-muted)]">the lots it is made of</p>
-        <ul className="ml-4 list-disc space-y-2" data-lots={position.instrument_id}>
+        <ul className="ml-4 list-disc space-y-2">
           {position.lots.map((lot) => (
             <li key={lot.lot_id} data-lot={lot.lot_id}>
               <span data-quantity="">{quantity(lot.quantity)}</span> acquired {lot.acquired_on} for{" "}

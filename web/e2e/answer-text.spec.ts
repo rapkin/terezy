@@ -82,7 +82,6 @@ test("no unrounded float reaches the document", async ({ page }) => {
   expect(scanned.composed.length).toBeGreaterThan(500);
   const found = scanned.composed.match(new RegExp(UNROUNDED.source, "g"));
   expect(found, "the page composed these").toBeNull();
-  // Not vacuous anywhere: the data root the API is started over declares a holding (FR-045).
   expect(scanned.quantities.length, "a holding is on the screen to scan").toBeGreaterThan(0);
   expect(scanned.quantities.filter((held) => UNROUNDED_QUANTITY.test(held))).toEqual([]);
 });
@@ -125,8 +124,7 @@ test("what the owner already holds is on the screen, valued or refused", async (
     ).json();
     return body.result.answer.held;
   }, AS_OF);
-  // The count is the count of POSITIONS. A position's lots are inside it and are not members of
-  // this population; the empty case is a named state and is held by the unit suite.
+  // Positions. A position's lots are drawn inside it and are not members of this population.
   expect(stated).toBe(served.length);
   expect(served.length, "the data root the API was started over declares a holding").toBeGreaterThan(
     0,

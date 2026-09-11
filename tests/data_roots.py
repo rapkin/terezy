@@ -75,12 +75,10 @@ def with_fixtures() -> Path:
 
 
 def materialise(destination: Path) -> Path:
-    """The composed root copied where a process outside pytest can be pointed at it.
+    """The composed root copied where it outlives the process that composed it.
 
-    :func:`with_fixtures` builds under ``tempfile`` and unlinks at interpreter exit, so a root
-    handed to another process would be gone before it read it. An existing destination is
-    replaced rather than merged: a stale file left from a previous run is a declaration nobody
-    wrote.
+    An existing destination is replaced rather than merged: a stale file left from a previous
+    run is a declaration nobody wrote.
     """
     if destination.exists():
         shutil.rmtree(destination)

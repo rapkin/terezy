@@ -11,10 +11,9 @@ import { defineConfig, devices } from "@playwright/test";
  * are started here rather than by the job, so `pnpm e2e` and CI run the same thing.
  *
  * **The root is `tests/data_roots.py`'s composed one, not the checkout's `data/`.** The default
- * root includes `data/user/`, which is gitignored and holds the owner's real position on his
- * machine and nothing at all in every other checkout — so the held block was vacuous everywhere
- * and broke only where his lots existed. The composed root is `data/` with that overlay stripped
- * plus `tests/fixtures/data/`, whose invented holding is what these tests read.
+ * root includes `data/user/`, which is gitignored: it holds the owner's real position on his
+ * machine and nothing at all in every other checkout, so a screen drawn from it is a different
+ * screen per machine.
  */
 const API_PORT = Number(process.env.TEREZY_API_PORT ?? 8123);
 const WEB_PORT = Number(process.env.TEREZY_WEB_PORT ?? 4173);
