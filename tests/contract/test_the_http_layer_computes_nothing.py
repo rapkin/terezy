@@ -33,7 +33,9 @@ MONEY = re.compile(r"\bMoney\s*\(|\bmoney\.(add|sub|scale|total|convert|zero|fro
 CANONICAL = re.compile(r"results\.canonical|from terezy\.core\.results import canonical")
 STALENESS = re.compile(r"staleness_of_\w+|\bstaleness\.\w*\(")
 SERVER = re.compile(r"uvicorn\.run|\.serve\(\)|socket\.socket\(|\.listen\(|\.bind\(")
-CANDIDATE_KEY = re.compile(r"candidate_key\s*\(|CANDIDATE_KEY_SEPARATOR|\.instrument_id\b|\.stream_id\b")
+CANDIDATE_KEY = re.compile(
+    r"candidate_key\s*\(|CANDIDATE_KEY_SEPARATOR|\.instrument_id\b|\.stream_id\b"
+)
 
 
 def _sources() -> list[Path]:
