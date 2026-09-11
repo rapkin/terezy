@@ -33,7 +33,7 @@ MONEY = re.compile(r"\bMoney\s*\(|\bmoney\.(add|sub|scale|total|convert|zero|fro
 CANONICAL = re.compile(r"results\.canonical|from terezy\.core\.results import canonical")
 STALENESS = re.compile(r"staleness_of_\w+|\bstaleness\.\w*\(")
 SERVER = re.compile(r"uvicorn\.run|\.serve\(\)|socket\.socket\(|\.listen\(|\.bind\(")
-CANDIDATE_KEY = re.compile(r"candidate_key|CANDIDATE_KEY_SEPARATOR|\.instrument_id\b|\.stream_id\b")
+CANDIDATE_KEY = re.compile(r"candidate_key\s*\(|CANDIDATE_KEY_SEPARATOR|\.instrument_id\b|\.stream_id\b")
 
 
 def _sources() -> list[Path]:
@@ -80,7 +80,9 @@ def test_no_module_composes_a_candidate_key() -> None:
 def test_the_key_scan_would_catch_a_composition() -> None:
     assert CANDIDATE_KEY.search('    return f"{key.instrument_id}|{key.stream_id}"')
     assert CANDIDATE_KEY.search("    return canonical.candidate_key(key, horizon)")
-    assert not CANDIDATE_KEY.search("def _projection(candidate: str) -> Json:")
+    # The parameter and the path placeholder are the key **echoed**, which is the whole point.
+    assert not CANDIDATE_KEY.search("def read(question_id: str, candidate_key: str) -> Json:")
+    assert not CANDIDATE_KEY.search("        candidate_key=candidate_key,")
 
 
 @pytest.mark.contract

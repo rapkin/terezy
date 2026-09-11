@@ -20,6 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.types import ASGIApp
 
+from terezy.api import projection
 from terezy.api.answer import AnsweredQuestion
 from terezy.api.http import (
     answers,
@@ -35,6 +36,8 @@ from terezy.api.http import (
     shapes,
     summary,
 )
+from terezy.api.projection import ProjectedCandidate
+from terezy.core.decision.card import NoSuchCandidate
 from terezy.core.primitives.currency import Currency
 from terezy.data.declarations import resolver
 from terezy.data.declarations.errors import DeclarationError
@@ -368,6 +371,7 @@ def _register_fixed(router: APIRouter, root: Path, app: FastAPI) -> None:
     # parameter here would be one a caller could set and believe in.
     plain = _reader(root, scenario=False)
     answer_envelope = envelopes.answer_of(AnsweredQuestion)
+    projection_envelope = envelopes.projection_of(ProjectedCandidate, NoSuchCandidate)
 
     @router.get(
         "/registry",
@@ -390,6 +394,41 @@ def _register_fixed(router: APIRouter, root: Path, app: FastAPI) -> None:
                 question_id=question_id,
                 as_of=asked.as_of,
                 result=answers.answered(asked.ask, question_id, as_of=asked.as_of),
+            ),
+        )
+
+    @router.get(
+        "/questions/{question_id}/candidates/{candidate_key}",
+        response_model=_model(projection_envelope),
+        name="questions.candidate",
+    )
+    def candidate(
+        question_id: str, candidate_key: str, asked: Annotated[Read, Depends(plain)]
+    ) -> encode.Json:
+        """One evaluated candidate's projection, under the answer that published its key.
+
+        The declared ids are checked here first for `answers.answered`'s reason: the verb raises
+        for an id nothing declares, and that error means *this data root is broken*.
+        """
+        declared = answers.declared_ids(asked.ask)
+        result: object
+        if question_id not in declared:
+            result = answers.no_such_question(question_id, declared)
+        else:
+            result = projection.projection_for_candidate(
+                asked.ask.root,
+                question_id,
+                candidate_key,
+                as_of=asked.as_of,
+                base_currency=asked.ask.base_currency,
+            )
+        return _body(
+            projection_envelope,
+            projection_envelope(
+                question_id=question_id,
+                candidate_key=candidate_key,
+                as_of=asked.as_of,
+                result=result,
             ),
         )
 

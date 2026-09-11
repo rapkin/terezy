@@ -141,25 +141,8 @@ def answer_declared(
     it is why *flags are sugar over the file* has to mean the refusal too. The typed members
     stay the form the **verb** returns to a caller holding a record it built itself.
     """
-    declarations = resolver.answer_from_data_root(
-        root,
-        base_currency=base_currency,
-        scenario_id=_scenario_of(root, question.regime_id, base_currency=base_currency),
-    )
-    resolver.check_question(
-        question,
-        declarations.tuples.registries.streams,
-        path=declared_in,
-        objective_sets=declarations.objective_sets,
-    )
-    result = answer(
-        question,
-        inputs_of(
-            declarations,
-            regime_id=question.regime_id,
-            objective_set_id=question.objective_set_id,
-        ),
-        as_of,
+    declarations, _, result = run(
+        question, root, as_of=as_of, base_currency=base_currency, declared_in=declared_in
     )
     return AnsweredQuestion(
         answer=result,
@@ -173,6 +156,41 @@ def answer_declared(
     )
 
 
+def run(
+    question: Question,
+    root: Path,
+    *,
+    as_of: date,
+    base_currency: Currency,
+    declared_in: Path,
+) -> tuple[resolver.AnswerDeclarations, AnswerInputs, Answer | Refused]:
+    """One question answered over one data root, with what it was answered from kept.
+
+    The load, the cross-file checks and the verb, in the one order they happen in. Returned
+    rather than folded into :func:`answer_declared` because a second reader needs the
+    ``AnswerInputs``: 027's endpoint resolves a published candidate key back to the tuple and
+    horizon it names and evaluates that one candidate, which takes the same registries this run
+    used or it would serve a projection from a different world.
+    """
+    declarations = resolver.answer_from_data_root(
+        root,
+        base_currency=base_currency,
+        scenario_id=_scenario_of(root, question.regime_id, base_currency=base_currency),
+    )
+    resolver.check_question(
+        question,
+        declarations.tuples.registries.streams,
+        path=declared_in,
+        objective_sets=declarations.objective_sets,
+    )
+    inputs = inputs_of(
+        declarations,
+        regime_id=question.regime_id,
+        objective_set_id=question.objective_set_id,
+    )
+    return declarations, inputs, answer(question, inputs, as_of)
+
+
 def answer_question(
     root: Path,
     question_id: str,
@@ -181,7 +199,7 @@ def answer_question(
     base_currency: Currency,
 ) -> AnsweredQuestion:
     """Load one data root, answer one **declared** question, and record what it rested on."""
-    declared, path = _declared_question(root, question_id)
+    declared, path = declared_question(root, question_id)
     return answer_declared(
         declared,
         root,
@@ -191,7 +209,7 @@ def answer_question(
     )
 
 
-def _declared_question(root: Path, question_id: str) -> tuple[Question, Path]:
+def declared_question(root: Path, question_id: str) -> tuple[Question, Path]:
     """The declared question with that id, read from the question files and nothing else.
 
     Deliberately **not** a full resolution of the data root: the regime it names decides which
@@ -237,4 +255,11 @@ def _scenario_of(root: Path, regime_id: str, *, base_currency: Currency) -> str 
     )
 
 
-__all__ = ["AnsweredQuestion", "answer_declared", "answer_question", "inputs_of"]
+__all__ = [
+    "AnsweredQuestion",
+    "answer_declared",
+    "answer_question",
+    "declared_question",
+    "inputs_of",
+    "run",
+]

@@ -17,6 +17,8 @@ import pytest
 from terezy.api.answer import AnsweredQuestion
 from terezy.api.http import categories, encode, envelopes, service, shapes, tags
 from terezy.api.http.summary import RegistrySummary
+from terezy.api.projection import ProjectedCandidate
+from terezy.core.decision.card import NoSuchCandidate
 from terezy.core.primitives.money import Money
 from terezy.core.primitives.provenance import Provenance, SourceRef
 from tests.data_roots import SHIPPED
@@ -43,6 +45,7 @@ def _built() -> list[shapes.Shape]:
     roots: list[shapes.Shape] = [
         shapes.plan_of(RegistrySummary),
         shapes.plan_of(envelopes.answer_of(AnsweredQuestion)),
+        shapes.plan_of(envelopes.projection_of(ProjectedCandidate, NoSuchCandidate)),
     ]
     for category in categories.CATEGORIES:
         shape = category.shape
@@ -228,6 +231,7 @@ the gap in the core is the `a-reason-on-every-refusal` future entry.
 
 DECLARATIONS_WITHOUT_A_REASON = frozenset(
     {
+        "accrual.Carried",
         "access.InstrumentAccess",
         "answer.Answer",
         "answer.AnsweredQuestion",
@@ -240,6 +244,14 @@ DECLARATIONS_WITHOUT_A_REASON = frozenset(
         "answer.SubjectUnreached",
         "answer.UndeclaredSubject",
         "candidates.CandidateCeiling",
+        # 027: the three arms of the served projection, the read that returns one, and the two
+        # records the card draws that had reached no response type before it.
+        "card.BondArm",
+        "card.CashArm",
+        "card.FundArm",
+        "conventions.ConventionsApplied",
+        "fund.ExitLine",
+        "projection.ProjectedCandidate",
         "candidates.CandidateSurvey",
         "cash.CashAssumptions",
         "cash.CashDeclaration",

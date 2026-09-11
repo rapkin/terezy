@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Final
 if TYPE_CHECKING:  # pragma: no cover -- typing only
     from fastapi import FastAPI
 
-VERSION: Final[str] = "1.0.0"
+VERSION: Final[str] = "1.1.0"
 """The version of **this wire contract**, bumped in the same commit as any change to the served
 document that a generated client would have to react to."""
 

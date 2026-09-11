@@ -379,6 +379,26 @@ def answer_of(answered: object) -> type:
     )
 
 
+def projection_of(projected: object, no_such: object) -> type:
+    """What the candidate endpoint returns: one candidate's projection, or one of two refusals.
+
+    Two and no third (027 FR-011): the **question** is not declared, which is a wrong URL, and
+    the **key** names no evaluated candidate of this answer, which is a stale client. They are
+    separate records because the remedies are. A candidate whose projection could not be produced
+    never became an outcome, so it carries no key and has no address here -- what the card meets
+    instead is a bar the arm states no flow for, which lives in the body.
+    """
+    return container(
+        "TheCandidateProjection",
+        (
+            ("question_id", str),
+            ("candidate_key", str),
+            ("as_of", date),
+            ("result", projected | no_such | CategoryHasNoSuchId),  # type: ignore[operator]
+        ),
+    )
+
+
 def describe(record: type) -> tuple[FieldDescription, ...]:
     """The ordered field descriptors of one record, derived from the shape its body is encoded
     from rather than written out per category (020 FR-052)."""
