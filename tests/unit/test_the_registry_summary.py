@@ -158,7 +158,9 @@ def test_the_summarised_mark_is_the_mark_the_full_list_produces(
             assert mark["tag"] == "summary.NoSourceCited", row
             continue
         assert mark["sources"] == len(refs), row
-        assert mark["latest_retrieved_on"] == max(ref["retrieved_on"] for ref in refs), row
+        retrieved = [ref["retrieved_on"] for ref in refs]
+        assert mark["earliest_retrieved_on"] == min(retrieved), row
+        assert mark["latest_retrieved_on"] == max(retrieved), row
         if unverified:
             assert mark["unverified"] == len(unverified), row
         else:
@@ -178,9 +180,9 @@ def test_a_verified_source_moves_the_marks_arm_and_nothing_else() -> None:
     )
     marked = summary._mark(unverified)
     assert isinstance(marked, summary.SourcesUnverified)
-    assert (marked.unverified, marked.sources, marked.latest_retrieved_on) == (
-        1,
-        2,
+    assert (marked.unverified, marked.sources) == (1, 2)
+    assert (marked.earliest_retrieved_on, marked.latest_retrieved_on) == (
+        date(2026, 9, 1),
         date(2026, 9, 3),
     )
 
@@ -195,11 +197,30 @@ def test_a_verified_source_moves_the_marks_arm_and_nothing_else() -> None:
     )
     lifted = summary._mark(verified)
     assert isinstance(lifted, summary.EverySourceVerified)
-    assert (lifted.sources, lifted.earliest_verified_on, lifted.latest_retrieved_on) == (
-        2,
-        date(2026, 9, 4),
+    assert (lifted.sources, lifted.earliest_verified_on) == (2, date(2026, 9, 4))
+    assert (lifted.earliest_retrieved_on, lifted.latest_retrieved_on) == (
+        date(2026, 9, 1),
         date(2026, 9, 3),
     )
+
+
+def test_a_stale_source_is_not_hidden_by_a_fresh_one() -> None:
+    """One end of the span is a figure more confident than the fold: a category read six years
+    ago and again today reads as fully fresh from its latest alone."""
+    marked = summary._mark(
+        prov.of(
+            (
+                prov.SourceRef(
+                    id="old", citation="c", retrieved_on=date(2020, 1, 1), verified_on=None
+                ),
+                prov.SourceRef(
+                    id="new", citation="c", retrieved_on=date(2026, 9, 11), verified_on=None
+                ),
+            )
+        )
+    )
+    assert isinstance(marked, summary.SourcesUnverified)
+    assert marked.earliest_retrieved_on == date(2020, 1, 1)
 
 
 def test_the_merged_mark_is_the_monoids_own_fold() -> None:

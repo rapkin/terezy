@@ -6,6 +6,7 @@
  * passes one is a body that renderer is total over.
  */
 import type {
+  CategorySummary,
   FieldDescription,
   Listing,
   RecordRead,
@@ -35,6 +36,20 @@ function isFieldDescription(value: unknown): value is FieldDescription {
   );
 }
 
+/**
+ * The mark arms `CategoryCard`'s own switch is total over.
+ *
+ * A mapped type over the union, so an arm the API adds leaves this literal one key short and the
+ * build goes red -- the mechanism `REFUSAL_TAGS` uses. Enumerated rather than *any tag*, because
+ * this predicate's contract is that a body passing it is one the renderer is total over, and that
+ * renderer ends in `assertNever`, which throws the whole index rather than one card.
+ */
+const MARK_TAGS: { readonly [Tag in CategorySummary["mark"]["tag"]]: true } = {
+  "summary.NoSourceCited": true,
+  "summary.SourcesUnverified": true,
+  "summary.EverySourceVerified": true,
+};
+
 export function isRegistry(body: unknown): body is RegistrySummary {
   if (tagOf(body) !== "summary.RegistrySummary" || !isRecord(body)) return false;
   if (typeof body["as_of"] !== "string" || !Array.isArray(body["categories"])) return false;
@@ -45,7 +60,7 @@ export function isRegistry(body: unknown): body is RegistrySummary {
       isRecord(held) &&
       typeof held["category"] === "string" &&
       isRecord(held["citations"]) &&
-      tagOf(held["mark"]) !== null &&
+      Object.hasOwn(MARK_TAGS, tagOf(held["mark"]) ?? "") &&
       Array.isArray(held["files"])
     );
   });

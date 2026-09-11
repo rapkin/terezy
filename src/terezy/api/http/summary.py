@@ -47,6 +47,7 @@ class SourcesUnverified:
 
     sources: int
     unverified: int
+    earliest_retrieved_on: date
     latest_retrieved_on: date
 
 
@@ -57,6 +58,7 @@ class EverySourceVerified:
 
     sources: int
     earliest_verified_on: date
+    earliest_retrieved_on: date
     latest_retrieved_on: date
 
 
@@ -198,23 +200,29 @@ def _row(
 
 
 def _mark(merged: Provenance) -> CategoryMark:
-    """The fold's verdict, in the three states a reader acts on differently."""
+    """The fold's verdict, in the three states a reader acts on differently.
+
+    Retrieval is reported at **both** ends. One end is a figure more confident than the fold it
+    summarises: `instruments` spans 2026-08-22..2026-09-02, and a category holding a source read
+    six years ago beside one read today would read as fully fresh from its latest alone.
+    """
     if not merged.sources:
         return NoSourceCited()
-    latest = max(ref.retrieved_on for ref in merged.sources)
+    retrieved = [ref.retrieved_on for ref in merged.sources]
+    span = {"earliest_retrieved_on": min(retrieved), "latest_retrieved_on": max(retrieved)}
     unverified = prov.unverified_sources(merged)
     if unverified:
         return SourcesUnverified(
             sources=len(merged.sources),
             unverified=len(unverified),
-            latest_retrieved_on=latest,
+            **span,
         )
     return EverySourceVerified(
         sources=len(merged.sources),
         earliest_verified_on=min(
             ref.verified_on for ref in merged.sources if ref.verified_on is not None
         ),
-        latest_retrieved_on=latest,
+        **span,
     )
 
 

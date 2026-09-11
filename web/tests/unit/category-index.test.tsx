@@ -49,6 +49,7 @@ describe("CategoryIndex", () => {
               tag: "summary.EverySourceVerified",
               sources: 3,
               earliest_verified_on: "2026-08-01",
+              earliest_retrieved_on: "2026-07-30",
               latest_retrieved_on: "2026-09-02",
             },
           }),
@@ -64,6 +65,48 @@ describe("CategoryIndex", () => {
     expect(container.querySelector("[data-category-mark='verified']")?.textContent).toContain(
       "verified since 2026-08-01",
     );
+  });
+
+  it("shows both ends of the retrieval span, so one fresh source cannot hide a stale one", async () => {
+    const { container } = await renderInRouter(
+      <CategoryIndex
+        registry={registry([
+          keyedSummary({
+            mark: {
+              tag: "summary.SourcesUnverified",
+              sources: 2,
+              unverified: 2,
+              earliest_retrieved_on: "2020-01-01",
+              latest_retrieved_on: "2026-09-11",
+            },
+          }),
+        ])}
+      />,
+    );
+    const span = container.querySelector("[data-retrieved]");
+    expect(span?.getAttribute("data-retrieved")).toBe("2020-01-01..2026-09-11");
+    expect(span?.textContent).toBe("retrieved 2020-01-01 – 2026-09-11");
+  });
+
+  it("marks a required-citation category that cites nothing, and leaves an exempt one calm", async () => {
+    // `groups`, `venues` and `quotations` ship as CitationsRequired with no cited source; one
+    // tone for both would put *nothing to verify* and *everything verified* behind one colour.
+    const { container } = await renderInRouter(
+      <CategoryIndex
+        registry={registry([
+          keyedSummary({
+            category: "venues",
+            citations: { tag: "citation_policy.CitationsRequired", path: "venues.toml" },
+            mark: { tag: "summary.NoSourceCited" },
+          }),
+          singletonSummary(),
+        ])}
+      />,
+    );
+    const badges = [...container.querySelectorAll("[data-category-mark='no-source-cited']")];
+    expect(badges).toHaveLength(2);
+    expect(badges[0]?.className).toContain("warn");
+    expect(badges[1]?.className).not.toContain("warn");
   });
 
   it("renders the citation exemption on the card that carries one", async () => {

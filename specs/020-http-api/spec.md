@@ -452,8 +452,13 @@ of addresses it may bind to.
 - **FR-009**: A **registry summary** endpoint MUST report, per category: its **shape**; for a keyed
   category the number of declared ids and for a singleton **whether the document was resolved at
   all**; the files behind it with each file's digest; and the **verdict** of the merged provenance of
-  everything in it — whether any source is unverified and how many, the latest `retrieved_on`, and
-  the earliest `verified_on` where every source carries one.
+  everything in it — whether any source is unverified and how many, **both ends** of the
+  `retrieved_on` span, and the earliest `verified_on` where every source carries one.
+
+  Both ends, because one end is a figure more confident than the fold it summarises: a category
+  holding a source read six years ago beside one read today reads as fully fresh from its latest
+  alone, which is Principle I's *no number more confident than its inputs* at the one screen whose
+  job is to say what the registry rests on.
 
   The merged provenance **itself** MUST be served, per category, at a second endpoint. Serialising
   every `SourceRef` repeats a ~300-character citation once per declared row: measured 2026-09-11 the

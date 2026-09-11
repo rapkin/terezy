@@ -156,6 +156,7 @@ export function keyedSummary(over: Partial<Extract<CategorySummary, { tag: "summ
       tag: "summary.SourcesUnverified" as const,
       sources: 1,
       unverified: 1,
+      earliest_retrieved_on: "2026-09-02",
       latest_retrieved_on: "2026-09-02",
     },
     ...over,
