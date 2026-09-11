@@ -49,3 +49,34 @@ for (const { theme, stamp } of MODES) {
     });
   }
 }
+
+/**
+ * 027 FR-029: the card in both themes.
+ *
+ * Opened from the answer rather than listed above, because its URL carries a key the **answer**
+ * publishes — one this test composed would address a candidate nobody ranked.
+ */
+for (const { theme, stamp } of MODES) {
+  const named = stamp ? `chosen ${theme}` : `system ${theme}`;
+  test(`a candidate card has no AA violation with the ${named} theme`, async ({ page }) => {
+    await offline(page);
+    await page.emulateMedia({ colorScheme: theme });
+    await page.goto(`/?as_of=${AS_OF}`);
+    if (stamp) {
+      await page.evaluate((chosen: string) => {
+        document.documentElement.setAttribute("data-theme", chosen);
+      }, theme);
+    }
+    await expect(page.locator("[data-answer]")).toBeVisible({ timeout: 120_000 });
+    await page.locator("[data-open-card]").first().click();
+    await expect(page.locator("[data-card]")).toBeVisible({ timeout: 120_000 });
+    // Every disclosure open: a violation inside a folded one is a violation a reader meets.
+    await page.evaluate(() => {
+      for (const held of document.querySelectorAll("details")) held.setAttribute("open", "");
+    });
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+      .analyze();
+    expect(results.violations.map((held) => `${held.id}: ${held.help}`)).toEqual([]);
+  });
+}
