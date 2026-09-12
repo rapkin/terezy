@@ -103,6 +103,17 @@ def test_every_read_declares_no_length_and_is_untouched() -> None:
 
 
 @pytest.mark.contract
+def test_a_method_that_carries_no_body_is_left_to_the_route_table() -> None:
+    """Found by review: skipping only GET, HEAD and OPTIONS answered a bodyless `DELETE` with
+    *this request carries a body*, which the guard had not checked and could not. The route
+    table's own refusal is the right one for a verb this surface does not serve."""
+    response = served(DATA_ROOT).delete(f"{document.PREFIX}/venues", params=AS_OF)
+
+    assert response.status_code != 411
+    assert "BodyLengthNotDeclared" not in response.text
+
+
+@pytest.mark.contract
 def test_the_cap_is_declared_on_the_route_that_can_answer_with_it() -> None:
     """A refusal a client is not told about is one its generated types cannot narrow on."""
     published = json.loads(served(DATA_ROOT).get(f"{document.PREFIX}/openapi.json").text)["paths"][

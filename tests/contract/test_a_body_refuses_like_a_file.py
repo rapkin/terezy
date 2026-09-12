@@ -164,6 +164,23 @@ def test_a_body_that_is_not_json_is_the_frameworks_own_malformed_refusal() -> No
 
 
 @pytest.mark.contract
+def test_a_body_that_is_not_utf_8_refuses_the_same_way() -> None:
+    """`json.loads` decodes before it parses, so bytes that are not UTF-8 never reach the parser
+    and raise a different exception. Found by review: caught as only a parse failure, a whole
+    class of unparseable bodies escaped as an untyped 500 while the ASCII-garbage case above
+    stayed green."""
+    response = served(DATA_ROOT).post(
+        ANSWERS,
+        params={"as_of": AS_OF},
+        content='{"owner": {"id": "\u00fcnicode"}}'.encode("latin-1"),
+        headers={"content-type": "application/json"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["tag"] == "envelopes.RequestMalformed"
+
+
+@pytest.mark.contract
 def test_a_body_that_is_json_but_not_an_object_refuses_the_same_way() -> None:
     response = served(DATA_ROOT).post(ANSWERS, params={"as_of": AS_OF}, json=[1, 2, 3])
 

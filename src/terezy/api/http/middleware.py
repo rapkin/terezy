@@ -40,11 +40,13 @@ about the owner's money decides it. Measured against the real thing rather than 
 `test_a_body_has_a_ceiling.py` asserts the shipped question's canonical JSON stays far inside it.
 """
 
-BODYLESS_METHODS: Final[tuple[str, ...]] = ("GET", "HEAD", "OPTIONS")
-"""The methods that carry no body, and are therefore not asked to declare a length.
+BODY_BEARING_METHODS: Final[tuple[str, ...]] = ("POST", "PUT", "PATCH")
+"""The methods the cap applies to: the ones defined to carry a body.
 
-Without this the cap would refuse every read on this surface -- each is a GET that legitimately
-declares no `Content-Length` -- and would do it wearing a message about a question document.
+Named rather than inverted from the read methods. Every read here is a GET that declares no
+`Content-Length`, so a cap over everything would refuse the whole surface; and a `DELETE` or an
+unknown verb declares none either, so inverting would answer it *this request carries a body* --
+a claim about something the guard never checked, in place of the route table's own refusal.
 """
 
 
@@ -90,7 +92,7 @@ def body_cap(app: ASGIApp, *, limit: int = BODY_LIMIT) -> ASGIApp:
     """
 
     async def guarded(scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http" or scope.get("method", "") in BODYLESS_METHODS:
+        if scope["type"] != "http" or scope.get("method", "") not in BODY_BEARING_METHODS:
             await app(scope, receive, send)
             return
         declared = _content_length(scope)
@@ -102,9 +104,10 @@ def body_cap(app: ASGIApp, *, limit: int = BODY_LIMIT) -> ASGIApp:
                     method=str(scope.get("method", "")),
                     limit_bytes=limit,
                     reason=(
-                        "this request carries a body and declares no readable Content-Length, "
-                        "so the cap could only be applied by counting the bytes as they "
-                        "arrive -- which is the machinery the cap exists to avoid."
+                        f"a {scope.get('method', '')} declares the length of the body it "
+                        "carries, and this one declares no readable Content-Length. The cap "
+                        "could then only be applied by counting the bytes as they arrive, "
+                        "which is the machinery the cap exists to avoid."
                     ),
                 ),
             )

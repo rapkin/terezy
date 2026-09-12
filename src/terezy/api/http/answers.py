@@ -140,7 +140,11 @@ def document_of(body: bytes) -> dict[str, Any]:
     """
     try:
         parsed = json.loads(body)
-    except json.JSONDecodeError as malformed:
+    except (json.JSONDecodeError, UnicodeDecodeError) as malformed:
+        # `json.loads` decodes before it parses, so bytes that are not UTF-8 raise
+        # `UnicodeDecodeError` and never reach the parser. Caught with the parse failure because
+        # both are the same fact -- these bytes carry no document -- and one of them escaping as
+        # an untyped 500 is the silent failure Principle IV forbids.
         raise _not_a_document(f"the body is not JSON: {malformed}") from malformed
     if not isinstance(parsed, dict):
         raise _not_a_document(
