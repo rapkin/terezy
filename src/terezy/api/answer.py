@@ -15,7 +15,7 @@ obtain from ``api/`` lacks one (FR-025).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 
 from terezy.core.decision.answer import AnswerInputs, answer
 from terezy.core.results.answer import Answer, Refused
@@ -28,12 +28,20 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from collections.abc import Mapping
     from datetime import date
     from pathlib import Path
+    from typing import Any
 
     from terezy.core.primitives.currency import Currency
     from terezy.core.results.objectives import ObjectiveSet
     from terezy.core.results.question import Question
     from terezy.core.routes.legs import Route
     from terezy.data.manifest import RunManifest
+
+
+REGIME_FIELD: Final = f"{loader.QUESTION_TABLE}.regime"
+"""What an undeclared regime is blamed on: the question's own field, wherever the question came
+from. Which scenario declares a regime is a fact about ``data/scenarios/``, but a question naming
+one nobody declared is the **question's** fault -- and rooting the refusal at the scenarios
+directory sent the first caller to make that typo to a data root that was fine (029 FR-015)."""
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -49,7 +57,11 @@ class AnsweredQuestion:
 
 
 def inputs_of(
-    declarations: resolver.AnswerDeclarations, *, regime_id: str, objective_set_id: str
+    declarations: resolver.AnswerDeclarations,
+    *,
+    regime_id: str,
+    objective_set_id: str,
+    declared_in: Path,
 ) -> AnswerInputs:
     """The verb's second parameter, built from a resolved data root.
 
@@ -80,8 +92,8 @@ def inputs_of(
     named = coverage.regimes.get(regime_id)
     if named is None:
         raise DeclarationError(
-            coverage.spendable_file.parent.parent / resolver.SCENARIOS_DIR,
-            "",
+            declared_in,
+            REGIME_FIELD,
             f"the question asks under the regime {regime_id!r}, and the scenario resolved for "
             f"this run declares {sorted(coverage.regimes)}. A regime nobody declared would "
             "leave the route set unnarrowed, and the answer would compare corridors the "
@@ -116,6 +128,7 @@ def answer_declared(
     as_of: date,
     base_currency: Currency,
     declared_in: Path,
+    question_version: str | None,
 ) -> AnsweredQuestion:
     """Answer a question record over one data root, and record what it rested on.
 
@@ -124,10 +137,9 @@ def answer_declared(
     declared regime is asked under the scenario that declares it. Both entry points go through
     here, so a question built from flags searches the same world a file does.
 
-    **A question with no file contributes no input reference**, which is the honest record for
-    one typed on a command line: there is nothing to digest. The file is canonical precisely so
-    that the reproducible case is the one with an artefact behind it -- and ``declared_in`` is
-    what a refusal names instead, so *where* is answered either way.
+    ``question_version`` is ``None`` where a **file** declares the question and the digest of
+    the validated document otherwise; :func:`terezy.data.manifest.answer_input_refs` is where
+    that distinction is spent.
 
     **The cross-file checks run here as well as at load**, so a record built by a caller goes
     through them too: two of the four -- the owner and the amount's currency -- are stated
@@ -149,6 +161,8 @@ def answer_declared(
         manifest=run_manifest.of_answer(
             declarations=declarations,
             question=question,
+            declared_in=declared_in,
+            question_version=question_version,
             as_of=as_of,
             result=result if isinstance(result, Answer) else None,
             refusal=None if isinstance(result, Answer) else result,
@@ -175,7 +189,9 @@ def run(
     declarations = resolver.answer_from_data_root(
         root,
         base_currency=base_currency,
-        scenario_id=_scenario_of(root, question.regime_id, base_currency=base_currency),
+        scenario_id=_scenario_of(
+            root, question.regime_id, base_currency=base_currency, declared_in=declared_in
+        ),
     )
     resolver.check_question(
         question,
@@ -187,6 +203,7 @@ def run(
         declarations,
         regime_id=question.regime_id,
         objective_set_id=question.objective_set_id,
+        declared_in=declared_in,
     )
     return declarations, inputs, answer(question, inputs, as_of)
 
@@ -206,6 +223,32 @@ def answer_question(
         as_of=as_of,
         base_currency=base_currency,
         declared_in=path,
+        question_version=None,
+    )
+
+
+def answer_document(
+    document: Mapping[str, Any],
+    root: Path,
+    *,
+    as_of: date,
+    base_currency: Currency,
+    declared_in: Path,
+) -> AnsweredQuestion:
+    """Answer a question **no file declares**, from the document a file would have held.
+
+    The one entry point for the two callers that hold a document rather than a path -- the CLI's
+    ``--set`` lines and a request body -- so that one question asked two ways carries one
+    identity in the manifest (029 FR-020). Orchestration lives here rather than in either
+    caller, which is also why neither of them takes a digest.
+    """
+    return answer_declared(
+        loader.question_from_document(document, declared_in),
+        root,
+        as_of=as_of,
+        base_currency=base_currency,
+        declared_in=declared_in,
+        question_version=run_manifest.question_version(document, declared_in),
     )
 
 
@@ -232,7 +275,9 @@ def declared_question(root: Path, question_id: str) -> tuple[Question, Path]:
     )
 
 
-def _scenario_of(root: Path, regime_id: str, *, base_currency: Currency) -> str | None:
+def _scenario_of(
+    root: Path, regime_id: str, *, base_currency: Currency, declared_in: Path
+) -> str | None:
     """The declared scenario whose regimes include ``regime_id``, or ``None`` for the implicit.
 
     Resolved rather than declared beside the regime in the question file: which scenario a
@@ -246,18 +291,19 @@ def _scenario_of(root: Path, regime_id: str, *, base_currency: Currency) -> str 
         if any(regime.id == regime_id for regime in scenario.regimes):
             return scenario_id
     raise DeclarationError(
-        root / resolver.SCENARIOS_DIR,
-        "",
-        f"declares no regime {regime_id!r}, which a question asks under. A regime nobody "
-        "declared would leave the route set unnarrowed, and the answer would compare corridors "
-        "the question's own world says do not exist.",
-        f"declare {regime_id!r} in a scenario, or name a declared regime in the question",
+        declared_in,
+        REGIME_FIELD,
+        f"names the regime {regime_id!r}, which no scenario under {resolver.SCENARIOS_DIR}/ "
+        "declares. A regime nobody declared would leave the route set unnarrowed, and the "
+        "answer would compare corridors the question's own world says do not exist.",
+        f"name a declared regime, or declare {regime_id!r} in a scenario",
     )
 
 
 __all__ = [
     "AnsweredQuestion",
     "answer_declared",
+    "answer_document",
     "answer_question",
     "declared_question",
     "inputs_of",

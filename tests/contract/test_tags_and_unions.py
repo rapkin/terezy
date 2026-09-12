@@ -46,6 +46,7 @@ def _built() -> list[shapes.Shape]:
         shapes.plan_of(RegistrySummary),
         shapes.plan_of(RegistrySources),
         shapes.plan_of(envelopes.answer_of(AnsweredQuestion)),
+        shapes.plan_of(envelopes.posted_answer_of(AnsweredQuestion)),
         shapes.plan_of(envelopes.projection_of(ProjectedCandidate, NoSuchCandidate)),
     ]
     for category in categories.CATEGORIES:

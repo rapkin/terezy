@@ -82,6 +82,7 @@ def _answered(
         as_of=as_of,
         base_currency=Currency.UAH,
         declared_in=fixtures.QUESTION_FILE,
+        question_version=None,
     )
     assert isinstance(run.answer, Answer), run.answer
     return run.answer

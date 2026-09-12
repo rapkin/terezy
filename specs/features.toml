@@ -222,10 +222,10 @@ note   = "Closes the real-terms-for-a-tuple future: the owner asked for inflatio
 
 [[feature]]
 id     = "029-question-in-request"
-status = "drafted"
+status = "in-progress"
 needs  = ["015-the-question", "020-http-api"]
 why    = "015 owns the question record, its one validator and the rule that a second source builds the SAME record; 020 owns the route table, the tag and union machinery the request schema joins, and the FR-043 deferral this supersedes"
-note   = "Owner 2026-09-13: a question goes in the request body, so asking one stops meaning editing TOML; files stay as saved questions. Two clarifications open, so `drafted` though plan.md and tasks.md exist; see specs/029-question-in-request/spec.md."
+note   = "Owner 2026-09-13: a question goes in the request body, so asking one stops meaning editing TOML; files stay as saved questions. Both clarifications answered in specs/decisions/2026-09-13-clarify-029.toml."
 
 [[feature]]
 id     = "030-question-form"
@@ -243,11 +243,6 @@ note    = "The display-currency selector, the `display` search parameter and the
 id    = "display-currency-switch"
 after = ["020-http-api"]
 note  = "The display role of constitution Principle VI has no machinery, and 020 was where it was offered and declined («відкладемо перемикач курсів поки», owner 2026-09-03, specs/decisions/2026-09-03-clarify-020.toml). **The three options and their consequences are in specs/020-http-api/spec.md under 'Display currency — deferred by owner decision' and under 'Answered 1'; do not restate them here.** What the deferral costs is one row: REQUIRED_TESTS F2 stays open, and its own note says why it cannot be closed by a feature that never checked it -- so the row is now waiting on this entry rather than on 020. What the deferral buys is that no invented rate reaches a rendered figure: all three declared channels carry `reference_rate = 42.0` sourced *SYNTHETIC FIXTURE -- invented reference rate*, so the first display this repository ever shows would have shown every converted amount marked unverified. FR-021 to FR-025 are written and reviewed; the work is building them, not deciding them."
-
-[[future]]
-id    = "http-question-from-request-parameters"
-after = ["020-http-api"]
-note  = "020 FR-043 keeps the HTTP equivalent of the CLI's `--set` out of the API: the answer endpoint names a DECLARED question id and nothing else. The reason is 015 FR-004's -- in an artefact under review an unknown stream is a typo -- and `answer_declared`'s own docstring records that two of the four cross-file checks are UNREACHABLE through the record-taking entry point. An ad-hoc HTTP question needs those two refusals to be reachable, which is a change to the verb's contract rather than a serialisation concern. 020 SC-026a asserts the absence over the route table, so the deferral is measured rather than merely stated. SUPERSEDED BY 029-question-in-request (owner 2026-09-13), which takes a WHOLE question in the body rather than the parameters this entry deferred; it is still OPEN and SC-026a still asserts the absence, and 029's own T031 closes both when it lands. The form that fills such a body is 030."
 
 [[future]]
 id    = "openapi-wire-change-is-unannounced"
@@ -454,4 +449,4 @@ note  = "029 FR-006 writes nothing, so a body answered over HTTP cannot become a
 [[future]]
 id    = "a-card-for-a-body-asked-candidate"
 after = ["029-question-in-request", "027-candidate-card"]
-note  = "A body-asked question has no declared id, so 029 FR-011 leaves the card on declared questions only; the shape one would need is 029 CL-2, an OWNER decision because it settles whether 030's form shows cards at all. Recorded 2026-09-13."
+note  = "A body-asked question has no declared id, so 029 FR-011 leaves the card on declared questions only. The owner settled on 2026-09-13 (specs/decisions/2026-09-13-clarify-029.toml) that it is decided with 030's form and the redesign that comes with it."

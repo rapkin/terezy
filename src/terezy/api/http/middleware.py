@@ -1,4 +1,4 @@
-"""The two per-request refusals, written as closures over the app rather than as classes.
+"""The per-request refusals, written as closures over the app rather than as classes.
 
 :func:`loopback_guard` is the load-bearing half of the bind restriction: it holds however the
 process was started, which :mod:`terezy.api.http.serve` cannot (020 FR-026a).
@@ -32,6 +32,23 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
 ALLOWED_HOSTS: Final[tuple[str, ...]] = ("localhost", "127.0.0.1", "[::1]")
 """The closed list of hosts a request may name. Host part only; a port is stripped."""
 
+BODY_LIMIT: Final[int] = 64 * 1024
+"""What a request body may be, in bytes (029 FR-024).
+
+A service limit rather than domain knowledge, so it is declared here and not in `data/`: nothing
+about the owner's money decides it. Measured against the real thing rather than chosen round:
+`test_a_body_has_a_ceiling.py` asserts the shipped question's canonical JSON stays far inside it.
+"""
+
+BODY_BEARING_METHODS: Final[tuple[str, ...]] = ("POST", "PUT", "PATCH")
+"""The methods the cap applies to: the ones defined to carry a body.
+
+Named rather than inverted from the read methods. Every read here is a GET that declares no
+`Content-Length`, so a cap over everything would refuse the whole surface; and a `DELETE` or an
+unknown verb declares none either, so inverting would answer it *this request carries a body* --
+a claim about something the guard never checked, in place of the route table's own refusal.
+"""
+
 
 @dataclass(frozen=True, kw_only=True)
 class NotOnLoopback:
@@ -46,6 +63,85 @@ class HostNotDeclared:
     host: str | None
     declared: tuple[str, ...]
     reason: str
+
+
+@dataclass(frozen=True, kw_only=True)
+class BodyTooLarge:
+    tag: Literal["middleware.BodyTooLarge"] = "middleware.BodyTooLarge"
+    limit_bytes: int
+    declared_bytes: int
+    reason: str
+
+
+@dataclass(frozen=True, kw_only=True)
+class BodyLengthNotDeclared:
+    tag: Literal["middleware.BodyLengthNotDeclared"] = "middleware.BodyLengthNotDeclared"
+    method: str
+    limit_bytes: int
+    reason: str
+
+
+def body_cap(app: ASGIApp, *, limit: int = BODY_LIMIT) -> ASGIApp:
+    """Refuse a request whose declared body exceeds the cap, before anything is parsed.
+
+    In the guard chain rather than in the route, because the body is read and parsed before a
+    handler runs -- a cap checked there has already paid for the parse it exists to prevent.
+
+    A body-bearing request that declares **no** length is refused rather than streamed and
+    counted: counting as it arrives is the machinery the cap exists to avoid.
+    """
+
+    async def guarded(scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or scope.get("method", "") not in BODY_BEARING_METHODS:
+            await app(scope, receive, send)
+            return
+        declared = _content_length(scope)
+        if declared is None:
+            await _refuse(
+                send,
+                HTTPStatus.LENGTH_REQUIRED,
+                BodyLengthNotDeclared(
+                    method=str(scope.get("method", "")),
+                    limit_bytes=limit,
+                    reason=(
+                        f"a {scope.get('method', '')} declares the length of the body it "
+                        "carries, and this one declares no readable Content-Length. The cap "
+                        "could then only be applied by counting the bytes as they arrive, "
+                        "which is the machinery the cap exists to avoid."
+                    ),
+                ),
+            )
+            return
+        if declared > limit:
+            await _refuse(
+                send,
+                HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+                BodyTooLarge(
+                    limit_bytes=limit,
+                    declared_bytes=declared,
+                    reason=(
+                        f"the body declares {declared} bytes and the cap is {limit}. Nothing "
+                        "was parsed and nothing was truncated: a document read in part is a "
+                        "question nobody asked."
+                    ),
+                ),
+            )
+            return
+        await app(scope, receive, send)
+
+    return guarded
+
+
+def _content_length(scope: Scope) -> int | None:
+    """The declared body length, or ``None`` where none is declared or it is not a number."""
+    headers: Iterable[tuple[bytes, bytes]] = scope.get("headers", [])
+    for key, value in headers:
+        if key.lower() == b"content-length":
+            try:
+                return int(value.decode("latin-1"))
+            except ValueError:
+                return None
+    return None
 
 
 def loopback_guard(app: ASGIApp, *, context: bind.BindContext) -> ASGIApp:
@@ -119,7 +215,11 @@ def _host_header(scope: Scope) -> str | None:
     return None
 
 
-async def _refuse(send: Send, status: HTTPStatus, record: NotOnLoopback | HostNotDeclared) -> None:
+async def _refuse(
+    send: Send,
+    status: HTTPStatus,
+    record: NotOnLoopback | HostNotDeclared | BodyTooLarge | BodyLengthNotDeclared,
+) -> None:
     body = json.dumps(asdict(record), ensure_ascii=False).encode("utf-8")
     await send(
         {

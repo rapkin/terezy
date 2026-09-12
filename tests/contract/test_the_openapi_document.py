@@ -13,12 +13,15 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import typing
 from pathlib import Path
 from typing import Any
 
 import pytest
+from pydantic import BaseModel
 
 from terezy.api.http import document
+from terezy.data.declarations import schema
 from tests.data_roots import SHIPPED
 from tests.http_client import served
 
@@ -85,6 +88,90 @@ def test_the_version_is_a_literal_and_no_path_reads_distribution_metadata() -> N
         or "distribution(" in text
     ]
     assert not reading, f"these modules read distribution metadata: {reading}"
+
+
+@pytest.mark.contract
+def test_every_reference_in_the_served_document_resolves() -> None:
+    """A `$ref` resolves from the **document root**, so a schema that brought its own `$defs`
+    table into a path points at a table that is not there -- and a client generator refuses the
+    whole document, not just that route. Found by review on the branch that added the first
+    hand-published schema; asserted over every reference rather than that one, because the next
+    hand-published schema will make the same mistake in a different place."""
+    served_document = json.loads(_served_document())
+    references = _references(served_document, "")
+
+    assert len(references) > 100, "the walk found suspiciously little to check"
+    dangling = [ref for _, ref in references if not _resolves(served_document, ref)]
+    assert not dangling, f"{len(dangling)} reference(s) resolve to nothing: {sorted(set(dangling))}"
+
+
+def _references(node: Any, path: str) -> list[tuple[str, str]]:
+    if isinstance(node, dict):
+        return [
+            (path, value) if key == "$ref" and isinstance(value, str) else held
+            for key, value in node.items()
+            for held in ([(path, value)] if key == "$ref" else _references(value, f"{path}/{key}"))
+        ]
+    if isinstance(node, list):
+        return [
+            held
+            for index, value in enumerate(node)
+            for held in _references(value, f"{path}/{index}")
+        ]
+    return []
+
+
+def _resolves(served_document: dict[str, Any], reference: str) -> bool:
+    """Whether a JSON pointer names something in this document. Local references only: an
+    external one on this surface would be a second document nobody serves."""
+    if not reference.startswith("#/"):
+        return False
+    node: Any = served_document
+    for part in reference[2:].split("/"):
+        unescaped = part.replace("~1", "/").replace("~0", "~")
+        if not isinstance(node, dict) or unescaped not in node:
+            return False
+        node = node[unescaped]
+    return True
+
+
+@pytest.mark.contract
+def test_the_document_publishes_the_question_a_body_may_carry() -> None:
+    """029 FR-028. Generated from the model the loader validates against, so a client is
+    generated from the same schema a file is checked by: every field the question schema names,
+    at every depth, is a property of the published body, and a hand-written copy that drifted
+    would be short of one."""
+    served_document = json.loads(_served_document())
+    posted = served_document["paths"][f"{document.PREFIX}/answers"]["post"]
+    published = posted["requestBody"]["content"]["application/json"]["schema"]
+
+    assert posted["requestBody"]["required"] is True
+    assert set(published["required"]) == set(schema.QuestionFile.model_fields)
+    assert _properties(published) == _model_fields(schema.QuestionFile)
+
+
+def _properties(node: Any) -> set[str]:
+    """Every property name the published schema declares, at whatever depth."""
+    if isinstance(node, dict):
+        named = (
+            set(node.get("properties", {})) if isinstance(node.get("properties"), dict) else set()
+        )
+        return named.union(*(_properties(value) for value in node.values()), set())
+    if isinstance(node, list):
+        return set().union(*(_properties(value) for value in node), set())
+    return set()
+
+
+def _model_fields(model: type[BaseModel]) -> set[str]:
+    """Every field name the model declares, at whatever depth, walked off the model itself."""
+    names: set[str] = set()
+    for name, field in model.model_fields.items():
+        names.add(name)
+        for argument in (field.annotation, *typing.get_args(field.annotation)):
+            for nested in (argument, *typing.get_args(argument)):
+                if isinstance(nested, type) and issubclass(nested, BaseModel):
+                    names |= _model_fields(nested)
+    return names
 
 
 UNDER_A_SCENARIO = f"{document.PREFIX}/spendable"

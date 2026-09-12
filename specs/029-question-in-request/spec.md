@@ -6,11 +6,8 @@
 
 **Created**: 2026-09-13
 
-**Status**: **Drafted** — the word `specs/features.toml` defines for *two clarifications still
-open*, and the honest label even though `plan.md` and `tasks.md` exist: they were written on the
-owner's instruction of 2026-09-13, and each clarification states its blast radius in "What only the
-owner decides". Neither reaches the endpoint, the schema or the manifest; the only task either gates
-is the plan's Phase 7.
+**Status**: **Planned** — `plan.md` and `tasks.md` exist and both clarifications are answered
+(`specs/decisions/2026-09-13-clarify-029.toml`, 2026-09-13).
 
 **Input**: Owner decision of 2026-09-13, after an outside review. The natural operation — *"I have
 ₴170 000, I need the money accessible in nine months, keep ₴50k liquid, what should I do?"* — must
@@ -152,8 +149,9 @@ and compare against the saved question's GET.
   silent widening.
 - **FR-011**: The candidate projection endpoint MUST stay addressed by a declared question id.
   A candidate's card is reached by `(question id, candidate key)` and a body-asked question has no
-  address; what a card for one would need is stated in CL-2 and carried by the
-  `a-card-for-a-body-asked-candidate` future entry, not built here.
+  address. The owner settled on 2026-09-13 that a card for an unsaved question is decided with the
+  UI form (030) and the redesign that comes with it; the `a-card-for-a-body-asked-candidate` future
+  entry carries it, and nothing here builds it.
 
 ### Refusals, and whose fault a request is
 
@@ -179,6 +177,12 @@ and compare against the saved question's GET.
 - **FR-017**: A body MUST name subjects by **group label** exactly as a file does, and the
   resolution, the undeclared-subject population and the counts MUST be unchanged (015 FR-007a).
   Nothing about a request may make a label mean something a file's label does not.
+- **FR-029**: A body naming an **income stream no declaration names** MUST refuse with the
+  loader's own record, attributed to the request, naming the field `question.amount.stream`
+  (owner decision 2026-09-13). One shape for every body mistake: never a 200 whose body is a
+  different record. `AmountForAnUndeclaredStream` and `StreamWithNoAmount` therefore stay
+  unreachable through `api/` and remain the form the **verb** returns to a caller holding a
+  record it built itself — which is what `answer_declared` already records about itself.
 
 ### Reproducibility
 
@@ -284,41 +288,26 @@ and compare against the saved question's GET.
   from it carries its discriminator. (FR-028)
 - **SC-012**: Answering by body leaves `data/` unchanged, asserted by digesting the tree before and
   after. (FR-006)
+- **SC-013**: A body naming an undeclared stream refuses as a request fault on
+  `question.amount.stream`, and no response on this surface carries
+  `AmountForAnUndeclaredStream` or `StreamWithNoAmount`. (FR-029)
 
 ---
 
-## What only the owner decides
+## Answered by the owner, 2026-09-13
 
-### CL-1 — How does a body's *undeclared stream* come back?
+Both answers are recorded verbatim in `specs/decisions/2026-09-13-clarify-029.toml`; neither moves
+a figure.
 
-015 FR-004 made a mismatched or unknown stream a **load-time** refusal, because in an artefact
-under review it is a typo. The verb also has typed union members for the same two facts —
-`AmountForAnUndeclaredStream` and `StreamWithNoAmount` — which `answer_declared`'s own docstring
-records as **unreachable** through it. A request body is the first caller that is neither an
-artefact under review nor a core caller, so the shape has to be chosen rather than inherited.
+**An undeclared stream in a body comes back as the loader's refusal** (FR-029), attributed to the
+request and naming `question.amount.stream` — one shape for every body mistake, so a form
+highlights a field and a client narrows on one record. The alternative, a 200 carrying the verb's
+`AmountForAnUndeclaredStream`, was refused because it makes one class of caller mistake arrive in
+two shapes. The two union members stay unreachable through `api/`.
 
-| Option | What a caller gets | Consequence |
-|---|---|---|
-| **A** *(recommended)* | The loader's refusal, attributed to the request, with the field path `question.amount.stream`. | One shape for every body fault: a form highlights a field and a client narrows on one record. The two union members stay unreachable from `api/` and remain the form a core caller sees. |
-| **B** | A 200 whose body is the verb's typed union member. | Body faults then arrive in two different shapes depending on which fault it is, and a form has to switch twice for one class of mistake. It does make the two members reachable. |
-
-**Blast radius**: one requirement and its test. It does not move the endpoint, the schema, the
-manifest or the digest. Gates the refusal-attribution tasks only.
-
-### CL-2 — Can a card be opened for a candidate of a body-asked question?
-
-A candidate's card is addressed `(question id, candidate key)` and a body-asked question has no
-declared id, so FR-011 leaves the card to saved questions.
-
-| Option | What it means | Consequence |
-|---|---|---|
-| **A** *(recommended)* | Not in this feature. The form in 030 shows an answer without per-candidate cards, or re-asks as a saved question when the owner wants one. | This feature stays the answer, and the card's shape is decided where the need is visible. |
-| **B** | A body-taking projection route beside the answer, re-posting the body with the candidate key. | Symmetric and cheap, and it doubles the surface this feature's tests must cover before anything renders it. |
-
-**Blast radius**: a second endpoint or none. It does not touch the answer route, the schema or the
-manifest. Gates no task in this feature's plan; it decides whether 030 has one more.
-
----
+**A card for a candidate of a body-asked question is not in this feature** (FR-011). It is decided
+with 030's form and the redesign that comes with it, where whether such a card is opened at all is
+visible; `a-card-for-a-body-asked-candidate` in `specs/features.toml` carries it.
 
 ## Assumptions
 
@@ -342,4 +331,4 @@ manifest. Gates no task in this feature's plan; it decides whether 030 has one m
 - **More than one owner.** Principle VII's boundary is unchanged: one owner, and the body names
   him exactly as a file does.
 - **Authentication.** Unchanged and not approached (FR-026).
-- **A card for a body-asked candidate.** FR-011, CL-2.
+- **A card for a body-asked candidate.** FR-011, and the owner's answer of 2026-09-13.

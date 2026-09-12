@@ -263,18 +263,28 @@ def test_the_route_set_is_the_one_the_named_regime_declares(tmp_path: Path) -> N
     )
     for regime_id in ("wartime", "normalized"):
         supplied = inputs_of(
-            declarations, regime_id=regime_id, objective_set_id=fixtures.OBJECTIVE_SET
+            declarations,
+            regime_id=regime_id,
+            objective_set_id=fixtures.OBJECTIVE_SET,
+            declared_in=fixtures.QUESTION_FILE,
         )
         assert set(supplied.routes) == set(
             declarations.candidates.composition.coverage.regimes[regime_id].route_ids
         )
-    assert set(
-        inputs_of(declarations, regime_id="wartime", objective_set_id=fixtures.OBJECTIVE_SET).routes
-    ) < set(
-        inputs_of(
-            declarations, regime_id="normalized", objective_set_id=fixtures.OBJECTIVE_SET
-        ).routes
-    ), "the fixture must use two regimes that actually differ"
+    narrowed = {
+        regime_id: set(
+            inputs_of(
+                declarations,
+                regime_id=regime_id,
+                objective_set_id=fixtures.OBJECTIVE_SET,
+                declared_in=fixtures.QUESTION_FILE,
+            ).routes
+        )
+        for regime_id in ("wartime", "normalized")
+    }
+    assert narrowed["wartime"] < narrowed["normalized"], (
+        "the fixture must use two regimes that actually differ"
+    )
 
 
 def test_a_question_with_no_horizon_refuses_through_the_api_too(tmp_path: Path) -> None:
@@ -286,5 +296,6 @@ def test_a_question_with_no_horizon_refuses_through_the_api_too(tmp_path: Path) 
         as_of=fixtures.AS_OF,
         base_currency=Currency.UAH,
         declared_in=fixtures.QUESTION_FILE,
+        question_version=None,
     )
     assert isinstance(run.answer, NoHorizonDeclared), run.answer
