@@ -1312,7 +1312,11 @@ def _spans_no_time(
     **Only where the projection is a contractual series**, which is the bond. Its yield is a
     root find over that series, and a series on one date is a bracket that never crosses zero:
     ``bond_results.project`` reaches it as a raise rather than as a value, so there is no
-    projection to report and no later layer that could say this instead. A balance and a fund
+    projection to report and no later layer that could say this instead. The window measured
+    here is the owner's -- the money arriving to the horizon closing -- and the series' own runs
+    to the last contractual flow, which is the earlier of the two: a convention measuring that
+    shorter window as nothing while this one is not nothing still raises
+    (``[[future]] a-contractual-series-can-still-collapse-under-30-360``). A balance and a fund
     build no such series: they project over a window of no length, report their amounts with
     the marks those amounts carry, and refuse only the **rate** in :func:`_rate`'s own zero-span
     arm. Refusing the whole tuple for them would take the do-nothing baseline out of the answer
