@@ -17,6 +17,10 @@ import { Population } from "./Population";
  * never as a card on a front. Every verdict it carries is typed, including the one that matters
  * most: a valuation the registry cannot strike is a refusal with its reason and never a blank
  * where a number should be.
+ *
+ * **The population counts positions, and a position is one disclosure.** Its lots are a plain
+ * list rather than a `Population` of their own: a nested population's members sit inside its
+ * host's element, where the host's own count never counted them.
  */
 export function HeldPositions({
   held,
@@ -47,7 +51,8 @@ function Held({
         <KindTile kind="held_asset" size="inline" />
         <span className="font-mono">{position.instrument_id}</span>
         <span className="text-[var(--ink-muted)]">
-          {quantity(position.quantity)} {position.quantity_unit} at {position.venue_id}
+          <span data-quantity="">{quantity(position.quantity)}</span> {position.quantity_unit} at{" "}
+          {position.venue_id}
         </span>
       </p>
       <p>
@@ -73,12 +78,11 @@ function Held({
         <TypedState state={position.rank} label="against the benchmark" />
         <TypedState state={position.tax} label="tax" />
         <TypedState state={position.yields} label="yield" />
-        <Population
-          name="lots"
-          members={position.lots}
-          render={(lot) => (
-            <p data-lot={lot.lot_id}>
-              {quantity(lot.quantity)} acquired {lot.acquired_on} for{" "}
+        <p className="text-[var(--ink-muted)]">the lots it is made of</p>
+        <ul className="ml-4 list-disc space-y-2">
+          {position.lots.map((lot) => (
+            <li key={lot.lot_id} data-lot={lot.lot_id}>
+              <span data-quantity="">{quantity(lot.quantity)}</span> acquired {lot.acquired_on} for{" "}
               <FigureSlot
                 state={{
                   kind: "marked",
@@ -86,9 +90,9 @@ function Held({
                   marks: marksOf(lot.basis.provenance, staleness),
                 }}
               />
-            </p>
-          )}
-        />
+            </li>
+          ))}
+        </ul>
       </Disclosure>
     </div>
   );

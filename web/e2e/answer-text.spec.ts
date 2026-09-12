@@ -1,16 +1,24 @@
 import { expect, test } from "@playwright/test";
+import { quantity } from "@/design/format";
 import { AS_OF, offline } from "./offline";
 import { openTheAnswer } from "./answer";
 
 /**
  * SC-003 and SC-004: the belief is stated once, and no unrounded float reaches the document.
  *
- * *Unrounded* is measured two ways, because the page also renders the engine's own prose. Every
- * figure slot is checked outright; the rest of the visible page is checked with the served text
+ * *Unrounded* is measured three ways, because the page renders three kinds of text. Every figure
+ * slot is checked outright; the rest of the visible page is checked with the served text
  * excluded, since a citation the API wrote — `the gap is 0.000% to 0.637%` — is a quotation and
  * not a figure this client formatted. Eliding it would be 021's *Edge Cases* prohibition.
+ *
+ * A quantity is the third, and it is exempt from the two-decimal rule rather than from the scan:
+ * money is stated to the kopeck and a holding is subdivided down to the satoshi, so a lot of a
+ * fraction of a coin is a correctly rounded figure the two-decimal rule called a raw float.
  */
 const UNROUNDED = /\d\.\d{3,}|\d[eE][+-]?\d/;
+
+/** FR-026's quantity precision: eight decimals, and never an exponent. */
+const UNROUNDED_QUANTITY = /\d\.\d{9,}|\d[eE][+-]?\d/;
 
 test("the early-exit belief is stated once, and each card leaning on it carries a mark", async ({
   page,
@@ -52,25 +60,30 @@ test("no unrounded float reaches the document", async ({ page }) => {
   expect(slots.length).toBeGreaterThan(0);
   expect(slots.filter((held) => UNROUNDED.test(held))).toEqual([]);
 
-  const composed = await page.evaluate(() => {
-    const main = document.querySelector("main");
-    if (main === null) return "";
-    const walker = document.createTreeWalker(main, NodeFilter.SHOW_TEXT);
+  const scanned = await page.evaluate((): { composed: string; quantities: string[] } => {
     const parts: string[] = [];
+    const quantities: string[] = [];
+    const main = document.querySelector("main");
+    if (main === null) return { composed: "", quantities };
+    const walker = document.createTreeWalker(main, NodeFilter.SHOW_TEXT);
     let node = walker.nextNode();
     while (node !== null) {
       const parent = node.parentElement;
       // Text the API wrote is a quotation; text this client composed is a figure.
       if (parent !== null && parent.closest("[data-served-text]") === null) {
-        parts.push(node.textContent ?? "");
+        const text = node.textContent ?? "";
+        if (parent.closest("[data-quantity]") === null) parts.push(text);
+        else quantities.push(text);
       }
       node = walker.nextNode();
     }
-    return parts.join(" ");
+    return { composed: parts.join(" "), quantities };
   });
-  expect(composed.length).toBeGreaterThan(500);
-  const found = composed.match(new RegExp(UNROUNDED.source, "g"));
+  expect(scanned.composed.length).toBeGreaterThan(500);
+  const found = scanned.composed.match(new RegExp(UNROUNDED.source, "g"));
   expect(found, "the page composed these").toBeNull();
+  expect(scanned.quantities.length, "a holding is on the screen to scan").toBeGreaterThan(0);
+  expect(scanned.quantities.filter((held) => UNROUNDED_QUANTITY.test(held))).toEqual([]);
 });
 
 test("every subject is a state, declared or not, and none of them is blank", async ({ page }) => {
@@ -100,28 +113,41 @@ test("what the owner already holds is on the screen, valued or refused", async (
   const stated = Number((await held.getAttribute("data-count")) ?? "0");
   const served = await page.evaluate(async (asOf: string) => {
     const declared: { ids: string[] } = await (await fetch(`/api/questions?as_of=${asOf}`)).json();
-    const body: { result: { answer: { held: { instrument_id: string }[] } } } = await (
+    const body: {
+      result: {
+        answer: {
+          held: { instrument_id: string; quantity: number; lots: { quantity: number }[] }[];
+        };
+      };
+    } = await (
       await fetch(`/api/questions/${String(declared.ids[0])}/answer?as_of=${asOf}`)
     ).json();
-    return body.result.answer.held.map((one) => one.instrument_id);
+    return body.result.answer.held;
   }, AS_OF);
+  // Positions. A position's lots are drawn inside it and are not members of this population.
   expect(stated).toBe(served.length);
-  if (served.length === 0) {
-    // Empty on the shipped tree by design: the owner's own position lives in the gitignored
-    // `data/user/` overlay, which no checkout and no test root carries. The empty case is a
-    // named state, and the rendering of a position is held by the unit suite.
-    await expect(held).toContainText("none");
-    await expect(page.locator("[data-held]")).toHaveCount(0);
-    return;
-  }
+  expect(served.length, "the data root the API was started over declares a holding").toBeGreaterThan(
+    0,
+  );
 
-  await held.locator("summary").click();
-  for (const id of served) {
-    const position = held.locator(`[data-held='${id}']`);
-    await expect(position).toHaveCount(1);
+  await held.locator("[data-disclosure='what the owner already holds'] > summary").click();
+  for (const position of served) {
+    const drawn = held.locator(`[data-held='${position.instrument_id}']`);
+    await expect(drawn).toHaveCount(1);
+    // One disclosure per position, whatever its lots number: a second lot must not add a second.
+    await expect(drawn.locator("details")).toHaveCount(1);
+    await drawn.locator("details > summary").click();
+    await expect(drawn.locator("[data-lot]")).toHaveCount(position.lots.length);
+    // The position's own quantity first, then one per lot, in the served order. That every
+    // quantity goes through the formatting module is `held-positions.test.tsx`'s to assert:
+    // a served figure this module renders unchanged renders the same either way.
+    expect(await drawn.locator("[data-quantity]").allTextContents()).toEqual([
+      quantity(position.quantity),
+      ...position.lots.map((lot) => quantity(lot.quantity)),
+    ]);
     // A valuation the registry could not strike is a refusal with its reason, never a blank.
-    const worth = position.locator("[data-figure='marked'], [data-figure='refused']");
+    const worth = drawn.locator("[data-figure='marked'], [data-figure='refused']");
     expect(await worth.count()).toBeGreaterThan(0);
-    expect(((await position.textContent()) ?? "").trim()).not.toBe("");
+    expect(((await drawn.textContent()) ?? "").trim()).not.toBe("");
   }
 });

@@ -331,7 +331,9 @@ Everything 021 built stays reachable under a secondary navigation entry.
   prohibition, unchanged.
 - **FR-026**: Formatting MUST live in **one** module — money to the kopeck with thin-space grouping in
   the currency the API returned it in, a rate as a percent to two decimals, a date as the API's ISO
-  date rendered `4 Oct 2026` — with the precision stated there once and imported. That precision is a
+  date rendered `4 Oct 2026`, a quantity to the finest subdivision a holding declares with trailing
+  zeros trimmed and a value below the last place stated as a bound rather than as zero — with the
+  precision stated there once and imported. That precision is a
   **rendering** precision and never a comparison tolerance: nothing here compares two figures for
   closeness, because `ties` and `beats_benchmark` are the engine's, struck at the project tolerance.
   A raw float reaching the document is a defect, asserted over the rendered page rather than over the

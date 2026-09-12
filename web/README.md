@@ -35,6 +35,13 @@ Start the API through `python -m terezy.api.http` and never through a bare `uvic
 the entry point is what applies the bind guard *before* it binds, and what refuses a data root
 it cannot read instead of coming up and answering 500 to everything.
 
+## What the Playwright suite runs against
+
+`pnpm e2e` starts the API over the root `python -m tests.data_roots --materialise` writes —
+`data/` with the gitignored `data/user/` overlay stripped, plus `tests/fixtures/data/` — so the
+screen shows the same declarations on every machine, including a holding; started over the
+default root it would show the owner's real position on his machine and none anywhere else.
+
 ## When a screen says the API did not answer
 
 - **"no route of the API produced this"** — either nothing is listening, or a request reached the

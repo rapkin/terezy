@@ -124,4 +124,54 @@ describe("a held position", () => {
     );
     expect(container.querySelector("[data-lot='btc-1']")?.textContent).toContain("2025-03-11");
   });
+
+  it("is one disclosure whatever its lots number, and the population counts positions", () => {
+    // The owner holds his BTC in two lots, which is the shape a lots population broke on.
+    const lot = HELD.lots[0];
+    if (lot === undefined) throw new Error("the fixture declares no lot");
+    const second = {
+      ...lot,
+      lot_id: "btc-2",
+      quantity: 0.02,
+      acquired_on: "2025-06-02",
+      basis: money(48000, [source()]),
+    };
+    // A position's quantity and its basis are both summed from its lots, so a fixture that
+    // states either independently is a position the engine cannot build.
+    const two = {
+      ...HELD,
+      quantity: lot.quantity + second.quantity,
+      basis: money(lot.basis.amount + second.basis.amount, [source()]),
+      lots: [lot, second],
+    };
+    const { container } = render(<HeldPositions held={[two]} staleness={verdict([])} />);
+    const population = container.querySelector("[data-population='what the owner already holds']");
+    expect(population?.getAttribute("data-count")).toBe("1");
+    const position = container.querySelector("[data-held='btc']");
+    expect(position?.querySelectorAll("details")).toHaveLength(1);
+    expect(position?.querySelectorAll("[data-lot]")).toHaveLength(2);
+    expect(container.querySelectorAll("[data-population]")).toHaveLength(1);
+  });
+
+  it("routes every quantity through the formatting module, position and lot alike", () => {
+    // A holding is summed from its lots in float64, so it arrives carrying the artefact —
+    // 0.1 + 0.2 is 0.30000000000000004 — and that is what `String(n)` would put on the screen.
+    const lot = HELD.lots[0];
+    if (lot === undefined) throw new Error("the fixture declares no lot");
+    const lots = [
+      { ...lot, quantity: 0.1, basis: money(240000, [source()]) },
+      { ...lot, lot_id: "btc-2", quantity: 0.2, basis: money(480000, [source()]) },
+    ];
+    const summed = {
+      ...HELD,
+      quantity: 0.1 + 0.2,
+      basis: money(720000, [source()]),
+      lots,
+    };
+    const { container } = render(<HeldPositions held={[summed]} staleness={verdict([])} />);
+    const marked = [...container.querySelectorAll("[data-quantity]")].map(
+      (held) => held.textContent,
+    );
+    expect(marked).toEqual(["0.3", "0.1", "0.2"]);
+  });
 });
