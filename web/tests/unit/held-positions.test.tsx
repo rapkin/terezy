@@ -129,10 +129,21 @@ describe("a held position", () => {
     // The owner holds his BTC in two lots, which is the shape a lots population broke on.
     const lot = HELD.lots[0];
     if (lot === undefined) throw new Error("the fixture declares no lot");
-    const second = { ...lot, lot_id: "btc-2", quantity: 0.02, acquired_on: "2025-06-02" };
-    // The quantity is the sum of the lots, as the engine builds it; any other pair is a
-    // position it cannot produce.
-    const two = { ...HELD, quantity: lot.quantity + second.quantity, lots: [lot, second] };
+    const second = {
+      ...lot,
+      lot_id: "btc-2",
+      quantity: 0.02,
+      acquired_on: "2025-06-02",
+      basis: money(48000, [source()]),
+    };
+    // A position's quantity and its basis are both summed from its lots, so a fixture that
+    // states either independently is a position the engine cannot build.
+    const two = {
+      ...HELD,
+      quantity: lot.quantity + second.quantity,
+      basis: money(lot.basis.amount + second.basis.amount, [source()]),
+      lots: [lot, second],
+    };
     const { container } = render(<HeldPositions held={[two]} staleness={verdict([])} />);
     const population = container.querySelector("[data-population='what the owner already holds']");
     expect(population?.getAttribute("data-count")).toBe("1");
@@ -147,13 +158,15 @@ describe("a held position", () => {
     // 0.1 + 0.2 is 0.30000000000000004 — and that is what `String(n)` would put on the screen.
     const lot = HELD.lots[0];
     if (lot === undefined) throw new Error("the fixture declares no lot");
+    const lots = [
+      { ...lot, quantity: 0.1, basis: money(240000, [source()]) },
+      { ...lot, lot_id: "btc-2", quantity: 0.2, basis: money(480000, [source()]) },
+    ];
     const summed = {
       ...HELD,
       quantity: 0.1 + 0.2,
-      lots: [
-        { ...lot, quantity: 0.1 },
-        { ...lot, lot_id: "btc-2", quantity: 0.2 },
-      ],
+      basis: money(720000, [source()]),
+      lots,
     };
     const { container } = render(<HeldPositions held={[summed]} staleness={verdict([])} />);
     const marked = [...container.querySelectorAll("[data-quantity]")].map(
