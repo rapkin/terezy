@@ -476,9 +476,8 @@ any one of them moves exactly that one digest.
 - **A reserve dated after every horizon's end** — permitted; the verdict is computed against each
   candidate's own arrivals, which may run past a horizon (014's recorded
   `horizon-as-a-latency-budget` gap), and the verdict says which arrivals it used.
-- **The enumerated set spans two streams** — 014's `MoreThanOneStreamInTheSet` is carried as the
-  section's outcome, verbatim. This feature does not resolve the recorded
-  `one-amount-per-stream-in-compare` gap and does not hide it (FR-022).
+- **The enumerated set spans two streams** — ranked as one set since 2026-09-13, each tuple
+  struck against its own stream's amount (FR-022).
 - **A question naming a benchmark that is not among its subjects** — the whole answer refuses:
   the benchmark must be one of the set's members exactly once (014 FR-022), and a benchmark
   outside the question's subjects can never be.
@@ -780,12 +779,12 @@ any one of them moves exactly that one digest.
   registry** — for a reason this feature would otherwise have forbidden itself from supplying.
   The assumption MUST be marked and MUST propagate exactly as FR-032's spread assumption does: it
   is a belief about the future, and every figure computed through it inherits the mark.
-- **FR-022**: Where a section's set spans more than one stream, the answer MUST carry 014's
-  `MoreThanOneStreamInTheSet` as that section's outcome. The question shape does **not** avoid
-  the recorded `one-amount-per-stream-in-compare` gap — it makes it easier to reach, because a
-  person naturally states an amount for each of his streams — and this feature surfaces it rather
-  than resolving it. It is unreachable from the shipped registry, where the dollar stream
-  connects to nothing inbound.
+- **FR-022**: Where a section's set spans more than one stream, each candidate MUST be scored
+  against the amount its own stream states, and the set MUST be ranked once. The question shape
+  is what made the disagreement easy to reach — a person naturally states an amount for each of
+  his streams — and it was carried as a `MoreThanOneStreamInTheSet` refusal until `compare` took
+  one amount per stream (2026-09-13). It stays unreachable from the shipped registry, where the
+  dollar stream connects to nothing inbound.
 - **FR-023**: The answer MUST carry **the whole question** and the `as_of` it was answered under,
   beside every count it reports (014 FR-012, one layer up).
 - **FR-023a**: The answer MUST state what it excludes as a set of **typed records**, never as

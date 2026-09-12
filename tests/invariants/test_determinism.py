@@ -429,6 +429,7 @@ class TestVerifyingASourceDoesNotMoveTheDigest:
             seed=None,
             as_of=AS_OF,
             regime_id=IMPLICIT_REGIME_ID,
+            scenario_id=None,
         )
         assert record.result_digest == _digest(outcome)
         assert record.unverified_sources

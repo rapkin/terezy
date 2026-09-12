@@ -57,15 +57,12 @@ differ in the first, and the second dates the declaration rather than describing
 Every other field of the served question record is compared and named when it differs. The rule
 is mechanical, so no judgement about which difference "matters" is made in the client.
 
-### F5 — One regime declared by two scenarios is resolved by the first scenario id
+### F5 — One regime is declared by one scenario, and the manifest says which
 
-`api/answer.py::_scenario_of` walks the declared scenarios sorted by **scenario id** — which the
-declaration states and the filename need not match — and returns the first whose regimes include
-the id; duplicate regime ids are refused only *within* one scenario. So two scenarios naming one
-regime is loadable, the answer runs under whichever id sorts first, and the manifest records the
-regime and not the scenario. The screen therefore names every scenario
-declaring the regime and says the record does not settle which was searched — a `[[future]]`
-carries the engine-side remedy, which is not this feature's to make.
+**Closed 2026-09-13.** The resolver claims a regime id across the whole of `data/scenarios/`
+and refuses a second claim naming both files, and `RunManifest.scenario_id` records whose
+belief the run searched. So a served answer settles which scenario was searched, and the screen
+reads that field rather than naming every scenario that could have supplied the regime.
 
 ### F6 — What the two clarifications gate
 

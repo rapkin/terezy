@@ -403,13 +403,12 @@ across two enumerations run under two different regimes.
   populations **are** the ones `compare` already returns — the outcomes it scored, and the
   `RefusedTuple` records it collected — read out and counted, in both the ranked case and
   `BenchmarkUnavailable`. FR-007 is satisfied by that loop, not beside it.
-  ⚙ **A gap, recorded rather than worked around:** `compare` takes **one** `amount` for the
-  whole set, while FR-001 and FR-005 take one **per stream**. Today's set is single-stream, so
-  the two agree and SC-015 is constructible; a two-stream set cannot be handed to `compare` at
-  all — and none can be built from the shipped registry, where `contract_usd` connects to
-  nothing inbound, so no question reaches the disagreement. Widening the signature is a change
-  to 010, made and reviewed there on the rule FR-014a states, and a `[[future]]` entry — not a
-  per-stream loop here, which would produce one ranking per stream and none of the set.
+  **Closed 2026-09-13.** `compare` takes one amount **per stream** and strikes each tuple
+  against the amount its own `stream_id` names, so a two-stream set is one comparison. It took
+  one `amount` for the whole set until then — which agreed with FR-001 and FR-005 only while a
+  set was single-stream — and this feature carried a `MoreThanOneStreamInTheSet` refusal for
+  the disagreement, now deleted with it. A per-stream loop here was never the answer: it would
+  produce one ranking per stream and none of the set.
 - **FR-002**: Every candidate's five terms MUST name declared things, and the two route terms
   MUST be read off candidates feature 004's `compose` emitted. Enumeration MUST NOT construct
   a chain, extend one, or decide that two routes join. Every rule about what connects stays in

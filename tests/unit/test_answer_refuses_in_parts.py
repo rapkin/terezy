@@ -13,7 +13,7 @@ member nobody thought about.
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import date
+from datetime import date, timedelta
 from typing import Final, get_args
 
 import pytest
@@ -42,6 +42,9 @@ from terezy.core.results.composed import SegmentBound
 from terezy.core.results.tuple import TupleOutcome
 from tests import answer_registries as fixtures
 
+CASH: Final = "cash_uah_monobank"
+"""The do-nothing baseline: the balance the salary is already credited to."""
+
 UNREACHABLE: Final[dict[str, str]] = {
     "DuplicateRunPlan": (
         "a question's plans are expanded per subject and equal ones are deduplicated in order "
@@ -51,12 +54,6 @@ UNREACHABLE: Final[dict[str, str]] = {
         "the verb resolves the benchmark's key out of the enumerated set before calling survey, "
         "so it is a member exactly once by construction. Zero is BenchmarkYieldsNoCandidate and "
         "more than one is a whole-answer Refused, both of which are asserted here"
-    ),
-    "MoreThanOneStreamInTheSet": (
-        "the benchmark check is about the *question* and fires first. Every instrument in this "
-        "registry is bought at one venue, so a corridor that makes a set span two streams gives "
-        "the benchmark a second candidate too -- which is a whole-answer Refused. Measured in "
-        "tests/unit/test_cross_currency_candidate.py, which declares that corridor"
     ),
 }
 
@@ -99,6 +96,29 @@ PLANTED: Final[dict[str, object]] = {
     "QuestionDoesNotStandUp": _plant_broken_bound,
     "UndeclaredRouteSupplied": _plant_undeclared_route,
 }
+
+
+def test_a_horizon_of_one_day_is_answered_rather_than_raised() -> None:
+    """010's span refusal, read where an owner would meet it, **beside what still has figures**.
+
+    The bonds are bought and given up on one date and are dropped. The balance is not: it
+    projects over that window, and its amount and the marks on it stay in the answer. Asserting
+    only the drop would pass just as well on a section where everything had gone -- which is
+    the regression this input is here to catch, because the do-nothing baseline is the one
+    candidate an owner is entitled to see whatever else refuses.
+    """
+    question = fixtures.owners_question()
+    opens = question.horizons[0].start
+    window = DateRange(start=opens, end=opens + timedelta(days=1))
+    result = fixtures.answered(replace(question, horizons=(window,)))
+    survey = result.sections[0].outcome
+    assert isinstance(survey, CandidateSurvey), survey
+    dropped = {type(item.refusal).__name__ for item in survey.comparison.refused}
+    assert "SpansNoTime" in dropped, dropped
+    balances = [item for item in evaluated(survey.comparison) if item.key.instrument_id == CASH]
+    assert balances, [item.key.instrument_id for item in evaluated(survey.comparison)]
+    assert all(item.reaches.amount > 0.0 for item in balances)
+    assert all(item.provenance.sources for item in balances)
 
 
 def test_the_battery_covers_every_member_of_the_union() -> None:

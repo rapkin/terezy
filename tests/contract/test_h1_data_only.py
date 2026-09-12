@@ -285,7 +285,7 @@ def _comparison(tmp_path: Path) -> Comparison:
     comparison = compare(
         (_new_tuple(),),
         benchmark=fixtures.hurdle_tuple(),
-        amount=Money(SENT, Currency.UAH, prov.EMPTY),
+        amounts={fixtures.SALARY: Money(SENT, Currency.UAH, prov.EMPTY)},
         horizon=HORIZON,
         as_of=fixtures.AS_OF,
         continuation=fixtures.HOLD_AS_CASH,

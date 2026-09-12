@@ -1,7 +1,7 @@
 """What the types claim, where a later change could break the claim with every behaviour green.
 
 FR-014's no-candidate reason names its side, research D5's two unions stay nested, and FR-006's
-union stays at seventeen.
+union is not grown by it.
 """
 
 from __future__ import annotations
@@ -31,16 +31,16 @@ class TestTheTwoRefusalUnions:
     def test_every_enumeration_refusal_is_also_a_survey_refusal(self) -> None:
         assert set(get_args(rec.EnumerationRefused)) <= set(get_args(rec.SurveyRefused))
 
-    def test_the_survey_only_refusals_are_the_two_about_handing_the_set_to_compare(self) -> None:
+    def test_the_survey_only_refusal_is_the_one_about_handing_the_set_to_compare(self) -> None:
         extra = set(get_args(rec.SurveyRefused)) - set(get_args(rec.EnumerationRefused))
-        assert extra == {rec.BenchmarkNotACandidate, rec.MoreThanOneStreamInTheSet}
+        assert extra == {rec.BenchmarkNotACandidate}
 
 
-class TestThisFeatureAddsNoEighteenthRefusal:
-    def test_the_pruning_union_still_has_seventeen_members(self) -> None:
+class TestThisFeatureAddsNoRefusalOfItsOwn:
+    def test_the_pruning_union_is_still_the_size_010_declares_it(self) -> None:
         """Pinned in 010's suite too, and not one fact twice: that one asserts the union's size,
         this one asserts *this* feature did not grow it. Different changes edit each."""
-        assert len(get_args(TupleRefused)) == 17
+        assert len(get_args(TupleRefused)) == 18
 
     def test_no_record_in_this_module_is_a_feasibility_verdict(self) -> None:
         """A candidate-level refusal here would be the eighteenth by the back door: the union

@@ -170,7 +170,7 @@ Returned *instead of* a `Comparison` where the benchmark itself refused or produ
 Carries `refusal`, `scored` (the other outcomes, in **candidate order** — deliberately not
 ranked), `refused`, `not_comparable` and `reason`.
 
-## Refusals — seventeen, and the count is asserted
+## Refusals — the count is asserted, in `tests/unit/test_tuple_refusals.py`
 
 | Record | When |
 |---|---|
@@ -191,6 +191,7 @@ ranked), `refused`, `not_comparable` and `reason`.
 | `PlanDoesNotFitInstrument` | Run settings for the other declaration kind |
 | `TaxCurrencyConversionUnavailable` | A foreign-currency taxable event (research.md D10) |
 | `InstrumentDemandsCash` | A date that nets negative, refused rather than netted forward |
+| `SpansNoTime` | The horizon closes on the day the money arrives, so there is no period any figure could be measured over (2026-09-13) |
 
 ## What is deliberately absent
 

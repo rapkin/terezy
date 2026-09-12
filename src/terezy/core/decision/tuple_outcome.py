@@ -128,6 +128,7 @@ from terezy.core.results.tuple import (
     RouteInUnusable,
     RouteStanding,
     SeamDoesNotChain,
+    SpansNoTime,
     TaxCurrencyConversionUnavailable,
     Tuple,
     TupleOutcome,
@@ -495,6 +496,9 @@ def _hold(
     bought = _acquire(prepared, tuple_.route_in, routed.one_way.arrived, purchased_on=purchased_on)
     if not isinstance(bought, _Acquisition):
         return bought
+    no_span = _spans_no_time(prepared, purchased_on=purchased_on, horizon=horizon)
+    if no_span is not None:
+        return no_span
     projected = _project(
         prepared,
         bought,
@@ -1298,6 +1302,57 @@ def _project(
                 f"{type(prepared.plan).__name__}, which _plan_for refuses. A Registries built "
                 "in code has bypassed the check."
             )
+
+
+def _spans_no_time(
+    prepared: _Prepared, *, purchased_on: date, horizon: DateRange
+) -> SpansNoTime | None:
+    """The window between the money arriving and the horizon closing, if it is no window at all.
+
+    **Only where the projection is a contractual series**, which is the bond. Its yield is a
+    root find over that series, and a series on one date is a bracket that never crosses zero:
+    ``bond_results.project`` reaches it as a raise rather than as a value, so there is no
+    projection to report and no later layer that could say this instead. The window measured
+    here is the owner's -- the money arriving to the horizon closing -- and the series' own runs
+    to the last contractual flow, which is the earlier of the two: a convention measuring that
+    shorter window as nothing while this one is not nothing still raises
+    (``[[future]] a-contractual-series-can-still-collapse-under-30-360``). A balance and a fund
+    build no such series: they project over a window of no length, report their amounts with
+    the marks those amounts carry, and refuse only the **rate** in :func:`_rate`'s own zero-span
+    arm. Refusing the whole tuple for them would take the do-nothing baseline out of the answer
+    and its provenance with it, which is a worse answer than the one the arithmetic refuses.
+
+    After the purchase, so the acquisition's own refusals come first: a quote the instrument
+    cannot price on that date, a ticket below the minimum. Those name what the owner would fix,
+    and this one would send him to lengthen a horizon that is not what is wrong.
+
+    A window that closes **before** the money arrives is a different fact and is not this one:
+    the instrument refuses it by name, and a convention raises rather than measuring a period
+    that runs backwards -- so the dates are ordered before one is asked.
+    """
+    if not isinstance(prepared.declared, InstrumentDeclaration):
+        return None
+    if horizon.end < purchased_on:
+        return None
+    convention = _day_count_of(prepared)
+    if day_count(convention)(purchased_on, horizon.end) != 0.0:
+        return None
+    return SpansNoTime(
+        instrument_id=prepared.declared.id,
+        purchased_on=purchased_on,
+        ends_on=horizon.end,
+        day_count=convention,
+        missing="a window the declared convention measures as more than no time",
+        reason=(
+            f"the money reaches {prepared.declared.id!r} on {purchased_on.isoformat()} and this "
+            f"comparison's horizon closes on {horizon.end.isoformat()}, which "
+            f"{convention!r} measures as no time at all. Bought and given up on "
+            "one date, a holding has no period for a return to be over: every rate discounts "
+            "those flows to the same nothing, so any figure reported would be a number the "
+            "arithmetic does not distinguish. The dates are named beside the convention "
+            "because a convention can measure two of them as one."
+        ),
+    )
 
 
 def _early_exit(prepared: _Prepared, registries: Registries) -> EarlyExit | None:

@@ -67,12 +67,11 @@ distinguishable without reading prose (FR-014, D3).
 | `QuestionDoesNotStandUp` | `refusal: CompositionRefused`, `reason` | FR-018, FR-014a. Fires only for `BOUND_ADMITS_NOTHING` and `NO_SPENDABLE_ENDPOINT`, read off `CompositionRefused.case` and never off its text. |
 | `UndeclaredRouteSupplied` | `part: Literal["route_in", "route_out"]`, `route_ids: tuple[str, ...]`, `reason` | FR-018's third clause, D4. A way in or way out names a route `registries.routes` does not declare — reachable because the narrowed `routes` and the `Registries` arrive independently. `survey` applies the same record to the **benchmark's** supplied chain, which is the other supplied way in this feature has. |
 
-`SurveyRefused = EnumerationRefused | BenchmarkNotACandidate | MoreThanOneStreamInTheSet`
+`SurveyRefused = EnumerationRefused | BenchmarkNotACandidate`
 
 | record | fields | why |
 |---|---|---|
 | `BenchmarkNotACandidate` | `benchmark: Tuple`, `occurrences: int`, `reason` | FR-022. The benchmark must be a member exactly once; `compare` would otherwise prepend it, which is the privileged side channel 010 FR-012 forbids, reintroduced one layer up. |
-| `MoreThanOneStreamInTheSet` | `stream_ids: tuple[str, ...]`, `reason` | FR-001a's recorded gap. `compare` takes one amount for the whole set while FR-005 takes one per stream; a two-stream set cannot be handed to it, and looping per stream would produce one ranking per stream and none of the set. `[[future]] one-amount-per-stream-in-compare`. |
 
 ### `DropGroup` — one row of the tally (FR-011)
 | field | carries |

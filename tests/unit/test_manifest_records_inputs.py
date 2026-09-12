@@ -171,6 +171,7 @@ def _manifest(root: Path = DATA_ROOT) -> manifest.RunManifest:
         seed=None,
         as_of=AS_OF,
         regime_id=IMPLICIT_REGIME_ID,
+        scenario_id=None,
         inflation=resolver.inflation_from_data_root(root),
         official_rates=_official_rates(root),
     )
@@ -239,6 +240,7 @@ class TestNothingAboutAManifestCanBeOmitted:
             seed=None,
             as_of=AS_OF,
             regime_id=IMPLICIT_REGIME_ID,
+            scenario_id=None,
         )
         assert record.result_digest == manifest.digest_of_projection(result)
         assert record.result_digest.startswith(f"{manifest.ALGORITHM}:")
@@ -502,6 +504,7 @@ class TestAManifestCannotDescribeARunThatDidNotHappen:
                 seed=None,
                 as_of=AS_OF,
                 regime_id=IMPLICIT_REGIME_ID,
+                scenario_id=None,
             )
 
     def test_a_file_that_cannot_be_read_names_itself(self, tmp_path: Path) -> None:

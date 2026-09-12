@@ -287,7 +287,7 @@ class TestTheRankingPutsThemInTheSamePlace:
         comparison = compare(
             (replace(fixtures.hurdle_tuple(), instrument_id=MIRROR),),
             benchmark=fixtures.hurdle_tuple(),
-            amount=fixtures.AMOUNT,
+            amounts={fixtures.SALARY: fixtures.AMOUNT},
             horizon=HORIZON,
             as_of=fixtures.AS_OF,
             continuation=fixtures.HOLD_AS_CASH,

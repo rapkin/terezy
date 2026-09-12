@@ -4441,7 +4441,7 @@ provenance is what tells them apart. That distinction is required test E11.
 | What options do the declarations actually offer? | `tests/worked_examples/test_candidate_enumeration.py` |
 | Does every discard land in the right column? | `tests/worked_examples/test_candidate_accounting.py` |
 | Is a pair that connects nothing counted as a rejection? | `tests/unit/test_no_candidate_column.py` |
-| Can every one of the seventeen refusals actually be reached? | `tests/unit/test_seventeen_refusals_through_the_loop.py` |
+| Can every one of the tuple refusals actually be reached? | `tests/unit/test_every_refusal_through_the_loop.py` |
 | Does enumeration build a route chain of its own? | `tests/contract/test_candidates_construct_nothing.py` |
 | What does the whole candidate set look like? | `tests/golden/candidate_set.golden.txt` |
 | Can a cost figure leak into the coverage report? | `tests/contract/test_coverage_no_figures.py` |

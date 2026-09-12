@@ -815,7 +815,7 @@ a registry that will not exist. The sites, read 2026-08-30:
 | `tests/worked_examples/test_candidate_accounting.py` | the literals 9, 9, 18, 7, 2, 9 |
 | `tests/worked_examples/test_candidate_enumeration.py` | "9 instruments with an access declaration", and prose counting nine twice more |
 | `tests/golden/candidate_set.golden.txt` | the whole set: 9 plans, the accounting block, one row per candidate |
-| `tests/unit/test_seventeen_refusals_through_the_loop.py` | "the same nine candidates the two-currency world yields" |
+| `tests/unit/test_every_refusal_through_the_loop.py` | "the same nine candidates the two-currency world yields" |
 | `specs/014-candidates/spec.md` | its *measurement* table and four further statements of nine |
 | `specs/014-candidates/plan.md` | "the shipped set's nine candidates are a golden" |
 | `specs/features.toml` | feature 015's note — "seven of nine instruments are fixtures" |

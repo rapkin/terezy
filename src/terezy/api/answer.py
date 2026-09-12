@@ -242,7 +242,7 @@ def _scenario_of(root: Path, regime_id: str, *, base_currency: Currency) -> str 
     if regime_id == IMPLICIT_REGIME_ID:
         return None
     ramp = resolver.ramp_from_data_root(root, base_currency=base_currency)
-    for scenario_id, scenario in sorted(ramp.scenarios.items()):
+    for scenario_id, scenario in ramp.scenarios.items():
         if any(regime.id == regime_id for regime in scenario.regimes):
             return scenario_id
     raise DeclarationError(
