@@ -39,6 +39,8 @@ const REFUSAL_TAGS: { readonly [Tag in Refusal["tag"]]: true } = {
   "envelopes.ScenarioNotDeclared": true,
   "envelopes.WindowMalformed": true,
   "envelopes.WindowOutsideCoverage": true,
+  "middleware.BodyLengthNotDeclared": true,
+  "middleware.BodyTooLarge": true,
   "middleware.HostNotDeclared": true,
   "middleware.NotOnLoopback": true,
   "service.PathNotServed": true,

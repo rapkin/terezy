@@ -109,6 +109,19 @@ function RefusalDetail({ refusal }: { refusal: RefusalValue }) {
       );
     case "middleware.NotOnLoopback":
       return <Detail>the client address was {refusal.client_address ?? "not recorded"}</Detail>;
+    case "middleware.BodyLengthNotDeclared":
+      return (
+        <Detail>
+          a {refusal.method} request must declare its body length; the cap is {refusal.limit_bytes}{" "}
+          bytes
+        </Detail>
+      );
+    case "middleware.BodyTooLarge":
+      return (
+        <Detail>
+          the body declares {refusal.declared_bytes} bytes against a cap of {refusal.limit_bytes}
+        </Detail>
+      );
     case "service.PathNotServed":
       return <Detail>no route serves {refusal.path}</Detail>;
     case "card.NoSuchCandidate":
