@@ -96,12 +96,8 @@ PLANTED: Final[dict[str, object]] = {
 
 
 def test_a_horizon_of_one_day_is_answered_rather_than_raised() -> None:
-    """The whole point of 010's span refusal, read where an owner would meet it.
-
-    The arithmetic behind a yield raises on a round trip with no period in it, and a one-day
-    horizon is one an owner can ask for. What comes back is an answer whose section reports
-    every candidate dropped, with the reason on the record.
-    """
+    """010's span refusal, read where an owner would meet it: a section reporting drops with
+    their reason, rather than a traceback out of the verb."""
     question = fixtures.owners_question()
     opens = question.horizons[0].start
     result = fixtures.answered(replace(question, horizons=(DateRange(start=opens, end=opens),)))

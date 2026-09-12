@@ -1416,11 +1416,9 @@ def _spans_no_time(
 ) -> SpansNoTime | None:
     """The window between the money arriving and the horizon closing, if it is no window at all.
 
-    Before the purchase and before the projection, because there is nothing downstream that can
-    state this: a bond sold on the day it settles builds a contractual series on one date, and
-    the root find behind its yield raises on a bracket that never crosses zero. That raise is
-    documented as a caller's error and this is not one -- ``horizon.start + latency ==
-    horizon.end`` is what a one-day horizon becomes on any way in that takes a day.
+    Before the purchase and before the projection, because nothing downstream can state it:
+    ``bond_results.project`` reaches a one-date series as a raise rather than as a value, and
+    ``_rate`` -- which would say it -- is never arrived at.
 
     A window that closes **before** the money arrives is a different fact and is not this one:
     the instrument refuses it by name, and a convention raises rather than measuring a period
@@ -1428,19 +1426,19 @@ def _spans_no_time(
     """
     if horizon.end < purchased_on:
         return None
-    year_fraction = day_count(_day_count_of(prepared))
-    if year_fraction(purchased_on, horizon.end) != 0.0:
+    convention = _day_count_of(prepared)
+    if day_count(convention)(purchased_on, horizon.end) != 0.0:
         return None
     return SpansNoTime(
         instrument_id=prepared.declared.id,
         purchased_on=purchased_on,
         ends_on=horizon.end,
-        day_count=_day_count_of(prepared),
+        day_count=convention,
         missing="a window the declared convention measures as more than no time",
         reason=(
             f"the money reaches {prepared.declared.id!r} on {purchased_on.isoformat()} and this "
             f"comparison's horizon closes on {horizon.end.isoformat()}, which "
-            f"{_day_count_of(prepared)!r} measures as no time at all. Bought and given up on "
+            f"{convention!r} measures as no time at all. Bought and given up on "
             "one date, a holding has no period for a return to be over: every rate discounts "
             "those flows to the same nothing, so any figure reported would be a number the "
             "arithmetic does not distinguish. The dates are named beside the convention "

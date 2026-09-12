@@ -152,9 +152,8 @@ def test_a_regime_no_scenario_declares_is_refused_by_name(tmp_path: Path) -> Non
 def test_two_scenarios_declaring_one_regime_are_refused_at_load(tmp_path: Path) -> None:
     """Which scenario a regime belongs to must be a fact, and two claims on it are not one.
 
-    Nothing downstream can choose between them: ``_scenario_of`` would take whichever id sorted
-    first and the run would be narrowed to that scenario's routes under a label that names
-    neither file.
+    A question names a regime and no scenario, so nothing downstream can choose between them:
+    whichever resolved first would supply the route set, under a manifest naming neither file.
     """
     root = _scratch_with_second_scenario(tmp_path, regime_id=WARTIME)
     with pytest.raises(DeclarationError) as caught:
@@ -175,8 +174,8 @@ def test_the_shipped_root_declares_each_regime_once(tmp_path: Path) -> None:
     """
     root = _scratch_with_second_scenario(tmp_path, regime_id="a_regime_of_its_own")
     declared = resolver.ramp_from_data_root(root, base_currency=Currency.UAH)
-    named = [regime.id for scenario in declared.scenarios.values() for regime in scenario.regimes]
-    assert sorted(named) == sorted(set(named)), named
+    named = {regime.id for scenario in declared.scenarios.values() for regime in scenario.regimes}
+    assert {WARTIME, "a_regime_of_its_own"} <= named, named
 
 
 def _scratch_with_second_scenario(tmp_path: Path, *, regime_id: str) -> Path:

@@ -991,9 +991,6 @@ class SpansNoTime:
     the arithmetic, which reaches it as a bracket that never crosses zero and raises -- a
     statement about a caller's mistake, which this is not: a one-day horizon is a thing an
     owner can ask for, and a way in with a declared latency can turn a longer one into this.
-
-    The dates are named beside the convention because a convention can measure two of them as
-    one: what is refused is the span the figures would be measured over, not the calendar.
     """
 
     instrument_id: str

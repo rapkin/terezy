@@ -391,10 +391,8 @@ class RunManifest:
     scenario_id: str | None
     """Whose belief that world came from, or ``None`` where no scenario was in force.
 
-    Beside the regime rather than derivable from it: a regime id is unique across
-    ``data/scenarios/`` because the resolver refuses a second claim on one, and that refusal is
-    a rule about the declarations rather than a property of this record -- so a reader handed a
-    manifest alone could otherwise not name the file the route set came from.
+    Beside the regime rather than left to be looked up from it: a manifest is read on its own,
+    long after the run, and a regime id alone does not name the file the route set came from.
     """
 
     projection: ProjectedRun | None

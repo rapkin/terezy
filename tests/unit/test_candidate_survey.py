@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from terezy.core.decision.candidates import evaluated, survey
+from terezy.core.decision.candidates import dropped, evaluated, survey
 from terezy.core.results.candidates import (
     BenchmarkNotACandidate,
     CandidateSet,
@@ -201,9 +201,14 @@ class TestTwoStreamsAreOneComparison:
             if item.key.instrument_id == OVDP and item.key.stream_id == fixtures.SALARY
         )
 
-    def test_the_set_is_ranked_once_and_spans_both_streams(self) -> None:
-        """One ranking of the set, never one per stream: scoring per stream would produce two
-        orderings and no answer to *which option is best*, which is the question asked."""
+    def test_the_whole_set_is_one_comparison_spanning_both_streams(self) -> None:
+        """One comparison of the set, never one per stream: scoring per stream would produce two
+        orderings and no answer to *which option is best*, which is the question asked.
+
+        The dollar candidates are evaluated and **not ranked** -- an outlay in one currency
+        against proceeds in another is an amount with no ratio (010's ``RateNotComparable``),
+        which is a fact about that round trip rather than about how the set was scored.
+        """
         registries = self._both_streams_connect()
         result = _survey(registries, self._hurdle(registries))
         assert isinstance(result, CandidateSurvey), result
@@ -213,9 +218,10 @@ class TestTwoStreamsAreOneComparison:
             fixtures.SALARY,
             fixtures.CONTRACT,
         }
-        assert len(result.comparison.ranked) + len(result.comparison.not_comparable) == len(
-            outcomes
-        )
+        assert len(outcomes) + len(dropped(result.comparison)) == len(result.enumerated.candidates)
+        assert {item.key.stream_id for item in result.comparison.not_comparable} == {
+            fixtures.CONTRACT
+        }
 
     def test_each_tuple_is_struck_against_its_own_streams_amount(self) -> None:
         """FR-005: nothing converts one into the other, so a dollar candidate's outlay is the

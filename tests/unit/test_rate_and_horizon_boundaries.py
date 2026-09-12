@@ -1,8 +1,8 @@
 """Where the join stops short: no rate, no span, and a tax base in the wrong currency.
 
-Four boundaries, and none of them is an error. Each is a **typed occupant of a slot whose
-value is genuinely unavailable** -- the shape ``ExitCostUnknown`` and ``RealTermsUnavailable``
-already take, applied to the two things this feature computes.
+None of these boundaries is an error. Each is a **typed occupant of a slot whose value is
+genuinely unavailable** -- the shape ``ExitCostUnknown`` and ``RealTermsUnavailable`` already
+take, applied to the two things this feature computes.
 
 * **No rate.** A tuple funded in one currency and spent in another has an amount and no ratio.
   It is reachable in the shipped registry, not a theoretical case: dollar contract income
@@ -23,6 +23,8 @@ already take, applied to the two things this feature computes.
 * **No conventional series.** A round trip whose repatriation charges exceed everything it
   released has no single internal rate of return, and extrapolating one past the bracket
   would invent a figure.
+* **No window at all.** A horizon closing on the day the money arrives leaves a purchase and a
+  disposal on one date, which the arithmetic behind a yield reaches as a raise.
 """
 
 from __future__ import annotations
@@ -310,11 +312,9 @@ class TestAnInstrumentThatCannotSpanTheHorizon:
 class TestAWindowWithNoTimeInIt:
     """A horizon that closes on the day the money arrives, and the day either side of it.
 
-    The arithmetic behind a yield reaches this as a bracket that never crosses zero and raises,
-    by its own contract -- which says a series that fails it is the caller's mistake. A one-day
-    horizon is not a mistake: it is a thing an owner can ask for, and the declared inbound
-    latency turns it into a purchase and a disposal on one date. The join states it as a typed
-    refusal before anything is bought, so a bond and a balance answer alike.
+    Both sides, because the boundary is what the refusal is about: one day later the convention
+    measures a span and there is a rate, one day earlier the window closed before the money
+    arrived and the instrument says so in its own words.
     """
 
     @staticmethod
@@ -343,7 +343,7 @@ class TestAWindowWithNoTimeInIt:
         assert isinstance(refusal, SpansNoTime), refusal
         assert refusal.purchased_on == refusal.ends_on == fixtures.OUTLAY_ON + timedelta(days=1)
         assert refusal.day_count == "act/365"
-        assert "no time at all" in refusal.reason
+        assert "more than no time" in refusal.missing
 
     def test_a_window_closing_before_the_money_arrives_is_the_other_refusal(self) -> None:
         # Less than no time is a different fact and keeps its own name: the remedy is a longer
