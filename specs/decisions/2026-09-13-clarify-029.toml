@@ -1,0 +1,55 @@
+# Owner answers — the two clarifications of 029's specification.
+#
+# Взято 2026-09-13, по одному питанню за раз. Обидва стосуються ФОРМИ, в якій помилка або
+# кандидат доходять до того, хто питає, а не того, що рахується: жодна цифра від них не
+# рухається. CL-1 вирішує, чи має тіло запиту ДРУГУ форму відмови; CL-2 — чи має ця фіча
+# другий ендпоінт.
+#
+# `choice` несе САМУ ВІДПОВІДЬ, а не лише літеру варіанта. Де варіант є, він названий на
+# початку рядка.
+exported_on = "2026-09-13"
+
+[[answer]]
+q        = 1
+feature  = "029-question-in-request"
+title    = "Якою формою повертається потік, якого ніхто не оголосив"
+question = "How does a body naming an income stream nobody declared come back — as the loader's refusal, or as the verb's typed union member in a 200?"
+options  = [
+  "A. The loader's own refusal, attributed to the request, with the field path question.amount.stream",
+  "B. A 200 whose body is the verb's typed union member (AmountForAnUndeclaredStream / StreamWithNoAmount)",
+]
+choice   = "A — the loader's own typed refusal, blamed on the request, pointing at the field `question.amount.stream`. One shape for every body mistake; never a 200 whose body is a different record."
+notes    = """
+Одна форма на КОЖНУ помилку в тілі. Клієнт звужується на одному записі, форма підсвічує одне
+поле, і ніщо не мусить перемикатися двічі в межах одного класу помилок.
+
+Чому не B. Тоді помилка в тілі приходить у двох різних формах залежно від того, ЯКА це
+помилка: невідоме поле — відмова зі статусом, невідомий потік — двісті з іншим записом
+усередині. Це два різні коди в клієнті на одну дію користувача.
+
+Наслідок, який мусить бути в специфікації: `AmountForAnUndeclaredStream` і `StreamWithNoAmount`
+лишаються НЕДОСЯЖНИМИ через `api/` — рівно як `answer_declared` уже записує про себе. Вони
+є формою, яку бачить той, хто тримає запис і кличе дієслово напряму, і ця фіча цього не
+міняє. Радіус: одна вимога і один тест; ендпоінт, схема, маніфест і дайджест не рухаються.
+"""
+
+[[answer]]
+q        = 2
+feature  = "029-question-in-request"
+title    = "Чи можна відкрити картку кандидата для питання, заданого тілом"
+question = "Can a candidate card be opened for a candidate of a body-asked question, which has no declared id to address it by?"
+options  = [
+  "A. Not in this feature — the form in 030 shows an answer without per-candidate cards, or re-asks as a saved question",
+  "B. A body-taking projection route beside the answer, re-posting the body with the candidate key",
+]
+choice   = "A — not in 029. Cards for unsaved questions are decided with the UI form (030) and the owner's coming redesign."
+notes    = """
+Не в цій фічі. Картка для незбереженого питання вирішується РАЗОМ із формою (030) і з
+редизайном, який власник ще робитиме — тобто там, де видно, чи її взагалі відкривають.
+
+Чому не B: воно симетричне й дешеве, і саме тому його легко збудувати до того, як хоч щось
+його рендерить. Подвоєна поверхня тестів заради екрана, форму якого ще не вирішено.
+
+FR-011 уже це каже, і `a-card-for-a-body-asked-candidate` у specs/features.toml уже це несе.
+Ця відповідь закриває питання, а не додає роботу: жодне завдання плану нею не керується.
+"""

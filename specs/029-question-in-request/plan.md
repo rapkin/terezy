@@ -6,9 +6,10 @@
 not an implementation. The implementation branch is `feat/029-question-in-request` and lands by
 `--no-ff`.
 
-**Two clarifications are open** (spec, "What only the owner decides"). Each states its blast radius
-and neither reaches the endpoint, the schema or the manifest, so the build order below runs without
-them; Phase 7 is CL-1's and is the only phase either gates.
+**Both clarifications are answered** (`specs/decisions/2026-09-13-clarify-029.toml`, 2026-09-13).
+Neither reaches the endpoint, the schema or the manifest: the undeclared stream comes back as the
+loader's refusal attributed to the request, which Phases 2 and 4 already build, so Phase 7 is a
+test; and a card for a body-asked candidate is not in this feature.
 
 ## Summary
 
@@ -154,12 +155,12 @@ OpenAPI request schema and its union walk, the `document.VERSION` bump,
 `docs/REQUIRED_TESTS.md`, and `specs/features.toml`: `status = "done"`, and
 `http-question-from-request-parameters` closed.
 
-**Phase 7 — gated by CL-1.** The shape an undeclared stream comes back in: one requirement and one
-test either way. Recommendation A is the loader's refusal attributed to the request, which Phases 2
-and 4 already build — so if the owner answers A this phase is a test, and if he answers B it is a
-second refusal shape at the boundary.
+**Phase 7 — the undeclared stream** (FR-029). The loader's refusal attributed to the request,
+naming `question.amount.stream`, which Phases 2 and 4 already build — so this phase is the test
+that says so, plus the assertion that neither `AmountForAnUndeclaredStream` nor
+`StreamWithNoAmount` reaches this surface.
 
 ## Out of the plan, by the spec
 
-The UI form (030), saving a body, partial overrides, a card for a body-asked candidate (CL-2), and
+The UI form (030), saving a body, partial overrides, a card for a body-asked candidate, and
 the answer document's size, which is unchanged and already recorded as a future.

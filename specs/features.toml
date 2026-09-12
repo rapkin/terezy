@@ -232,10 +232,10 @@ note   = "Closes the real-terms-for-a-tuple future: the owner asked for inflatio
 
 [[feature]]
 id     = "029-question-in-request"
-status = "drafted"
+status = "planned"
 needs  = ["015-the-question", "020-http-api"]
 why    = "015 owns the question record, its one validator and the rule that a second source builds the SAME record; 020 owns the route table, the tag and union machinery the request schema joins, and the FR-043 deferral this supersedes"
-note   = "Owner 2026-09-13: a question goes in the request body, so asking one stops meaning editing TOML; files stay as saved questions. Two clarifications open, so `drafted` though plan.md and tasks.md exist; see specs/029-question-in-request/spec.md."
+note   = "Owner 2026-09-13: a question goes in the request body, so asking one stops meaning editing TOML; files stay as saved questions. Both clarifications answered in specs/decisions/2026-09-13-clarify-029.toml."
 
 [[feature]]
 id     = "030-question-form"
@@ -459,4 +459,4 @@ note  = "029 FR-006 writes nothing, so a body answered over HTTP cannot become a
 [[future]]
 id    = "a-card-for-a-body-asked-candidate"
 after = ["029-question-in-request", "027-candidate-card"]
-note  = "A body-asked question has no declared id, so 029 FR-011 leaves the card on declared questions only; the shape one would need is 029 CL-2, an OWNER decision because it settles whether 030's form shows cards at all. Recorded 2026-09-13."
+note  = "A body-asked question has no declared id, so 029 FR-011 leaves the card on declared questions only. The owner settled on 2026-09-13 (specs/decisions/2026-09-13-clarify-029.toml) that it is decided with 030's form and the redesign that comes with it."

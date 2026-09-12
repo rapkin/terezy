@@ -13,10 +13,8 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain — **two open, both the owner's**, carried as CL-1 and
-      CL-2 with options, a recommendation and a stated blast radius rather than as inline markers.
-      Neither reaches the endpoint, the schema or the manifest, so `plan.md` and `tasks.md` were
-      written on the owner's instruction while `status` stays `drafted` — the word this state has.
+- [x] No [NEEDS CLARIFICATION] markers remain — both were the owner's and both are answered on
+      2026-09-13 (`specs/decisions/2026-09-13-clarify-029.toml`).
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic

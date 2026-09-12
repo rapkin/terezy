@@ -3,8 +3,7 @@
 **Feature**: `029-question-in-request` | **Plan**: [plan.md](./plan.md) | **Spec**: [spec.md](./spec.md)
 
 Both `needs` are `done` on `main` (`015-the-question`, `020-http-api`), so implementation is
-unblocked. **Two clarifications are open**; Phase 7 is the only phase either gates, and CL-2 gates
-nothing here.
+unblocked. Both clarifications are answered (`specs/decisions/2026-09-13-clarify-029.toml`).
 
 Tests are **not optional**. Principle V is NON-NEGOTIABLE; every implementation task is preceded by
 the test that fails before it exists.
@@ -70,9 +69,9 @@ the test that fails before it exists.
 - [ ] T030 Bump `document.VERSION` in the same commit as the wire change (FR-028).
 - [ ] T031 Flip the rows this feature closes in `docs/REQUIRED_TESTS.md`; set `029-question-in-request` to `done` in `specs/features.toml`, and close `http-question-from-request-parameters` there — it is marked *superseded by a planned feature* until this lands, because a deferral recorded as closed by work that does not exist is a false record on `main`.
 
-## Phase 7 — gated by CL-1
+## Phase 7 — the undeclared stream
 
-- [ ] T032 [US2] Test and requirement for the shape an **undeclared stream** in a body comes back in. Under recommendation A this is a test over what Phases 2 and 4 already build; under B it is a second refusal shape at the boundary (spec CL-1).
+- [ ] T032 [US2] [API] Test: a body naming an income stream nothing declares refuses as a **request** fault naming `question.amount.stream`, and neither `AmountForAnUndeclaredStream` nor `StreamWithNoAmount` reaches this surface — `tests/contract/test_a_body_refuses_like_a_file.py` (FR-029, SC-013).
 
 ---
 
@@ -80,7 +79,7 @@ the test that fails before it exists.
 
 Phase 0 is red against nothing and blocks nothing. Phase 1 is independent of every HTTP task and
 lands first on purpose — it is what makes the endpoint reproducible. Phase 2 precedes Phase 4, which
-needs the attribution rule. Phase 3 precedes Phases 4, 5 and 6. Phase 7 waits on the owner.
+needs the attribution rule. Phase 3 precedes Phases 4, 5 and 6. Phase 7 reads what Phases 2 and 4 build.
 
 **MVP**: Phases 0–3. At that point a whole question is answered from a body, reproducibly, and every
 refusal still arrives — only its attribution and its cap are unfinished.
