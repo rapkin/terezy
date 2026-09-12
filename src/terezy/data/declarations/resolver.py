@@ -1,35 +1,20 @@
 """The cross-file pass: the checks a per-file validator structurally cannot make.
 
-``schema.py`` validates one document at a time, which is all pydantic can see. Two of
-feature 001's FR-016 rules span files and are therefore impossible there -- and feature 002
-added nine more of the same kind, enumerated in their own section further down:
+``schema.py`` validates one document at a time, which is all pydantic can see. Whether two
+files declare one id, and whether a reference resolves, are facts about the whole set.
 
-* **A duplicate identifier.** Each file is individually valid; together they declare two
-  different things with one name, and whichever loaded second would win by accident of
-  directory ordering. The error names **both** files, because knowing only one of them
-  leaves the reader to find the other by hand.
-* **A reference to an undeclared tax class.** An instrument's ``tax_classes`` table holds
-  references; whether they resolve depends on the tax files. Unresolved is reported and
-  **never read as an exemption** -- a missing rule and a declared zero are opposite
-  claims, and only one of them is cited (Principle I). This is the single most expensive
-  silent default available in this domain: it would make every after-tax figure flattering
-  by exactly the tax that was not charged.
+**The order is the design: parse every file individually first, then resolve.** A resolver
+that loaded lazily could not report a duplicate at all, since it would never hold both
+declarations at once -- and could not check a reference against a file it had not yet read.
 
-So the order is fixed and is the whole design: **parse every file individually first,
-then resolve.** A resolver that loaded lazily could not report a duplicate at all, since
-it would never hold both declarations at once.
+An unresolved tax-class reference is reported and **never read as an exemption**: a missing
+rule and a declared zero are opposite claims, and only one of them is cited (Principle I).
+It is the most expensive silent default available in this domain -- it would make every
+after-tax figure flattering by exactly the tax that was not charged.
 
-A third check lives here for the same reason -- it needs both sides. An instrument may
-reference a class that exists but whose ``applies_to`` does not cover the income kind it
-was referenced for. The tax rule refuses such a charge at run time (*"the rule does not
-cover this"* and *"the rule applied and the answer was zero"* are opposite claims), and
-catching it here turns a refusal mid-projection into a message about the file that caused
-it.
-
-**No caching, no global registry.** :func:`resolve` takes the files it is to read and
-returns a value. A module-level cache would make the second call in a process depend on
-the first, which is exactly the hidden state that makes a determinism claim (C4)
-unverifiable.
+**No caching, no global registry.** :func:`resolve` takes the files it is to read and returns
+a value. A module-level cache would make the second call in a process depend on the first,
+which is the hidden state that makes a determinism claim unverifiable.
 """
 
 from __future__ import annotations
@@ -105,10 +90,9 @@ else's directory was absent.
 class Declarations:
     """Every declaration one run was given, resolved and keyed by id.
 
-    A frozen record carrying only data, like everything else in the project. The two file
-    maps are not decoration: they are what lets a *later* failure -- a manifest entry
-    (FR-012), an unresolved reference discovered downstream -- still name the file a
-    declaration came from, after the TOML has long since been discarded.
+    The file maps are what lets a *later* failure -- a manifest entry, an unresolved reference
+    discovered downstream -- still name the file a declaration came from, after the TOML has
+    been discarded.
     """
 
     instruments: Mapping[str, InstrumentDeclaration]
@@ -119,43 +103,29 @@ class Declarations:
     """Declared tax classes by id, ready to pass to ``results.project`` as the tax pack."""
 
     instrument_files: Mapping[str, Path]
-    """Which file declared each instrument."""
 
     tax_class_files: Mapping[str, Path]
-    """Which file declared each tax class."""
 
     funds: Mapping[str, FundDeclaration]
-    """⚙ **Added by feature 006.** Declared collective-investment funds by id.
+    """Declared collective-investment funds by id.
 
-    A separate map rather than a wider :attr:`instruments`, because a fund and a bond have
-    almost nothing in common beyond an id: no coupon, no maturity, no face value. One map
-    of a union type would make every consumer narrow before it could read a field, and the
-    two are consumed by different projections anyway.
-
-    The **id space is shared**, though: a fund and a bond declaring the same id is a
-    duplicate and is refused, because a holding names an instrument by id and would
-    otherwise resolve to whichever map was searched first.
+    A separate map rather than a wider :attr:`instruments`: one map of a union type would make
+    every consumer narrow before it could read a field, and the two are consumed by different
+    projections. The **id space is shared**, though -- a fund and a bond declaring one id is a
+    duplicate and is refused, because a holding names an instrument by id.
     """
 
     fund_files: Mapping[str, Path]
-    """Which file declared each fund."""
 
     cash: Mapping[str, CashDeclaration]
-    """Declared cash balances by id.
-
-    A third map on :attr:`funds`' argument, and the same shared id space: a balance and a bond
-    declaring one id is a duplicate and is refused, because a holding names an instrument by id
-    and would otherwise resolve to whichever map was searched first.
-    """
+    """Declared cash balances by id, in :attr:`funds`' shared id space."""
 
     cash_files: Mapping[str, Path]
-    """Which file declared each balance."""
 
     held: Mapping[str, HeldAssetDeclaration]
-    """Declared held assets by id (025 FR-009). A fourth map, on the same argument."""
+    """Declared held assets by id (025 FR-009)."""
 
     held_files: Mapping[str, Path]
-    """Which file declared each held asset."""
 
     groups: Mapping[str, InstrumentGroup]
     """The declared group vocabulary by id (015 FR-007a).
@@ -165,7 +135,6 @@ class Declarations:
     """
 
     groups_file: Path
-    """Which file declared the vocabulary, so the manifest can name it after the TOML is gone."""
 
 
 def _refuse_duplicate(
@@ -242,15 +211,6 @@ def resolve(
     held_files_by_id: dict[str, Path] = {}
     files_by_id: dict[str, Path] = {}
     for path in instrument_files:
-        # ⚙ feature 006: one directory, several kinds of declaration, told apart by the one
-        # key they share and dispatched through a declared mapping rather than a branch
-        # naming a class. See ``loader.declared_class_of`` and ``LOADERS_BY_KIND``.
-        #
-        # ⚙ feature 013: both bond forms produce an ``InstrumentDeclaration``, so the id space,
-        # the duplicate check and the tax-class resolution below are shared. A duplicate id
-        # therefore collides across the forms as well as within one -- which is what
-        # `files_by_id` is: the whole directory's id space, one entry per declaration of any
-        # kind.
         read = LOADERS_BY_KIND[_kind_of(path)]
         if read is loader.fund_from_file:
             declared_fund = loader.fund_from_file(path)
@@ -350,10 +310,9 @@ def _check_references(
 ) -> None:
     """Every tax class an instrument names must exist **and** cover the kind named.
 
-    Both halves matter, and the second is the easier one to get wrong. A class that exists
-    but does not apply to the income kind it was referenced for would pass a naive
-    existence check and then be refused by the tax rule mid-projection -- reported against
-    an event rather than against the file that declared the reference.
+    A class that exists but does not apply to the income kind it was referenced for would pass
+    a naive existence check and then be refused by the tax rule mid-projection -- reported
+    against an event rather than against the file that declared the reference.
     """
     for kind, class_id in declaration.tax_classes.items():
         field_path = f"instrument.tax_classes.{kind.value}"
@@ -389,19 +348,14 @@ def _check_references(
 def from_data_root(root: Path) -> Declarations:
     """Every declaration under a data root: ``instruments/*.toml`` and ``tax/*.toml``.
 
-    Sorted, so a run is reproducible: an unsorted directory listing would make the order
-    of two files -- and therefore which one a duplicate-id error names -- depend on the
-    filesystem.
+    Sorted, so a run is reproducible: an unsorted directory listing would make the order of two
+    files -- and therefore which one a duplicate-id error names -- depend on the filesystem.
+    Only the top level of each directory is read, because ``instruments/nav/`` holds a different
+    shape of file that a recursive glob would try to validate as a declaration.
 
-    Only the top level of each directory is read. ``instruments/nav/`` holds dated NAV and
-    distribution series, which are a different shape and a different feature; globbing
-    recursively would try to validate them as declarations and report a confusing failure
-    about a file that is perfectly correct.
-
-    An empty directory is an **error**, not an empty world. Silently returning no
-    declarations would make a mistyped path indistinguishable from a repository with no
-    data, and every downstream reference would then fail for a reason that names the
-    wrong thing.
+    An empty directory is an **error**, not an empty world. Silently returning no declarations
+    would make a mistyped path indistinguishable from a repository with no data, and every
+    downstream reference would then fail for a reason that names the wrong thing.
     """
     instruments = sorted((root / INSTRUMENTS_DIR).glob("*.toml"))
     tax = sorted((root / TAX_DIR).glob("*.toml"))
@@ -433,47 +387,16 @@ def from_data_root(root: Path) -> Declarations:
 # 002-ramp-cost: the ramp's cross-file pass
 # ---------------------------------------------------------------------------
 #
-# Everything below answers a question one file cannot: does the thing this file *names*
-# exist, and do two files agree about it. The division is the same one the module docstring
-# argues -- shape in ``schema``, meaning in ``loader``, **relations here** -- and the reason
-# is the same: pydantic validates a document, and by the time it fails the other documents
-# have not been read.
+# Everything below answers a question one file cannot: does the thing this file *names* exist,
+# and do two files agree about it. Shape in ``schema``, meaning in ``loader``, relations here.
 #
-# Nine relations, and each one is a row of the enforced-rules table in
-# ``contracts/declaration-schema.md``:
-#
-# 1. **Duplicate ids** across files, for every kind of declaration. The error names both
-#    files, because knowing one of the two leaves the reader to find the other by hand.
-# 2. **Duplicate ``(provider x currency path x venue)``** triples (FR-023). Identity is the
-#    triple and not the provider, because conversion count is usually the largest difference
-#    between two ways of doing the same thing -- and two entries that collide on the triple
-#    are two descriptions of one corridor, of which at most one can be right.
-# 3. **Kind resolution.** Every ``kind`` and ``kind_of_observation`` names a declared
-#    ``ObservationKind`` (FR-028), so no observed value ages under a threshold nobody set.
-# 4. **Venue and channel references**, including whether the venue can *hold* the currency
-#    the leg moves through it -- the check ``Venue.currencies`` exists for.
-# 5. **Leg chaining** (research.md D6): leg *n* ends where leg *n+1* begins, the first leg
-#    starts at the route's ``origin``, the last ends at its ``destination``.
-# 6. **``partner_route`` resolution** (FR-027): the id exists, names an ``exit`` route,
-#    starts where the inbound route ends -- at that venue **and in the currency the inbound
-#    delivers there** -- and finishes holding the base currency.
-# 7. **``capacity_pool`` cap agreement** across *files* (research.md D10). Two legs naming
-#    one rail must declare one cap.
-# 8. **A regime's ``route_ids``** resolve, and a regime is **partner-closed**.
-# 9. **A stream's ``arrives_at``** names a declared venue.
-#
-# ⚙ **Every declared kind resolves here, and the rule has been learned twice.** An earlier
-# revision validated a channel *side's* kind at load and then dropped it, so the core aged
-# every side under ``FxChannel.kind`` -- a 7-day premium under a 365-day schedule threshold,
-# reported fresh. Feature 010 then shipped ``[access.price].kind`` carried into the record and
-# resolved nowhere: a typo loaded clean, resolved clean, and raised ``KeyError`` out of the
-# pure core, whose message calls that a programmer error. A data-file typo is not one.
-#
-# Because the same shape appeared twice, the third guard is a **scan rather than a field**:
-# ``tests/contract/test_access_declaration_loading.py`` walks every ``SourceRef`` reachable
-# from the resolved registries and requires each to carry a kind that this file's registry
-# declares. A new declaration kind whose citation nobody resolves fails there, whether or not
-# anybody remembered to add a line to the list above.
+# **Every declared kind resolves here.** A kind carried into a record and resolved nowhere is a
+# data-file typo that loads clean, resolves clean, and then raises ``KeyError`` out of the pure
+# core, whose message calls that a programmer error. Because the shape appeared twice, the third
+# guard is a scan rather than a field: ``tests/contract/test_access_declaration_loading.py``
+# walks every ``SourceRef`` reachable from the resolved registries and requires each to carry a
+# kind this file's registry declares, so a new declaration kind whose citation nobody resolves
+# fails there whether or not anybody remembered to add a line here.
 
 BASE_CURRENCY_ROLE = (
     "the base currency is the currency the owner earns and spends -- the ledger's home "
@@ -508,16 +431,9 @@ SCENARIOS_DIR = "scenarios"
 class RampDeclarations:
     """Every declaration a ramp comparison needs, resolved and keyed by id.
 
-    ⚙ **A second record beside :class:`Declarations` rather than more fields on it.** The
-    two describe different runs: a projection needs instruments and tax classes, a ramp
-    comparison needs routes, channels, streams, kinds and scenarios, and neither needs the
-    other's inputs. Merging them would make ``from_data_root`` require six directories
-    before it could load a bond, which would break every caller that has one -- and would
-    mean a data root with no routes could not project an instrument, which is not a fact
-    about the world.
-
-    The file maps are not decoration: they are what lets a *later* failure still name the
-    file a declaration came from, after the TOML has been discarded.
+    A second record beside :class:`Declarations` rather than more fields on it: the two describe
+    different runs, and merging them would mean a data root with no routes could not project an
+    instrument, which is not a fact about the world.
     """
 
     kinds: Mapping[str, ObservationKind]
@@ -552,37 +468,27 @@ class RampDeclarations:
     """
 
     kind_files: Mapping[str, Path]
-    """Which file declared each observation kind."""
 
     venue_files: Mapping[str, Path]
-    """Which file declared each venue."""
 
     channel_files: Mapping[str, Path]
-    """Which file declared each channel."""
 
     route_files: Mapping[str, Path]
-    """Which file declared each route."""
 
     stream_files: Mapping[str, Path]
-    """Which file declared each stream."""
 
     scenario_files: Mapping[str, Path]
-    """Which file declared each scenario."""
 
 
 def _identity(route: Route) -> tuple[str, tuple[str, ...], str, str]:
     """A route's registry identity: ``(provider, currency path, origin, destination)``.
 
-    FR-023 says an entry is per ``(provider x currency path x venue)`` and **not** per
-    provider. The currency path is the sequence of currencies the money is actually in --
-    the first leg's ``from_ccy`` followed by every leg's ``to_ccy`` -- so two routes that
-    differ only in how many times they cross a currency have different identities. That is
-    the point of the rule: conversion count is usually the largest difference between two
-    ways of doing the same thing, and collapsing the two into one entry would hide the
-    expensive one.
-
-    "Venue" is read as the pair of endpoints. One venue would not distinguish a corridor
-    from where it starts, and the endpoints are what a funding path names.
+    FR-023 says an entry is per ``(provider x currency path x venue)`` and **not** per provider.
+    The currency path is the sequence of currencies the money is actually in, so two routes that
+    differ only in how many times they cross a currency have different identities: conversion
+    count is usually the largest difference between two ways of doing the same thing, and
+    collapsing the two into one entry would hide the expensive one. "Venue" is read as the pair
+    of endpoints, because one venue would not distinguish a corridor from where it starts.
     """
     currencies = (route.legs[0].from_ccy.value, *(leg.to_ccy.value for leg in route.legs))
     return route.provider, currencies, route.origin, route.destination
@@ -614,9 +520,8 @@ def _check_kind(
     """Every observed value ages under a **declared** threshold (FR-028).
 
     No permissive default, and no silent pass for a kind nobody declared: a value whose
-    threshold does not exist could never be reported stale, which is the failure mode
-    FR-028 exists to close -- a stale route cost invalidates every comparison built on it,
-    silently.
+    threshold does not exist could never be reported stale, and a stale route cost invalidates
+    every comparison built on it, silently.
     """
     if named not in kinds:
         raise DeclarationError(
@@ -641,11 +546,9 @@ def _check_venue(
 ) -> None:
     """A venue a leg names must exist **and** be able to hold the currency moved through it.
 
-    Both halves, and the second is the one ``Venue.currencies`` exists for: a leg moving
-    dollars into a hryvnia-only card account is a declaration nobody can satisfy, and
-    inferring the venue's capabilities from its legs would make the mistake
-    self-justifying -- the leg declaring the impossible movement would be the evidence that
-    it was possible.
+    Both halves, and the second is what ``Venue.currencies`` exists for: inferring the venue's
+    capabilities from its legs would make the mistake self-justifying -- the leg declaring the
+    impossible movement would be the evidence that it was possible.
     """
     venue = venues.get(named)
     if venue is None:
@@ -680,10 +583,9 @@ def _check_channel(
 ) -> None:
     """An ``fx`` leg's channel must exist and must quote the pair the leg converts.
 
-    A channel quotes **one ordered pair**, and applying it to another would be inventing a
-    rate -- which no amount of convenience justifies (FR-010). Checked here rather than left
-    to ``channels.side_for``'s raise, because here the message can name the file and the leg
-    index; reaching that raise means this check was bypassed.
+    A channel quotes **one ordered pair**, and applying it to another would be inventing a rate
+    (FR-010). Checked here rather than left to ``channels.side_for``'s raise, because here the
+    message can name the file and the leg index.
     """
     if leg.channel is None:
         return
@@ -718,11 +620,10 @@ def _check_channel(
 def _check_chain(route: Route, *, path: Path) -> None:
     """Leg *n* must end where leg *n+1* begins, and the chain must span the route (D6).
 
-    Continuity is a structural property of the declaration, knowable with no amount and no
-    date, so it is checked where the error can name the file and the leg index. Deferring it
-    to cost time would mean the same broken route produced an error per call site rather
-    than one message naming the file -- and the core, which may then assume a chained route,
-    raises instead of returning a typed failure, because by then the caller is the problem.
+    Continuity is knowable with no amount and no date, so it is checked where the error can name
+    the file and the leg index. Deferring it to cost time would mean the same broken route
+    produced an error per call site, and the core -- which may then assume a chained route --
+    raises rather than returning a typed failure, because by then the caller is the problem.
     """
     first = route.legs[0]
     last = route.legs[-1]
@@ -781,27 +682,18 @@ def _check_partner(
 ) -> None:
     """The five things a declared exit route must be (FR-027), each refused by name.
 
-    ``partner_route`` absent is **legal and expected**: it means nobody has costed the way
-    out, and it produces ``ExitCostUnknown`` rather than a reversal or a promoted one-way
-    figure (FR-030). What is refused is a partner that *looks* declared and is not usable:
+    ``partner_route`` absent is **legal and expected**: it means nobody has costed the way out,
+    and it produces ``ExitCostUnknown`` rather than a reversal or a promoted one-way figure
+    (FR-030). What is refused is a partner that *looks* declared and is not usable: a dangling
+    id, a partner whose direction is not ``exit``, a partner that does not start where this
+    route ends, a partner whose first leg does not take in the currency this route delivers, and
+    a partner that does not end holding the base currency.
 
-    * **A dangling id.** ``cost._round_trip`` raises on it, blaming the loader -- correctly,
-      since the whole reason the absence is expressible is that a typo must not become it.
-    * **A partner whose direction is not ``exit``.** An inbound route is not an exit; pairing
-      two ways *in* would produce a round trip that never comes back.
-    * **A partner that does not start where this route ends.** This is the sharpest of the
-      five: a pair that does not meet would load and produce a *confident round-trip figure
-      for two unrelated journeys*, which is the exact class of number FR-030 exists to
-      refuse.
-    * **A partner whose first leg does not take in the currency this route delivers.** The
-      seam is a currency as well as a venue: a pair meeting at the venue but not in the
-      currency could only be walked through a conversion nobody declared, at a rate nobody
-      chose -- the implicit mid-rate FR-010 forbids -- and without this check it loads and
-      then dies mid-costing as a raw currency mismatch naming neither file.
-    * **A partner that does not end holding the base currency.** §4.3.3 asks for money back
-      in **spendable** base currency; an exit that stops in dollars at an exchange has not
-      got the money out, and an asset that cannot be liquidated into spendable base currency
-      is not worth its stated value (Principle VI).
+    The third and fourth are the sharp ones. A pair that does not meet would load and produce a
+    *confident round-trip figure for two unrelated journeys*, which is the class of number
+    FR-030 exists to refuse; a pair meeting at the venue but not in the currency could only be
+    walked through a conversion nobody declared, at the implicit mid-rate FR-010 forbids, and
+    would die mid-costing as a raw currency mismatch naming neither file.
     """
     if route.partner_route is None:
         return
@@ -880,19 +772,13 @@ def _check_pools(
 ) -> None:
     """Two legs naming one rail must declare one cap (research.md D10).
 
-    Across files, which is the case that matters: the whole point of a pool is that two
-    *different routes* through the owner's Monobank card consume one limit. Two numbers for
-    one real limit means at least one of them is wrong, and picking either silently would be
-    a guess -- so the error names both files and both legs.
+    Across files, which is the case that matters: two *different routes* through the owner's
+    Monobank card consume one limit. Two numbers for one real limit means at least one of them
+    is wrong, so the error names both files and both legs.
 
-    **One currency, checked before the amounts.** A pool whose caps disagree about the
-    currency is a sharper defect than one whose caps disagree about the number: nothing can
-    accumulate consumption across two currencies without inventing a rate, and the amount
-    comparison itself would raise a currency mismatch naming neither file. So the currency
-    rule is its own refusal, first.
-
-    ``core.routes.capacity.caps_of`` refuses the same disagreement within one route and
-    raises, because reaching it means this check was bypassed.
+    **One currency, checked before the amounts**, and its own refusal: nothing can accumulate
+    consumption across two currencies without inventing a rate, and the amount comparison itself
+    would raise a currency mismatch naming neither file.
     """
     declared: dict[str, tuple[str, int, Money]] = {}
     for route_id in sorted(routes):
@@ -944,18 +830,12 @@ def _check_regimes(
 ) -> None:
     """A regime selects from the declared routes, and it must select a **closed** set.
 
-    Two checks, both of which the core also refuses -- by raising, because by then the
-    scenario has already been handed to a comparison:
-
-    * **Every ``route_ids`` member resolves.** A regime does not declare routes of its own;
-      it states which of the declared ones it believes in, so a name that resolves to
-      nothing is a belief about a corridor that does not exist.
-    * **Partner closure.** Including an inbound route while excluding the exit route it
-      names would make money one-way, and costing it would raise on a dangling partner and
-      blame the loader for a scenario's belief. "There is a way in and none out" is a
-      *route* declaring no ``partner_route`` -- a fact about the corridor, with a source --
-      so a regime with only one direction of a corridor is expressed as a separately
-      declared pair rather than as half of this one (FR-027).
+    A regime does not declare routes of its own, so a ``route_ids`` member that resolves to
+    nothing is a belief about a corridor that does not exist. Partner closure is the second
+    half: including an inbound route while excluding the exit route it names would make money
+    one-way, and costing it would raise on a dangling partner and blame the loader for a
+    scenario's belief. "There is a way in and none out" is a *route* declaring no
+    ``partner_route`` -- a fact about the corridor, with a source -- not a regime (FR-027).
     """
     for regime in scenario.regimes:
         field_path = f"scenario.regime[{regime.id}].route_ids"
@@ -993,9 +873,8 @@ def _check_regimes(
 def _resolved_kinds(path: Path) -> tuple[dict[str, ObservationKind], dict[str, Path]]:
     """Declared observation kinds by id, refusing a duplicate.
 
-    One helper per family of declaration, and the split is not cosmetic: :func:`resolve_ramp`
-    is the *order* the families are resolved in, and a reader checking that order should not
-    have to read six duplicate-detection loops to find it.
+    One helper per family, because :func:`resolve_ramp` is the *order* the families are resolved
+    in and a reader checking that order should not have to read six duplicate-detection loops.
     """
     kinds: dict[str, ObservationKind] = {}
     files: dict[str, Path] = {}
@@ -1160,24 +1039,14 @@ def resolve_ramp(
 ) -> RampDeclarations:
     """Parse every ramp declaration, then check what only the whole set can show.
 
-    The order is the design, exactly as it is for :func:`resolve`: **every file is parsed
-    individually first, then the relations are checked.** A resolver that loaded lazily could
-    not report a duplicate at all, since it would never hold both declarations at once -- and
-    it could not check a chain against the venues, or a partner against the routes, because
-    the file naming them would have been read before the file declaring them.
+    Files are read in the order given and the caller is expected to have sorted them
+    (:func:`ramp_from_data_root` does), so a duplicate is always reported against the same one of
+    the two files rather than depending on filesystem order.
 
-    Within that, kinds and venues come first because everything else refers to them, then
-    channels, then routes (which refer to all three), then streams, then scenarios (which
-    refer to routes). Files are read in the order given and the caller is expected to have
-    sorted them (:func:`ramp_from_data_root` does), so a duplicate is always reported against
-    the same one of the two files rather than depending on filesystem order.
-
-    ``base_currency`` is required and keyword-only, and there is nothing here to guess it
-    from. It is what the exit routes are checked against: ``base_currency`` is the currency
-    the owner earns and spends, the ledger's home currency (Principle VI), and it is passed in
-    rather than read off the tax pack's ``base_currency`` because the *tax* role of currency is
-    a different role from the *base* role -- conflating two of the three is itself a defect,
-    and a data layer that quietly took one for the other would be the place it happened.
+    ``base_currency`` is passed in rather than read off the tax pack's ``base_currency`` because
+    the *tax* role of currency is a different role from the *base* role -- conflating two of the
+    three is itself a defect, and a data layer that quietly took one for the other would be the
+    place it happened.
     """
     kinds, kind_files = _resolved_kinds(kinds_file)
     venues, venue_files = _resolved_venues(venues_file)
@@ -1218,9 +1087,9 @@ def _check_route(
 ) -> None:
     """Everything about one route that needs the other files: references, then continuity.
 
-    References first and the chain second, deliberately. A leg naming a venue that does not
-    exist would otherwise be reported as a broken chain -- true, and not the reason -- and
-    the owner would go looking for a missing leg instead of a misspelt id.
+    References first, so a leg naming a venue that does not exist is not reported as a broken
+    chain -- true, and not the reason -- sending the owner after a missing leg instead of a
+    misspelt id.
     """
     for leg in route.legs:
         _check_kind(
@@ -1264,22 +1133,14 @@ def _check_route(
 def ramp_from_data_root(root: Path, *, base_currency: Currency) -> RampDeclarations:
     """Every ramp declaration under a data root, resolved together.
 
-    ``observation_kinds.toml`` and ``venues.toml`` at the root, then ``channels/*.toml``,
-    ``routes/*.toml``, ``streams/*.toml`` and ``scenarios/*.toml``. Sorted, so a run is
-    reproducible: an unsorted directory listing would make the order of two files -- and
-    therefore which one a duplicate-id error names -- depend on the filesystem.
+    Sorted, and only the top level of each directory, on the precedent ``instruments/nav/`` set:
+    a subdirectory holds a different shape of file, and globbing recursively would try to
+    validate it as a declaration and report a confusing failure about a file that is correct.
 
-    Only the top level of each directory is read, on the precedent
-    ``instruments/nav/`` set: a subdirectory holds a different shape of file, and globbing
-    recursively would try to validate it as a declaration and report a confusing failure
-    about a file that is perfectly correct.
+    An empty directory is an **error**, not an empty world: silently returning no routes would
+    make a mistyped path indistinguishable from a repository with no data.
 
-    An empty directory is an **error**, not an empty world. Silently returning no routes
-    would make a mistyped path indistinguishable from a repository with no data, and every
-    downstream reference would then fail for a reason that names the wrong thing.
-
-    ``base_currency`` is required and keyword-only, for the reason
-    :func:`resolve_ramp` gives.
+    ``base_currency`` is required and keyword-only, for the reason :func:`resolve_ramp` gives.
     """
     channels = sorted((root / CHANNELS_DIR).glob("*.toml"))
     routes = sorted((root / ROUTES_DIR).glob("*.toml"))
@@ -1316,19 +1177,9 @@ def ramp_from_data_root(root: Path, *, base_currency: Currency) -> RampDeclarati
 # 003-route-coverage: the coverage report's cross-file pass
 # ---------------------------------------------------------------------------
 #
-# One new declaration and four relations, each of which needs a file the spendable list has
-# never opened:
-#
-# 1. **The venue exists**, on the loader's existing `_known` path -- a spendable endpoint at a
-#    venue nobody declared cannot be checked against anything.
-# 2. **The venue can hold the currency.** `Venue.currencies` already exists for this class of
-#    contradiction and `_check_venue` already owns it for legs; a place that cannot hold
-#    hryvnia is not a place the owner spends hryvnia from.
-# 3. **The currency is the run's base currency** (FR-004). Accepting a foreign one would make
-#    the report decide that foreign cash counts as spent.
-# 4. **The owner owns the streams** the list is resolved with. Where a person spends is a fact
-#    about *that* person, and one owner's spendable venues deciding another's verdicts would
-#    put two people's facts in one report (Principle VII).
+# One new declaration, and the relations the spendable list cannot check about itself: the venue
+# exists and can hold the currency, the currency is the run's base currency (FR-004), and the
+# owner owns the streams the list is resolved with (Principle VII).
 
 SPENDABLE_DIR = "spendable"
 """Where the per-owner spendable-endpoint list lives under a data root.
@@ -1341,14 +1192,7 @@ world; where this person spends is not.
 
 @dataclass(frozen=True, slots=True)
 class CoverageDeclarations:
-    """Every declaration a coverage report needs: the ramp's, plus the spendable list.
-
-    ⚙ **A record beside :class:`RampDeclarations` rather than more fields on it**, on the
-    precedent `RampDeclarations` itself sets against :class:`Declarations`. The two describe
-    different runs: a data root with no spendable file must still be able to cost a ramp, and
-    folding the list into the ramp record would make every existing caller require a file this
-    feature invented.
-    """
+    """Every declaration a coverage report needs: the ramp's, plus the spendable list."""
 
     ramp: RampDeclarations
     """The venues, streams, routes, channels, kinds and scenarios the report audits -- the same
@@ -1360,8 +1204,6 @@ class CoverageDeclarations:
     is the whole question and order means nothing; the report sorts it where it reports it."""
 
     spendable_file: Path
-    """Which file declared the list. Not decoration: it is what lets a later failure still name
-    the file after the TOML has been discarded."""
 
     scenario_id: str | None
     """Which declared scenario's belief this set was resolved for, or ``None`` for FR-015's
@@ -1388,12 +1230,10 @@ def _check_spendable(
 ) -> None:
     """One spendable endpoint against the venues and the base currency (FR-004).
 
-    The venue check is ``_check_venue``'s, unchanged, so "this venue cannot hold that currency"
-    is asked in the same words wherever it is asked. The base-currency check is separate and is
-    this feature's own: FR-004 says base currency only, and it is refused rather than converted,
-    because the alternative -- accepting dollars at an exchange as somewhere money has "come
-    back out" -- is the report quietly deciding that foreign cash counts as spent, which is the
-    single most flattering possible error it could make about the registry.
+    The venue check is ``_check_venue``'s, unchanged. The base-currency check is separate: a
+    foreign currency is refused rather than converted, because accepting dollars at an exchange
+    as somewhere money has "come back out" is the report quietly deciding that foreign cash
+    counts as spent -- the most flattering error it could make about the registry.
     """
     field_path = f"{loader.SPENDABLE_TABLE}[{position}].venue"
     _check_venue(endpoint.venue_id, endpoint.currency, venues, path=path, field_path=field_path)
@@ -1421,28 +1261,19 @@ def _check_spendable_owner(
 ) -> None:
     """The list must belong to the owner whose streams it is resolved with (Principle VII).
 
-    Checked against the *streams* rather than against a configured owner id, because the streams
-    are the other per-owner declaration in the run and the report pairs the two on every line:
-    every verdict is a `(destination x stream)`, and the spendable list is what decides half of
-    it. A list belonging to somebody else would answer this owner's question with that owner's
-    life.
+    Checked against the *streams* rather than a configured owner id: every verdict is a
+    `(destination x stream)` and the spendable list decides half of it, so a list belonging to
+    somebody else would answer this owner's question with that owner's life.
 
-    ⚙ **The run must hold exactly one owner's streams, not merely include his** (correction,
-    2026-08-23). Asking only ``owner_id in owners`` was the leak: ``ramp_from_data_root`` globs
-    every ``streams/*.toml``, so a second owner's file loads beside the first, his streams are
-    paired with *this* owner's spendable list, and his destinations come out marked ready on
-    somebody else's definition of where money can be spent. That is exactly what
-    :func:`coverage_from_data_root` refuses in as many words on the spendable side -- "merging
-    two lists would let one owner's spendable venues decide the other's verdicts" -- and a guard
-    whose stated claim is false is worse than no guard.
+    **The run must hold exactly one owner's streams, not merely include his.**
+    ``ramp_from_data_root`` globs every ``streams/*.toml``, so a second owner's file loads beside
+    the first, his streams are paired with *this* owner's spendable list, and his destinations
+    come out marked ready on somebody else's definition of where money can be spent.
 
-    **Refused here rather than in `ramp_from_data_root`, and against the foreign stream file.**
-    A ramp comparison costs one named `(destination x stream x route)` at a time and blends
-    nothing across owners, so multi-owner streams are not a defect there; a coverage run folds
-    over *every* stream at once, which is what makes the second owner's presence a wrong answer
-    rather than an unused file. The offending declaration is the stream file that does not
-    belong in this run -- the spendable list is correct about itself -- so that is the file the
-    error names, with both owner ids and every foreign stream in the message.
+    Refused here rather than in ``ramp_from_data_root``, and against the foreign stream file: a
+    ramp comparison costs one named tuple at a time and blends nothing across owners, while a
+    coverage run folds over *every* stream at once. The spendable list is correct about itself,
+    so the error names the stream file that does not belong in this run.
     """
     owners = sorted({stream.owner_id for stream in streams.values()})
     if owner_id not in owners:
@@ -1485,26 +1316,16 @@ def _regimes_of_scenario(
 ) -> Mapping[str, Regime]:
     """One named scenario's regimes, keyed by id -- or none at all, said out loud.
 
-    ⚙ **The audit is scoped to one scenario, and two scenarios are never blended**
-    (research.md D17, owner decision 2026-08-23). A scenario is the unit of belief: it declares
-    its regimes *and* the transition between them, so its regimes are alternatives to each
-    other. Two scenarios are alternatives to *one another*, and pooling their regimes into one
-    ``regimes`` mapping would produce a report about a world nobody declared -- four blocks
-    where the owner holds two beliefs of two regimes each, each block honestly labelled and the
-    set of them meaningless. There is therefore no way to ask for two, and no merge to get
-    wrong.
+    **The audit is scoped to one scenario, and two are never blended** (research.md D17, owner
+    decision 2026-08-23). A scenario is the unit of belief -- it declares its regimes *and* the
+    transition between them -- so two scenarios are alternatives to *one another*, and pooling
+    their regimes would produce a report about a world nobody declared.
 
     **An unknown ``scenario_id`` is refused, never quietly read as "no regime declared".** The
     fallback would audit every declared route under the implicit regime and say so in the
-    ``source`` field, which is the flattering reading of a typo: a full-coverage-looking report
-    over a route set no belief in the registry supports. The refusal names the files that were
-    read and lists what they declare, so the caller can correct the name from the message.
+    ``source`` field: a full-coverage-looking report over a route set no belief supports.
 
-    ``None`` is FR-015's implicit regime and returns an empty mapping, which is what
-    ``coverage`` reads as "audit every declared route under one implicit regime".
-
-    Duplicate regime ids **within** a scenario are already refused by the loader
-    (``loader._regimes``), which is why keying by id here cannot silently drop one.
+    ``None`` is FR-015's implicit regime and returns an empty mapping.
     """
     if scenario_id is None:
         return {}
@@ -1544,19 +1365,14 @@ def resolve_coverage(
     """The ramp declarations plus a resolved spendable list, checked against them.
 
     Takes the resolved :class:`RampDeclarations` rather than the paths that produced them: the
-    spendable list is checked against the *venues*, the *base currency* and the *streams*, all
-    three of which are already resolved by then, and re-resolving them here would give a data
-    root two chances to disagree with itself.
+    list is checked against the venues, the base currency and the streams, all three already
+    resolved, and re-resolving them here would give a data root two chances to disagree with
+    itself.
 
-    ⚙ **``scenario_id`` is required and nullable, rather than defaulted to ``None``.** The two
-    would behave identically until the day somebody forgets the argument, and then they differ
-    by exactly the thing this feature exists to prevent: a report that audits every declared
-    route under an implicit regime, while the registry declares regimes that believe in a
-    subset of them, is confident about a world nobody stated. FR-015's implicit regime is a
-    legitimate answer to *"audit everything"* and an illegitimate one to *"audit my scenario"*,
-    and only the caller knows which was asked. Making it required forces that sentence to be
-    written down at every call site; making it nullable keeps FR-015 reachable without a second
-    entry point. See :func:`_regimes_of_scenario` for what each value resolves to.
+    ``scenario_id`` is required and nullable rather than defaulted to ``None``. The two behave
+    identically until somebody forgets the argument, and then a report audits every declared
+    route under an implicit regime while the registry declares regimes believing in a subset of
+    them. Making it required forces the caller to say which question was asked.
     """
     owner_id, endpoints = loader.spendable_from_file(spendable_file)
     _check_spendable_owner(
@@ -1587,24 +1403,15 @@ def coverage_from_data_root(
     """Every declaration a coverage report needs, under one data root.
 
     :func:`ramp_from_data_root`'s six families, plus ``spendable/*.toml``. An empty
-    ``spendable/`` directory is an **error** for the reason that function already gives: a
-    mistyped path and an empty world are indistinguishable downstream, and one of them is a
-    mistake -- and here the mistake would be the loudest possible one, since a report with no
-    spendable endpoints marks every destination in the registry deficit 3.
+    ``spendable/`` directory is an **error** for the reason that function gives, and here the
+    mistake would be the loudest possible one: a report with no spendable endpoints marks every
+    destination in the registry deficit 3.
 
-    ⚙ **Exactly one file, and a second is refused by name.** ``contracts/spendable-schema.md``
-    gives :class:`CoverageDeclarations` one ``spendable_file``, and the spec assumes one owner.
-    A second file is refused rather than merged, on the precedent of the ``deposit`` fallback
-    policy: a real thing that is not built yet and an unrecognised thing are different facts,
-    and the owner acts differently on each. Merging two owners' lists silently would let one
-    person's spendable venues decide the other person's verdicts -- and this file is per-owner
-    precisely so that cannot happen.
-
-    **The same blend arrives through ``streams/`` and is refused there too.** This directory
-    holds one file, but ``ramp_from_data_root`` globs every ``streams/*.toml``, so the claim
-    above is only true because :func:`_check_spendable_owner` requires the streams loaded
-    beside the list to be *this* owner's and no one else's. Without that half, the sentence
-    here would be false in the one direction nobody was looking.
+    **Exactly one file, and a second is refused by name.** Merging two owners' lists would let
+    one person's spendable venues decide the other's verdicts. That claim holds only because
+    :func:`_check_spendable_owner` also requires the streams loaded beside the list to be *this*
+    owner's -- ``ramp_from_data_root`` globs every ``streams/*.toml``, so the same blend arrives
+    through that directory.
     """
     declared = sorted((root / SPENDABLE_DIR).glob("*.toml"))
     if not declared:
@@ -1639,10 +1446,6 @@ def coverage_from_data_root(
 # ---------------------------------------------------------------------------
 # 006-inzhur-instruments: fund reference resolution
 # ---------------------------------------------------------------------------
-#
-# The same cross-file pass a bond declaration gets, over the same tax pack. It lives here
-# rather than in the loader for the reason every check in this module does: whether a class
-# id resolves depends on files ``fund_from_file`` has never opened.
 
 
 def _check_fund_references(
@@ -1693,11 +1496,8 @@ def _check_fund_references(
 # 004-composed-paths: the segment bound's cross-file pass
 # ---------------------------------------------------------------------------
 #
-# One new declaration and one relation the file cannot check about itself: **the owner owns the
-# streams the bound is resolved with**. How far a search may run is a fact about *this* person
-# (Principle VII), and one owner's policy deciding another's reach would put two people's facts
-# in one comparison -- feature 003's argument about the spendable list, applied to the one knob
-# feature 004 adds.
+# One relation the file cannot check about itself: **the owner owns the streams the bound is
+# resolved with**. How far a search may run is a fact about *this* person (Principle VII).
 
 COMPOSITION_DIR = "composition"
 """Where the per-owner segment bound lives under a data root.
@@ -1711,20 +1511,12 @@ COMPOSITION_DIR = "composition"
 class CompositionDeclarations:
     """Every declaration composed candidates need: the coverage set, plus the segment bound.
 
-    ⚙ **A record beside :class:`CoverageDeclarations` rather than more fields on it**, on the
-    precedent that record itself sets against :class:`RampDeclarations`. The three describe
-    different runs: a data root with no composition file must still be able to cost a ramp and
-    audit a registry, and folding the bound into either would make every existing caller require
-    a file this feature invented.
-
     **It builds on the coverage set rather than on the ramp set, and that is a dependency on
-    declarations rather than on a report** (004 research.md D13). Composition needs the
-    *spendable list*, because a composed exit chain has to end somewhere the owner calls
-    spendable (FR-022), and it needs the regimes, because every segment of a candidate belongs to
-    one regime's route set (FR-017). Both are already resolved and checked by
-    :func:`resolve_coverage`. What composition does **not** consult is the coverage *report*:
-    using the declarations is not using the audit, and a ranking that depended on a report would
-    invert the direction feature 003's FR-019 fixed.
+    declarations rather than on a report** (004 research.md D13). Composition needs the spendable
+    list, because a composed exit chain has to end somewhere the owner calls spendable (FR-022),
+    and the regimes, because every segment belongs to one regime's route set (FR-017); both are
+    already resolved by :func:`resolve_coverage`. What it does **not** consult is the coverage
+    *report*: a ranking that depended on a report would invert the direction 003's FR-019 fixed.
     """
 
     coverage: CoverageDeclarations
@@ -1737,8 +1529,6 @@ class CompositionDeclarations:
     mistaken for a gap in the registry."""
 
     composition_file: Path
-    """Which file declared the bound. Not decoration: it is what lets a later failure still name
-    the file after the TOML has been discarded."""
 
 
 def _check_composition_owner(
@@ -1750,15 +1540,11 @@ def _check_composition_owner(
     """The bound must belong to the owner whose streams it is resolved with (Principle VII).
 
     A composed candidate is keyed by its stream, so a bound resolved beside somebody else's
-    streams would decide how far *his* money is allowed to travel -- one person's stated
-    preference silently applied to another person's registry.
+    streams would decide how far *his* money is allowed to travel.
 
-    ⚙ **Only one half of :func:`_check_spendable_owner`'s check is here, and the other half is
-    not missing.** That function also refuses a run holding a *second* owner's streams beside the
-    first's, and :func:`resolve_composition` takes an already-resolved
-    :class:`CoverageDeclarations` -- which has been through exactly that refusal. Repeating it
-    here was unreachable code: no input can arrive with a foreign stream still in it. A guard
-    that cannot fire is worse than no guard, because it reads as protection.
+    Only one half of :func:`_check_spendable_owner`'s check is here and the other half is not
+    missing: the input is an already-resolved :class:`CoverageDeclarations`, which has been
+    through the second-owner refusal, so repeating it would be a guard that cannot fire.
     """
     owners = sorted({stream.owner_id for stream in streams.values()})
     if owner_id not in owners:
@@ -1778,10 +1564,8 @@ def resolve_composition(
 ) -> CompositionDeclarations:
     """The coverage declarations plus a resolved segment bound, checked against their owner.
 
-    Takes the resolved :class:`CoverageDeclarations` rather than the paths that produced them,
-    on :func:`resolve_coverage`'s own reasoning: the bound is checked against the *streams*,
-    which are already resolved by then, and re-resolving them here would give a data root two
-    chances to disagree with itself.
+    Takes the resolved :class:`CoverageDeclarations` rather than the paths that produced them:
+    re-resolving would give a data root two chances to disagree with itself.
     """
     owner_id, bound = loader.composition_from_file(composition_file)
     _check_composition_owner(owner_id, coverage.ramp.streams, path=composition_file)
@@ -1795,17 +1579,10 @@ def composition_from_data_root(
 ) -> CompositionDeclarations:
     """Every declaration composed candidates need, under one data root.
 
-    :func:`coverage_from_data_root`'s families, plus ``composition/*.toml``.
-
     **An empty directory is an error, not a policy of "do not compose".** FR-006 refuses a
-    permissive default, and the absence of the file is the absence of the policy: a mistyped
-    path and an unstated bound are indistinguishable downstream, and reading the absence as a
-    bound of 1 would silently turn the feature off in a run that asked for it.
-
-    ⚙ **Exactly one file, and a second is refused by name**, on feature 003's precedent for the
-    spendable list. Two owners' policies cannot both be in force, and merging them silently --
-    by taking either one, or the smaller, or the larger -- would let one person decide the
-    other's reach. Multi-owner resolution is a later feature, not a defect here.
+    permissive default: reading the absence as a bound of 1 would silently turn the feature off
+    in a run that asked for it. Exactly one file, and a second is refused by name -- two owners'
+    policies cannot both be in force, and merging them would let one decide the other's reach.
     """
     declared = sorted((root / COMPOSITION_DIR).glob("*.toml"))
     if not declared:
@@ -1842,10 +1619,9 @@ def composition_from_data_root(
 # 014-candidates: how many candidates one enumeration may produce
 # ---------------------------------------------------------------------------
 #
-# One new declaration and the same relation `composition` cannot check about itself: **the
-# owner owns the streams the ceiling is resolved with**. How many options this person is shown
-# is a fact about *this* person (Principle VII), and because exceeding the ceiling refuses
-# rather than truncates, somebody else's number would decide whether he is shown any at all.
+# The same relation `composition` cannot check about itself: **the owner owns the streams the
+# ceiling is resolved with**. Because exceeding the ceiling refuses rather than truncates,
+# somebody else's number would decide whether this person is shown any options at all.
 
 CANDIDATES_DIR = "candidates"
 """Where the per-owner candidate ceiling lives under a data root.
@@ -1856,12 +1632,7 @@ CANDIDATES_DIR = "candidates"
 
 @dataclass(frozen=True, slots=True)
 class CandidateDeclarations:
-    """Every declaration an enumeration needs: the composition set, plus the candidate ceiling.
-
-    A record beside :class:`CompositionDeclarations` rather than more fields on it: a data root
-    with no ceiling must still be able to compose candidates, and folding the ceiling in would
-    make every existing caller require a file this feature invented.
-    """
+    """Every declaration an enumeration needs: the composition set, plus the candidate ceiling."""
 
     composition: CompositionDeclarations
     """The routes, venues, streams, spendable endpoints, regimes and the segment bound -- one
@@ -1871,8 +1642,6 @@ class CandidateDeclarations:
     """The declared maximum number of candidates one enumeration may produce (FR-019)."""
 
     candidates_file: Path
-    """Which file declared the ceiling. Not decoration: it is what lets a later failure still
-    name the file after the TOML has been discarded."""
 
 
 def _check_candidates_owner(
@@ -1881,12 +1650,7 @@ def _check_candidates_owner(
     *,
     path: Path,
 ) -> None:
-    """The ceiling must belong to the owner whose streams it is resolved with (Principle VII).
-
-    Only one half of :func:`_check_spendable_owner`'s check, and the other half is not missing:
-    the input is an already-resolved :class:`CompositionDeclarations`, so no run holding a
-    second owner's streams can reach here. A guard that cannot fire reads as protection.
-    """
+    """The ceiling must belong to the owner whose streams it is resolved with (Principle VII)."""
     owners = sorted({stream.owner_id for stream in streams.values()})
     if owner_id not in owners:
         raise DeclarationError(
@@ -1904,13 +1668,7 @@ def _check_candidates_owner(
 def resolve_candidates(
     *, composition: CompositionDeclarations, candidates_file: Path
 ) -> CandidateDeclarations:
-    """The composition declarations plus a resolved ceiling, checked against their owner.
-
-    Takes the resolved :class:`CompositionDeclarations` rather than the paths that produced
-    them, on :func:`resolve_composition`'s own reasoning: the ceiling is checked against the
-    *streams*, which are already resolved by then, and re-resolving them here would give a data
-    root two chances to disagree with itself.
-    """
+    """The composition declarations plus a resolved ceiling, checked against their owner."""
     owner_id, ceiling = loader.candidates_from_file(candidates_file)
     _check_candidates_owner(owner_id, composition.coverage.ramp.streams, path=candidates_file)
     return CandidateDeclarations(
@@ -1923,16 +1681,10 @@ def candidates_from_data_root(
 ) -> CandidateDeclarations:
     """Every declaration an enumeration needs, under one data root.
 
-    :func:`composition_from_data_root`'s families, plus ``candidates/*.toml``.
-
-    **An empty directory is an error, not an absent ceiling.** FR-019 refuses a default, and the
-    absence of the file is the absence of the policy: reading it as *no limit* would let a
-    registry that has outgrown enumeration keep enumerating, which is the one thing the ceiling
-    exists to report.
-
-    Exactly one file: two ceilings cannot both be in force, and merging them -- by taking
-    either, or the smaller, or the larger -- would let one person decide whether the other is
-    shown any options at all.
+    **An empty directory is an error, not an absent ceiling.** FR-019 refuses a default: reading
+    the absence as *no limit* would let a registry that has outgrown enumeration keep
+    enumerating, which is the one thing the ceiling exists to report. Exactly one file -- two
+    ceilings cannot both be in force.
     """
     declared = sorted((root / CANDIDATES_DIR).glob("*.toml"))
     if not declared:
@@ -1973,23 +1725,17 @@ LOADERS_BY_KIND: Mapping[str, Callable[[Path], object]] = {
 }
 """Which loader parses each declared ``[instrument] class``.
 
-⚙ **Feature 006.** The *vocabulary* of declaration kinds is domain knowledge and lives in
-``core.instruments.registry``; which function reads each file is the data layer's business
-and lives here, beside the loaders. Keeping them apart is what stops ``core`` needing to
-know that a file exists.
+The *vocabulary* of declaration kinds is domain knowledge and lives in
+``core.instruments.registry``; which function reads each file is the data layer's business and
+lives here, beside the loaders. Keeping them apart is what stops ``core`` needing to know that a
+file exists.
 
-A mapping rather than a branch, on ``core``'s own precedent -- *"registries are mappings of
-functions, not subclass dispatch"* (owner decision D-E). Not every entry returns the same record
-type, so this is typed at ``object`` and the caller narrows immediately; that is honest
-about what the loaders have in common, which is a path in and a declaration out and
-nothing else.
+A mapping rather than a branch (owner decision D-E). Not every entry returns the same record
+type, so this is typed at ``object`` and the caller narrows immediately -- honest about what the
+loaders have in common, which is a path in and a declaration out and nothing else.
 
-⚙ **Feature 013 added a second entry returning an ``InstrumentDeclaration``.** The two
-forms of bond declaration are one record and one downstream, and they differ only in which
-loader reads the file -- which is exactly what this mapping is for.
-
-:func:`_kind_of` refuses a kind the vocabulary does not contain, naming the
-file, so an unrecognised class never reaches a ``KeyError`` here.
+:func:`_kind_of` refuses a kind the vocabulary does not contain, naming the file, so an
+unrecognised class never reaches a ``KeyError`` here.
 """
 
 
@@ -2018,28 +1764,16 @@ def _kind_of(path: Path) -> str:
 # 008-seed-and-goals: the owner's opening lots and targets, resolved as one life
 # ---------------------------------------------------------------------------
 #
-# Two new declarations and three relations no single file can check about itself:
-#
-# * **a seed's instrument must be declared** (FR-005) -- the reference resolves only against
-#   the whole curated set, which is what this module exists to hold;
-# * **a goal's currency must be the run's base currency** (FR-016) -- a base currency is a
-#   property of the run rather than of the file, the same reading `_check_spendable` already
-#   applies to a spendable endpoint;
-# * **the two files must name the same owner** -- one run holds one person's life
-#   (Principle VII), and resolving somebody's holdings beside somebody else's target would
-#   produce a report whose every figure was arithmetically correct and about nobody.
-#
-# ⚙ **An absent or empty directory is *not* an error here**, and this is the only declaration
-# family in the project of which that is true (008 FR-024, research.md D9). `composition`
-# refuses the same shape and the contrast is deliberate: the absence of a segment bound is the
-# absence of a policy a search cannot proceed without, while the absence of a holding is a
-# perfectly ordinary financial position. Refuse emptiness where it cannot be told from an
-# error; accept it where it can.
+# **An absent or empty directory is not an error here**, and this is the only declaration family
+# in the project of which that is true (008 FR-024, research.md D9). `composition` refuses the
+# same shape and the contrast is deliberate: the absence of a segment bound is the absence of a
+# policy a search cannot proceed without, while the absence of a holding is a perfectly ordinary
+# financial position. Refuse emptiness where it cannot be told from an error; accept it where it
+# can.
 #
 # What is deliberately **not** checked here: whether a lot was acquired before its instrument
 # existed. That is a well-formed declaration of an impossible history and it is the engine's
-# typed `InconsistentTerms`, on the precedent of a maturity on or before its issue date --
-# `core.ledger.seeds.opening_events` reports it.
+# typed `InconsistentTerms` -- `core.ledger.seeds.opening_events` reports it.
 
 SEEDS_DIR = "seeds"
 """Where the owner's declared opening lots live under a data root.
@@ -2055,8 +1789,7 @@ USER_DIR = "user"
 """The private overlay under a data root: gitignored, and the only place a real figure may live.
 
 025 FR-001. `data/README.md` rule 5 forbids committing a figure that describes the owner's
-actual position, and until this feature the rule was kept by a reviewer noticing.
-:func:`_check_committable` is that rule made mechanical.
+actual position; :func:`_check_committable` is that rule made mechanical.
 """
 
 OVERLAY_DIRS: Final[frozenset[str]] = frozenset({SEEDS_DIR})
@@ -2117,13 +1850,7 @@ def _check_overlay_directories(overlay: Path) -> None:
 
 @dataclass(frozen=True, slots=True)
 class SeedAndGoalDeclarations:
-    """One owner's holdings and targets, resolved against the curated declarations.
-
-    A record beside :class:`Declarations` rather than more fields on it, on the precedent
-    :class:`CoverageDeclarations` and :class:`CompositionDeclarations` set: the three describe
-    different runs, and folding seeds into the instrument set would make every existing caller
-    require files this feature invented.
-    """
+    """One owner's holdings and targets, resolved against the curated declarations."""
 
     owner_id: str | None
     """Whose declarations these are, or ``None`` when neither file exists.
@@ -2150,11 +1877,7 @@ class SeedAndGoalDeclarations:
     """The declared targets, in file order. Empty is ordinary."""
 
     seed_file: Path | None
-    """Which file under the **shipped** root declared lots, or ``None`` if none did.
-
-    Not decoration: it is what lets a later failure name the file after the TOML has been
-    discarded -- and what a test asserting the Principle VII boundary points at.
-    """
+    """Which file under the **shipped** root declared lots, or ``None`` if none did."""
 
     overlay_seed_file: Path | None
     """Which file under the **overlay** declared lots, or ``None`` if none did (025 FR-008).
@@ -2182,9 +1905,8 @@ def _check_seed_instruments(
     owner declares, and it is the only way a quantity ever enters the system.
 
     ``core.ledger.seeds.opening_events`` refuses the same thing as a typed
-    ``SeedInstrumentUndeclared``, for a caller that assembles lots without a file. Both exist
-    on :class:`UnresolvedTaxClass`'s precedent, and for its reason: the core cannot name a file
-    it never saw, and FR-005 asks for the file.
+    ``SeedInstrumentUndeclared``, for a caller that assembles lots without a file: the core
+    cannot name a file it never saw, and FR-005 asks for the file.
     """
     declarable = {**instruments, **held}
     for position, lot in enumerate(declared):
@@ -2206,11 +1928,9 @@ def _check_goal_currencies(
 ) -> None:
     """FR-016: a non-base target is refused as **not yet modelled**, never as invalid.
 
-    The distinction is the requirement rather than a nicety. USD is a currency this engine
-    models perfectly well; what is missing is the dated-rate machinery that would make a dollar
-    target comparable with a hryvnia one, and §4.7 is explicit that under devaluation the two
-    are different goals rather than one goal in two denominations. A reader told "invalid
-    currency" would go and edit a file that is correct.
+    USD is a currency this engine models perfectly well; what is missing is the dated-rate
+    machinery that would make a dollar target comparable with a hryvnia one. A reader told
+    "invalid currency" would go and edit a file that is correct.
     """
     for position, goal in enumerate(declared):
         if goal.currency is base_currency:
@@ -2268,12 +1988,9 @@ def _declared_currency(
     """What currency a lot's declared cost is in (025 FR-025).
 
     The base currency **unless the instrument it names declares a different one**. The fact
-    lives on the instrument rather than on the seed, which is where it belongs and where a
-    second lot of the same thing cannot contradict it -- 008 FR-010's "no ``currency`` key"
-    survives, and what changes is the reading of *base currency*.
-
-    A lot naming nothing declared falls through to the base currency and is refused a moment
-    later by :func:`_check_seed_instruments`, which can say what is wrong.
+    lives on the instrument rather than on the seed, where a second lot of the same thing
+    cannot contradict it. A lot naming nothing declared falls through to the base currency and
+    is refused a moment later by :func:`_check_seed_instruments`, which can say what is wrong.
     """
     instrument = instruments.get(lot.instrument_id)
     if instrument is not None:
@@ -2288,16 +2005,11 @@ def _base_currency_series(root: Path, *, base_currency: Currency) -> OfficialRat
     """The official-rate series the jurisdiction assessing in ``base_currency`` declares.
 
     Selected by tax currency rather than picked, which is what makes a struck basis the
-    *jurisdiction's* legal figure rather than one this loader chose: ``_official_rate_for``
-    already refuses a series that quotes the tax currency the wrong way round.
+    *jurisdiction's* legal figure rather than one this loader chose.
 
-    ``None`` where no such jurisdiction declares one, or where none is declared at all. It is
-    a declared absence rather than an oversight, and the lot that needed a rate refuses saying
-    so -- an empty ``tax/timing/`` is not this loader's business to complain about, because a
-    run whose every cost is already in the base currency needs no series at all.
-
-    Two of them naming different series is refused rather than resolved by directory order:
-    which the owner files under is a fact nothing here declares.
+    ``None`` where no such jurisdiction declares one: a declared absence rather than an
+    oversight, and the lot that needed a rate refuses saying so. Two of them naming different
+    series is refused rather than resolved by directory order.
     """
     named = {
         declared.official_rate_series: (declared, path)
@@ -2333,14 +2045,12 @@ def _struck(
     """One declared lot with its cost tagged, striking a foreign one at the acquisition date.
 
     025 FR-026: ``base = cost x rate / quotation_unit`` at the rate declared for the lot's own
-    acquisition date, through 011's existing conversion. Struck **before** the cost is tagged,
-    because ``strike_base`` raises on an amount already in the tax currency and by the time a
-    lot reaches ``core.ledger.seeds.seed_cost`` it is one.
+    acquisition date. Struck **before** the cost is tagged, because ``strike_base`` raises on an
+    amount already in the tax currency and by the time a lot reaches
+    ``core.ledger.seeds.seed_cost`` it is one.
 
     The estimated-basis mark is **not** merged here: it rides on ``basis`` and ``seed_cost``
-    joins the two, so a lot this function never saw carries it too (008 FR-007). What the
-    struck base carries is the rate observation's own provenance, and the union of the two is
-    what reaches every derived figure (FR-027).
+    joins the two, so a lot this function never saw carries it too (008 FR-007).
     """
     if currency is base_currency:
         # The declared amount rests on no cited source: an owner's own record is not an
@@ -2477,12 +2187,8 @@ def resolve_seeds_and_goals(
 ) -> SeedAndGoalDeclarations:
     """The owner's declared holdings and targets, checked against the curated set and the run.
 
-    Every file may be ``None``, and all may be: that is a person who holds nothing and wants
-    nothing in particular, which is an ordinary state rather than a refusal (FR-024).
-
-    The two seed files are **unioned** into one sequence of lots in shipped-then-overlay order,
-    after the collision check has ruled out the reading under which the union would double a
-    holding.
+    Every file may be ``None``, and all may be: a person who holds nothing and wants nothing in
+    particular is an ordinary state rather than a refusal (FR-024).
     """
     seed_owner: str | None = None
     goal_owner: str | None = None
@@ -2544,11 +2250,9 @@ def resolve_seeds_and_goals(
 def _at_most_one(root: Path, directory: str) -> Path | None:
     """The single declaration in a per-owner directory, or ``None`` if there is none.
 
-    **Zero is ordinary and two is refused**, which is the same split every other per-owner
-    directory makes at the top end and the opposite of what they make at the bottom. Two
-    owners' declarations cannot both be in force -- merging them would put two people's
-    holdings in one ledger -- while nobody's declarations being present is simply a person who
-    has not declared any.
+    **Zero is ordinary and two is refused.** Two owners' declarations cannot both be in force
+    -- merging them would put two people's holdings in one ledger -- while nobody's
+    declarations being present is simply a person who has not declared any.
     """
     declared = sorted((root / directory).glob("*.toml"))
     if not declared:
@@ -2572,14 +2276,10 @@ def seeds_and_goals_from_data_roots(
 ) -> SeedAndGoalDeclarations:
     """One owner's holdings and targets over both roots, resolved against the curated set.
 
-    The instrument set comes from :func:`from_data_root` over the **shipped** root, so a seed
-    is checked against exactly the declarations a projection would run with rather than
-    against a set assembled twice. The overlay declares no instrument: `data/user/` holds what
-    the owner has, and what a thing *is* stays curated and reviewed (FR-006).
-
-    **A missing ``seeds/`` or ``goals/`` directory is not an error** (FR-024), unlike every
-    other family, and an absent overlay is the same ordinary state (FR-002). See this
-    section's banner for why the two cases are different rather than inconsistent.
+    The instrument set comes from :func:`from_data_root` over the **shipped** root, so a seed is
+    checked against exactly the declarations a projection would run with. The overlay declares
+    no instrument: `data/user/` holds what the owner has, and what a thing *is* stays curated
+    and reviewed (FR-006).
     """
     overlay_seed_file: Path | None = None
     if roots.overlay is not None:
@@ -2601,19 +2301,12 @@ def seeds_and_goals_from_data_roots(
 # 007-cpi-real-terms: the CPI series and the inflation assumption
 # ---------------------------------------------------------------------------
 #
-# One relation a per-file validator structurally cannot check: **two files declaring one
-# series identity**. Each is individually valid; together they declare two different things
-# with one name, whichever loaded second would win by directory order, and every real figure
-# would silently rest on the other one. The error names both files, on this module's own
-# precedent, because knowing one of them leaves the reader to find the other by hand.
-#
-# ⚙ **An absent series and an absent assumption are reported states, not load failures**, and
-# this is the one place this feature departs from `composition`'s precedent deliberately. An
-# empty `composition/` directory is an error because the absence of the bound would silently
-# turn a search off -- nothing in the output would say a corridor had been skipped. An absent
-# CPI series is the opposite: every figure that wanted it comes back typed-unavailable naming
-# the absence (FR-012), in words, where the owner reads it. Refusing to load would move an
-# honest message from the result into a stack trace.
+# **An absent series and an absent assumption are reported states, not load failures**, and this
+# is the one place the feature departs from `composition`'s precedent deliberately. An empty
+# `composition/` directory is an error because the absence of the bound would silently turn a
+# search off -- nothing in the output would say a corridor had been skipped. An absent CPI
+# series is the opposite: every figure that wanted it comes back typed-unavailable naming the
+# absence (FR-012), in words, where the owner reads it.
 
 CPI_DIR = "cpi"
 """Where declared price-index series live under a data root. Cited; in `SOURCED_DIRS`."""
@@ -2631,14 +2324,7 @@ reading `data/instruments/nav/` already has: a subdirectory holds a different sh
 
 @dataclass(frozen=True, slots=True)
 class InflationDeclarations:
-    """Every declaration the real-terms slot needs: the price series, and the belief.
-
-    ⚙ **A record beside the others rather than more fields on `Declarations`**, on
-    `CompositionDeclarations`' own precedent. The sets describe different runs: a projection
-    with no CPI declared is a legitimate run that produces a shape-identical result, and
-    folding these fields into `Declarations` would make every existing caller require files
-    this feature invented.
-    """
+    """Every declaration the real-terms slot needs: the price series, and the belief."""
 
     series: Mapping[str, CpiSeries]
     """Declared series by their own declared id, never by file name or load order (FR-002).
@@ -2647,9 +2333,6 @@ class InflationDeclarations:
     """
 
     series_files: Mapping[str, Path]
-    """Which file declared each series. Not decoration: it is what lets a later failure -- a
-    manifest entry, a duplicate discovered downstream -- still name the file after the TOML has
-    been discarded."""
 
     assumption: InflationAssumption | None
     """The declared future-inflation belief, or ``None`` when this run was given none.
@@ -2736,17 +2419,7 @@ def inflation_from_data_root(root: Path) -> InflationDeclarations:
 # 009-tax-depth: the assessment rules, and the owner's positions on them
 # ---------------------------------------------------------------------------
 #
-# Two relations a per-file validator structurally cannot check:
-#
-# **A class mapped to a category that no rate pack declares.** Whether the class exists is a
-# fact about another file, and reading the dangling reference as "no rules apply" would be the
-# silent default this layer exists to prevent -- a class with rates and no category cannot be
-# assessed at all.
-#
-# **Two files declaring one jurisdiction's rules.** Each is valid alone; together, whichever
-# loaded second would win by directory order and every liability would rest on the other one.
-#
-# ⚙ **Absent rules are a load failure here, unlike an absent CPI series.** A tax year cannot be
+# **Absent rules are a load failure here, unlike an absent CPI series.** A tax year cannot be
 # assessed at all without them -- there is no figure to come back typed-unavailable, because
 # there is no figure. That is `composition`'s reading rather than `cpi`'s.
 
@@ -2770,13 +2443,10 @@ citation exemption a belief needs without pretending to be a scenario document.
 def _timing_by_jurisdiction(root: Path) -> dict[str, tuple[loader.TimingDeclaration, Path]]:
     """Every ``data/tax/timing/<jurisdiction>.toml``, keyed by the jurisdiction it declares.
 
-    Hoisted because two entry points need it -- the assessment rules a tax year is assembled
-    from, and the official-rate series a taxation scheme's base is struck at -- and reading
-    the directory twice would let the duplicate-jurisdiction refusal exist in one of them and
-    not the other.
-
-    An empty directory is **not** refused here: whether a run can proceed without assessment
-    rules is the caller's question and they answer it differently.
+    Hoisted because two entry points need it, and reading the directory twice would let the
+    duplicate-jurisdiction refusal exist in one of them and not the other. An empty directory is
+    **not** refused here: whether a run can proceed without assessment rules is the caller's
+    question and they answer it differently.
     """
     declared: dict[str, tuple[loader.TimingDeclaration, Path]] = {}
     for path in sorted((root / TAX_TIMING_DIR).glob("*.toml")):
@@ -2801,9 +2471,8 @@ def tax_rules_from_data_root(
 ) -> Mapping[str, AssessmentRules]:
     """Every jurisdiction's assessment rules, with their class references resolved.
 
-    Keyed by jurisdiction id. ``declarations`` is passed in rather than re-read so that the
-    class references resolve against **the same** rate packs the run will charge with: reading
-    the files twice would let a reference resolve here and fail at the charge, or the reverse.
+    ``declarations`` is passed in rather than re-read so the class references resolve against
+    **the same** rate packs the run will charge with.
     """
     timing = _timing_by_jurisdiction(root)
     if not timing:
@@ -2880,31 +2549,11 @@ def tax_positions_from_data_root(
 # 010-full-tuple: how an instrument is reached, and the whole set the join needs
 # ---------------------------------------------------------------------------
 #
-# Four relations a per-file validator structurally cannot check, and they are the whole of
-# this section:
-#
-# 1. **The instrument exists** -- of either declaration kind, because a fund and a bond share
-#    one id space.
-# 2. **The venues exist and can hold the instrument's currency**, which is `_check_venue`
-#    unchanged. Money cannot sit where its currency cannot, and a purchase venue that cannot
-#    hold what the instrument trades in is a seam nobody can cross.
-# 3. **The quote's currency is the instrument's own.** The price states its currency so the
-#    file reads on its own; the two are then checked against each other, on `_check_partner`'s
-#    precedent, because a file that can state something wrong is a file whose disagreement can
-#    be reported.
-# 4. **A price is declared exactly where the instrument states none.** A fund prices from its
-#    own declared NAV and entry markup; a bond declares a face value, which is what it repays,
-#    and no purchase price at all. Both halves are refused: a missing bond price would leave a
-#    purchase unsizable from an arriving amount, and a fund price here would be a second place
-#    for one fact -- the two disagreeing the day one of them is updated, with nothing to say
-#    which the figures used.
-#
-# ⚙ **This is also the first place the instrument side and the route side of the registry meet
-# in one record.** `Declarations` (instruments, funds, tax) and `RampDeclarations` (venues,
-# routes, channels, streams, kinds) have never known about each other, because until now
-# nothing needed both: a projection had no route and a route bought nothing. The join needs
-# every one of them at once, so `TupleDeclarations` composes rather than widens -- the same
-# "a record beside X rather than more fields on X" the five records above already take.
+# **A price is declared exactly where the instrument states none**, and both halves are refused.
+# A fund prices from its own declared NAV and entry markup; a bond declares a face value and no
+# purchase price at all. A missing bond price would leave a purchase unsizable from an arriving
+# amount, and a fund price here would be a second place for one fact -- the two disagreeing the
+# day one of them is updated, with nothing to say which the figures used.
 
 ACCESS_DIR = "access"
 """Where access declarations live under a data root. Cited; in `SOURCED_DIRS`.
@@ -2920,11 +2569,9 @@ same reading `[instrument.tax_classes]` and `data/venues.toml` already carry.
 class TupleDeclarations:
     """Every declaration the join needs, in one place, resolved against each other.
 
-    ⚙ **It composes the existing records rather than flattening them.** Reaching a route
-    through `coverage.ramp.routes` is two attributes longer than a flat field would be, and it
-    is what keeps one fact in one place: the venue set the access declarations were checked
-    against is literally the venue set the routes were checked against, rather than a copy
-    that can drift.
+    It composes the existing records rather than flattening them, which is what keeps one fact
+    in one place: the venue set the access declarations were checked against is literally the
+    venue set the routes were checked against, rather than a copy that can drift.
     """
 
     instruments: Declarations
@@ -2947,16 +2594,14 @@ class TupleDeclarations:
     """The two deflators a real figure needs, and which file declared each (024 FR-012).
 
     The whole record rather than the two values :attr:`registries` flattens, because
-    ``manifest.inflation_input_refs`` takes it whole; loose paths beside the registries would
-    be the same fact declared twice.
+    ``manifest.inflation_input_refs`` takes it whole.
     """
 
     registries: Registries
     """The same set again, flattened into the record the pure core takes.
 
     Built here rather than by every caller: assembling nine mappings by hand at each call site
-    is nine chances to pass the wrong one, and the core must not learn how to read a data root
-    to avoid that.
+    is nine chances to pass the wrong one, and the core must not learn how to read a data root.
     """
 
 
@@ -3040,9 +2685,8 @@ def _check_one_observation(entry: InstrumentAccess, *, path: Path, field_prefix:
     """A buy and a sell price for one instrument are **one** observation of one market.
 
     Both are carried by one accrual from their own observation day, so the difference between
-    the two clean prices is the spread and nothing else -- which is only true if the pair was
-    read on one day. Nothing downstream can see the pair, so the agreement is enforced here or
-    nowhere.
+    the two clean prices is the spread and nothing else -- only true if the pair was read on one
+    day. Nothing downstream can see the pair, so the agreement is enforced here or nowhere.
     """
     if entry.quote is None or entry.resale_price is None:
         return
@@ -3072,10 +2716,9 @@ def _check_resale_price(
     """A resale price is optional, is in the instrument's currency, and is a bond's alone.
 
     Optional because its absence is what 015 FR-031 refuses by name: an early exit that cannot
-    be struck reports a missing declaration rather than a figure. A
-    **fund** may not declare one, on the purchase quote's reasoning: it prices its own exit from
-    its declared NAV and its declared exit discount, and a second price in a second file is one
-    fact in two places. Nor may a **balance**, whose exit is the same identity its entry is.
+    be struck reports a missing declaration rather than a figure. A **fund** may not declare one
+    -- it prices its own exit from its declared NAV and exit discount, and a second price in a
+    second file is one fact in two places. Nor may a **balance**, whose exit is its entry.
     """
     quote = entry.resale_price
     if quote is None:
@@ -3365,15 +3008,12 @@ def tuple_from_data_root(
 ) -> TupleDeclarations:
     """Every declaration a tuple evaluation needs, under one data root.
 
-    The instrument side and the route side are resolved by the two entry points that already
-    own them, and then the access declarations are checked against both. Nothing here
-    re-parses a file either of them read.
+    The instrument side and the route side are resolved by the two entry points that already own
+    them, and then the access declarations are checked against both.
 
     An empty ``access/`` directory is an **error**, on ``composition``'s precedent rather than
-    ``cpi``'s: an absent CPI series makes every real figure say so in words, whereas an absent
-    access set makes every tuple in the comparison refuse for a missing declaration -- and a
-    comparison emptied by a forgotten directory looks exactly like one emptied by a genuine
-    gap in the registry.
+    ``cpi``'s: a comparison emptied by a forgotten directory looks exactly like one emptied by a
+    genuine gap in the registry.
     """
     instruments = from_data_root(root)
     covered = coverage_from_data_root(root, base_currency=base_currency, scenario_id=scenario_id)
@@ -3429,20 +3069,13 @@ def tuple_from_data_root(
 # 011-official-rate: the declared official-rate series
 # ---------------------------------------------------------------------------
 #
-# Two relations a per-file validator structurally cannot check:
+# **The series a jurisdiction names for its tax currency** must exist, and must quote the
+# currency the tax is assessed in: a series quoting dollars per hryvnia would strike every base
+# at the reciprocal of the published rate and leave every figure plausible.
 #
-# **Two files declaring one series identity.** Each is individually valid; together whichever
-# loaded second would win by directory order and every tax base would rest on the other one.
-#
-# **The series a jurisdiction names for its tax currency.** Whether it exists is a fact about
-# another file, and so is whether it quotes the currency the tax is assessed in — a series
-# quoting dollars per hryvnia would strike every base at the reciprocal of the published rate
-# and leave every figure plausible.
-#
-# ⚙ **An absent directory is an empty set, not a load failure**, on `cpi`'s reading rather
-# than `composition`'s. A run that never strikes a foreign base needs no series, and the one
-# that does comes back typed-unavailable, naming the pair it wanted and the event it failed on
-# — which is more use to the owner than a load error naming a directory.
+# **An absent directory is an empty set, not a load failure**, on `cpi`'s reading rather than
+# `composition`'s. A run that never strikes a foreign base needs no series, and the one that
+# does comes back typed-unavailable, naming the pair it wanted and the event it failed on.
 
 OFFICIAL_RATES_DIR = "official_rates"
 """Where declared official-rate series live under a data root. Cited; in `SOURCED_DIRS`."""
@@ -3459,8 +3092,6 @@ class OfficialRateDeclarations:
     """
 
     files: Mapping[str, Path]
-    """Which file declared each series, so a later failure can still name it after the TOML
-    has been discarded."""
 
 
 def official_rates_from_data_root(
@@ -3470,13 +3101,12 @@ def official_rates_from_data_root(
 
     Sorted, so a run does not depend on the order a filesystem happens to return.
 
-    ⚙ **``kinds`` is required, and this docstring is where that is explained.** A
-    `[non_publication_rule]` table carries a citation and a list of dates and **no number**,
-    so `scripts/check_provenance.py` -- which recognises a sourced table by its numeric
-    leaves -- cannot see it, and its staleness kind would be checked nowhere. Left unchecked a
-    misspelt kind loads clean and then raises from `staleness.kind_for` when a figure it
-    marked is aged: a crash at report time for a file that could have been refused by name at
-    load. Measured 2026-08-29.
+    ``kinds`` is required because a `[non_publication_rule]` table carries a citation and a list
+    of dates and **no number**, so `scripts/check_provenance.py` -- which recognises a sourced
+    table by its numeric leaves -- cannot see it, and its staleness kind would be checked
+    nowhere. Left unchecked a misspelt kind loads clean and then raises from
+    `staleness.kind_for` when a figure it marked is aged: a crash at report time for a file that
+    could have been refused by name at load.
     """
     series: dict[str, OfficialRateSeries] = {}
     declaring: dict[str, Path] = {}
@@ -3554,17 +3184,8 @@ def _official_rate_for(
 # 012-fop-group-3: the taxation scheme, and where income is credited
 # ---------------------------------------------------------------------------
 #
-# Three relations a per-file validator structurally cannot check:
-#
-# **Two files declaring one scheme identity.** Whichever loaded second would win by directory
-# order, and every charge would rest on the other one.
-#
-# **A destination row's scheme and venue.** A row naming a scheme nobody declares computes
-# nothing; a row naming a venue nobody declares records a judgement about a place this model
-# cannot name.
-#
-# **A stream's declared treatment.** Whether it exists, and whether it is a scheme a stream is
-# allowed to name — a `reading` scheme exists only inside a labelled what-if.
+# A stream's declared treatment must exist and must be one a stream is allowed to name: a
+# `reading` scheme exists only inside a labelled what-if.
 
 SCHEMES_DIR = "tax/schemes"
 """Where declared taxation schemes live. A subdirectory of `tax/`, which `check_provenance`
@@ -3605,11 +3226,9 @@ class SchemeDeclarations:
 def schemes_from_data_root(root: Path, *, base_currency: Currency) -> SchemeDeclarations:
     """Every scheme and destination under a data root, with every reference checked.
 
-    Composes ``ramp_from_data_root`` rather than taking venues and streams as arguments,
-    because all three checks below need them and a caller assembling the pieces by hand is a
-    caller who can assemble two-thirds of them.
-
-    Sorted, so a run does not depend on the order a filesystem happens to return.
+    Composes ``ramp_from_data_root`` rather than taking venues and streams as arguments, because
+    all three checks below need them and a caller assembling the pieces by hand is a caller who
+    can assemble two-thirds of them.
     """
     ramp = ramp_from_data_root(root, base_currency=base_currency)
     timing = _timing_by_jurisdiction(root)
@@ -3717,11 +3336,9 @@ def _check_destination(
 ) -> None:
     """A row's scheme, its venue and every reading's scheme, checked against what exists."""
     field_prefix = f"{loader.DESTINATION_TABLE}[{key[0]}/{key[1]}]"
-    # `is_reading` is carried rather than inferred from the field label. The comparison it
-    # replaced -- `field != "scheme"` -- was in fact unreachable-safe, since a reading's label
-    # always begins `reading[`; what is wrong with it is that its correctness depended on how
-    # a message string happens to be spelled, and the next edit to that spelling would not
-    # look like a behaviour change to anyone making it.
+    # `is_reading` is carried rather than inferred from the field label: a correctness that
+    # depended on how a message string happens to be spelled would not look like a behaviour
+    # change to whoever next edited the spelling.
     for named, field, is_reading in (
         (row.scheme_id, "scheme", False),
         *((reading.scheme_id, f"reading[{reading.id}].scheme", True) for reading in row.readings),
@@ -3883,13 +3500,9 @@ def resolve_objective_sets(
 # 015-the-question: the questions, and the bundle one verb takes
 # ---------------------------------------------------------------------------
 #
-# Three relations a per-file validator structurally cannot check, and every one of them is a
-# **typo in an artefact under review** rather than a fact about the money (015 FR-004):
-#
-# 1. an amount for a stream the registry does not declare;
-# 2. a declared stream the question states no amount for -- the case that fails *silently*
-#    today, because such a stream's pairs yield no candidate and never reach `survey`;
-# 3. an amount whose currency the named stream does not deliver.
+# Every relation checked here is a **typo in an artefact under review** rather than a fact about
+# the money (015 FR-004), and one of them fails *silently* today: a declared stream the question
+# states no amount for yields no candidate and never reaches `survey`.
 #
 # What is deliberately NOT checked here: whether a subject word names anything. A question is
 # the owner's own vocabulary and its gaps are the answer's content (FR-009), which is the
@@ -3930,17 +3543,16 @@ class AnswerDeclarations:
     holdings: SeedAndGoalDeclarations
     """What the owner already holds, over both roots (025 FR-001).
 
-    An answer reports a held position beside the candidates it ranks, so the lots are part of
-    what the verb reads rather than a separate load. The goals in this record are resolved with
-    them and are not read here; they arrive because one file pair declares both.
+    The goals in this record are resolved with the lots and are not read here; they arrive
+    because one file pair declares both.
     """
 
     held_inputs: HeldInputs
     """Everything a held position is built from, assembled here rather than by a caller.
 
-    The API layer receives it whole and passes it on: assembling it there would make
-    orchestration know which declarations a held position needs, and would put the name of the
-    rate it is struck at in a module 015 SC-004 scans for exactly that word.
+    Assembling it in the API layer would make orchestration know which declarations a held
+    position needs, and would put the name of the rate it is struck at in a module 015 SC-004
+    scans for exactly that word.
     """
 
     quotation_files: Mapping[str, Path]
@@ -3962,10 +3574,7 @@ def check_question(
     **Public, because a question built from flags has to go through it too** (015 FR-005). Two
     of its four refusals are re-stated by the verb and two are not -- the owner and the amount's
     currency -- so a caller-built record that skipped this would answer one person's question
-    from another person's money, and the refusal names the path it was declared in either way.
-
-    A question that reached here through a file is checked twice, once at load and once at the
-    verb, and that is the cost of the guarantee: the second call cannot know which it got.
+    from another person's money.
     """
     if question.objective_set_id not in objective_sets:
         raise DeclarationError(
@@ -4118,11 +3727,8 @@ def working_day_calendars_from_data_root(
     Sorted, so a run does not depend on the order a filesystem happens to return.
 
     ``kinds`` is required for the reason ``official_rates_from_data_root`` gives, and here it
-    is `[calendar.week]` it covers: three tables carry a citation, and that one holds weekday
-    *names* rather than a number or a date, so `scripts/check_provenance.py` does not see it
-    even with a predicate that counts dates. Left unchecked, a misspelt kind on it loads clean
-    and raises from `staleness.kind_for` when a figure it marked is aged -- a crash at report
-    time for a file that could have been refused by name at load.
+    covers `[calendar.week]`, which holds weekday *names* rather than a number or a date and is
+    therefore invisible to `scripts/check_provenance.py`.
     """
     calendars: dict[str, WorkingDayCalendar] = {}
     declaring: dict[str, Path] = {}

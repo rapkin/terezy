@@ -1,69 +1,62 @@
 """The TOML shapes, as pydantic models configured against pydantic's own defaults.
 
 This module is the **only** place in the project where a validation-library type appears
-(research.md D6, and the layer contract in ``.importlinter`` that keeps ``pydantic`` out
-of ``core``). It is also the one permitted exception to the functional style: every model
-here is a class with a base class, which is what pydantic is, and nothing it produces
-escapes this package -- :mod:`terezy.data.declarations.loader` turns each one into a plain
-frozen core record and the models stop existing.
+(research.md D6, and the layer contract in ``.importlinter`` that keeps ``pydantic`` out of
+``core``). It is also the one permitted exception to the functional style: every model here is
+a class with a base class, and nothing it produces escapes this package -- the loader turns
+each one into a plain frozen core record.
 
-**The configuration is the design.** Three settings, each closing a specific way a data
-file can lie about itself:
+**The configuration is the design.** Three settings, each closing a specific way a data file
+can lie about itself:
 
 ``extra="forbid"``
-    *Is* FR-016's unrecognised-field rule. A misspelled ``min_tickett`` sitting unread
-    beside the real field would be a declared constraint that does nothing, and the
-    engine would run happily with a limit nobody enforced.
+    *Is* FR-016's unrecognised-field rule. A misspelled ``min_tickett`` sitting unread beside
+    the real field would be a declared constraint that does nothing, and the engine would run
+    happily with a limit nobody enforced.
 
 ``strict=True``
-    Turns off coercion. ``coupon_rate_pct = "15.5"`` is a quoted string, and quietly
-    reading it as a number would mean the file's type and the engine's type disagree
-    while the answer still looks right. Note what strict mode still permits: an ``int``
-    where a ``float`` is declared, because that widening is lossless -- ``face_value =
-    1000`` is accepted and is the same value as ``1000.0``. It does *not* permit ``bool``
-    for a number, or a number for a string.
+    Turns off coercion. ``coupon_rate_pct = "15.5"`` is a quoted string, and quietly reading
+    it as a number would mean the file's type and the engine's type disagree while the answer
+    still looks right. Strict mode still permits an ``int`` where a ``float`` is declared,
+    because that widening is lossless; it does not permit ``bool`` for a number.
 
 ``frozen=True``
-    A validated document is a fact about a file on disk. Nothing may edit it afterwards
-    and hand on a value that no file contains.
+    A validated document is a fact about a file on disk. Nothing may edit it afterwards and
+    hand on a value that no file contains.
 
 **No field default ever stands in for a value** (FR-016: *"a default value MUST NOT be
-substituted for anything absent"*). In pydantic a default is the only mechanism by which
-that substitution can happen, so a default here is written **only** where the absence of
-the key is itself a declaration -- an omitted `[access.price]` says *this instrument prices
-itself*, an omitted `published_in_order` says *the source published in date order*, an
-omitted goal variable says *solve for this one*. Every such field defaults to ``None`` and
-never to a value, because ``None`` is "the key was not written" and a value would be a
-number no file contains.
+substituted for anything absent"*). A default is written **only** where the absence of the key
+is itself a declaration -- an omitted `[access.price]` says *this instrument prices itself* --
+and every such field defaults to ``None``, never to a value, because ``None`` is "the key was
+not written" and a value would be a number no file contains. The exact set of defaulted fields
+is pinned by ``tests/contract/test_declaration_loading.py``.
 
-⚙ This paragraph used to read *"Zero field defaults, anywhere. Not one model below has a
-default"*, and by 2026-08-30 eleven models had one. Corrected rather than reworded, and the
-exact set is pinned by ``tests/contract/test_declaration_loading.py`` so the next one is a
-decision somebody takes rather than a sentence that quietly stops being true.
+**Provenance sits per table, and only where a table holds an observation.** Values sharing a
+source are declared together and cite it once; a table whose fields are references or the
+owner's own statements -- an id, a currency code, a venue, a belief -- carries no citation
+keys at all, because there is nothing for a source to vouch for. That is why
+``[instrument.constraints]`` repeats the citation keys instead of borrowing the terms': a
+minimum ticket and a coupon rate are two observations.
 
 Two consequences a reader should expect and not try to fix:
 
-* ``verified_on`` must be **present** in every sourced table, and empty (``""``) is how
-  a value says it is unverified (FR-014). The key being absent is an error; a default of
-  ``""`` would make "nobody filled this in" indistinguishable from "checked, and
-  unverified" -- and would silently mark verified data unverified the day the key was
-  forgotten.
+* ``verified_on`` must be **present** in every sourced table, and empty (``""``) is how a
+  value says it is unverified (FR-014). The key being absent is an error; a default of ``""``
+  would make "nobody filled this in" indistinguishable from "checked, and unverified".
 * ``is_synthetic`` must be **stated**. Defaulting it to ``false`` would let a fixture be
   mistaken for a real issue through omission, and the omission runs the wrong way round.
 
-**What these models deliberately do *not* validate.** Dates are typed ``str`` and parsed
-by the loader; convention names, currencies, instrument classes and taxable event kinds
-are typed ``str`` and resolved by the loader against the core's registries. That is not
-laziness, it is where the error message can be good: the loader knows the file path and
-the field path and can say *"``act/360`` is not a day count; known: act/365, act/act,
-30/360"*, which is what FR-021 asks for. A pydantic validator would know the value and
-not the file. This module owns **shape**; the loader owns **meaning**.
+**What these models deliberately do *not* validate.** Dates, convention names, currencies,
+instrument classes and taxable event kinds are typed ``str`` and resolved by the loader
+against the core's registries, because that is where the error message can be good: the loader
+knows the file path and the field path and can say *"``act/360`` is not a day count; known:
+act/365, act/act, 30/360"* (FR-021), while a pydantic validator would know the value and not
+the file. This module owns **shape**; the loader owns **meaning**.
 
-Dates are strings in these files rather than TOML's native date type, following the
-contract's own examples (``retrieved_on = "2026-08-21"``). Under ``strict=True`` a
-``date``-typed field would then reject every one of them, so the choice is between
-changing the file format and parsing at the loader. Parsing at the loader is what gives
-``instrument.terms.issue_date`` a message naming the file.
+Dates are strings in these files rather than TOML's native date type, following the contract's
+own examples (``retrieved_on = "2026-08-21"``); under ``strict=True`` a ``date``-typed field
+would reject every one of them, so the choice is between changing the file format and parsing
+at the loader.
 """
 
 from __future__ import annotations
@@ -75,11 +68,9 @@ from pydantic import BaseModel, ConfigDict, Field
 STRICT: Final = ConfigDict(extra="forbid", strict=True, frozen=True)
 """The one configuration every model here uses.
 
-Assigned rather than inherited from a shared base model on purpose: a base class would
-be a second inheritance layer in the one module allowed any, and the point of naming the
-config is that a reader can see all three settings at each model without following a
-hierarchy. Sharing the object also means a model cannot drift to a laxer setting by
-copying a neighbour and editing one word.
+Assigned rather than inherited from a shared base model: a base class would be a second
+inheritance layer in the one module allowed any, and a shared object cannot drift to a laxer
+setting by a model copying a neighbour and editing one word.
 """
 
 
@@ -119,30 +110,14 @@ class BondTermsTable(BaseModel):
     kind: str
     """An ``ObservationKind`` id -- which staleness threshold these values age under.
 
-    ⚙ **Added by feature 002 as a migration**, and required rather than optional: FR-028
-    says the threshold is per kind of value with no permissive default, so a sourced table
-    that names no kind is a table whose values could never be reported stale. Every
-    declaration in the project gained the field in one change, because a half-applied
-    requirement makes ``scripts/check_provenance.py`` red for every file that has not caught
-    up yet.
-
-    Resolved against ``data/observation_kinds.toml`` by ``check_provenance.py`` rather than
-    by the loader: the feature-001 core records this table becomes -- ``BondTerms``,
-    ``InstrumentConstraints``, ``TaxClass`` -- have no field to carry a kind, because their
-    staleness verdict is a later feature's, so a kind resolved here would be a value the
-    engine reads nowhere. The gate is blocking, so the check is enforced either way.
+    Required rather than optional (FR-028): a sourced table that names no kind is a table whose
+    values could never be reported stale. Resolved against ``data/observation_kinds.toml`` by
+    ``check_provenance.py`` rather than by the loader, because the core records this table
+    becomes have no field to carry a kind.
     """
 
     source: str
-    """A URL or document reference. These three keys are the terms' own citation.
-
-    Provenance sits **per table, not per scalar** (the declaration-schema contract):
-    values sharing a source are declared together and cite it once, and facts from
-    different sources go in different tables. That is why ``[instrument.constraints]``
-    repeats these keys instead of borrowing the terms' -- a minimum ticket and a coupon
-    rate are two observations, and one citation covering both would be a claim about the
-    source that is not true.
-    """
+    """A URL or document reference. These three keys are the terms' own citation."""
 
     retrieved_on: str
 
@@ -163,18 +138,8 @@ class ConstraintsTable(BaseModel):
     kind: str
     """An ``ObservationKind`` id -- which staleness threshold these values age under.
 
-    ⚙ **Added by feature 002 as a migration**, and required rather than optional: FR-028
-    says the threshold is per kind of value with no permissive default, so a sourced table
-    that names no kind is a table whose values could never be reported stale. Every
-    declaration in the project gained the field in one change, because a half-applied
-    requirement makes ``scripts/check_provenance.py`` red for every file that has not caught
-    up yet.
-
-    Resolved against ``data/observation_kinds.toml`` by ``check_provenance.py`` rather than
-    by the loader: the feature-001 core records this table becomes -- ``BondTerms``,
-    ``InstrumentConstraints``, ``TaxClass`` -- have no field to carry a kind, because their
-    staleness verdict is a later feature's, so a kind resolved here would be a value the
-    engine reads nowhere. The gate is blocking, so the check is enforced either way.
+    Required rather than optional (FR-028), and resolved by ``check_provenance.py`` rather than
+    by the loader, for :attr:`BondTermsTable.kind`'s reasons.
     """
 
     source: str
@@ -200,11 +165,10 @@ class InstrumentTable(BaseModel):
     instrument_class: str = Field(alias="class")
     """Which ``InstrumentOps`` computes this thing's events.
 
-    Declared as ``class`` in the file, because that is what it is called in the domain,
-    and ``class`` is a Python keyword -- hence the alias. Only the alias is accepted:
+    Declared as ``class`` in the file, because that is what it is called in the domain, and
+    ``class`` is a Python keyword -- hence the alias. Only the alias is accepted:
     ``populate_by_name`` is left off, so a file writing ``instrument_class`` gets the
-    unrecognised-field error rather than working by accident and diverging from every
-    other file.
+    unrecognised-field error rather than working by accident.
     """
 
     currency: str
@@ -221,13 +185,10 @@ class InstrumentTable(BaseModel):
     tax_classes: dict[str, str]
     """``[instrument.tax_classes]`` -- income kind to tax-class id.
 
-    A table, not a scalar: the same instrument is taxed differently on distribution and
-    on disposal. It carries no provenance because it holds *references*, not
-    observations -- the citation lives with the rates, in the tax file.
-
-    Typed ``dict[str, str]`` rather than an enum-keyed mapping so that an unrecognised
-    income kind is reported by the loader naming the file, the key and the kinds that
-    exist, instead of by pydantic naming a key it cannot place in a file.
+    A table, not a scalar: the same instrument is taxed differently on distribution and on
+    disposal. Typed ``dict[str, str]`` rather than an enum-keyed mapping so that an
+    unrecognised income kind is reported by the loader naming the file, the key and the kinds
+    that exist, instead of by pydantic naming a key it cannot place in a file.
     """
 
     groups: list[str]
@@ -254,16 +215,11 @@ class InstrumentFile(BaseModel):
 # 013-enumerated-schedule: a bond declared as the payments it will make
 # ---------------------------------------------------------------------------
 #
-# The same root table and the same ``[instrument] class`` key, on the precedent a fund set:
-# one directory, several kinds of declaration, told apart by the one key they all carry.
-#
-# ⚙ **A payment's label is spelled ``pays``, not ``kind``.** ``kind`` is already the key
-# every sourced table uses for the *observation* kind it ages under, and
-# `scripts/check_provenance.py` reads it that way. A payment declaring ``kind = "coupon"``
-# would be reported as naming an undeclared observation kind -- a true statement about the
-# wrong field, sending the reader to fix a line that is correct. The same trap
-# ``kind_of_observation`` exists for on a route leg, and the same fix: name the field for
-# what it is.
+# **A payment's label is spelled ``pays``, not ``kind``.** ``kind`` is already the key every
+# sourced table uses for the *observation* kind it ages under, and `scripts/check_provenance.py`
+# reads it that way. A payment declaring ``kind = "coupon"`` would be reported as naming an
+# undeclared observation kind -- a true statement about the wrong field, sending the reader to
+# fix a line that is correct. The same trap ``kind_of_observation`` exists for on a route leg.
 
 
 class ScheduledPaymentTable(BaseModel):
@@ -303,12 +259,10 @@ class ScheduledPaymentTable(BaseModel):
 class EnumeratedScheduleTable(BaseModel):
     """``[instrument.schedule]`` -- the coverage claim, the face value, and the payments.
 
-    **What is absent is absent by construction.** There is no ``issue_date``, no
-    ``coupon_rate_pct``, no ``periodicity``, no ``business_day_rule`` and no
-    ``maturity_date``, so a file supplying one gets the unrecognised-field error rather
-    than being quietly accepted and ignored (FR-003). There is likewise no second coverage
-    bound, which is what makes a two-ended window unrepresentable rather than checked for
-    (FR-005).
+    **What is absent is absent by construction.** No term of the issue is declarable here, so a
+    file supplying one gets the unrecognised-field error rather than being quietly accepted and
+    ignored (FR-003); there is likewise no second coverage bound, which is what makes a
+    two-ended window unrepresentable rather than checked for (FR-005).
     """
 
     model_config = STRICT
@@ -398,21 +352,15 @@ class EnumeratedInstrumentTable(BaseModel):
     verification_task: list[EnumeratedVerificationTaskTable]
     """What is inferred, and what would settle it.
 
-    The **key** is required here; that the list covers every inference is
+    The **key** is required; that the list covers every inference is
     ``scripts/check_provenance.py``'s check, and it errors and exits 1 on a file that misses
     one. This model has no ``min_length``, so an empty list validates and the loader's
-    per-entry checks then loop zero times -- which is correct division of labour and was not
-    what this docstring said: it claimed "required and non-empty" and attributed to the
-    schema an enforcement that lives in the gate.
+    per-entry checks then loop zero times.
     """
 
     groups: list[str]
-    """``[instrument] groups`` -- the declared groups this instrument is in (015 FR-007a).
-
-    Required and possibly empty. A key that could be omitted would make *in no group* the
-    thing that happens when nobody thought about it, which is the shrink FR-008a says no
-    downstream check can see.
-    """
+    """``[instrument] groups`` -- :attr:`InstrumentTable.groups`' key, on an enumerated
+    schedule, for its reason."""
 
 
 class EnumeratedInstrumentFile(BaseModel):
@@ -426,15 +374,14 @@ class EnumeratedInstrumentFile(BaseModel):
 class RateEntryTable(BaseModel):
     """One ``[[jurisdiction.tax_class.rate]]`` entry: the rates in force from a date.
 
-    ⚙ **Feature 006 moved the rates out of the class table and into these entries**, so a
-    legislated change is one entry added to a file rather than a rebuild (`data/README.md`
-    rule 3, ``SIMULATOR_SPEC.md`` §4.5.1, required test E10). The scalar pair the class
-    used to carry is gone rather than deprecated (research.md D1).
+    The rates live on dated entries rather than on the class table, so a legislated change is
+    one entry added to a file rather than a rebuild (`data/README.md` rule 3, required test
+    E10, research.md D1).
 
-    Every numeric field here is an observed legal value, so the citation keys are not
-    optional -- **including for a rate of zero**. The exemption is the single most
-    decision-relevant number in the model, and an uncited zero is exactly the figure that
-    gets believed without checking (Principle I).
+    Every numeric field here is an observed legal value, so the citation keys are not optional
+    -- **including for a rate of zero**. The exemption is the single most decision-relevant
+    number in the model, and an uncited zero is exactly the figure that gets believed without
+    checking (Principle I).
     """
 
     model_config = STRICT
@@ -442,12 +389,11 @@ class RateEntryTable(BaseModel):
     effective_from: str
     """ISO date this entry comes into force, inclusive.
 
-    **A cited legal fact, and the sharpest trap in the tax data.** It must be exactly the
-    date this entry's citation attests. Where a source establishes the current rate but
-    not the date the previous one began, no earlier entry is invented: the schedule starts
-    at the attested date, and an event before it is a typed refusal rather than a
-    defaulted rate (research.md D2, FR-012). Back-dating an entry so that "everything just
-    works" would put an invented legal fact in this file while every gate stayed green.
+    **A cited legal fact, and the sharpest trap in the tax data.** It must be exactly the date
+    this entry's citation attests. Where a source establishes the current rate but not the date
+    the previous one began, no earlier entry is invented: the schedule starts at the attested
+    date, and an event before it is a typed refusal rather than a defaulted rate (research.md
+    D2, FR-012).
     """
 
     pit_rate_pct: float
@@ -484,10 +430,9 @@ class RateEntryTable(BaseModel):
 class TaxClassTable(BaseModel):
     """One ``[[jurisdiction.tax_class]]`` entry: a declared tax treatment.
 
-    Carries no rate and no citation of its own. Both live on the dated entries below,
-    because two rates cited by two sources are two observations with two verification
-    dates, and one mark for both would let a checked figure vouch for an unchecked one
-    (research.md D1).
+    Carries no rate and no citation of its own: two rates cited by two sources are two
+    observations with two verification dates, and one mark for both would let a checked figure
+    vouch for an unchecked one (research.md D1).
     """
 
     model_config = STRICT
@@ -510,9 +455,9 @@ class TaxClassTable(BaseModel):
     rate: list[RateEntryTable]
     """``[[jurisdiction.tax_class.rate]]`` -- the dated schedule, in effective-date order.
 
-    Non-empty, strictly increasing and non-duplicated: all three are checked by the
-    loader, where the file and the field can be named. A class with no entry cannot charge
-    anything, and a silent zero is the worst available reading of that.
+    Non-empty, strictly increasing and non-duplicated, all three checked by the loader: a class
+    with no entry cannot charge anything, and a silent zero is the worst available reading of
+    that.
     """
 
 
@@ -553,24 +498,12 @@ class TaxFile(BaseModel):
 # 002-ramp-cost: observation kinds, venues, channels, routes, streams, scenarios
 # ---------------------------------------------------------------------------
 #
-# ⚙ **One qualification to "zero field defaults", and it is the only one.** Several fields
-# below are declared ``X | None = None``. That is *not* a substituted value: **TOML has no
-# null**, so an omitted key is the only way a file can say "nothing is declared here", and
-# a pydantic field with no default cannot be omitted at all. The rule is therefore stated
-# rather than bent -- a ``= None`` default is permitted **only** where the core field it
-# feeds is itself ``X | None`` and ``None`` means *the owner declared nothing*, never
-# where it would stand in for a number, a date or a policy. So ``minimum``,
-# ``monthly_cap``, ``tax_scheme`` and ``partner_route`` may be omitted, because
-# ``Leg.minimum``, ``Leg.monthly_cap``, ``IncomeStream.tax_scheme`` and
-# ``Route.partner_route`` are all "``None`` means none was declared" in the core; while
-# ``fee_pct``, ``verified_on``, ``staleness_days`` and ``policy`` have no default and a
-# file that omits one fails.
-#
-# ``contracts/declaration-schema.md`` writes ``partner_route = null`` and
-# ``capacity_pool = null`` in its examples, which no TOML parser accepts. Omission is the
-# expressible form of the same declaration, and ``verified_on = ""`` stays the exception it
-# already was: present-and-empty, because for a citation a forgotten key and a deliberate
-# "not yet" must not look alike.
+# **The one qualification to "no field default stands in for a value".** Several fields below
+# are declared ``X | None = None``. **TOML has no null**, so an omitted key is the only way a
+# file can say "nothing is declared here", and a pydantic field with no default cannot be
+# omitted at all. A ``= None`` default is therefore permitted **only** where the core field it
+# feeds is itself ``X | None`` and ``None`` means *the owner declared nothing*, never where it
+# would stand in for a number, a date or a policy.
 
 
 class ObservationKindTable(BaseModel):
@@ -594,9 +527,8 @@ class ObservationKindTable(BaseModel):
 class ObservationKindsFile(BaseModel):
     """The whole of ``data/observation_kinds.toml``.
 
-    No provenance keys anywhere in it, deliberately: a staleness threshold is the owner's
-    *policy* about how long he will trust a number, not an observation of the world, so
-    there is nothing for a citation to vouch for.
+    A staleness threshold is the owner's *policy* about how long he will trust a number, not an
+    observation of the world.
     """
 
     model_config = STRICT
@@ -616,12 +548,7 @@ class VenueTable(BaseModel):
     """Human-readable and non-empty. For a fixture it says so in words."""
 
     kind: str
-    """One of ``core.routes.venues.VENUE_KINDS``, resolved by the loader.
-
-    Typed ``str`` here and closed there, so an unknown kind is refused by the loader with the
-    file, the field and the names that would have worked, rather than by pydantic with a union
-    message that names neither.
-    """
+    """One of ``core.routes.venues.VENUE_KINDS``, resolved by the loader."""
 
     currencies: list[str]
     """The currency codes this venue can hold. Non-empty, resolved against the core's
@@ -636,9 +563,7 @@ class VenueTable(BaseModel):
 class VenuesFile(BaseModel):
     """The whole of ``data/venues.toml``.
 
-    No citation keys: a venue table carries no observed value -- no number and no date --
-    and ``core.routes.venues.Venue`` has no provenance field to carry one. Every number
-    attached to a venue lives on a leg, in ``data/routes/``, with its own source.
+    Every number attached to a venue lives on a leg, in ``data/routes/``, with its own source.
     """
 
     model_config = STRICT
@@ -652,8 +577,7 @@ class VenuesFile(BaseModel):
 #
 # A root-level curated file beside `venues.toml`, and for that file's reason: the label lives
 # on the curated instrument declaration, so the vocabulary it resolves against cannot be
-# per-owner without a curated file depending on one person's registry. No citation keys -- an
-# id and a name are references, not observations, exactly as a venue's are.
+# per-owner without a curated file depending on one person's registry.
 
 
 class GroupTable(BaseModel):
@@ -680,13 +604,12 @@ class ChannelSideTable(BaseModel):
     """``[channel.buy_side]`` / ``[channel.sell_side]`` -- one side of a two-sided quote.
 
     **Exactly one of the two numeric forms.** Both set, or neither, is a load-time failure
-    (FR-010). There is deliberately no precedence rule: "the markup wins if both are set"
-    would silently ignore one of the two numbers the owner wrote, and an empty side is not
-    a zero -- zero is declarable, so an absence can only mean an unfinished declaration.
+    (FR-010). There is deliberately no precedence rule: "the markup wins if both are set" would
+    silently ignore one of the two numbers the owner wrote, and an empty side is not a zero --
+    zero is declarable, so an absence can only mean an unfinished declaration.
 
-    The side carries its **own** citation because it is its own observation: a P2P screen's
-    buy price and its sell price are two numbers, and the loader unions both sides' sources
-    with the reference rate's into the channel's provenance so no mark is lost.
+    The side carries its **own** citation because a P2P screen's buy price and its sell price
+    are two observations.
     """
 
     model_config = STRICT
@@ -802,10 +725,9 @@ class LegTable(BaseModel):
     """The shared rail whose monthly limit this leg consumes, or omitted for none.
 
     Two legs on two different routes that both run over the owner's Monobank card name the
-    **same** pool, and the accumulator keys on the pool rather than the route -- otherwise
-    each route would receive its own full limit (research.md D10). A ``monthly_cap`` with no
-    pool is refused: there would be no key to accumulate it under, so capacity consumed
-    earlier in the month could never reduce it.
+    **same** pool, and the accumulator keys on the pool rather than the route -- otherwise each
+    route would receive its own full limit (research.md D10). A ``monthly_cap`` with no pool is
+    refused: there would be no key to accumulate it under.
     """
 
     fee_pct: float
@@ -852,10 +774,9 @@ class LegTable(BaseModel):
     kind_of_observation: str
     """An ``ObservationKind`` id -- which staleness threshold this leg's numbers age under.
 
-    Named ``kind_of_observation`` rather than ``kind`` because ``kind`` on a leg is already
-    the *leg* kind. Where a leg's table carries values of two kinds, it names the
-    fastest-ageing one: a table is verified as a whole, and the shorter threshold is the
-    honest one.
+    Named ``kind_of_observation`` rather than ``kind`` because ``kind`` on a leg is already the
+    *leg* kind. Where a leg's table carries values of two kinds, it names the fastest-ageing
+    one: a table is verified as a whole.
     """
 
     source: str
@@ -909,10 +830,7 @@ class RouteTable(BaseModel):
 class RouteFile(BaseModel):
     """A whole ``data/routes/<id>.toml``: exactly one route.
 
-    One route per file, named after the file, on the instrument precedent: a file declaring
-    several would make a duplicate id harder to see and would put two unrelated review
-    histories in one place. Inbound and exit are therefore two files, which is also what
-    FR-027 wants a reader to see.
+    Inbound and exit are therefore two files, which is what FR-027 wants a reader to see.
     """
 
     model_config = STRICT
@@ -942,10 +860,8 @@ class IndexationTable(BaseModel):
 class StreamTable(BaseModel):
     """One ``[[stream]]`` entry: an income stream the owner declares about himself.
 
-    No ``source`` and no ``verified_on``. An owner's own salary is not an observation
-    needing a citation; it is a statement of fact by the only person who can make it -- the
-    same exemption ``data/scenarios/`` has, and the reason ``check_provenance.py`` gains
-    ``channels`` and not ``streams``.
+    An owner's own salary is not an observation needing a citation; it is a statement of fact by
+    the only person who can make it.
     """
 
     model_config = STRICT
@@ -991,13 +907,8 @@ class StreamTable(BaseModel):
     Omitting it means **the owner has not named one**, which is a different claim from a
     scheme that charges nothing: ``capacity.deployable`` then returns
     ``TaxTreatmentUndeclared``, which has no net field at all, rather than a net figure that
-    quietly equals the gross (012 FR-016).
-
-    ⚙ **This is where the legal rates left per-owner data.** The retired
-    ``income_tax_rate_pct`` let a public legal fact about the Republic be written, uncited,
-    into a file whose citation exemption was argued for an owner's statement about himself.
-    What a stream declares now is *which regime he is in*; the regime's rates are curated and
-    cited in ``data/tax/schemes/``.
+    quietly equals the gross (012 FR-016). What a stream declares is *which regime he is in*;
+    the regime's rates are curated and cited in ``data/tax/schemes/``.
     """
 
     indexation: IndexationTable
@@ -1039,8 +950,7 @@ class FallbackTable(BaseModel):
 class RegimeTable(BaseModel):
     """One ``[[scenario.regime]]`` entry: which routes a regime believes in.
 
-    No provenance, and the absence is load-bearing. A belief has nothing to cite; giving a
-    regime a source field would invite a citation for a guess.
+    Giving a regime a source field would invite a citation for a guess.
     """
 
     model_config = STRICT
@@ -1072,10 +982,9 @@ class TransitionTable(BaseModel):
     is_assumption: bool
     """Must be declared, and must be ``true``.
 
-    Typed ``bool`` here and ``Literal[True]`` in the core: the loader refuses ``false`` with
-    a message that can say *why*, which pydantic could not. FR-020 requires a transition
-    date be presented as a stated assumption, and a marker that can be switched off is not
-    a marker.
+    Typed ``bool`` here and ``Literal[True]`` in the core: the loader refuses ``false`` with a
+    message that can say *why*, which pydantic could not. A marker that can be switched off is
+    not a marker (FR-020).
     """
 
     rationale: str
@@ -1115,19 +1024,6 @@ class ScenarioFile(BaseModel):
 # ---------------------------------------------------------------------------
 # 003-route-coverage: the spendable-endpoint list
 # ---------------------------------------------------------------------------
-#
-# One new declaration, and no other format (spec Assumptions). Same three settings as every
-# model above, and the same standing rule: **zero field defaults**. There is nothing here that
-# could legitimately be omitted -- a venue with no currency and a currency at no venue are both
-# half a statement -- so no field below is `X | None`.
-#
-# ⚙ **No citation keys, and their absence is the design.** `contracts/spendable-schema.md` and
-# research.md D4 both argue it: there is no observed value in this file for a source to vouch
-# for -- an id, a currency code, and the owner's statement about where he spends. Adding
-# `source` / `retrieved_on` / `verified_on` here would invite a citation for a fact about a
-# person's life, which is the same category error as citing a regime. The same reading
-# `data/venues.toml` already carries in its own header. Every *number* attached to a venue
-# lives on a leg, in `data/routes/`, cited.
 
 
 class OwnerTable(BaseModel):
@@ -1151,8 +1047,7 @@ class SpendableTable(BaseModel):
     model_config = STRICT
 
     venue: str
-    """Must name a declared venue that can hold :attr:`currency`. Typed ``str`` and resolved by
-    the loader and resolver, which know the file and the field; pydantic would know neither."""
+    """Must name a declared venue that can hold :attr:`currency`."""
 
     currency: str
     """Must be the base currency the set was resolved against (FR-004).
@@ -1167,9 +1062,8 @@ class SpendableFile(BaseModel):
     """A whole ``data/spendable/<owner_id>.toml``: one owner's spendable endpoints.
 
     Per-owner, beside ``data/streams/`` and **not** at the root beside curated ``venues.toml``
-    (research.md D3). A curated declaration is a public fact about the world; a per-owner one is
-    a fact about this person, and putting both at one filesystem level would make the boundary a
-    matter of reading field names.
+    (research.md D3): putting a public fact about the world and a fact about this person at one
+    filesystem level would make the boundary a matter of reading field names.
     """
 
     model_config = STRICT
@@ -1185,22 +1079,15 @@ class SpendableFile(BaseModel):
 # 006-inzhur-instruments: collective-investment funds
 # ---------------------------------------------------------------------------
 #
-# Same three settings and the same standing rule: ``STRICT`` everywhere, and **zero field
-# defaults** except where TOML's lack of a null leaves an omitted key as the only way to
-# say "nothing is declared here" -- which here is exactly three fields, each feeding a core
-# field that is itself ``X | None``: ``subscription_cutoff`` (a fund that never stops
-# accepting money), ``peg`` (a payout that is not pegged to another currency) and
-# ``distribution`` (an accumulation fund, which owes no dividend at all).
+# **A fund file and a bond file share a directory and a root table**, and are told apart by
+# ``[instrument] class``. The resolver reads that one key and picks a loader, because the two
+# declarations have almost nothing in common beyond an id: a fund has no coupon, no maturity
+# and no face value, and forcing them into one model would mean a table of optional fields
+# where every combination is loadable and only two are meaningful.
 #
-# ⚙ **A fund file and a bond file share a directory and a root table**, and are told apart
-# by ``[instrument] class``. The resolver reads that one key and picks a loader, because
-# the two declarations have almost nothing in common beyond an id: a fund has no coupon, no
-# maturity and no face value, and forcing them into one model would mean a table of
-# optional fields where every combination is loadable and only two are meaningful.
-#
-# **``[[instrument.verification_task]]`` carries no citation**, deliberately. It is the
-# record of a question nobody has answered; a source would be a source for *what*? Its one
-# date -- when the search ran -- is exempted by name in ``scripts/check_provenance.py``.
+# **``[[instrument.verification_task]]`` carries no citation**, deliberately. It is the record
+# of a question nobody has answered; a source would be a source for *what*? Its one date --
+# when the search ran -- is exempted by name in ``scripts/check_provenance.py``.
 
 
 class FundNavTable(BaseModel):
@@ -1222,10 +1109,9 @@ class FundNavTable(BaseModel):
 class DeclaredYieldTable(BaseModel):
     """``[instrument.declared_yield]`` -- the rate the fund states about itself.
 
-    Two fields rather than one because a fund may state a range, and the range is the
-    answer: MilTech's 25-29% is not a figure with error bars, it is two numbers the fund
-    published. A fund stating one figure writes it twice, which reads oddly and is correct
-    -- it says "the low end and the high end are the same", which is what a point rate is.
+    Two fields rather than one because a fund may state a range, and the range is the answer:
+    MilTech's 25-29% is not a figure with error bars, it is two numbers the fund published. A
+    fund stating one figure writes it twice.
     """
 
     model_config = STRICT
@@ -1260,9 +1146,7 @@ class PegCapTable(BaseModel):
 class PegTable(BaseModel):
     """``[instrument.distribution.peg]`` -- what the payout is sized in, and its ceiling.
 
-    Carries no observed value of its own and therefore no citation: the currency is a
-    reference to the core's enum, and every number lives on a dated cap entry that cites
-    itself.
+    Every number lives on a dated cap entry that cites itself.
     """
 
     model_config = STRICT
@@ -1292,8 +1176,7 @@ class DistributionTable(BaseModel):
     fund that distributes everything it earns."""
 
     peg: PegTable | None = None
-    """Omitted where the payout is not pegged to another currency. One of the three
-    permitted ``= None`` defaults; see the section comment above."""
+    """Omitted where the payout is not pegged to another currency."""
 
     kind: str
     source: str
@@ -1427,8 +1310,7 @@ class FundTable(BaseModel):
     day_count: str
     terminates_on: str
     subscription_cutoff: str | None = None
-    """Omitted by a fund that never stops accepting subscriptions. One of the three
-    permitted ``= None`` defaults; see the section comment above."""
+    """Omitted by a fund that never stops accepting subscriptions."""
 
     nav: FundNavTable
     declared_yield: DeclaredYieldTable
@@ -1458,15 +1340,8 @@ class FundFile(BaseModel):
 # 023-cash-instrument: a balance held at a venue
 # ---------------------------------------------------------------------------
 #
-# The smallest instrument declaration in the project, and its smallness is the design. Every
-# field a bond or a fund states about what the paper *does* is absent because a balance does
-# none of it: no face value, no maturity, no periodicity, no NAV, no spread, no liquidity
-# terms, no constraints table and no tax classes. What is left is an identity and one observed
-# value.
-#
 # `rate_pct` is REQUIRED and has no default. `= 0.0` would make a forgotten line read as a
-# stated zero, which is exactly the substitution `extra="forbid"` and the absent defaults exist
-# together to prevent -- and here the forgotten line would be the whole content of the file.
+# stated zero -- and here the forgotten line would be the whole content of the file.
 
 
 class CashBalanceTable(BaseModel):
@@ -1556,18 +1431,6 @@ class HeldAssetFile(BaseModel):
 # 004-composed-paths: the segment bound
 # ---------------------------------------------------------------------------
 #
-# One new declaration, and the smallest one in the project: an owner and an integer. Same three
-# settings as every model above, and the same standing rule: **zero field defaults**. FR-006
-# rests entirely on that rule -- a `max_segments` with a default would make a forgotten line
-# read as a chosen policy, which is the substitution `extra="forbid"` and the absent defaults
-# exist together to prevent.
-#
-# ⚙ **No citation keys, and their absence is the design.** How far the owner is willing to let
-# a search run is a statement about him, not an observation of the world, so there is nothing
-# for a source to vouch for. The same reading `data/objectives/`, `data/strategies/` and
-# `data/spendable/` already carry. Every *number* that describes a corridor lives on a leg, in
-# `data/routes/`, cited.
-#
 # `[owner]` is the shared `OwnerTable` above rather than a copy: it is the same claim -- whose
 # file this is -- and two models for it would eventually disagree about whether the id may be
 # blank.
@@ -1577,15 +1440,10 @@ class HeldAssetFile(BaseModel):
 # 015-the-question: the question itself
 # ---------------------------------------------------------------------------
 #
-# No citation keys anywhere below: a question is one person's stated preference, not an
-# observation about the world. `data/questions/` is named in `EXEMPT_DIRS` with that reason.
-#
 # The `| None = None` defaults here all mean *the owner stated none*, and every one of them is
-# a positive declaration a refusal names rather than a value the loader supplies: a fund run
-# with no chosen point inside its stated range refuses as `TwoFiguresNotOne`, and one with no
-# exchange-rate assumption refuses as `PegUnsizable`. `exit_on` is the exception and is
-# REQUIRED with a closed vocabulary, because *hold to the fund's own end* is a choice rather
-# than the absence of one (014 FR-003).
+# a positive declaration a refusal names rather than a value the loader supplies. `exit_on` is
+# the exception and is REQUIRED with a closed vocabulary, because *hold to the fund's own end*
+# is a choice rather than the absence of one (014 FR-003).
 
 
 class QuestionAmountTable(BaseModel):
@@ -1734,29 +1592,21 @@ class CompositionTable(BaseModel):
 class CandidatesTable(BaseModel):
     """``[candidates]`` -- the owner's policy on how many candidates a search may produce.
 
-    014 FR-019, on :class:`CompositionTable`'s shape exactly. The two are different knobs on the
-    same search and are declared in different files because they are answered differently: the
-    bound says how far one candidate may reach, and this says how many the whole enumeration may
-    hold before the primitive itself is the wrong one.
+    A different knob from :class:`CompositionTable` and declared in a different file because it
+    is answered differently: the bound says how far one candidate may reach, and this says how
+    many the whole enumeration may hold before the primitive itself is the wrong one.
     """
 
     model_config = STRICT
 
     max_candidates: int
-    """At least one, checked by the loader, which can name the file and the field.
-
-    Typed ``int`` under ``strict=True``, so ``2.5`` and ``"1000"`` are both refused at the shape
-    stage: half a candidate is not a candidate, and a quoted number is a file whose type and the
-    engine's type disagree while the answer still looks right.
+    """At least one, checked by the loader, which can name the file and the field. Typed ``int``
+    under ``strict=True``, on :attr:`CompositionTable.max_segments`'s rule.
     """
 
 
 class CandidatesFile(BaseModel):
-    """A whole ``data/candidates/<owner_id>.toml``: one owner's enumeration ceiling.
-
-    Per-owner, beside ``data/composition/``, for that file's reason unchanged: how many options
-    this person is willing to have enumerated is a fact about him rather than about the world.
-    """
+    """A whole ``data/candidates/<owner_id>.toml``: one owner's enumeration ceiling."""
 
     model_config = STRICT
 
@@ -1768,9 +1618,8 @@ class CandidatesFile(BaseModel):
 class CompositionFile(BaseModel):
     """A whole ``data/composition/<owner_id>.toml``: one owner's reach policy.
 
-    Per-owner, beside ``data/streams/`` and ``data/spendable/`` and **not** at the root beside
-    curated ``venues.toml`` (research.md D8, on feature 003's precedent). A corridor is a public
-    fact about the world; how far this person will let a search run is a fact about him.
+    Per-owner, on :class:`SpendableFile`'s rule: how far this person will let a search run is a
+    fact about him rather than about the world (research.md D8).
     """
 
     model_config = STRICT
@@ -1784,35 +1633,16 @@ class CompositionFile(BaseModel):
 # 008-seed-and-goals: the owner's opening lots, and what the money is for
 # ---------------------------------------------------------------------------
 #
-# Two new declarations, and the first two that live *wholly* on the private side of Principle
-# VII's boundary. Same three settings as every model above, and the same standing rule: **zero
-# field defaults**, with the one qualification the 002 banner already states -- a `X | None =
-# None` is permitted only where the core field it feeds is itself `X | None` and `None` means
-# *the owner declared nothing*. That qualification does real work here: `Goal` declares any
-# *two* of three variables and the third is the question, so all three are nullable in the
-# core record and all three may be omitted in the file. `reason` on a seed is nullable for the
-# same reason -- it is required for an estimated basis and forbidden for a known one, a pairing
-# no pydantic field can express, so the loader owns it and can say which of the two lines is
-# probably wrong.
+# The first two declarations that live wholly on the private side of Principle VII's boundary.
+# The citation gate is fail-closed over the data tree, so absence from `SOURCED_DIRS` is an
+# error rather than an exemption; if a *market value* ever has to live in either file, it moves
+# to a sourced directory instead of the exemption widening.
 #
-# ⚙ **No citation keys, and their absence is the design.** What the owner paid for a lot, and
-# what sum he is aiming at, are his own records rather than observations of the world -- there
-# is nothing for a source to vouch for. It is the same exemption `objectives`, `strategies`,
-# `streams`, `spendable` and `composition` already carry, and `scripts/check_provenance.py`
-# names both directories in `EXEMPT_DIRS` with that reason written out. The gate is fail-closed
-# over the data tree, so absence from `SOURCED_DIRS` is an error rather than an exemption. If a
-# *market value* ever has to live in either file, it moves to a sourced directory instead of
-# the exemption widening.
-#
-# ⚙ **There is deliberately no `currency` key on a seed** (008 FR-010). A cost is in the base
+# **There is deliberately no `currency` key on a seed** (008 FR-010). A cost is in the base
 # currency, full stop: converting a foreign-currency basis needs a rate on the acquisition date
 # and this feature has none, so rather than accept the field and refuse the value, the field
 # does not exist. A file that states one gets the unrecognised-field error, which is a stronger
 # guarantee than a validation rule -- no later change can quietly start converting it.
-#
-# `[owner]` is the shared `OwnerTable` above rather than a copy, as `composition` does: it is
-# the same claim -- whose file this is -- and two models for it would eventually disagree about
-# whether the id may be blank.
 
 
 class SeedTable(BaseModel):
@@ -1847,23 +1677,18 @@ class SeedTable(BaseModel):
     is_synthetic: bool
     """``true`` for a fixture whose holding is invented. Required; there is no default.
 
-    The same field and the same argument ``InstrumentTable`` carries, and here it is doing more
-    work than a label. `data/README.md` rule 5 -- the owner's own rule -- permits this file in
-    the repository *because* what ships in it is synthetic, so the claim has to be readable by
-    something other than a human reading a comment. Defaulting it to ``false`` would let a
-    fixture be mistaken for the owner's real position through omission, and the omission runs
-    the wrong way round; defaulting it to ``true`` would let his real holdings be committed
-    while claiming to be invented, which is worse.
+    `data/README.md` rule 5 permits this file in the repository *because* what ships in it is
+    synthetic, so the claim has to be readable by something other than a human reading a
+    comment. Defaulting it to ``false`` would let a fixture be mistaken for the owner's real
+    position; defaulting it to ``true`` would let his real holdings be committed while claiming
+    to be invented, which is worse.
     """
 
     basis: str
     """``known`` or ``estimated``, and there is no third value and no default (FR-006).
 
-    Typed ``str`` and resolved by the loader rather than by an enum here, for the reason this
-    module's docstring gives: the loader knows the file and can name the two words that would
-    have worked. Defaulting it to ``known`` would make every forgotten declaration produce a
-    confidently unmarked tax figure, which is the single most expensive omission available in
-    this file.
+    Defaulting it to ``known`` would make every forgotten declaration produce a confidently
+    unmarked tax figure, which is the single most expensive omission available in this file.
     """
 
     reason: str | None = None
@@ -1871,9 +1696,9 @@ class SeedTable(BaseModel):
     forbidden otherwise** -- a pairing the loader checks, because a reason on a known basis
     means one of the two lines is wrong and guessing which would be inventing a declaration.
 
-    It becomes the citation text of the ``SourceRef`` that marks every figure derived from
-    this lot, including the tax on its disposal, which is why an empty one is refused: a mark
-    that says nothing is a taint flag rather than provenance (FR-008).
+    It becomes the citation text of the ``SourceRef`` that marks every figure derived from this
+    lot, which is why an empty one is refused: a mark that says nothing is a taint flag rather
+    than provenance (FR-008).
     """
 
 
@@ -1886,13 +1711,12 @@ class SeedFile(BaseModel):
 
     seed: list[SeedTable]
     """May be **empty**, and this is the only declaration list in the project of which that is
-    true (008 FR-024, research.md D9). An empty spendable list makes every exit fail a test it
-    should pass; an empty seed list is an ordinary state of affairs and not a mistyped path.
+    true (008 FR-024, research.md D9). An empty seed list is an ordinary state of affairs and
+    not a mistyped path.
 
     It says **no lot has been declared**, never *the owner holds none*: the second is a figure
     describing his actual position, which `data/README.md` rule 5 forbids committing. The key
-    itself stays required, so the absence has to be written down rather than inferred from a
-    missing line."""
+    itself stays required, so the absence has to be written down."""
 
 
 class GoalTable(BaseModel):
@@ -1948,29 +1772,15 @@ class GoalFile(BaseModel):
 # ---------------------------------------------------------------------------
 #
 # Two declarations of opposite epistemic kinds, which is why they are two files in two
-# directories rather than two tables in one.
+# directories rather than two tables in one. `data/cpi/*.toml` carries one source per
+# *observation*; `data/scenarios/inflation/*.toml` is a *belief*, and carries
+# `is_assumption = true` where an observation carries a source. An external published forecast
+# may carry a citation too -- and is **still** an assumption (007 FR-010): a forecast is a
+# statement about a year that has not happened, and no source makes it observed.
 #
-# `data/cpi/*.toml` carries one source per *observation*: 411 of them in the shipped
-# Ukrainian price series, every `verified_on` empty because
-# a number that was downloaded is not a number anyone has checked. It lives in `SOURCED_DIRS`
-# and `scripts/check_provenance.py` reports every one of those empties as a warning, which is
-# correct and expected.
-#
-# `data/scenarios/inflation/*.toml` is a *belief*. It carries `is_assumption = true` where an
-# observation carries a source, on `TransitionTable`'s precedent, and `data/scenarios/` is
-# exempt from the citation gate for that reason. An external published forecast may carry a
-# citation too -- and is **still** an assumption (007 FR-010): a forecast is a statement about
-# a year that has not happened, and no source makes it observed.
-#
-# Same three settings as every model above, and the same standing rule: **zero field
-# defaults**. Nothing below may be omitted. The assumption's four citation keys follow
-# `verified_on`'s own precedent -- present and empty for the owner's own belief, all filled in
-# for an external forecast -- because a forgotten line must not read as a deliberate blank.
-#
-# ⚙ **The shipped `data/cpi/ua.toml` is generated by `scripts/fetch_cpi.py`.** Where that file
+# **The shipped `data/cpi/ua.toml` is generated by `scripts/fetch_cpi.py`.** Where that file
 # and these models disagree, the models are right and the script is updated (007 research.md
-# D10): the file can be regenerated, while a schema bent to match a generator's convenience is
-# a schema that will accept the next convenience too.
+# D10): a schema bent to match a generator's convenience will accept the next convenience too.
 
 
 class CpiSeriesTable(BaseModel):
@@ -1991,12 +1801,11 @@ class CpiSeriesTable(BaseModel):
     """Which index this is, in words. Two indices for one country are two series."""
 
     periodicity: str
-    """``monthly``. Typed ``str`` and resolved by the loader against the core's closed set, so
-    the error can name the file and list what would have worked.
+    """``monthly``, resolved by the loader against the core's closed set.
 
-    **Declared per series and never assumed** (FR-002): the annualisation divides by the
-    number of periods in a year, so an engine that assumed twelve would be wrong by a factor
-    of three on a quarterly series with nothing in the output to say so.
+    **Declared per series and never assumed** (FR-002): the annualisation divides by the number
+    of periods in a year, so an engine that assumed twelve would be wrong by a factor of three
+    on a quarterly series with nothing in the output to say so.
     """
 
     base: str
@@ -2088,9 +1897,8 @@ class InflationAssumptionTable(BaseModel):
     annual_rate_pct: float
     """The assumed rate per annum as a **percentage**: ``10.0`` means 10%.
 
-    The ``_pct`` suffix is part of the name so the unit is unmissable at the point of editing,
-    and the loader divides by 100 exactly once. Strictly above ``-100``: prices cannot fall to
-    nothing, and the bound is what keeps the Fisher denominator away from zero.
+    Strictly above ``-100``: prices cannot fall to nothing, and the bound is what keeps the
+    Fisher denominator away from zero.
     """
 
     is_assumption: bool
@@ -2178,11 +1986,7 @@ class QuoteAssetBeliefTable(BaseModel):
 
 
 class QuoteAssetBeliefFile(BaseModel):
-    """A whole ``data/scenarios/quote_asset/<owner>.toml``: one owner's belief.
-
-    A subdirectory for the reason ``data/scenarios/quotation/`` is one: the resolver globs
-    ``scenarios/*.toml`` as scenario documents and does not recurse.
-    """
+    """A whole ``data/scenarios/quote_asset/<owner>.toml``: one owner's belief."""
 
     model_config = STRICT
 
@@ -2235,21 +2039,15 @@ class InflationAssumptionFile(BaseModel):
 # 009-tax-depth: how a tax year is assembled, and the owner's positions on it
 # ---------------------------------------------------------------------------
 #
-# Two declarations of opposite epistemic kinds again, and split the same way 007's were.
-#
-# `data/tax/timing/<jurisdiction>.toml` is **cited law**: which category a class belongs to,
-# whether that category nets, what a loss in it does, when the money is due, and what each
-# basis method stands on. It sits under `data/tax/`, so `scripts/check_provenance.py` requires
-# a citation on every table carrying an observed value -- which is why the deadlines are
-# declared as month and day integers rather than as an `"08-01"` string. The gate recognises
-# numbers and full ISO dates, and a legal value spelled any other way would sit outside it.
+# `data/tax/timing/<jurisdiction>.toml` is **cited law**. It sits under `data/tax/`, so
+# `scripts/check_provenance.py` requires a citation on every table carrying an observed value
+# -- which is why the deadlines are declared as month and day integers rather than as an
+# `"08-01"` string: the gate recognises numbers and full ISO dates, and a legal value spelled
+# any other way would sit outside it.
 #
 # `data/scenarios/tax/<owner>.toml` is the **owner's own**: whether he filed, and which branch
 # of an unanswered legal question this run takes. It carries `is_assumption = true` where an
 # observation carries a source, on `TransitionTable`'s precedent.
-#
-# Same three settings as every model above, and the same standing rule: **zero field
-# defaults**. A missing filing decision must fail rather than read as `false`.
 
 
 class TimingCategoryTable(BaseModel):
@@ -2259,8 +2057,8 @@ class TimingCategoryTable(BaseModel):
 
     id: str
     treatment: str
-    """``nets``, ``per_event`` or ``outside``. Resolved by the loader against the core's closed
-    set, so an unrecognised value names the file and lists what would have worked."""
+    """``nets``, ``per_event`` or ``outside``, resolved by the loader against the core's closed
+    set."""
 
     carryforward: str
     """``unlimited`` or ``none``. What a negative annual result does."""
@@ -2292,9 +2090,8 @@ class TimingCategoryTable(BaseModel):
 class TimingClassTable(BaseModel):
     """``[[timing.class]]`` -- which category one declared tax class belongs to.
 
-    A reference rather than an observation, so no citation: the rates are cited where they are
-    declared. Whether the class **resolves** is the resolver's job, since it needs every rate
-    pack parsed first.
+    Whether the class **resolves** is the resolver's job, since it needs every rate pack parsed
+    first.
     """
 
     model_config = STRICT
@@ -2335,10 +2132,9 @@ class TimingTable(BaseModel):
     """The official-rate series that serves this jurisdiction's tax currency, or omitted.
 
     Declared beside ``tax_currency`` because the two are one fact read twice: the currency a
-    liability is assessed in, and the published series that says what a foreign amount is
-    worth in it (011 FR-007). Omitted is a declared absence -- a foreign-currency taxable
-    result then refuses saying this jurisdiction declared no series, there being none to name,
-    and no other series is picked for it by load order.
+    liability is assessed in, and the published series that says what a foreign amount is worth
+    in it (011 FR-007). Omitted is a declared absence -- a foreign-currency taxable result then
+    refuses, and no other series is picked for it by load order.
     """
 
     category: list[TimingCategoryTable]
@@ -2426,26 +2222,16 @@ class TaxPositionsFile(BaseModel):
 # 010-full-tuple: how an instrument is reached
 # ---------------------------------------------------------------------------
 #
-# Same three settings and the same standing rule: ``STRICT`` everywhere, and **zero field
-# defaults** except where TOML's lack of a null leaves an omitted key as the only way to say
-# "nothing is declared here" -- which here is exactly one field, ``price``, feeding a core
-# field that is itself ``Money | None``.
-#
-# ⚙ **A separate file rather than four keys on the instrument declaration.** Every field here
-# is a property of the **option** -- this instrument, reached this way -- rather than of the
-# security: where it is bought, where its proceeds land, what a unit costs *at that venue*,
-# and how risky reaching it that way is. Today the resolver enforces **one row per
-# instrument**, so one instrument at two venues is not yet declarable; what the separate file
-# buys is that it becomes declarable here, in one file, without touching the terms the paper
-# carries. Keying by (instrument, venue) now would also need a venue term on the tuple, and
-# building it for a second venue nobody has declared would be speculation.
+# **A separate file rather than four keys on the instrument declaration.** Every field here is
+# a property of the **option** -- this instrument, reached this way -- rather than of the
+# security. Today the resolver enforces **one row per instrument**, so one instrument at two
+# venues is not yet declarable; what the separate file buys is that it becomes declarable here,
+# without touching the terms the paper carries.
 #
 # **``[[access]]`` itself carries no observed value and therefore no citation**, deliberately.
 # A venue id, an instrument id and a risk-class label are references and statements, not
-# observations -- the same reading ``[instrument.tax_classes]`` and ``data/venues.toml``
-# already carry. The one observed value, the unit price, is a *venue quote* and lives in its
-# own ``[access.price]`` table with its own four citation keys, exactly as ``[instrument.nav]``
-# does.
+# observations. The one observed value, the unit price, is a *venue quote* and lives in its own
+# ``[access.price]`` table with its own four citation keys.
 
 
 class AccessPriceTable(BaseModel):
@@ -2465,11 +2251,9 @@ class AccessPriceTable(BaseModel):
     """What the quote is in. Stated rather than inherited from the instrument, and then
     **checked against** the instrument's own declared currency by the resolver.
 
-    Two declarations of one fact, on purpose and on ``_check_partner``'s precedent: a price
-    that silently adopted whatever currency the instrument named would be unreadable on its
-    own -- ``per_unit = 1000.0`` of what? -- and a file that can state something wrong is a
-    file whose disagreement can be reported. One that cannot is a file whose author's
-    intention is unrecoverable.
+    Two declarations of one fact, on purpose: a price that silently adopted whatever currency
+    the instrument named would be unreadable on its own -- ``per_unit = 1000.0`` of what? --
+    and a file that can state something wrong is a file whose disagreement can be reported.
     """
 
     kind: str
@@ -2543,7 +2327,7 @@ class AccessFile(BaseModel):
 # 011-official-rate: the declared official-rate series
 # ---------------------------------------------------------------------------
 #
-# ⚙ **There is no field for a second side, and that absence is the mechanism.** An official
+# **There is no field for a second side, and that absence is the mechanism.** An official
 # rate is one number: two sides is the defining property of an `FxChannel`, and a rate that
 # acquired a spread would be a channel with a government's name on it. Under
 # `extra="forbid"`, a `[observation.buy_side]` is therefore an unrecognised field rather
@@ -2565,11 +2349,7 @@ class OfficialRateSeriesTable(BaseModel):
     that makes a second country's series a data-only addition rather than a rewrite."""
 
     pair: list[str]
-    """``["UAH", "USD"]`` -- price currency then unit currency, ``FxChannel.pair``'s order.
-
-    Typed as a list of ``str`` and resolved by the loader against ``Currency``, so the error
-    can name the file and list what would have worked.
-    """
+    """``["UAH", "USD"]`` -- price currency then unit currency, ``FxChannel.pair``'s order."""
 
     quotation_unit: float
     """How many units of the unit currency the value is stated per: ``1.0``, or ``100.0``.
@@ -2639,10 +2419,9 @@ class OfficialRateObservationTable(BaseModel):
     on_date: str
     """The ISO date this rate is the official rate **for** -- not the date it was read.
 
-    Load-bearing beyond provenance: it must not be later than this observation's own
-    ``retrieved_on``, or the value is a forecast wearing an observation's clothes, and this
-    one would silently set a legal base. Checked against the file's own retrieval date rather
-    than against a clock, so the same file loads the same way in 2026 and in 2030.
+    Must not be later than this observation's own ``retrieved_on``, on
+    :attr:`CpiObservationTable.retrieved_on`'s rule, and this one would silently set a legal
+    base.
     """
 
     value: float
@@ -2656,11 +2435,6 @@ class OfficialRateObservationTable(BaseModel):
     precedent: any declared kind loads, so a file naming a slower-ageing one would age a rate
     at that kind's threshold. What *is* enforced is that a kind is named and that it is
     declared (FR-006, ``scripts/check_provenance.py``).
-
-    Per observation rather than per series, because the gate treats each ``[[observation]]``
-    as a sourced table and requires a kind on each. The loader stamps it onto the citation and
-    the core record carries no copy of it: the citation is what survives the merge a derived
-    tax figure passes through.
     """
 
     source: str
@@ -2688,15 +2462,11 @@ class OfficialRateFile(BaseModel):
     observation: list[OfficialRateObservationTable]
     """Strictly ascending by date, no duplicates -- both checked by the loader.
 
-    **Required with no default, and an empty series is written ``observation = []``.** That
-    keeps this model's zero-defaults rule intact where it matters: a file that simply forgot
-    its observations and a file declaring it has none must not look alike, and a default of
-    ``[]`` would make them identical.
+    **Required with no default, and an empty series is written ``observation = []``**: a file
+    that simply forgot its observations and a file declaring it has none must not look alike.
 
     **Gaps are permitted and so is emptiness**, and neither is an oversight. A date the
-    publisher did not publish for is a fact, and FR-010 forbids inventing one; an empty
-    declaration is the shape a fetch script writes into before it has run, and every date asked
-    of such a series refuses by name until the publisher's values are fetched.
+    publisher did not publish for is a fact, and FR-010 forbids inventing one.
     """
 
 
@@ -2704,7 +2474,7 @@ class OfficialRateFile(BaseModel):
 # 012-fop-group-3: the taxation scheme, and where income is credited
 # ---------------------------------------------------------------------------
 #
-# ⚙ **There is no `rate_pct` on a periodic component and no `amount` on a rate component,
+# **There is no `rate_pct` on a periodic component and no `amount` on a rate component,
 # and that absence is the mechanism.** A periodic obligation's trigger is a period elapsing
 # and its base is a statutory sum; a rate component's trigger is income arriving and its base
 # is a percentage. Under `extra="forbid"`, writing one as the other is an unrecognised field
@@ -2828,13 +2598,10 @@ class SchemeTable(BaseModel):
     variant: str
     """Which of the law's alternative rate sets this file declares (012 FR-002).
 
-    Named even where a scheme has one variant in this repository, so declaring the second is
-    a file rather than a schema change the day its rate is cited.
-
-    **A variant is one scheme per file, not a second dimension inside one.** Which variant
-    the owner is in is a fact about him, and he states it by naming *this scheme* on his
-    stream -- so it is declared once, in per-owner data, and cannot disagree with itself. The
-    rates of every variant are public legal facts and live here, cited.
+    **A variant is one scheme per file, not a second dimension inside one.** Which variant the
+    owner is in is a fact about him, and he states it by naming *this scheme* on his stream --
+    so it is declared once, in per-owner data, and cannot disagree with itself. The rates of
+    every variant are public legal facts and live here, cited.
     """
 
     reporting_cadence: str
@@ -2976,11 +2743,10 @@ class CalendarWeekTable(BaseModel):
     """``[calendar.week]`` -- the weekly rest pattern and the week start, cited together.
 
     **The provenance gate cannot see this table, measured 2026-08-31**: it holds weekday
-    *names* and no date and no number, so `_has_observed_value` is false for it even after the
-    predicate learned to count dates. Its citation is required by the loader and its
-    observation kind by the resolver, which is the same division `non_publication_rule`
-    already lives under -- and the reason `[calendar.coverage]` carries the window as two
-    dates rather than as two years is that the gate does then reach *that* one.
+    *names* and no date and no number, so `_has_observed_value` is false for it. Its citation is
+    required by the loader and its observation kind by the resolver instead, and
+    `[calendar.coverage]` carries its window as two dates rather than two years so that the gate
+    does reach that one.
     """
 
     model_config = STRICT
@@ -3071,17 +2837,13 @@ class CalendarFile(BaseModel):
 # 019-decision-layer: the objectives a dominance pass runs over
 # ---------------------------------------------------------------------------
 #
-# Same three settings as every model above, and the same standing rule: **zero field defaults**
-# except where an absent key is itself a positive statement. Here the exception is the band,
-# whose three shapes are declared as four optional keys and refused by the loader unless exactly
-# one shape is stated -- the `subjects` / `every_declared_instrument` reading, for its reason:
-# two shapes side by side would leave which one is in force to be settled by whichever the code
-# read first.
+# The band's three shapes are declared as four optional keys and refused by the loader unless
+# exactly one shape is stated: two shapes side by side would leave which one is in force to be
+# settled by whichever the code read first.
 #
 # No citation keys, and their absence is the design (FR-004). How much precision the owner
 # believes his inputs support is a statement about him, so there is nothing for a source to
-# vouch for. `data/objectives/` is already named in `EXEMPT_DIRS` of `scripts/check_provenance.py`
-# with that reason recorded beside it.
+# vouch for.
 
 
 class BandTable(BaseModel):

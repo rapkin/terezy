@@ -80,8 +80,8 @@ class TestDispatchIsAMapping:
         assert ops.constraints is fixed_income.constraints
 
     def test_the_second_bond_form_selects_its_own_three_functions(self) -> None:
-        """⚙ Feature 013. A bond declared as the payments it will make is a further entry
-        under the **same** interface, not a fifth one."""
+        """A bond declared as the payments it will make is a further entry under the **same**
+        interface."""
         ops = instruments.ops_for(instruments.ENUMERATED_SCHEDULE)
         assert ops.events is enumerated.events
         assert ops.tax_classes is enumerated.tax_classes
