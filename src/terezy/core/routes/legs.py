@@ -5,13 +5,9 @@ in order, and MUST report what arrives at the far end.* A leg is that unit of ap
 transfer, a conversion, a trade, a withdrawal, carrying its own fees, limits, latency,
 availability window, disruption probability and provenance.
 
-**The registry is a mapping of functions, and it is not a fifth plugin interface**
-(research.md D1, and the argument in this package's ``__init__``). ``LEG_COST_FNS`` is an
-*algorithm* registry on the precedent set by ``DAY_COUNT_FNS`` in
-``primitives.conventions``: the choice of kind is data, the arithmetic behind each kind is
-code. Principle II requires that adding an instrument, venue, tax regime or jurisdiction be
-data-only, and a leg kind is none of those four. Adding a leg that *uses* a kind is data,
-which is the property the principle actually protects.
+``LEG_COST_FNS`` is an *algorithm* registry on the precedent set by ``DAY_COUNT_FNS`` in
+``primitives.conventions`` (research.md D1): the choice of kind is data, the arithmetic behind
+each kind is code, and adding a leg that *uses* a kind is data.
 
 **Three of the four kinds share one implementation, and that is stated rather than hidden.**
 A transfer, a trade and a withdrawal all charge a percentage of the amount plus a fixed fee

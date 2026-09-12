@@ -6,23 +6,14 @@ distribution at 14% and a redemption at 23% and then reported one total would be
 the ledger and useless to the reader, which is what FR-007's per-class subtotals are for
 (research.md D4).
 
-**Every figure here is read off the ledger**, through the same two folds
-``results.project`` describes. Nothing is read off the instrument's own arithmetic, because a
-figure that came into existence twice can disagree with itself.
+**Every figure here is read off the ledger**, through the same two folds ``results.project``
+describes. Nothing is read off the instrument's own arithmetic, because a figure that came
+into existence twice can disagree with itself.
 
-**No statistical metric, and no field one could sit in.** Both Inzhur funds are
-assumption-driven, so :func:`statistical_metric` returns a typed refusal and there is
-nowhere on :class:`FundProjection` for a volatility or a Sharpe ratio to be written
-(research.md D10, FR-005). A caveated number gets copied without its caveat; a refusal
-cannot be.
-
-**A range stays a range.** Where the fund states 25-29% and the owner has chosen no point
-inside it, the result is a :class:`RangeProjection` -- two complete projections, one at each
-end -- rather than one figure at a midpoint nobody declared (research.md D11). There is no
-midpoint helper in this module or in any other.
-
-Every refusal is typed, none of them an exception. Each carries the reason, and the reason
-reaches the output.
+**No statistical metric, and no field one could sit in** (research.md D10, FR-005). **A range
+stays a range**: where the fund states 25-29% and the owner has chosen no point inside it, the
+result is two complete projections rather than one figure at a midpoint nobody declared
+(research.md D11), and there is no midpoint helper in this module or in any other.
 """
 
 from __future__ import annotations
@@ -94,9 +85,8 @@ NOMINAL_ONLY: Final = "inflation is not modelled, so every figure here is nomina
 class FundAssumptions:
     """What the owner states for one run, beyond what the fund declares.
 
-    Every field is required and none has a default anywhere in the stack. That is the
-    whole discipline of research.md D5 applied to five inputs rather than one: an unstated
-    assumption is indistinguishable from a checked one, and each of these changes the
+    Every field is required and none has a default anywhere in the stack (research.md D5): an
+    unstated assumption is indistinguishable from a checked one, and each of these changes the
     answer.
     """
 
@@ -188,9 +178,8 @@ class PegUnsizable:
 class AwaitingVerification:
     """A projection needed a value the primary documents did not give (research.md D8).
 
-    Carries the *question*, not a placeholder value, because the record it comes from
-    carries no value either. This turns "I cannot compute this" into "go and read this
-    document".
+    Carries the *question*, not a placeholder value, because the record it comes from carries
+    no value either.
     """
 
     instrument_id: str
@@ -226,12 +215,7 @@ FundRefusal = (
 
 @dataclass(frozen=True, slots=True)
 class ClassSubtotal:
-    """What one declared tax class charged across the whole run (FR-007).
-
-    The reason this record exists: without it the two-class split is invisible to a reader
-    even when the ledger is right, and E1's whole point is that a fund payout and a fund
-    exit are not taxed alike.
-    """
+    """What one declared tax class charged across the whole run (FR-007)."""
 
     tax_class_id: str
     kinds: tuple[TaxableEventKind, ...]
@@ -310,8 +294,8 @@ class ExitLine:
 class FundProjection:
     """One fund holding, projected under one stated set of assumptions.
 
-    No ``volatility``, no ``sharpe``, no ``sortino``, and **no field one could live in**.
-    No computed fee either: the researched fee facts are context for the declared yield and
+    No ``volatility``, no ``sharpe``, no ``sortino``, and **no field one could live in**. No
+    computed fee either: the researched fee facts are context for the declared yield and
     nothing accrues from them (research.md D9, D10).
     """
 
@@ -361,9 +345,8 @@ class FundProjection:
 class RangeProjection:
     """The fund states a range and the owner chose no point, so the answer is two figures.
 
-    Not a midpoint, not the low end, not the high end. The range that survives to the
-    output is more useful than a false point, and Principle I's ordering puts a
-    distribution ahead of a point estimate anyway (research.md D11, SC-013).
+    Not a midpoint, not the low end, not the high end: Principle I's ordering puts a
+    distribution ahead of a point estimate (research.md D11, SC-013).
     """
 
     instrument_id: str
@@ -398,10 +381,8 @@ def statistical_metric(declaration: FundDeclaration, metric: str) -> MetricRefus
     """Refuse a statistical metric for an assumption-driven instrument. Always.
 
     The return type is the refusal itself rather than a union: there is no input to this
-    function that produces a number, which is Principle I in its most literal form --
-    *refuse to emit a Sharpe ratio rather than computing one from invented data*. A
-    signature that could return a float would be a signature somebody eventually makes
-    return one.
+    function that produces a number. A signature that could return a float would be a
+    signature somebody eventually makes return one.
     """
     return MetricRefused(
         instrument_id=declaration.id,
@@ -432,13 +413,12 @@ def project_fund(
 ) -> FundOutcome:
     """Project one fund holding under one stated set of assumptions.
 
-    The order of the guards is the order a reader would ask the questions in, and the
-    **first** problem found is the one reported -- an owner fixing a purchase after the
-    cutoff does not also need to be told the peg cannot be sized.
+    The order of the guards is the order a reader would ask the questions in, and the **first**
+    problem found is the one reported -- an owner fixing a purchase after the cutoff does not
+    also need to be told the peg cannot be sized.
 
-    ``tax_classes`` is passed in rather than looked up, exactly as ``results.project``
-    takes it: loading is the data layer's job, and the core must be testable with no file
-    on disk near the arithmetic.
+    ``tax_classes`` is passed in rather than looked up: loading is the data layer's job, and
+    the core must be testable with no file on disk near the arithmetic.
     """
     refused = _refuse(declaration, holding, assumptions)
     if refused is not None:
@@ -461,10 +441,9 @@ def project_fund(
 def _resolve_rate(declared: DeclaredYield, chosen: ChosenPoint | None) -> float | None:
     """The one rate to project at, or ``None`` where the honest answer is two.
 
-    Three cases and no fourth. A fund stating a single figure has ``low == high`` and that
-    is the rate. A fund stating a range and an owner who chose a point inside it gets the
-    owner's point, labelled his. A fund stating a range and no chosen point gets ``None``,
-    and the caller projects **both ends** -- because the alternative is picking one, and
+    Three cases and no fourth. A single stated figure has ``low == high``; a range with a
+    chosen point gets the owner's point, labelled his; a range with no chosen point gets
+    ``None`` and the caller projects **both ends**, because the alternative is picking one and
     the midpoint is the most seductive invented number in this feature.
     """
     if chosen is not None:
@@ -482,7 +461,6 @@ def _both_ends(
     *,
     tax_classes: Mapping[str, TaxClass],
 ) -> FundOutcome:
-    """Two complete projections, one at each end of the fund-stated range."""
     declared = declaration.declared_yield
     at_low = _project_at(
         declaration,
@@ -526,7 +504,6 @@ def _refuse(
     holding: Holding,
     assumptions: FundAssumptions,
 ) -> FundRefusal | InstrumentFailure | None:
-    """Every reason this holding cannot be projected at all, in the order a reader asks."""
     cutoff = declaration.subscription_cutoff
     if cutoff is not None and holding.purchased_on > cutoff:
         return PurchaseAfterCutoff(
@@ -596,7 +573,6 @@ def _refuse_the_exit(
     holding: Holding,
     assumptions: FundAssumptions,
 ) -> FundRefusal | InstrumentFailure | None:
-    """An early exit the terms do not owe and the scenario does not grant (FR-017)."""
     requested = assumptions.exit_on
     if requested is None:
         return None
@@ -636,7 +612,6 @@ def _refuse_the_peg(
     declaration: FundDeclaration,
     assumptions: FundAssumptions,
 ) -> FundRefusal | None:
-    """A pegged payout with no declared exchange rate, and a cap nobody has confirmed."""
     terms = declaration.distribution
     if terms is None or terms.peg is None:
         return None
@@ -680,15 +655,14 @@ def _exit_plan(
 ) -> ExitPlan | None:
     """When and how the holding ends, or ``None`` where it is still open at the horizon.
 
-    Three cases, and the third is the one that matters. A **requested** exit before the
-    fund's end executes on the day asked for, at the assumed mode's discount and delay. An
-    exit requested on or after the termination date, or a horizon that simply reaches it,
-    is the **termination payout**: a dated disposal at NAV with no discount, because it is
-    the contract ending rather than a favour being asked for. Anything else leaves the
+    Three cases, and the third is the one that matters. A **requested** exit before the fund's
+    end executes on the day asked for, at the assumed mode's discount and delay. An exit
+    requested on or after the termination date, or a horizon that simply reaches it, is the
+    **termination payout**: a dated disposal at NAV with no discount. Anything else leaves the
     holding open -- a projection running out of dates is not a reason to sell (FR-019).
 
     A termination payout settles on the **legal** terms' delay whatever mode was assumed,
-    because the payout is an obligation of the регламент and not an instance of the
+    because the payout is an obligation of the регламент rather than an instance of the
     company's current practice.
     """
     requested = assumptions.exit_on
@@ -724,16 +698,14 @@ def _pegged_distribution(
     """One pegged payout, sized in the peg's currency and converted at the capped rate.
 
     The unit's value **in the peg's currency** is its declared NAV divided by the owner's
-    assumed rate, the period's income is that times a twelfth of the declared annual rate,
-    and the hryvnia payment is that term converted at ``min(assumed, cap)``. Written out
-    that way rather than collapsed, because the collapse hides what owner decision A is
-    about: below the ceiling the payment tracks the dollar exactly, and above it the peg
-    partially breaks and the holder starts losing real income.
+    assumed rate, the period's income is that times a twelfth of the declared annual rate, and
+    the hryvnia payment is that term converted at ``min(assumed, cap)``. Written out that way
+    rather than collapsed, because the collapse hides what owner decision A is about: below the
+    ceiling the payment tracks the dollar exactly, and above it the peg partially breaks.
 
     A payment dated before the earliest declared ceiling is **refused**, naming the
-    verification task: "no ceiling is declared for this date" is not "there is no ceiling",
-    and reading the first as the second would size the payment at the full assumed rate --
-    the favourable answer, chosen silently.
+    verification task: "no ceiling is declared for this date" is not "there is no ceiling", and
+    reading the first as the second would size the payment at the full assumed rate.
     """
     assumption = plan.exchange_rate
     if assumption is None:  # pragma: no cover -- _refuse_the_peg rules this out first
@@ -762,7 +734,6 @@ def _pegged_distribution(
 
 
 def _awaiting_cap(declaration: FundDeclaration, paid_on: date) -> AwaitingVerification:
-    """The cap question, as a refusal naming the task and the date it was needed for."""
     task = _task_mentioning(declaration, "курс")
     unrecorded = (
         " This fund declares a peg whose ceiling does not cover the date AND records no "
@@ -795,10 +766,9 @@ def _awaiting_cap(declaration: FundDeclaration, paid_on: date) -> AwaitingVerifi
 def _task_mentioning(declaration: FundDeclaration, needle: str) -> VerificationTask | None:
     """The recorded open question about ``needle``, or ``None`` if none was recorded.
 
-    Matched on the declared prose rather than on an enumerated code, deliberately: a task
-    is a sentence the owner has to act on, and a parallel code vocabulary would be a second
-    thing to keep in step with it. ``None`` where nothing matches, because inventing a
-    question is as bad as inventing an answer.
+    Matched on the declared prose rather than on an enumerated code, deliberately: a task is a
+    sentence the owner has to act on, and a parallel code vocabulary would be a second thing to
+    keep in step with it.
     """
     for task in declaration.verification_tasks:
         if needle.casefold() in task.question.casefold():
@@ -869,8 +839,7 @@ def _project_at(
 
     The same two-pass shape ``results.project`` uses, and for the same reason: the tax on a
     disposal is knowable only from the realised gain, which is a property of the fold. Tax
-    events are cash-only, so weaving them in cannot change a disposal the first fold
-    computed -- the two passes agree by construction rather than by coincidence.
+    events are cash-only, so weaving them in cannot change a disposal the first fold computed.
     """
     plan = _plan(declaration, horizon, assumptions, rate)
     payouts = _distribution_events(declaration, holding, plan, horizon)
@@ -913,8 +882,7 @@ def _sequence(
 
     Numbered here rather than at construction, because a payout's date and the exit's
     settlement date decide the order and neither is known until the plan is resolved. The
-    ledger requires sequence order to agree with date order, and doing the numbering in one
-    place is what guarantees it.
+    ledger requires sequence order to agree with date order.
     """
     purchase = fund.purchase_event(declaration, holding, plan, sequence=1)
     tail: list[Event] = list(payouts)
@@ -931,9 +899,8 @@ def _charge_every_taxable_event(
 ) -> tuple[TaxCharge, ...] | UnresolvedTaxClass | RateUndeclaredBefore:
     """One charge per taxable event, each under the class its own kind maps to (FR-006).
 
-    This is E1's whole mechanism: the mapping is plural, the two values differ, and the
-    class is chosen by the *kind of income* rather than by the instrument. Neither class's
-    rates can reach the other's events, because neither class is ever looked up for them.
+    The class is chosen by the *kind of income* rather than by the instrument, so neither
+    class's rates can reach the other's events.
     """
     rule = tax_registry.ops_for(tax_registry.FLAT_RATE)
     charges: list[TaxCharge] = []
@@ -968,9 +935,8 @@ def _charge_every_taxable_event(
 def _taxable_kind(kind: EventKind) -> TaxableEventKind | None:
     """Which kind of taxable income a fund event is, or ``None`` if it is not income.
 
-    Only two kinds of income exist in a fund's stream, and they are the two that make this
-    feature exist. Everything else -- the purchase, the tax charges this very function
-    produces -- moves money without being income.
+    Everything else -- the purchase, the tax charges this very function produces -- moves money
+    without being income.
     """
     match kind:
         case EventKind.DISTRIBUTION:
@@ -1022,13 +988,11 @@ def _class_for(
 def _taxable_base(event: Event, kind: TaxableEventKind, state: LedgerState) -> Money:
     """What the rates apply to: the payout itself, or the gain a disposal realised.
 
-    **A disposal at a loss has a base of zero, and that is not a silent clamp** (FR-008).
-    Investment profit tax is charged on profit; a loss produces no charge. The loss is not
-    swallowed -- :class:`ExitLine` carries it as its own figure with the statement that
-    carryforward is not modelled here -- and the zero keeps the gain's provenance, so it
-    still cites what it was computed from. Charging a negative tax instead would report a
-    refund this rule does not model, and dropping the line entirely would make the loss
-    invisible.
+    **A disposal at a loss has a base of zero, and that is not a silent clamp** (FR-008). The
+    loss is not swallowed -- :class:`ExitLine` carries it as its own figure with the statement
+    that carryforward is not modelled here -- and the zero keeps the gain's provenance. Charging
+    a negative tax instead would report a refund this rule does not model, and dropping the line
+    entirely would make the loss invisible.
     """
     if kind is not TaxableEventKind.DISPOSAL_GAIN:
         return event.amount
@@ -1037,7 +1001,6 @@ def _taxable_base(event: Event, kind: TaxableEventKind, state: LedgerState) -> M
 
 
 def _realised_gain(event: Event, state: LedgerState) -> Money:
-    """The gain the fold realised for this disposal: proceeds less basis less fees."""
     for disposal in state.disposals:
         if disposal.sequence == event.sequence:
             return disposal.realised_gain_base_ccy
@@ -1050,7 +1013,6 @@ def _interleave(
     gross_state: LedgerState,
     charges: Sequence[TaxCharge],
 ) -> tuple[tuple[Event, ...], tuple[TaxCharge, ...]]:
-    """Weave each charge in behind the event it taxes, renumbering the whole stream."""
     by_sequence = {charge.event_sequence: charge for charge in charges}
     combined: list[Event] = []
     renumbered: list[TaxCharge] = []
@@ -1074,10 +1036,6 @@ def _tax_event(taxed: Event, charge: TaxCharge, *, sequence: int) -> Event:
     (FR-001). The amount is :func:`terezy.core.tax.year.memo_amount` -- the charge's own money
     at no magnitude, so the rate entry's citation still travels with it -- and the liability
     leaves cash as a ``TAX_PAYMENT`` later.
-
-    Every tax figure this projection reports is read off the ``TaxCharge`` records rather than
-    off a balance, so what moves is the **cash**, which now holds the gross until the tax is
-    actually paid.
     """
     return Event(
         sequence=sequence,
@@ -1113,7 +1071,6 @@ def _assemble(
     basis: DeclaredYield | ChosenPoint,
     tax_classes: Mapping[str, TaxClass],
 ) -> FundProjection:
-    """Read every reported figure off the folded ledger and say what it rests on."""
     currency = declaration.unit_currency
     by_event = {charge.event_sequence: charge for charge in charges}
     lines = _distribution_lines(state, by_event, payouts, tax_classes)
@@ -1164,11 +1121,10 @@ def _net_proceeds(state: LedgerState, total_tax: Money, currency: Currency) -> M
 
     **The tax is subtracted explicitly**: a charge does not debit the account on the day the
     income arrived, so summing the events alone would turn this field into a pre-tax figure
-    while it still called itself after tax -- in the field feeding
-    :func:`beside_hurdle`, where a taxed fund would gain against an exempt bond overnight.
+    while it still called itself after tax -- in the field feeding :func:`beside_hurdle`, where
+    a taxed fund would gain against an exempt bond overnight.
 
-    **An outcome, not a cash timeline.** It states what the holding returns once its tax is
-    paid and says nothing about *when*; the dated answer, and whether the cash is even there
+    **An outcome, not a cash timeline.** The dated answer, and whether the cash is even there
     on the due date, is ``core.results.tax_year.settle``.
     """
     return money.sub(money.total([event.amount for event in state.applied], currency), total_tax)
@@ -1180,7 +1136,6 @@ def _distribution_lines(
     payouts: Sequence[tuple[Event, PeggedAmount | None, bool, date]],
     tax_classes: Mapping[str, TaxClass],
 ) -> tuple[DistributionLine, ...]:
-    """One line per payout, carrying which dated rate entry taxed it and which peg sized it."""
     peg_facts = {
         (event.occurred_on, record_on): (pegged, bound)
         for event, pegged, bound, record_on in payouts
@@ -1211,7 +1166,6 @@ def _peg_fact_for(
     peg_facts: Mapping[tuple[date, date], tuple[PeggedAmount | None, bool]],
     paid_on: date,
 ) -> tuple[date, PeggedAmount | None, bool]:
-    """The record date and peg facts recorded for the payout made on this date."""
     for (payment_date, record_on), (pegged, bound) in peg_facts.items():
         if payment_date == paid_on:
             return record_on, pegged, bound
@@ -1251,7 +1205,6 @@ def _exit_line(
     by_event: Mapping[int, TaxCharge],
     tax_classes: Mapping[str, TaxClass],
 ) -> ExitLine | None:
-    """The exit as its own line: NAV, the discount, the gain, and what was charged on it."""
     if plan.exit is None:
         return None
     exit_event = next(event for event in state.applied if event.kind is EventKind.REDEMPTION)
@@ -1286,9 +1239,7 @@ def _subtotals(
 ) -> tuple[ClassSubtotal, ...]:
     """Per-class subtotals: which class charged what, and on which kinds of income (FR-007).
 
-    Sorted by class id so two runs of the same scenario produce the same order. Without
-    this record the two-class split is invisible to a reader even when the ledger is right,
-    which is the whole reporting requirement E1 turns on.
+    Sorted by class id so two runs of the same scenario produce the same order.
     """
     kind_of = {event.sequence: _taxable_kind(event.kind) for event in state.applied}
     by_class: dict[str, list[TaxCharge]] = {}
@@ -1319,11 +1270,10 @@ def _peg_statement(
 ) -> str | None:
     """The peg and its cap, restated on every output that has one (FR-020).
 
-    The whole point of owner decision A is that the currency exposure stays visible instead
-    of being lost inside a hryvnia figure, so the statement names the peg, the assumed
-    rate, the ceiling and **how often the ceiling bound**. A run where the cap bound every
-    month is a run where the holder's dollar income stopped arriving in full, and a
-    hryvnia total alone would not say so.
+    Owner decision A is that the currency exposure stays visible instead of being lost inside a
+    hryvnia figure, so the statement names the peg, the assumed rate, the ceiling and **how
+    often the ceiling bound**: a run where the cap bound every month is a run where the
+    holder's dollar income stopped arriving in full.
     """
     terms = declaration.distribution
     if terms is None or terms.peg is None or plan.exchange_rate is None:
@@ -1422,14 +1372,13 @@ class BesideTheHurdle:
     """A fund's after-spread, after-tax outcome next to feature 001's tax-free benchmark.
 
     FR-025. The comparison exists because a fund-stated 25-29% next to a 15.5% exempt
-    government bond is the exact place false precision does its damage, and the honest
-    answer is arithmetic rather than a verdict: here is what survives the spread and the
-    tax, here is what the benchmark pays, and here is everything the comparison leaves out.
+    government bond is the exact place false precision does its damage, and the honest answer
+    is arithmetic rather than a verdict.
 
     **The excluded terms are on the record's face, not in a footnote** (Principle VI). This
-    compares an instrument against an instrument. The funding route in and the exit route
-    out are the largest missing numbers, and naming them is what stops this being read as
-    a decision.
+    compares an instrument against an instrument; the funding route in and the exit route out
+    are the largest missing numbers, and naming them is what stops this being read as a
+    decision.
     """
 
     instrument_id: str
@@ -1462,14 +1411,12 @@ def beside_hurdle(
 ) -> BesideTheHurdle | InconsistentTerms:
     """Put one fund projection beside one hurdle rate, with what it excludes attached.
 
-    The fund figure is ``net profit / invested / years``: everything the holding returned
-    after the spread and after tax, as a simple annual rate over the period actually held.
-    Read off the projection's own ledger totals rather than recomputed, so it cannot
-    disagree with the lines above it.
+    The fund figure is ``net profit / invested / years``, read off the projection's own ledger
+    totals rather than recomputed, so it cannot disagree with the lines above it.
 
-    Refuses where the holding has no measurable length -- a projection whose events all
-    fall on one day annualises to a division by zero, and a large number produced that way
-    would be the most confident figure in the output and the least meaningful.
+    Refuses where the holding has no measurable length: a projection whose events all fall on
+    one day annualises to a division by zero, and a large number produced that way would be the
+    most confident figure in the output and the least meaningful.
     """
     invested = -_purchase_amount(projection)
     ends_on = _ends_on(projection)
@@ -1500,7 +1447,6 @@ def beside_hurdle(
 
 
 def _purchase_amount(projection: FundProjection) -> float:
-    """What the purchase cost, signed as the ledger holds it: negative, money going out."""
     for event in projection.ledger.applied:
         if event.kind is EventKind.PURCHASE:
             return event.amount.amount
@@ -1511,5 +1457,4 @@ def _purchase_amount(projection: FundProjection) -> float:
 
 
 def _ends_on(projection: FundProjection) -> date:
-    """The date the last thing happened: the exit's settlement, or the last payout."""
     return max(event.occurred_on for event in projection.ledger.applied)

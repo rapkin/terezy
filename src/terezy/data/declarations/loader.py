@@ -15,14 +15,13 @@ Four things this module is responsible for, in the order they happen:
    and no defaults. A ``ValidationError`` never escapes: :func:`_validate` adapts it,
    because pydantic's own rendering does not name the file at all, and the file is half of
    what FR-016 asks for.
-3. **Meaning.** Convention names, currencies, instrument classes and taxable event kinds
-   are resolved against the core's registries; dates are parsed; amounts are checked
-   positive; citations are checked non-empty. Every failure names the file, the field, the
-   offending value, and -- for a closed set -- the values that would have worked.
-4. **Construct.** Core records, with provenance attached. This package is one of the two
-   places entitled to construct ``Money`` directly (the other is ``money.py`` itself),
-   because it is where declared values *enter* the system and where their citation is
-   attached; see ``tests/contract/test_money_construction_guard.py``.
+3. **Meaning.** Declared names are resolved against the core's registries, dates are parsed
+   and amounts are checked. Every failure names the file, the field, the offending value,
+   and -- for a closed set -- the values that would have worked.
+4. **Construct.** Core records, with provenance attached. This package may construct
+   ``Money`` directly because it is where declared values *enter* the system and where their
+   citation is attached; ``tests/contract/test_money_construction_guard.py`` is the
+   mechanical form of that entitlement.
 
 **Percent becomes a fraction exactly once in this module**: every ``_pct`` field passes
 through :func:`_as_fraction`, which is the only division by 100 here. Doing it twice and
@@ -30,13 +29,6 @@ not doing it at all are the two likeliest bugs in this layer, and both are invis
 the output -- a 15.5% coupon reading as 0.155% still produces a plausible schedule -- so
 the conversion is one named function with one caller per field and a worked assertion in
 the contract tests.
-
-⚙ The sentence used to claim that nothing else divided by 100 **anywhere in the project**,
-and feature 007 made it false: `core.inflation.series` turns a CPI observation published
-against the previous month = 100 into a growth factor. Corrected in 013 rather than
-restated, because a claim about another module is a test or it is not written --
-``tests/contract/test_nothing_is_inferred.py`` now holds the project-wide version, with
-each permitted site named beside its reason.
 
 **Provenance is per table.** Each sourced table becomes one ``SourceRef`` whose id names
 the file and the table, so a figure traces back to *where it was declared* rather than
@@ -175,12 +167,6 @@ def _as_fraction(percent: float) -> float:
     The only place a declared **percentage** becomes a fraction, and the only division by
     100 in this module: every ``_pct`` field goes through here, which is what makes "exactly
     once, at the boundary" a checkable claim rather than a convention.
-
-    ⚙ It is **not** the only division by 100 in the project -- `core.inflation.series` turns
-    a CPI observation published against the previous month = 100 into a growth factor -- and
-    this docstring said it was, twice, after feature 007 landed that one.
-    ``tests/contract/test_nothing_is_inferred.py`` holds the project-wide version, with each
-    permitted site named beside its reason and pinned to exactly one division each.
     """
     return percent / _PERCENT
 
@@ -193,9 +179,6 @@ def source_id(path: Path, table: str) -> str:
     the bare file name would collide. The *absolute* path is deliberately not used: it
     would embed a machine's directory layout in a source id, and two checkouts of the
     same commit would describe the same declaration differently.
-
-    ``SourceRef`` equality is by value, so this id is also what makes two refs to the
-    same table merge into one rather than accumulating duplicates in a provenance set.
     """
     return f"{path.parent.name}/{path.name}#{table}"
 
@@ -267,7 +250,6 @@ guess, because the loader knows what was rejected and not what the author meant.
 
 
 def _problem(error: Mapping[str, Any]) -> str:
-    """One pydantic error as a sentence naming the value it rejected."""
     if error["type"] == "missing":
         return (
             "is required and is absent. No default value is substituted for a missing "
@@ -288,12 +270,9 @@ def _validate[M: BaseModel](model: type[M], document: Mapping[str, Any], path: P
     lost if one does: the file path, which pydantic never had, and the caller's ability to
     handle a declaration problem without importing pydantic.
 
-    When a document has several problems the **first** becomes the error's ``field_path``,
-    in the order pydantic reports them, which is field-definition order and therefore
-    stable. The rest are listed in ``problem``: a reader fixing a file wants to see every
-    line that needs editing, and a loader that reported one problem per run would make a
-    file with five faults take five runs to fix. The single ``field_path`` is honest about
-    only being able to point at one place.
+    When a document has several problems the **first** becomes the error's ``field_path``, in
+    pydantic's report order, which is field-definition order and therefore stable; the rest are
+    listed in ``problem``, so a file with five faults does not take five runs to fix.
     """
     try:
         return model.model_validate(document, strict=True)
@@ -450,20 +429,13 @@ def _source_ref(
     non-empty, and an empty ``verified_on`` becomes ``None`` -- the unverified mark that
     FR-015 propagates through every figure derived from this table.
 
-    ⚙ **``kind`` is now carried as well as checked, and that reversed a decision.** It used to
-    be validated here and dropped, on the reading that a kind resolved into feature 001's
-    ``BondTerms``, ``InstrumentConstraints`` and ``TaxClass`` would be "a value nothing
-    reads". Feature 010 made it a value something reads: a tuple's outcome is derived from
-    those tables, FR-019 requires staleness to propagate from **every** declared value in
-    every part, and by the time a provenance has been merged across five tables the record
-    that knew each kind is gone. Carrying it on the citation is what lets a merged provenance
-    be aged at all -- see :attr:`terezy.core.primitives.provenance.SourceRef.kind`.
+    ``kind`` is carried as well as checked. FR-019 ages a tuple's outcome from every declared
+    value in every part, and by the time a provenance has been merged across five tables the
+    record that knew each kind is gone -- so the citation carries it.
 
-    ``check_kind=False`` says the non-empty check happens at the record field this kind
-    becomes -- a leg's ``kind_of_observation``, a channel's ``kind``, an access price's -- so
-    that the error names the field the file actually uses. It suppresses the *check* and never
-    the carrying: a kind checked elsewhere is still stamped here, because a source that
-    reached the core without one could never be aged.
+    ``check_kind=False`` says the non-empty check happens at the record field this kind becomes
+    -- a leg's ``kind_of_observation``, a channel's ``kind``, an access price's -- so the error
+    names the field the file actually uses. It suppresses the *check* and never the carrying.
     """
     if check_kind:
         _require_text(
@@ -906,7 +878,7 @@ def _published_in_order(
     the ascending one records no difference at all, and a field that can be filled in
     without saying anything is a field that stops tracking the source.
 
-    ⚙ The second refusal is also the field's stated limit: two payments of different kinds
+    The second refusal is also the field's stated limit: two payments of different kinds
     on one date are one date here, so a source that published *that pair* the other way
     round has nothing to record and is told so. See ``EnumeratedTerms.published_in_order``.
     """
@@ -1118,11 +1090,6 @@ def _rate_schedule(
       make the file's order a thing nobody has to get right, and a reviewer scanning a
       misordered schedule would read the wrong rate as current;
     * **negative rate** -- a refund, which this rule does not model.
-
-    The order check is the one worth being deliberate about. Sorting here was the obvious
-    alternative and it is refused: a schedule whose written order disagrees with its
-    effective order is a file a human misreads, and the load-time error is what stops that
-    file existing at all.
     """
     if not declared:
         raise DeclarationError(
@@ -1245,22 +1212,11 @@ def tax_classes_from_file(path: Path) -> tuple[TaxClass, ...]:
 # 002-ramp-cost: observation kinds, venues, channels, routes, streams, scenarios
 # ---------------------------------------------------------------------------
 #
-# Same four responsibilities as above, in the same order -- read, shape, meaning, construct
-# -- and the same two rules that make this boundary worth having: **percent becomes a
-# fraction exactly once, in** :func:`_as_fraction`, and **no pydantic type crosses this
-# line**.
-#
-# What is *not* here, and could not be: everything needing a second file. A leg naming a
-# venue, a channel or an observation kind is a reference, and whether it resolves depends on
-# files this function has never opened; leg-to-leg continuity is checkable here but is
-# checked beside the reference resolution so that one pass reports the whole shape of a
-# broken declaration (research.md D6). Those live in
-# :mod:`terezy.data.declarations.resolver`.
-#
-# ⚙ **Basis points are not percent.** ``markup_bps`` reaches the core *as basis points* and
-# ``ChannelSide`` divides by 10 000 itself, in one place beside the channel that uses it.
-# Passing a bps field through :func:`_as_fraction` would be the "twice" half of the
-# divided-once bug, and it would look plausible: a 150 bps markup would read as 1.5 bps.
+# What is *not* here, and could not be: everything needing a second file. A leg naming a venue,
+# a channel or an observation kind is a reference, and whether it resolves depends on files this
+# function has never opened; leg-to-leg continuity is checkable here but is checked beside the
+# reference resolution so that one pass reports the whole shape of a broken declaration
+# (research.md D6). Those live in :mod:`terezy.data.declarations.resolver`.
 
 OBSERVATION_KIND_TABLE: Final = "kind"
 """Root array of ``data/observation_kinds.toml``, and the prefix of every field path in
@@ -1565,8 +1521,7 @@ def groups_from_file(path: Path) -> tuple[InstrumentGroup, ...]:
     """Every declared group, in file order (015 FR-007a).
 
     A group table carries no observed value -- an id and a name -- so no citation is read and
-    :class:`~terezy.core.instruments.groups.InstrumentGroup` has no field to carry one. This is
-    ``venues_from_file``'s shape, for that function's reason.
+    :class:`~terezy.core.instruments.groups.InstrumentGroup` has no field to carry one.
 
     A duplicate id is refused here rather than by the resolver, because both entries are in one
     file and naming the other one needs nothing the caller has to supply.
@@ -1644,10 +1599,8 @@ def _non_empty_list[T](path: Path, field_path: str, values: list[T], why: str) -
     of a venue's currencies, of a regime's routes, of the two currencies a quote is between --
     and one message shape keeps them saying it the same way.
 
-    ⚙ **The callers are deliberately not counted.** They were, and the count was already wrong
-    when somebody re-read it -- then the sentence written to replace it got its own count
-    wrong, and review caught that too. A number in prose beside a function that counts nothing
-    is a claim with no way to fail except by being read.
+    The callers are deliberately **not** counted: a number in prose beside a function that
+    counts nothing is a claim with no way to fail except by being read.
     """
     if not values:
         raise DeclarationError(
@@ -1691,11 +1644,8 @@ def _channel_side(
         source=table.source,
         retrieved_on=table.retrieved_on,
         verified_on=table.verified_on,
-        # Checked below, at ``ChannelSide.kind``, where the message names the field the
-        # file actually uses. A side is its own observation, and its kind is carried into
-        # the record so the staleness verdict ages the side under it (FR-028) -- not
-        # validated here and dropped, which would leave the side ageing under the
-        # channel's kind.
+        # Checked below, at ``ChannelSide.kind``. Carried into the record so the side ages
+        # under its own kind rather than the channel's (FR-028).
         kind=table.kind,
         check_kind=False,
     )
@@ -1831,11 +1781,8 @@ def channels_from_file(path: Path) -> tuple[FxChannel, ...]:
 
 
 def _channel(path: Path, entry: schema.ChannelTable) -> FxChannel:
-    """One ``[[channel]]`` entry as an :class:`~terezy.core.routes.channels.FxChannel`.
-
-    The field path names the entry by its **id** rather than its index, on the tax-class
-    precedent: the id is what a reader searches for, and it does not change when entries are
-    reordered.
+    """One ``[[channel]]`` entry as an :class:`~terezy.core.routes.channels.FxChannel`, with
+    the field path naming the entry by its **id** rather than its index.
     """
     field_prefix = f"{CHANNEL_TABLE}[{entry.id}]"
     channel_id = _require_text(
@@ -1924,8 +1871,7 @@ def _channel(path: Path, entry: schema.ChannelTable) -> FxChannel:
 def _leg(path: Path, table: schema.LegTable, *, position: int) -> Leg:
     """One ``[[route.leg]]`` entry as a :class:`~terezy.core.routes.legs.Leg`.
 
-    Three checks live here rather than in the resolver, because all three are properties of
-    one leg read in isolation:
+    Three checks live here because all three are properties of one leg read in isolation:
 
     * **The declared index matches the position.** A leg declaring index 3 in position 0
       would make every message about it point at the wrong lines, including the chaining
@@ -2021,8 +1967,7 @@ def _leg(path: Path, table: schema.LegTable, *, position: int) -> Leg:
         source=table.source,
         retrieved_on=table.retrieved_on,
         verified_on=table.verified_on,
-        # Checked below, at ``Leg.kind_of_observation``: a leg's ``kind`` is the *leg* kind,
-        # so the message has to name the field the file actually uses.
+        # Checked below, at ``Leg.kind_of_observation``: a leg's ``kind`` is the *leg* kind.
         kind=table.kind_of_observation,
         check_kind=False,
     )
@@ -2125,10 +2070,6 @@ def _leg(path: Path, table: schema.LegTable, *, position: int) -> Leg:
 
 def route_from_file(path: Path) -> Route:
     """One ``data/routes/<id>.toml`` as a :class:`~terezy.core.routes.legs.Route`.
-
-    Nothing is inferred from the file *name*, on the instrument precedent: a renamed file is
-    still the same declaration, and a file whose name disagrees with its ``id`` is not
-    silently reinterpreted.
 
     **A route with no legs is refused, never costed as free.** Free is the answer a reader
     would least question and the one most likely to be wrong.
@@ -2257,10 +2198,9 @@ def _indexation(path: Path, table: schema.IndexationTable, *, field_prefix: str)
 def streams_from_file(path: Path) -> tuple[IncomeStream, ...]:
     """Every stream declared in one ``data/streams/<owner>.toml``, in file order.
 
-    **No citation is read, and that is the exemption argued in the contract**: an owner's
-    own salary is not an observation needing a source, it is a statement of fact by the only
-    person who can make it. The same exemption ``data/scenarios/`` has, and the reason
-    ``check_provenance.py`` gains ``channels`` and not ``streams``.
+    **No citation is read, and that is the exemption argued in the contract**: an owner's own
+    salary is not an observation needing a source, it is a statement of fact by the only person
+    who can make it.
 
     The declared ``currency`` and ``amount`` become **one** ``Money``: ``IncomeStream`` has
     no currency field, because two fields stating one fact can disagree and a record with
@@ -2271,9 +2211,7 @@ def streams_from_file(path: Path) -> tuple[IncomeStream, ...]:
     ``capacity.deployable`` returns a record with no net field at all rather than a net
     figure that quietly equals the gross (012 FR-016).
 
-    ``arrives_at`` and ``credited_to`` are both required and neither is derived from the
-    other. Whether each names a declared venue, and whether ``tax_scheme`` names a declared
-    scheme a stream is allowed to name, are relations and belong to the resolver.
+    ``arrives_at`` and ``credited_to`` are both required and neither is derived from the other.
     """
     document = read_document(path)
     declared = _validate(schema.StreamFile, document, path).stream
@@ -2345,18 +2283,10 @@ def _stream(path: Path, entry: schema.StreamTable) -> IncomeStream:
 def scenario_from_file(path: Path) -> ScenarioDeclaration:
     """One ``data/scenarios/<id>.toml`` as a :class:`ScenarioDeclaration`.
 
-    **Exempt from the citation requirement, and it carries something else instead.** A
-    regime is a belief about which corridors exist and a transition is a guess about a date;
-    ``is_assumption`` is what they carry where an observation carries a source and a
-    verification date (research.md D8). Never present anything from here as though it were
-    observed.
-
-    Four properties are checked here because they are properties of this one file:
-    duplicate regime ids, an ``is_assumption`` that is not ``true``, transitions that are
-    not strictly ascending, and a chain that does not join up. The core refuses the last two
-    as well -- and *raises* when it sees them, because by then the caller bypassed this
-    check -- so checking here is what turns a raise mid-comparison into a message naming
-    this file and this row.
+    Duplicate regime ids, an ``is_assumption`` that is not ``true``, a transition sequence that
+    is not strictly ascending and a chain that does not join up are all refused here. The core
+    refuses the last two as well -- and *raises*, because by then the caller bypassed this check
+    -- so checking here turns a raise mid-comparison into a message naming this file and row.
 
     Whether a regime's ``route_ids`` resolve, and whether a regime is partner-closed, need
     ``data/routes/`` and belong to the resolver.
@@ -2613,23 +2543,16 @@ def _fallback(
 # 003-route-coverage: the spendable-endpoint list
 # ---------------------------------------------------------------------------
 #
-# Same four responsibilities -- read, shape, meaning, construct -- and the one difference worth
-# stating: **no citation is read and none is expected.** An owner's statement about where he
-# spends is not an observation of the world; it is a fact about his own life, the same exemption
+# **No citation is read and none is expected.** An owner's statement about where he spends is
+# not an observation of the world; it is a fact about his own life, the same exemption
 # `data/streams/` and `data/scenarios/` already have.
 #
-# `scripts/check_provenance.py` therefore does not scan `data/spendable/` -- but **not** because
-# the directory is absent from `SOURCED_DIRS` (research.md D4, amended 2026-08-23). That gate is
-# fail-closed over the whole data tree: a directory in neither list is an *error*, never a blind
-# spot. `spendable` goes unscanned only because it is named in `EXEMPT_DIRS` **with its reason
-# recorded beside it**, which is the one way a directory is permitted to be out of scope. If a
-# number ever has to live here it moves to a sourced directory, rather than the exemption
-# widening to cover it. Contract tests assert both halves rather than assuming either.
-#
-# What is *not* here, because it needs a second file: whether the venue exists, whether it can
-# hold the currency, whether the currency is the run's base currency, and whether the owner owns
-# the streams. All four are relations, and they live in the resolver where the whole set is in
-# hand.
+# `scripts/check_provenance.py` is fail-closed over the whole data tree: a directory in neither
+# `SOURCED_DIRS` nor `EXEMPT_DIRS` is an *error*, never a blind spot (research.md D4, amended
+# 2026-08-23). `spendable` goes unscanned only because it is named in `EXEMPT_DIRS` **with its
+# reason recorded beside it**, which is the one way a directory is permitted to be out of scope.
+# If a number ever has to live here it moves to a sourced directory, rather than the exemption
+# widening to cover it.
 
 SPENDABLE_TABLE: Final = "spendable"
 """Root array of a spendable file, and the prefix of every field path in one."""
@@ -2645,8 +2568,7 @@ def spendable_from_file(path: Path) -> tuple[str, tuple[SpendableEndpoint, ...]]
     endpoints are `(venue x currency)` pairs and the owner is a property of the *file*, so
     putting him on every row would be one fact in as many places as there are venues.
 
-    Three refusals belong here because all three are properties of this one file read in
-    isolation:
+    Three refusals belong here, all properties of this one file read in isolation:
 
     * **An empty ``[[spendable]]`` list.** A file with no entries would make every exit deficit
       3 -- a report full of confident wrong verdicts built out of a forgotten line (research.md
@@ -2709,24 +2631,17 @@ def spendable_from_file(path: Path) -> tuple[str, tuple[SpendableEndpoint, ...]]
 # 006-inzhur-instruments: collective-investment funds
 # ---------------------------------------------------------------------------
 #
-# Same four responsibilities in the same order -- read, shape, meaning, construct -- and the
-# same two rules: **percent becomes a fraction exactly once**, in :func:`_as_fraction`, and
-# **no pydantic type crosses this line**.
-#
-# ⚙ What is different here, and it is the whole point of the feature: a fund's numbers come
-# from what the fund says about *itself*. Every table below therefore carries its own
-# citation and is expected to carry an **empty** ``verified_on`` -- researched is not
-# verified, and the mark propagates to every figure derived from it (FR-002). The provenance
+# A fund's numbers come from what the fund says about *itself*. Every table below therefore
+# carries its own citation and is expected to carry an **empty** `verified_on` -- researched is
+# not verified, and the mark propagates to every figure derived from it (FR-002). The provenance
 # gate reports these as unverified rather than failing, which is the correct outcome and not
 # something to work around.
 #
-# Two refusals here have no analogue in the bond loader and are worth naming. A
-# ``verification_task`` that carries a **value** is refused, because the entire purpose of
-# that record is that it holds none (research.md D8) -- ``extra="forbid"`` does the work, and
-# the contract test asserts it. And ``is_assumption_driven = false`` is refused, because the
-# core field is ``Literal[True]``: a fund whose terms are observed rather than stated is a
-# different declaration, and silently accepting ``false`` would produce a record whose type
-# says one thing and whose file says another.
+# Two refusals here have no analogue in the bond loader. A `verification_task` that carries a
+# **value** is refused, because the entire purpose of that record is that it holds none
+# (research.md D8). And `is_assumption_driven = false` is refused, because the core field is
+# `Literal[True]`: silently accepting `false` would produce a record whose type says one thing
+# and whose file says another.
 
 
 FUND_BASIS: Final[Mapping[str, str]] = {
@@ -2864,7 +2779,6 @@ def _distribution(
     *,
     prefix: str,
 ) -> DistributionTerms:
-    """``[instrument.distribution]`` as the core record."""
     if not 1 <= table.payment_day <= _MAX_PAYMENT_DAY:
         raise DeclarationError(
             path,
@@ -3004,11 +2918,7 @@ def _liquidity(path: Path, table: schema.LiquidityTable, *, prefix: str) -> Liqu
 
 
 def fund_from_file(path: Path) -> FundDeclaration:
-    """One ``data/instruments/<id>.toml`` declaring a fund, as a ``FundDeclaration``.
-
-    Nothing is inferred from the file *name*, as with a bond: a renamed file is the same
-    declaration, and a file whose name disagrees with its ``id`` is not reinterpreted.
-    """
+    """One ``data/instruments/<id>.toml`` declaring a fund, as a ``FundDeclaration``."""
     document = read_document(path)
     table = _validate(schema.FundFile, document, path).instrument
     prefix = INSTRUMENT_TABLE
@@ -3143,10 +3053,7 @@ def fund_from_file(path: Path) -> FundDeclaration:
 
 
 def cash_from_file(path: Path) -> CashDeclaration:
-    """One ``data/instruments/<id>.toml`` declaring a balance, as a ``CashDeclaration``.
-
-    Nothing is inferred from the file *name*, as with a bond and a fund.
-    """
+    """One ``data/instruments/<id>.toml`` declaring a balance, as a ``CashDeclaration``."""
     document = read_document(path)
     table = _validate(schema.CashFile, document, path).instrument
     prefix = INSTRUMENT_TABLE
@@ -3362,39 +3269,21 @@ def declared_class_of(path: Path) -> str:
 # 004-composed-paths: the segment bound
 # ---------------------------------------------------------------------------
 #
-# Same four responsibilities -- read, shape, meaning, construct -- over the smallest declaration
-# in the project, and the same difference `spendable` already has: **no citation is read and
-# none is expected.** How far the owner is willing to let a search run is a statement about his
-# own preferences, not an observation of the world.
-#
-# `scripts/check_provenance.py` therefore does not scan `data/composition/` -- but **not**
-# because the directory is absent from `SOURCED_DIRS`. That gate is fail-closed over the whole
-# data tree: a directory in neither list is an *error*, never a blind spot. `composition` goes
-# unscanned only because it is named in `EXEMPT_DIRS` **with its reason recorded beside it**,
-# which is the one way a directory is permitted to be out of scope. If a number that describes
-# the world ever has to live here it moves to a sourced directory, rather than the exemption
-# widening to cover it.
+# **No citation is read and none is expected.** How far the owner is willing to let a search run
+# is a statement about his own preferences, not an observation of the world; `data/composition/`
+# is named in `EXEMPT_DIRS` of `scripts/check_provenance.py` with its reason recorded beside it.
 #
 # **The one refusal that is this feature's own**: `max_segments` below 1. It is checked here
 # rather than in the schema because the message has to name the file and say what the number
 # would mean -- a bound of 0 admits nothing at all, including declared routes, so it is a broken
 # registry and not a way to turn composition off. A bound of 1 *is* that way, and it loads.
-#
-# What is *not* here, because it needs a second file: whether the owner owns the streams the
-# bound is resolved with. That is a relation, and it lives in the resolver where both are in
-# hand.
 
 COMPOSITION_TABLE: Final = "composition"
 """Root table of a composition file, and the prefix of every field path in one."""
 
 
 def composition_from_file(path: Path) -> tuple[str, SegmentBound]:
-    """One ``data/composition/<owner>.toml`` as its owner id and the declared bound.
-
-    Returns the owner id beside the bound rather than folding it into the record: the bound is
-    a number and the owner is a property of the *file*, and a core record carrying him would be
-    one fact in two places (the same shape as ``spendable_from_file``).
-    """
+    """One ``data/composition/<owner>.toml`` as its owner id and the declared bound."""
     document = read_document(path)
     file = _validate(schema.CompositionFile, document, path)
     owner_id = _require_text(
@@ -3435,12 +3324,7 @@ CANDIDATES_TABLE: Final = "candidates"
 
 
 def candidates_from_file(path: Path) -> tuple[str, CandidateCeiling]:
-    """One ``data/candidates/<owner>.toml`` as its owner id and the declared ceiling.
-
-    Returns the owner id beside the ceiling rather than folding it into the record, on
-    :func:`composition_from_file`'s reasoning: the ceiling is a number and the owner is a
-    property of the *file*.
-    """
+    """One ``data/candidates/<owner>.toml`` as its owner id and the declared ceiling."""
     document = read_document(path)
     file = _validate(schema.CandidatesFile, document, path)
     owner_id = _require_text(
@@ -3467,12 +3351,9 @@ def candidates_from_file(path: Path) -> tuple[str, CandidateCeiling]:
 # 008-seed-and-goals: the owner's opening lots, and what the money is for
 # ---------------------------------------------------------------------------
 #
-# Same four responsibilities -- read, shape, meaning, construct -- and the same difference
-# `spendable` and `composition` already have: **no citation is read and none is expected.**
-# What the owner paid for a lot and what sum he is aiming at are his own records, not
-# observations of the world, so there is nothing for a source to vouch for. Both directories
-# are named in `EXEMPT_DIRS` of `scripts/check_provenance.py` **with their reason recorded**,
-# which is the one way a directory is permitted to be out of scope under a fail-closed gate.
+# **No citation is read and none is expected.** What the owner paid for a lot and what sum he is
+# aiming at are his own records, not observations of the world. Both directories are named in
+# `EXEMPT_DIRS` of `scripts/check_provenance.py` with their reason recorded beside them.
 #
 # **The refusals that are this feature's own** are the two the honesty mechanism rests on:
 #
@@ -3483,20 +3364,11 @@ def candidates_from_file(path: Path) -> tuple[str, CandidateCeiling]:
 #   two lines is wrong, and either guess is a declaration it invented: ignoring the reason
 #   drops something the owner wrote, and marking the figure contradicts what he said (FR-008).
 #
-# **The mark on an estimated basis is built here and joined to the cost in the core.** This is
-# where the owner's reason enters the system, so `core.ledger.seeds.basis_estimated` is called
-# here to turn it into a `SourceRef` -- but the *join* between that mark and the amount happens
-# in `seeds.seed_cost`, not in this function. The declared cost therefore rests on no cited
-# source of its own (`prov.EMPTY`, the reading `data/streams/` already has for a salary), and a
-# seed assembled without a file still reaches the ledger marked (008 FR-007).
-#
-# What is *not* here, because it needs a second file or a run: whether the instrument exists
-# (the resolver holds every declaration), whether the goal's currency is the run's base
-# currency (`spendable`'s precedent -- a base currency is a property of the run), and whether
-# the acquisition date is consistent with the instrument's issue date. The last of those is
-# deliberately **not** a load error at all: it is a well-formed declaration of an impossible
-# history, and the engine reports it as a typed `InconsistentTerms` -- the same division this
-# module already draws for a maturity on or before its issue date.
+# **The mark on an estimated basis is built here and joined to the cost in the core.**
+# `core.ledger.seeds.basis_estimated` is called here to turn the owner's reason into a
+# `SourceRef`, but the *join* between that mark and the amount happens in `seeds.seed_cost`. The
+# declared cost therefore rests on no cited source of its own (`prov.EMPTY`), and a seed
+# assembled without a file still reaches the ledger marked (008 FR-007).
 
 SEED_TABLE: Final = "seed"
 """Root array of a seed file, and the prefix of every field path in one."""
@@ -3615,10 +3487,9 @@ class DeclaredLot:
 def seeds_from_file(path: Path) -> tuple[str, tuple[DeclaredLot, ...]]:
     """One ``data/seeds/<owner>.toml`` as its owner id and the lots it declares.
 
-    Returns the owner beside the lots rather than folding him into the file record, on
-    ``spendable_from_file``'s precedent -- though each lot *does* carry him, because a lot
-    outlives the file it was read from and "whose holding is this" must still be answerable
-    when it does.
+    Returns the owner beside the lots rather than folding him into the file record -- though
+    each lot *does* carry him, because a lot outlives the file it was read from and "whose
+    holding is this" must still be answerable when it does.
 
     Lot ids come from the entry's position -- ``seed-0``, ``seed-1`` -- rather than being
     declared. Two purchases of one instrument on one date are legitimate and must be two lots,
@@ -3676,8 +3547,7 @@ def goals_from_file(path: Path) -> tuple[str, tuple[Goal, ...]]:
     No ``base_currency`` argument, unlike :func:`seeds_from_file`, and the asymmetry is the
     declarations': a goal *states* its currency (FR-016 keeps the field so the multi-currency
     case stays open) while a seed's cost has no currency field at all. Whether the stated
-    currency is the run's base currency is therefore a question for the resolver, exactly as
-    it is for the spendable list.
+    currency is the run's base currency is a question for the resolver.
 
     **Fewer than two of the three variables is refused here, naming what is missing** (FR-011).
     It is a property of one entry read in isolation, so it belongs to the loader; and the
@@ -3776,25 +3646,14 @@ def _require_two_variables(path: Path, entry: schema.GoalTable, *, field_prefix:
 # 007-cpi-real-terms: the CPI series and the inflation assumption
 # ---------------------------------------------------------------------------
 #
-# Same four responsibilities -- read, shape, meaning, construct -- over two declarations of
-# opposite epistemic kinds, and the difference is the whole point of loading them separately.
-#
-# A CPI file carries **one `SourceRef` per observation**, 411 of them in the shipped
-# Ukrainian price series. Not one per file, which would
+# A CPI file carries **one `SourceRef` per observation**, not one per file -- which would
 # collapse into a single ref in a frozenset and make a real figure over a long window look as
-# though it rested on one thing. It rests on every month it chained, and research.md D6 says
-# to report that honestly rather than summarise it.
-#
-# An inflation assumption is a *belief*, and carries `is_assumption` where an observation
-# carries a source. An external forecast may carry a citation as well -- and is still an
-# assumption (FR-010).
+# though it rested on one thing. It rests on every month it chained, and research.md D6 says to
+# report that honestly rather than summarise it.
 #
 # **No network, no cache, and no knowledge that a fetcher exists.** `scripts/fetch_cpi.py`
 # wrote `data/cpi/ua.toml` and is tooling outside the package; this module reads a committed
 # file (research.md D10, Principle III).
-#
-# What is *not* here, because it needs a second file: whether two series declare one identity.
-# That is a relation and lives in the resolver, where the whole set is in hand.
 
 CPI_SERIES_TABLE: Final = "series"
 """The identity table of a CPI file, and the prefix of every field path in it."""
@@ -3871,15 +3730,12 @@ def _elapsed_when_retrieved(path: Path, field_path: str, period: str, retrieved_
 def cpi_from_file(path: Path) -> CpiSeries:
     """One ``data/cpi/<economy>.toml`` as a :class:`~terezy.core.inflation.series.CpiSeries`.
 
-    Every refusal below is a property of this one file read in isolation, and every one names
-    the file and the offending field or period (FR-003):
+    Every refusal below names the file and the offending field or period (FR-003):
 
     * **An empty series.** A file declaring no observations would make every window uncovered
       for a reason naming the *window*, sending the reader to the wrong place.
-    * **A non-positive index value.** See :class:`schema.CpiObservationTable.value`.
     * **A period that does not conform to the declared periodicity**, and an unknown
       periodicity, both with the alternatives listed.
-    * **A period that had not elapsed when the value was retrieved.**
     * **A duplicate period**, and **periods running backwards**. Strictly ascending is what
       "overlapping" means for a series of whole months, and a file that jumps backwards is one
       somebody edited twice.
@@ -4069,10 +3925,6 @@ def _forecast_citation(
 
 def inflation_assumption_from_file(path: Path) -> tuple[str, InflationAssumption]:
     """One ``data/scenarios/inflation/<owner>.toml`` as its owner id and the declared belief.
-
-    Returns the owner id beside the record rather than folding it into it, on
-    ``spendable_from_file``'s precedent: the belief is a rate and the owner is a property of
-    the *file*.
 
     **Exempt from the citation requirement, and it carries something else instead.** A belief
     about next year's prices has no publisher; ``is_assumption`` is what it carries where an
@@ -4528,9 +4380,7 @@ class TimingDeclaration:
     official_rate_series: str | None
     """The id of the series this jurisdiction declares for its tax currency, or ``None``.
 
-    Carried as declared text rather than resolved here, on ``category_of_class``'s precedent:
-    resolving it needs every official-rate file parsed first, which is the resolver's boundary
-    and the only place that can name both files.
+    Carried as declared text rather than resolved here, on ``category_of_class``'s precedent.
     """
 
     categories: tuple[tax_year.IncomeCategory, ...]
@@ -4754,19 +4604,11 @@ def _unsettled_switch(
 # 010-full-tuple: how an instrument is reached
 # ---------------------------------------------------------------------------
 #
-# Same four responsibilities in the same order -- read, shape, meaning, construct -- and the
-# same rule that no pydantic type crosses this line.
-#
-# What is checked here is everything true of one file read in isolation: the list is
-# non-empty, ids and labels are not blank, a duplicate ``instrument_id`` within the file is
-# refused, the price is positive and its currency is one this engine models, and the citation
-# is complete.
-#
-# What is **not** here, because each needs a second file: whether the instrument exists,
-# whether the venues exist and can hold its currency, whether the quote's currency is the
-# instrument's own, and whether this kind of instrument is entitled to declare a price at all.
-# Four relations, and all four live in the resolver where the whole set is in hand and both
-# files can be named.
+# What is checked here is everything true of one file read in isolation. What is **not** --
+# whether the instrument exists, whether the venues exist and can hold its currency, whether the
+# quote's currency is the instrument's own, and whether this kind of instrument is entitled to
+# declare a price at all -- are four relations, and all four live in the resolver, where the
+# whole set is in hand and both files can be named.
 
 ACCESS_TABLE: Final = "access"
 """Root array of an access file, and the prefix of every field path in one."""
@@ -4853,10 +4695,8 @@ def _access_price(
     returned without judgement -- whether this instrument is entitled to make it is a relation
     between two files and belongs to the resolver.
 
-    ``check_kind=False`` is passed to :func:`_source_ref` because the kind is also carried into
-    the record and checked at the field it becomes -- the same reading a leg's
-    ``kind_of_observation`` gets. The citation is stamped with it either way, and *resolving*
-    the name against the declared kinds is the resolver's, which reads a second file to do it.
+    Resolving the kind's name against the declared kinds is the resolver's, which reads a
+    second file to do it.
     """
     if declared is None:
         return None
@@ -4902,20 +4742,15 @@ def _access_price(
 # 011-official-rate: the declared official-rate series
 # ---------------------------------------------------------------------------
 #
-# The same four responsibilities -- read, shape, meaning, construct -- over the one
-# declaration whose values decide what the *law* says an income was rather than what the
-# owner received. Nothing here knows about a channel, and `.importlinter` keeps it that way
-# in both directions: an official rate may never price a leg (FR-012) and a channel's
-# reference rate may never strike a tax base (FR-013).
+# These values decide what the *law* says an income was, rather than what the owner received.
+# Nothing here knows about a channel, and `.importlinter` keeps it that way in both directions:
+# an official rate may never price a leg (FR-012) and a channel's reference rate may never
+# strike a tax base (FR-013).
 #
 # **No network and no cache.** `scripts/fetch_nbu_rates.py` retrieves the National Bank's
 # published rates and writes the file this module reads -- retrieve, write an EMPTY
 # `verified_on`, never verify. What this module owes it is the shape it writes into, and
 # nothing here reaches for it: a declaration is read the same way whoever produced it.
-#
-# What is *not* here, because it needs a second file: whether two files declare one series
-# identity, and whether the series a jurisdiction names exists and quotes its tax currency.
-# Both are relations and live in the resolver, where the whole set is in hand.
 
 OFFICIAL_RATE_SERIES_TABLE: Final = "series"
 """The identity table of an official-rate file, and the prefix of every field path in it."""
@@ -5019,8 +4854,7 @@ def _non_publication_rule(
 def official_rate_from_file(path: Path) -> OfficialRateSeries:
     """One ``data/official_rates/<series>.toml`` as an :class:`OfficialRateSeries`.
 
-    Every refusal below is a property of this one file read in isolation, and every one names
-    the file and the offending field or date (FR-004):
+    Every refusal below names the file and the offending field or date (FR-004):
 
     * **A non-positive rate**, and **a missing or non-positive quotation unit**. A rate quoted
       per 100 units and read as per 1 is wrong by two orders of magnitude while looking
@@ -5031,7 +4865,6 @@ def official_rate_from_file(path: Path) -> OfficialRateSeries:
       forecast wearing an observation's clothes, and this one would silently set a legal base.
       Aged against the file's own ``retrieved_on`` rather than a clock, so the same file loads
       the same way for ever.
-    * **A rule pointing at an undeclared date, or redirecting a published one.**
 
     **An observation carrying two sides is refused by the schema**, not here: there is no
     field for a second side, so ``extra="forbid"`` makes declaring one an unrecognised field.
@@ -5176,10 +5009,6 @@ def official_rate_from_file(path: Path) -> OfficialRateSeries:
 # The scheme an income stream is under, rather than the tax class an instrument's income
 # falls in. Nothing here knows which components exist: a scheme charges exactly what it
 # declares, and the two component kinds differ in what they are asked -- a date, or a period.
-#
-# What is *not* here, because it needs a second file: whether two files declare one scheme
-# identity, whether a destination's scheme and venue exist, and whether a stream's declared
-# treatment does. All three are relations and live in the resolver.
 
 SCHEME_TABLE: Final = "scheme"
 """The identity table of a scheme file, and the prefix of every field path in it."""
@@ -5485,12 +5314,6 @@ def _amounts_in_the_tax_currency(
 def scheme_from_file(path: Path) -> scheme_module.TaxationScheme:
     """One ``data/tax/schemes/<id>.toml`` as a :class:`TaxationScheme`.
 
-    Every refusal below is a property of this one file read in isolation, and every one names
-    the file and the offending component or field: a scheme charging no component at all, an
-    empty schedule, two entries on one effective date, a schedule running backwards, a
-    negative rate or amount, two components sharing an id, an unknown period, currency or
-    ``declared_for``, and a recorded fact with no reason it is not applied.
-
     **A rate written on a periodic component, or an amount on a rate component, is refused by
     the schema** rather than here: neither field exists on the other table, so ``extra="forbid"``
     makes writing one an unrecognised field instead of a check somebody has to remember.
@@ -5748,12 +5571,9 @@ def destinations_from_file(path: Path) -> tuple[scheme_module.CreditingDestinati
 # 015-the-question: the question itself
 # ---------------------------------------------------------------------------
 #
-# `composition`'s reading, unchanged: an owner's own statement, no citation read and none
-# expected, and **no default** anywhere. What this loader owns is every refusal a *single*
-# file can carry. Whether a subject word names anything, whether the benchmark is among the
-# subjects and whether an amount's stream exists are relations across files and belong to the
-# resolver and the verb -- and a word naming nothing is not a refusal at all, but the answer's
-# own content (FR-009).
+# An owner's own statement: no citation is read and none is expected, and there is **no default**
+# anywhere. A subject word naming nothing is not a refusal at all, but the answer's own content
+# (FR-009).
 
 QUESTION_TABLE: Final = "question"
 """Root table of a question file, and the prefix of every field path in one."""
@@ -6402,15 +6222,11 @@ def _shut_week(path: Path, calendar: wd.WorkingDayCalendar) -> None:
 def working_day_calendar_from_file(path: Path) -> wd.WorkingDayCalendar:
     """One ``data/calendars/<id>.toml`` as a :class:`WorkingDayCalendar`.
 
-    Every refusal below is a property of this one file read in isolation, and every one names
-    the file and the offending field or date (FR-007). The two that are not obvious:
+    Every refusal names the file and the offending field or date (FR-007); two are not obvious:
 
     * **A row dated outside the coverage window.** The window is what a refusal reports, and a
       row outside it is a date the calendar simultaneously claims not to reach.
     * **A week inside the window with no working day** -- see :func:`_shut_week`.
-
-    Two files declaring one calendar id is a *relation* and belongs to the resolver, which is
-    the only thing holding both paths.
     """
     document = read_document(path)
     file = _validate(schema.CalendarFile, document, path)
@@ -6515,15 +6331,9 @@ def _scope(path: Path, value: str) -> wd.CalendarScope:
 # 019-decision-layer: the objectives a dominance pass runs over
 # ---------------------------------------------------------------------------
 #
-# The same four responsibilities -- read, shape, meaning, construct -- and `composition`'s
-# reading of what a per-owner policy file is: **no citation is read and none is expected**, and
-# **no default anywhere**. How much precision the owner believes his inputs support is a
-# statement about him rather than an observation of the world (FR-004).
-#
-# The refusals this loader owns are the ones a declaration file has the facts to decide:
-# a criterion outside the closed set, a direction outside it, a band that is not exactly one
-# shape, a band shape the criterion does not take, and a band that is not finite and strictly
-# positive (FR-011b, FR-011d).
+# **No citation is read and none is expected**, and there is **no default anywhere**. How much
+# precision the owner believes his inputs support is a statement about him rather than an
+# observation of the world (FR-004).
 #
 # **FR-011c's acyclicity floor is deliberately not among them.** The slack it is measured
 # against depends on the magnitudes of the figures being compared, which a declaration file does
