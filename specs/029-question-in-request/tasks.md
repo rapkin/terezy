@@ -56,9 +56,9 @@ the test that fails before it exists.
 
 ## Phase 5 — the cap
 
-- [ ] T024 [P] Test: a body one byte over the cap is refused with a tagged record naming the cap and what was received and nothing is parsed; a **body** arriving with no declared length is refused too; and every GET, which declares none, is untouched — `tests/contract/test_a_body_has_a_ceiling.py` (FR-024, SC-009). The third case is the one that keeps the guard from refusing the whole surface.
-- [ ] T025 The `Content-Length` cap in `src/terezy/api/http/middleware.py`, refusing through the same path `NotOnLoopback` does (FR-024; plan Finding 6).
-- [ ] T026 [P] Test: a body cannot raise, state or opt out of the candidate ceiling — a posted question over a root whose `max_candidates` is small refuses exactly as the saved read does — `tests/contract/test_candidate_ceiling_declaration.py` extended (FR-025).
+- [x] T024 [P] Test: a body one byte over the cap is refused with a tagged record naming the cap and what was received and nothing is parsed; a **body** arriving with no declared length is refused too; and every GET, which declares none, is untouched — `tests/contract/test_a_body_has_a_ceiling.py` (FR-024, SC-009). The third case is the one that keeps the guard from refusing the whole surface.
+- [x] T025 The `Content-Length` cap in `src/terezy/api/http/middleware.py`, refusing through the same path `NotOnLoopback` does (FR-024; plan Finding 6).
+- [x] T026 [P] Test: a body cannot raise, state or opt out of the candidate ceiling — a posted question over a root whose `max_candidates` is small refuses exactly as the saved read does — `tests/contract/test_candidate_ceiling_declaration.py` extended (FR-025).
 
 ## Phase 6 — the published contract
 

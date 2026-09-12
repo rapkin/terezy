@@ -447,7 +447,9 @@ def _register_fixed(router: APIRouter, root: Path, app: FastAPI) -> None:
         response_model=_model(posted_envelope),
         name="answers.answer",
         responses={
-            400: {"model": _either(middleware.HostNotDeclared, envelopes.DeclarationFailed)}
+            400: {"model": _either(middleware.HostNotDeclared, envelopes.DeclarationFailed)},
+            411: {"model": _model(middleware.BodyLengthNotDeclared)},
+            413: {"model": _model(middleware.BodyTooLarge)},
         },
         openapi_extra={"requestBody": answers.REQUEST_BODY},
     )
@@ -661,8 +663,14 @@ def bind_context(*, root: Path = FILESYSTEM_ROOT) -> bind.BindContext:
 
 
 def guarded(served: FastAPI, *, context: bind.BindContext) -> ASGIApp:
-    """The two per-request refusals, wrapped around one application."""
-    return middleware.host_allowlist(middleware.loopback_guard(served, context=context))
+    """The per-request refusals, wrapped around one application.
+
+    The cap is innermost, so a request that is both off-loopback and oversized is refused for
+    the reason that matters: where it came from.
+    """
+    return middleware.host_allowlist(
+        middleware.loopback_guard(middleware.body_cap(served), context=context)
+    )
 
 
 _SERVED: list[ASGIApp] = []
