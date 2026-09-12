@@ -32,8 +32,8 @@ the test that fails before it exists.
 
 ## Phase 2 — attribution
 
-- [ ] T009 [P] [US2] Test: a question naming an undeclared regime refuses naming **the question's own artefact** and the field `question.regime`, for a file-declared question and for a caller-built record alike — `tests/unit/test_an_undeclared_regime_blames_the_question.py` (FR-015).
-- [ ] T010 [US2] Move **both** undeclared-regime refusals off `root/scenarios` and onto the question's artefact in `src/terezy/api/answer.py` — `_scenario_of`'s and `inputs_of`'s, which are near-identical and both rooted at `resolver.SCENARIOS_DIR` (FR-015; plan Finding 3).
+- [x] T009 [P] [US2] Test: a question naming an undeclared regime refuses naming **the question's own artefact** and the field `question.regime`, for a file-declared question and for a caller-built record alike — `tests/unit/test_an_undeclared_regime_blames_the_question.py` (FR-015).
+- [x] T010 [US2] Move **both** undeclared-regime refusals off `root/scenarios` and onto the question's artefact in `src/terezy/api/answer.py` — `_scenario_of`'s and `inputs_of`'s, which are near-identical and both rooted at `resolver.SCENARIOS_DIR` (FR-015; plan Finding 3).
 - [ ] T011 [P] [US2] [API] Test: a body fault is attributed to the request and a data-root fault to the server — **both cases in one test file**, so neither passes by answering everything one way — `tests/contract/test_a_broken_declaration_reaches_the_caller.py` extended (FR-013, SC-005).
 - [ ] T012 [US2] The `DeclarationError` handler in `src/terezy/api/http/service.py` branches on which artefact the refusal names (FR-013, FR-014).
 

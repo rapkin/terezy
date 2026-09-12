@@ -15,7 +15,7 @@ obtain from ``api/`` lacks one (FR-025).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 
 from terezy.core.decision.answer import AnswerInputs, answer
 from terezy.core.results.answer import Answer, Refused
@@ -37,6 +37,13 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from terezy.data.manifest import RunManifest
 
 
+REGIME_FIELD: Final = f"{loader.QUESTION_TABLE}.regime"
+"""What an undeclared regime is blamed on: the question's own field, wherever the question came
+from. Which scenario declares a regime is a fact about ``data/scenarios/``, but a question naming
+one nobody declared is the **question's** fault -- and rooting the refusal at the scenarios
+directory sent the first caller to make that typo to a data root that was fine (029 FR-015)."""
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class AnsweredQuestion:
     """One answer and the manifest of the run that produced it.
@@ -50,7 +57,11 @@ class AnsweredQuestion:
 
 
 def inputs_of(
-    declarations: resolver.AnswerDeclarations, *, regime_id: str, objective_set_id: str
+    declarations: resolver.AnswerDeclarations,
+    *,
+    regime_id: str,
+    objective_set_id: str,
+    declared_in: Path,
 ) -> AnswerInputs:
     """The verb's second parameter, built from a resolved data root.
 
@@ -81,8 +92,8 @@ def inputs_of(
     named = coverage.regimes.get(regime_id)
     if named is None:
         raise DeclarationError(
-            coverage.spendable_file.parent.parent / resolver.SCENARIOS_DIR,
-            "",
+            declared_in,
+            REGIME_FIELD,
             f"the question asks under the regime {regime_id!r}, and the scenario resolved for "
             f"this run declares {sorted(coverage.regimes)}. A regime nobody declared would "
             "leave the route set unnarrowed, and the answer would compare corridors the "
@@ -179,7 +190,9 @@ def run(
     declarations = resolver.answer_from_data_root(
         root,
         base_currency=base_currency,
-        scenario_id=_scenario_of(root, question.regime_id, base_currency=base_currency),
+        scenario_id=_scenario_of(
+            root, question.regime_id, base_currency=base_currency, declared_in=declared_in
+        ),
     )
     resolver.check_question(
         question,
@@ -191,6 +204,7 @@ def run(
         declarations,
         regime_id=question.regime_id,
         objective_set_id=question.objective_set_id,
+        declared_in=declared_in,
     )
     return declarations, inputs, answer(question, inputs, as_of)
 
@@ -262,7 +276,9 @@ def declared_question(root: Path, question_id: str) -> tuple[Question, Path]:
     )
 
 
-def _scenario_of(root: Path, regime_id: str, *, base_currency: Currency) -> str | None:
+def _scenario_of(
+    root: Path, regime_id: str, *, base_currency: Currency, declared_in: Path
+) -> str | None:
     """The declared scenario whose regimes include ``regime_id``, or ``None`` for the implicit.
 
     Resolved rather than declared beside the regime in the question file: which scenario a
@@ -276,12 +292,12 @@ def _scenario_of(root: Path, regime_id: str, *, base_currency: Currency) -> str 
         if any(regime.id == regime_id for regime in scenario.regimes):
             return scenario_id
     raise DeclarationError(
-        root / resolver.SCENARIOS_DIR,
-        "",
-        f"declares no regime {regime_id!r}, which a question asks under. A regime nobody "
-        "declared would leave the route set unnarrowed, and the answer would compare corridors "
-        "the question's own world says do not exist.",
-        f"declare {regime_id!r} in a scenario, or name a declared regime in the question",
+        declared_in,
+        REGIME_FIELD,
+        f"names the regime {regime_id!r}, which no scenario under {resolver.SCENARIOS_DIR}/ "
+        "declares. A regime nobody declared would leave the route set unnarrowed, and the "
+        "answer would compare corridors the question's own world says do not exist.",
+        f"name a declared regime, or declare {regime_id!r} in a scenario",
     )
 
 

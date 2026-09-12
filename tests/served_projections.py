@@ -33,6 +33,8 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
 QUESTION: Final = "fifty-thousand-hryvnia"
 """The owner's own declared question -- the one the answer screen renders."""
 
+QUESTION_FILE: Final = SHIPPED / "questions" / "fifty-thousand.toml"
+
 AS_OF: Final = date(2026, 9, 6)
 
 
@@ -71,6 +73,7 @@ def served() -> tuple[tuple[TupleOutcome, CandidateProjection], ...]:
         declarations,
         regime_id=answer.question.regime_id,
         objective_set_id=answer.question.objective_set_id,
+        declared_in=QUESTION_FILE,
     )
     pairs: list[tuple[TupleOutcome, CandidateProjection]] = []
     for outcome, _ in evaluated_outcomes():
