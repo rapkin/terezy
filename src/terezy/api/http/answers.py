@@ -16,6 +16,7 @@ same fault in a file produces.
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final
 
@@ -39,9 +40,42 @@ refusal still has to say *where*, an absolute path on the serving machine is a f
 machine, and there is no file to go and look at (029 FR-014).
 """
 
+DEFS_PREFIX: Final = "#/$defs/"
+"""How pydantic points at a nested model of its own, before :func:`_self_contained` removes it."""
+
+
+def _self_contained(schema_node: Any, defs: Mapping[str, Any]) -> Any:
+    """One JSON Schema with every ``#/$defs/`` reference substituted in place.
+
+    A ``$ref`` in an OpenAPI document resolves from the **document root**, and a schema spliced
+    into a path takes its ``$defs`` table with it -- so every one of pydantic's internal
+    references points at a root ``$defs`` that does not exist, and a client generator refuses the
+    whole document rather than just this route.
+
+    Substituted rather than hoisted into ``components/schemas``, which this application fills
+    from its own records: ``OwnerTable`` and six ``Question*Table`` names would join a namespace
+    that already holds ``question_Question`` and ``candidates_Question``, and a collision there
+    overwrites a response model silently.
+    """
+    if isinstance(schema_node, dict):
+        named = schema_node.get("$ref")
+        if isinstance(named, str) and named.startswith(DEFS_PREFIX):
+            return _self_contained(defs[named.removeprefix(DEFS_PREFIX)], defs)
+        return {key: _self_contained(value, defs) for key, value in schema_node.items()}
+    if isinstance(schema_node, list):
+        return [_self_contained(value, defs) for value in schema_node]
+    return schema_node
+
+
+def _published_schema() -> dict[str, Any]:
+    generated = schema.QuestionFile.model_json_schema()
+    inlined: dict[str, Any] = _self_contained(generated, generated.pop("$defs", {}))
+    return inlined
+
+
 REQUEST_BODY: Final[dict[str, Any]] = {
     "required": True,
-    "content": {"application/json": {"schema": schema.QuestionFile.model_json_schema()}},
+    "content": {"application/json": {"schema": _published_schema()}},
 }
 """The published request schema, generated from the model the loader validates against.
 

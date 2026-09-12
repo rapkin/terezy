@@ -36,8 +36,8 @@ BODY_LIMIT: Final[int] = 64 * 1024
 """What a request body may be, in bytes (029 FR-024).
 
 A service limit rather than domain knowledge, so it is declared here and not in `data/`: nothing
-about the owner's money decides it. About thirty times the canonical JSON of the question this
-repository ships, which is the real thing it is measured against.
+about the owner's money decides it. Measured against the real thing rather than chosen round:
+`test_a_body_has_a_ceiling.py` asserts the shipped question's canonical JSON stays far inside it.
 """
 
 BODYLESS_METHODS: Final[tuple[str, ...]] = ("GET", "HEAD", "OPTIONS")
