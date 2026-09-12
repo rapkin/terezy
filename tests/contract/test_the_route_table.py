@@ -8,7 +8,11 @@ would put `/scenarios/inflation` beside `/scenarios/{id}` and a scenario declare
 
 from __future__ import annotations
 
+import hashlib
 import json
+import shutil
+import tomllib
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -45,7 +49,7 @@ def test_every_route_group_owns_a_distinct_first_segment() -> None:
     """Owners of a first segment, not paths: `/questions/{id}/answer` is inside its category."""
     owners = [path[len(document.PREFIX) + 1 :].split("/", 1)[0] for path in _paths()]
     categorised = {category.id for category in categories.CATEGORIES}
-    fixed = {"registry", "openapi.json"}
+    fixed = {"registry", "openapi.json", "answers"}
     assert set(owners) == categorised | fixed
     assert not categorised & fixed, "a category shadows a fixed endpoint's segment"
 
@@ -82,10 +86,15 @@ def test_observations_are_reachable_from_no_other_category() -> None:
 
 
 @pytest.mark.contract
-def test_the_only_answer_route_names_a_declared_question() -> None:
-    """FR-043's deferral, measured over the route table rather than merely stated."""
-    answers = [path for path in _paths() if path.endswith("/answer")]
-    assert answers == [f"{document.PREFIX}/questions/{{question_id}}/answer"]
+def test_both_answer_routes_are_served() -> None:
+    """029 FR-027. 020's `SC-026a` asserted the body-taking route's *absence*; an absence test
+    kept after the thing exists passes for the wrong reason. Matched on the route table rather
+    than on paths ending in `/answer`, which the new one does not."""
+    answers = {path for path in _paths() if "answer" in path}
+    assert answers == {
+        f"{document.PREFIX}/questions/{{question_id}}/answer",
+        f"{document.PREFIX}/answers",
+    }
 
 
 @pytest.mark.contract
@@ -99,7 +108,45 @@ def test_the_documentation_routes_serve_nothing() -> None:
 
 
 @pytest.mark.contract
-def test_no_route_writes() -> None:
-    """Read-only means read-only: every route is a GET."""
-    methods = {method for operations in _published().values() for method in operations}
-    assert methods == {"get"}
+def test_the_one_route_that_is_not_a_get_is_the_posted_answer() -> None:
+    """020's read-only guard restated rather than deleted (029 FR-010). It asserted that every
+    route is a GET, under a name about writing; a POST falsifies the verb and leaves the
+    property untouched, so the surface is pinned by name and a second POST is a red build."""
+    not_a_get = {
+        f"{method.upper()} {path}"
+        for path, operations in _published().items()
+        for method in operations
+        if method != "get"
+    }
+    assert not_a_get == {f"POST {document.PREFIX}/answers"}
+
+
+@pytest.mark.contract
+def test_a_posted_answer_leaves_the_data_root_byte_identical(tmp_path: Path) -> None:
+    """The half that makes the guard above one about **writing** rather than about a verb: a
+    method pinned says nothing about what a route does to `data/` (029 FR-006, SC-012)."""
+    root = tmp_path / "data"
+    shutil.copytree(DATA_ROOT, root)
+    before = _tree_digest(root)
+
+    body = tomllib.loads((root / "questions" / "fifty-thousand.toml").read_text(encoding="utf-8"))
+    answered = served(root).post(
+        f"{document.PREFIX}/answers", params={"as_of": "2026-09-03"}, json=body
+    )
+
+    assert answered.status_code == 200, answered.text
+    assert _tree_digest(root) == before
+
+
+def _tree_digest(root: Path) -> str:
+    """Every path under a data root and the digest of its bytes, as one digest.
+
+    Paths as well as contents, so a file *added* by a request moves it too -- a digest over
+    contents alone would stay equal when a body was saved beside a file with the same bytes.
+    """
+    walked = hashlib.sha256()
+    for path in sorted(root.rglob("*")):
+        walked.update(path.relative_to(root).as_posix().encode("utf-8"))
+        if path.is_file():
+            walked.update(hashlib.sha256(path.read_bytes()).digest())
+    return walked.hexdigest()

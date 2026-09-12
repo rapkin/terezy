@@ -393,6 +393,20 @@ def answer_of(answered: object) -> type:
     )
 
 
+def posted_answer_of(answered: object) -> type:
+    """What the body-taking answer returns: the answer and its manifest, and no refusal arm.
+
+    Deliberately **not** `TheAnswer`, whose `result` union carries `CategoryHasNoSuchId` -- a
+    member a posted question can never produce, because it names no id to be unknown. A union
+    member that cannot occur is a switch arm a client writes for nothing (029 FR-007).
+
+    It states no `question_id` either: the answer carries the question the body declared, and
+    echoing a field back out of a document this layer is forbidden to read would be the second
+    place that id lives.
+    """
+    return container("ThePostedAnswer", (("as_of", date), ("result", answered)))
+
+
 def projection_of(projected: object, no_such: object) -> type:
     """What the candidate endpoint returns: one candidate's projection, or one of two refusals.
 

@@ -96,9 +96,10 @@ def test_every_route_declares_the_malformed_parameter_refusal() -> None:
     """Declared on the router, so a route added later cannot forget it -- and so the framework's
     own untagged 422 is never the one the document publishes."""
     undeclared = [
-        path
-        for path, methods in _document()["paths"].items()
-        if MALFORMED_REFUSAL not in _tags_declared(methods["get"]["responses"]["422"])
+        f"{method.upper()} {path}"
+        for path, operations in _document()["paths"].items()
+        for method, held in operations.items()
+        if MALFORMED_REFUSAL not in _tags_declared(held["responses"]["422"])
     ]
     assert not undeclared, f"these routes declare no typed 422: {undeclared}"
     assert "HTTPValidationError" not in _document()["components"]["schemas"]
@@ -108,9 +109,10 @@ def test_every_route_declares_the_malformed_parameter_refusal() -> None:
 def test_every_route_declares_the_host_refusal_it_can_answer_with() -> None:
     """The allowlist runs in front of every route, so every route can answer with it."""
     undeclared = [
-        path
-        for path, methods in _document()["paths"].items()
-        if HOST_REFUSAL not in _tags_declared(methods["get"]["responses"]["400"])
+        f"{method.upper()} {path}"
+        for path, operations in _document()["paths"].items()
+        for method, held in operations.items()
+        if HOST_REFUSAL not in _tags_declared(held["responses"]["400"])
     ]
     assert not undeclared, (
         f"these routes can answer a Host refusal they do not declare: {undeclared}"

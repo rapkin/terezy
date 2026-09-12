@@ -34,25 +34,25 @@ the test that fails before it exists.
 
 - [x] T009 [P] [US2] Test: a question naming an undeclared regime refuses naming **the question's own artefact** and the field `question.regime`, for a file-declared question and for a caller-built record alike — `tests/unit/test_an_undeclared_regime_blames_the_question.py` (FR-015).
 - [x] T010 [US2] Move **both** undeclared-regime refusals off `root/scenarios` and onto the question's artefact in `src/terezy/api/answer.py` — `_scenario_of`'s and `inputs_of`'s, which are near-identical and both rooted at `resolver.SCENARIOS_DIR` (FR-015; plan Finding 3).
-- [ ] T011 [P] [US2] [API] Test: a body fault is attributed to the request and a data-root fault to the server — **both cases in one test file**, so neither passes by answering everything one way — `tests/contract/test_a_broken_declaration_reaches_the_caller.py` extended (FR-013, SC-005).
-- [ ] T012 [US2] The `DeclarationError` handler in `src/terezy/api/http/service.py` branches on which artefact the refusal names (FR-013, FR-014).
+- [x] T011 [P] [US2] [API] Test: a body fault is attributed to the request and a data-root fault to the server — **both cases in one test file**, so neither passes by answering everything one way — `tests/contract/test_a_broken_declaration_reaches_the_caller.py` extended (FR-013, SC-005).
+- [x] T012 [US2] The `DeclarationError` handler in `src/terezy/api/http/service.py` branches on which artefact the refusal names (FR-013, FR-014).
 
 ## Phase 3 — the endpoint [API]
 
-- [ ] T013 [P] [US1] Test: posting the document of `fifty-thousand.toml` with the saved question's `as_of` returns an answer byte-identical to `GET /api/questions/fifty-thousand-hryvnia/answer`, and a manifest carrying **exactly one added input** — the body's own question reference — and otherwise equal. An added input rather than a differing one, for SC-001's reason: the file's ref survives, because every declared question file is recorded whichever was answered — `tests/contract/test_the_answer_from_a_body.py` (FR-009, SC-001).
-- [ ] T014 [US1] `POST /api/answers` in `service._register_fixed`: the **raw** body into `loader.question_from_document` with a body sentinel, `as_of` as the required query parameter, no `scenario_id` (FR-007, FR-004).
-- [ ] T015 [US1] The published request schema on that route, generated from `schema.QuestionFile` rather than written out, so it cannot drift from the validator (FR-001; plan Finding 2).
-- [ ] T016 [US1] The response container in `src/terezy/api/http/envelopes.py` — the answer and its manifest, with **no** `CategoryHasNoSuchId` member, which a POST can never produce (plan, Phase 3).
-- [ ] T017 [P] [US1] [API] Test: `GET /api/questions/{id}/answer` is unchanged — same path, same envelope, same body for the shipped question — `tests/contract/test_the_answer_over_http.py` extended (FR-008).
+- [x] T013 [P] [US1] Test: posting the document of `fifty-thousand.toml` with the saved question's `as_of` returns an answer byte-identical to `GET /api/questions/fifty-thousand-hryvnia/answer`, and a manifest carrying **exactly one added input** — the body's own question reference — and otherwise equal. An added input rather than a differing one, for SC-001's reason: the file's ref survives, because every declared question file is recorded whichever was answered — `tests/contract/test_the_answer_from_a_body.py` (FR-009, SC-001).
+- [x] T014 [US1] `POST /api/answers` in `service._register_fixed`: the **raw** body into `loader.question_from_document` with a body sentinel, `as_of` as the required query parameter, no `scenario_id` (FR-007, FR-004).
+- [x] T015 [US1] The published request schema on that route, generated from `schema.QuestionFile` rather than written out, so it cannot drift from the validator (FR-001; plan Finding 2).
+- [x] T016 [US1] The response container in `src/terezy/api/http/envelopes.py` — the answer and its manifest, with **no** `CategoryHasNoSuchId` member, which a POST can never produce (plan, Phase 3).
+- [x] T017 [P] [US1] [API] Test: `GET /api/questions/{id}/answer` is unchanged — same path, same envelope, same body for the shipped question — `tests/contract/test_the_answer_over_http.py` extended (FR-008).
 
 ## Phase 4 — the boundary's refusals [API]
 
-- [ ] T018 [P] [US2] Test: a body missing `question.objectives`, a body with an unrecognised field, and a body naming an owner no stream belongs to each produce the loader's four fields and the same tag the equivalent **file** fault produces — `tests/contract/test_a_body_refuses_like_a_file.py` (FR-003, FR-012, SC-004).
-- [ ] T019 [US2] Carry the loader's record verbatim at the boundary, naming the request where a file names its path; synthesise no message, code or severity (FR-012, FR-014, SC-006).
-- [ ] T020 [P] [US1] Test: a posted body whose subjects are group labels resolves exactly as the file's do — the same four standings and the same counts as the saved read, `btc` **held** rather than undeclared — and a body naming a word nothing declares reaches the undeclared population, which the shipped question leaves empty — `tests/contract/test_the_answer_from_a_body.py` (FR-017).
-- [ ] T021 [P] [US1] Test: a posted body whose plan names nothing returns `PlanForNothing` in a **200** body, the same shape an answer has — `tests/contract/test_the_answer_from_a_body.py` (FR-016).
-- [ ] T022 [P] [US3] [API] Test: one body, one `as_of`, one data root, answered in two processes under two hash seeds — identical answer digest and identical manifest — `tests/contract/test_the_answer_from_a_body.py` (FR-022, SC-008).
-- [ ] T023 [P] [US1] [API] Test: every `Money` in a posted answer carries provenance and the unverified roll-up equals the saved read's — `tests/contract/test_marks_survive_the_join.py` extended (FR-023).
+- [x] T018 [P] [US2] Test: a body missing `question.objectives`, a body with an unrecognised field, and a body naming an owner no stream belongs to each produce the loader's four fields and the same tag the equivalent **file** fault produces — `tests/contract/test_a_body_refuses_like_a_file.py` (FR-003, FR-012, SC-004).
+- [x] T019 [US2] Carry the loader's record verbatim at the boundary, naming the request where a file names its path; synthesise no message, code or severity (FR-012, FR-014, SC-006).
+- [x] T020 [P] [US1] Test: a posted body whose subjects are group labels resolves exactly as the file's do — the same four standings and the same counts as the saved read, `btc` **held** rather than undeclared — and a body naming a word nothing declares reaches the undeclared population, which the shipped question leaves empty — `tests/contract/test_the_answer_from_a_body.py` (FR-017).
+- [x] T021 [P] [US1] Test: a posted body whose plan names nothing returns `PlanForNothing` in a **200** body, the same shape an answer has — `tests/contract/test_the_answer_from_a_body.py` (FR-016).
+- [x] T022 [P] [US3] [API] Test: one body, one `as_of`, one data root, answered in two processes under two hash seeds — identical answer digest and identical manifest — `tests/contract/test_the_answer_from_a_body.py` (FR-022, SC-008).
+- [x] T023 [P] [US1] [API] Test: every `Money` in a posted answer carries provenance and the unverified roll-up equals the saved read's — `tests/contract/test_marks_survive_the_join.py` extended (FR-023).
 
 ## Phase 5 — the cap
 
@@ -62,16 +62,16 @@ the test that fails before it exists.
 
 ## Phase 6 — the published contract
 
-- [ ] T027 [P] Test: the set of non-GET operations in the served document is exactly `POST /api/answers`, and the two answer routes are both present — replacing `test_no_route_writes`'s verb assertion and `test_the_only_answer_route_names_a_declared_question`'s absence, whose `endswith("/answer")` filter would otherwise leave it green while missing the new route entirely — `tests/contract/test_the_route_table.py` (FR-010, FR-027, SC-010).
-- [ ] T027a [P] `answers` joins the `fixed` set of `test_every_route_group_owns_a_distinct_first_segment`, which asserts every first segment is a declared category or a fixed endpoint and goes red on the new one — `tests/contract/test_the_route_table.py` (FR-010).
-- [ ] T028 [P] [API] Test: `data/` is byte-identical before and after a POST, digested tree-wide — `tests/contract/test_the_route_table.py` (FR-006, FR-010, SC-012). This is the half that makes T027 a guard about writing rather than about a verb.
-- [ ] T029 [P] [API] Test: the served document carries the request schema, every record reachable from it is distinctly tagged and every union discriminated, and the bytes are reproducible across hash seeds — `tests/contract/test_the_openapi_document.py` and `test_tags_and_unions.py` extended (FR-028, SC-011).
-- [ ] T030 Bump `document.VERSION` in the same commit as the wire change (FR-028).
+- [x] T027 [P] Test: the set of non-GET operations in the served document is exactly `POST /api/answers`, and the two answer routes are both present — replacing `test_no_route_writes`'s verb assertion and `test_the_only_answer_route_names_a_declared_question`'s absence, whose `endswith("/answer")` filter would otherwise leave it green while missing the new route entirely — `tests/contract/test_the_route_table.py` (FR-010, FR-027, SC-010).
+- [x] T027a [P] `answers` joins the `fixed` set of `test_every_route_group_owns_a_distinct_first_segment`, which asserts every first segment is a declared category or a fixed endpoint and goes red on the new one — `tests/contract/test_the_route_table.py` (FR-010).
+- [x] T028 [P] [API] Test: `data/` is byte-identical before and after a POST, digested tree-wide — `tests/contract/test_the_route_table.py` (FR-006, FR-010, SC-012). This is the half that makes T027 a guard about writing rather than about a verb.
+- [x] T029 [P] [API] Test: the served document carries the request schema, every record reachable from it is distinctly tagged and every union discriminated, and the bytes are reproducible across hash seeds — `tests/contract/test_the_openapi_document.py` and `test_tags_and_unions.py` extended (FR-028, SC-011).
+- [x] T030 Bump `document.VERSION` in the same commit as the wire change (FR-028).
 - [ ] T031 Flip the rows this feature closes in `docs/REQUIRED_TESTS.md`; set `029-question-in-request` to `done` in `specs/features.toml`, and close `http-question-from-request-parameters` there — it is marked *superseded by a planned feature* until this lands, because a deferral recorded as closed by work that does not exist is a false record on `main`.
 
 ## Phase 7 — the undeclared stream
 
-- [ ] T032 [US2] [API] Test: a body naming an income stream nothing declares refuses as a **request** fault naming `question.amount.stream`, and neither `AmountForAnUndeclaredStream` nor `StreamWithNoAmount` reaches this surface — `tests/contract/test_a_body_refuses_like_a_file.py` (FR-029, SC-013).
+- [x] T032 [US2] [API] Test: a body naming an income stream nothing declares refuses as a **request** fault naming `question.amount.stream`, and neither `AmountForAnUndeclaredStream` nor `StreamWithNoAmount` reaches this surface — `tests/contract/test_a_body_refuses_like_a_file.py` (FR-029, SC-013).
 
 ---
 

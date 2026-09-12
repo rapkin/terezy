@@ -19,6 +19,7 @@ from typing import Any
 import pytest
 
 from terezy.api.http import document
+from terezy.data.declarations import schema
 from tests.data_roots import SHIPPED
 from tests.http_client import served
 
@@ -85,6 +86,34 @@ def test_the_version_is_a_literal_and_no_path_reads_distribution_metadata() -> N
         or "distribution(" in text
     ]
     assert not reading, f"these modules read distribution metadata: {reading}"
+
+
+@pytest.mark.contract
+def test_the_document_publishes_the_question_a_body_may_carry() -> None:
+    """029 FR-028. Generated from the model the loader validates against, so a client is
+    generated from the same schema a file is checked by: the published required fields are the
+    schema's own, and a hand-written copy would drift the first time a field was added."""
+    served_document = json.loads(_served_document())
+    posted = served_document["paths"][f"{document.PREFIX}/answers"]["post"]
+    published = posted["requestBody"]["content"]["application/json"]["schema"]
+
+    assert posted["requestBody"]["required"] is True
+    assert set(published["required"]) == set(schema.QuestionFile.model_fields)
+    assert published == _without_nulls(schema.QuestionFile.model_json_schema())
+
+
+def _without_nulls(schema_node: Any) -> Any:
+    """The framework encodes the whole document with `exclude_none=True`, so a `"default": null`
+    on an optional field does not survive into it. Stripped here rather than asserted around,
+    because the assertion above is *the published schema is the model's* and a carve-out for one
+    key would make a second, quietly weaker claim."""
+    if isinstance(schema_node, dict):
+        return {
+            key: _without_nulls(value) for key, value in schema_node.items() if value is not None
+        }
+    if isinstance(schema_node, list):
+        return [_without_nulls(value) for value in schema_node]
+    return schema_node
 
 
 UNDER_A_SCENARIO = f"{document.PREFIX}/spendable"

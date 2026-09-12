@@ -1,24 +1,55 @@
-"""The answer, over declared questions only.
+"""The answer: one for a declared question id, one for a whole question in a request body.
 
 `api.answer.answer_question` raises `DeclarationError` for an id nothing declares, and the CLI
 maps that to a different exit code from a refusal -- so reaching it for a well-formed question
 about an id that does not exist would report a broken data root to a caller whose data root is
 fine. The declared ids are checked here first, against the same category the list read serves
 (020 FR-008, FR-042).
+
+A posted question goes through the loader that validates a **file**'s document, so there is one
+validator, one schema and one set of refusals whichever carried it (029 FR-001). The framework
+is deliberately not given the body to validate: a shape fault would then arrive as
+`RequestMalformed`, with no field path and no remedy, under a different tag from the one the
+same fault in a file produces. What the framework does parse is the JSON itself, which is the
+same division a file gets -- `tomllib` refuses bytes that are not TOML before the loader sees a
+document at all.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import json
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Final
+
+from fastapi.exceptions import RequestValidationError
 
 from terezy.api import answer as verb
 from terezy.api.http import categories, envelopes
+from terezy.data.declarations import schema
 
 if TYPE_CHECKING:  # pragma: no cover -- typing only
     from datetime import date
 
 
 CATEGORY = "questions"
+
+REQUEST = Path("<request>")
+"""What a question carried by a request body is named by when it refuses, and in the manifest.
+
+Not a real path and shaped so a reader cannot mistake it for one, on `cli.main.FLAGS`'s rule: a
+refusal still has to say *where*, an absolute path on the serving machine is a fact about that
+machine, and there is no file to go and look at (029 FR-014).
+"""
+
+REQUEST_BODY: Final[dict[str, Any]] = {
+    "required": True,
+    "content": {"application/json": {"schema": schema.QuestionFile.model_json_schema()}},
+}
+"""The published request schema, generated from the model the loader validates against.
+
+Written out by hand it would be the second question model FR-001 forbids, and it would drift
+silently the first time a field was added to the file's schema.
+"""
 
 
 def declared_ids(ask: categories.Ask) -> tuple[str, ...]:
@@ -54,3 +85,45 @@ def answered(
         as_of=as_of,
         base_currency=ask.base_currency,
     )
+
+
+def answered_from(ask: categories.Ask, body: bytes, *, as_of: date) -> verb.AnsweredQuestion:
+    """One posted question's answer and its manifest. Nothing is written and nothing is saved."""
+    return verb.answer_document(
+        document_of(body),
+        ask.root,
+        as_of=as_of,
+        base_currency=ask.base_currency,
+        declared_in=REQUEST,
+    )
+
+
+def document_of(body: bytes) -> dict[str, Any]:
+    """The request's bytes as the document a question file holds, or the framework's own refusal.
+
+    Bytes that are not a JSON object carry no question to validate, so they refuse the way a
+    malformed request parameter does rather than as a malformed declaration -- the distinction
+    the CLI already keeps between a file `tomllib` would not parse and a document the loader
+    refuses.
+    """
+    try:
+        parsed = json.loads(body)
+    except json.JSONDecodeError as malformed:
+        raise RequestValidationError(
+            [{"loc": ("body",), "input": None, "msg": f"the body is not JSON: {malformed}"}]
+        ) from malformed
+    if not isinstance(parsed, dict):
+        raise RequestValidationError(
+            [
+                {
+                    "loc": ("body",),
+                    "input": None,
+                    "msg": (
+                        "the body is JSON but not an object, so it carries no [owner] and no "
+                        f"[question] table: it is a {type(parsed).__name__}."
+                    ),
+                }
+            ]
+        )
+    document: dict[str, Any] = parsed
+    return document

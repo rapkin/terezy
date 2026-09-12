@@ -371,6 +371,7 @@ def _register_fixed(router: APIRouter, root: Path, app: FastAPI) -> None:
     # parameter here would be one a caller could set and believe in.
     plain = _reader(root, scenario=False)
     answer_envelope = envelopes.answer_of(AnsweredQuestion)
+    posted_envelope = envelopes.posted_answer_of(AnsweredQuestion)
     projection_envelope = envelopes.projection_of(ProjectedCandidate, NoSuchCandidate)
 
     @router.get(
@@ -438,6 +439,32 @@ def _register_fixed(router: APIRouter, root: Path, app: FastAPI) -> None:
                 candidate_key=candidate_key,
                 as_of=asked.as_of,
                 result=result,
+            ),
+        )
+
+    @router.post(
+        "/answers",
+        response_model=_model(posted_envelope),
+        name="answers.answer",
+        responses={
+            400: {"model": _either(middleware.HostNotDeclared, envelopes.DeclarationFailed)}
+        },
+        openapi_extra={"requestBody": answers.REQUEST_BODY},
+    )
+    async def answer_a_posted_question(
+        request: Request, asked: Annotated[Read, Depends(plain)]
+    ) -> encode.Json:
+        """A whole question in the body, answered and not saved.
+
+        The body is read raw so the **loader** validates it: declaring it as the schema model
+        would hand a shape fault to the framework, which answers a different tag from the one
+        the same fault in a file produces (029 FR-012).
+        """
+        return _body(
+            posted_envelope,
+            posted_envelope(
+                as_of=asked.as_of,
+                result=answers.answered_from(asked.ask, await request.body(), as_of=asked.as_of),
             ),
         )
 
@@ -588,6 +615,10 @@ def _declaration_failed(root: Path) -> Callable[[Request, Exception], Awaitable[
     An error status rather than a typed refusal in a 200 body: nothing was answered and no
     partial result exists, which is the distinction the CLI keeps between `LOAD_FAILED` and
     `REFUSED`.
+
+    **Which status says whose fault it is** (029 FR-013). One record and one tag either way, so
+    a client narrows the same; the artefact the refusal names is what separates them, because a
+    fault in the body reported as a broken data root sends a caller to fix a file that is fine.
     """
 
     async def handler(_: Request, exc: Exception) -> Response:
@@ -599,7 +630,8 @@ def _declaration_failed(root: Path) -> Callable[[Request, Exception], Awaitable[
             problem=exc.problem,
             remedy=exc.remedy,
         )
-        return JSONResponse(status_code=500, content=_body(envelopes.DeclarationFailed, failure))
+        blamed = 400 if exc.file == answers.REQUEST else 500
+        return JSONResponse(status_code=blamed, content=_body(envelopes.DeclarationFailed, failure))
 
     return handler
 

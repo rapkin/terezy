@@ -77,6 +77,17 @@ def test_as_of_is_required_on_the_answer() -> None:
 
 
 @pytest.mark.contract
+def test_the_saved_read_is_untouched_by_the_body_taking_route(answered: dict[str, Any]) -> None:
+    """029 FR-008: a saved question is still read by name, into its own envelope. The two are
+    separate containers because the saved read carries a refusal arm a posted question cannot
+    produce, and folding them would put an unreachable member in a client's switch."""
+    assert answered["tag"] == "envelopes.TheAnswer"
+    assert answered["question_id"] == QUESTION
+    published = service.create_app(DATA_ROOT, client=None).openapi()["paths"]
+    assert "get" in published[f"{document.PREFIX}/questions/{{question_id}}/answer"]
+
+
+@pytest.mark.contract
 def test_the_answer_takes_no_scenario_parameter() -> None:
     """It resolves its own scenario from the question's declared regime, so a parameter here
     would be one a caller could set, and believe in, while it decided nothing."""
