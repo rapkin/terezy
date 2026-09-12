@@ -506,3 +506,13 @@ schedule rows carry a zero resting on no source because no rule ran
 
 No golden moved. `TupleOutcome` gains one short string per outcome, `results.canonical` does not
 read it, and both goldens' result lines and digests are unchanged.
+
+**029-question-in-request** closes **no** row. It adds one endpoint and moves nothing an engine
+computes; what it changes about a lettered behaviour is **H3**, from the far end — a run whose
+question came from no file recorded every file it read and not the question it answered.
+
+| Row | How, and why the box does not move |
+|---|---|
+| **H3** | *Every data file's values round-trip through the run manifest.* Closed by 015 and widened here to the half that was not a file at all: a question carried by a request body or by `--set` is recorded with the digest of its **validated document**, so one question asked two ways carries one identity and a posted answer can be re-derived on a command line (`tests/unit/test_the_question_digest.py`, `tests/unit/test_the_cli_records_its_question.py`). A file-declared question keeps digesting its own bytes, so no golden and no recorded manifest moved. The row is about data files and stays closed as it was. |
+| **H2** | Reinforced with the fact it was missing: **whose** fault a malformed declaration is. The loader's four fields are carried verbatim as before, and the artefact the refusal names decides the status — a body fault is the request's and a data-root fault is the server's, asserted with both cases in one file so neither passes by answering everything one way (`tests/contract/test_a_body_refuses_like_a_file.py`). |
+| **K4** | Reinforced: the first non-GET route in the repository, and the read-only guard it falsifies is restated rather than deleted — the set of non-GET operations is pinned to this one, and a POST is asserted to leave `data/` byte-identical (`tests/contract/test_the_route_table.py`). |

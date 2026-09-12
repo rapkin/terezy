@@ -67,7 +67,7 @@ the test that fails before it exists.
 - [x] T028 [P] [API] Test: `data/` is byte-identical before and after a POST, digested tree-wide — `tests/contract/test_the_route_table.py` (FR-006, FR-010, SC-012). This is the half that makes T027 a guard about writing rather than about a verb.
 - [x] T029 [P] [API] Test: the served document carries the request schema, every record reachable from it is distinctly tagged and every union discriminated, and the bytes are reproducible across hash seeds — `tests/contract/test_the_openapi_document.py` and `test_tags_and_unions.py` extended (FR-028, SC-011).
 - [x] T030 Bump `document.VERSION` in the same commit as the wire change (FR-028).
-- [ ] T031 Flip the rows this feature closes in `docs/REQUIRED_TESTS.md`; set `029-question-in-request` to `done` in `specs/features.toml`, and close `http-question-from-request-parameters` there — it is marked *superseded by a planned feature* until this lands, because a deferral recorded as closed by work that does not exist is a false record on `main`.
+- [x] T031 Record what this feature does to `docs/REQUIRED_TESTS.md`'s rows, and close `http-question-from-request-parameters` in `specs/features.toml` — the deferral its code removes. `status` stays `in-progress` on the branch and is flipped to `done` by the landing change, per `specs/README.md` step 6.
 
 ## Phase 7 — the undeclared stream
 
