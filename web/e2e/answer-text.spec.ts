@@ -138,7 +138,9 @@ test("what the owner already holds is on the screen, valued or refused", async (
     await expect(drawn.locator("details")).toHaveCount(1);
     await drawn.locator("details > summary").click();
     await expect(drawn.locator("[data-lot]")).toHaveCount(position.lots.length);
-    // Every quantity is the formatting module's, never the number as JavaScript prints it.
+    // The position's own quantity first, then one per lot, in the served order. That every
+    // quantity goes through the formatting module is `held-positions.test.tsx`'s to assert:
+    // a served figure this module renders unchanged renders the same either way.
     expect(await drawn.locator("[data-quantity]").allTextContents()).toEqual([
       quantity(position.quantity),
       ...position.lots.map((lot) => quantity(lot.quantity)),

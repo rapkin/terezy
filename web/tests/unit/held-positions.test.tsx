@@ -126,16 +126,13 @@ describe("a held position", () => {
   });
 
   it("is one disclosure whatever its lots number, and the population counts positions", () => {
-    // The owner holds his BTC in two lots. A second lot drawn as a population of its own put a
-    // second disclosure inside the position and its members inside the held population, where
-    // the count-matches-members guard read them as the population's own.
+    // The owner holds his BTC in two lots, which is the shape a lots population broke on.
     const lot = HELD.lots[0];
     if (lot === undefined) throw new Error("the fixture declares no lot");
-    const two = {
-      ...HELD,
-      quantity: 0.3,
-      lots: [lot, { ...lot, lot_id: "btc-2", quantity: 0.2, acquired_on: "2025-06-02" }],
-    };
+    const second = { ...lot, lot_id: "btc-2", quantity: 0.02, acquired_on: "2025-06-02" };
+    // The quantity is the sum of the lots, as the engine builds it; any other pair is a
+    // position it cannot produce.
+    const two = { ...HELD, quantity: lot.quantity + second.quantity, lots: [lot, second] };
     const { container } = render(<HeldPositions held={[two]} staleness={verdict([])} />);
     const population = container.querySelector("[data-population='what the owner already holds']");
     expect(population?.getAttribute("data-count")).toBe("1");
