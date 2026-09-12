@@ -55,7 +55,11 @@ export default defineConfig({
       cwd: "../..",
       env: { TEREZY_DATA_ROOT: DATA_ROOT },
       url: `http://127.0.0.1:${String(API_PORT)}/api/cpi?as_of=2026-01-01`,
-      reuseExistingServer: process.env.CI === undefined,
+      // Never reused, unlike the client below: reuse skips `command`, so a process left on this
+      // port by an interrupted run answers from whatever root it was started over — the stale
+      // materialised one, or the checkout's `data/` with his overlay in it. A port already in
+      // use fails the run instead, which is the outcome this whole change is for.
+      reuseExistingServer: false,
       timeout: 120_000,
     },
     {

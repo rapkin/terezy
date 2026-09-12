@@ -15,9 +15,13 @@ from tests import data_roots
 OVERLAY_SEEDS = Path(resolver.USER_DIR) / resolver.SEEDS_DIR / "owner-001.toml"
 
 
-def test_it_writes_a_root_that_outlives_the_process_that_composed_it(tmp_path: Path) -> None:
-    """The whole point of the entry point: :func:`with_fixtures` unlinks at interpreter exit."""
-    written = data_roots.materialise(tmp_path / "root")
+def test_it_writes_the_composed_root_to_the_directory_it_was_given(tmp_path: Path) -> None:
+    """The given directory and not a temporary one, which is the whole point of the entry point:
+    :func:`with_fixtures`'s root is registered for removal at interpreter exit, so returning it
+    would hand another process a path that is gone before it reads it."""
+    destination = tmp_path / "root"
+    written = data_roots.materialise(destination)
+    assert written == destination
     assert (written / resolver.VENUES_FILE).is_file(), "a root the API would refuse to start over"
     assert (written / "questions" / "a-holding-among-the-words.toml").is_file()
     assert (written / "instruments" / "synthetic_held_x.toml").is_file()

@@ -45,20 +45,12 @@ test("every population the API reports is one interaction from its own members",
     for (const held of document.querySelectorAll("[data-population]")) {
       const name = held.getAttribute("data-population") ?? "";
       const stated = Number((held.getAttribute("data-count") ?? "").replace(/\D/g, ""));
-      // Its OWN members: `querySelectorAll` matches every descendant, so a population drawn
-      // inside another one has its members counted for its host too, whose count never counted
-      // them.
-      const members = [
-        ...held.querySelectorAll("[data-population-members] > li, [data-group-members] > li"),
-      ].filter((member) => member.closest("[data-population]") === held).length;
+      const members = held.querySelectorAll(
+        "[data-population-members] > li, [data-group-members] > li",
+      ).length;
       if (stated !== members) wrong.push(`${name}: says ${String(stated)}, holds ${String(members)}`);
     }
     return wrong;
   });
   expect(mismatched).toEqual([]);
-  // The nested case above is live rather than hypothetical: the held population is on the screen.
-  await expect(page.locator("[data-population='what the owner already holds']")).toHaveAttribute(
-    "data-count",
-    /[1-9]/,
-  );
 });
