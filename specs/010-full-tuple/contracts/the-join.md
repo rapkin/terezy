@@ -24,13 +24,18 @@ def compare(
     tuples: Sequence[Tuple],
     *,
     benchmark: Tuple,
-    amount: Money,
+    amounts: Mapping[str, Money],
     horizon: DateRange,
     as_of: date,
     continuation: ContinuationAssumption,
     registries: Registries,
 ) -> Comparison | BenchmarkUnavailable: ...
 ```
+
+`amounts` is one figure per income stream in that stream's own currency, and each tuple is
+struck against the amount its own `stream_id` names (2026-09-13, closing
+`one-amount-per-stream-in-compare`; it took one `amount` for the whole set until then, which
+agreed with 014 FR-005 only while a set was single-stream).
 
 Pure. No clock: `horizon.start` is when the money leaves, `as_of` is when the question is
 asked, and neither is read from the machine. `continuation` has no default anywhere in the

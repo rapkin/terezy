@@ -383,22 +383,8 @@ class BenchmarkNotACandidate:
     reason: str
 
 
-@dataclass(frozen=True, slots=True, kw_only=True)
-class MoreThanOneStreamInTheSet:
-    """The set spans two income streams and ``compare`` takes one amount for all of it.
-
-    A recorded gap rather than a workaround. FR-001a: widening ``compare`` to take one amount per
-    stream is a change to 010, made and reviewed there -- and a per-stream loop here would produce
-    one ranking per stream and no ranking of the set. Unreachable in the shipped registry, where
-    the dollar stream connects to nothing inbound.
-    """
-
-    stream_ids: tuple[str, ...]
-    reason: str
-
-
-SurveyRefused = EnumerationRefused | BenchmarkNotACandidate | MoreThanOneStreamInTheSet
-"""The ways a set cannot be compared, widening :data:`EnumerationRefused` by two.
+SurveyRefused = EnumerationRefused | BenchmarkNotACandidate
+"""The ways a set cannot be compared, widening :data:`EnumerationRefused` by one.
 
 Two unions rather than one, so a caller of ``enumerate_candidates`` matching exhaustively is not
 made to carry arms that never fire -- the shape ``resolver._check_composition_owner`` argues
@@ -450,7 +436,6 @@ __all__ = [
     "DropGroup",
     "DuplicateRunPlan",
     "EnumerationRefused",
-    "MoreThanOneStreamInTheSet",
     "NoCandidateReason",
     "NoPlanSupplied",
     "NothingConnects",

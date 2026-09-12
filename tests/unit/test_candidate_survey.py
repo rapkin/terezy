@@ -9,10 +9,11 @@ Three claims, and each is a place this feature could quietly become something el
 * **The loop is a loop.** An enumerated candidate's outcome is field for field the outcome
   `evaluate` produces for the same key. If it were not, this feature would be a second pipeline
   wearing the first one's name.
-* **Two streams are refused rather than converted.** `compare` takes one amount for the whole
-  set while a question states one per stream in its own currency, and no landed feature declares
-  a rate that values one currency in another *for a return*. The gap is recorded and refused,
-  not smoothed over.
+* **Two streams are one comparison, each tuple struck against its own stream's amount.**
+  A question states an amount per income stream in that stream's own currency, and nothing
+  converts one into the other -- no landed feature declares a rate that values one currency in
+  another *for a return*. So the set is ranked once, and a dollar candidate's outlay is the
+  dollar amount.
 """
 
 from __future__ import annotations
@@ -27,7 +28,6 @@ from terezy.core.results.candidates import (
     BenchmarkNotACandidate,
     CandidateSet,
     CandidateSurvey,
-    MoreThanOneStreamInTheSet,
     SurveyRefused,
     UndeclaredRouteSupplied,
 )
@@ -141,7 +141,7 @@ class TestTheLoopIsALoop:
             assert direct == refused.refusal
 
 
-class TestTwoStreamsAreRefusedRatherThanConverted:
+class TestTwoStreamsAreOneComparison:
     @staticmethod
     def _both_streams_connect() -> Registries:
         """One fixture inbound corridor turning dollars into hryvnia at the buying venue.
@@ -169,28 +169,67 @@ class TestTwoStreamsAreRefusedRatherThanConverted:
             fixtures.CONTRACT,
         }
 
-    def test_the_typed_refusal_wins_over_the_missing_amount_raise(self) -> None:
-        """A caller with a two-stream set naturally supplies one amount, because one is all
-        `compare` takes. The record naming the real gap must reach him, not a construction
-        error about the amount he was never able to state usefully."""
+    def test_a_stream_in_the_set_with_no_stated_amount_still_raises(self) -> None:
+        """One amount per stream has no default, and a two-stream set makes the second one
+        reachable: stating the hryvnia amount alone leaves the dollar candidates unfunded."""
         registries = self._both_streams_connect()
-        result = survey(
-            registries=registries,
-            routes=registries.routes,
-            question=fixtures.question(registries, amounts={fixtures.SALARY: fixtures.AMOUNT_UAH}),
-            ceiling=fixtures.ceiling(10_000),
-            benchmark=fixtures.benchmark_key(registries, OVDP),
-        )
-        assert isinstance(result, MoreThanOneStreamInTheSet), result
+        with pytest.raises(ValueError, match="no amount"):
+            survey(
+                registries=registries,
+                routes=registries.routes,
+                question=fixtures.question(
+                    registries, amounts={fixtures.SALARY: fixtures.AMOUNT_UAH}
+                ),
+                ceiling=fixtures.ceiling(10_000),
+                benchmark=self._hurdle(registries),
+            )
 
-    def test_it_is_refused_naming_both_streams(self) -> None:
+    @staticmethod
+    def _hurdle(registries: Registries) -> Tuple:
+        """The hryvnia-funded OVDP candidate, named explicitly.
+
+        The dollar-funded one is a candidate too, and it carries no rate -- an outlay in one
+        currency against proceeds in another -- so naming it as the benchmark leaves nothing to
+        rank against. Which stream funds the hurdle is a choice the caller makes, and a
+        two-stream set is the first set where there is a choice to make.
+        """
+        result = fixtures.enumerated(registries)
+        assert isinstance(result, CandidateSet), result
+        return next(
+            item.key
+            for item in result.candidates
+            if item.key.instrument_id == OVDP and item.key.stream_id == fixtures.SALARY
+        )
+
+    def test_the_set_is_ranked_once_and_spans_both_streams(self) -> None:
+        """One ranking of the set, never one per stream: scoring per stream would produce two
+        orderings and no answer to *which option is best*, which is the question asked."""
         registries = self._both_streams_connect()
-        result = _survey(registries, fixtures.benchmark_key(registries, OVDP))
-        assert isinstance(result, MoreThanOneStreamInTheSet), result
-        assert result.stream_ids == (fixtures.CONTRACT, fixtures.SALARY)
+        result = _survey(registries, self._hurdle(registries))
+        assert isinstance(result, CandidateSurvey), result
+        assert isinstance(result.comparison, Comparison), result.comparison
+        outcomes = evaluated(result.comparison)
+        assert {outcome.key.stream_id for outcome in outcomes} == {
+            fixtures.SALARY,
+            fixtures.CONTRACT,
+        }
+        assert len(result.comparison.ranked) + len(result.comparison.not_comparable) == len(
+            outcomes
+        )
+
+    def test_each_tuple_is_struck_against_its_own_streams_amount(self) -> None:
+        """FR-005: nothing converts one into the other, so a dollar candidate's outlay is the
+        dollar amount. Scoring the set with one figure would fund the dollar tuples with
+        hryvnia -- a number in the wrong currency, and one nobody stated for them."""
+        registries = self._both_streams_connect()
+        question = fixtures.question(registries)
+        result = _survey(registries, self._hurdle(registries))
+        assert isinstance(result, CandidateSurvey), result
+        for outcome in evaluated(result.comparison):
+            assert outcome.outlay == question.amounts[outcome.key.stream_id], outcome.key
 
     def test_each_stream_keeps_its_own_amount_in_its_own_currency(self) -> None:
-        """FR-005: nothing converts one into the other, so the two amounts stay two amounts."""
+        """The two amounts stay two amounts, in the currencies their streams deliver."""
         question = fixtures.question(fixtures.declared())
         assert question.amounts[fixtures.SALARY].currency is fixtures.UAH
         assert question.amounts[fixtures.CONTRACT].currency is fixtures.USD

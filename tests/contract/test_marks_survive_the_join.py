@@ -271,7 +271,7 @@ class TestOneUnverifiedValueInEachPartMarksTheOutcome:
         comparison = compare(
             (),
             benchmark=fixtures.hurdle_tuple(),
-            amount=fixtures.AMOUNT,
+            amounts={fixtures.SALARY: fixtures.AMOUNT},
             horizon=fixtures.DateRange(start=fixtures.ISSUE_DATE, end=fixtures.HORIZON_END),
             as_of=fixtures.AS_OF,
             continuation=fixtures.HOLD_AS_CASH,

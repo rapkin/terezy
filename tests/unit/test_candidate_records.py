@@ -31,9 +31,9 @@ class TestTheTwoRefusalUnions:
     def test_every_enumeration_refusal_is_also_a_survey_refusal(self) -> None:
         assert set(get_args(rec.EnumerationRefused)) <= set(get_args(rec.SurveyRefused))
 
-    def test_the_survey_only_refusals_are_the_two_about_handing_the_set_to_compare(self) -> None:
+    def test_the_survey_only_refusal_is_the_one_about_handing_the_set_to_compare(self) -> None:
         extra = set(get_args(rec.SurveyRefused)) - set(get_args(rec.EnumerationRefused))
-        assert extra == {rec.BenchmarkNotACandidate, rec.MoreThanOneStreamInTheSet}
+        assert extra == {rec.BenchmarkNotACandidate}
 
 
 class TestThisFeatureAddsNoRefusalOfItsOwn:
