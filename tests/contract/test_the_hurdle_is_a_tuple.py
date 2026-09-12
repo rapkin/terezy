@@ -75,7 +75,7 @@ def _compared(
     return compare(
         others,
         benchmark=fixtures.hurdle_tuple(),
-        amount=fixtures.AMOUNT,
+        amounts={fixtures.SALARY: fixtures.AMOUNT},
         horizon=horizon,
         as_of=fixtures.AS_OF,
         continuation=fixtures.HOLD_AS_CASH,

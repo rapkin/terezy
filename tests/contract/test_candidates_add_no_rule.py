@@ -47,7 +47,7 @@ def test_the_scan_is_looking_at_something() -> None:
     for path, source in _behaviour().items():
         assert "class " in source or "def " in source, path
         assert len(source) > 500, path
-    assert len(REFUSALS) == 17
+    assert len(REFUSALS) == 18
 
 
 def test_no_module_constructs_or_matches_a_feasibility_verdict_of_its_own() -> None:
@@ -71,12 +71,12 @@ def test_every_raise_is_one_a_programmer_error_earns() -> None:
 
     Each permitted raise is **named** rather than excluded by a pattern, so a further one is a
     failure here and has to be argued for in review. A count alone would let one replace
-    another; the exception type and a phrase of each message are pinned too.
+    another; the exception type and a phrase of the message are pinned too.
 
-    The second arrived with 023: enumeration constructs an entry by identity for a pair the
-    money has already reached and never asks ``compose`` about it, so ``compose``'s *already
-    arrived* case is unreachable from here -- and the arm raises rather than being deleted,
-    because deleting it would leave a closed enum with a member nothing handles.
+    The one that is left arrived with 023: enumeration constructs an entry by identity for a
+    pair the money has already reached and never asks ``compose`` about it, so ``compose``'s
+    *already arrived* case is unreachable from here -- and the arm raises rather than being
+    deleted, because deleting it would leave a closed enum with a member nothing handles.
     """
     raised = {
         str(path.relative_to(SOURCE_ROOT)): [
@@ -88,10 +88,9 @@ def test_every_raise_is_one_a_programmer_error_earns() -> None:
     }
     assert raised["core/results/candidates.py"] == [], "a record must never raise"
     permitted = raised["core/decision/candidates.py"]
-    assert len(permitted) == 2, permitted
-    # One phrase per raise, matched against its own message. Unioning them across both would
-    # let a single raise carrying both phrases stand in for two, which is the substitution the
-    # naming exists to prevent.
+    assert len(permitted) == 1, permitted
+    # The phrase is matched against the message, not only the count: a count alone would let a
+    # different raise take the permitted one's place.
     matched = []
     for node in permitted:
         call = node.exc
@@ -99,12 +98,10 @@ def test_every_raise_is_one_a_programmer_error_earns() -> None:
         assert isinstance(call.func, ast.Name)
         assert call.func.id == "ValueError"
         unparsed = ast.unparse(call)
-        found = [
-            phrase for phrase in ("no amount", "already where it was wanted") if phrase in unparsed
-        ]
+        found = [phrase for phrase in ("already where it was wanted",) if phrase in unparsed]
         assert len(found) == 1, (unparsed, found)
         matched.extend(found)
-    assert sorted(matched) == ["already where it was wanted", "no amount"]
+    assert sorted(matched) == ["already where it was wanted"]
 
 
 def test_no_module_names_a_rate_a_channel_or_a_conversion() -> None:

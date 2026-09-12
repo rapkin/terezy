@@ -46,9 +46,9 @@ without its size would keep passing over a population that grew. It cannot drift
 observation files are pinned to their own retrieval dates in `tests/observations.py`, so a
 re-fetch fails there first."""
 
-REFUSAL_MEMBERS: Final = 17
+REFUSAL_MEMBERS: Final = 18
 """SC-021: 016 declared 24 instruments and widened nothing. 015 left the resale price's home
-open precisely so that settling it late could not add an eighteenth member behind a landed
+open precisely so that settling it late could not add a member behind a landed
 count -- and it is declared on the access record, so `DeclarationMissing(part="access")`
 carries it and this number does not move."""
 

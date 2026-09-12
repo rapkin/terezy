@@ -69,14 +69,14 @@ from terezy.core.results.tuple import (
 )
 
 if TYPE_CHECKING:  # pragma: no cover -- typing only
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
 
 
 def compare(
     tuples: Sequence[Tuple],
     *,
     benchmark: Tuple,
-    amount: Money,
+    amounts: Mapping[str, Money],
     horizon: DateRange,
     as_of: date,
     continuation: ContinuationAssumption,
@@ -88,6 +88,13 @@ def compare(
     It is named separately only so the result can point at it; it is **not** costed, ranked or
     scored differently, and if the caller also lists it in ``tuples`` it is evaluated once.
 
+    **``amounts`` is one figure per income stream, in that stream's own currency**, and each
+    tuple is struck against the amount its own ``stream_id`` names (014 FR-005). One figure for
+    the whole set would fund a dollar tuple with hryvnia, and converting between them needs a
+    rate that values one currency in another *for a return* -- which is not what either declared
+    rate is. Looping per stream in a caller is the other wrong answer: it produces one ranking
+    per stream and no ranking of the set, and *which option is best* is the question asked.
+
     Pure, and every argument that could have been read from a clock is passed instead:
     ``horizon.start`` is when the money leaves, ``as_of`` is when the question is asked.
     ``continuation`` has no default anywhere in the stack, because FR-025 forbids defaulting
@@ -97,8 +104,13 @@ def compare(
     not a weaker comparison -- where the benchmark itself produced no rate. FR-011 says the
     hurdle must always be scored and always shown, so ranking the rest against nothing would
     invite the head of the list to be read as a winner.
+
+    Raises ``ValueError`` where a tuple's stream has no stated amount. An incomplete question
+    rather than a fact about the money, on ``evaluate``'s own rule -- and defaulting it to zero
+    would score a real option at nothing and rank it last with nothing on the record to say why.
     """
     candidates = (benchmark, *(item for item in tuples if item != benchmark))
+    _every_stream_has_an_amount(candidates, amounts)
     rated: list[tuple[float, TupleOutcome]] = []
     unrated: list[TupleOutcome] = []
     refused: list[RefusedTuple] = []
@@ -108,7 +120,7 @@ def compare(
         outcome = outcome_of(
             evaluate(
                 candidate,
-                amount=amount,
+                amount=amounts[candidate.stream_id],
                 horizon=horizon,
                 as_of=as_of,
                 continuation=continuation,
@@ -149,6 +161,19 @@ def compare(
         not_comparable=tuple(unrated),
         beats_benchmark=_beats(rates, index),
     )
+
+
+def _every_stream_has_an_amount(candidates: Sequence[Tuple], amounts: Mapping[str, Money]) -> None:
+    """Refuse the whole comparison where any tuple's stream is unfunded, naming the streams."""
+    unfunded = sorted({item.stream_id for item in candidates} - set(amounts))
+    if unfunded:
+        raise ValueError(
+            f"the comparison states no amount for {unfunded}, which is a stream some tuple in "
+            f"this set is funded from. The stated streams are {sorted(amounts)}. An amount is "
+            "stated per stream with no default anywhere, so a missing one is an incomplete "
+            "question rather than a fact about the money -- and defaulting it to zero would "
+            "score a real option at nothing."
+        )
 
 
 def _beats(rates: Sequence[float], benchmark: int) -> tuple[int, ...]:

@@ -106,7 +106,7 @@ dependency on each other.
 
 ## Phase 5 — the seventeen, and the scans
 
-- [x] **T026 (test)** `tests/unit/test_seventeen_refusals_through_the_loop.py` — SC-005. One
+- [x] **T026 (test)** `tests/unit/test_every_refusal_through_the_loop.py` — SC-005. One
       case per member of `TupleRefused`, each either planted (moves exactly one candidate from
       evaluated to dropped, changes the no-candidate count by zero, appears in the tally under
       its own name) or **recorded unreachable with its reason**. The battery asserts its own

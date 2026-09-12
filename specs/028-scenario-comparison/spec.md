@@ -158,8 +158,9 @@ the screen states the fronts do not differ by the regime alone.
 
 - Both fronts empty for a matched horizon: the horizon renders with an empty union stated as
   such, not omitted.
-- A regime declared by two scenarios: the label names both rather than picking one. A regime
-  declared by none cannot arrive — the answer refuses to load — so the screen has no such state.
+- A regime declared by two scenarios cannot arrive either, since 2026-09-13: the resolver
+  refuses the second claim naming both files. A regime declared by none cannot arrive — the
+  answer refuses to load — so the screen has no such state.
 - Two questions with no horizon in common: the screen says they share none, rather than showing
   a page of one-column horizons with nothing said about it.
 - Every other boundary this screen has is a requirement below rather than an edge case: an
@@ -229,13 +230,11 @@ the screen states the fronts do not differ by the regime alone.
 - **FR-015**: Each column MUST name the regime its answer ran under, from the served manifest.
   The implicit regime MUST render in the served string's own words, never as an absence or a
   blank. Resolving that regime to a scenario has exactly two outcomes the API can produce — the
-  implicit regime, which belongs to none, and a regime one or more declared scenarios name. A
-  regime nobody declares cannot reach this screen: the answer refuses to load at all. Where
-  **several** scenarios declare one regime id, the screen MUST name all of them and state that
-  the run's own record does not say which was searched — the engine takes the first scenario id
-  in sort order and records only the regime
-  (`regime-declared-by-two-scenarios-resolves-by-the-first-id` in `specs/features.toml`).
-  Choosing one here would name a belief whose route set may not have been the one searched.
+  implicit regime, which belongs to none, and a regime exactly one declared scenario names. A
+  regime nobody declares cannot reach this screen, and neither can one two scenarios declare:
+  the answer refuses to load in both cases (2026-09-13; the second used to load and resolve by
+  sort order, which is why this requirement once asked the screen to name several). The
+  scenario is read off the manifest's own `scenario_id`, never re-derived from the regime.
 - **FR-016**: Where a column's regime belongs to a declared scenario, the column MUST name that
   scenario and render its transitions as the declaration marks them — an assumption, with the
   transition's own rationale reachable in full behind a disclosure. Eliding that text to a fixed

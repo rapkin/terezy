@@ -149,7 +149,7 @@ def test_the_answer_document_grows_only_by_the_published_key() -> None:
     the rest of the document is the one merged ``main`` serves, so a second field added to
     ``TupleOutcome`` fails here even though it is small. The baseline moves with the registry
     and with whatever else `main` serves, which is why it carries the date it was taken on:
-    8 540 527 bytes, re-taken 2026-09-12 after `fix/served-hygiene` landed.
+    8 540 546 bytes, re-taken 2026-09-13 when the manifest gained `scenario_id`.
     """
     body = served(SHIPPED).get(
         f"{document.PREFIX}/questions/{QUESTION}/answer", params={"as_of": AS_OF}
@@ -157,7 +157,7 @@ def test_the_answer_document_grows_only_by_the_published_key() -> None:
     assert body.status_code == 200
     published = re.findall(rb'"projection_key":"[^"]*",', body.content)
     assert len(published) == len(published_keys())
-    assert len(body.content) - sum(len(held) for held in published) == 8_540_527
+    assert len(body.content) - sum(len(held) for held in published) == 8_540_546
 
 
 def test_the_route_takes_no_scenario_parameter() -> None:

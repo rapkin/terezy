@@ -7,12 +7,6 @@ but a refusal about the *question*: every instrument in the registry is bought a
 the corridor gives the named benchmark a second candidate, and a benchmark that yields two is
 one whose figure everything else would be ranked against by accident of file order.
 
-**This is why FR-022's ``MoreThanOneStreamInTheSet`` is not reachable through the verb over
-this registry**, and the reason is structural rather than an omission: the benchmark check is
-about the question and fires first, and any registry where the corridor makes a *set* span two
-streams also makes the *benchmark* span them. 014's own suite reaches that record directly, and
-this file records why the layer above cannot.
-
 **Nothing here converts anything.** The corridor crosses at the shipped p2p channel's declared
 two-sided quote, so no rate is derived and none is read from a series (FR-021).
 """

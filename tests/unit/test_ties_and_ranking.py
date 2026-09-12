@@ -58,7 +58,7 @@ def _ranked(others: tuple[Tuple, ...]) -> Comparison:
     comparison = compare(
         others,
         benchmark=fixtures.hurdle_tuple(),
-        amount=fixtures.AMOUNT,
+        amounts={fixtures.SALARY: fixtures.AMOUNT},
         horizon=fixtures.HORIZON,
         as_of=fixtures.AS_OF,
         continuation=fixtures.HOLD_AS_CASH,

@@ -11,14 +11,14 @@ three are seams enumeration closes by construction: it never names a stream its 
 costed from, never anchors a chain at a venue the instrument does not use, and never emits a
 way out that stops short of somewhere spendable.
 
-The battery checks its own coverage against ``get_args(TupleRefused)``, so an eighteenth member
-fails here as well as in 010's suite.
+The battery checks its own coverage against ``get_args(TupleRefused)``, so a new member fails
+here as well as in 010's suite.
 """
 
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import date
+from datetime import date, timedelta
 from typing import TYPE_CHECKING, get_args
 
 import pytest
@@ -246,6 +246,17 @@ PLANTED: dict[str, tuple[Registries, dict[str, object]]] = {
         {"plans": _plans(ovdp_synthetic_a=(fixtures.fund_plan(fixtures.declared().funds[REIT]),))},
     ),
     "InstrumentDemandsCash": (_taxed_at(fixtures.declared(), pit=0.9, levy=0.9), {}),
+    # A horizon closing on the day the way in's declared latency delivers the money, so every
+    # bond is bought and given up on one date. A day earlier and the purchase overruns the
+    # window instead, which is the instrument's own refusal and not this one.
+    "SpansNoTime": (
+        fixtures.declared(),
+        {
+            "horizon": DateRange(
+                start=fixtures.OUTLAY_ON, end=fixtures.OUTLAY_ON + timedelta(days=1)
+            )
+        },
+    ),
     "TaxCurrencyConversionUnavailable": (_a_foreign_taxable_bond(), {}),
 }
 """One registry-and-question per refusal this loop can actually reach."""
@@ -296,7 +307,7 @@ def _surveyed(registries: Registries, changes: dict[str, object]) -> CandidateSu
 
 
 def test_the_battery_covers_every_member_of_the_union() -> None:
-    """An eighteenth member fails here, not only in 010's own suite."""
+    """A new member fails here, not only in 010's own suite."""
     assert set(PLANTED) | set(UNREACHABLE) == {member.__name__ for member in get_args(TupleRefused)}
     assert not set(PLANTED) & set(UNREACHABLE)
 
