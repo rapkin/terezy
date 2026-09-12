@@ -13,9 +13,8 @@ assert and easy to fake. Four checks, none a matter of opinion:
    the new corridor is costed and ranked beside the shipped ones.
 2. **No module in ``src/`` names a route, venue, channel or pool id.** A branch on an id is
    the Principle II violation this design exists to prevent, and it is greppable.
-3. The **four plugin interfaces are still four**: a leg kind is an entry in a mapping of
-   functions, not a fifth interface. If ``LEG_COST_FNS`` had grown an ops record or a
-   protocol, adding a leg kind would have become an amendment to the constitution.
+3. **A leg kind is an entry in a mapping of functions**, not an ops record or a protocol:
+   the core grows no interface module for it.
 4. The records the **loader** builds behave identically to the records the tests build **by
    hand** -- asserted on every amount as ``float.hex()``, so it is bit-identity and not
    agreement on a headline.
@@ -504,12 +503,10 @@ X: int = 1
 
 
 class TestTheFourPluginInterfacesAreStillFour:
-    """A leg kind is an entry in a mapping of functions, not a fifth interface.
+    """A leg kind is an entry in a mapping of functions, not a new plugin seam.
 
-    Principle II permits exactly four -- ``Instrument``, ``Provider``, ``TaxRule``,
-    ``ReturnModel`` -- and adding a fifth requires an amendment to the constitution rather
-    than a pull request. This feature adds four new kinds of thing (routes, legs, channels,
-    streams) and must add none.
+    This feature adds four new kinds of thing -- routes, legs, channels, streams -- and must
+    add no interface module to the core.
     """
 
     def test_the_core_declares_no_interface_module_beyond_the_two_that_exist(self) -> None:

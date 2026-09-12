@@ -68,7 +68,7 @@ def test_a_held_asset_loads_into_its_own_map(tmp_path: Path) -> None:
 
 
 def test_the_kind_is_in_the_vocabulary_and_out_of_the_event_registry() -> None:
-    """FR-010: no fifth plugin interface, because there is no event stream to compute."""
+    """FR-010: in the vocabulary, out of the event registry -- there is no event stream."""
     assert instrument_registry.HELD_ASSET in instrument_registry.DECLARATION_KINDS
     assert instrument_registry.HELD_ASSET not in instrument_registry.REGISTRY
 

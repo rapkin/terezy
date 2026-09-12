@@ -220,6 +220,20 @@ needs  = ["007-cpi-real-terms", "015-the-question", "022-accrued-interest"]
 why    = "007 owns the relation, the coverage refusal and the function that fills a real slot; 015 states the absence this fills as a typed exclusion and is where that exclusion is deleted; 022 is what the deflated figure is, since it changed how `implied_rate` is computed and the spec's worked example is a post-022 number"
 note   = "Closes the real-terms-for-a-tuple future: the owner asked for inflation on 2026-09-03, and every candidate's rate was nominal while the benchmark's could be real. No clarification is open -- the future-span question is 007's owner decision of 2026-08-22 applied rather than re-asked; see specs/024-real-terms-tuple/spec.md."
 
+[[feature]]
+id     = "029-question-in-request"
+status = "drafted"
+needs  = ["015-the-question", "020-http-api"]
+why    = "015 owns the question record, its one validator and the rule that a second source builds the SAME record; 020 owns the route table, the tag and union machinery the request schema joins, and the FR-043 deferral this supersedes"
+note   = "Owner 2026-09-13: a question goes in the request body, so asking one stops meaning editing TOML; files stay as saved questions. Two clarifications open, so `drafted` though plan.md and tasks.md exist; see specs/029-question-in-request/spec.md."
+
+[[feature]]
+id     = "030-question-form"
+status = "queued"
+needs  = ["026-answer-screen", "029-question-in-request"]
+why    = "029 is the endpoint this form posts to; 026 owns the answer screen the form's result renders into, its formatting module and its `as_of` parameter"
+note   = "Owner 2026-09-13, accepted with 029 and deliberately split from it: the API half is answerable, the form half is where a person's sentence becomes the eight required fields it does not contain."
+
 [[future]]
 id      = "web-display-currency-switch"
 after   = ["021-web-declared-data"]
@@ -233,7 +247,7 @@ note  = "The display role of constitution Principle VI has no machinery, and 020
 [[future]]
 id    = "http-question-from-request-parameters"
 after = ["020-http-api"]
-note  = "020 FR-043 keeps the HTTP equivalent of the CLI's `--set` out of the API: the answer endpoint names a DECLARED question id and nothing else. The reason is 015 FR-004's -- in an artefact under review an unknown stream is a typo -- and `answer_declared`'s own docstring records that two of the four cross-file checks are UNREACHABLE through the record-taking entry point. An ad-hoc HTTP question needs those two refusals to be reachable, which is a change to the verb's contract rather than a serialisation concern. 020 SC-026a asserts the absence over the route table, so the deferral is measured rather than merely stated."
+note  = "020 FR-043 keeps the HTTP equivalent of the CLI's `--set` out of the API: the answer endpoint names a DECLARED question id and nothing else. The reason is 015 FR-004's -- in an artefact under review an unknown stream is a typo -- and `answer_declared`'s own docstring records that two of the four cross-file checks are UNREACHABLE through the record-taking entry point. An ad-hoc HTTP question needs those two refusals to be reachable, which is a change to the verb's contract rather than a serialisation concern. 020 SC-026a asserts the absence over the route table, so the deferral is measured rather than merely stated. SUPERSEDED BY 029-question-in-request (owner 2026-09-13), which takes a WHOLE question in the body rather than the parameters this entry deferred; it is still OPEN and SC-026a still asserts the absence, and 029's own T031 closes both when it lands. The form that fills such a body is 030."
 
 [[future]]
 id    = "openapi-wire-change-is-unannounced"
@@ -421,3 +435,13 @@ note  = "FOUND BY THE MERGE ROUND of 027, 2026-09-12, and DELIBERATELY NOT FIXED
 id    = "a-lot-s-acquisition-date-is-not-rendered-as-a-date"
 after = ["026-answer-screen"]
 note  = "`HeldPositions` prints a lot's `acquired_on` as the raw ISO string while the same component renders a quotation date through `day()`, and 026 FR-026 says a date reads `4 Oct 2026`. Behaviour predates fix/held-block, which rewrote the line without changing it; recorded 2026-09-12 by that branch's review round one. The fix is one call and moving the expectation `web/tests/unit/held-positions.test.tsx` pins the raw form with."
+
+[[future]]
+id    = "saving-a-body-as-a-question"
+after = ["029-question-in-request"]
+note  = "029 FR-006 writes nothing, so a body answered over HTTP cannot become a saved question; what a body loses against a file, and the alternative shape, are in that spec under 'Why this feature exists'. Recorded 2026-09-13; deliberately not built."
+
+[[future]]
+id    = "a-card-for-a-body-asked-candidate"
+after = ["029-question-in-request", "027-candidate-card"]
+note  = "A body-asked question has no declared id, so 029 FR-011 leaves the card on declared questions only; the shape one would need is 029 CL-2, an OWNER decision because it settles whether 030's form shows cards at all. Recorded 2026-09-13."

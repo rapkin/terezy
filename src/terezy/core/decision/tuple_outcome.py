@@ -1,15 +1,10 @@
 """The join: an instrument bought through a route from a stream, and what comes back.
 
-Everything built before this computes one term of the constitution's unit of analysis and
-says in writing that it ignores the others. This module composes them, and **it computes
-nothing of its own beyond summing what they return** (research.md D1). Every term comes from
-the call that owns it: 002's :func:`terezy.core.routes.cost.cost_one` for the way in, 001's or
-006's projection for the holding and its tax, the same module's ``cost_exit`` for each amount
-the instrument releases. A figure this module invented would have no owner, and no test would
-know where to check it.
-
-Its only original content is **the chaining rule and the refusals**, and that is where it can
-be wrong.
+Every term comes from the call that owns it -- the way in from
+:func:`terezy.core.routes.cost.cost_one`, the holding and its tax from its own projection,
+each release's way home from ``cost_exit`` -- and **this module computes nothing of its own
+beyond summing what they return** (research.md D1). Its only original content is the chaining
+rule and the refusals, and that is where it can be wrong.
 
 ## The three seams, and why all of them are anchored
 
@@ -17,62 +12,42 @@ be wrong.
     stream --[ way in ]--> (venue, currency) == where the purchase happens
     where the proceeds land == (venue, currency) --[ way out ]--> a spendable endpoint
 
-Feature 004 learned the cost of leaving one of these open. Its exit chain was anchored at
-neither end: money moved between venues for free, and the record still read as a coherent
-three-hop journey -- an arriving amount in one currency beside a cost fraction computed in
-another. The same failure is available here three times, so all three are checked -- both
-halves of the two positional ones (the venue **and** the currency) -- and a mismatch is a
-typed refusal naming both sides. Bridging one would be an invented leg at an invented rate,
-which is the single most tempting fabrication in this feature: the declarations look adjacent.
-
-The first seam has no venue in it and is the easiest to miss for exactly that reason: the way
-in is costed from the *candidate's* stream and everything else reads the *tuple's*, so two
-strings hold one fact. A tuple funded on paper from the dollar contract income and costed over
-the free domestic hryvnia route is the shape of it, and every figure it produced looked right.
+All three are checked -- both halves of the two positional ones, the venue **and** the
+currency -- and a mismatch is a typed refusal naming both sides. Bridging one would be an
+invented leg at an invented rate: feature 004 shipped an exit chain anchored at neither end,
+and money moving between venues for free still read as a coherent three-hop journey. The
+first seam is the easiest to miss because it has no venue in it -- the way in is costed from
+the *candidate's* stream and everything else reads the *tuple's*, so two strings hold one fact.
 
 ## What travels the way out, and why it is a series
 
-Once something is bought, the amount going home is no longer the amount that arrived. It is
-whatever the holding released -- a coupon, a distribution, a redemption -- **on the date it
-released it**, and each release travels the declared way out and is charged what that chain
-charges. A fixed fee does not scale, so applying a round-trip *fraction* to a coupon would be
-a fabricated figure that looks exactly like a real one.
-
-The remainder the purchase could not deploy travels the same way out, on the purchase date
-(owner decision, 2026-09-06). It never became a position, which is what fixes its date and
-makes it untaxed: nothing was disposed of, so there is no gain.
-
-This is also what makes "no reinvestment" (FR-025) structural rather than a rule to remember:
-money that reaches a spendable endpoint has left the model, so there is nothing sitting
-anywhere for an undeclared reinvestment assumption to be applied to.
+What goes home is whatever the holding released, **on the date it released it**, charged what
+the declared way out charges. A fixed fee does not scale, so applying a round-trip *fraction*
+to a coupon would be a fabricated figure that looks exactly like a real one. The remainder the
+purchase could not deploy travels the same way out, on the purchase date (owner decision,
+2026-09-06); it never became a position, which is what fixes its date and makes it untaxed.
+"No reinvestment" (FR-025) is then structural rather than a rule to remember: money that
+reaches a spendable endpoint has left the model.
 
 ## The rate, and where it refuses
 
 The comparable figure is a money-weighted return over the tuple's **actual span**, from the
 first outlay to the last arrival, with ramp and settlement latency inside it because waiting
 is a cost (FR-015, owner decision 2026-08-22). It is
-:func:`terezy.core.results.hurdle.internal_rate_of_return` over every arrival on its own
-date -- the releases, and the remainder coming back -- against the whole outlay. That is the
-same root find that produces feature 001's benchmark, which is what makes hurdle-versus-tuple
-one kind of number against the same kind.
+:func:`terezy.core.results.hurdle.internal_rate_of_return`, the same root find that produces
+feature 001's benchmark, which is what makes hurdle-versus-tuple one kind of number.
 
 **It refuses where those amounts are not all in one currency**, and that is reachable in the
-shipped registry rather than a theoretical case: the dollar contract income reaching a hryvnia
-fund produces a dollar outflow and hryvnia inflows, and an internal rate of return over the
-two is not a rate of anything. Valuing one in the other needs a rate that values one currency
-in another **for a return**, and nothing declares one: a channel rate is a transaction price,
-and the official rate feature 011 brought is a legal reference for what an income was worth --
-reusing either to score a return conflates a role rather than filling this one. So
-the **amount** is reported and the **rate** is a typed absence naming what is missing, on
-``RealTermsUnavailable``'s precedent, and the comparison keeps such a tuple out of the ranking
-while showing it (002's ``Ranking.not_comparable``, unchanged).
+shipped registry. Valuing one in the other needs a rate that values a currency **for a
+return**, and nothing declares one: a channel rate is a transaction price and the official
+rate is a legal reference for what an income was worth. The **amount** is reported and the
+**rate** is a typed absence naming what is missing.
 
 ## No clock
 
 ``horizon.start`` is when the money leaves the stream; the purchase happens the way in's
 declared latency later; every other date comes from a declaration or from the projection.
-``as_of`` is when the question is asked and decides staleness only. Neither is read from a
-clock, and there may never be one here.
+``as_of`` decides staleness only. Neither is read from a clock, and there may never be one.
 """
 
 from __future__ import annotations
@@ -198,25 +173,20 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
 Declared = InstrumentDeclaration | FundDeclaration | CashDeclaration
 """The declaration kinds a tuple can name, matched with ``match``.
 
-**The seam is recorded rather than hidden.** The projections return different shapes, so the
-join has to know which one to call. That is a branch on a **declaration kind** -- an algorithm,
-which Principle II leaves as code -- and never a branch on an instrument id, which it forbids
-and which ``tests/contract/test_h1_data_only.py`` scans for. Adding another instrument is
-data; adding another kind is code, here and wherever else the kind is dispatched on.
+The join dispatches on a declaration **kind** because the projections return different
+shapes; never on an instrument id, which ``tests/contract/test_h1_data_only.py`` scans for.
 """
 
 Projected = Projection | FundProjection | CashProjection
-"""What a projection returns, whichever kind produced it: the union every figure is read off."""
+"""What a projection returns, whichever kind produced it."""
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Registries:
     """Every declared set the join reads, in one pure record.
 
-    Passed in rather than loaded, because loading is the ``data`` layer's job and the core
-    must be testable with no file on disk anywhere near the arithmetic -- the same reasoning
-    ``results.project`` takes ``tax_classes`` by argument. The data layer builds one of these
-    from a resolved data root; a test builds one by hand.
+    Passed in rather than loaded: loading is the ``data`` layer's job, and the core must be
+    testable with no file on disk anywhere near the arithmetic.
     """
 
     instruments: Mapping[str, InstrumentDeclaration]
@@ -224,10 +194,9 @@ class Registries:
     cash: Mapping[str, CashDeclaration]
     """Declared cash balances by id.
 
-    A third mapping rather than a widened first, on :attr:`funds`' argument. It is read
-    wherever the other two are, and the reason is Principle IV's: an id in neither existing map
-    was skipped by enumeration with **no refusal at all**, so a declared balance would have
-    disappeared from the comparison silently (023 FR-008a).
+    A third mapping rather than a widened first: an id in neither existing map was skipped by
+    enumeration with **no refusal at all**, so a declared balance disappeared from the
+    comparison silently (023 FR-008a).
     """
 
     held: Mapping[str, HeldAssetDeclaration]
@@ -251,25 +220,23 @@ class Registries:
     """Every CPI series this run declares, by declared id. Empty when it declares none.
 
     No default: an absent deflator is a *reported reason* rather than an error (024 FR-013).
-    The whole mapping and not one series, for the reason
-    :attr:`~terezy.core.results.hurdle.Deflation.series` gives.
     """
 
     inflation: InflationAssumption | None
     """The declared future-inflation belief, or ``None`` when this run was given none.
 
-    Required with no default, on ``quotation_holds``' reasoning: a caller that could omit it
-    would produce an answer whose assumed real figures are all unavailable and no record of
-    whether that was the data or the call.
+    Required with no default: a caller that could omit it would produce an answer whose
+    assumed real figures are all unavailable, and no record of whether that was the data or
+    the call.
     """
 
     quotation_holds: QuotationHolds
     """The owner's declared belief about what a future early exit is struck at.
 
-    On the registries rather than on the question, because it is not a property of one question:
-    two questions asked on one day must not be able to disagree about how a platform's quote
-    behaves (015 FR-032). Required with no default -- an absent belief refuses at load, and a
-    default here would be the invented number the declaration exists to prevent.
+    On the registries rather than on the question, because it is not a property of one
+    question: two questions asked on one day must not be able to disagree about how a
+    platform's quote behaves (015 FR-032). Required with no default -- a default here would be
+    the invented number the declaration exists to prevent.
     """
 
     base_currency: Currency
@@ -277,8 +244,7 @@ class Registries:
 
     Read for exactly one thing: refusing a taxable instrument declared in another currency.
     Not for want of an official rate -- feature 011 built that -- but because the projection
-    below holds a holding under one currency and sums its charges in it. See
-    :class:`~terezy.core.results.tuple.TaxCurrencyConversionUnavailable`.
+    below holds a holding under one currency and sums its charges in it.
     """
 
 
@@ -286,11 +252,8 @@ class Registries:
 class Evaluated:
     """One tuple's outcome and the projection it was read off (027 FR-001).
 
-    Both halves, always. The projection was built and dropped inside the join until this
-    record existed, so every intermediate a reader would check a figure against -- the dated
-    flows, the charges with their bases, the premium struck at purchase -- was unreachable by
-    the time the outcome reached him. It is a **return value** rather than a field on the
-    outcome because a field on that record is on the wire in every response carrying one.
+    A **return value** rather than a field on the outcome: a field on that record would be on
+    the wire in every response carrying one.
     """
 
     outcome: TupleOutcome
@@ -322,16 +285,8 @@ def evaluate(
     ``continuation`` is required with no default, because FR-025 forbids defaulting what an
     instrument terminating before the horizon does with its proceeds.
 
-    The order of the checks is the order a reader would ask the questions in, and the **first**
-    problem found is the one reported: an owner whose instrument is undeclared does not also
-    need to be told that its route is closed. They run from the declarations (true of every
-    run) through the seams (true of this tuple) to feasibility (true of this amount on this
-    date).
-
-    Raises only for a caller's construction error, on
-    :func:`terezy.core.routes.cost.cost_one`'s reasoning: an amount in a currency the named
-    stream does not deliver, a candidate whose junctions do not join, a way out naming an
-    inbound route. Every fact about the *money* is a returned value.
+    The **first** problem found is the one reported. Raises only for a caller's construction
+    error; every fact about the *money* is a returned value.
     """
     prepared = _prepare(tuple_, registries)
     if not isinstance(prepared, _Prepared):
@@ -357,9 +312,8 @@ def evaluate(
 class _Routed:
     """The way in, costed, with both venue seams checked and the way out resolved.
 
-    A private carrier for the same reason :class:`_Prepared` is one: it makes "both venue seams
-    were anchored before anything was bought" a fact about the control flow rather than a rule
-    spread over one long function.
+    A private carrier, so that "both venue seams were anchored before anything was bought" is
+    a fact about the control flow rather than a rule spread over one long function.
     """
 
     one_way: OneWayCost
@@ -387,13 +341,9 @@ def _route_in(
 ) -> _Routed | TupleRefused:
     """Cost the way in, check both venue seams, and resolve the way out. Nothing is bought yet.
 
-    The order matters and is the plan's: the chaining rule first, because it is the part that
-    can be silently wrong, and everything after it is a sum of calls that already work.
-
     **``cost_one``'s own round-trip figure is deliberately unused.** This tuple's way out
     starts where the *instrument* releases its proceeds, which is not in general where the
-    inbound chain ended, so that figure is about a different journey and reporting it would put
-    a figure for one journey in the slot for another.
+    inbound chain ended, so that figure is about a different journey.
     """
     entry = tuple_.route_in
     if isinstance(entry, EntryByIdentity):
@@ -432,11 +382,10 @@ def _route_in(
         seam_in = _seam_in(entry, prepared, priced.one_way.arrived)
         if seam_in is not None:
             return seam_in
-        # After the seam, not before, and the order is a decision rather than a habit: a seam
-        # mismatch says the tuple is impossible at **any** amount in any month, while a cap
-        # says it is impossible at *this* amount *this* month. Reporting the cap first hands
-        # the owner a remedy that reads as actionable -- send at most the ceiling -- and
-        # sending less would then reveal a seam the first refusal had concealed.
+        # After the seam, not before: a seam mismatch says the tuple is impossible at **any**
+        # amount in any month, while a cap says it is impossible at *this* amount *this*
+        # month. Reporting the cap first hands the owner a remedy that reads as actionable,
+        # and sending less would then reveal a seam the first refusal had concealed.
         capped = _over_the_monthly_cap(entry, priced.ceiling, amount)
         if capped is not None:
             return capped
@@ -464,9 +413,8 @@ def _route_in(
 class _Costed:
     """What a way in costs, from whichever of the two kinds of way in it is.
 
-    The four figures `_Routed` carries about the inbound leg, gathered so the identity branch
-    and the routed one meet at one point instead of building a `_Routed` each -- which is where
-    the two would come to disagree about what an unwalked chain reports.
+    Gathered so the identity branch and the routed one meet at one point instead of building a
+    `_Routed` each -- which is where the two would come to disagree.
     """
 
     one_way: OneWayCost
@@ -476,20 +424,12 @@ class _Costed:
 
 
 def _identity_way_in(prepared: _Prepared) -> SeamDoesNotChain | None:
-    """*There is nothing to do* is a claim about where the money is, and it is checked.
+    """*There is nothing to do* is a claim about where the money is, and it is checked (FR-013).
 
-    FR-013, and exactly :func:`_identity_way_out`'s rule at the near end: derived from the
-    declarations the entry is safe by construction, asserted by a caller it is the bare
-    statement that the stream already arrives where the purchase happens -- and a caller who
-    asserts it wrongly would have the purchase made with money that is somewhere else.
-
-    **Both halves come from declarations, and the currency half is the one that matters.** The
+    **Both halves come from declarations, and the currency half is the one that matters**: the
     amount the caller chose to move says nothing about what the stream delivers, so comparing
-    it here would pass a dollar stream against a hryvnia instrument whenever the caller handed
-    in hryvnia -- an undeclared conversion, charged nothing, on the one branch where no walk
-    exists to refuse it. The comparison is character-for-character the one
-    ``candidates._ways_in`` short-circuits on, which is what makes ``compose``'s *already
-    arrived* case unreachable from enumeration.
+    it here would pass a dollar stream against a hryvnia instrument -- an undeclared
+    conversion, charged nothing, on the one branch where no walk exists to refuse it.
     """
     left: Junction = (prepared.stream.arrives_at, prepared.stream.amount.currency.value)
     right: Junction = (prepared.access.bought_at, prepared.currency.value)
@@ -515,14 +455,10 @@ def _over_the_monthly_cap(
 ) -> RouteInCapExceeded | None:
     """Refuse an amount larger than the tightest monthly cap the way in declares (FR-016).
 
-    ``cost_one`` reports the ceiling rather than refusing, and that is right one layer down:
-    a cap is a fact about the rail, and what to do with the excess is the owner's declared
-    fallback (``routes.capacity``). It is read **here** because a tuple has nowhere to put an
-    excess -- an acquisition is one dated purchase event (FR-018) -- and reading it nowhere is
-    what let a 5 000.00 cap deploy 10 000.00 and report ten units bought.
-
-    The deferral goes in the refusal's own words rather than only in the specification,
-    because the refusal is what a reader actually meets.
+    ``cost_one`` reports the ceiling rather than refusing, which is right one layer down: what
+    to do with the excess is the owner's declared fallback (``routes.capacity``). A tuple has
+    nowhere to put an excess -- an acquisition is one dated purchase event (FR-018) -- and
+    reading the ceiling nowhere let a 5 000.00 cap deploy 10 000.00 and report ten units.
     """
     if ceiling is None or money.compare(amount, ceiling) <= 0:
         return None
@@ -641,9 +577,9 @@ def _hold(
 class _Prepared:
     """The declarations one tuple names, resolved and checked against each other.
 
-    A private carrier, not a result: it exists so the fifteen lines of resolution happen once,
-    in one order, and so the functions below cannot be handed an access declaration for one
-    instrument and a currency from another.
+    A private carrier, not a result: the resolution happens once, in one order, so the
+    functions below cannot be handed an access declaration for one instrument and a currency
+    from another.
     """
 
     declared: Declared
@@ -656,12 +592,7 @@ class _Prepared:
 def _instrument_side(
     tuple_: Tuple, registries: Registries
 ) -> tuple[Declared, InstrumentAccess, Currency] | TupleRefused:
-    """The instrument, how it is reached, and what it trades in -- or the first thing missing.
-
-    Split from :func:`_prepare` so each half is short enough to read in one go, and along the
-    seam the constitution already draws: this is the instrument-and-tax side of the registry,
-    and what follows is the route side.
-    """
+    """The instrument, how it is reached, and what it trades in -- or the first thing missing."""
     declared = _declaration(tuple_.instrument_id, registries)
     if isinstance(declared, DeclarationMissing):
         return declared
@@ -763,9 +694,8 @@ def _declaration(instrument_id: str, registries: Registries) -> Declared | Decla
 def currency_of(declared: Declared) -> Currency:
     """What the instrument trades and pays in, from whichever declaration kind it is.
 
-    Public because feature 014 anchors an enumeration's two ``Destination`` records on it -- the
-    venue a purchase happens at, in the currency the instrument trades in -- and a second copy
-    of *which field of which declaration kind holds the currency* is one fact in two places.
+    Public because feature 014 anchors an enumeration's two ``Destination`` records on it, and
+    *which field of which declaration kind holds the currency* is one fact.
     """
     match declared:
         case InstrumentDeclaration() | CashDeclaration():
@@ -780,9 +710,7 @@ def _tax_classes_of(declared: Declared) -> Mapping[TaxableEventKind, str]:
     """Which declared class governs each kind of income this instrument pays.
 
     Empty for a balance, and that is the declaration's answer rather than an omitted field
-    (FR-009): a release returns the basis, so no gain and no income arise and there is nothing
-    for a class to charge. A field on ``CashDeclaration`` able to hold only one value would be
-    somewhere for a later contributor to name one.
+    (FR-009): a release returns the basis, so there is nothing for a class to charge.
     """
     match declared:
         case InstrumentDeclaration() | FundDeclaration():
@@ -799,8 +727,7 @@ def _unresolved_class(
     """Every tax class the instrument names must be declared (FR-020).
 
     Checked here rather than left to the projection, which would report it as an instrument
-    failure: a missing rule pack is a **declaration** that is missing, and FR-006 wants the
-    part named so the remedy is a file in ``data/tax/`` rather than a search.
+    failure: FR-006 wants the part named, so the remedy is a file in ``data/tax/``.
     """
     missing = sorted(
         {class_id for class_id in _tax_classes_of(declared).values() if class_id not in tax_classes}
@@ -825,9 +752,8 @@ def _foreign_tax_currency(
     """A taxable instrument in a currency the projection cannot hold its tax in (FR-024).
 
     Checked before anything is computed, because the alternative is a projection that charged
-    a hryvnia rate against a dollar base and produced a plausible number. It is unreachable in
-    the shipped registry -- every declared instrument is hryvnia -- and that is a property of
-    today's data rather than of the arithmetic, which is why the guard exists.
+    a hryvnia rate against a dollar base and produced a plausible number. Unreachable in the
+    shipped registry, which is a property of today's data rather than of the arithmetic.
     """
     if currency is base_currency or not _tax_classes_of(declared):
         return None
@@ -882,9 +808,9 @@ def _plan_for(
 def _seam_in(entry: Candidate, prepared: _Prepared, arrived: Money) -> SeamDoesNotChain | None:
     """The way in must end where and in the currency the purchase begins (FR-004).
 
-    Both halves, and the venue half is the one that has no other guard: two hryvnia venues
-    look identical to a currency check, and a way in that lands the money at the wrong one
-    would produce a purchase funded by money that never got there.
+    The venue half is the one that has no other guard: two hryvnia venues look identical to a
+    currency check, and a way in landing the money at the wrong one would fund a purchase with
+    money that never got there.
     """
     left: Junction = (entry.destination_id, arrived.currency.value)
     right: Junction = (prepared.access.bought_at, prepared.currency.value)
@@ -911,9 +837,8 @@ def _way_out_chain(
 ) -> ExitChain | TupleRefused:
     """The declared way out, anchored at both ends, or the refusal that says why there is none.
 
-    Two anchors, and they are the second seam: the chain must **depart from where the
-    instrument releases its proceeds**, and it must **end somewhere the owner actually
-    spends**. A chain that stops short has not got the money out.
+    It must **depart from where the instrument releases its proceeds** and **end somewhere the
+    owner actually spends**. A chain that stops short has not got the money out.
     """
     chain = _chosen_way_out(tuple_.route_out, tuple_, prepared, proceeds_at, registries)
     if not isinstance(chain, ExitChain):
@@ -976,9 +901,8 @@ def _identity_way_out(
 ) -> ExitByIdentity | SeamDoesNotChain:
     """*There is nothing to do* is a claim about the far end, and it is checked, not trusted.
 
-    Derived from the declarations it is safe by construction; asserted by a caller it is the
-    bare statement that the instrument releases its proceeds somewhere the owner already
-    spends from, and its whole content is a claim about the far end.
+    Asserted by a caller, its whole content is the claim that the instrument releases its
+    proceeds somewhere the owner already spends from.
     """
     endpoints = cost.spendable_junctions(registries.spendable)
     if proceeds_at in endpoints:
@@ -1007,10 +931,8 @@ def _chosen_way_out(
 ) -> ExitChain | TupleRefused:
     """What the caller said about the way out, or what the declarations say when he said that.
 
-    :data:`~terezy.core.routes.path.FROM_THE_DECLARATION` reads them in the owner's own order,
-    which is 002's rule and 003's, unchanged: a destination that is itself spendable needs no
-    way out, and otherwise the arriving route's ``partner_route`` is the declared one. No
-    partner still means ``ExitCostUnknown`` and no round-trip figure (FR-007, FR-030).
+    :data:`~terezy.core.routes.path.FROM_THE_DECLARATION` reads them in the owner's own order.
+    No partner route still means ``ExitCostUnknown`` and no round-trip figure (FR-007, FR-030).
     """
     if not isinstance(choice, FromTheDeclaration):
         return choice
@@ -1070,8 +992,8 @@ class _Remainder:
     """What the purchase could not deploy, before its way home has been costed.
 
     Distinct from :class:`~terezy.core.results.tuple.UndeployedCash`, which carries that
-    journey: the exit chain is resolved and the purchase date is known one level up from the
-    purchase, so the two halves cannot be built in one place.
+    journey: the exit chain and the purchase date are known one level up, so the two halves
+    cannot be built in one place.
     """
 
     amount: Money
@@ -1084,14 +1006,9 @@ def _acquire(
     """Turn what arrived into units, at the declared price and the declared increment.
 
     **Bought with what arrived, never with what departed** (FR-003). The two differ by the way
-    in's whole charge, and using the departing amount is the mistake that makes an expensive
-    ramp invisible in the size of the holding as well as in the rate.
-
-    The **increment is declared or it does not exist**: a bond declares ``min_unit`` and is
-    bought in whole increments of it, and a fund declares none, so its arriving amount buys
-    exactly what it buys. Rounding a fund's purchase to whole certificates would be inventing
-    a term its declaration does not state; the minimum *number* of units it does declare is
-    its own projection's check, refused there with its own shortfall.
+    in's whole charge, and using the departing amount makes an expensive ramp invisible in the
+    size of the holding as well as in the rate. The **increment is declared or it does not
+    exist**: rounding a fund's purchase to whole certificates would invent a term.
     """
     minimum = _minimum_ticket(prepared)
     if minimum is not None and money.compare(arrived, minimum) < 0:
@@ -1154,23 +1071,14 @@ def _undeployed(
 ) -> _Remainder | None:
     """What the purchase could not deploy, or ``None`` where there is no such thing.
 
-    **A declaration with no increment leaves no remainder, by construction.** ``increment ==
-    0.0`` is :func:`_min_unit`'s statement that none is declared, and then the arriving amount
-    buys exactly what it buys -- so there is nothing left over to report, and a figure here
-    would be a category error rather than a small number. What ``price * (arrived / price)``
-    leaves behind in binary floating point is not money: the shipped MilTech fund at a net
-    asset value of 1006.97 and an arriving 1007.00 produced ``-1.14e-13``, a **negative**
-    "money that made the trip in and bought nothing" -- a state
-    :class:`~terezy.core.results.tuple.UndeployedCash` forbids in its own words, sent home
-    along a declared exit under a sentence reading "bought in increments of 0.0 unit(s)".
-
-    Where an increment **is** declared the same arithmetic can land a hair either side of
-    zero, so the comparison is the imported tolerance rather than ``== 0.0``. **Anything at or
-    below zero is refused outright as well**, and not only what the tolerance absorbs: the two
-    tolerances are applied to different quantities -- :func:`_whole_increments` rounds a
-    *ratio* at the relative one, this tests the *money* at the absolute one -- so a residue can
-    be negative by more than this guard admits, and a negative one now reaches ``cost_exit``,
-    which raises rather than costing a movement that runs backwards.
+    **A declaration with no increment leaves no remainder, by construction** -- the arriving
+    amount buys exactly what it buys. What ``price * (arrived / price)`` leaves behind in
+    binary floating point is not money: the shipped MilTech fund at a net asset value of
+    1006.97 and an arriving 1007.00 produced ``-1.14e-13``, a **negative** "money that made the
+    trip in and bought nothing", sent home along a declared exit. So the comparison is the
+    imported tolerance rather than ``== 0.0``, and anything at or below zero is refused
+    outright as well: :func:`_whole_increments` rounds a *ratio* at the relative tolerance
+    while this tests *money* at the absolute one.
     """
     if increment == 0.0 or remainder.amount <= 0.0 or is_close(remainder.amount, 0.0):
         return None
@@ -1209,18 +1117,11 @@ class _Priced:
 def _price_for(prepared: _Prepared, *, purchased_on: date) -> _Priced | InstrumentRefused:
     """What one unit costs, from whichever declaration states it.
 
-    A fund prices itself -- its declared net asset value plus the entry markup the assumed
-    liquidity mode charges -- through the fund module's own function, so the price the join
-    buys at is the price the projection records. A bond states no purchase price at all (a
-    face value is what it repays), so the venue's declared quote is the price, and the
-    resolver has already refused an access declaration that omits one for a bond or supplies
-    one for a fund.
-
-    **A bond's quotation is a dirty price and is carried to the settlement date** (FR-005),
-    by the same function that carries the resale quotation to the sale date. It applies where
-    the window holds to maturity too, which is the half of the round trip no second leg
-    cancels: nothing else would state the difference between the price on the quotation's day
-    and the price on the day the money arrives.
+    A fund prices itself through the fund module's own function, so the price the join buys at
+    is the price the projection records. A bond states no purchase price at all, so the venue's
+    declared quote is the price -- and **a bond's quotation is a dirty price, carried to the
+    settlement date** (FR-005), because nothing else would state the difference between the
+    quotation's day and the day the money arrives.
     """
     match prepared.declared, prepared.plan:
         case FundDeclaration(), FundAssumptions():
@@ -1254,12 +1155,11 @@ def _price_for(prepared: _Prepared, *, purchased_on: date) -> _Priced | Instrume
                 return InstrumentRefused(instrument_id=prepared.declared.id, reason=carried.reason)
             price = accrual.price(carried)
             if price.amount <= 0.0:
-                # **The same guard the sell leg carries** (`acquire.early_sale`), and the buy
-                # leg needs it for the same reason since 022: the price is no longer the
-                # declared quote the data boundary vets, it is that quote net of one accrual
-                # and plus another, and the resolver cannot see the result. Zero divides in
-                # `_whole_increments`; negative buys a negative number of units and reports
-                # `BuysNoWholeUnit`, whose message would blame an owner who can afford it.
+                # **The same guard the sell leg carries** (`acquire.early_sale`): the price is
+                # the declared quote net of one accrual and plus another, which the resolver
+                # cannot see. Zero divides in `_whole_increments`; negative buys a negative
+                # number of units and reports `BuysNoWholeUnit`, whose message would blame an
+                # owner who can afford it.
                 return InstrumentRefused(
                     instrument_id=prepared.declared.id,
                     reason=(
@@ -1286,8 +1186,8 @@ def _accrual_schedule(declared: InstrumentDeclaration) -> accrual.Schedule:
     """This instrument's coupon dates and day count, through its own declared plugin.
 
     ``ops_for`` rather than a match on the declaration form: which coupons one unit pays is a
-    question both forms answer, and asking it here is what keeps the decision layer from
-    learning that there are two of them (013 FR-011a).
+    question both forms answer, which keeps the decision layer from learning there are two
+    (013 FR-011a).
     """
     ops = instrument_registry.ops_for(declared.instrument_class)
     return accrual.schedule_of(declared, ops.coupons_per_unit(declared))
@@ -1296,10 +1196,9 @@ def _accrual_schedule(declared: InstrumentDeclaration) -> accrual.Schedule:
 def _minimum_ticket(prepared: _Prepared) -> Money | None:
     """The smallest amount that may be invested, where the declaration states one.
 
-    A bond states a minimum ticket in money. A fund states a minimum in **units**, which is a
-    different constraint and is checked by its own projection against the quantity -- deriving
-    a ticket from it here would be this module computing a figure the declaration does not
-    contain, and it would report the wrong one the moment the price moved.
+    A bond states it in money. A fund states a minimum in **units**, checked by its own
+    projection -- deriving a ticket from it here would report the wrong one once the price
+    moved.
     """
     match prepared.declared:
         case InstrumentDeclaration():
@@ -1313,8 +1212,7 @@ def _minimum_ticket(prepared: _Prepared) -> Money | None:
 def _min_unit(prepared: _Prepared) -> float:
     """The smallest buyable increment the declaration states, or ``0.0`` where it states none.
 
-    ``1.0`` would be an invented increment -- rounding a fund's purchase to whole certificates
-    is a term its declaration does not contain. ``0.0`` is read by :func:`_whole_increments` as
+    ``1.0`` would be an invented increment. ``0.0`` is read by :func:`_whole_increments` as
     *no increment*, and the arriving amount then buys exactly what it buys.
     """
     match prepared.declared:
@@ -1329,13 +1227,10 @@ def _min_unit(prepared: _Prepared) -> float:
 def _whole_increments(arrived: Money, price: Money, increment: float) -> float:
     """As many whole declared increments as the arriving amount covers, and no fraction.
 
-    ``increment == 0.0`` means *no increment is declared*, and the amount buys exactly what it
-    buys -- see :func:`_min_unit`. Otherwise this is
-    ``fixed_income._reinvest_whole_units``' arithmetic on a different amount, including its one
-    subtlety: an exact multiple can land a hair below itself in binary floating point, and a
-    bare floor would throw away a whole unit the owner could really buy. A ratio within the
-    single project tolerance of a whole number is that whole number, and the tolerance is
-    imported rather than redefined.
+    ``increment == 0.0`` means *no increment is declared*. Otherwise: an exact multiple can
+    land a hair below itself in binary floating point and a bare floor would throw away a whole
+    unit the owner could really buy, so a ratio within the imported project tolerance of a
+    whole number is that whole number.
     """
     units = arrived.amount / price.amount
     if increment == 0.0:
@@ -1362,10 +1257,8 @@ def _project(
 ) -> Projected | TupleRefused:
     """Run the holding through the call that owns its lifecycle, and read the refusals.
 
-    Nothing about the lifecycle happens here. What this function does is translate the owning
-    call's own typed failures into tuple-level ones **without re-wording them**: the reason a
-    fund owes no buyback belongs to the fund module, and the join's contribution is to say
-    which of the round trip's parts the refusal came from.
+    The owning call's typed failures are translated **without re-wording them**; the join's
+    contribution is to say which of the round trip's parts the refusal came from.
     """
     holding = Holding(
         owner_id=prepared.stream.owner_id,
@@ -1450,11 +1343,9 @@ def _spans_no_time(
 def _early_exit(prepared: _Prepared, registries: Registries) -> EarlyExit | None:
     """What this holding is sold for if the horizon ends before its own terms do (015 FR-029).
 
-    ``None`` where the access declaration quotes no resale price: the instrument then refuses
-    naming ``access.resale_price`` and :func:`_bond_outcome` turns that into a missing
-    declaration. Nothing is inferred from the purchase quote or the face value -- either would
-    report a spread of zero. The quotation's own date travels with it, because it is the date
-    the accrual inside the quotation is measured at.
+    ``None`` where the access declaration quotes no resale price. Nothing is inferred from the
+    purchase quote or the face value -- either would report a spread of zero. The quotation's
+    own date travels with it: it is the date the accrual inside the quotation is measured at.
     """
     quote = prepared.access.resale_price
     if quote is None:
@@ -1494,11 +1385,7 @@ def _bond_outcome(
 def _cash_outcome(
     prepared: _Prepared, outcome: CashProjection | InconsistentTerms
 ) -> CashProjection | TupleRefused:
-    """A balance projection, or the refusal its one failure becomes.
-
-    One arm where a bond has four: `project_cash` returns two things, and the second is the
-    only way a window can be wrong about a balance.
-    """
+    """A balance projection, or the refusal its one failure becomes."""
     match outcome:
         case CashProjection():
             return outcome
@@ -1567,14 +1454,9 @@ def _repatriate(
     """Every net amount the holding released, sent home along the declared way out.
 
     Netted **by date** rather than event by event, because the way out charges a flat fee per
-    movement: a date on which the holding pays twice is one journey home and one fee, and
-    repatriating each line separately would charge the flat part twice for money that
-    travelled once. What travels is what the owner actually has that day.
-
-    A date that nets **negative** is refused rather than absorbed into a later receipt. It
-    would mean money travelling *in* along a route nobody costed, on a date nobody planned,
-    and netting it forward would move a real outflow to a date it did not happen on -- quietly
-    improving the rate.
+    movement. A date that nets **negative** is refused rather than absorbed into a later
+    receipt: it would mean money travelling *in* along a route nobody costed, and netting it
+    forward would move a real outflow to a date it did not happen on.
     """
     charged: list[tuple[Arrival, WayOutCost]] = []
     for released_on, released in _released_by_date(projected):
@@ -1633,15 +1515,10 @@ def _repatriate(
 def _over_the_way_out_cap(way_out: WayOutCost, sent: Money, on: date) -> WayOutCapExceeded | None:
     """Refuse a movement larger than the tightest monthly cap the way out declares (FR-016).
 
-    The way in's rule (:func:`_over_the_monthly_cap`) applied where FR-016 says it also
-    applies. ``cost_exit`` reports the ceiling for ``cost_one``'s reason -- a cap is a fact
-    about the rail and what happens to the excess is the owner's declared fallback -- and a
-    caller that reads it nowhere repatriates past it in silence, which is what shipped: a
-    1.00 hryvnia monthly cap on the shipped exit route produced a complete outcome reporting
-    13 100.00 reaching the endpoint.
-
-    Per movement rather than per month, deliberately and with the gap stated on
-    :class:`~terezy.core.results.tuple.WayOutCapExceeded`.
+    A caller that reads ``cost_exit``'s reported ceiling nowhere repatriates past it in
+    silence, which is what shipped: a 1.00 hryvnia monthly cap on the shipped exit route
+    produced a complete outcome reporting 13 100.00 reaching the endpoint. Per movement rather
+    than per month, with the gap on :class:`~terezy.core.results.tuple.WayOutCapExceeded`.
     """
     if way_out.ceiling is None or money.compare(sent, way_out.ceiling) <= 0:
         return None
@@ -1678,18 +1555,11 @@ def _send_the_remainder_home(
 ) -> tuple[UndeployedCash | None, WayOutCost | None]:
     """Send what the purchase could not deploy back out along the tuple's declared way out.
 
-    The terms of that journey are :class:`~terezy.core.results.tuple.UndeployedCash`'s, and
-    the two things this function decides are here.
-
-    **The fourth seam.** The remainder is at the venue the purchase was made at while the
-    chain departs from wherever the instrument releases its **proceeds**, and those are two
-    declarations -- reachable in the shipped shapes rather than theoretical. Where they
-    differ, walking the chain with this money would be the free transfer between venues
-    feature 004 shipped.
-
-    **A way out that will not carry it leaves it where it is** rather than refusing the
-    tuple, which is where this parts company with :func:`_repatriate`. See
-    :class:`~terezy.core.results.tuple.RemainderStayed`.
+    **The fourth seam.** The remainder is at the venue the purchase was made at while the chain
+    departs from wherever the instrument releases its **proceeds**; where the two declarations
+    differ, walking the chain with this money would be the free transfer between venues feature
+    004 shipped. **A way out that will not carry it leaves it where it is** rather than
+    refusing the tuple (:class:`~terezy.core.results.tuple.RemainderStayed`).
     """
     if remainder is None:
         return None, None
@@ -1786,9 +1656,7 @@ def _charges_of(projected: Projected) -> tuple[TaxCharge, ...]:
     """Every tax charge a projection recorded, whichever kind produced it.
 
     Empty for a balance, and the emptiness is the declaration's answer rather than a table the
-    join failed to read: proceeds equal basis, so no charge is assessed and none is recorded
-    (FR-009). A field on ``CashProjection`` able to hold only the empty tuple would be
-    somewhere for a later contributor to put one.
+    join failed to read: proceeds equal basis, so none is assessed (FR-009).
     """
     match projected:
         case Projection() | FundProjection():
@@ -1802,35 +1670,20 @@ def _charges_of(projected: Projected) -> tuple[TaxCharge, ...]:
 def _released_by_date(projected: Projected) -> tuple[tuple[date, Money], ...]:
     """The holding's net-of-tax cash effect per date, in date order, purchase excluded.
 
-    The purchase is excluded because the join already paid for it: it is the arriving amount
-    turned into units, and it is reported as the ``entry`` part. Every other event is a real
-    movement between the owner and the instrument, and dates that net to exactly zero are
-    dropped -- there is nothing to send home, and sending nothing would still be charged a
-    fixed fee by an exit chain that declares one.
+    The purchase is excluded because the join already paid for it and reports it as the
+    ``entry`` part. Dates that net to exactly zero are dropped: sending nothing would still be
+    charged a fixed fee by an exit chain that declares one.
 
-    ⚙ **The tax comes from the charge, not from the charge event's amount** (feature 009).
-    A ``TAX_CHARGE`` is an assessment memo that moves nothing -- ``tax_year.memo_amount``, the
-    charge's own money at no magnitude -- so summing the events alone would send the **gross**
-    coupon home and report a pre-tax amount and a pre-tax rate on a record whose
-    :data:`~terezy.core.results.tuple.ACCOUNTS_FOR` says it is net of tax. That is the same
-    defect ``results.schedule`` names for the reader-facing rows, and it is read the same way
-    out of the same place: ``charges``, paired to the taxed event by its own sequence number.
+    **The tax comes from the charge, not from the charge event's amount.** A ``TAX_CHARGE`` is
+    an assessment memo that moves nothing, so summing the events alone would send the **gross**
+    coupon home and report a pre-tax rate on a record whose
+    :data:`~terezy.core.results.tuple.ACCOUNTS_FOR` says it is net of tax.
 
-    ⚙ **It is netted on the date the income accrued, and the settlement date is not modelled
-    here.** Since 009 the liability leaves cash as a ``TAX_PAYMENT`` on a declared deadline in
-    a later year, and that deadline lives in ``data/tax/timing/`` with the filing decisions
-    that assemble the year -- none of which a :class:`Registries` carries. So this dates the
-    outflow **earlier than it is due**, exactly as ``results.schedule``'s ``net`` column does,
-    and the error runs one way: the money leaves sooner, so the rate is understated rather
-    than flattered. Deferring it to a date nobody declared would be the other kind of guess.
-
-    ⚙ **The direction claim above is about the dates only. On the base a percentage exit fee
-    charges, the choice here is the *flattering* one.** Netting shrinks that base, so an
-    arrival is ``(gross - tax) x (1 - pct)``, which exceeds the ``gross x (1 - pct) - tax`` of
-    charging the fee on the gross by exactly ``pct x tax``. It is taken on correctness rather
-    than on conservatism: the tax is a domestic liability settled in the base currency and
-    never travels the way out, so charging a repatriation fee on it would invent a journey.
-    Stated because the two claims point opposite ways and a reader is owed both.
+    **It is netted on the date the income accrued**, because the declared settlement deadline
+    lives in ``data/tax/timing/``, which a :class:`Registries` does not carry; the error runs
+    one way, the money leaving sooner, so the rate is understated. On the base a percentage
+    exit fee charges the choice is instead the *flattering* one, by exactly ``pct x tax``, and
+    it is taken on correctness: the tax never travels the way out.
     """
     ledger = projected.ledger
     currency = ledger.base_currency
@@ -1850,12 +1703,10 @@ def _released_by_date(projected: Projected) -> tuple[tuple[date, Money], ...]:
                 "correctly. Both projections renumber their charges onto the combined stream "
                 "before folding it, so reaching here means that renumbering was skipped."
             )
-        # ⚙ **Which drop this catches, and which it cannot.** It catches a charge naming an
-        # event that is not in the ledger. It does not catch *two* charges on one event: both
-        # chargers key their pairing by `event_sequence` in a dict, so the second would
-        # already have replaced the first before `charges` was built, and the loss happens
-        # upstream of anything here. Not reachable today -- each charger walks the events once
-        # -- and recorded because it is the same shape as the drop above, on the same field.
+        # This catches a charge naming an event that is not in the ledger. It does not catch
+        # *two* charges on one event: both chargers key their pairing by `event_sequence` in a
+        # dict, so the second would already have replaced the first before `charges` was built.
+        # Not reachable today -- each charger walks the events once.
         by_date.setdefault(taxed, []).append(money.scale(charge.total, -1.0))
     netted = ((on, money.total(amounts, currency)) for on, amounts in sorted(by_date.items()))
     return tuple((on, amount) for on, amount in netted if amount.amount != 0.0)
@@ -1889,13 +1740,10 @@ _RELEASE_KINDS: Final[frozenset[EventKind]] = frozenset(
 )
 """The event kinds that are the instrument paying the owner, for the ``lifecycle`` line.
 
-A closed set naming what a *holding produces*, and **distinct from** the ledger's
-``CASH_ONLY_KINDS`` rather than narrower: the two overlap and neither contains the other,
-because a redemption is a receipt that also closes a lot. The sets are drawn on different
-axes -- that one is the kinds that touch no holding, this one is the kinds that are a receipt.
-A fee is a charge rather than a receipt, and a tax charge is neither: since feature 009 it
-moves nothing at all, and what it assessed reaches the ``tax`` line from the charge rather
-than from the event. Each has a line of its own.
+**Distinct from** the ledger's ``CASH_ONLY_KINDS`` rather than narrower: the two overlap and
+neither contains the other, because a redemption is a receipt that also closes a lot. A fee is
+a charge rather than a receipt, and a tax charge is neither -- what it assessed reaches the
+``tax`` line from the charge rather than from the event.
 """
 
 
@@ -1923,12 +1771,10 @@ def _assemble(
 ) -> Evaluated:
     """Everything the owning calls returned, summed and chained. No new arithmetic here.
 
-    Every amount below is a sum of figures a named call produced, and every part carries the
-    name of that call so a reader can go and check it. The six parts are an **attribution**
-    and not an addition: they are in up to three currencies and two of them -- the instrument's
-    exit terms and its lifecycle receipts -- describe the same money from two sides, so a
-    reader who added them up would be double-counting. What adds up is the series of arrivals,
-    and that is :attr:`~terezy.core.results.tuple.TupleOutcome.reaches`.
+    Every part carries the name of the call that produced it. The parts are an **attribution**
+    and not an addition: they are in up to three currencies, and the instrument's exit terms
+    and its lifecycle receipts describe the same money from two sides. What adds up is
+    :attr:`~terezy.core.results.tuple.TupleOutcome.reaches`.
     """
     carried = _carried_quotation(
         prepared, projected, purchased_on=purchased_on, quotation_holds=quotation_holds
@@ -2008,12 +1854,9 @@ def _assemble(
 def _standing(routed: _Routed, way_out_costs: tuple[WayOutCost, ...]) -> RouteStanding:
     """How usable both declared ways are, from the figures the costing already returned.
 
-    Both, and never one: a status describing the way in alone on a record whose headline
-    number is a round trip is the half-truth ``RampCost.status`` records about itself.
-
-    A holding that released nothing has no way-out cost to read, and then the way out's
-    standing is genuinely unknown rather than open. Unreachable today: a position is closed at
-    the window's end if its own terms have not closed it, so every tuple releases something.
+    Both, and never one: a status describing the way in alone on a record whose headline number
+    is a round trip is the half-truth ``RampCost.status`` records about itself. A holding that
+    released nothing has no way-out cost, and that standing is unknown rather than open.
     """
     out_status = {charged.status for charged in way_out_costs}
     constrained: list[Literal["route_in", "route_out"]] = []
@@ -2037,30 +1880,17 @@ def _declaration_provenance(prepared: _Prepared) -> Provenance:
     consults that it never sees:
 
     * ``[instrument.constraints]`` -- the minimum ticket and the buyable increment, which
-      decide how many units were bought and therefore every figure downstream. This feature is
-      what made them load-bearing: before :func:`_acquire` nothing sized a purchase from them,
-      which is exactly why they were the table left out;
+      decide how many units were bought and therefore every figure downstream;
     * a fund's :class:`~terezy.core.instruments.fund.LiquidityTerms`, **both tables**. The
       settlement delay moves the arrival date and therefore the rate -- 0 to 30 business days
-      moves the shipped MilTech tuple from 0.17578 to 0.16553 -- and which of the two supplies
-      it depends on the run: the assumed mode picks one, and the termination path reads the
-      legal one whatever the mode. The join cannot tell which fired without re-deciding the
-      exit, so it marks the pair. A mark present where it need not be costs a reader nothing;
-      one absent where it belongs is Principle I's defect.
+      moves the shipped MilTech tuple from 0.17578 to 0.16553 -- and the join cannot tell which
+      of the two supplied it without re-deciding the exit, so it marks the pair. One mark
+      absent where it belongs is Principle I's defect; one present where it need not be is not.
 
-    **Not everything a declaration cites.** ``fee_context`` is recorded context for the
-    declared yield and nothing accrues from it (``instruments.fund``, owner decision B), so it
-    moves no figure and claiming a figure rests on it would make the mark mean less. The line
-    is *can this table move a number*, and it is asserted rather than left to judgement:
-    ``tests/contract/test_marks_survive_the_join.py`` partitions every sourced table of the
-    declarations a tuple names into those that reach the outcome and those classified as
-    unable to move one.
-
-    **The venue quote is not here either, and that is not an omission.** The join did size the
-    purchase from it, and the purchase event the projection recorded carries the amount it
-    produced -- so the quote's citation arrives through :func:`_projection_provenance`
-    already. Merging it a second time changed no outcome, which is how a duplicate is
-    recognised.
+    **Not everything a declaration cites.** ``fee_context`` moves no figure
+    (``instruments.fund``, owner decision B); the line is *can this table move a number*,
+    asserted by ``tests/contract/test_marks_survive_the_join.py``. The venue quote's citation
+    arrives through :func:`_projection_provenance` with the purchase event.
     """
     tables: list[Provenance] = []
     match prepared.declared:
@@ -2089,9 +1919,8 @@ def _parts(
     """Each of the six terms, with the call that produced it named (FR-005).
 
     Signed as the ledger signs things: negative for money leaving the owner. The
-    ``exit_terms`` line is a **recorded zero** for an instrument whose declared way out charges
-    nothing -- a bond redeeming at face value -- because a declared zero is a value like any
-    other and only an *absent* declaration is a refusal (FR-009).
+    ``exit_terms`` line is a **recorded zero** where the declared way out charges nothing,
+    because only an *absent* declaration is a refusal (FR-009).
     """
     currency = prepared.currency
     charged_out = money.total(
@@ -2167,9 +1996,7 @@ def _exit_terms_line(prepared: _Prepared, projected: Projected) -> tuple[Money, 
 def _purchase_amount(projected: Projected) -> Money:
     """The purchase event's own amount, read off the ledger rather than recomputed.
 
-    Read back rather than reported from the join's own multiplication, so the ``entry`` line
-    is the figure the projection actually charged: if the two ever differed, the ledger's is
-    the one every other figure rests on.
+    If the two ever differed, the ledger's is the one every other figure rests on.
     """
     for event in projected.ledger.applied:
         if event.kind is EventKind.PURCHASE:
@@ -2209,11 +2036,9 @@ def _projection_provenance(projected: Projected) -> Provenance:
 def _day_count_of(prepared: _Prepared) -> str:
     """The convention this holding's own figures are annualised on.
 
-    ⚙ The docstring used to say *the convention the instrument's own flows were **sized**
-    with*, and that was only ever true of a schedule computed from a rate and a periodicity.
-    A day count is a convention of computation: it turns a span of days into a fraction of a
-    year. Whether it also sized anything is a fact about the declaration, not about the
-    convention -- which is why the declaration is asked rather than a field read.
+    A day count turns a span of days into a fraction of a year. Whether it also sized anything
+    is a fact about the declaration, not about the convention, which is why the declaration is
+    asked rather than a field read.
     """
     match prepared.declared:
         case InstrumentDeclaration():
@@ -2227,8 +2052,7 @@ def _day_count_of(prepared: _Prepared) -> str:
 
 
 def _excludes_of(prepared: _Prepared) -> frozenset[str]:
-    """What this outcome fails to account for, beyond what every outcome fails to account
-    for.
+    """What this outcome fails to account for, beyond the answer-wide exclusions.
 
     :data:`~terezy.core.results.tuple.EXCLUDES` is the floor. What a particular declaration
     adds to it is the declaration's answer, not this module's decision (013 FR-023).
@@ -2254,33 +2078,18 @@ def _rate(
     """The money-weighted return over the span, or a typed statement of why there is none.
 
     **The payment out at ``t=0`` is the whole outlay**, and every dated amount that reached the
-    endpoint is a receipt against it -- including the remainder the purchase could not deploy,
-    which comes home along the declared way out with its own cost and its own arrival date.
-    Netting it off the denominator instead would assume it recoverable at par and free, and it
-    is neither: it is a costed movement like any other.
+    endpoint is a receipt against it, including the remainder the purchase could not deploy.
+    Netting that off the denominator instead would assume it recoverable at par and free.
 
     **Where the way out would not carry it there is no figure at all**, and that is Principle I
     rather than caution: measuring on the whole outlay prices the stranded amount at zero and
     netting it off prices it at par, nothing declares which it is worth, and both look like a
     real rate. The amount is unaffected and is reported.
 
-    Time is measured with the **instrument's declared day-count convention**, from the first
-    outlay -- the same convention that sized the instrument's own flows, so this rate and
-    feature 001's hurdle are measured on the same clock. A hard-coded 365 here would make the
-    two disagree in a way that reads as rounding and is not.
-
-    The root find is
-    :func:`terezy.core.results.hurdle.internal_rate_of_return`, unchanged: the same function
-    that produces the benchmark, which is what makes hurdle-versus-tuple one kind of number
-    against the same kind rather than two figures that resemble each other.
-
-    Its precondition is a **conventional series** -- one payment out at the start, receipts
-    afterwards, over a period -- and it is checked here rather than discovered as an exception,
-    because a series that fails it is a fact about this round trip and not a caller's mistake.
-    Two ways it fails, and neither is the caller's fault: nothing positive came back
-    (everything was eaten by fees, or nothing came back at all), or everything came back on the
-    day it left, so there is no period for a return to be over and the present value never
-    crosses zero. ``internal_rate_of_return`` raises on both, by its own contract.
+    Time is measured with the **instrument's declared day-count convention**, so this rate and
+    feature 001's hurdle are on the same clock. The root find's precondition -- one payment out
+    at the start, receipts afterwards, over a period -- is checked here rather than discovered
+    as an exception, because a series that fails it is a fact about this round trip.
     """
     endpoint = endpoint_currency
     if stranded is not None:
@@ -2299,9 +2108,7 @@ def _rate(
             "stranded at a venue",
         )
     # One guard for one rule: what left and what came back have to be in one currency, because
-    # a money-weighted return over two of them is not a rate of anything. Valuing one in the
-    # other needs a rate that values a currency *for a return*, and neither rate this system
-    # has is one.
+    # a money-weighted return over two of them is not a rate of anything.
     if outlay.currency is not endpoint:
         return RateNotComparable(
             reason=(
@@ -2331,10 +2138,8 @@ def _rate(
     if all(year_fraction(span.start, on) == 0.0 for on, _ in arriving):
         # `internal_rate_of_return`'s precondition is one payment out at the start and receipts
         # **afterwards**: money out and the same money back on one date discounts to zero at
-        # every rate, so the bracket never crosses and the root find raises. Reported as a
-        # typed absence rather than allowed to raise, because it is a fact about the round
-        # trip. Reachable only where a holding returns its money on the day it was bought,
-        # which needs both legs to be instant -- a balance over a horizon of no length.
+        # every rate, so the bracket never crosses and the root find raises. A typed absence
+        # rather than a raise, because it is a fact about the round trip.
         return RateNotComparable(
             reason=(
                 f"{outlay.amount!r} {outlay.currency.value} left the stream on "
@@ -2367,8 +2172,7 @@ def _rests_on(
 
     The continuation assumption appears **only where it bites** -- where the last arrival is
     before the end of the horizon -- because listing it on a tuple that runs to the horizon
-    would be claiming a dependency the figure does not have, and a ``rests_on`` that is always
-    the same is one a reader stops reading.
+    would claim a dependency the figure does not have.
     """
     stated: list[str] = []
     if span.end < horizon.end:
@@ -2413,10 +2217,9 @@ def _carried_quotation(
 ) -> QuotationHolds | None:
     """The belief either leg of this round trip leaned on, or ``None`` where neither did.
 
-    FR-018, and either leg is enough. A hold-to-maturity candidate states no early exit and its
-    purchase price is still a quotation carried to the settlement date -- which is why the
-    belief is not the early exit's. A trade struck on the quotation's own day carried nothing,
-    and naming a belief there would claim a dependency the figure does not have.
+    FR-018, and either leg is enough: a hold-to-maturity candidate states no early exit and its
+    purchase price is still a quotation carried to the settlement date. A trade struck on the
+    quotation's own day carried nothing.
     """
     quoted = prepared.access.quote
     if quoted is not None and quoted.observed_on != purchased_on:

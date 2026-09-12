@@ -117,10 +117,12 @@ dominance → distribution → break-even → point estimate, in that order.
 If you write a transform that drops the mark, that is a top-severity defect, not a
 cosmetic one.
 
-**Domain knowledge is data, not code.** Before adding a branch for a new instrument,
-venue, tax rule or jurisdiction, stop: it belongs in `data/`. There are exactly four
-plugin interfaces (`Instrument`, `Provider`, `TaxRule`, `ReturnModel`) and adding a
-fifth requires a constitution amendment.
+**Domain knowledge is data, not code.** Another instance of a product kind the engine
+already knows -- a bond, a fund, a venue, a route, a tax class -- belongs in `data/`, and
+if adding it needs an engine edit the abstraction is wrong. New financial behaviour is code
+behind a named extension point (`Instrument`, `Provider`, `TaxRule`, `ReturnModel`, or a
+per-kind projection arm), never a branch on an id; do not write prose arguing that a new
+arm is "not really" an extension point -- name it.
 
 **The core stays pure.** No I/O, no network, no logging, no formatting, no `random`, no
 `datetime.now()`. `.importlinter` will catch you, but understand *why*: determinism is

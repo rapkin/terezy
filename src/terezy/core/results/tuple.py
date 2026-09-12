@@ -1,31 +1,17 @@
 """The tuple and its outcome: what reaches a spendable endpoint, and what it cost to get there.
 
-Constitution Principle VI names the product's unit of analysis::
+These records are the join over Principle VI's unit of analysis, and `SIMULATOR_SPEC.md` §8
+question 1 -- *does anything beat 15.5% tax-free OVDP after every other option's fees, taxes
+and access costs?* -- is the question they exist to make computable.
 
-    (instrument) x (funding route in) x (tax treatment) x (exit route out) x (risk class)
-
-These records are the join, and `SIMULATOR_SPEC.md` §8 question 1 -- *does anything beat
-15.5% tax-free OVDP after every other option's fees, taxes and access costs?* -- is the
-question they exist to make computable. What feature 001's hurdle rate excluded, a tuple
-outcome accounts for, and that is asserted rather than described:
-``tests/contract/test_every_figure_states_its_scope.py``.
-
-**The rule that governs this module: nothing here holds a figure the join computed itself.**
-Every amount below came from the call that owns it -- 002's costing, 001's or 006's
-projection, the declared tax rules -- and the join's own content is the chaining and the
-refusals (research.md D1). A figure the join invented would have no owner and no test would
-know where to check it.
+**Nothing here holds a figure the join computed itself.** Every amount below came from the
+call that owns it -- 002's costing, 001's or 006's projection, the declared tax rules -- and
+the join's own content is the chaining and the refusals (research.md D1). A figure the join
+invented would have no owner and no test would know where to check it.
 
 **Both figures, always** (research.md D8). :attr:`TupleOutcome.reaches` is what can be spent;
 :attr:`TupleOutcome.implied_rate` is what compares across horizons. Reporting one invites a
-reader to derive the other under an assumption the tool never made -- and the assumption
-available here is reinvestment, which is exactly the number FR-025 forbids inventing.
-
-**Two exit-unknown cases, and they are different types.** :class:`NoExitRouteDeclared` is
-002's FR-030 inherited whole: nobody has costed the way out of the *venue*.
-:class:`NoExitTermsDeclared` is the instrument's own way out being unavailable. They call for
-different actions -- declare a route, versus wait for termination or accept the discount --
-so a reader must be able to tell them apart without reading prose (FR-008).
+reader to derive the other under an assumption the tool never made.
 """
 
 from __future__ import annotations
@@ -57,12 +43,10 @@ wrapping them: they are already the per-kind assumption records, each required i
 default anywhere in the stack, and a wrapper would be a further place for a run's choices to
 live.
 
-The fund member carries the term that makes this the tuple's *exit terms* and not merely its
-run settings: ``FundAssumptions.exit_on`` and ``liquidity_mode`` choose between the fund's
-declared ways out -- a requested buyback at a discount settled in so many business days, or
-the termination payout -- each with its own terms (spec.md, Key Entities). A bond has one
-declared way out, redemption at maturity, so ``Assumptions`` names none; a balance has one and
-nothing to choose about it, so ``CashAssumptions`` carries no field at all.
+``FundAssumptions.exit_on`` and ``liquidity_mode`` choose between a fund's declared ways out
+-- a requested buyback at a discount, or the termination payout. A bond has one way out,
+redemption at maturity, so ``Assumptions`` names none; a balance has one with nothing to
+choose about it, so ``CashAssumptions`` carries no field at all.
 """
 
 
@@ -71,10 +55,8 @@ class Tuple:
     """The unit of analysis: an instrument, funded from a stream, reached and left by routes.
 
     **Identity is all five terms** (FR-010, research.md D5). The same instrument funded from
-    the hryvnia salary and from the dollar contract income is two tuples with two outcomes,
-    and that is the product's whole thesis -- it is only true if the key says so. A cost or an
-    outcome attributed to an instrument alone stays unrepresentable, as 002's FR-008 and 004's
-    FR-011 already require, because there is no type here with a shape to hold one.
+    the hryvnia salary and from the dollar contract income is two tuples with two outcomes, so
+    a cost or an outcome attributed to an instrument alone stays unrepresentable.
 
     Keyword-only: ``instrument_id`` and ``stream_id`` are adjacent strings, and a positional
     constructor would let them be transposed with no type error anywhere.
@@ -108,10 +90,8 @@ Part = Literal["ramp_in", "entry", "lifecycle", "tax", "exit_terms", "ramp_out"]
 
 Closed rather than a free-form string for :class:`~terezy.core.results.ramp.CostComponent`'s
 reason: a free mapping would let a term invent a name, and then "a reader can see which part
-dominates" would be satisfiable by a figure hiding under a key nobody reads. That every
-member is actually reported is asserted in
-``tests/contract/test_every_figure_states_its_scope.py``, because a closed set the builder
-does not fill is a gap nothing else catches.
+dominates" would be satisfiable by a figure hiding under a key nobody reads. That every member
+is actually reported is asserted in ``tests/contract/test_every_figure_states_its_scope.py``.
 """
 
 
@@ -119,12 +99,11 @@ does not fill is a gap nothing else catches.
 class PartContribution:
     """What one part of the round trip contributed, and which call produced it.
 
-    **Never summed across parts.** They are in three different currencies in the general
-    case -- the way in charges in the stream's, the instrument lives in its own, the way out
-    delivers in the endpoint's -- and adding them would be the currency conflation Principle
-    VI puts at top severity. They are reported side by side so a reader can see which term
-    dominates, which is the sentence this feature exists to let the tool write about a
-    *holding* rather than about a currency balance.
+    **Never summed across parts.** They are in three different currencies in the general case
+    -- the way in charges in the stream's, the instrument lives in its own, the way out
+    delivers in the endpoint's -- and adding them would be the currency conflation Principle VI
+    puts at top severity. They are reported side by side so a reader can see which term
+    dominates.
     """
 
     part: Part
@@ -138,8 +117,8 @@ class PartContribution:
     source: str
     """Which call produced this figure, in words, so a reader can go and check it.
 
-    Required, and it is the mechanical half of "the join invents nothing": a part with no
-    named producer is a figure the join computed, and there is nowhere to write one.
+    Required, and it is the mechanical half of "the join invents nothing": a part with no named
+    producer is a figure the join computed, and there is nowhere to write one.
     """
 
 
@@ -158,14 +137,13 @@ class Arrival:
     """
 
     released: Money
-    """What the instrument released on this date **net of the tax charged on it**, at the
-    venue it released it at.
+    """What the instrument released on this date **net of the tax charged on it**, at the venue
+    it released it at.
 
-    Net rather than gross, and the field says so because two contract tests now assert
-    ``released == lifecycle + tax`` against it. Read as gross it would look like the
-    ``lifecycle`` part line, and the two differ by exactly the charge on every taxed holding.
-    The gross figure is that part line; this is what actually travelled the way out, which is
-    what the way out's fee was charged on.
+    Net rather than gross: read as gross it would look like the ``lifecycle`` part line, and
+    the two differ by exactly the charge on every taxed holding. The gross figure is that part
+    line; this is what actually travelled the way out, and what the way out's fee was charged
+    on.
     """
 
     amount: Money
@@ -209,15 +187,13 @@ class UndeployedCash:
     FR-003 under the owner's decision of 2026-09-06
     (``specs/decisions/2026-09-06-undeployed-remainder-returns.toml``): the remainder is
     withdrawable from the purchase venue, so it rides the tuple's own declared way out rather
-    than sitting there. It **never became a position**, which is what fixes every term of that
-    journey: it leaves on the purchase date, it is charged whatever the way out charges, and
-    it bears **no tax** -- nothing was disposed of and there is no gain. So it is part of
-    :attr:`TupleOutcome.reaches` and its arrival is inside the span the rate is measured over.
+    than sitting there. It **never became a position**, which fixes every term of that journey:
+    it leaves on the purchase date, it is charged whatever the way out charges, and it bears
+    **no tax** -- nothing was disposed of and there is no gain.
 
-    Reported as its own record either way, rather than folded in with what the instrument
-    released: money the purchase could not deploy and money a holding paid out are different
-    facts, and rounding the remainder into the purchase would spend money the owner did not
-    agree to spend.
+    Reported as its own record either way: money the purchase could not deploy and money a
+    holding paid out are different facts, and rounding the remainder into the purchase would
+    spend money the owner did not agree to spend.
     """
 
     amount: Money
@@ -265,9 +241,7 @@ ACCOUNTS_FOR: Final[frozenset[str]] = frozenset(
 )
 """What a tuple outcome *is* net of, in the output's own words (FR-014).
 
-The sibling of :data:`EXCLUDES`, and it is the sentence feature 001's hurdle rate could not
-say: 001's ``EXCLUDES`` names *funding route costs (in)* and *exit route costs (out)*, and
-here both have moved to this set. A later feature moving a term the other way has to delete a
+The sibling of :data:`EXCLUDES`: a later feature moving a term the other way has to delete a
 line here and add one there, in one change, where a reviewer sees both.
 """
 
@@ -293,17 +267,8 @@ as identifiers, because they are meant to be shown.
 class RouteStanding:
     """How usable the two declared routes are, on the outcome's own face.
 
-    ``RampCost`` reports eight things about a way in and a tuple's outcome uses four of them:
-    the key, the one-way cost, the latency and the ceiling. Two more are dropped with a reason
-    -- the round-trip figure is about a different journey, and the inbound record's exit path
-    is not this tuple's. **These two were dropped with no reason recorded anywhere**, which is
-    how a `constrained` way in came to produce an outcome with nothing on its face saying so
-    -- and ``RampCost.status``'s own docstring calls that "the field a reader scans to decide
-    whether to trust the figure beside it".
-
-    Both directions, because a status that described the way in only would put a half-truth on
-    a record whose headline number is a round trip -- the gap ``RampCost.status`` records
-    about itself, repeated one layer up rather than closed.
+    Both directions, because a status describing the way in only would put a half-truth on a
+    record whose headline number is a round trip.
     """
 
     status: RouteStatus
@@ -313,16 +278,13 @@ class RouteStanding:
     disruption_probability: float
     """The largest single leg's declared probability, never compounded across legs.
 
-    **A lower bound, and it has to be read as one.** ``RampCost``'s own field says so in as
-    many words -- the honest reading of 5% is *at least 5%* -- and this is the field a reader
-    actually meets, on the outcome's face, so the reading belongs here rather than two records
-    away. Multiplying independent-looking per-leg probabilities would invent a joint
-    distribution nobody declared, and the largest is the weakest claim the declarations
-    support.
+    **A lower bound, and it has to be read as one**: the honest reading of 5% is *at least 5%*.
+    Multiplying independent-looking per-leg probabilities would invent a joint distribution
+    nobody declared, and the largest is the weakest claim the declarations support.
 
     Across **both** ways where the holding released something, and the way in's alone where it
-    released nothing: there is then no way-out cost to read a figure off. Such a tuple has no
-    rate either, so no ranked figure rests on the narrower reading.
+    released nothing: there is then no way-out cost to read a figure off, and such a tuple has
+    no rate either, so no ranked figure rests on the narrower reading.
     """
 
     constrained: tuple[Literal["route_in", "route_out"], ...]
@@ -350,18 +312,16 @@ class TupleOutcome:
     because it is an address a client echoes back and never composes -- the five terms alone
     name the same candidate in all three sections, whose projections differ.
 
-    The projection itself is not here. A field on this record is on the wire in every response
-    that carries one, and the 69 the shipped question evaluates come to about a third again of
-    the answer document; a reader who opens one card pays for one.
+    The projection itself is not here: a field on this record is on the wire in every response
+    that carries one, and a reader who opens one card should pay for one.
     """
 
     outlay: Money
     """What left the income stream, in the stream's currency, on :attr:`span`'s first day.
 
     The whole amount, and the whole amount is what :attr:`implied_rate` is measured against:
-    since 2026-09-06 the part of it :attr:`undeployed` says bought nothing comes home along
-    the declared way out, so it is a receipt in the series rather than a deduction from the
-    denominator.
+    the part of it :attr:`undeployed` says bought nothing comes home along the declared way
+    out, so it is a receipt in the series rather than a deduction from the denominator.
     """
 
     parts: tuple[PartContribution, ...]
@@ -389,12 +349,11 @@ class TupleOutcome:
     implied_rate: NominalRate | RateNotComparable
     """The money-weighted return over :attr:`span` (FR-015), or a typed statement of why none.
 
-    The internal rate of return, on their own dates, of the arrivals and of the remainder's
-    own arrival against the whole :attr:`outlay`, measured with the instrument's declared
-    day-count convention, the same convention that sized the instrument's flows. Computed by
+    The internal rate of return, on their own dates, of the arrivals and of the remainder's own
+    arrival against the whole :attr:`outlay`, measured with the instrument's declared day-count
+    convention. Computed by
     :func:`terezy.core.results.hurdle.internal_rate_of_return`, which is also what produces
-    feature 001's benchmark, so hurdle-versus-tuple is one kind of number against the same
-    kind.
+    feature 001's benchmark, so hurdle-versus-tuple is one kind of number against the same kind.
 
     Ramp latency and settlement latency sit **inside** the span, because waiting is a cost
     (owner decision, 2026-08-22).
@@ -409,10 +368,10 @@ class TupleOutcome:
     """What :attr:`implied_rate` returns in purchasing power: two figures, or two reasons.
 
     The same record the hurdle carries and filled by the same function, so a candidate's real
-    figure is comparable with the benchmark's field for field. Present on every evaluated
-    outcome and never optional: one half deflated by declared CPI observations covering the
-    whole window, the other by the declared future-inflation belief, and where either input is
-    missing that half alone is typed-unavailable naming what is missing (024 FR-001, FR-003).
+    figure is comparable with the benchmark's field for field. One half deflated by declared
+    CPI observations covering the whole window, the other by the declared future-inflation
+    belief, and where either input is missing that half alone is typed-unavailable naming what
+    is missing (024 FR-001, FR-003).
 
     **Never ranked on, compared on, or used to choose a benchmark** (024 FR-017): a figure
     added for the reader must not reorder the answer.
@@ -499,10 +458,9 @@ class TupleOutcome:
 class ContinuationAssumption(Enum):
     """What proceeds arriving before the horizon do until it (FR-025).
 
-    An enumeration with one member rather than a bare string, on
-    :class:`~terezy.core.routes.path.ExitByIdentity`'s precedent: a closed set makes a typo a
-    type error, and it makes the *second* member -- reinvestment, when something declares its
-    terms -- an addition a reviewer sees rather than a new string appearing at a call site.
+    An enumeration with one member rather than a bare string: a closed set makes a typo a type
+    error, and it makes the *second* member -- reinvestment, when something declares its terms
+    -- an addition a reviewer sees rather than a new string appearing at a call site.
     """
 
     HOLD_AS_CASH = "hold_as_cash"
@@ -512,21 +470,17 @@ HOLD_AS_CASH: Final = ContinuationAssumption.HOLD_AS_CASH
 """The one declared continuation assumption: proceeds arriving before the horizon sit as cash.
 
 FR-025 requires a comparison to *state* what an instrument maturing before the horizon does
-with its proceeds -- reinvest on stated terms, or sit as cash -- and forbids defaulting it. It
-is a required argument of :func:`terezy.core.decision.compare.compare` with no default
-anywhere, so a caller has to say it.
+with its proceeds and forbids defaulting it, so it is a required argument of
+:func:`terezy.core.decision.compare.compare` with no default anywhere.
 
 **Reinvestment is deliberately not offered.** "Reinvest on stated terms" needs terms: a rate,
 an instrument, an entry cost, a tax treatment. None of them is declared, and inventing any of
-them is the number this feature is most likely to reach for (research.md D4). A second member
-arrives with the declaration that gives it something to mean.
+them is the number this feature is most likely to reach for (research.md D4).
 
-**It changes no figure, and that is worth stating rather than hiding.** The rate is an
-internal rate of return over dated flows, and cash earns nothing, so holding proceeds from
-termination to the horizon moves neither an arrival nor a date. The assumption is still
-recorded on every outcome that rests on it, because *reinvest* would move both -- and a
-reader comparing a two-year instrument against a twenty-year one over one horizon is entitled
-to know which of the two answers he is being given.
+**It changes no figure.** The rate is an internal rate of return over dated flows and cash
+earns nothing, so holding proceeds from termination to the horizon moves neither an arrival
+nor a date. It is still recorded on every outcome that rests on it, because *reinvest* would
+move both.
 """
 
 
@@ -534,36 +488,23 @@ to know which of the two answers he is being given.
 class RateNotComparable:
     """The rate slot, present and explicitly empty, naming what would be needed to fill it.
 
-    Not an error and not a failure -- a valid, honest occupant of a slot whose value is
-    genuinely unavailable, exactly as ``ExitCostUnknown`` occupies the round-trip slot and
-    ``RealTermsUnavailable`` the real-terms one. The round trip happened, the amount that
-    reached a spendable endpoint is real and is reported; what is missing is a *ratio*.
+    Not an error -- a valid occupant of a slot whose value is genuinely unavailable, exactly
+    as ``ExitCostUnknown`` occupies the round-trip slot. What is missing is a *ratio*.
 
     **The case that is reachable today** is a tuple funded in one currency and spent in
-    another: dollar contract income reaching a hryvnia fund produces a dollar outflow and
-    hryvnia inflows, and an internal rate of return over the two is not a rate of anything.
-    Valuing the outlay in hryvnia needs a rate that values one currency in another **for a
-    return**, and nothing in this system declares one. Neither of the two rates that do exist
-    is it. A channel rate is a transaction price, and using it to value an outlay against a
-    return would put a price where a valuation belongs and quietly change every ranking it
-    touched. The official rate feature 011 brought is a *legal* reference -- what the law says
-    an income was worth on a date -- and reusing it to score a return is the role conflation
-    Principle VI names, not a shortcut around it.
+    another: a dollar outflow against hryvnia inflows, and an internal rate of return over the
+    two is not a rate of anything. Valuing the outlay in hryvnia needs a rate that values one
+    currency in another *for a return*, and neither rate this system declares is it -- a
+    channel rate is a transaction price, and the official rate is a legal reference, so using
+    either would be the role conflation Principle VI names.
 
-    A remainder the purchase could not deploy joins that first case when it is in a third
-    currency, because it is netted off the outlay: three amounts, and a rate is a rate only
-    over one currency. **That case turns on divisibility**, which is a fact about the data
-    rather than an inconsistency: a hryvnia outlay buying a dollar instrument and coming home
-    in hryvnia is one currency out and one back and has a perfectly good rate, and only a
-    remainder the unit price left behind puts a third currency in the series. It is
-    unreachable today for the reasons ``decision.tuple_outcome._rate`` records.
+    A remainder the purchase could not deploy joins that case when it is in a third currency,
+    because it is netted off the outlay. That turns on divisibility and is unreachable today
+    for the reasons ``decision.tuple_outcome._rate`` records.
 
     The other case is a series with no rate to find: a round trip that returned nothing, or
     whose repatriation charges exceeded what was released. Reported rather than approximated,
     because a rate extrapolated past the bracket would be invented.
-
-    A tuple holding one of these is **not comparison-ready** and is kept out of the ranking,
-    reported separately -- 002's ``Ranking.not_comparable``, unchanged.
     """
 
     reason: str
@@ -577,10 +518,6 @@ class RateNotComparable:
 # ---------------------------------------------------------------------------
 # The refusals
 # ---------------------------------------------------------------------------
-#
-# Every one of them is a typed value naming what is missing and, where two things had to meet,
-# **both sides**. None of them is an exception: a fact about the money is a result, and `raise`
-# is for a caller that built something incoherent (Principle IV).
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -605,12 +542,10 @@ class DeclarationMissing:
 class SeamDoesNotChain:
     """Two declarations that had to meet do not, and the refusal names both sides.
 
-    FR-004, and the one place this feature is most likely to be silently wrong. Feature 004
-    shipped an exit chain anchored at neither end: money moved between venues for free, and
-    the record still read as a coherent three-hop journey -- an arriving amount in one currency
-    beside a cost fraction computed in another. The same failure is available here twice, so
-    both are anchored and each is tested with a deliberate mismatch. The third seam is not a
-    place at all and has its own record: :class:`FundedFromAnotherStream`.
+    FR-004, and the one place this feature is most likely to be silently wrong: feature 004
+    shipped an exit chain anchored at neither end, so money moved between venues for free and
+    the record still read as a coherent three-hop journey. The third seam is not a place at
+    all and has its own record: :class:`FundedFromAnotherStream`.
 
     Bridging the gap is what must never happen: a conversion or a transfer nobody declared,
     inserted to make two declarations meet, is an invented leg at an invented rate.
@@ -635,17 +570,15 @@ class FundedFromAnotherStream:
     """The tuple names one funding stream and its way in is costed from another (FR-010).
 
     The third seam, and the only one with no venue in it. A
-    :class:`~terezy.core.routes.path.Candidate` carries its own ``stream_id`` and the way in
-    is costed from *that* one -- the same acquisition is free from the hryvnia salary and
-    crosses a P2P spread from the dollar contract income -- while :attr:`Tuple.stream_id` is
-    what resolves the stream, keys the way out, and appears in every report. Two fields, one
-    fact, and until this refusal existed nothing compared them: a tuple claiming to be funded
-    from ``contract_usd`` over the free domestic hryvnia route produced complete, plausible
-    figures for a journey nobody could make.
+    :class:`~terezy.core.routes.path.Candidate` carries its own ``stream_id`` and the way in is
+    costed from *that* one, while :attr:`Tuple.stream_id` is what resolves the stream, keys the
+    way out, and appears in every report. Until this refusal existed nothing compared them: a
+    tuple claiming to be funded from ``contract_usd`` over the free domestic hryvnia route
+    produced complete, plausible figures for a journey nobody could make.
 
     Refused rather than resolved in either direction. Preferring the tuple's would re-cost a
     way in the caller did not name; preferring the candidate's would silently rewrite the key
-    the whole comparison is built on, which is the term SC-004 exists to protect.
+    the whole comparison is built on.
     """
 
     tuple_stream_id: str
@@ -674,22 +607,15 @@ class RouteInUnusable:
 class RouteInCapExceeded:
     """The way in declares a monthly ceiling below the amount, and the excess has nowhere to go.
 
-    **Distinct from :class:`RouteInUnusable` because the two bind for different reasons and
-    the reader has to know which.** A per-transaction ``leg.maximum`` says *this route cannot
-    carry this movement at all*, and 002 refuses it inside ``cost_one``. A ``leg.monthly_cap``
-    says *this rail carries this much a month*, which 002 deliberately does **not** treat as a
-    refusal: ``routes.capacity`` reports the ceiling and decides what fits, because refusing
-    would deploy nothing where the honest answer is to deploy the cap and report the rest.
+    **Distinct from :class:`RouteInUnusable` because the two bind for different reasons.** A
+    per-transaction ``leg.maximum`` says *this route cannot carry this movement at all*; a
+    ``leg.monthly_cap`` says *this rail carries this much a month*, which ``routes.capacity``
+    deliberately treats as a ceiling to report rather than a refusal.
 
-    Deploying the cap is what this feature cannot honestly do. FR-018 defers partial
-    deployment (owner decision, 2026-08-22), and the machinery that would report the excess
-    needs two things a tuple does not carry: a declared fallback policy with its
-    ``redirect_to``, and the month's consumed capacity. Choosing one -- holding the excess as
-    cash, say -- is the substituted default ``routes.capacity`` refuses by name.
-
-    So the tuple refuses, naming the ceiling and the excess. It is the one answer that invents
-    nothing, and it is temporary by construction: when a planning feature brings staggered
-    entry this becomes a split rather than something to unwind.
+    Deploying the cap is what this feature cannot honestly do: FR-018 defers partial deployment
+    (owner decision, 2026-08-22), and reporting the excess needs a declared fallback policy
+    with its ``redirect_to`` and the month's consumed capacity, neither of which a tuple
+    carries. So the tuple refuses, naming the ceiling and the excess.
 
     Without it a monthly cap below the outlay is read nowhere at all, and the join returns a
     complete outcome buying more units than the rail will carry -- the silent execution of an
@@ -717,19 +643,15 @@ class RouteInCapExceeded:
 class WayOutCapExceeded:
     """A monthly ceiling on the way out, below an amount that was to travel it on one date.
 
-    :class:`RouteInCapExceeded`'s twin, and a separate record for the reason
-    :class:`WayOutUnusable` is one: the remedies differ, and a cap that carries every coupon
-    while refusing the redemption is a real and non-obvious finding rather than a variant of
-    the inbound case. Only this record can say **which release** could not go home, which is
-    the first thing a reader needs and the thing the inbound record has no field for.
+    :class:`RouteInCapExceeded`'s twin, and a separate record because the remedies differ and
+    only this one can say **which release** could not go home.
 
     **It checks one movement against the ceiling, not a month's worth against it.** Several
     movements can fall in one month and share one rail's allowance; adding them up is the
-    capacity accumulator's job (FR-012, FR-015), and a tuple carries no accumulator. So this
-    is the *loosest* honest check -- it fires only where a single release alone exceeds the
-    cap -- and the gap is stated rather than left to be discovered: two coupons of 700.00 in
-    one month against a 1 000.00 cap still pass here. Narrowing it needs the accumulator, and
-    inventing a month's consumption would be worse than reporting less than everything.
+    capacity accumulator's job (FR-012, FR-015), and a tuple carries no accumulator. So this is
+    the *loosest* honest check -- two coupons of 700.00 in one month against a 1 000.00 cap
+    still pass here -- and inventing a month's consumption would be worse than reporting less
+    than everything.
     """
 
     path: Candidate
@@ -737,10 +659,9 @@ class WayOutCapExceeded:
 
     released_on: date
     """The date the amount that could not be carried was to set out -- a release date, or the
-    purchase date for the remainder the purchase could not deploy. :class:`WayOutUnusable`
-    carries the same field for the same reason: "the way out will not carry it" is
-    unactionable until a reader knows *which* movement, and the answer decides whether the
-    remedy is a different exit or a different exit date."""
+    purchase date for the remainder the purchase could not deploy. "The way out will not carry
+    it" is unactionable until a reader knows *which* movement, and the answer decides whether
+    the remedy is a different exit or a different exit date."""
 
     ceiling: Money
     """The tightest monthly cap any leg of the way out declares, in the released currency."""
@@ -758,10 +679,10 @@ class WayOutCapExceeded:
 class WayOutUnusable:
     """The way out will not carry what the instrument released, on the date it released it.
 
-    FR-016 on the way back. Distinct from :class:`RouteInUnusable` because the remedies
-    differ, and because a way out that cannot carry a *coupon* while carrying the redemption
-    perfectly well is a real and non-obvious finding: a fixed minimum on an exit leg makes
-    small, frequent distributions unrepatriable.
+    FR-016 on the way back. Separate from :class:`RouteInUnusable` because a way out that
+    cannot carry a *coupon* while carrying the redemption perfectly well is a real and
+    non-obvious finding: a fixed minimum on an exit leg makes small, frequent distributions
+    unrepatriable.
     """
 
     refused: RouteUnusable
@@ -807,9 +728,8 @@ class NoExitTermsDeclared:
 class BelowMinimumTicket:
     """What arrived is less than the instrument's declared minimum purchase (FR-017).
 
-    The tuple is infeasible for this amount, and the refusal names the minimum, what arrived
-    and the shortfall. Nothing is rounded: rounding up would spend money the owner did not
-    agree to spend, and rounding down would report a return on a holding never bought.
+    Nothing is rounded: rounding up would spend money the owner did not agree to spend, and
+    rounding down would report a return on a holding never bought.
 
     ``arrived`` may be zero or negative where the way in's fees exceeded the amount, and it is
     reported as it stands -- feature 002's B13 regression, extended through the join.
@@ -821,8 +741,7 @@ class BelowMinimumTicket:
 
     Carried because the figure it refuses is a *post-ramp* amount: "1 000 short of the minimum"
     says nothing until a reader knows which stream and which route delivered what arrived, and
-    the same purchase is feasible from one and infeasible from the other. That difference is
-    the finding this project exists to surface.
+    the same purchase is feasible from one and infeasible from the other.
     """
 
     required: Money
@@ -832,8 +751,7 @@ class BelowMinimumTicket:
 
     # ``required``/``actual``/``shortfall`` rather than ``minimum``/``arrived``: it is the
     # vocabulary ``errors.InfeasiblePurchase`` and ``ramp.RouteUnusable`` already use for the
-    # same shape of statement, and one word per concept across three records is worth more than
-    # a locally prettier name.
+    # same shape of statement.
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -861,10 +779,9 @@ class BuysNoWholeUnit:
 class InstrumentRefused:
     """The instrument's own projection refused, and its reason is carried verbatim.
 
-    The call that owns the terms is the one entitled to say why it produced no figure -- a
-    purchase after a subscription cutoff, a redemption the terms do not owe, a value the
-    primary documents never gave. Re-wording any of them here would put the join's
-    interpretation between the owner and the declaration.
+    The call that owns the terms is the one entitled to say why it produced no figure.
+    Re-wording it here would put the join's interpretation between the owner and the
+    declaration.
     """
 
     instrument_id: str
@@ -887,8 +804,7 @@ class CannotSpanHorizon:
 
     ``instrument.terminates_on`` today, and only that: 015 FR-029 sells a **bond** that
     outlives its window rather than refusing it, so what is left here is a fund still open at
-    the horizon's end with no exit requested -- there is nothing to sell into, and no date to
-    name but the fund's own.
+    the horizon's end with no exit requested.
     """
 
     reason: str
@@ -925,24 +841,18 @@ class PlanDoesNotFitInstrument:
 class TaxCurrencyConversionUnavailable:
     """A taxable instrument in a currency the projection cannot hold its tax in.
 
-    Principle VI's tax role -- base currency at the official rate on the transaction date --
-    exists as of feature 011, and ``core.tax.year`` strikes a base with it at assessment. This
-    refusal is upstream of that and is about a different gap: ``core.results.project`` folds a
-    holding under **one** currency and sums every charge in it, so a hryvnia charge inside a
-    dollar projection is a currency mismatch rather than a figure. A disposal adds a second
-    gap, because a realised gain needs a per-lot basis carried in both currencies with each
-    leg struck at its own date's rate.
-
-    Both are ``fx-tax-asymmetry-f1`` in ``specs/features.toml``, whose remaining blocker this
-    refusal names. 011 supplied the dated rates it needs and deliberately did not build it.
+    ``core.results.project`` folds a holding under **one** currency and sums every charge in
+    it, so a hryvnia charge inside a dollar projection is a currency mismatch rather than a
+    figure. A disposal adds a second gap, because a realised gain needs a per-lot basis carried
+    in both currencies with each leg struck at its own date's rate. Both are
+    ``fx-tax-asymmetry-f1`` in ``specs/features.toml``.
 
     **It must not be satisfied with a channel rate**, and neither must the base itself. A
     channel is a market you transact in; the official rate is a legal reference you never
     transact at, and substituting one for the other would strike a tax base at a price nobody
     was charged.
 
-    Unreachable in the shipped registry, where every declared instrument is in hryvnia, and it
-    exists because unreachable-today is not the same as never.
+    Unreachable in the shipped registry, where every declared instrument is in hryvnia.
     """
 
     instrument_id: str
@@ -964,15 +874,13 @@ class InstrumentDemandsCash:
     planned. It is refused rather than netted against a later receipt, because netting would
     move a real outflow to a date it did not happen on and quietly improve the rate.
 
-    Unreachable while every declared class charges a **fraction** of the income it taxes: the
-    charge is netted on that income's own date, so the date nets to zero at worst.
+    Unreachable while every declared class charges a **fraction** of the income it taxes.
 
     **Strictly above 100%, and not at it.** At exactly 100% the date nets to zero,
-    ``_released_by_date`` drops it, and the holding simply sends nothing home on it -- which
-    ``tests/unit/test_rate_and_horizon_boundaries.py`` pins from both sides, at 50+50 for the
-    dropped date and at 90+90 for this refusal. Which side of the boundary the declared rates
-    fall on is a property of the rates rather than of the arithmetic, and is why this is a
-    guard rather than an assertion that it cannot happen.
+    ``_released_by_date`` drops it, and the holding simply sends nothing home on it, which
+    ``tests/unit/test_rate_and_horizon_boundaries.py`` pins from both sides. Which side of the
+    boundary the declared rates fall on is a property of the rates rather than of the
+    arithmetic, which is why this is a guard rather than an assertion that it cannot happen.
     """
 
     instrument_id: str
@@ -1030,11 +938,8 @@ TupleRefused = (
 """The eighteen ways a tuple honestly produces no outcome. Match exhaustively.
 
 Never a partial outcome and never an empty one. A ``case _:`` arm the type checker proves
-unreachable means a new member becomes an error at every site that must handle it.
-
-The count is asserted rather than left to rot: ``tests/unit/test_tuple_refusals.py`` compares
-it against ``get_args``, so a nineteenth member fails a test instead of quietly making
-this sentence false.
+unreachable means a new member becomes an error at every site that must handle it. The count
+is asserted against ``get_args`` in ``tests/unit/test_tuple_refusals.py``.
 """
 
 
@@ -1079,8 +984,6 @@ class Comparison:
     points at came out of the same call, in the same loop, as everything it is ranked against.
     A separately computed benchmark drifts from what it benchmarks, and the drift is invisible
     because both numbers look reasonable.
-
-    002's ``Ranking.recommended`` sets the precedent, and its argument applies unchanged.
     """
 
     ties: tuple[tuple[int, ...], ...]
@@ -1117,8 +1020,7 @@ class Comparison:
 class BenchmarkUnavailable:
     """The benchmark tuple itself refused, so there is no comparison -- only its parts.
 
-    Returned *instead of* a :class:`Comparison`, on the precedent of
-    ``Ranking | NothingComparable`` one layer down. FR-011 says the hurdle must **always** be
+    Returned *instead of* a :class:`Comparison`. FR-011 says the hurdle must **always** be
     scored and always shown, so a comparison without it is not a weaker comparison: it is a
     different thing, and ranking the rest against nothing would invite the head of the list to
     be read as a winner.
