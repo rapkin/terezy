@@ -352,12 +352,21 @@ class TestAWindowWithNoTimeInIt:
         assert isinstance(refusal, InstrumentRefused), refusal
         assert "before the purchase settles" in refusal.reason
 
-    def test_a_balance_funded_on_the_day_the_window_closes_refuses_the_same_way(self) -> None:
-        # No latency on the way in, so the balance is funded on the horizon's own start date.
-        refusal = _evaluated(fixtures.declared(), fixtures.cash_tuple(), horizon=self._horizon(0))
-        assert isinstance(refusal, SpansNoTime), refusal
-        assert refusal.instrument_id == fixtures.CASH
-        assert refusal.purchased_on == refusal.ends_on == fixtures.OUTLAY_ON
+    def test_a_balance_over_the_same_window_reports_its_figures_and_refuses_the_rate(self) -> None:
+        """The other side of the refusal above, and the reason it is the **bond's**.
+
+        A balance projects over a window of no length: the money is there, it comes back, and
+        what is unavailable is the ratio. Refusing the whole tuple would take the do-nothing
+        baseline out of the comparison along with the marks its amount carries -- an answer
+        strictly worse than the one the arithmetic declines to give.
+        """
+        outcome = _evaluated(fixtures.declared(), fixtures.cash_tuple(), horizon=self._horizon(0))
+        assert isinstance(outcome, TupleOutcome), outcome
+        assert outcome.reaches.amount == fixtures.AMOUNT.amount
+        assert outcome.provenance.sources
+        rate = outcome.implied_rate
+        assert isinstance(rate, RateNotComparable)
+        assert "no time at all" in rate.reason
 
     def test_a_balance_over_one_day_is_a_rate_and_not_a_refusal(self) -> None:
         """The control: one day is a span the convention measures, and the refusal above is

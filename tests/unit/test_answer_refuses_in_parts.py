@@ -13,7 +13,7 @@ member nobody thought about.
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import date
+from datetime import date, timedelta
 from typing import Final, get_args
 
 import pytest
@@ -41,6 +41,9 @@ from terezy.core.results.candidates import CandidateCeiling, CandidateSurvey, Su
 from terezy.core.results.composed import SegmentBound
 from terezy.core.results.tuple import TupleOutcome
 from tests import answer_registries as fixtures
+
+CASH: Final = "cash_uah_monobank"
+"""The do-nothing baseline: the balance the salary is already credited to."""
 
 UNREACHABLE: Final[dict[str, str]] = {
     "DuplicateRunPlan": (
@@ -96,15 +99,26 @@ PLANTED: Final[dict[str, object]] = {
 
 
 def test_a_horizon_of_one_day_is_answered_rather_than_raised() -> None:
-    """010's span refusal, read where an owner would meet it: a section reporting drops with
-    their reason, rather than a traceback out of the verb."""
+    """010's span refusal, read where an owner would meet it, **beside what still has figures**.
+
+    The bonds are bought and given up on one date and are dropped. The balance is not: it
+    projects over that window, and its amount and the marks on it stay in the answer. Asserting
+    only the drop would pass just as well on a section where everything had gone -- which is
+    the regression this input is here to catch, because the do-nothing baseline is the one
+    candidate an owner is entitled to see whatever else refuses.
+    """
     question = fixtures.owners_question()
     opens = question.horizons[0].start
-    result = fixtures.answered(replace(question, horizons=(DateRange(start=opens, end=opens),)))
+    window = DateRange(start=opens, end=opens + timedelta(days=1))
+    result = fixtures.answered(replace(question, horizons=(window,)))
     survey = result.sections[0].outcome
     assert isinstance(survey, CandidateSurvey), survey
     dropped = {type(item.refusal).__name__ for item in survey.comparison.refused}
     assert "SpansNoTime" in dropped, dropped
+    balances = [item for item in evaluated(survey.comparison) if item.key.instrument_id == CASH]
+    assert balances, [item.key.instrument_id for item in evaluated(survey.comparison)]
+    assert all(item.reaches.amount > 0.0 for item in balances)
+    assert all(item.provenance.sources for item in balances)
 
 
 def test_the_battery_covers_every_member_of_the_union() -> None:

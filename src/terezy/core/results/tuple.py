@@ -891,14 +891,16 @@ class InstrumentDemandsCash:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class SpansNoTime:
-    """The window closes on the day the money arrives, so there is no round trip to measure.
+    """A bond's window closes on the day the money arrives, so it has no schedule to project.
 
-    A holding bought on the day the comparison ends is a purchase and a disposal on one date:
-    every flow discounts to the same nothing at every rate, so there is no implied rate to
-    report and no period any figure could be annualised over. Refused here rather than left to
-    the arithmetic, which reaches it as a bracket that never crosses zero and raises -- a
-    statement about a caller's mistake, which this is not: a one-day horizon is a thing an
-    owner can ask for, and a way in with a declared latency can turn a longer one into this.
+    Bought and given up on one date, the contractual series a yield is found over is all on one
+    date, and the root find reaches that as a bracket which never crosses zero and raises -- a
+    statement about a caller's mistake, which this is not: a one-day horizon is a thing an owner
+    can ask for, and a way in with a declared latency can turn a longer one into this.
+
+    **A whole-tuple refusal only because there is no projection at all.** Where a declaration
+    does produce one over such a window -- a balance, a fund -- the figures are reported and
+    what refuses is the rate alone.
     """
 
     instrument_id: str

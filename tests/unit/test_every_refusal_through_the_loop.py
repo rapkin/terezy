@@ -18,7 +18,7 @@ here as well as in 010's suite.
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import date
+from datetime import date, timedelta
 from typing import TYPE_CHECKING, get_args
 
 import pytest
@@ -246,12 +246,16 @@ PLANTED: dict[str, tuple[Registries, dict[str, object]]] = {
         {"plans": _plans(ovdp_synthetic_a=(fixtures.fund_plan(fixtures.declared().funds[REIT]),))},
     ),
     "InstrumentDemandsCash": (_taxed_at(fixtures.declared(), pit=0.9, levy=0.9), {}),
-    # A horizon closing on the day it opens. What reaches this arm is the pair the money
-    # arrives at instantly -- a balance at the venue the stream is already credited to; every
-    # other pair's way in takes a day and overruns the window instead.
+    # A horizon closing on the day the way in's declared latency delivers the money, so every
+    # bond is bought and given up on one date. A day earlier and the purchase overruns the
+    # window instead, which is the instrument's own refusal and not this one.
     "SpansNoTime": (
         fixtures.declared(),
-        {"horizon": DateRange(start=fixtures.OUTLAY_ON, end=fixtures.OUTLAY_ON)},
+        {
+            "horizon": DateRange(
+                start=fixtures.OUTLAY_ON, end=fixtures.OUTLAY_ON + timedelta(days=1)
+            )
+        },
     ),
     "TaxCurrencyConversionUnavailable": (_a_foreign_taxable_bond(), {}),
 }

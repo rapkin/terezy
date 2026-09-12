@@ -493,12 +493,12 @@ def _hold(
 ) -> Evaluated | TupleRefused:
     """Buy with what arrived, live the declared lifecycle, and send every release home."""
     purchased_on = horizon.start + timedelta(days=routed.latency_days)
-    no_span = _spans_no_time(prepared, purchased_on=purchased_on, horizon=horizon)
-    if no_span is not None:
-        return no_span
     bought = _acquire(prepared, tuple_.route_in, routed.one_way.arrived, purchased_on=purchased_on)
     if not isinstance(bought, _Acquisition):
         return bought
+    no_span = _spans_no_time(prepared, purchased_on=purchased_on, horizon=horizon)
+    if no_span is not None:
+        return no_span
     projected = _project(
         prepared,
         bought,
@@ -1309,14 +1309,25 @@ def _spans_no_time(
 ) -> SpansNoTime | None:
     """The window between the money arriving and the horizon closing, if it is no window at all.
 
-    Before the purchase and before the projection, because nothing downstream can state it:
-    ``bond_results.project`` reaches a one-date series as a raise rather than as a value, and
-    ``_rate`` -- which would say it -- is never arrived at.
+    **Only where the projection is a contractual series**, which is the bond. Its yield is a
+    root find over that series, and a series on one date is a bracket that never crosses zero:
+    ``bond_results.project`` reaches it as a raise rather than as a value, so there is no
+    projection to report and no later layer that could say this instead. A balance and a fund
+    build no such series: they project over a window of no length, report their amounts with
+    the marks those amounts carry, and refuse only the **rate** in :func:`_rate`'s own zero-span
+    arm. Refusing the whole tuple for them would take the do-nothing baseline out of the answer
+    and its provenance with it, which is a worse answer than the one the arithmetic refuses.
+
+    After the purchase, so the acquisition's own refusals come first: a quote the instrument
+    cannot price on that date, a ticket below the minimum. Those name what the owner would fix,
+    and this one would send him to lengthen a horizon that is not what is wrong.
 
     A window that closes **before** the money arrives is a different fact and is not this one:
     the instrument refuses it by name, and a convention raises rather than measuring a period
     that runs backwards -- so the dates are ordered before one is asked.
     """
+    if not isinstance(prepared.declared, InstrumentDeclaration):
+        return None
     if horizon.end < purchased_on:
         return None
     convention = _day_count_of(prepared)
