@@ -158,8 +158,9 @@ the screen states the fronts do not differ by the regime alone.
 
 - Both fronts empty for a matched horizon: the horizon renders with an empty union stated as
   such, not omitted.
-- A regime declared by two scenarios: the label names both rather than picking one. A regime
-  declared by none cannot arrive — the answer refuses to load — so the screen has no such state.
+- A regime declared by two scenarios cannot arrive either, since 2026-09-13: the resolver
+  refuses the second claim naming both files. A regime declared by none cannot arrive — the
+  answer refuses to load — so the screen has no such state.
 - Two questions with no horizon in common: the screen says they share none, rather than showing
   a page of one-column horizons with nothing said about it.
 - Every other boundary this screen has is a requirement below rather than an edge case: an

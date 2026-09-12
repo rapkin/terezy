@@ -76,6 +76,7 @@ def test_the_manifest_records_the_run_and_not_a_holding_it_did_not_have() -> Non
     assert run.manifest.projection is None
     assert run.manifest.as_of == fixtures.AS_OF
     assert run.manifest.regime_id == IMPLICIT_REGIME_ID
+    assert run.manifest.scenario_id is None
     assert run.manifest.owner_id == "owner-001"
     assert run.manifest.code_version
     assert run.manifest.encoding == run_manifest.ENCODING

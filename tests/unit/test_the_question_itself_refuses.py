@@ -136,6 +136,7 @@ def test_the_scenario_is_resolved_from_the_regime_the_question_names(tmp_path: P
     )
     assert isinstance(run.answer, Answer), run.answer
     assert run.manifest.regime_id == WARTIME
+    assert run.manifest.scenario_id == "war_end"
 
 
 def test_a_regime_no_scenario_declares_is_refused_by_name(tmp_path: Path) -> None:
@@ -146,6 +147,70 @@ def test_a_regime_no_scenario_declares_is_refused_by_name(tmp_path: Path) -> Non
             root, fixtures.OWNERS_QUESTION, as_of=fixtures.AS_OF, base_currency=Currency.UAH
         )
     assert "a_regime_nobody_declared" in caught.value.problem
+
+
+def test_two_scenarios_declaring_one_regime_are_refused_at_load(tmp_path: Path) -> None:
+    """Which scenario a regime belongs to must be a fact, and two claims on it are not one.
+
+    Nothing downstream can choose between them: ``_scenario_of`` would take whichever id sorted
+    first and the run would be narrowed to that scenario's routes under a label that names
+    neither file.
+    """
+    root = _scratch_with_second_scenario(tmp_path, regime_id=WARTIME)
+    with pytest.raises(DeclarationError) as caught:
+        answer_question(
+            root, fixtures.OWNERS_QUESTION, as_of=fixtures.AS_OF, base_currency=Currency.UAH
+        )
+    assert WARTIME in caught.value.problem
+    assert "war_end" in caught.value.problem
+    assert "a_second_scenario" in caught.value.problem
+
+
+def test_the_shipped_root_declares_each_regime_once(tmp_path: Path) -> None:
+    """The positive control: the refusal above is planted, and the registry does not trip it.
+
+    Over the **composed** root, which is the shipped scenarios plus whatever the fixture
+    overlay adds -- a fixture scenario colliding with a shipped regime would refuse every suite
+    that loads this root, and this is where that would be said plainly.
+    """
+    root = _scratch_with_second_scenario(tmp_path, regime_id="a_regime_of_its_own")
+    declared = resolver.ramp_from_data_root(root, base_currency=Currency.UAH)
+    named = [regime.id for scenario in declared.scenarios.values() for regime in scenario.regimes]
+    assert sorted(named) == sorted(set(named)), named
+
+
+def _scratch_with_second_scenario(tmp_path: Path, *, regime_id: str) -> Path:
+    """The composed root with one more scenario file, declaring one regime by the given id."""
+    root = tmp_path / "data"
+    shutil.copytree(fixtures.DATA_ROOT, root)
+    (root / "scenarios" / "a_second_scenario.toml").write_text(
+        f"""
+[scenario]
+id       = "a_second_scenario"
+owner_id = "owner-001"
+
+[scenario.fallback]
+policy      = "hold_as_cash"
+redirect_to = ""
+
+[[scenario.regime]]
+id        = "{regime_id}"
+route_ids = ["inzhur_direct", "inzhur_to_monobank"]
+
+[[scenario.regime]]
+id        = "a_regime_only_this_file_declares"
+route_ids = ["inzhur_direct", "inzhur_to_monobank"]
+
+[[scenario.transition]]
+on_date       = "2027-06-30"
+before        = "{regime_id}"
+after         = "a_regime_only_this_file_declares"
+is_assumption = true
+rationale     = "SYNTHETIC FIXTURE -- a second scenario, so a regime can be claimed twice."
+""".lstrip(),
+        encoding="utf-8",
+    )
+    return root
 
 
 def test_a_question_id_nothing_declares_is_refused_by_name(tmp_path: Path) -> None:

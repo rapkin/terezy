@@ -1133,9 +1133,17 @@ def _resolved_streams(
 def _resolved_scenarios(
     paths: Sequence[Path], routes: Mapping[str, Route]
 ) -> tuple[dict[str, ScenarioDeclaration], dict[str, Path]]:
-    """Declared scenarios by id, each naming only declared routes and partner-closed."""
+    """Declared scenarios by id, each naming only declared routes and partner-closed.
+
+    **A regime id is claimed across the whole directory, not within one file.** The loader
+    refuses two regimes with one id inside a scenario; a question names a regime and nothing
+    else, so two *scenarios* claiming one would leave nothing able to say which world was
+    searched -- the resolution would take whichever scenario id sorted first, and the run would
+    be narrowed to that file's routes under a label naming neither file.
+    """
     scenarios: dict[str, ScenarioDeclaration] = {}
     files: dict[str, Path] = {}
+    claimed: dict[str, tuple[str, Path]] = {}
     for path in paths:
         scenario = loader.scenario_from_file(path)
         if scenario.id in scenarios:
@@ -1143,9 +1151,32 @@ def _resolved_scenarios(
                 "scenario", scenario.id, "scenario.id", files[scenario.id], path
             )
         _check_regimes(scenario, routes, path=path)
+        for regime in scenario.regimes:
+            _claim_regime(regime.id, scenario.id, path, claimed)
         scenarios[scenario.id] = scenario
         files[scenario.id] = path
     return scenarios, files
+
+
+def _claim_regime(
+    regime_id: str, scenario_id: str, path: Path, claimed: dict[str, tuple[str, Path]]
+) -> None:
+    """Record which scenario declared a regime, refusing a second claim naming both files."""
+    held = claimed.get(regime_id)
+    if held is not None:
+        already, first_file = held
+        raise DeclarationError(
+            path,
+            f"scenario.regime[{regime_id}].id",
+            f"declares the regime id {regime_id!r} for the scenario {scenario_id!r}, which "
+            f"the scenario {already!r} in {first_file} already declares. A question names a "
+            "regime and no scenario, so two scenarios claiming one regime leave nothing able "
+            "to say which world a run searched: whichever scenario resolved first would "
+            "supply the route set, and the manifest would record the regime under a label "
+            "naming neither file.",
+            "rename one of the two regimes, or declare them in one scenario",
+        )
+    claimed[regime_id] = (scenario_id, path)
 
 
 def resolve_ramp(

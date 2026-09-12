@@ -388,6 +388,15 @@ class RunManifest:
     is itself an assumption worth naming.
     """
 
+    scenario_id: str | None
+    """Whose belief that world came from, or ``None`` where no scenario was in force.
+
+    Beside the regime rather than derivable from it: a regime id is unique across
+    ``data/scenarios/`` because the resolver refuses a second claim on one, and that refusal is
+    a rule about the declarations rather than a property of this record -- so a reader handed a
+    manifest alone could otherwise not name the file the route set came from.
+    """
+
     projection: ProjectedRun | None
     """The single-projection facts, or ``None`` where the run projected many.
 
@@ -636,6 +645,7 @@ def of_run(
     seed: int | None,
     as_of: date,
     regime_id: str,
+    scenario_id: str | None,
     inflation: InflationDeclarations | None = None,
     official_rates: OfficialRateDeclarations | None = None,
 ) -> RunManifest:
@@ -669,6 +679,7 @@ def of_run(
         owner_id=holding.owner_id,
         as_of=as_of,
         regime_id=regime_id,
+        scenario_id=scenario_id,
         projection=ProjectedRun(
             instrument_id=holding.instrument_id,
             holding=holding,
@@ -935,6 +946,7 @@ def of_answer(
         owner_id=question.owner_id,
         as_of=as_of,
         regime_id=question.regime_id,
+        scenario_id=declarations.candidates.composition.coverage.scenario_id,
         projection=None,
         inputs=answer_input_refs(declarations),
         seed=None,
