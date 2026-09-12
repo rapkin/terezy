@@ -137,10 +137,9 @@ def answer_declared(
     declared regime is asked under the scenario that declares it. Both entry points go through
     here, so a question built from flags searches the same world a file does.
 
-    ``question_version`` is ``None`` exactly where a **file** declares the question: its bytes
-    are its version and the manifest already records every declared question file. A question
-    carried by flags or by a request body passes the digest of its validated document, which is
-    what puts it in the manifest at all (029 FR-018 to FR-021).
+    ``question_version`` is ``None`` where a **file** declares the question and the digest of
+    the validated document otherwise; :func:`terezy.data.manifest.answer_input_refs` is where
+    that distinction is spent.
 
     **The cross-file checks run here as well as at load**, so a record built by a caller goes
     through them too: two of the four -- the owner and the amount's currency -- are stated

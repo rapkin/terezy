@@ -111,6 +111,10 @@ from terezy.data.declarations.resolver import (
     OfficialRateDeclarations,
 )
 
+if TYPE_CHECKING:  # pragma: no cover -- typing only
+    from collections.abc import Mapping
+    from typing import Any
+
 ENCODING: Final = "terezy-canonical-v3"
 """The name of the byte encoding a digest was taken under.
 
@@ -137,10 +141,6 @@ ALGORITHM: Final = "sha256"
 Carried in the value rather than only in this constant so that a stored digest cannot be
 compared against one taken with a different algorithm by accident.
 """
-
-if TYPE_CHECKING:  # pragma: no cover -- typing only
-    from collections.abc import Mapping
-    from typing import Any
 
 InputKind = Literal[
     "access",

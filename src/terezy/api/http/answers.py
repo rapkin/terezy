@@ -10,9 +10,7 @@ A posted question goes through the loader that validates a **file**'s document, 
 validator, one schema and one set of refusals whichever carried it (029 FR-001). The framework
 is deliberately not given the body to validate: a shape fault would then arrive as
 `RequestMalformed`, with no field path and no remedy, under a different tag from the one the
-same fault in a file produces. What the framework does parse is the JSON itself, which is the
-same division a file gets -- `tomllib` refuses bytes that are not TOML before the loader sees a
-document at all.
+same fault in a file produces.
 """
 
 from __future__ import annotations
@@ -109,21 +107,16 @@ def document_of(body: bytes) -> dict[str, Any]:
     try:
         parsed = json.loads(body)
     except json.JSONDecodeError as malformed:
-        raise RequestValidationError(
-            [{"loc": ("body",), "input": None, "msg": f"the body is not JSON: {malformed}"}]
-        ) from malformed
+        raise _not_a_document(f"the body is not JSON: {malformed}") from malformed
     if not isinstance(parsed, dict):
-        raise RequestValidationError(
-            [
-                {
-                    "loc": ("body",),
-                    "input": None,
-                    "msg": (
-                        "the body is JSON but not an object, so it carries no [owner] and no "
-                        f"[question] table: it is a {type(parsed).__name__}."
-                    ),
-                }
-            ]
+        raise _not_a_document(
+            "the body is JSON but not an object, so it carries no [owner] and no [question] "
+            f"table: it is a {type(parsed).__name__}."
         )
     document: dict[str, Any] = parsed
     return document
+
+
+def _not_a_document(problem: str) -> RequestValidationError:
+    """The framework's own parameter refusal, located at the body and echoing none of it back."""
+    return RequestValidationError([{"loc": ("body",), "input": None, "msg": problem}])

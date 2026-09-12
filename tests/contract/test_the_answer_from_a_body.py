@@ -174,7 +174,7 @@ def test_every_figure_in_a_posted_answer_keeps_its_mark(
 
 
 PROGRAM = """
-import json, sys, tomllib
+import sys, tomllib
 from pathlib import Path
 sys.path.insert(0, "src")
 from tests.http_client import served
