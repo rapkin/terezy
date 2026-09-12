@@ -1,6 +1,15 @@
 <!--
 Sync Impact Report
 ==================
+Version change: 1.5.1 → 1.6.0 (2026-09-13)
+Rationale: MINOR — a rule redefined in the direction it was already enforced. "Exactly
+four plugin interfaces" had become lawyering: funds, cash balances and held assets each
+project through their own arm, and the code carried paragraphs arguing that an arm is not a
+fifth interface. The rule now says what those paragraphs meant: an instance of a known
+product kind is data only; new financial behaviour is code behind a named extension point.
+Owner decision 2026-09-13 after an outside architecture review. Invalidates no spec or test;
+the data-only acceptance test is unchanged.
+
 Version change: 1.5.0 → 1.5.1 (2026-09-05)
 Rationale: PATCH — wording. The OpenAPI document is generated from the API's types and
 never stored (owner decision, specs/decisions/2026-09-05-openapi-on-the-fly.toml); two
@@ -133,9 +142,14 @@ data-only change**. If it requires an engine edit, the abstraction is wrong.
 
 - Configurable domain knowledge lives in versioned, sourced, dated data files under
   `data/`, reviewed in git like code.
-- Exactly four plugin interfaces sit behind that data: `Instrument`, `Provider`,
-  `TaxRule`, `ReturnModel`. Adding a fifth requires an amendment to this
-  constitution, not a pull request.
+- Another instance of a product kind the engine already knows -- one more bond, fund,
+  venue, route, tax class or jurisdiction -- is data only. New financial behaviour --
+  a product kind whose money moves in a way nothing declared can express -- is code, and
+  it lands behind an explicit, named extension point (today: `Instrument`, `Provider`,
+  `TaxRule`, `ReturnModel`, and the per-kind projection arms the join dispatches on),
+  never as a branch on an id inside the engine. Adding an extension point is a pull
+  request that names it here; arguing that new behaviour is "not really" a new point is
+  the smell this rule exists to remove.
 - There is an executable acceptance test for this property: a new instrument, route,
   tax class and jurisdiction added *in data only* must run the full pipeline and
   appear in the comparison. That test is the definition of "the abstraction is real".
@@ -450,4 +464,4 @@ skipped, marked expected-to-fail, or deleted without an amendment.
 **Runtime guidance.** Day-to-day development guidance for coding agents lives in
 `CLAUDE.md`, which is subordinate to this document and may not contradict it.
 
-**Version**: 1.5.1 | **Ratified**: 2026-08-21 | **Last Amended**: 2026-09-05
+**Version**: 1.6.0 | **Ratified**: 2026-08-21 | **Last Amended**: 2026-09-13
