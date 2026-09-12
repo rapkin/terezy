@@ -101,6 +101,22 @@ PLANTED: Final[dict[str, object]] = {
 }
 
 
+def test_a_horizon_of_one_day_is_answered_rather_than_raised() -> None:
+    """The whole point of 010's span refusal, read where an owner would meet it.
+
+    The arithmetic behind a yield raises on a round trip with no period in it, and a one-day
+    horizon is one an owner can ask for. What comes back is an answer whose section reports
+    every candidate dropped, with the reason on the record.
+    """
+    question = fixtures.owners_question()
+    opens = question.horizons[0].start
+    result = fixtures.answered(replace(question, horizons=(DateRange(start=opens, end=opens),)))
+    survey = result.sections[0].outcome
+    assert isinstance(survey, CandidateSurvey), survey
+    dropped = {type(item.refusal).__name__ for item in survey.comparison.refused}
+    assert "SpansNoTime" in dropped, dropped
+
+
 def test_the_battery_covers_every_member_of_the_union() -> None:
     """A member in neither column is a member nobody thought about."""
     members = {member.__name__ for member in get_args(SurveyRefused)}

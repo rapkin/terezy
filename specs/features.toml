@@ -213,11 +213,6 @@ note   = """
 The join builds a projection per candidate and discards every one; this serves them per candidate so a waterfall and a timeline can say why a figure is that figure. Closes required test E11.
 Both clarifications are answered -- by the CONDUCTOR and PROVISIONALLY, applying the spec's own recommendations, in specs/decisions/2026-09-11-clarify-027.toml. Neither reaches the wire, so the owner overrules either with the one-line text change that file names."""
 
-[[future]]
-id    = "a-one-day-horizon-raises"
-after = ["015-the-question"]
-note  = "A horizon whose start and end are the same day raises `ValueError` out of `results.project` for a BOND: the contractual series it builds for `hurdle.of_flows` is all on one date, so the present value never crosses zero and `internal_rate_of_return` refuses it -- by its own contract, which says reaching that state is the caller's error. It is a raise out of the PURE CORE where every other statement about a round trip is a typed refusal, and a one-day horizon is a thing an owner can ask for. `_rate` states the same fact as a typed refusal one layer up (023 built it, measured by the declared convention rather than by comparing dates), and a cash balance reaches that refusal because it builds no contractual series; a bond raises here before reaching it. Recorded 2026-09-07, verified against a fixture bond. Pre-existing."
-
 [[feature]]
 id     = "024-real-terms-tuple"
 status = "done"

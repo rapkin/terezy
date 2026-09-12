@@ -28,7 +28,7 @@ already take, applied to the two things this feature computes.
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import date
+from datetime import date, timedelta
 from typing import Final
 
 from terezy.core.decision.compare import compare
@@ -36,6 +36,7 @@ from terezy.core.decision.tuple_outcome import Registries
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.core.primitives.money import Money
+from terezy.core.primitives.rates import NominalRate
 from terezy.core.results.tuple import (
     BenchmarkUnavailable,
     CannotSpanHorizon,
@@ -47,6 +48,7 @@ from terezy.core.results.tuple import (
     RateNotComparable,
     RemainderStayed,
     RouteInUnusable,
+    SpansNoTime,
     TaxCurrencyConversionUnavailable,
     Tuple,
     TupleOutcome,
@@ -303,6 +305,66 @@ class TestAnInstrumentThatCannotSpanTheHorizon:
         )
         assert isinstance(refusal, InstrumentRefused), refusal
         assert "subscriptions" in refusal.reason
+
+
+class TestAWindowWithNoTimeInIt:
+    """A horizon that closes on the day the money arrives, and the day either side of it.
+
+    The arithmetic behind a yield reaches this as a bracket that never crosses zero and raises,
+    by its own contract -- which says a series that fails it is the caller's mistake. A one-day
+    horizon is not a mistake: it is a thing an owner can ask for, and the declared inbound
+    latency turns it into a purchase and a disposal on one date. The join states it as a typed
+    refusal before anything is bought, so a bond and a balance answer alike.
+    """
+
+    @staticmethod
+    def _with_a_resale_price() -> Registries:
+        """The declared registry with a price the bond can be sold at before its terms end.
+
+        Without one, a window shorter than the paper refuses for the missing quote and this
+        case is never reached -- the refusal under test would pass on the wrong record.
+        """
+        return fixtures.with_access(
+            fixtures.declared(), fixtures.OVDP, resale_price=fixtures.quote(1_000.0)
+        )
+
+    @staticmethod
+    def _horizon(days: int) -> fixtures.DateRange:
+        return fixtures.DateRange(
+            start=fixtures.OUTLAY_ON, end=fixtures.OUTLAY_ON + timedelta(days=days)
+        )
+
+    def test_a_bond_bought_and_sold_on_one_date_refuses_rather_than_raising(self) -> None:
+        # The way in takes a day, so a horizon of one day settles the purchase on the day the
+        # window closes: the contractual series lands on one date and the root find raises.
+        refusal = _evaluated(
+            self._with_a_resale_price(), horizon=self._horizon(1), amount=fixtures.AMOUNT
+        )
+        assert isinstance(refusal, SpansNoTime), refusal
+        assert refusal.purchased_on == refusal.ends_on == fixtures.OUTLAY_ON + timedelta(days=1)
+        assert refusal.day_count == "act/365"
+        assert "no time at all" in refusal.reason
+
+    def test_a_window_closing_before_the_money_arrives_is_the_other_refusal(self) -> None:
+        # Less than no time is a different fact and keeps its own name: the remedy is a longer
+        # horizon in both cases, but only this one is about the latency having overrun it.
+        refusal = _evaluated(self._with_a_resale_price(), horizon=self._horizon(0))
+        assert isinstance(refusal, InstrumentRefused), refusal
+        assert "before the purchase settles" in refusal.reason
+
+    def test_a_balance_funded_on_the_day_the_window_closes_refuses_the_same_way(self) -> None:
+        # No latency on the way in, so the balance is funded on the horizon's own start date.
+        refusal = _evaluated(fixtures.declared(), fixtures.cash_tuple(), horizon=self._horizon(0))
+        assert isinstance(refusal, SpansNoTime), refusal
+        assert refusal.instrument_id == fixtures.CASH
+        assert refusal.purchased_on == refusal.ends_on == fixtures.OUTLAY_ON
+
+    def test_a_balance_over_one_day_is_a_rate_and_not_a_refusal(self) -> None:
+        """The control: one day is a span the convention measures, and the refusal above is
+        about a window of none rather than about a window that is short."""
+        outcome = _evaluated(fixtures.declared(), fixtures.cash_tuple(), horizon=self._horizon(1))
+        assert isinstance(outcome, TupleOutcome), outcome
+        assert isinstance(outcome.implied_rate, NominalRate)
 
 
 class TestATaxBaseInTheWrongCurrency:

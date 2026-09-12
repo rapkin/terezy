@@ -153,6 +153,7 @@ from terezy.core.results.tuple import (
     RouteInUnusable,
     RouteStanding,
     SeamDoesNotChain,
+    SpansNoTime,
     TaxCurrencyConversionUnavailable,
     Tuple,
     TupleOutcome,
@@ -556,6 +557,9 @@ def _hold(
 ) -> Evaluated | TupleRefused:
     """Buy with what arrived, live the declared lifecycle, and send every release home."""
     purchased_on = horizon.start + timedelta(days=routed.latency_days)
+    no_span = _spans_no_time(prepared, purchased_on=purchased_on, horizon=horizon)
+    if no_span is not None:
+        return no_span
     bought = _acquire(prepared, tuple_.route_in, routed.one_way.arrived, purchased_on=purchased_on)
     if not isinstance(bought, _Acquisition):
         return bought
@@ -1405,6 +1409,44 @@ def _project(
                 f"{type(prepared.plan).__name__}, which _plan_for refuses. A Registries built "
                 "in code has bypassed the check."
             )
+
+
+def _spans_no_time(
+    prepared: _Prepared, *, purchased_on: date, horizon: DateRange
+) -> SpansNoTime | None:
+    """The window between the money arriving and the horizon closing, if it is no window at all.
+
+    Before the purchase and before the projection, because there is nothing downstream that can
+    state this: a bond sold on the day it settles builds a contractual series on one date, and
+    the root find behind its yield raises on a bracket that never crosses zero. That raise is
+    documented as a caller's error and this is not one -- ``horizon.start + latency ==
+    horizon.end`` is what a one-day horizon becomes on any way in that takes a day.
+
+    A window that closes **before** the money arrives is a different fact and is not this one:
+    the instrument refuses it by name, and a convention raises rather than measuring a period
+    that runs backwards -- so the dates are ordered before one is asked.
+    """
+    if horizon.end < purchased_on:
+        return None
+    year_fraction = day_count(_day_count_of(prepared))
+    if year_fraction(purchased_on, horizon.end) != 0.0:
+        return None
+    return SpansNoTime(
+        instrument_id=prepared.declared.id,
+        purchased_on=purchased_on,
+        ends_on=horizon.end,
+        day_count=_day_count_of(prepared),
+        missing="a window the declared convention measures as more than no time",
+        reason=(
+            f"the money reaches {prepared.declared.id!r} on {purchased_on.isoformat()} and this "
+            f"comparison's horizon closes on {horizon.end.isoformat()}, which "
+            f"{_day_count_of(prepared)!r} measures as no time at all. Bought and given up on "
+            "one date, a holding has no period for a return to be over: every rate discounts "
+            "those flows to the same nothing, so any figure reported would be a number the "
+            "arithmetic does not distinguish. The dates are named beside the convention "
+            "because a convention can measure two of them as one."
+        ),
+    )
 
 
 def _early_exit(prepared: _Prepared, registries: Registries) -> EarlyExit | None:

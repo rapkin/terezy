@@ -981,6 +981,35 @@ class InstrumentDemandsCash:
     reason: str
 
 
+@dataclass(frozen=True, slots=True, kw_only=True)
+class SpansNoTime:
+    """The window closes on the day the money arrives, so there is no round trip to measure.
+
+    A holding bought on the day the comparison ends is a purchase and a disposal on one date:
+    every flow discounts to the same nothing at every rate, so there is no implied rate to
+    report and no period any figure could be annualised over. Refused here rather than left to
+    the arithmetic, which reaches it as a bracket that never crosses zero and raises -- a
+    statement about a caller's mistake, which this is not: a one-day horizon is a thing an
+    owner can ask for, and a way in with a declared latency can turn a longer one into this.
+
+    The dates are named beside the convention because a convention can measure two of them as
+    one: what is refused is the span the figures would be measured over, not the calendar.
+    """
+
+    instrument_id: str
+    purchased_on: date
+    """When the money arrives -- ``horizon.start`` plus the way in's declared latency."""
+
+    ends_on: date
+    """When the comparison's horizon closes."""
+
+    day_count: str
+    """The instrument's declared convention, which is what measured the two as one."""
+
+    missing: str
+    reason: str
+
+
 TupleRefused = (
     DeclarationMissing
     | SeamDoesNotChain
@@ -999,14 +1028,15 @@ TupleRefused = (
     | PlanDoesNotFitInstrument
     | TaxCurrencyConversionUnavailable
     | InstrumentDemandsCash
+    | SpansNoTime
 )
-"""The seventeen ways a tuple honestly produces no outcome. Match exhaustively.
+"""The eighteen ways a tuple honestly produces no outcome. Match exhaustively.
 
 Never a partial outcome and never an empty one. A ``case _:`` arm the type checker proves
 unreachable means a new member becomes an error at every site that must handle it.
 
 The count is asserted rather than left to rot: ``tests/unit/test_tuple_refusals.py`` compares
-it against ``get_args``, so an eighteenth member fails a test instead of quietly making
+it against ``get_args``, so a nineteenth member fails a test instead of quietly making
 this sentence false.
 """
 

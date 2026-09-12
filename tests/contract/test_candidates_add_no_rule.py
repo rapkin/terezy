@@ -47,7 +47,7 @@ def test_the_scan_is_looking_at_something() -> None:
     for path, source in _behaviour().items():
         assert "class " in source or "def " in source, path
         assert len(source) > 500, path
-    assert len(REFUSALS) == 17
+    assert len(REFUSALS) == 18
 
 
 def test_no_module_constructs_or_matches_a_feasibility_verdict_of_its_own() -> None:
