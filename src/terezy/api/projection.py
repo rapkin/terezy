@@ -72,6 +72,8 @@ def projection_for_candidate(
         manifest=run_manifest.of_answer(
             declarations=declarations,
             question=question,
+            declared_in=path,
+            question_version=None,
             as_of=as_of,
             result=result,
             refusal=None,

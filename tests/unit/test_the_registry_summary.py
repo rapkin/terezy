@@ -24,12 +24,13 @@ from terezy.api.http import categories, document, summary
 from terezy.core.primitives import provenance as prov
 from terezy.core.primitives.currency import Currency
 from terezy.data import citation_policy, manifest
-from terezy.data.declarations import resolver
+from terezy.data.declarations import loader, resolver
 from tests.data_roots import SHIPPED
 from tests.http_client import served
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DATA_ROOT = SHIPPED
+QUESTION_FILE = SHIPPED / "questions" / "fifty-thousand.toml"
 AS_OF = {"as_of": "2026-09-03"}
 
 PRIVATE_OVERLAY = "private-seeds"
@@ -121,7 +122,12 @@ def test_every_manifest_input_appears_under_exactly_one_category(
     assert not shared, f"these files are listed under more than one category: {shared}"
 
     versions = {file: version for _, file, version in served_files}
-    for ref in manifest.answer_input_refs(declarations):
+    for ref in manifest.answer_input_refs(
+        declarations,
+        answered=loader.question_from_file(QUESTION_FILE),
+        declared_in=QUESTION_FILE,
+        question_version=None,
+    ):
         assert ref.file in versions, f"{ref.file} is a manifest input no category lists"
         assert versions[ref.file] == ref.version
 

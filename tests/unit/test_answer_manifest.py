@@ -114,7 +114,15 @@ def test_the_manifest_names_every_file_the_run_read() -> None:
     the rule against itself. A version is what a walk can compute without knowing it.
     """
     declarations = fixtures.declarations()
-    recorded = {ref.version for ref in run_manifest.answer_input_refs(declarations)}
+    recorded = {
+        ref.version
+        for ref in run_manifest.answer_input_refs(
+            declarations,
+            answered=fixtures.owners_question(),
+            declared_in=fixtures.QUESTION_FILE,
+            question_version=None,
+        )
+    }
     walked = {run_manifest.file_version(path) for path in _declared_files(declarations)}
     assert walked - recorded == set(), sorted(walked - recorded)
     assert len(walked) == len(set(_declared_files(declarations))), (
@@ -210,6 +218,8 @@ def test_two_refusals_of_two_kinds_do_not_share_one_digest() -> None:
         run_manifest.of_answer(
             declarations=declarations,
             question=question,
+            declared_in=fixtures.QUESTION_FILE,
+            question_version=None,
             as_of=fixtures.AS_OF,
             result=None,
             refusal=refusal,
@@ -226,6 +236,8 @@ def test_two_refusals_of_two_kinds_do_not_share_one_digest() -> None:
         run_manifest.of_answer(
             declarations=declarations,
             question=replace(question, horizons=()),
+            declared_in=fixtures.QUESTION_FILE,
+            question_version=None,
             as_of=fixtures.AS_OF,
             result=None,
             refusal=NoHorizonDeclared(),
@@ -261,7 +273,15 @@ def test_the_manifest_names_the_two_deflators_an_answer_was_given() -> None:
 
 def test_every_input_kind_the_set_admits_is_one_the_walk_produces() -> None:
     """A member nothing constructs reads as coverage the manifest does not have."""
-    produced = {ref.kind for ref in run_manifest.answer_input_refs(fixtures.declarations())}
+    produced = {
+        ref.kind
+        for ref in run_manifest.answer_input_refs(
+            fixtures.declarations(),
+            answered=fixtures.owners_question(),
+            declared_in=fixtures.QUESTION_FILE,
+            question_version=None,
+        )
+    }
     admitted = set(get_args(InputKind))
     unreachable = admitted - produced - NOT_READ_BY_AN_ANSWER
     assert not unreachable, sorted(unreachable)

@@ -222,5 +222,6 @@ def test_a_question_with_no_horizon_refuses_through_the_api_too(tmp_path: Path) 
         as_of=fixtures.AS_OF,
         base_currency=Currency.UAH,
         declared_in=fixtures.QUESTION_FILE,
+        question_version=None,
     )
     assert isinstance(run.answer, NoHorizonDeclared), run.answer

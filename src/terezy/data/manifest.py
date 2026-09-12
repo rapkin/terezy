@@ -78,10 +78,11 @@ rest on?"*.
 from __future__ import annotations
 
 import hashlib
+import json
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-from typing import Final, Literal, assert_never
+from typing import TYPE_CHECKING, Final, Literal, assert_never
 
 import terezy
 from terezy.core.instruments.access import InstrumentAccess
@@ -102,7 +103,7 @@ from terezy.core.results.project import Projection
 from terezy.core.results.question import Question
 from terezy.core.routes.legs import Route
 from terezy.core.tax.interface import TaxClass
-from terezy.data.declarations import resolver
+from terezy.data.declarations import loader, resolver
 from terezy.data.declarations.errors import DeclarationError
 from terezy.data.declarations.resolver import (
     Declarations,
@@ -136,6 +137,10 @@ ALGORITHM: Final = "sha256"
 Carried in the value rather than only in this constant so that a stored digest cannot be
 compared against one taken with a different algorithm by accident.
 """
+
+if TYPE_CHECKING:  # pragma: no cover -- typing only
+    from collections.abc import Mapping
+    from typing import Any
 
 InputKind = Literal[
     "access",
@@ -291,6 +296,28 @@ def file_version(path: Path) -> str:
     return f"{ALGORITHM}:{hashlib.sha256(content).hexdigest()}"
 
 
+def question_version(document: Mapping[str, Any], path: Path) -> str:
+    """The version of a question **no file declares**: a digest of its validated document.
+
+    Digested after validation and never as it arrived (029 FR-018). JSON spells two things a
+    TOML file cannot -- an integer where the schema declares a number, and an explicit ``null``
+    where a file omits the key -- and both validate to the identical question, so digesting what
+    arrived would give one question two identities and the command line could not reproduce a
+    posted answer at all.
+
+    ``json`` rather than :func:`encode`, which identifies a *result* by its canonical tuple: what
+    is identified here is a **document**, and its canonical form is the sorted-key rendering the
+    published contract already uses. Absent optional fields are left out, so a file's omission
+    and a body's ``null`` render the same bytes.
+    """
+    rendered = json.dumps(
+        loader.validated_question(document, path).model_dump(mode="json", exclude_none=True),
+        sort_keys=True,
+        ensure_ascii=False,
+    )
+    return f"{ALGORITHM}:{hashlib.sha256(rendered.encode('utf-8')).hexdigest()}"
+
+
 def file_name(path: Path) -> str:
     """A declaration file's name for the record: ``directory/name``, never the full path.
 
@@ -317,10 +344,13 @@ class InputRef:
     """``directory/name`` of the declaring file, or the bare name for one at the data root.
 
     See :func:`file_name`, and :func:`_ref`'s ``at_root`` for why the parent is dropped there.
+    A question no file declares names the sentinel its refusals name instead, because an
+    absolute path on the serving machine is not a place a reader can go and look (029 FR-014).
     """
 
     version: str
-    """``"sha256:<hex>"`` of the file's bytes. See the module docstring on versions."""
+    """``"sha256:<hex>"`` of the file's bytes, or -- for a question no file declares -- of its
+    validated document (:func:`question_version`). See the module docstring on versions."""
 
     unverified_sources: tuple[str, ...]
     """Ids of this declaration's sources with no verification date, sorted.
@@ -741,12 +771,24 @@ GROUP_VOCABULARY_ID: Final = "groups"
 them -- and ``InputRef.id`` is documented as a declared id rather than a file name."""
 
 
-def answer_input_refs(declarations: resolver.AnswerDeclarations) -> tuple[InputRef, ...]:
+def answer_input_refs(
+    declarations: resolver.AnswerDeclarations,
+    *,
+    answered: Question,
+    declared_in: Path,
+    question_version: str | None,
+) -> tuple[InputRef, ...]:
     """Every file an answer's run read, as input references (015 FR-025, row H3).
 
     Walked from the loader's own declaration maps rather than by globbing the data root, which
     is what makes SC-008's claim -- *every file the run **read** appears* -- checkable at all: a
     glob would name files nothing consulted and would say nothing about the ones it missed.
+
+    **The question that was answered appears too, whatever declared it** (029 FR-019). Every
+    declared question *file* is recorded whichever one was asked, so a file-declared question is
+    already here under its own bytes (FR-021) and ``question_version`` is ``None`` for it; a
+    question carried by a request body or by ``--set`` has no file, and gets a reference naming
+    the sentinel its refusals name and carrying the digest of its validated document.
     """
     coverage = declarations.candidates.composition.coverage
     ramp = coverage.ramp
@@ -839,6 +881,16 @@ def answer_input_refs(declarations: resolver.AnswerDeclarations) -> tuple[InputR
             for identifier in sorted(declarations.quotation_files)
         ),
     ]
+    if question_version is not None:
+        refs.append(
+            InputRef(
+                kind="question",
+                id=answered.id,
+                file=declared_in.name,
+                version=question_version,
+                unverified_sources=(),
+            )
+        )
     if declarations.quote_asset_file is not None and declarations.held_inputs.quote_asset:
         refs.append(
             _ref(
@@ -914,6 +966,8 @@ def of_answer(
     *,
     declarations: resolver.AnswerDeclarations,
     question: Question,
+    declared_in: Path,
+    question_version: str | None,
     as_of: date,
     result: Answer | None,
     refusal: Refused | None = None,
@@ -936,7 +990,12 @@ def of_answer(
         as_of=as_of,
         regime_id=question.regime_id,
         projection=None,
-        inputs=answer_input_refs(declarations),
+        inputs=answer_input_refs(
+            declarations,
+            answered=question,
+            declared_in=declared_in,
+            question_version=question_version,
+        ),
         seed=None,
         result_digest=_digest_of(result, refusal),
         unverified_sources=_unverified_ids(prov.EMPTY if result is None else result.provenance),

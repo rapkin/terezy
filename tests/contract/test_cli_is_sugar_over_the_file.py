@@ -24,6 +24,7 @@ from typing import Any, cast
 
 import pytest
 
+from terezy.api import answer as api_answer
 from terezy.api.answer import AnsweredQuestion, answer_declared, answer_question
 from terezy.cli import main as cli
 from terezy.core.decision.answer import (
@@ -122,21 +123,30 @@ def test_the_cli_declares_no_question_field_of_its_own() -> None:
     assert _declared_flags() == {"--question", "--set", *NOT_QUESTION_FIELDS}
 
 
-def test_it_builds_a_question_through_the_same_loader_the_file_goes_through() -> None:
-    """The structural half: one validator, so a CLI-only field is unrepresentable.
+def _calls(source: Path) -> set[str]:
+    """Every function name one module calls, off the syntax tree rather than off the text.
 
-    Asserted over the syntax tree rather than over the text, because a substring search for
-    ``Question(`` also finds ``AnsweredQuestion(`` -- a test that passes for the wrong reason
-    and, worse, one that would fail for the right code.
+    A substring search for ``Question(`` also finds ``AnsweredQuestion(`` -- a check that passes
+    for the wrong reason and, worse, one that fails for the right code.
     """
-    tree = ast.parse(CLI_SOURCE.read_text(encoding="utf-8"))
-    called = {
+    tree = ast.parse(source.read_text(encoding="utf-8"))
+    return {
         node.func.id if isinstance(node.func, ast.Name) else node.func.attr
         for node in ast.walk(tree)
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name | ast.Attribute)
     }
-    assert "question_from_document" in called
-    assert "Question" not in called, "the CLI must not construct the record itself"
+
+
+def test_it_builds_a_question_through_the_same_loader_the_file_goes_through() -> None:
+    """The structural half: one validator, so a CLI-only field is unrepresentable.
+
+    Followed across the one hop it takes: the CLI hands its document to ``answer_document``,
+    which is where a request body goes too (029 FR-020), and that is the function that calls the
+    loader. Asserting only the CLI's own calls would go green on a second validator built there.
+    """
+    assert "answer_document" in _calls(CLI_SOURCE)
+    assert "question_from_document" in _calls(Path(api_answer.__file__))
+    assert "Question" not in _calls(CLI_SOURCE), "the CLI must not construct the record itself"
 
 
 def test_flags_produce_a_record_equal_to_the_one_the_file_produces(tmp_path: Path) -> None:
@@ -575,7 +585,11 @@ def test_a_declared_group_nobody_labelled_is_not_printed_as_undeclared() -> None
 
 
 def test_flags_answer_a_question_against_a_root_that_declares_none(tmp_path: Path) -> None:
-    """The one place the file does not exist is the one place the flags path exists for."""
+    """The one place the file does not exist is the one place the flags path exists for.
+
+    The run still records the question it answered (029 FR-019): the only question reference in
+    this manifest is the flags one, by digest of the validated document.
+    """
     root = tmp_path / "data"
     shutil.copytree(fixtures.SHIPPED_ROOT, root)
     (root / "questions" / "fifty-thousand.toml").unlink()
@@ -583,7 +597,8 @@ def test_flags_answer_a_question_against_a_root_that_declares_none(tmp_path: Pat
         root, [fixtures.QUESTION_FILE.read_text(encoding="utf-8")], as_of=fixtures.AS_OF
     )
     assert isinstance(run.answer, Answer), run.answer
-    assert not [ref for ref in run.manifest.inputs if ref.kind == "question"]
+    questions = [ref for ref in run.manifest.inputs if ref.kind == "question"]
+    assert [(ref.id, ref.file) for ref in questions] == [(fixtures.OWNERS_QUESTION, cli.FLAGS.name)]
 
 
 def test_a_malformed_as_of_is_not_blamed_on_a_declaration(
@@ -1068,6 +1083,7 @@ def _held_answer(root: Path = fixtures.DATA_ROOT) -> Answer:
         as_of=fixtures.AS_OF,
         base_currency=Currency.UAH,
         declared_in=fixtures.QUESTION_FILE,
+        question_version=None,
     )
     assert isinstance(run.answer, Answer), run.answer
     return run.answer
@@ -1125,6 +1141,7 @@ def test_an_answer_with_no_held_position_prints_no_held_section() -> None:
         as_of=fixtures.AS_OF,
         base_currency=Currency.UAH,
         declared_in=fixtures.QUESTION_FILE,
+        question_version=None,
     )
     assert run.answer.held == ()
     assert cli._held_lines(run.answer) == []

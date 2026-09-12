@@ -50,7 +50,12 @@ def recorded(
         encoding="utf-8",
     )
     declared = resolver.answer_from_data_root(root, base_currency=Currency.UAH, scenario_id=None)
-    return overlay, run_manifest.answer_input_refs(declared)
+    return overlay, run_manifest.answer_input_refs(
+        declared,
+        answered=fixtures.owners_question(),
+        declared_in=fixtures.QUESTION_FILE,
+        question_version=None,
+    )
 
 
 def test_the_overlay_is_recorded_under_a_prefixed_id(

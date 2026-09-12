@@ -28,6 +28,7 @@ if TYPE_CHECKING:  # pragma: no cover -- typing only
     from collections.abc import Mapping
     from datetime import date
     from pathlib import Path
+    from typing import Any
 
     from terezy.core.primitives.currency import Currency
     from terezy.core.results.objectives import ObjectiveSet
@@ -116,6 +117,7 @@ def answer_declared(
     as_of: date,
     base_currency: Currency,
     declared_in: Path,
+    question_version: str | None,
 ) -> AnsweredQuestion:
     """Answer a question record over one data root, and record what it rested on.
 
@@ -124,10 +126,10 @@ def answer_declared(
     declared regime is asked under the scenario that declares it. Both entry points go through
     here, so a question built from flags searches the same world a file does.
 
-    **A question with no file contributes no input reference**, which is the honest record for
-    one typed on a command line: there is nothing to digest. The file is canonical precisely so
-    that the reproducible case is the one with an artefact behind it -- and ``declared_in`` is
-    what a refusal names instead, so *where* is answered either way.
+    ``question_version`` is ``None`` exactly where a **file** declares the question: its bytes
+    are its version and the manifest already records every declared question file. A question
+    carried by flags or by a request body passes the digest of its validated document, which is
+    what puts it in the manifest at all (029 FR-018 to FR-021).
 
     **The cross-file checks run here as well as at load**, so a record built by a caller goes
     through them too: two of the four -- the owner and the amount's currency -- are stated
@@ -149,6 +151,8 @@ def answer_declared(
         manifest=run_manifest.of_answer(
             declarations=declarations,
             question=question,
+            declared_in=declared_in,
+            question_version=question_version,
             as_of=as_of,
             result=result if isinstance(result, Answer) else None,
             refusal=None if isinstance(result, Answer) else result,
@@ -206,6 +210,32 @@ def answer_question(
         as_of=as_of,
         base_currency=base_currency,
         declared_in=path,
+        question_version=None,
+    )
+
+
+def answer_document(
+    document: Mapping[str, Any],
+    root: Path,
+    *,
+    as_of: date,
+    base_currency: Currency,
+    declared_in: Path,
+) -> AnsweredQuestion:
+    """Answer a question **no file declares**, from the document a file would have held.
+
+    The one entry point for the two callers that hold a document rather than a path -- the CLI's
+    ``--set`` lines and a request body -- so that one question asked two ways carries one
+    identity in the manifest (029 FR-020). Orchestration lives here rather than in either
+    caller, which is also why neither of them takes a digest.
+    """
+    return answer_declared(
+        loader.question_from_document(document, declared_in),
+        root,
+        as_of=as_of,
+        base_currency=base_currency,
+        declared_in=declared_in,
+        question_version=run_manifest.question_version(document, declared_in),
     )
 
 
@@ -258,6 +288,7 @@ def _scenario_of(root: Path, regime_id: str, *, base_currency: Currency) -> str 
 __all__ = [
     "AnsweredQuestion",
     "answer_declared",
+    "answer_document",
     "answer_question",
     "declared_question",
     "inputs_of",

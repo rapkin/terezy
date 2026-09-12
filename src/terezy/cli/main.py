@@ -26,7 +26,7 @@ from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, assert_never
 
-from terezy.api.answer import AnsweredQuestion, answer_declared, answer_question
+from terezy.api.answer import AnsweredQuestion, answer_document, answer_question
 from terezy.core.decision.answer import (
     benchmark_unavailable,
     key_agreement,
@@ -96,7 +96,6 @@ from terezy.core.routes.path import (
     entry_id,
 )
 from terezy.core.scenarios import quote_asset
-from terezy.data.declarations import loader
 from terezy.data.declarations.errors import DeclarationError
 
 if TYPE_CHECKING:  # pragma: no cover -- typing only
@@ -193,9 +192,8 @@ def _from_flags(root: Path, lines: Sequence[str], *, as_of: date) -> AnsweredQue
     in the one place it matters.
     """
     document: dict[str, Any] = tomllib.loads("\n".join(lines))
-    question = loader.question_from_document(document, FLAGS)
-    return answer_declared(
-        question, root, as_of=as_of, base_currency=Currency.UAH, declared_in=FLAGS
+    return answer_document(
+        document, root, as_of=as_of, base_currency=Currency.UAH, declared_in=FLAGS
     )
 
 

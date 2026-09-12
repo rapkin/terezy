@@ -5778,6 +5778,17 @@ def question_from_file(path: Path) -> Question:
     return question_from_document(read_document(path), path)
 
 
+def validated_question(document: Mapping[str, Any], path: Path) -> schema.QuestionFile:
+    """One question document, shape-validated and nothing more.
+
+    Exposed because a question no file declares is identified by the digest of its *validated*
+    document rather than of the bytes that carried it (029 FR-018), and the digest is taken
+    where digests live. Calling this is how a second reader gets the same validation without a
+    second model.
+    """
+    return _validate(schema.QuestionFile, document, path)
+
+
 def question_from_document(document: Mapping[str, Any], path: Path) -> Question:
     """One question, from a document the caller has already read.
 
@@ -5786,7 +5797,7 @@ def question_from_document(document: Mapping[str, Any], path: Path) -> Question:
     field the file cannot express and no default it cannot state is then structural rather than
     a scan somebody has to keep honest: there is one validator and one set of refusals.
     """
-    file = _validate(schema.QuestionFile, document, path)
+    file = validated_question(document, path)
     table = file.question
     prefix = QUESTION_TABLE
     owner_id = _require_text(

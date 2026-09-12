@@ -232,7 +232,7 @@ note   = "Closes the real-terms-for-a-tuple future: the owner asked for inflatio
 
 [[feature]]
 id     = "029-question-in-request"
-status = "planned"
+status = "in-progress"
 needs  = ["015-the-question", "020-http-api"]
 why    = "015 owns the question record, its one validator and the rule that a second source builds the SAME record; 020 owns the route table, the tag and union machinery the request schema joins, and the FR-043 deferral this supersedes"
 note   = "Owner 2026-09-13: a question goes in the request body, so asking one stops meaning editing TOML; files stay as saved questions. Both clarifications answered in specs/decisions/2026-09-13-clarify-029.toml."
